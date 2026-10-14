@@ -93,12 +93,17 @@ pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     all.retain(|d| new.iter().all(|n| n.call != d.call));
     all.extend(new);
     all.sort_by(|a, b| a.call.cmp(&b.call));
+    // A hand-edited file may repeat a call; the first entry is the one replay applies.
+    all.dedup_by(|later, first| later.call == first.call);
     Ok(toml::to_string(&Decisions { items: all })?)
 }
 
-/// Writes `text`, from `canonical`, as `<root>/meada.decisions.toml`.
+/// Writes `text`, from `canonical`, as `<root>/meada.decisions.toml`. It goes to a temporary
+/// file first and is renamed over the old one, so a failed write keeps the old decisions.
 pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
-    Ok(std::fs::write(root.join(FILE), text)?)
+    let temp = root.join(format!("{FILE}.tmp"));
+    std::fs::write(&temp, text)?;
+    Ok(std::fs::rename(temp, root.join(FILE))?)
 }
 
 impl Decision {

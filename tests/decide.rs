@@ -52,7 +52,9 @@ fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
     let written = file(&web).expect("the file is written");
     assert_golden("chain-web.decisions.human.toml", &written);
     // A cold index of the chain with the file gives the decided export.
-    let export = Engine::open(&web).unwrap().export().unwrap();
+    let (cold, _, _) = chain("decide_pick_cold");
+    fs::write(cold.join("meada.decisions.toml"), &written).unwrap();
+    let export = Engine::open(&cold).unwrap().export().unwrap();
     assert_golden("chain-web.decided-human.export.json", &export);
 }
 
@@ -72,7 +74,7 @@ fn skipping_and_end_of_input_leave_the_rest_undecided() {
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &[], "2\n");
     assert!(ok, "{stderr}");
     assert!(
-        stdout.ends_with("wrote 1 decisions to meada.decisions.toml\n"),
+        stdout.ends_with("wrote 1 decision to meada.decisions.toml\n"),
         "{stdout}"
     );
     let written = file(&web).unwrap();
@@ -121,6 +123,37 @@ fn a_new_decision_replaces_the_entry_of_its_call_stale_or_not() {
 
     assert!(ok, "{stderr}");
     assert_golden("chain-web.decisions.replaced.toml", &file(&web).unwrap());
+}
+
+#[test]
+fn a_stale_entry_for_another_call_survives_a_rewrite_and_a_repeated_call_keeps_its_first() {
+    let (web, _, _) = chain("decide_survive");
+    let entry = |call: &str, target: &str| {
+        format!(
+            "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{call}\"\n\
+             target = \"{target}\"\nby = \"human\"\n\n"
+        )
+    };
+    let gone = "example.com/chain/web::src/gone.ts::run::fetch#0";
+    let stale = entry(gone, "example.com/chain/ghost::http::GET::/gone");
+    let first = entry(gone, "example.com/chain/ghost::http::GET::/first");
+    let second = entry(gone, "example.com/chain/ghost::http::GET::/second");
+    fs::write(
+        web.join("meada.decisions.toml"),
+        format!("{first}{second}{stale}"),
+    )
+    .unwrap();
+
+    let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "2\n");
+
+    assert!(ok, "{stderr}");
+    let written = file(&web).unwrap();
+    assert_eq!(written.matches(gone).count(), 1, "{written}");
+    assert!(
+        written.contains("/first") && !written.contains("/second"),
+        "{written}"
+    );
+    assert!(written.contains(HEALTH), "{written}");
 }
 
 #[test]

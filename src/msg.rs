@@ -137,8 +137,14 @@ impl Msg<'_> {
             ),
             Msg::DecideNothing => pick("nothing decided".into(), "nada decidido".into()),
             Msg::DecideWrote(n) => pick(
-                format!("wrote {n} decisions to meada.decisions.toml"),
-                format!("{n} decisões gravadas em meada.decisions.toml"),
+                format!(
+                    "wrote {n} decision{} to meada.decisions.toml",
+                    if *n == 1 { "" } else { "s" }
+                ),
+                format!(
+                    "{n} {} em meada.decisions.toml",
+                    if *n == 1 { "decisão gravada" } else { "decisões gravadas" }
+                ),
             ),
             Msg::DecideDryRun => pick(
                 "dry run, meada.decisions.toml would be:".into(),
