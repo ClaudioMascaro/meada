@@ -1,4 +1,4 @@
-//! The query engine: opens a repository from a directory and answers over its index.
+//! The query engine: opens a workspace from a directory and answers over its indexes.
 
 use std::collections::HashMap;
 use std::fs;
@@ -6,72 +6,180 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::index::{CallSite, Export, Symbol};
-use crate::{Result, index, render, repo};
+use crate::contract::{self, Link};
+use crate::index::{CallSite, Export, State, Symbol};
+use crate::workspace::{Member, Workspace};
+use crate::{Result, index, render};
+
+/// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
+const MAX_PEERS: usize = 10;
 
 pub struct Engine {
+    /// The index of the repository where Meada runs, with every other repository of the
+    /// workspace attached as `peer<n>`, `n` its position in `workspace.repos`.
     db: Connection,
+    workspace: Workspace,
     root: PathBuf,
     identity: String,
 }
 
 impl Engine {
-    /// Opens the repository that contains `dir`. Every query refreshes its index first.
+    /// Opens the workspace of the repository that contains `dir`. Every repository's index
+    /// lives inside its own `.meada/`; every query refreshes them first.
     pub fn open(dir: &Path) -> Result<Self> {
-        let root = repo::root(dir)?;
-        let identity = repo::identity(&root);
-        let db = index::open(&root)?;
-        Ok(Self { db, root, identity })
+        let workspace = Workspace::discover(dir)?;
+        if workspace.repos.len() > MAX_PEERS + 1 {
+            // ponytail: one connection attaches every peer; batch the attaches when a
+            // workspace outgrows SQLite's limit.
+            return Err(format!(
+                "the workspace has {} repositories; v0.1 reads at most {}",
+                workspace.repos.len(),
+                MAX_PEERS + 1
+            )
+            .into());
+        }
+        // Opening creates a missing index, or recreates one of another schema, before it is
+        // attached.
+        for peer in &workspace.repos[1..] {
+            index::open(&peer.root)?;
+        }
+        let here = &workspace.repos[0];
+        let db = index::open(&here.root)?;
+        for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
+            let path = index::path(&peer.root);
+            let path = path.to_str().ok_or("index path is not UTF-8")?;
+            db.execute(&format!("ATTACH DATABASE ?1 AS peer{n}"), [path])?;
+        }
+        Ok(Self {
+            db,
+            root: here.root.clone(),
+            identity: here.identity.clone(),
+            workspace,
+        })
     }
 
-    /// Brings the index up to date with the files on disk (ADR 0004), with no watcher: only
-    /// files whose mtime or size changed are hashed.
+    /// Brings every index of the workspace up to date with the files on disk (ADR 0004), with
+    /// no watcher: only files whose mtime or size changed are hashed. Each repository is
+    /// refreshed on its own, through its own connection; links are derived from the stored
+    /// contracts at query time, so links that touch a changed file follow it.
     pub fn refresh(&self) -> Result<()> {
+        for peer in &self.workspace.repos[1..] {
+            index::refresh(&index::open(&peer.root)?, &peer.root, &peer.identity)?;
+        }
         index::refresh(&self.db, &self.root, &self.identity)
     }
 
-    /// The canonical export: the whole index as sorted, pretty-printed JSON.
+    /// The canonical export of the repository where Meada runs: its whole index, plus the
+    /// links from its consumers and to its providers, as sorted, pretty-printed JSON.
     pub fn export(&self) -> Result<String> {
         self.refresh()?;
-        let export = index::export(&self.db, &self.identity)?;
+        let mut export = index::export(&self.db, "main", &self.identity)?;
+        export.links = self.links()?;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
-    /// Symbols whose name matches `query` case-insensitively, one line each: exact name
-    /// first, then prefix, then substring, ties by identity. `kind` keeps only that kind of
-    /// match (`symbol` is the only kind so far). The answer is cut at `budget` tokens.
+    /// Every link that touches the repository where Meada runs, sorted.
+    fn links(&self) -> Result<Vec<Link>> {
+        let exports: Vec<Export> = self
+            .workspace
+            .repos
+            .iter()
+            .enumerate()
+            .map(|(n, m)| index::export(&self.db, &schema(n), &m.identity))
+            .collect::<Result<_>>()?;
+        let members: Vec<&Member> = self.workspace.repos.iter().collect();
+        let providers: Vec<_> = exports
+            .iter()
+            .zip(&members)
+            .flat_map(|(e, m)| e.providers.iter().map(move |p| (*m, p)))
+            .collect();
+        let here = format!("{}::", self.identity);
+        let mut links = Vec::new();
+        for (n, (export, from)) in exports.iter().zip(&members).enumerate() {
+            for consumer in &export.consumers {
+                let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
+                    continue;
+                };
+                let found = kind.link(consumer, from, &providers).into_iter();
+                links.extend(found.filter(|l| n == 0 || l.provider.starts_with(&here)));
+            }
+        }
+        links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
+        Ok(links)
+    }
+
+    /// Symbols of this repository whose name matches `query` case-insensitively, and contracts
+    /// of the workspace whose identifier does, one line each: exact first, then prefix, then
+    /// substring, ties by identity. `kind` keeps only `symbol` or `contract` matches. The
+    /// answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
-        let export = index::export(&self.db, &self.identity)?;
+        let export = index::export(&self.db, "main", &self.identity)?;
         let needle = query.to_lowercase();
-        let mut hits: Vec<(u8, &Symbol)> = Vec::new();
+        // (rank, identity to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut files = Files::new(&self.root);
         if kind.is_none_or(|k| k == "symbol") {
             // ponytail: scans every symbol; an indexed lookup waits for a repository that
             // makes this slow.
             for symbol in &export.symbols {
                 let name = label(&symbol.id).to_lowercase();
                 let last = name.rsplit('.').next().unwrap_or(&name);
-                let rank = [name.as_str(), last]
+                if let Some(r) = [name.as_str(), last]
                     .iter()
-                    .filter_map(|n| match () {
-                        _ if *n == needle => Some(0),
-                        _ if n.starts_with(&needle) => Some(1),
-                        _ if n.contains(&needle) => Some(2),
-                        _ => None,
-                    })
-                    .min();
-                hits.extend(rank.map(|r| (r, symbol)));
+                    .filter_map(|n| rank(n, &needle))
+                    .min()
+                {
+                    let line = self.line(&mut files, symbol, label(&symbol.id));
+                    hits.push((r, symbol.id.clone(), line));
+                }
             }
         }
-        hits.sort_by(|a, b| (a.0, &a.1.id).cmp(&(b.0, &b.1.id)));
+        if kind.is_none_or(|k| k == "contract") {
+            for (n, member) in self.workspace.repos.iter().enumerate() {
+                let peer;
+                let export = match n {
+                    0 => &export,
+                    _ => {
+                        peer = index::export(&self.db, &schema(n), &member.identity)?;
+                        &peer
+                    }
+                };
+                let mut files = Files::new(&member.root);
+                let provided = export.providers.iter().map(|p| (&p.contract, &p.site));
+                let consumed = export
+                    .consumers
+                    .iter()
+                    .filter_map(|c| Some((c.contract.as_ref()?, &c.site)));
+                for (contract, site) in provided.chain(consumed) {
+                    let Some(r) = rank(&contract.to_lowercase(), &needle) else {
+                        continue;
+                    };
+                    let span = export
+                        .symbols
+                        .iter()
+                        .find(|s| s.id == *site)
+                        .map(|s| &s.span);
+                    let span = span
+                        .or_else(|| export.calls.iter().find(|c| c.id == *site).map(|c| &c.span));
+                    let location = match span {
+                        Some(span) => self.at(&mut files, &span.path, span.start),
+                        // A route file that serves the contract with no function of its own.
+                        None => site
+                            .rsplit_once("::")
+                            .map_or(site.as_str(), |(_, p)| p)
+                            .to_string(),
+                    };
+                    let line = format!("{} {location} {contract}", member.identity);
+                    hits.push((r, format!("{contract} {site}"), line));
+                }
+            }
+        }
+        hits.sort();
         if hits.is_empty() {
             return Ok(format!("no matches for `{query}`\n"));
         }
-        let mut files = Files::new(&self.root);
-        let lines: Vec<String> = hits
-            .iter()
-            .map(|(_, s)| self.line(&mut files, s, label(&s.id)))
-            .collect();
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
         Ok(render::budgeted(&lines, budget))
     }
 
@@ -85,7 +193,7 @@ impl Engine {
     }
 
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
-        let export = index::export(&self.db, &self.identity)?;
+        let export = index::export(&self.db, "main", &self.identity)?;
         let suffix = format!("::{symbol}");
         let found: Vec<&Symbol> = export
             .symbols
@@ -231,6 +339,70 @@ fn ambiguous(call: &CallSite) -> &'static str {
         " [ambiguous]"
     } else {
         ""
+    }
+}
+
+/// The workspace of the repository containing `dir`: each repository with where it is,
+/// relative to the one Meada runs in, and its index state, then every peer not found. It
+/// reads only; nothing is indexed.
+pub fn status(dir: &Path) -> Result<String> {
+    let workspace = Workspace::discover(dir)?;
+    let here = &workspace.repos[0].root;
+    let mut lines: Vec<String> = workspace
+        .repos
+        .iter()
+        .map(|m| {
+            let state = match index::state(&m.root) {
+                State::Missing => "not indexed".to_string(),
+                State::OtherSchema => "indexed by another version; rebuilt on next use".into(),
+                State::Indexed { files } => format!("indexed, {files} files"),
+            };
+            format!("{} ({}) {state}", m.identity, relative(here, &m.root))
+        })
+        .collect();
+    lines.extend(
+        workspace
+            .missing
+            .iter()
+            .map(|m| format!("missing peer: {}, named by {}", m.repo, m.named_by)),
+    );
+    Ok(lines.iter().map(|l| format!("{l}\n")).collect())
+}
+
+/// 0 when `name` is `needle`, 1 when it starts with it, 2 when it contains it.
+fn rank(name: &str, needle: &str) -> Option<u8> {
+    match () {
+        _ if name == needle => Some(0),
+        _ if name.starts_with(needle) => Some(1),
+        _ if name.contains(needle) => Some(2),
+        _ => None,
+    }
+}
+
+/// The schema a workspace repository's index is attached as.
+fn schema(n: usize) -> String {
+    if n == 0 {
+        "main".into()
+    } else {
+        format!("peer{n}")
+    }
+}
+
+/// `to` as a path from `from`, with `/` separators: `.`, `../api`.
+fn relative(from: &Path, to: &Path) -> String {
+    let from: Vec<_> = from.components().collect();
+    let to: Vec<_> = to.components().collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    let mut parts: Vec<String> = vec!["..".into(); from.len() - common];
+    parts.extend(
+        to[common..]
+            .iter()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned()),
+    );
+    if parts.is_empty() {
+        ".".into()
+    } else {
+        parts.join("/")
     }
 }
 

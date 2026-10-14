@@ -18,7 +18,7 @@ use crate::engine::Engine;
 struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
-    /// Only this kind of match: `symbol`.
+    /// Only this kind of match: `symbol` or `contract`.
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -52,7 +52,9 @@ impl Meada {
         }
     }
 
-    #[tool(description = "Find symbols by name. One line each: repository, path:line, name.")]
+    #[tool(
+        description = "Find symbols by name and contracts by identifier (`http::GET::/users/{}`). One line each: repository, path:line, name."
+    )]
     async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> Result<String, String> {
         answer(|engine| {
             let budget = args.budget.map(|b| b as usize);

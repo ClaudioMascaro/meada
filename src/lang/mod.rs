@@ -111,4 +111,28 @@ pub struct Call {
     pub scope: String,
     pub callee: String,
     pub range: Range<usize>,
+    /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
+    /// and options from. Not kept in the index: they hold string literals, and contracts are
+    /// extracted when the file is parsed.
+    #[serde(skip)]
+    pub args: Vec<Value>,
+}
+
+/// An expression as written at the call. Names bound elsewhere are not followed.
+pub enum Value {
+    /// A string: literals, template literals and `+` concatenation, folded into parts.
+    Str(Vec<Part>),
+    /// An object literal's properties; a spread `...x` is the key `...` with an unknown value.
+    Object(Vec<(String, Value)>),
+    /// Anything else.
+    Unknown,
+}
+
+pub enum Part {
+    Text(String),
+    /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
+    /// fallbacks and string method calls. Its value is never known.
+    Env(String),
+    /// Any other expression inside a string.
+    Hole,
 }

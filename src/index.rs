@@ -11,12 +11,13 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 
 use crate::Result;
+use crate::contract::{self, Link, Site};
 use crate::lang::{self, Facts};
 use crate::resolve::{Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -40,18 +41,53 @@ CREATE TABLE calls (
 CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
+CREATE TABLE contracts (
+    role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL
+);
+CREATE INDEX contracts_path ON contracts (path);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
 /// its mtime is not trusted on the next refresh and the file is hashed again.
 const RACY: Duration = Duration::from_secs(2);
 
+/// Where the index of the repository at `root` lives.
+pub fn path(root: &Path) -> PathBuf {
+    root.join(".meada/index.db")
+}
+
+/// What `status` reports about one repository's index, read without writing.
+pub enum State {
+    Missing,
+    OtherSchema,
+    Indexed { files: i64 },
+}
+
+pub fn state(root: &Path) -> State {
+    let path = path(root);
+    if !path.is_file() {
+        return State::Missing;
+    }
+    let Ok(db) = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
+        return State::OtherSchema;
+    };
+    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0));
+    if version.ok() != Some(SCHEMA_VERSION) {
+        return State::OtherSchema;
+    }
+    match db.query_row("SELECT count(*) FROM files", [], |r| r.get(0)) {
+        Ok(files) => State::Indexed { files },
+        Err(_) => State::OtherSchema,
+    }
+}
+
 /// Opens `<root>/.meada/index.db`, creating `.meada/` with a `.gitignore` of `*`.
 pub fn open(root: &Path) -> Result<Connection> {
     let dir = root.join(".meada");
     fs::create_dir_all(&dir)?;
     fs::write(dir.join(".gitignore"), "*\n")?;
-    let path = dir.join("index.db");
+    let path = path(root);
     let db = Connection::open(&path)?;
     // An unreadable file counts as a mismatch: `.meada/` is Meada's own directory.
     let version = db
@@ -118,7 +154,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         _ => {
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
-                 DELETE FROM calls; DELETE FROM candidates;",
+                 DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts;",
             )?;
             None
         }
@@ -199,6 +235,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
     for path in &deleted {
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
+        tx.execute("DELETE FROM contracts WHERE path = ?1", params![path])?;
         tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
     }
     for p in &changed {
@@ -313,29 +350,48 @@ fn walk(root: &Path) -> Vec<(String, PathBuf, usize)> {
     files
 }
 
-/// Replaces a changed file's row, facts and symbols. Its calls are written once resolved.
+/// Replaces a changed file's row, facts, symbols and contracts. Contracts depend on the file
+/// alone; its calls are written once resolved, and links are derived from contracts when
+/// queried.
 fn write_file(tx: &Transaction, identity: &str, p: &Parsed) -> Result<()> {
+    let path = p.path.as_str();
     tx.execute(
         "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '')",
         params![
-            p.path,
+            path,
             p.hash,
             p.mtime,
             p.size,
             serde_json::to_string(&p.facts)?
         ],
     )?;
-    tx.execute("DELETE FROM symbols WHERE path = ?1", params![p.path])?;
+    tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
+    tx.execute("DELETE FROM contracts WHERE path = ?1", params![path])?;
+    let base = format!("{identity}::{path}");
     for def in &p.facts.defs {
         tx.execute(
             "INSERT INTO symbols VALUES (?1, ?2, ?3, ?4)",
             params![
-                format!("{identity}::{}::{}", p.path, def.name),
-                p.path,
+                format!("{base}::{}", def.name),
+                path,
                 def.range.start as i64,
                 def.range.end as i64
             ],
         )?;
+    }
+    let calls = call_ids(identity, path, &p.facts);
+    for kind in contract::KINDS {
+        for found in kind.extract(path, &p.facts) {
+            let (role, site) = match found.site {
+                Site::Def(name) => ("provider", format!("{base}::{name}")),
+                Site::File => ("provider", base.clone()),
+                Site::Call(n) => ("consumer", calls[n].1.clone()),
+            };
+            tx.execute(
+                "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![role, found.contract, site, found.via, path],
+            )?;
+        }
     }
     Ok(())
 }
@@ -349,14 +405,8 @@ fn forget_calls(tx: &Transaction, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// The call rows of one file, in source order.
-fn resolve_file<'a>(
-    identity: &str,
-    path: &'a str,
-    facts: &'a Facts,
-    resolver: &Resolver<'a>,
-) -> Vec<Resolved> {
-    let id = |t: &Target| format!("{identity}::{}::{}", t.path, t.name);
+/// The caller and id of each call in a file, in source order: `<caller>::<callee>#<ordinal>`.
+fn call_ids(identity: &str, path: &str, facts: &Facts) -> Vec<(String, String)> {
     let base = format!("{identity}::{path}");
     let mut ordinals: HashMap<(&str, &str), usize> = HashMap::new();
     facts
@@ -372,6 +422,25 @@ fn resolve_file<'a>(
             } else {
                 format!("{base}::{}", call.scope)
             };
+            let id = format!("{caller}::{}#{ordinal}", call.callee);
+            (caller, id)
+        })
+        .collect()
+}
+
+/// The call rows of one file, in source order.
+fn resolve_file<'a>(
+    identity: &str,
+    path: &'a str,
+    facts: &'a Facts,
+    resolver: &Resolver<'a>,
+) -> Vec<Resolved> {
+    let id = |t: &Target| format!("{identity}::{}::{}", t.path, t.name);
+    facts
+        .calls
+        .iter()
+        .zip(call_ids(identity, path, facts))
+        .map(|(call, (caller, call_id))| {
             let (target, level, candidates) = match resolver.call(path, call) {
                 Resolution::Exact(t) => (Some(id(&t)), Some("exact"), Vec::new()),
                 Resolution::Inferred(t) => (Some(id(&t)), Some("inferred"), Vec::new()),
@@ -379,7 +448,7 @@ fn resolve_file<'a>(
                 Resolution::Unresolved => (None, None, Vec::new()),
             };
             Resolved {
-                id: format!("{caller}::{}#{ordinal}", call.callee),
+                id: call_id,
                 caller,
                 target,
                 level,
@@ -408,6 +477,9 @@ pub(crate) struct Export {
     pub(crate) files: Vec<File>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
+    pub(crate) providers: Vec<Provider>,
+    pub(crate) consumers: Vec<Consumer>,
+    pub(crate) links: Vec<Link>,
 }
 
 #[derive(Serialize)]
@@ -440,10 +512,29 @@ pub(crate) struct CallSite {
     pub(crate) span: Span,
 }
 
-/// The index content, every list sorted.
-pub fn export(db: &Connection, identity: &str) -> Result<Export> {
+/// A symbol that serves a contract.
+#[derive(Serialize)]
+pub(crate) struct Provider {
+    pub(crate) contract: String,
+    pub(crate) site: String,
+}
+
+/// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
+/// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
+#[derive(Serialize)]
+pub(crate) struct Consumer {
+    pub(crate) contract: Option<String>,
+    pub(crate) site: String,
+    pub(crate) via: Option<String>,
+}
+
+/// The index content of the repository attached as `schema`, every list sorted. Links are
+/// left empty: they span repositories, so the engine adds them.
+pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let files = db
-        .prepare("SELECT path, hash FROM files ORDER BY path")?
+        .prepare(&format!(
+            "SELECT path, hash FROM {schema}.files ORDER BY path"
+        ))?
         .query_map([], |r| {
             Ok(File {
                 path: r.get(0)?,
@@ -452,7 +543,9 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let symbols = db
-        .prepare("SELECT id, path, start, end FROM symbols ORDER BY id, path, start, end")?
+        .prepare(&format!(
+            "SELECT id, path, start, end FROM {schema}.symbols ORDER BY id, path, start, end"
+        ))?
         .query_map([], |r| {
             Ok(Symbol {
                 id: r.get(0)?,
@@ -462,17 +555,19 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
     for row in db
-        .prepare("SELECT call, target FROM candidates ORDER BY call, target")?
+        .prepare(&format!(
+            "SELECT call, target FROM {schema}.candidates ORDER BY call, target"
+        ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
     {
         let (call, target) = row?;
         candidates.entry(call).or_default().push(target);
     }
     let calls = db
-        .prepare(
-            "SELECT id, caller, target, level, path, start, end FROM calls \
-             ORDER BY id, path, start, end",
-        )?
+        .prepare(&format!(
+            "SELECT id, caller, target, level, path, start, end FROM {schema}.calls \
+             ORDER BY id, path, start, end"
+        ))?
         .query_map([], |r| {
             let id: String = r.get(0)?;
             Ok(CallSite {
@@ -485,11 +580,39 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let providers = db
+        .prepare(&format!(
+            "SELECT contract, site FROM {schema}.contracts WHERE role = 'provider' \
+             ORDER BY contract, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Provider {
+                contract: r.get(0)?,
+                site: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let consumers = db
+        .prepare(&format!(
+            "SELECT contract, site, via FROM {schema}.contracts WHERE role = 'consumer' \
+             ORDER BY site, contract, via"
+        ))?
+        .query_map([], |r| {
+            Ok(Consumer {
+                contract: r.get(0)?,
+                site: r.get(1)?,
+                via: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
         symbols,
         calls,
+        providers,
+        consumers,
+        links: Vec::new(),
     })
 }
 

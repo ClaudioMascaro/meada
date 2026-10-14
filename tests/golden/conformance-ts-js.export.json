@@ -465,5 +465,8 @@
         "end": 92
       }
     }
-  ]
+  ],
+  "providers": [],
+  "consumers": [],
+  "links": []
 }

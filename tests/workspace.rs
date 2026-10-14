@@ -1,0 +1,130 @@
+mod common;
+
+use std::fs;
+use std::path::PathBuf;
+
+use common::{assert_golden, fixture_repo};
+use meada::engine::{self, Engine};
+
+/// The two-repository fixture as siblings in one case directory: `http-web` consumes from
+/// `http-api` and names a peer that is not cloned.
+fn web_and_api(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(case, "http-web", Some("git@example.com:acme/web.git")),
+        fixture_repo(case, "http-api", Some("https://example.com/acme/api.git")),
+    )
+}
+
+#[test]
+fn consumer_export_links_fetch_calls_to_peer_routes() {
+    let (web, _) = web_and_api("http_consumer_export");
+
+    let export = Engine::open(&web).unwrap().export().unwrap();
+
+    assert_golden("http-web.export.json", &export);
+}
+
+#[test]
+fn provider_export_shows_links_from_sibling_consumers() {
+    let (_, api) = web_and_api("http_provider_export");
+
+    let export = Engine::open(&api).unwrap().export().unwrap();
+
+    assert_golden("http-api.export.json", &export);
+}
+
+#[test]
+fn search_finds_contracts_across_the_workspace() {
+    let (web, _) = web_and_api("http_search");
+    let engine = Engine::open(&web).unwrap();
+
+    assert_golden(
+        "http-web.search-contract.txt",
+        &engine
+            .search("HTTP::GET::/api/users", Some("contract"), None)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn status_lists_the_workspace_index_states_and_missing_peers() {
+    let (web, api) = web_and_api("http_status");
+
+    assert_golden(
+        "http-web.status-unindexed.txt",
+        &engine::status(&web).unwrap(),
+    );
+    // The consumer's first query builds the peer's index inside the peer's own `.meada/`.
+    Engine::open(&web).unwrap().refresh().unwrap();
+    assert_golden("http-web.status.txt", &engine::status(&web).unwrap());
+    assert_eq!(
+        common::git(&api, &["status", "--porcelain", "--ignored"]),
+        "!! .meada/\n"
+    );
+}
+
+#[test]
+fn a_peer_without_remote_is_found_by_its_path_hint() {
+    let web = fixture_repo("path_hint_web", "http-web", None);
+    fixture_repo("path_hint_api", "http-api", None);
+    fs::write(
+        web.join("meada.toml"),
+        "[[peer]]\nrepo = \"local/http-api\"\npath = \"../../path_hint_api/http-api\"\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        engine::status(&web).unwrap(),
+        "local/http-web (.) not indexed\nlocal/http-api (../../path_hint_api/http-api) not indexed\n"
+    );
+}
+
+/// The error `Engine::open` gives for a repository whose `meada.toml` is `toml`, with the
+/// repository's path replaced by `<repo>`.
+fn config_error(case: &str, toml: &str) -> String {
+    let repo = fixture_repo(case, "ts-basic", Some("https://example.com/acme/web.git"));
+    fs::write(repo.join("meada.toml"), toml).unwrap();
+    let error = Engine::open(&repo)
+        .err()
+        .expect("an invalid meada.toml fails")
+        .to_string();
+    error.replace(repo.to_str().unwrap(), "<repo>")
+}
+
+#[test]
+fn invalid_config_errors_name_file_line_and_key() {
+    for (case, toml, expected) in [
+        (
+            "config_resource",
+            "[[peer]]\nrepo = \"example.com/acme/api\"\n\n[[resource]]\nkind = \"db\"\n",
+            "<repo>/meada.toml:4: `resource` is not in v0.1; track A adds it (resources and gateway)",
+        ),
+        (
+            "config_prefix",
+            "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"/api\"\n",
+            "<repo>/meada.toml:3: `serve.prefix` is not in v0.1; track A adds it (resources and gateway)",
+        ),
+        (
+            "config_unknown",
+            "[[peer]]\nrepo = \"example.com/acme/api\"\nbranch = \"main\"\n",
+            "<repo>/meada.toml:3: `peer.branch` is not a meada.toml key",
+        ),
+        (
+            "config_missing",
+            "[[peer]]\npath = \"../api\"\n",
+            "<repo>/meada.toml:1: `peer.repo` is missing",
+        ),
+        (
+            "config_type",
+            "[serve]\nhosts = [\n  \"api.example.com\",\n  443,\n]\n",
+            "<repo>/meada.toml:4: `serve.hosts`: invalid type: integer `443`, expected a string",
+        ),
+        (
+            "config_syntax",
+            "[[peer]\n",
+            "<repo>/meada.toml:1: unclosed array table, expected `]`",
+        ),
+    ] {
+        assert_eq!(config_error(case, toml), expected, "{case}");
+    }
+}
