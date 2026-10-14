@@ -7,7 +7,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, fixture_repo, set_mtime};
+use common::{age, assert_golden, chain, fixture_repo, set_mtime};
 use meada::engine::Engine;
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
@@ -230,6 +230,62 @@ fn contracts_follow_values_edited_in_other_files() {
 
     let cold = values("fresh_values_cold");
     edit_values(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
+type Chain = (PathBuf, PathBuf, PathBuf);
+
+/// Edits, adds and deletes files in each repository of the chain: the web adds a consumer and
+/// deletes the file of two others, the gateway moves a route to another method, the catalog
+/// deletes a route its peers link to and edits the end of its cycle.
+fn edit_chain((web, gateway, catalog): &Chain) {
+    let replace = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    fs::write(
+        web.join("src/archive.ts"),
+        "import { request } from \"./api/client\";\n\n\
+         export function archive(id: string) {\n  \
+           return request(`/api/orders/${id}`, \"PATCH\");\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(web.join("src/status.ts")).unwrap();
+    replace(gateway.join("src/routes.ts"), "api.delete(", "api.patch(");
+    fs::remove_file(catalog.join("app/api/health/route.ts")).unwrap();
+    replace(
+        catalog.join("lib/products.ts"),
+        "return { id };",
+        "return { id, found: true };",
+    );
+}
+
+#[test]
+fn a_refreshed_chain_exports_what_a_cold_chain_does() {
+    let exports = |(web, gateway, catalog): &Chain| -> Vec<String> {
+        [web, gateway, catalog]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = chain("fresh_chain");
+    [&repos.0, &repos.1, &repos.2].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_chain(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = chain("fresh_chain_cold");
+    edit_chain(&cold);
     for (n, ((refreshed, before), cold)) in refreshed
         .iter()
         .zip(&before)
