@@ -62,8 +62,10 @@ Each link carries a level and a reason. The levels are:
 - **decided**: the link comes from `meada.decisions.toml` (ADR 0006).
 - **ambiguous**: several candidates fit. They are listed, never silently picked.
 
-A chain is as strong as its weakest link. There are no tuned weights. The v0.1 spec fixes the
-order of the levels used to compare them.
+A chain is as strong as its weakest link. There are no tuned weights. The levels compare in
+this order: exact > declared > inferred > decided > ambiguous. `decided` sits below `inferred`
+because it covers exactly what mechanical resolution could not, and may be a model's judgment.
+(Amended 2026-10-14; the first version left the order to the v0.1 spec.)
 
 A chain has no hop limit. Meada follows it until it ends or the token budget runs out, and it
 detects cycles.

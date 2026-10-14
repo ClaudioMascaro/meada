@@ -35,17 +35,27 @@ that. Neither may enter indexing (invariant 1).
 
 ### Decider endpoint
 
-- A decider is any OpenAI-compatible endpoint. Its URL and its key come from the environment.
-- The documented default is Jev, Typesafe's model for typed judgments with probabilities, which
-  is cheap per token. It is reached through OpenRouter with zero-data-retention routing.
-- A local model, for example through Ollama, works for zero-cost, fully local use. Economic
-  access is a project principle.
-- Any compatible gateway works, including regional ones that bill in local currency. The
-  documentation lists them once they are public.
+A decider speaks one of two protocols. Its URL, key and model come from the environment.
+
+- **Decisions**: OpenRouter's decisions API, where each open item is a typed `choice` question
+  and the answer carries a choice, a confidence and a probability per candidate. This is the
+  documented default, with Jev, Typesafe's model for typed judgments, which is cheap per token,
+  reached with zero-data-retention routing. The API is labelled alpha upstream, so its adapter
+  is isolated and validates request and response shapes strictly.
+- **Chat**: any OpenAI-compatible chat completions endpoint, answering a JSON schema with the
+  chosen candidate and a self-reported probability. A local model, for example through Ollama,
+  works here for zero-cost, fully local use. Economic access is a project principle.
+- Any gateway that speaks either protocol works, including regional ones that bill in local
+  currency. The documentation lists them once they are public.
+
+(Amended 2026-10-14. The first version said any OpenAI-compatible endpoint with Jev as the
+default, but Jev answers through the decisions API, not chat completions.)
 
 ## Considered options
 
-- **Jev through OpenRouter only.** Vendor lock-in.
+- **Jev through OpenRouter only.** Vendor lock-in, and no local option.
+- **OpenAI-compatible chat only.** Jev does not speak it, so the typed judgment with
+  probabilities that motivated the default would be lost.
 - **The vendor's direct API only.** It offers no zero-data-retention outside enterprise
   contracts.
 
