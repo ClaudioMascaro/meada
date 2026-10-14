@@ -1,6 +1,6 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -108,6 +108,12 @@ impl Engine {
     /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
     /// each repository that did not apply, in workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
+        decisions::replay(self.core_links(exports), &self.workspace, exports)
+    }
+
+    /// Every link of the workspace as the core derives it from the stored contracts, before
+    /// any decision.
+    fn core_links(&self, exports: &[Export]) -> Vec<Link> {
         let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
@@ -123,7 +129,7 @@ impl Engine {
                 links.extend(kind.link(consumer, from, &providers));
             }
         }
-        decisions::replay(links, &self.workspace, exports)
+        links
     }
 
     /// For each repository of the workspace, in workspace order, the decisions that do not
@@ -159,13 +165,42 @@ impl Engine {
         Ok(items)
     }
 
-    /// The open items of the workspace, ambiguous links and unresolved consumers, in id order,
-    /// each with its sorted candidates. Callers keep the ones whose `repository` they own.
+    /// The item `id` of the repository where Meada runs, open or with a decision that applies,
+    /// as the core sees it (every candidate, as if undecided): what `meada decide --item`
+    /// redoes. `None` when the call is no such item.
+    pub fn local_item(&self, id: &str) -> Result<Option<OpenItem>> {
+        Ok((self.items()?.into_iter())
+            .map(|(item, _)| item)
+            .find(|i| i.id == id && i.repository == self.identity))
+    }
+
+    /// The open items of the workspace, ambiguous links and unresolved consumers that no
+    /// decision resolves, in id order, each with its sorted candidates. Callers keep the ones
+    /// whose `repository` they own.
     pub fn open_items(&self) -> Result<Vec<OpenItem>> {
+        Ok((self.items()?.into_iter())
+            .filter_map(|(item, decided)| (!decided).then_some(item))
+            .collect())
+    }
+
+    /// The items of the workspace as the core sees them, in id order, each with whether a
+    /// decision applies to it (its call has a `decided` link once the decisions replay).
+    fn items(&self) -> Result<Vec<(OpenItem, bool)>> {
         self.refresh()?;
         let exports = self.exports()?;
-        let links = self.links(&exports);
-        Ok(items::list(&self.workspace.repos, &exports, &links))
+        let core = self.core_links(&exports);
+        let items = items::list(&self.workspace.repos, &exports, &core);
+        let (links, _) = decisions::replay(core, &self.workspace, &exports);
+        let decided: HashSet<&str> = (links.iter())
+            .filter(|l| l.level == Level::Decided)
+            .map(|l| l.consumer.as_str())
+            .collect();
+        Ok((items.into_iter())
+            .map(|item| {
+                let applied = decided.contains(item.id.as_str());
+                (item, applied)
+            })
+            .collect())
     }
 
     /// The chain from `start`, followed `direction` through calls inside repositories and

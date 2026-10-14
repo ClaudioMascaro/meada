@@ -247,8 +247,8 @@ impl Msg<'_> {
             }
             Msg::DecideNoItems => pick("no open items".into(), "nenhum item aberto".into()),
             Msg::DecideUnknownItem(id) => pick(
-                format!("`{id}` is not an open item of this repository"),
-                format!("`{id}` não é um item aberto deste repositório"),
+                format!("`{id}` is not an open or decided item of this repository"),
+                format!("`{id}` não é um item aberto nem decidido deste repositório"),
             ),
             Msg::DecideNoCandidates => pick(
                 "no candidate fits; skipped".into(),

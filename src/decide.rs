@@ -30,16 +30,16 @@ pub struct Options {
     pub min_p: Option<f64>,
 }
 
-/// The open items of this repository to work on, in id order; with `only`, that one item.
+/// The open items of this repository to work on, in id order; with `only`, that one item,
+/// open or decided, so that a decision can be redone.
 pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>> {
-    let mut items = engine.local_items()?;
-    if let Some(id) = only {
-        items.retain(|i| i.id == id);
-        if items.is_empty() {
-            return Err(Msg::DecideUnknownItem(id).text().into());
-        }
+    let Some(id) = only else {
+        return engine.local_items();
+    };
+    match engine.local_item(id)? {
+        Some(item) => Ok(vec![item]),
+        None => Err(Msg::DecideUnknownItem(id).text().into()),
     }
-    Ok(items)
 }
 
 /// The item as `--list` and the prompt show it: id, location and call, then every candidate

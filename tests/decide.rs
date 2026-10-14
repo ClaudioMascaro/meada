@@ -6,7 +6,7 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{HEALTH, assert_golden, chain, written as file};
+use common::{HEALTH, TRACK, assert_golden, chain, written as file};
 use meada::engine::Engine;
 
 /// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
@@ -157,7 +157,7 @@ fn item_limits_the_run_and_an_unknown_id_is_an_error() {
     assert!(!ok);
     assert_eq!(
         stderr,
-        "meada: `nope` is not an open item of this repository\n"
+        "meada: `nope` is not an open or decided item of this repository\n"
     );
 }
 
@@ -203,6 +203,42 @@ fn decided_items_are_not_open_and_a_run_without_open_items_writes_nothing() {
         let answer = engine.search("", Some(kind), None).unwrap();
         assert_eq!(answer, "no matches for ``\n", "{kind}");
     }
+}
+
+#[test]
+fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_entry() {
+    let (web, _, _) = chain("decide_redo");
+    // Health decided for the gateway by a person, tracking for the catalog by a model.
+    common::decisions(&web, "chain-web");
+
+    // The decided health check is offered with its candidates as if undecided.
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "1\n");
+    assert!(ok, "{stderr}");
+    assert!(
+        stdout.starts_with(&format!(
+            "{HEALTH}\nsrc/status.ts:3  fetch(\"/api/health\")\n\
+             \x20 1) example.com/chain/catalog GET /api/health\n\
+             \x20 2) example.com/chain/gateway GET /api/health\n"
+        )),
+        "{stdout}"
+    );
+    // The decided tracking URL too; the person's pick replaces the model's entry.
+    let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", TRACK], "2\n");
+    assert!(ok, "{stderr}");
+    assert_eq!(
+        file(&web).unwrap(),
+        format!(
+            "[[decision]]\nkind = \"ambiguous-link\"\ncall = \"{HEALTH}\"\n\
+             target = \"example.com/chain/catalog::http::GET::/api/health\"\nby = \"human\"\n\n\
+             [[decision]]\nkind = \"dynamic-url\"\ncall = \"{TRACK}\"\n\
+             target = \"example.com/chain/gateway::http::POST::/api/events\"\nby = \"human\"\n"
+        )
+    );
+
+    // Without `--item`, decided calls stay closed (`search` too, see the test below).
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &[], "");
+    assert!(ok);
+    assert_eq!(stdout, "no open items\n");
 }
 
 #[test]

@@ -2,7 +2,7 @@
 //! candidates a decision may pick (spec #18). `search` lists them and `meada decide` resolves
 //! them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::contract::{Level, Link};
@@ -101,19 +101,16 @@ impl OpenItem {
     }
 }
 
-/// The open items of every repository, in id order. The candidates of an ambiguous link are
-/// the providers `links` lists for it; those of an unresolved consumer are the routes of the
-/// workspace its method and literal URL fragments leave.
+/// The items of every repository as the core sees them, in id order: `links` are the links
+/// before any decision, so a decided call is listed too (the caller drops it to keep the open
+/// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
+/// an unresolved consumer are the routes of the workspace its method and literal URL fragments
+/// leave.
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
     for link in links.iter().filter(|l| l.level == Level::Ambiguous) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
-    // An unresolved consumer a decision applied to has a `decided` link; it is no longer open.
-    let decided: HashSet<&str> = (links.iter())
-        .filter(|l| l.level == Level::Decided)
-        .map(|l| l.consumer.as_str())
-        .collect();
     let routes: Vec<(&str, &str, &str)> = exports
         .iter()
         .flat_map(|e| {
@@ -133,7 +130,6 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
         for consumer in &export.consumers {
             let (kind, candidates) =
                 match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
-                    (None, _) if decided.contains(&consumer.site.as_str()) => continue,
                     (None, _) => {
                         let method = consumer.method.as_deref();
                         let fits = routes
