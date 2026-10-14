@@ -7,8 +7,91 @@ outro pelos contratos que eles compartilham: rotas HTTP, filas, pacotes, recurso
 Agentes de código, e gente também, consultam esse mapa por MCP. Nenhuma etapa da indexação usa
 LLM.
 
-> **Estado:** em construção. Ainda não há nada para instalar. As decisões tomadas até aqui
-> estão em [`docs/adr`](docs/adr).
+## Instalação
+
+Escolha uma das três formas.
+
+- **Cargo**: `cargo install meada`.
+- **Binário pronto**: baixe o arquivo do seu sistema nas
+  [releases do GitHub](https://github.com/ClaudioMascaro/meada/releases) (Linux, macOS e
+  Windows, em x86_64 e arm64) e ponha `meada` no `PATH`.
+- **Instalador** (Linux e macOS):
+  `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
+
+## Configuração
+
+Cada repositório pode ter um `meada.toml` na raiz, versionado no git, dizendo com quem ele
+conversa. Quem consome uma rota nomeia o par:
+
+```toml
+[[peer]]
+repo = "example.com/acme/api"            # remoto git de origin, sem esquema nem .git
+base_url_env = ["API_URL"]               # variável de onde o cliente lê a URL base
+# path = "../api"                        # opcional: dica de onde o clone está
+```
+
+Quem serve a rota declara os hosts em que responde:
+
+```toml
+[serve]
+hosts = ["api.example.com"]
+```
+
+Meada acha os pares pelo remoto git, mesmo que o clone fique em outro caminho em cada máquina.
+Uma chave desconhecida ou mal escrita dá um erro com o arquivo, a linha e a chave. Sem
+`meada.toml`, o repositório não declara nenhum par.
+
+## Uso
+
+Na raiz do repositório:
+
+- `meada index` monta o índice, em `.meada/`, do repositório e dos pares;
+- `meada status` mostra o conjunto de repositórios, o estado de cada índice e os pares que não
+  foram encontrados;
+- `meada export` imprime o índice inteiro em JSON ordenado, bom para `diff` entre duas execuções;
+- `meada mcp` serve as ferramentas abaixo por MCP.
+
+Meada só escreve dentro de `.meada/`, que se ignora no git. Toda consulta primeiro atualiza o
+índice com o que mudou nos arquivos, inclusive o que ainda não foi commitado. As mensagens da
+linha de comando seguem o `LANG` (português ou inglês); as do MCP são sempre em inglês.
+
+## Agentes (MCP)
+
+`meada mcp` fala MCP por stdio e precisa ser iniciado dentro do repositório. Na configuração do
+seu agente (por exemplo o `.mcp.json` do Claude Code):
+
+```json
+{
+  "mcpServers": {
+    "meada": { "command": "meada", "args": ["mcp"] }
+  }
+}
+```
+
+São três ferramentas, sempre em inglês, e nenhuma escreve:
+
+- `search` acha um símbolo, uma rota ou um contrato pelo nome;
+- `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
+  chama e os contratos que ele toca;
+- `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
+  acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
+  analisar o impacto do que acabou de ser editado.
+
+As respostas são linhas compactas dentro de um orçamento de tokens (2.000 por padrão, ajustável
+a cada chamada). Cada ligação entre repositórios traz o nível e o motivo (`→[level: reason]`),
+e o `trace` termina com um rodapé: o nível mais fraco da cadeia, o número de saltos, os
+repositórios envolvidos e os tokens usados.
+
+## Estado
+
+Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
+`.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP: `fetch` no lado que consome,
+Next.js (app router) e Express no lado que serve. Cada ligação tem o nível `exact`, `inferred`
+ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida, nunca
+como ligação. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, filas,
+pacotes, o comando `meada decide` nem o pacote npm. O escopo e a ordem do trabalho estão no
+[ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
+Veja o [CHANGELOG](CHANGELOG.md).
 
 ## Por que mais uma ferramenta
 
