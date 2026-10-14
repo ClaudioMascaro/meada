@@ -12,7 +12,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use crate::engine::Engine;
+use crate::engine::{Direction, Engine, Start};
 
 #[derive(Deserialize, JsonSchema)]
 struct SearchArgs {
@@ -28,6 +28,18 @@ struct SearchArgs {
 struct ContextArgs {
     /// Symbol name, `<path>::<name>` or full identity.
     symbol: String,
+    /// Token budget for the answer (default 2000).
+    budget: Option<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct TraceArgs {
+    /// Start: a symbol, a route (`GET /users/{}` or its contract) or a call site.
+    from: Option<String>,
+    /// `uncommitted`: start from the symbols the working-tree diff touches instead.
+    changes: Option<String>,
+    /// `down` (default: what it reaches) or `up` (what reaches it).
+    direction: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
 }
@@ -65,6 +77,26 @@ impl Meada {
     #[tool(description = "Show one symbol: its source, callers and callees.")]
     async fn context(&self, Parameters(args): Parameters<ContextArgs>) -> Result<String, String> {
         answer(|engine| engine.context(&args.symbol, args.budget.map(|b| b as usize)))
+    }
+
+    #[tool(
+        description = "Follow a chain through calls and cross-repository links, down or up, until it ends. Links show →[level: reason]; a footer sums it up."
+    )]
+    async fn trace(&self, Parameters(args): Parameters<TraceArgs>) -> Result<String, String> {
+        let start = match (args.from.as_deref(), args.changes.as_deref()) {
+            (Some(from), None) => Start::From(from),
+            (None, Some("uncommitted")) => Start::Uncommitted,
+            (None, Some(other)) => {
+                return Err(format!("`changes` takes `uncommitted`, not `{other}`"));
+            }
+            _ => return Err("pass either `from` or `changes: uncommitted`".into()),
+        };
+        let direction = match args.direction.as_deref() {
+            None | Some("down") => Direction::Down,
+            Some("up") => Direction::Up,
+            Some(other) => return Err(format!("`direction` takes `down` or `up`, not `{other}`")),
+        };
+        answer(|engine| engine.trace(start, direction, args.budget.map(|b| b as usize)))
     }
 }
 

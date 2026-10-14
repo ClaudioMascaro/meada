@@ -12,6 +12,7 @@ pub mod msg;
 mod render;
 pub mod repo;
 mod resolve;
+mod trace;
 mod workspace;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

@@ -9,8 +9,9 @@ use rusqlite::Connection;
 use crate::contract::{self, Link};
 use crate::index::{CallSite, Export, State, Symbol};
 use crate::msg::Msg;
-use crate::workspace::{Member, Workspace};
-use crate::{Result, index, render};
+pub use crate::trace::{Direction, Start};
+use crate::workspace::Workspace;
+use crate::{Result, index, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -74,39 +75,67 @@ impl Engine {
     /// links from its consumers and to its providers, as sorted, pretty-printed JSON.
     pub fn export(&self) -> Result<String> {
         self.refresh()?;
-        let mut export = index::export(&self.db, "main", &self.identity)?;
-        export.links = self.links()?;
+        let mut exports = self.exports()?;
+        let here = format!("{}::", self.identity);
+        let links = self.links(&exports).into_iter();
+        let links =
+            links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
+        let mut export = exports.swap_remove(0);
+        export.links = links.collect();
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
-    /// Every link that touches the repository where Meada runs, sorted.
-    fn links(&self) -> Result<Vec<Link>> {
-        let exports: Vec<Export> = self
-            .workspace
+    /// The index content of every repository of the workspace, in workspace order.
+    fn exports(&self) -> Result<Vec<Export>> {
+        self.workspace
             .repos
             .iter()
             .enumerate()
             .map(|(n, m)| index::export(&self.db, &schema(n), &m.identity))
-            .collect::<Result<_>>()?;
-        let members: Vec<&Member> = self.workspace.repos.iter().collect();
+            .collect()
+    }
+
+    /// Every link of the workspace, sorted.
+    fn links(&self, exports: &[Export]) -> Vec<Link> {
+        let members = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
-            .zip(&members)
-            .flat_map(|(e, m)| e.providers.iter().map(move |p| (*m, p)))
+            .zip(members)
+            .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
-        let here = format!("{}::", self.identity);
         let mut links = Vec::new();
-        for (n, (export, from)) in exports.iter().zip(&members).enumerate() {
+        for (export, from) in exports.iter().zip(members) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
-                let found = kind.link(consumer, from, &providers).into_iter();
-                links.extend(found.filter(|l| n == 0 || l.provider.starts_with(&here)));
+                links.extend(kind.link(consumer, from, &providers));
             }
         }
         links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
-        Ok(links)
+        links
+    }
+
+    /// The chain from `start`, followed `direction` through calls inside repositories and
+    /// links between them, across the whole workspace, until it ends, a cycle closes or the
+    /// budget runs out; one indented line per step, then the chain footer and any missing
+    /// peer. `start` names a symbol, a route (`http::GET::/users/{}`, `GET /users/{}` or
+    /// `/users/{}`) or a call site, or takes the symbols the uncommitted changes touch.
+    pub fn trace(
+        &self,
+        start: Start,
+        direction: Direction,
+        budget: Option<usize>,
+    ) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let changes = match start {
+            Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
+            Start::From(_) => None,
+        };
+        let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        Ok(graph.answer(start, changes.as_deref(), direction, budget))
     }
 
     /// Symbols of this repository whose name matches `query` case-insensitively, and contracts
@@ -353,17 +382,9 @@ impl Engine {
         format!("{} {location} {name}", self.identity)
     }
 
-    /// `path:line`; just `path` when the file cannot be read. The line is display only: it
-    /// comes from the byte offset and the file as it is now.
+    /// `path:line`, as `Files::at` gives it.
     fn at(&self, files: &mut Files, path: &str, offset: i64) -> String {
-        match files.get(path) {
-            Some(src) => {
-                let before = &src[..(offset as usize).min(src.len())];
-                let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
-                format!("{path}:{line}")
-            }
-            None => path.to_string(),
-        }
+        files.at(path, offset)
     }
 }
 
@@ -452,36 +473,55 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
 }
 
 /// The name part of a symbol identity: `<repository>::<path>::<name>`.
-fn label(id: &str) -> &str {
+pub(crate) fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)
+}
+
+/// The callee of the call site `<caller>::<callee>#<ordinal>`.
+pub(crate) fn callee(site: &str) -> &str {
+    let callee = label(site);
+    callee.rsplit_once('#').map_or(callee, |(name, _)| name)
 }
 
 /// How an unresolved consumer shows: `(unresolved) fetch` for the call site
 /// `<caller>::fetch#<ordinal>`.
-fn unresolved(site: &str) -> String {
-    let callee = label(site);
-    let callee = callee.rsplit_once('#').map_or(callee, |(name, _)| name);
-    format!("(unresolved) {callee}")
+pub(crate) fn unresolved(site: &str) -> String {
+    format!("(unresolved) {}", callee(site))
 }
 
 /// Source files read once per answer.
-struct Files<'a> {
+pub(crate) struct Files<'a> {
     root: &'a Path,
     read: HashMap<String, Option<Vec<u8>>>,
 }
 
 impl<'a> Files<'a> {
-    fn new(root: &'a Path) -> Self {
+    pub(crate) fn new(root: &'a Path) -> Self {
         Self {
             root,
             read: HashMap::new(),
         }
     }
 
-    fn get(&mut self, path: &str) -> Option<&[u8]> {
+    pub(crate) fn get(&mut self, path: &str) -> Option<&[u8]> {
         self.read
             .entry(path.to_string())
             .or_insert_with(|| fs::read(self.root.join(path)).ok())
             .as_deref()
     }
+
+    /// `path:line`; just `path` when the file cannot be read. The line is display only: it
+    /// comes from the byte offset and the file as it is now.
+    pub(crate) fn at(&mut self, path: &str, offset: i64) -> String {
+        match self.get(path) {
+            Some(src) => format!("{path}:{}", line_of(src, offset)),
+            None => path.to_string(),
+        }
+    }
+}
+
+/// The 1-based line holding byte `offset` of `src`.
+pub(crate) fn line_of(src: &[u8], offset: i64) -> usize {
+    let before = &src[..(offset.max(0) as usize).min(src.len())];
+    before.iter().filter(|&&b| b == b'\n').count() + 1
 }
