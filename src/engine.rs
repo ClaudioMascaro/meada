@@ -90,13 +90,18 @@ impl Engine {
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
-    /// The index content of every repository of the workspace, in workspace order.
+    /// The index content of every repository of the workspace, with the contracts its
+    /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
-        self.workspace
-            .repos
-            .iter()
-            .enumerate()
-            .map(|(n, m)| index::export(&self.db, &schema(n), &m.identity))
+        let repos = self.workspace.repos.iter().enumerate();
+        repos
+            .map(|(n, m)| {
+                let mut export = index::export(&self.db, &schema(n), &m.identity)?;
+                for kind in contract::KINDS {
+                    kind.declare(m, &mut export);
+                }
+                Ok(export)
+            })
             .collect()
     }
 

@@ -7,7 +7,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, chain, fixture_repo, set_mtime};
+use common::{age, assert_golden, chain, fixture_repo, set_mtime, worker};
 use meada::engine::Engine;
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
@@ -286,6 +286,52 @@ fn a_refreshed_chain_exports_what_a_cold_chain_does() {
 
     let cold = chain("fresh_chain_cold");
     edit_chain(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
+/// Moves the gateway's write of `orders` to `listOrders` and makes the worker a writer too.
+fn edit_resources(gateway: &Path) {
+    let edit = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    edit(
+        gateway.join("meada.toml"),
+        "src/orders.ts::cancelOrder",
+        "src/orders.ts::listOrders",
+    );
+    edit(
+        worker(gateway).join("meada.toml"),
+        "role = \"read\"",
+        "role = \"read-write\"",
+    );
+}
+
+#[test]
+fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
+    let exports = |gateway: &Path| -> Vec<String> {
+        [gateway.to_path_buf(), worker(gateway)]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (_, gateway, _) = chain("fresh_resources");
+    let before = exports(&gateway);
+    edit_resources(&gateway);
+
+    let refreshed = exports(&gateway);
+
+    let (_, cold, _) = chain("fresh_resources_cold");
+    edit_resources(&cold);
     for (n, ((refreshed, before), cold)) in refreshed
         .iter()
         .zip(&before)

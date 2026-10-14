@@ -9,7 +9,8 @@ updates it. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 `Engine::open(dir)` finds the **workspace**, creates or recreates each **repository**'s **index**
 in its own `.meada/index.db`, and ATTACHes every **peer** to the first repository's connection
 as `peer<n>`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
-reads each index through `index::export`, derives **links** from the stored contracts, and renders.
+reads each index through `index::export`, adds the contracts each `meada.toml` declares
+(`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside `.meada/` is written. Everything the engine returns is sorted: the same files
 give byte-identical output.
 
@@ -104,8 +105,10 @@ give byte-identical output.
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config`
-  parses the v0.1 subset (`[[peer]]`, `[serve] hosts`) with `deny_unknown_fields`; keys track A
-  adds are listed in `LATER` so the error says "not in v0.1". `config::read<T>(root, name)` is the
+  parses `[[peer]]`, `[serve] hosts` and `[[resource]]` (`kind` checked as a lowercase
+  identifier, `id` not empty, `role` read, write or read-write, optional `via`) with
+  `deny_unknown_fields`; keys later track A specs add are listed in `LATER` so the error says
+  "not in v0.1". `config::read<T>(root, name)` is the
   shared TOML reader (file, line and key in every error), also used for the decisions file;
   `Repository` carries both `config` and `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -140,10 +143,18 @@ give byte-identical output.
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code` folds
   constants and client wrapper arguments into values for contract kinds, a destructured object
   parameter reading its names (`Param::fields`) off the literal object the caller passes.
-- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
-  `Names`. `http.rs` is the only kind: `fetch` consumers (also a call to a parameter defaulting to `fetch`), Next.js app-router and Express
-  providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
-- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
+- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
+  `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
+  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules
+  (host, `base_url_env`, unique provider). `resource.rs` (spec #19): reads no code; `declare`
+  turns each `[[resource]]` `via` symbol the repository has into a provider (writer) or
+  consumer (reader) of `resource::<kind>::<id>`, and `link` joins every reader to every writer
+  of another repository at `declared`, reason the contract. A `via` that names no symbol is
+  dropped; entries without `via` get no side yet.
+- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
+  whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
+  down and back going up; a call-site consumer the other way. Starts take only HTTP routes,
+  not resources.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
@@ -160,10 +171,12 @@ give byte-identical output.
 - Inline route handlers: a pack emits anonymous function arguments as `Kind::Inline` named
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
-- Contract: `<prefix>::...`, `http::GET::/users/{}`. A path parameter of any spelling is `{}`.
+- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
+  parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
   consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
-  and are left out of the export. A call has
+  and are left out of the export. A resource side is a
+  provider or consumer whose `site` is the `via` symbol (a consumer's `via` is null). A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
   repository where Meada runs. A repository with stale decisions also has `stale_decisions:
@@ -179,7 +192,9 @@ give byte-identical output.
 
 - New **contract kind**: implement `ContractKind`, add it to `KINDS`. `extract` reads `Code`
   (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
-  `link` receives the whole workspace's providers. A kind's rules stay in its own file.
+  a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
+  calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
+  whole workspace's providers. A kind's rules stay in its own file.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
@@ -206,8 +221,7 @@ give byte-identical output.
   is missed. A contract kind that reads a value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
-  no relinking. `Level` order: `exact` < `inferred` < `decided` < `ambiguous` (`declared` joins
-  with spec #19).
+  no relinking. `Level` order: `exact` < `declared` < `inferred` < `decided` < `ambiguous`.
 - Network: `decider::Config::send` is the only code that opens a connection, and only
   `meada decide --decider` without `--show-request` or `--list` reaches it. Indexing, queries,
   `status` and the MCP server never read the `MEADA_DECIDER_*` variables. `ureq` is the only
@@ -223,7 +237,8 @@ give byte-identical output.
 - `tests/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
-  the three-repository chain as siblings. `git()` pins config, author and dates; `age()` pushes
+  the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
+  the `postgres` `orders` resource the gateway writes. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
   has none.
@@ -275,6 +290,8 @@ Each is marked `ponytail:` at its site unless noted.
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
+- `resource.rs`: a `[[resource]]` entry without `via`, or none of whose `via` names a symbol,
+  has no side (the repository-level side is #44 of spec #19).
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

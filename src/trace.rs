@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::contract::{self, Level, Link};
+use crate::contract::{Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{Files, callee, label, line_of, unresolved};
 use crate::repo::Change;
@@ -45,7 +45,9 @@ pub(crate) struct Graph<'a> {
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
-    /// Links by consumer and by provider, each sorted as the engine sorts links.
+    /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
+    /// consumer is a call site, or, for a resource, the symbol that reads it: data goes from
+    /// the provider (writer) to that consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
 }
@@ -139,7 +141,8 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        let (contract, path) = if contract::kind_of(from).is_some() {
+        // A trace starts from a resource's `via` symbols, not from the resource.
+        let (contract, path) = if http::route(from).is_some() {
             (Some(from.to_string()), None)
         } else if let Some((method, path)) = from.split_once(' ')
             && path.starts_with('/')
@@ -338,6 +341,16 @@ impl<'a> Walk<'_, 'a> {
                 for &call in graph.callees.get(id).into_iter().flatten() {
                     self.call_down(call, depth + 1, &mut shown);
                 }
+                // A writer goes on to the readers of what it writes.
+                for link in graph.into.get(id).into_iter().flatten() {
+                    if graph.symbols.contains_key(link.consumer.as_str())
+                        && shown.insert((link.consumer.as_str(), true))
+                    {
+                        let (m, text) = self.node(&link.consumer);
+                        let text = format!("{} {text}", arrow(link));
+                        self.enter(&link.consumer, depth + 1, Row::link(text, m, link));
+                    }
+                }
             }
             Direction::Up => {
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
@@ -357,6 +370,14 @@ impl<'a> Walk<'_, 'a> {
                     }
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
                     self.enter(&c.caller, depth + 1, Row::link(text, n, link));
+                }
+                // A reader goes back to the writers of what it reads.
+                for link in graph.out.get(id).into_iter().flatten() {
+                    if shown.insert((link.provider.as_str(), true)) {
+                        let (m, text) = self.node(&link.provider);
+                        let text = format!("{} {text}", arrow(link));
+                        self.enter(&link.provider, depth + 1, Row::link(text, m, link));
+                    }
                 }
             }
         }

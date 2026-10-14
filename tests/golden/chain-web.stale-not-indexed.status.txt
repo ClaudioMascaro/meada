@@ -1,3 +1,4 @@
 example.com/chain/web (.) not indexed
 example.com/chain/gateway (../chain-gateway) not indexed
 example.com/chain/catalog (../chain-catalog) not indexed
+example.com/chain/worker (../chain-worker) not indexed
