@@ -2,6 +2,10 @@
   "repository": "example.com/chain/catalog",
   "files": [
     {
+      "path": "app/api/events/route.ts",
+      "hash": "4f0ad679a8252cc48bdb12fd490508b2eec987596bd7ea1d3473bb4e7c7b205d"
+    },
+    {
       "path": "app/api/health/route.ts",
       "hash": "fc112243d7c86477ef19dd4a789114daeb1179870fd562faef220175aef990a6"
     },
@@ -15,6 +19,14 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/chain/catalog::app/api/events/route.ts::POST",
+      "span": {
+        "path": "app/api/events/route.ts",
+        "start": 7,
+        "end": 72
+      }
+    },
     {
       "id": "example.com/chain/catalog::app/api/health/route.ts::GET",
       "span": {
@@ -121,6 +133,10 @@
     {
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET"
+    },
+    {
+      "contract": "http::POST::/api/events",
+      "site": "example.com/chain/catalog::app/api/events/route.ts::POST"
     }
   ],
   "consumers": [],

@@ -3,9 +3,13 @@
 
 mod config;
 mod contract;
+pub mod decide;
+mod decider;
+mod decisions;
 pub mod engine;
 mod http;
 mod index;
+mod items;
 mod lang;
 pub mod mcp;
 pub mod msg;

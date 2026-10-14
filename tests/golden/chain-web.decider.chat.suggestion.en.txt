@@ -1,0 +1,6 @@
+example.com/chain/web::src/status.ts::health::fetch#0
+proposed: example.com/chain/gateway GET /api/health (p=0.50, by local/test-model)
+example.com/chain/web::src/status.ts::track::fetch#0
+suggestion, not written: example.com/chain/catalog POST /api/events (p=0.49, below --min-p 0.50)
+
+wrote 1 decision to meada.decisions.toml

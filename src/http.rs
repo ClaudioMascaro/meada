@@ -64,9 +64,89 @@ fn next_route(path: &str) -> Option<String> {
 /// What a reader needs depends on a parameter of the enclosing function: a client wrapper.
 struct Depends;
 
+/// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
+/// how it names the provider's repository, and, for an unresolved one, what could still be
+/// read: its method (`None` when unknown) and the literal fragments of its path.
+struct Read {
+    contract: Option<String>,
+    via: Option<String>,
+    method: Option<String>,
+    fragments: Vec<String>,
+}
+
+/// What `fetch(url, init)` reads, or `None` when the URL or the method depends on a parameter.
+fn fetch(args: &[Value]) -> Option<Read> {
+    let (contract, via) = locate(args)?;
+    let (mut method, mut texts) = (None, Vec::new());
+    if contract.is_none() {
+        method = self::method(args.get(1))
+            .ok()
+            .flatten()
+            .map(|m| m.to_uppercase());
+        if let Some(Value::Str(parts)) = args.first() {
+            texts = fragments(parts);
+        }
+    }
+    Some(Read {
+        contract,
+        via,
+        method,
+        fragments: texts,
+    })
+}
+
+/// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
+/// and host and its query are dropped, split at every part that is not literal.
+fn fragments(parts: &[Part]) -> Vec<String> {
+    const GAP: &str = "\0";
+    let text: String = parts
+        .iter()
+        .map(|p| match p {
+            Part::Text(t) => t.as_str(),
+            _ => GAP,
+        })
+        .collect();
+    let path = match text.split_once("://") {
+        Some((_, rest)) => rest.find('/').map_or("", |at| &rest[at..]),
+        None => &text,
+    };
+    let path = path.split(['?', '#']).next().unwrap_or("");
+    // Route paths lose their trailing `/` (`normalize_path`), so a path ending in a literal does.
+    let path = match path.ends_with(GAP) {
+        true => path,
+        false => path.trim_end_matches('/'),
+    };
+    (path.split(GAP).filter(|f| !f.is_empty()))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
+pub fn route(contract: &str) -> Option<(&str, &str)> {
+    contract.strip_prefix("http::")?.split_once("::")
+}
+
+/// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
+/// `method` when that is known, and its path holds every literal fragment, in order.
+pub fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
+    let Some((route_method, mut path)) = route(contract) else {
+        return false;
+    };
+    if method.is_some_and(|m| m != route_method) {
+        return false;
+    }
+    for fragment in fragments {
+        match path.find(fragment.as_str()) {
+            Some(at) => path = &path[at + fragment.len()..],
+            None => return false,
+        }
+    }
+    true
+}
+
 /// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
 /// depends on a parameter; the contract is `None` when the URL or the method cannot be read.
-fn fetch(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
+fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
         Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
@@ -294,6 +374,8 @@ fn express(code: &Code) -> Vec<Found> {
                 site,
                 contract: Some(contract(&method, &full)),
                 via: None,
+                method: None,
+                fragments: Vec::new(),
             });
         }
     }
@@ -312,14 +394,16 @@ impl ContractKind for Http {
                 if call.callee != "fetch" || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
-                for (site, at, (contract, via)) in code.expand(path, n, &fetch) {
+                for (site, at, read) in code.expand(path, n, &fetch) {
                     found.push(Found {
                         site: Site::Call {
                             path: site.into(),
                             index: at,
                         },
-                        contract,
-                        via,
+                        contract: read.contract,
+                        via: read.via,
+                        method: read.method,
+                        fragments: read.fragments,
                     });
                 }
             }
@@ -346,6 +430,8 @@ impl ContractKind for Http {
                     site,
                     contract: Some(contract(exported, &route)),
                     via: None,
+                    method: None,
+                    fragments: Vec::new(),
                 });
             }
         }
@@ -410,6 +496,8 @@ impl ContractKind for Http {
                 } else {
                     format!("{reason} {}", repo.identity)
                 },
+                by: None,
+                p: None,
             })
             .collect()
     }
@@ -417,7 +505,7 @@ impl ContractKind for Http {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_path;
+    use super::{fragments, normalize_path, route_fits};
 
     #[test]
     fn paths_normalize_alike_on_both_sides() {
@@ -440,6 +528,97 @@ mod tests {
             ("?q=1", "/"),
         ] {
             assert_eq!(normalize_path(path), normalized, "{path}");
+        }
+    }
+
+    #[test]
+    fn a_route_fits_a_dynamic_url_by_method_and_ordered_literal_fragments() {
+        let fits = |contract, method, fragments: &[&str]| {
+            let fragments: Vec<String> = fragments.iter().map(|f| f.to_string()).collect();
+            route_fits(contract, method, &fragments)
+        };
+        for (contract, method, parts, expected) in [
+            // No method, no fragment: every route.
+            ("http::GET::/api/users", None, &[][..], true),
+            // The method filters when known.
+            ("http::GET::/api/users", Some("GET"), &[][..], true),
+            ("http::POST::/api/users", Some("GET"), &[][..], false),
+            // Every fragment must be in the path, in order, without overlapping.
+            ("http::GET::/api/users/{}", None, &["/api/"][..], true),
+            (
+                "http::GET::/api/users/{}",
+                None,
+                &["/api", "/users/"][..],
+                true,
+            ),
+            (
+                "http::GET::/api/users/{}",
+                None,
+                &["/users/", "/api/"][..],
+                false,
+            ),
+            (
+                "http::GET::/api/users",
+                None,
+                &["/api/users", "/users"][..],
+                false,
+            ),
+            (
+                "http::GET::/api/users/{}/posts",
+                None,
+                &["/api/", "/posts"][..],
+                true,
+            ),
+            ("http::GET::/api/orders", None, &["/users"][..], false),
+            ("http::GET::/api/users", None, &["/api/users"][..], true),
+            // Both filters apply together.
+            (
+                "http::DELETE::/api/users/{}",
+                Some("GET"),
+                &["/api/"][..],
+                false,
+            ),
+            // Not an HTTP route.
+            ("channel::orders", None, &[][..], false),
+        ] {
+            assert_eq!(
+                fits(contract, method, parts),
+                expected,
+                "{contract} {method:?} {parts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_fragments_of_a_url_are_its_literal_path_parts_without_scheme_host_and_query() {
+        use crate::lang::Part::{Hole, Text};
+        let text = |t: &str| Text(t.to_string());
+        for (parts, expected) in [
+            (vec![text("/api/users")], vec!["/api/users"]),
+            (
+                vec![text("/api/"), Hole, text("/posts")],
+                vec!["/api/", "/posts"],
+            ),
+            (vec![Hole, text("api/users")], vec!["api/users"]),
+            (
+                vec![text("https://"), Hole, text(".example.com/api/v2/"), Hole],
+                vec!["/api/v2/"],
+            ),
+            (vec![text("https://example.com")], vec![]),
+            (
+                vec![text("/api/users?page="), Hole, text("&x=1")],
+                vec!["/api/users"],
+            ),
+            (vec![Hole, Hole], vec![]),
+            // The trailing `/` of the end of the path is dropped, as route paths drop it.
+            (vec![text("/api/users/?page="), Hole], vec!["/api/users"]),
+            (
+                vec![text("/api/users/"), Hole, text("/")],
+                vec!["/api/users/"],
+            ),
+            (vec![text("/api/users/"), Hole], vec!["/api/users/"]),
+        ] {
+            assert_eq!(fragments(&parts), expected);
         }
     }
 }

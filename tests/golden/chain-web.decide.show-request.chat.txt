@@ -1,0 +1,89 @@
+POST <stub>/v1/chat/completions
+Authorization: <hidden>
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "content": "Pick the HTTP endpoint that a call in the repository example.com/chain/web reaches. You see the call, the function it is in, and the candidate endpoints, each under a key. Answer with the key of one candidate and the probability, from 0 to 1, that it is the right one.",
+      "role": "system"
+    },
+    {
+      "content": "Call:\nfetch(\"/api/health\")\n\nIn:\nfunction health() {\n  return fetch(\"/api/health\");\n}\n\nCandidates:\n1: example.com/chain/catalog GET /api/health\n2: example.com/chain/gateway GET /api/health\n",
+      "role": "user"
+    }
+  ],
+  "model": "local/test-model",
+  "response_format": {
+    "json_schema": {
+      "name": "decision",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "choice": {
+            "enum": [
+              "1",
+              "2"
+            ],
+            "type": "string"
+          },
+          "probability": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "choice",
+          "probability"
+        ],
+        "type": "object"
+      },
+      "strict": true
+    },
+    "type": "json_schema"
+  }
+}
+
+POST <stub>/v1/chat/completions
+Authorization: <hidden>
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "content": "Pick the HTTP endpoint that a call in the repository example.com/chain/web reaches. You see the call, the function it is in, and the candidate endpoints, each under a key. Answer with the key of one candidate and the probability, from 0 to 1, that it is the right one.",
+      "role": "system"
+    },
+    {
+      "content": "Call:\nfetch(event.url, { method: \"POST\" })\n\nIn:\nfunction track(event: { url: string }) {\n  return fetch(event.url, { method: \"POST\" });\n}\n\nCandidates:\n1: example.com/chain/catalog POST /api/events\n2: example.com/chain/gateway POST /api/events\n",
+      "role": "user"
+    }
+  ],
+  "model": "local/test-model",
+  "response_format": {
+    "json_schema": {
+      "name": "decision",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "choice": {
+            "enum": [
+              "1",
+              "2"
+            ],
+            "type": "string"
+          },
+          "probability": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "choice",
+          "probability"
+        ],
+        "type": "object"
+      },
+      "strict": true
+    },
+    "type": "json_schema"
+  }
+}

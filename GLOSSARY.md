@@ -100,6 +100,13 @@ _Avoid_: step, jump
 
 ### Decisions
 
+**Open item**:
+An ambiguous link or an unresolved consumer (a dynamic URL) of a repository that no decision
+resolves. Its id is the call-site identity, and its candidates are the providers the link lists
+or the routes the call's method and evaluated URL fragments leave. `search` lists open items
+and `meada decide` resolves them.
+_Avoid_: pending item, todo
+
 **Decision**:
 A recorded resolution of an ambiguous link or a dynamic URL, kept in `meada.decisions.toml` with
 who made it.
@@ -109,6 +116,14 @@ _Avoid_: override, verdict
 Whoever makes a decision: a person or, if the user opts in, a language model reached through
 `meada decide`.
 _Avoid_: judge, LLM, oracle
+
+**Stale decision**:
+A decision that no longer applies, for one cause: its call site is gone, its item is no longer
+open (the core now resolves the call on its own), its target is gone, or its target is no longer
+a candidate of the ambiguous link. Indexing ignores it, so the link stays as the core sees it;
+`meada status` and `meada export` report it with the cause. A decision whose target repository
+is a missing peer is neither applied nor stale: it waits.
+_Avoid_: outdated decision, invalid decision
 
 ### Testing
 

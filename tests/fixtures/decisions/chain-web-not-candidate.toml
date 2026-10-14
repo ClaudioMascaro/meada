@@ -1,0 +1,7 @@
+# The ambiguous health check, resolved to a route the catalog serves but that is no candidate
+# of the link.
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/chain/web::src/status.ts::health::fetch#0"
+target = "example.com/chain/catalog::http::GET::/api/products/{}"
+by = "human"

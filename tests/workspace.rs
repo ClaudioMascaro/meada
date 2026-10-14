@@ -77,7 +77,7 @@ fn search_rejects_an_unknown_kind_naming_the_valid_ones() {
 
     assert_eq!(
         error.to_string(),
-        "`kind` takes `symbol`, `contract` or `route`, not `file`"
+        "`kind` takes `symbol`, `contract`, `route`, `ambiguous` or `unresolved`, not `file`"
     );
 }
 

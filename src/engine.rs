@@ -1,18 +1,20 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
 use crate::contract::{self, Level, Link};
+pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
+pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, index, render, repo, trace};
+use crate::{Result, decisions, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -78,11 +80,13 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let links = self.links(&exports).into_iter();
+        let (links, mut evaluations) = self.links_and_decisions(&exports);
+        let links = links.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
         export.links = links.collect();
+        export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
@@ -98,6 +102,18 @@ impl Engine {
 
     /// Every link of the workspace, sorted.
     fn links(&self, exports: &[Export]) -> Vec<Link> {
+        self.links_and_decisions(exports).0
+    }
+
+    /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
+    /// each repository that did not apply, in workspace order.
+    fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
+        decisions::replay(self.core_links(exports), &self.workspace, exports)
+    }
+
+    /// Every link of the workspace as the core derives it from the stored contracts, before
+    /// any decision.
+    fn core_links(&self, exports: &[Export]) -> Vec<Link> {
         let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
@@ -113,8 +129,78 @@ impl Engine {
                 links.extend(kind.link(consumer, from, &providers));
             }
         }
-        links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
         links
+    }
+
+    /// For each repository of the workspace, in workspace order, the decisions that do not
+    /// apply with their cause (stale), and those that wait on a missing peer.
+    pub fn decision_report(&self) -> Result<Vec<Evaluation>> {
+        self.refresh()?;
+        Ok(self.links_and_decisions(&self.exports()?).1)
+    }
+
+    /// The decisions of the repository where Meada runs that are stale or waiting.
+    pub fn local_decisions(&self) -> Result<Evaluation> {
+        let all = self.decision_report()?;
+        Ok(all
+            .into_iter()
+            .find(|e| e.repository == self.identity)
+            .unwrap_or_else(|| Evaluation {
+                repository: self.identity.clone(),
+                stale: vec![],
+                waiting: vec![],
+            }))
+    }
+
+    /// The root of the repository where Meada runs.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// The open items whose call lives in the repository where Meada runs, in id order: the
+    /// ones `meada decide` works on.
+    pub fn local_items(&self) -> Result<Vec<OpenItem>> {
+        let mut items = self.open_items()?;
+        items.retain(|i| i.repository == self.identity);
+        Ok(items)
+    }
+
+    /// The item `id` of the repository where Meada runs, open or with a decision that applies,
+    /// as the core sees it (every candidate, as if undecided): what `meada decide --item`
+    /// redoes. `None` when the call is no such item.
+    pub fn local_item(&self, id: &str) -> Result<Option<OpenItem>> {
+        Ok((self.items()?.into_iter())
+            .map(|(item, _)| item)
+            .find(|i| i.id == id && i.repository == self.identity))
+    }
+
+    /// The open items of the workspace, ambiguous links and unresolved consumers that no
+    /// decision resolves, in id order, each with its sorted candidates. Callers keep the ones
+    /// whose `repository` they own.
+    pub fn open_items(&self) -> Result<Vec<OpenItem>> {
+        Ok((self.items()?.into_iter())
+            .filter_map(|(item, decided)| (!decided).then_some(item))
+            .collect())
+    }
+
+    /// The items of the workspace as the core sees them, in id order, each with whether a
+    /// decision applies to it (its call has a `decided` link once the decisions replay).
+    fn items(&self) -> Result<Vec<(OpenItem, bool)>> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let core = self.core_links(&exports);
+        let items = items::list(&self.workspace.repos, &exports, &core);
+        let (links, _) = decisions::replay(core, &self.workspace, &exports);
+        let decided: HashSet<&str> = (links.iter())
+            .filter(|l| l.level == Level::Decided)
+            .map(|l| l.consumer.as_str())
+            .collect();
+        Ok((items.into_iter())
+            .map(|item| {
+                let applied = decided.contains(item.id.as_str());
+                (item, applied)
+            })
+            .collect())
     }
 
     /// The chain from `start`, followed `direction` through calls inside repositories and
@@ -142,8 +228,13 @@ impl Engine {
     /// Symbols of the workspace whose name matches `query` case-insensitively, and contracts
     /// whose identifier or route path does, one line each: exact first, then prefix, then
     /// substring, ties by identity. `kind` keeps only `symbol`, `contract` or `route` (HTTP
-    /// contract) matches. The answer is cut at `budget` tokens.
+    /// contract) matches; `ambiguous` and `unresolved` list the open items whose enclosing
+    /// symbol or call expression matches, each with the `meada decide` command that resolves
+    /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
+        if let Some(item_kind) = kind.and_then(ItemKind::parse) {
+            return self.search_items(query, item_kind, budget);
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
             None => (true, Some("")),
@@ -151,7 +242,7 @@ impl Engine {
             Some("contract") => (false, Some("")),
             Some("route") => (false, Some("http::")),
             Some(other) => {
-                let valid = "`symbol`, `contract` or `route`";
+                let valid = "`symbol`, `contract`, `route`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -233,6 +324,43 @@ impl Engine {
         Ok(render::budgeted(&lines, budget))
     }
 
+    /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
+    fn search_items(&self, query: &str, kind: ItemKind, budget: Option<usize>) -> Result<String> {
+        let needle = query.to_lowercase();
+        // (rank, id, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for item in self.open_items()?.into_iter().filter(|i| i.kind == kind) {
+            let name = item.enclosing.as_ref().map(|e| e.name.to_lowercase());
+            let last = name.as_deref().and_then(|n| n.rsplit('.').next());
+            let Some(r) = [
+                name.as_deref(),
+                last,
+                Some(&*item.expression.to_lowercase()),
+            ]
+            .into_iter()
+            .flatten()
+            .filter_map(|n| rank(n, &needle))
+            .min() else {
+                continue;
+            };
+            let line = format!(
+                "{} {} ({}) candidates: {}; run `meada decide --item {}`",
+                item.repository,
+                item.location(),
+                kind.name(),
+                item.candidates.len(),
+                item.id
+            );
+            hits.push((r, item.id, line));
+        }
+        hits.sort();
+        if hits.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+        Ok(render::budgeted(&lines, budget))
+    }
+
     /// One symbol of the workspace: its span text read from disk (only while the file still
     /// has the indexed hash), its callers and its callees. `symbol` is an identity,
     /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
@@ -289,14 +417,28 @@ impl Engine {
             )]
         }));
         lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        lines.extend(contracts(identity, export, &mut files, symbol_found));
+        let links = self.links(&exports);
+        lines.extend(contracts(
+            identity,
+            export,
+            &links,
+            &mut files,
+            symbol_found,
+        ));
         Ok(render::budgeted(&lines, budget))
     }
 }
 
 /// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
-/// ones included; nothing when it has none.
-fn contracts(identity: &str, export: &Export, files: &mut Files, symbol: &Symbol) -> Vec<String> {
+/// ones included, each followed by its decided links (`links` are the workspace's); nothing
+/// when it has none.
+fn contracts(
+    identity: &str,
+    export: &Export,
+    links: &[Link],
+    files: &mut Files,
+    symbol: &Symbol,
+) -> Vec<String> {
     let mut lines: Vec<String> = export
         .providers
         .iter()
@@ -312,9 +454,26 @@ fn contracts(identity: &str, export: &Export, files: &mut Files, symbol: &Symbol
             continue;
         };
         let location = files.at(&call.span.path, call.span.start);
-        let contract = consumer.contract.clone();
-        let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
-        lines.push(format!("{identity} {location} consumes {contract}"));
+        let decided = links
+            .iter()
+            .filter(|l| l.consumer == consumer.site && l.level == Level::Decided)
+            .filter(|l| consumer.contract.as_ref().is_none_or(|c| *c == l.contract));
+        let mut any = false;
+        for link in decided {
+            any = true;
+            lines.push(format!(
+                "{identity} {location} consumes {} →[{}: {}] {}",
+                link.contract,
+                link.level.name(),
+                link.reason,
+                link.provider
+            ));
+        }
+        if !any {
+            let contract = consumer.contract.clone();
+            let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
+            lines.push(format!("{identity} {location} consumes {contract}"));
+        }
     }
     if lines.is_empty() {
         return lines;
@@ -411,23 +570,40 @@ fn ambiguous(call: &CallSite) -> String {
 }
 
 /// The workspace of the repository containing `dir`: each repository with where it is,
-/// relative to the one Meada runs in, and its index state, then every peer not found. It
-/// reads only; nothing is indexed.
+/// relative to the one Meada runs in, and its index state, each followed by the decisions of
+/// its `meada.decisions.toml` that are stale or wait on a missing peer; then every peer not
+/// found. It never creates an index: only when every repository is indexed at the current
+/// schema does it refresh them, like a query, to evaluate the decisions against the files as they
+/// are; otherwise it reports the states and no decision.
 pub fn status(dir: &Path) -> Result<String> {
     let workspace = Workspace::discover(dir)?;
     let here = &workspace.repos[0].root;
-    let mut lines: Vec<String> = workspace
-        .repos
-        .iter()
-        .map(|m| {
-            let state = match index::state(&m.root) {
-                State::Missing => Msg::NotIndexed.text(),
-                State::OtherSchema => Msg::OtherVersion.text(),
-                State::Indexed { files } => Msg::Indexed(files).text(),
-            };
-            format!("{} ({}) {state}", m.identity, relative(here, &m.root))
-        })
-        .collect();
+    let indexed =
+        |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
+    // A failure to open or refresh drops the decision lines, not the whole status.
+    let evaluations = if workspace.repos.iter().all(indexed) {
+        Engine::open(dir)
+            .and_then(|engine| engine.decision_report())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let mut lines = Vec::new();
+    for m in &workspace.repos {
+        let state = match index::state(&m.root) {
+            State::Missing => Msg::NotIndexed.text(),
+            State::OtherSchema => Msg::OtherVersion.text(),
+            State::Indexed { files } => Msg::Indexed(files).text(),
+        };
+        lines.push(format!(
+            "{} ({}) {state}",
+            m.identity,
+            relative(here, &m.root)
+        ));
+        for e in evaluations.iter().filter(|e| e.repository == m.identity) {
+            lines.extend(e.lines().map(|l| format!("  {l}")));
+        }
+    }
     lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
 }

@@ -1,0 +1,14 @@
+# Both open items of the chain's web repository, resolved to a repository the workspace names
+# but cannot find (the test adds `example.com/chain/billing` as a peer).
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/chain/web::src/status.ts::health::fetch#0"
+target = "example.com/chain/billing::http::GET::/api/health"
+by = "human"
+
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/chain/web::src/status.ts::track::fetch#0"
+target = "example.com/chain/billing::http::POST::/api/events"
+by = "openrouter/jev"
+p = 0.62

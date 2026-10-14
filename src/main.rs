@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use meada::decide;
 use meada::engine::{self, Engine};
 use meada::msg::{self, Msg};
 
@@ -19,6 +20,22 @@ enum Command {
     Status,
     Export,
     Mcp,
+    Decide {
+        #[arg(long)]
+        item: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        list: bool,
+        #[arg(long, conflicts_with_all = ["item", "dry_run", "list"])]
+        prune: bool,
+        #[arg(long)]
+        decider: bool,
+        #[arg(long, requires = "decider")]
+        show_request: bool,
+        #[arg(long, requires = "decider", allow_negative_numbers = true)]
+        min_p: Option<f64>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -29,6 +46,18 @@ fn main() -> ExitCode {
         .mut_subcommand("status", |c| c.about(Msg::Status.text()))
         .mut_subcommand("export", |c| c.about(Msg::Export.text()))
         .mut_subcommand("mcp", |c| c.about(Msg::Mcp.text()))
+        .mut_subcommand("decide", |c| {
+            c.about(Msg::Decide.text())
+                .mut_arg("item", |a| a.help(Msg::DecideItemHelp.text()))
+                .mut_arg("dry_run", |a| a.help(Msg::DecideDryRunHelp.text()))
+                .mut_arg("list", |a| a.help(Msg::DecideListHelp.text()))
+                .mut_arg("prune", |a| a.help(Msg::DecidePruneHelp.text()))
+                .mut_arg("decider", |a| a.help(Msg::DecideDeciderHelp.text()))
+                .mut_arg("show_request", |a| {
+                    a.help(Msg::DecideShowRequestHelp.text())
+                })
+                .mut_arg("min_p", |a| a.help(Msg::DecideMinPHelp.text()))
+        })
         .get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
@@ -39,6 +68,31 @@ fn main() -> ExitCode {
             meada::mcp::serve()
         }
         Command::Status => engine::status(here).map(|status| print!("{status}")),
+        Command::Decide {
+            item,
+            dry_run,
+            list,
+            prune,
+            decider,
+            show_request,
+            min_p,
+        } => Engine::open(here).and_then(|engine| {
+            let options = decide::Options {
+                item,
+                dry_run,
+                list,
+                prune,
+                decider,
+                show_request,
+                min_p,
+            };
+            decide::run(
+                &engine,
+                &options,
+                &mut std::io::stdin().lock(),
+                &mut std::io::stdout(),
+            )
+        }),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export => engine.export().map(|json| print!("{json}")),
             _ => engine.refresh(),

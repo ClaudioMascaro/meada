@@ -1,0 +1,13 @@
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/chain/web::src/status.ts::health::fetch#0"
+target = "example.com/chain/gateway::http::GET::/api/health"
+by = "local/test-model-2026"
+p = 0.9
+
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/chain/web::src/status.ts::track::fetch#0"
+target = "example.com/chain/catalog::http::POST::/api/events"
+by = "local/test-model-2026"
+p = 0.62

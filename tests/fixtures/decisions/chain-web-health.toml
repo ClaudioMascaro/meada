@@ -1,0 +1,6 @@
+# Only the ambiguous health check of the chain's web repository, resolved.
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/chain/web::src/status.ts::health::fetch#0"
+target = "example.com/chain/catalog::http::GET::/api/health"
+by = "human"

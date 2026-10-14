@@ -12,13 +12,15 @@ use crate::resolve::Code;
 use crate::workspace::Repository;
 
 /// How well a link is established. The order is the strength, strongest first: exact >
-/// inferred > ambiguous, so a chain takes its greatest (weakest) level. ADR 0005 adds declared
-/// and decided with later releases.
+/// inferred > decided > ambiguous, so a chain takes its greatest (weakest) level. ADR 0005
+/// adds declared, between exact and inferred, with spec #19.
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
     Exact,
     Inferred,
+    /// From `meada.decisions.toml` (ADR 0006).
+    Decided,
     Ambiguous,
 }
 
@@ -27,15 +29,21 @@ impl Level {
         match self {
             Level::Exact => "exact",
             Level::Inferred => "inferred",
+            Level::Decided => "decided",
             Level::Ambiguous => "ambiguous",
         }
     }
 
     /// The level `name` names, as the index stores call levels.
     pub fn parse(name: &str) -> Option<Self> {
-        [Level::Exact, Level::Inferred, Level::Ambiguous]
-            .into_iter()
-            .find(|l| l.name() == name)
+        [
+            Level::Exact,
+            Level::Inferred,
+            Level::Decided,
+            Level::Ambiguous,
+        ]
+        .into_iter()
+        .find(|l| l.name() == name)
     }
 }
 
@@ -47,6 +55,12 @@ pub struct Link {
     pub contract: String,
     pub level: Level,
     pub reason: String,
+    /// Who decided a `decided` link: `human` or a model id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    /// The probability a model stated for a `decided` link.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p: Option<f64>,
 }
 
 /// A contract the repository holds, before the index gives its site an identity.
@@ -56,6 +70,11 @@ pub struct Found {
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`.
     pub via: Option<String>,
+    /// For an unresolved consumer, the method it calls with when Meada could read it.
+    pub method: Option<String>,
+    /// For an unresolved consumer, the literal fragments of its URL path Meada could
+    /// evaluate, in order.
+    pub fragments: Vec<String>,
 }
 
 /// Where a contract sits; every path is repository-relative.

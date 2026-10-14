@@ -1,6 +1,8 @@
 //! Test harness: fixture repositories on disk and golden files.
 #![allow(dead_code)] // each test binary uses a different part of this module
 
+pub mod stub;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -42,6 +44,57 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
             Some("https://example.com/chain/catalog.git"),
         ),
     )
+}
+
+/// Copies `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml` (spec #18).
+/// The base chain fixture has no decisions file, so each test picks the variant it needs.
+pub fn decisions(repo: &Path, name: &str) {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/decisions")
+        .join(format!("{name}.toml"));
+    fs::copy(source, repo.join("meada.decisions.toml")).unwrap();
+}
+
+/// The chain's two open items, both in `chain-web`: the ambiguous health check and the
+/// unresolved tracking call.
+pub const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
+pub const TRACK: &str = "example.com/chain/web::src/status.ts::track::fetch#0";
+
+/// Runs `meada <args>` in `repo`, with `setup` adjusting the command (language, environment)
+/// and `stdin` as input. Returns stdout, stderr and success, with the repository's path
+/// replaced by `<repo>`.
+pub fn meada(
+    repo: &Path,
+    args: &[&str],
+    stdin: &str,
+    setup: impl FnOnce(&mut Command),
+) -> (String, String, bool) {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut command = Command::new(env!("CARGO_BIN_EXE_meada"));
+    command
+        .current_dir(repo)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    setup(&mut command);
+    let mut child = command.spawn().expect("meada runs");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    let text =
+        |bytes: &[u8]| String::from_utf8_lossy(bytes).replace(repo.to_str().unwrap(), "<repo>");
+    (text(&out.stdout), text(&out.stderr), out.status.success())
+}
+
+/// `<repo>/meada.decisions.toml`, when there is one.
+pub fn written(repo: &Path) -> Option<String> {
+    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
 }
 
 /// Runs `git` in `dir`, isolated from the user's and the system's git configuration, with a
