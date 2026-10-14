@@ -66,6 +66,17 @@ pub enum Msg<'a> {
     DecideNothing,
     DecideWrote(usize),
     DecideDryRun,
+    DecideDeciderHelp,
+    DecideShowRequestHelp,
+    DecideTooMany {
+        count: usize,
+        max: usize,
+    },
+    DecideFailed(&'a str),
+    DeciderInvalid(&'a str),
+    DeciderProtocol,
+    DeciderHttps,
+    DeciderLater,
 }
 
 impl Msg<'_> {
@@ -220,6 +231,47 @@ impl Msg<'_> {
             Msg::DecideDryRun => pick(
                 "dry run, meada.decisions.toml would be:".into(),
                 "execução a seco, meada.decisions.toml ficaria assim:".into(),
+            ),
+            Msg::DecideDeciderHelp => pick(
+                "Ask the model the MEADA_DECIDER_* variables configure instead of a person."
+                    .into(),
+                "Pergunta ao modelo configurado pelas variáveis MEADA_DECIDER_* em vez de a uma \
+                 pessoa."
+                    .into(),
+            ),
+            Msg::DecideShowRequestHelp => pick(
+                "With --decider: print every request the run would send, and send none.".into(),
+                "Com --decider: imprime cada requisição que a execução enviaria, e não envia \
+                 nenhuma."
+                    .into(),
+            ),
+            Msg::DecideTooMany { count, max } => pick(
+                format!("{count} candidates, more than {max}; skipped in decider mode"),
+                format!("{count} candidatos, mais de {max}; pulado no modo decisor"),
+            ),
+            Msg::DecideFailed(error) => pick(
+                format!("request failed: {error}"),
+                format!("a requisição falhou: {error}"),
+            ),
+            Msg::DeciderInvalid(var) => pick(
+                format!("`{var}` is not valid"),
+                format!("`{var}` não é válida"),
+            ),
+            Msg::DeciderProtocol => pick(
+                "`MEADA_DECIDER_PROTOCOL` must be `decisions` or `chat`".into(),
+                "`MEADA_DECIDER_PROTOCOL` deve ser `decisions` ou `chat`".into(),
+            ),
+            Msg::DeciderHttps => pick(
+                "`MEADA_DECIDER_URL` must use https, or http to a loopback address".into(),
+                "`MEADA_DECIDER_URL` deve usar https, ou http para um endereço de loopback".into(),
+            ),
+            Msg::DeciderLater => pick(
+                "the `decisions` protocol of `MEADA_DECIDER_PROTOCOL` is not available yet; \
+                 use `chat`"
+                    .into(),
+                "o protocolo `decisions` de `MEADA_DECIDER_PROTOCOL` ainda não está disponível; \
+                 use `chat`"
+                    .into(),
             ),
         }
     }

@@ -4,6 +4,7 @@
 mod config;
 mod contract;
 pub mod decide;
+mod decider;
 mod decisions;
 pub mod engine;
 mod http;

@@ -1,0 +1,306 @@
+//! Decider mode of `meada decide` (spec #18, ADR 0006): the configuration from the environment,
+//! the excerpt of each item, the requests of the configured protocol and the HTTP client. This
+//! is the only network path of Meada, and only `meada decide --decider` reaches it.
+//!
+//! The protocol adapters (`chat`, and `decisions` once it lands) only turn questions into
+//! requests and answers into proposals; reading the environment, choosing the eligible items,
+//! printing and sending stay here. The key is held by `Config` alone, which has no `Debug`, and
+//! leaves it only as the `Authorization` header of a request on the wire.
+
+mod chat;
+
+use std::env::VarError;
+use std::fs;
+use std::io::Write;
+use std::net::IpAddr;
+use std::path::Path;
+use std::time::Duration;
+
+use serde_json::Value;
+
+use crate::Result;
+use crate::decisions::Decision;
+use crate::engine::OpenItem;
+use crate::msg::Msg;
+
+/// An item with more candidates than this is skipped in decider mode and reported as such; the
+/// excerpt would grow past what a judgment of one call needs. Human mode still offers it.
+pub const MAX_CANDIDATES: usize = 50;
+
+/// How long one request may take, connection to last byte. There are no retries.
+const TIMEOUT: Duration = Duration::from_secs(120);
+
+/// What `--show-request` prints in place of the `Authorization` header value.
+const HIDDEN: &str = "<hidden>";
+
+const PROTOCOL: &str = "MEADA_DECIDER_PROTOCOL";
+const URL: &str = "MEADA_DECIDER_URL";
+const KEY: &str = "MEADA_DECIDER_KEY";
+const MODEL: &str = "MEADA_DECIDER_MODEL";
+
+/// The defaults of the `decisions` protocol: OpenRouter, and Jev.
+const DECISIONS_URL: &str = "https://openrouter.ai";
+const DECISIONS_MODEL: &str = "typesafe/jev-1.13";
+
+/// The task every protocol states, with the repository identity of the item.
+fn task(repository: &str) -> String {
+    format!(
+        "Pick the HTTP endpoint that a call in the repository {repository} reaches. You see the \
+         call, the function it is in, and the candidate endpoints, each under a key. Answer with \
+         the key of one candidate and the probability, from 0 to 1, that it is the right one."
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Protocol {
+    /// OpenRouter's decisions API: one request carries every item.
+    Decisions,
+    /// An OpenAI-compatible chat completions endpoint: one request per item.
+    Chat,
+}
+
+/// The decider configuration. Deliberately not `Debug`: the key must never be printed.
+pub(crate) struct Config {
+    pub protocol: Protocol,
+    /// The base URL, without a trailing `/`.
+    pub url: String,
+    key: Option<String>,
+    pub model: String,
+}
+
+impl Config {
+    /// Reads the decider variables. A missing or invalid one is an error naming it; an empty
+    /// value counts as missing. Nothing is read from a file.
+    pub(crate) fn from_env() -> Result<Self> {
+        let var = |name: &'static str| match std::env::var(name) {
+            Ok(value) if value.is_empty() => Ok(None),
+            Ok(value) => Ok(Some(value)),
+            Err(VarError::NotPresent) => Ok(None),
+            Err(VarError::NotUnicode(_)) => Err(Msg::DeciderInvalid(name).text()),
+        };
+        let protocol = match var(PROTOCOL)?.as_deref() {
+            None | Some("decisions") => Protocol::Decisions,
+            Some("chat") => Protocol::Chat,
+            Some(_) => return Err(Msg::DeciderProtocol.text().into()),
+        };
+        let (url, model) = match protocol {
+            Protocol::Decisions => (Some(DECISIONS_URL), Some(DECISIONS_MODEL)),
+            Protocol::Chat => (None, None),
+        };
+        let required = |name, default: Option<&str>| match var(name)? {
+            Some(value) => Ok(value),
+            None => default
+                .map(String::from)
+                .ok_or_else(|| Msg::KeyMissing(name).text()),
+        };
+        let url = required(URL, url)?;
+        if !allowed(&url) {
+            return Err(Msg::DeciderHttps.text().into());
+        }
+        let model = required(MODEL, model)?;
+        let key = var(KEY)?;
+        match &key {
+            None if protocol == Protocol::Decisions => {
+                return Err(Msg::KeyMissing(KEY).text().into());
+            }
+            // A token of visible ASCII only: anything else could not travel as a header value.
+            Some(key) if !key.bytes().all(|b| b.is_ascii_graphic()) => {
+                return Err(Msg::DeciderInvalid(KEY).text().into());
+            }
+            _ => {}
+        }
+        Ok(Self {
+            protocol,
+            url: url.trim_end_matches('/').into(),
+            key,
+            model,
+        })
+    }
+}
+
+/// HTTPS anywhere; plain HTTP only to a loopback address (a local model, the test stub). The
+/// scheme is case-insensitive.
+fn allowed(url: &str) -> bool {
+    match url.split_once("://") {
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("https") => !rest.is_empty(),
+        Some((scheme, _)) if scheme.eq_ignore_ascii_case("http") => loopback(url),
+        _ => false,
+    }
+}
+
+/// Whether the host of `url` is `localhost` or a loopback IP address.
+fn loopback(url: &str) -> bool {
+    let Some((_, rest)) = url.split_once("://") else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#', '\\']).next().unwrap_or_default();
+    let host = authority.rsplit('@').next().unwrap_or_default();
+    let host = match host.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or_default(),
+        None => host.split(':').next().unwrap_or_default(),
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
+/// What a decider sees of one item (ADR 0002, invariant 2): the call expression, the span of
+/// its enclosing function read from disk, and the candidates. No provider code, nothing else
+/// from the repository.
+pub(crate) struct Question {
+    /// The item id, its call-site identity.
+    pub id: String,
+    /// The identity of the repository that holds the call.
+    pub repository: String,
+    /// The call as written, on one line.
+    pub call: String,
+    /// The enclosing function as it is on disk; `None` for a call at the top level of a file.
+    pub enclosing: Option<String>,
+    /// `(key, description)` in candidate order: the key is the candidate's 1-based position,
+    /// as a string; the description its repository identity, method and path.
+    pub candidates: Vec<(String, String)>,
+}
+
+impl Question {
+    fn new(root: &Path, item: &OpenItem) -> Result<Self> {
+        let enclosing = match &item.enclosing {
+            Some(symbol) => {
+                let source = fs::read(root.join(&item.path))?;
+                let text = source.get(symbol.span.clone()).unwrap_or_default();
+                Some(String::from_utf8_lossy(text).into_owned())
+            }
+            None => None,
+        };
+        Ok(Self {
+            id: item.id.clone(),
+            repository: item.repository.clone(),
+            call: item.expression.clone(),
+            enclosing,
+            candidates: (item.candidates.iter().enumerate())
+                .map(|(n, c)| ((n + 1).to_string(), crate::decide::describe(c)))
+                .collect(),
+        })
+    }
+
+    /// The call and its enclosing function, as plain text.
+    pub fn excerpt(&self) -> String {
+        match &self.enclosing {
+            Some(function) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
+            None => format!("Call (at the top level of its file):\n{}\n", self.call),
+        }
+    }
+
+    /// The candidates, one `<key>: <description>` per line.
+    pub fn listing(&self) -> String {
+        (self.candidates.iter())
+            .map(|(key, description)| format!("{key}: {description}\n"))
+            .collect()
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.candidates
+            .iter()
+            .map(|(key, _)| key.as_str())
+            .collect()
+    }
+}
+
+/// One HTTP request of a run: always a `POST` of a JSON body.
+pub(crate) struct Request {
+    /// The ids of the items it asks about, in item order.
+    pub items: Vec<String>,
+    /// The full endpoint URL.
+    pub url: String,
+    pub body: Value,
+}
+
+impl Config {
+    /// The requests the configured protocol sends for `questions`, in item order.
+    fn requests(&self, questions: &[Question]) -> Result<Vec<Request>> {
+        match self.protocol {
+            Protocol::Chat => Ok(questions.iter().map(|q| chat::request(self, q)).collect()),
+            Protocol::Decisions => Err(Msg::DeciderLater.text().into()),
+        }
+    }
+
+    /// Prints `request` as it would leave the machine, with the key replaced by `HIDDEN`.
+    fn show(&self, request: &Request, out: &mut impl Write) -> Result<()> {
+        writeln!(out, "POST {}", request.url)?;
+        if self.key.is_some() {
+            writeln!(out, "Authorization: {HIDDEN}")?;
+        }
+        writeln!(out, "Content-Type: application/json")?;
+        writeln!(out)?;
+        writeln!(out, "{}", serde_json::to_string_pretty(&request.body)?)?;
+        Ok(())
+    }
+
+    /// Sends `request` and returns the body of a success answer. The key goes only into the
+    /// `Authorization` header; no error message carries a header.
+    fn send(&self, agent: &ureq::Agent, request: &Request) -> Result<String> {
+        let mut call = agent
+            .post(&request.url)
+            .header("Content-Type", "application/json");
+        if let Some(key) = &self.key {
+            call = call.header("Authorization", format!("Bearer {key}"));
+        }
+        let mut answer = call.send(request.body.to_string())?;
+        Ok(answer.body_mut().read_to_string()?)
+    }
+}
+
+/// Decider mode over `items`: skips the items with no candidate or more than `MAX_CANDIDATES`
+/// and reports them, then prints the requests (`show_request`) or sends them in item order.
+/// Reading the answers into decisions belongs to the next ticket; until then the run returns
+/// none and reports each failed request with its items.
+pub(crate) fn run(
+    config: &Config,
+    root: &Path,
+    items: &[OpenItem],
+    show_request: bool,
+    out: &mut impl Write,
+) -> Result<Vec<Decision>> {
+    let mut questions = Vec::new();
+    let mut skipped = false;
+    for item in items {
+        let skip = match item.candidates.len() {
+            0 => Msg::DecideNoCandidates,
+            n if n > MAX_CANDIDATES => Msg::DecideTooMany {
+                count: n,
+                max: MAX_CANDIDATES,
+            },
+            _ => {
+                questions.push(Question::new(root, item)?);
+                continue;
+            }
+        };
+        writeln!(out, "{}\n{}", item.id, skip.text())?;
+        skipped = true;
+    }
+    let requests = config.requests(&questions)?;
+    if show_request {
+        for (n, request) in requests.iter().enumerate() {
+            if n > 0 || skipped {
+                writeln!(out)?;
+            }
+            config.show(request, out)?;
+        }
+        return Ok(Vec::new());
+    }
+    let mut agent = ureq::Agent::config_builder()
+        .timeout_global(Some(TIMEOUT))
+        // A redirect could carry the key to another host or drop HTTPS.
+        .max_redirects(0);
+    if loopback(&config.url) {
+        // A proxy would carry the key and the excerpt off the machine, in clear over HTTP.
+        agent = agent.proxy(None);
+    }
+    let agent: ureq::Agent = agent.build().into();
+    for request in &requests {
+        if let Err(e) = config.send(&agent, request) {
+            for id in &request.items {
+                writeln!(out, "{id}\n{}", Msg::DecideFailed(&e.to_string()).text())?;
+            }
+        }
+    }
+    Ok(Vec::new())
+}

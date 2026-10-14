@@ -1,6 +1,8 @@
 //! Test harness: fixture repositories on disk and golden files.
 #![allow(dead_code)] // each test binary uses a different part of this module
 
+pub mod stub;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
