@@ -117,3 +117,17 @@ fn an_unresolved_consumer_shows_in_search_and_context_but_never_links() {
         &engine.context("dynamic", None).unwrap(),
     );
 }
+
+#[test]
+fn destructured_parameters_fold_like_positional_ones() {
+    let case = "urls_destructured";
+    let reports = fixture_repo(
+        case,
+        "http-destructured",
+        Some("https://example.com/acme/portal.git"),
+    );
+
+    let export = Engine::open(&reports).unwrap().export().unwrap();
+
+    assert_golden("http-destructured.export.json", &export);
+}

@@ -109,7 +109,8 @@ pub struct Def {
     pub name: String,
     pub kind: Kind,
     pub range: Range<usize>,
-    /// A function's parameters in order; a destructured one has an empty name.
+    /// A function's parameters in order; a destructured one has an empty name and lists the
+    /// names it binds in `fields`.
     pub params: Vec<Param>,
 }
 
@@ -117,6 +118,20 @@ pub struct Def {
 pub struct Param {
     pub name: String,
     /// The default value, as written. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub default: Option<Value>,
+    /// The names an object pattern binds, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<Field>,
+}
+
+/// A name bound by a destructured object parameter: `{ key: name = default }`.
+#[derive(Serialize, Deserialize)]
+pub struct Field {
+    pub name: String,
+    /// The property of the argument it reads.
+    pub key: String,
+    /// The default value, as written. Not kept in the index.
     #[serde(skip)]
     pub default: Option<Value>,
 }
