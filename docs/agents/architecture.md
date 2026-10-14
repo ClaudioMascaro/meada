@@ -51,7 +51,7 @@ give byte-identical output.
   `describe`; `None` enclosing at top level), `MAX_CANDIDATES` (50: more is skipped in decider
   mode only), `Config::requests` (the protocol dispatch), `show` (`--show-request`, the
   `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
-  redirects, no retries). `Config` has no `Debug`; the key leaves it only as the bearer header.
+  proxy to a loopback host, no redirects, no retries). `Config` has no `Debug`; the key leaves it only as the bearer header.
   Protocol adapters are files beside it that only build requests (and later read answers):
   `chat.rs` (`request(config, question)`, one `POST <url>/chat/completions` per item). A new
   protocol adds a file and one arm in `Config::requests`. Reading answers into decisions is not

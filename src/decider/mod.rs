@@ -118,12 +118,19 @@ impl Config {
     }
 }
 
-/// HTTPS anywhere; plain HTTP only to a loopback address (a local model, the test stub).
+/// HTTPS anywhere; plain HTTP only to a loopback address (a local model, the test stub). The
+/// scheme is case-insensitive.
 fn allowed(url: &str) -> bool {
-    if let Some(rest) = url.strip_prefix("https://") {
-        return !rest.is_empty();
+    match url.split_once("://") {
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("https") => !rest.is_empty(),
+        Some((scheme, _)) if scheme.eq_ignore_ascii_case("http") => loopback(url),
+        _ => false,
     }
-    let Some(rest) = url.strip_prefix("http://") else {
+}
+
+/// Whether the host of `url` is `localhost` or a loopback IP address.
+fn loopback(url: &str) -> bool {
+    let Some((_, rest)) = url.split_once("://") else {
         return false;
     };
     let authority = rest.split(['/', '?', '#', '\\']).next().unwrap_or_default();
@@ -279,12 +286,15 @@ pub(crate) fn run(
         }
         return Ok(Vec::new());
     }
-    let agent: ureq::Agent = ureq::Agent::config_builder()
+    let mut agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
         // A redirect could carry the key to another host or drop HTTPS.
-        .max_redirects(0)
-        .build()
-        .into();
+        .max_redirects(0);
+    if loopback(&config.url) {
+        // A proxy would carry the key and the excerpt off the machine, in clear over HTTP.
+        agent = agent.proxy(None);
+    }
+    let agent: ureq::Agent = agent.build().into();
     for request in &requests {
         if let Err(e) = config.send(&agent, request) {
             for id in &request.items {

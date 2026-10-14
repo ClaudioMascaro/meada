@@ -20,6 +20,8 @@ const VARS: [&str; 4] = [
     "MEADA_DECIDER_MODEL",
 ];
 
+const PROXIES: [&str; 3] = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"];
+
 /// Runs `meada <args>` in `repo` with only the decider variables in `env` set (the inherited
 /// ones are removed) and `stdin` as input. Returns stdout, stderr and success, with the
 /// repository's path replaced by `<repo>` and `stub` (when given) by `<stub>`, after checking
@@ -36,8 +38,10 @@ fn meada(
         .current_dir(repo)
         .args(args)
         .env("LANG", "en_US.UTF-8");
-    for var in VARS {
+    // No inherited proxy either: the test key must not travel anywhere but to the stub.
+    for var in VARS.iter().chain(&PROXIES) {
         command.env_remove(var);
+        command.env_remove(var.to_ascii_lowercase());
     }
     command.envs(env.iter().map(|(k, v)| (k, v)));
     let mut child = command
@@ -98,6 +102,66 @@ fn show_request_prints_the_golden_chat_requests_and_sends_nothing() {
     assert_golden("chain-web.decide.show-request.chat.txt", &stdout);
     assert!(stub.requests().is_empty());
     assert!(!web.join("meada.decisions.toml").exists());
+}
+
+#[test]
+fn the_url_must_use_https_except_to_a_loopback_host() {
+    let (web, _, _) = chain("decider_urls");
+    let stub = Stub::start(vec![]);
+    let port = stub.url.rsplit(':').next().unwrap().to_string();
+    let show = ["decide", "--decider", "--show-request"];
+    let rejected = [
+        "http://localhost@evil.com".to_string(),
+        "http://127.0.0.1.evil.com".into(),
+        "http://0.0.0.0".into(),
+        "http://localhost.".into(),
+        "http://[::ffff:127.0.0.1]".into(),
+        "HTTP://example.com".into(),
+    ];
+    let accepted = [
+        format!("http://[::1]:{port}"),
+        format!("http://user@127.0.0.1:{port}"),
+        format!("HTTP://127.0.0.1:{port}"),
+        "HTTPS://example.com/v1".into(),
+    ];
+
+    for (urls, ok) in [(&rejected[..], false), (&accepted[..], true)] {
+        for url in urls {
+            let mut env = chat(&stub);
+            env.retain(|(var, _)| *var != "MEADA_DECIDER_URL");
+            env.push(("MEADA_DECIDER_URL", url.clone()));
+            let (_, stderr, success) = meada(&web, &show, &env, "", Some(&stub));
+            assert_eq!(success, ok, "{url}: {stderr}");
+            if !ok {
+                assert!(
+                    stderr.starts_with("meada: `MEADA_DECIDER_URL` must use https"),
+                    "{url}: {stderr}"
+                );
+            }
+        }
+    }
+    assert!(stub.requests().is_empty());
+}
+
+#[test]
+fn a_loopback_decider_is_reached_directly_whatever_the_proxy_variables_say() {
+    let (web, _, _) = chain("decider_proxy");
+    let answer = serde_json::json!({"choice": "1", "probability": 0.5});
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model", answer.clone()),
+        Reply::chat("local/test-model", answer),
+    ]);
+    let proxy = Stub::start(vec![]);
+    let mut env = chat(&stub);
+    for var in PROXIES {
+        env.push((var, proxy.url.clone()));
+    }
+
+    let (_, stderr, ok) = meada(&web, &["decide", "--decider"], &env, "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    assert_eq!(stub.requests().len(), 2);
+    assert!(proxy.requests().is_empty());
 }
 
 #[test]
