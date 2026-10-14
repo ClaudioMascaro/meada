@@ -267,7 +267,10 @@ impl Config {
     }
 
     /// Sends `request` and returns the body of a success answer. The key goes only into the
-    /// `Authorization` header; no error message carries a header.
+    /// `Authorization` header; no error message carries a header. An endpoint that reflects
+    /// the key in its answer would put it in what is printed and recorded, so every
+    /// occurrence in the body (as is, and as JSON escapes it) becomes `HIDDEN` here, before
+    /// anything parses the body.
     fn send(&self, agent: &ureq::Agent, request: &Request) -> Result<String> {
         let mut call = agent
             .post(&request.url)
@@ -276,7 +279,15 @@ impl Config {
             call = call.header("Authorization", format!("Bearer {key}"));
         }
         let mut answer = call.send(request.body.to_string())?;
-        Ok(answer.body_mut().read_to_string()?)
+        let body = answer.body_mut().read_to_string()?;
+        Ok(match &self.key {
+            Some(key) => {
+                let escaped = serde_json::to_string(key)?;
+                body.replace(key, HIDDEN)
+                    .replace(&escaped[1..escaped.len() - 1], HIDDEN)
+            }
+            None => body,
+        })
     }
 }
 

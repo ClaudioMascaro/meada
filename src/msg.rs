@@ -301,8 +301,8 @@ impl Msg<'_> {
                 format!("a probabilidade {p} não está entre 0 e 1"),
             ),
             Msg::AnswerBy(by) => pick(
-                format!("`{by}` cannot be recorded as the model id"),
-                format!("`{by}` não pode ser gravado como id do modelo"),
+                format!("model id {by:?} cannot be recorded"),
+                format!("o id de modelo {by:?} não pode ser gravado"),
             ),
             Msg::DecideMinP => pick(
                 "`--min-p` must be a number from 0 to 1".into(),

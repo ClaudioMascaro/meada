@@ -112,14 +112,13 @@ pub fn run(
     input: &mut impl BufRead,
     out: &mut impl Write,
 ) -> Result<()> {
+    // Checked whenever it is given, whatever else the run does.
+    let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
     if options.prune {
         return prune(engine, out);
     }
     let config = match options.decider && !options.list {
-        true => {
-            let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
-            Some((decider::Config::from_env()?, min_p))
-        }
+        true => Some((decider::Config::from_env()?, min_p)),
         false => None,
     };
     let items = items(engine, options.item.as_deref())?;

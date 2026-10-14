@@ -38,7 +38,8 @@ pub(super) fn probability(p: f64) -> Result<f64> {
 }
 
 /// The answer of a decider to `question`: `choice` must be an offered key, `p` a probability,
-/// and `by` a model id (`human` is the person's, so a model may not take it).
+/// and `by` a model id: printed and recorded, so no control characters, and not `human`, which
+/// is the person's.
 pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> Result<Proposal> {
     let Some(at) = question.keys().iter().position(|key| *key == choice) else {
         let keys = question.keys().join(", ");
@@ -51,7 +52,7 @@ pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> R
         ));
     };
     let p = probability(p)?;
-    if by.is_empty() || by == "human" {
+    if by.is_empty() || by == "human" || by.chars().any(char::is_control) {
         return Err(invalid(Msg::AnswerBy(by).text()));
     }
     Ok(Proposal {

@@ -539,7 +539,12 @@ fn a_malformed_answer_fails_its_item_alone_and_the_others_are_still_written() {
         (
             "model id human",
             Reply::chat("human", answer("1", 0.9)),
-            "`human` cannot be recorded as the model id",
+            "model id \"human\" cannot be recorded",
+        ),
+        (
+            "model id with control characters",
+            Reply::chat("evil\u{1b}[2J", answer("1", 0.9)),
+            "model id \"evil\\u{1b}[2J\" cannot be recorded",
         ),
     ];
 
@@ -679,4 +684,49 @@ fn dry_run_sends_and_prints_the_proposals_and_leaves_the_file_alone() {
     assert!(stdout.contains(&format!("call = \"{HEALTH}\"")), "{stdout}");
     assert!(!stdout.contains(&format!("call = \"{TRACK}\"")), "{stdout}");
     assert!(written(&web).is_none());
+}
+
+#[test]
+fn a_key_reflected_in_a_success_answer_reaches_no_output_and_no_file() {
+    let (web, _, _) = chain("decider_reflect");
+    // The first answer names the key as its model id, which would be recorded; the second
+    // has it as the probability, which a parse error would quote.
+    let stub = Stub::start(vec![
+        Reply::chat(KEY, answer("2", 0.9)),
+        Reply::ok(serde_json::json!({
+            "model": "local/test-model",
+            "choices": [{"message": {"content": format!(r#"{{"choice": "1", "probability": "{KEY}"}}"#)}}],
+        })),
+    ]);
+
+    // `meada` itself asserts that the key is in neither stream.
+    let (stdout, _, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(!ok);
+    assert!(stdout.contains("<hidden>"), "{stdout}");
+    let file = written(&web).unwrap();
+    assert!(
+        !file.contains(KEY) && file.contains("by = \"<hidden>\""),
+        "{file}"
+    );
+}
+
+#[test]
+fn min_p_is_validated_with_list_and_prune_too() {
+    let (web, _, _) = chain("decider_min_p_list");
+    for mode in ["--list", "--prune"] {
+        let args = ["decide", "--decider", mode, "--min-p", "7"];
+        let (_, stderr, ok) = meada(&web, &args, &[], "", None);
+        assert!(!ok, "{mode}");
+        assert!(
+            stderr.starts_with("meada: `--min-p` must be a number from 0 to 1"),
+            "{mode}: {stderr}"
+        );
+    }
 }
