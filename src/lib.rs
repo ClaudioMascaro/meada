@@ -4,6 +4,8 @@
 pub mod engine;
 mod index;
 mod lang;
+pub mod mcp;
+mod render;
 pub mod repo;
 mod resolve;
 
