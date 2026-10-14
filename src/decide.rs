@@ -1,12 +1,14 @@
 //! `meada decide` (spec #18, ADR 0006): resolves the open items of the repository where Meada
 //! runs and records the picks in `meada.decisions.toml`. Human mode asks on a terminal, or reads
 //! the same lines from a script; it reads no environment variable and opens no connection.
+//! Decider mode (`--decider`, `crate::decider`) asks a model instead.
 
 use std::io::{BufRead, Write};
 
 use crate::Result;
+use crate::decider;
 use crate::decisions::{self, Decision};
-use crate::engine::{Engine, OpenItem};
+use crate::engine::{Candidate, Engine, OpenItem};
 use crate::msg::Msg;
 
 /// What the command line asked for.
@@ -18,6 +20,10 @@ pub struct Options {
     pub dry_run: bool,
     /// Print the open items and neither ask nor write.
     pub list: bool,
+    /// Ask the model the `MEADA_DECIDER_*` variables configure instead of a person.
+    pub decider: bool,
+    /// Decider mode: print every request the run would send, and send none.
+    pub show_request: bool,
 }
 
 /// The open items of this repository to work on, in id order; with `only`, that one item.
@@ -38,13 +44,17 @@ fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
     for (n, c) in item.candidates.iter().enumerate() {
-        let what = match c.method() {
-            "" => c.contract.clone(),
-            method => format!("{method} {}", c.path()),
-        };
-        writeln!(out, "  {}) {} {what}", n + 1, c.repository)?;
+        writeln!(out, "  {}) {}", n + 1, describe(c))?;
     }
     Ok(())
+}
+
+/// A candidate as a person or a decider sees it: repository identity, method and path.
+pub(crate) fn describe(c: &Candidate) -> String {
+    match c.method() {
+        "" => format!("{} {}", c.repository, c.contract),
+        method => format!("{} {method} {}", c.repository, c.path()),
+    }
 }
 
 /// Asks about each of `items` on `out` and reads the answers from `input`: a number picks that
@@ -88,15 +98,20 @@ pub(crate) fn ask(
     Ok(picks)
 }
 
-/// Runs the command in human mode: `--list` shows the items; otherwise it asks, then writes
-/// the file once, at the end (or prints it for `--dry-run`). Nothing is written when nothing
-/// was picked.
+/// Runs the command: `--list` shows the items; otherwise it asks a person, or the decider with
+/// `--decider`, then writes the file once, at the end (or prints it for `--dry-run`). Nothing
+/// is written when nothing was picked. Only decider mode reads the decider variables, and
+/// `--list` reads none.
 pub fn run(
     engine: &Engine,
     options: &Options,
     input: &mut impl BufRead,
     out: &mut impl Write,
 ) -> Result<()> {
+    let config = match options.decider && !options.list {
+        true => Some(decider::Config::from_env()?),
+        false => None,
+    };
     let items = items(engine, options.item.as_deref())?;
     if items.is_empty() {
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
@@ -111,7 +126,16 @@ pub fn run(
         }
         return Ok(());
     }
-    let picks = ask(&items, input, out)?;
+    let picks = match &config {
+        Some(config) => {
+            let picks = decider::run(config, engine.root(), &items, options.show_request, out)?;
+            if options.show_request {
+                return Ok(());
+            }
+            picks
+        }
+        None => ask(&items, input, out)?,
+    };
     finish(engine, picks, options.dry_run, out)
 }
 

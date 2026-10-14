@@ -27,6 +27,10 @@ enum Command {
         dry_run: bool,
         #[arg(long)]
         list: bool,
+        #[arg(long)]
+        decider: bool,
+        #[arg(long, requires = "decider")]
+        show_request: bool,
     },
 }
 
@@ -43,6 +47,10 @@ fn main() -> ExitCode {
                 .mut_arg("item", |a| a.help(Msg::DecideItemHelp.text()))
                 .mut_arg("dry_run", |a| a.help(Msg::DecideDryRunHelp.text()))
                 .mut_arg("list", |a| a.help(Msg::DecideListHelp.text()))
+                .mut_arg("decider", |a| a.help(Msg::DecideDeciderHelp.text()))
+                .mut_arg("show_request", |a| {
+                    a.help(Msg::DecideShowRequestHelp.text())
+                })
         })
         .get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
@@ -58,11 +66,15 @@ fn main() -> ExitCode {
             item,
             dry_run,
             list,
+            decider,
+            show_request,
         } => Engine::open(here).and_then(|engine| {
             let options = decide::Options {
                 item,
                 dry_run,
                 list,
+                decider,
+                show_request,
             };
             decide::run(
                 &engine,

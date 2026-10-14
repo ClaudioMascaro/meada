@@ -32,9 +32,25 @@ give byte-identical output.
   candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
   dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
   writes nothing) and `run`, the public entry. Human mode reads no environment variable and
-  opens no connection. Model deciders (later tickets) fill `Vec<Decision>` and call `finish`.
+  opens no connection. With `--decider` (and not `--list`), `run` reads `decider::Config` first,
+  then hands the items to `decider::run`, which returns the `Vec<Decision>` for `finish`;
+  `--show-request` stops after printing. `describe(candidate)` is the one candidate line
+  (repository identity, method, path) shared by the prompt and the excerpt.
+- `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
+  `Config::from_env` (the four `MEADA_DECIDER_*` variables, read nowhere else: errors name the
+  variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.13` and needs the key, `chat`
+  needs URL and model; HTTPS except to a loopback host), `Question` (the excerpt: call
+  expression, enclosing function span read from disk, candidates keyed `"1".."n"` with
+  `describe`; `None` enclosing at top level), `MAX_CANDIDATES` (50: more is skipped in decider
+  mode only), `Config::requests` (the protocol dispatch), `show` (`--show-request`, the
+  `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
+  redirects, no retries). `Config` has no `Debug`; the key leaves it only as the bearer header.
+  Protocol adapters are files beside it that only build requests (and later read answers):
+  `chat.rs` (`request(config, question)`, one `POST <url>/chat/completions` per item). A new
+  protocol adds a file and one arm in `Config::requests`. Reading answers into decisions is not
+  there yet (`run` reports failed requests and returns none).
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
-  `--list`). `search`, `context` and `trace`
+  `--list`, `--decider`, `--show-request`, which requires `--decider`). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
@@ -131,6 +147,10 @@ give byte-identical output.
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
   no relinking. `Level` order: `exact` < `inferred` < `decided` < `ambiguous` (`declared` joins
   with spec #19).
+- Network: `decider::Config::send` is the only code that opens a connection, and only
+  `meada decide --decider` without `--show-request` or `--list` reaches it. Indexing, queries,
+  `status` and the MCP server never read the `MEADA_DECIDER_*` variables. `ureq` is the only
+  HTTP dependency.
 - One index per identity: a second clone of a repository already in the workspace is skipped.
 - `context` shows span text only while the file's BLAKE3 still equals the indexed hash; on a
   mismatch it forgets the file's mtime, refreshes and retries once.
@@ -153,9 +173,18 @@ give byte-identical output.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
   (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, stale, parse
-  errors), `decide` (the binary in human mode over scripted stdin), `freshness` (cold vs refreshed), `items` (open items and their `search` goldens,
+  errors), `decide` (the binary in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness` (cold vs refreshed), `items` (open items and their `search` goldens,
   fixtures `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
   `LANG`), `mcp` (the binary over stdio).
+- **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
+  listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
+  the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
+  once it runs out, 404 on other paths) and records every request it receives
+  (`requests() -> Vec<Request {method, path, headers, body}>`, `header(name)`, `json()`).
+  `Reply::chat(model, content)`, `Reply::ok(json)`, `Reply::status(code, body)`.
+  `tests/decider.rs` runs the binary with only the decider variables it sets and asserts the
+  key is in no output; `--show-request`, `--list`, human mode, `index`, `export`, `status` and
+  the MCP server leave the stub with zero requests.
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
 
