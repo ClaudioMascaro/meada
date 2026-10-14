@@ -7,6 +7,7 @@ Commands:
   status  Show the workspace: each repository, its index state and any peer not found.
   export  Print the index as sorted JSON, with the links that touch it.
   mcp     Serve the repository in the current directory to agents over MCP (stdio).
+  decide  Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
   help    Print this message or the help of the given subcommand(s)
 
 Options:
