@@ -42,7 +42,8 @@ pub(crate) struct Graph<'a> {
     /// The calls that may reach each symbol, ambiguous ones included, in workspace and source
     /// order.
     callers: HashMap<&'a str, Vec<Call<'a>>>,
-    consumers: HashMap<&'a str, &'a Consumer>,
+    /// The consumers at each call site: a client wrapper's call holds one per URL it builds.
+    consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
     /// Links by consumer and by provider, each sorted as the engine sorts links.
@@ -76,7 +77,7 @@ impl<'a> Graph<'a> {
                 }
             }
             for c in &export.consumers {
-                graph.consumers.insert(&c.site, c);
+                graph.consumers.entry(&c.site).or_default().push(c);
             }
             let provided = export.providers.iter();
             graph
@@ -369,31 +370,31 @@ impl<'a> Walk<'_, 'a> {
             let text = self.node(&s.id).1 + mark(level);
             self.enter(&s.id, depth, text, m, level, false);
         }
-        let Some(consumer) = graph.consumers.get(c.id.as_str()) else {
-            return;
-        };
-        let site = self.site(call);
-        match (&consumer.contract, graph.out.get(c.id.as_str())) {
-            (None, _) => self.row(
-                depth,
-                format!("{site} {}", unresolved(&c.id)),
-                n,
-                None,
-                false,
-            ),
-            (Some(contract), None) => {
+        for consumer in graph.consumers.get(c.id.as_str()).into_iter().flatten() {
+            let site = self.site(call);
+            let Some(contract) = &consumer.contract else {
+                self.row(
+                    depth,
+                    format!("{site} {}", unresolved(&c.id)),
+                    n,
+                    None,
+                    false,
+                );
+                continue;
+            };
+            let out = graph.out.get(c.id.as_str()).into_iter().flatten();
+            let links: Vec<&Link> = out.filter(|l| l.contract == *contract).copied().collect();
+            if links.is_empty() {
                 let text = format!("{site} consumes {contract}, no provider");
                 self.row(depth, text, n, None, false);
             }
-            (Some(_), Some(links)) => {
-                for link in links {
-                    if !shown.insert((&link.provider, true)) {
-                        continue;
-                    }
-                    let (m, text) = self.node(&link.provider);
-                    let text = format!("{} {text}", arrow(link));
-                    self.enter(&link.provider, depth, text, m, Some(link.level), true);
+            for link in links {
+                if !shown.insert((&link.provider, true)) {
+                    continue;
                 }
+                let (m, text) = self.node(&link.provider);
+                let text = format!("{} {text}", arrow(link));
+                self.enter(&link.provider, depth, text, m, Some(link.level), true);
             }
         }
     }

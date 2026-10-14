@@ -8,24 +8,17 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, chain, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
 
-/// The three repositories as siblings in one case directory: (web, gateway, catalog).
-fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
-    (
-        fixture_repo(case, "chain-web", Some("https://example.com/chain/web.git")),
-        fixture_repo(
-            case,
-            "chain-gateway",
-            Some("git@example.com:chain/gateway.git"),
-        ),
-        fixture_repo(
-            case,
-            "chain-catalog",
-            Some("https://example.com/chain/catalog.git"),
-        ),
-    )
+#[test]
+fn every_expected_link_of_the_chain_appears_at_its_level() {
+    let (web, gateway, catalog) = chain("chain_export");
+
+    for (repo, name) in [(web, "web"), (gateway, "gateway"), (catalog, "catalog")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(&format!("chain-{name}.export.json"), &export);
+    }
 }
 
 #[test]
@@ -38,6 +31,33 @@ fn trace_down_follows_calls_and_links_across_three_repositories() {
         .unwrap();
 
     assert_golden("chain.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_down_shows_every_consumer_a_wrapper_call_site_holds() {
+    let (web, _, _) = chain("trace_wrapper_consumers");
+    // One call of a wrapper with three parameter-dependent fetch calls: three consumers on
+    // one site, one linked, one with no provider and one unresolved.
+    fs::write(
+        web.join("src/sync.ts"),
+        "const BASE = process.env.GATEWAY_URL;\n\n\
+         function both(path: string, url: string) {\n  \
+           fetch(`${BASE}${path}`);\n  \
+           fetch(`${BASE}${path}/archive`);\n  \
+           return fetch(url);\n\
+         }\n\n\
+         export function sync() {\n  \
+           return both(\"/api/orders\", location.href);\n\
+         }\n",
+    )
+    .unwrap();
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("sync"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("chain.trace-wrapper.txt", &answer);
 }
 
 #[test]

@@ -27,6 +27,23 @@ pub fn fixture_repo(case: &str, fixture: &str, origin: Option<&str>) -> PathBuf 
     dir
 }
 
+/// The chain fixture (spec #3) as siblings in one case directory: (web, gateway, catalog).
+pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    (
+        fixture_repo(case, "chain-web", Some("https://example.com/chain/web.git")),
+        fixture_repo(
+            case,
+            "chain-gateway",
+            Some("git@example.com:chain/gateway.git"),
+        ),
+        fixture_repo(
+            case,
+            "chain-catalog",
+            Some("https://example.com/chain/catalog.git"),
+        ),
+    )
+}
+
 /// Runs `git` in `dir`, isolated from the user's and the system's git configuration, with a
 /// fixed author and date so commits are the same on every machine.
 pub fn git(dir: &Path, args: &[&str]) -> String {
