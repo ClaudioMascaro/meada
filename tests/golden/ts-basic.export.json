@@ -77,6 +77,7 @@
       "id": "example.com/acme/web::src/draft.ts::draft::draft#0",
       "caller": "example.com/acme/web::src/draft.ts::draft",
       "target": "example.com/acme/web::src/draft.ts::draft",
+      "level": "exact",
       "span": {
         "path": "src/draft.ts",
         "start": 21,
@@ -87,6 +88,7 @@
       "id": "example.com/acme/web::src/math.ts::console.log#0",
       "caller": "example.com/acme/web::src/math.ts",
       "target": null,
+      "level": null,
       "span": {
         "path": "src/math.ts",
         "start": 335,
@@ -97,6 +99,7 @@
       "id": "example.com/acme/web::src/math.ts::outer#0",
       "caller": "example.com/acme/web::src/math.ts",
       "target": "example.com/acme/web::src/math.ts::outer",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 347,
@@ -107,6 +110,7 @@
       "id": "example.com/acme/web::src/math.ts::outer.inner::add#0",
       "caller": "example.com/acme/web::src/math.ts::outer.inner",
       "target": "example.com/acme/web::src/math.ts::add",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 289,
@@ -117,6 +121,7 @@
       "id": "example.com/acme/web::src/math.ts::outer::inner#0",
       "caller": "example.com/acme/web::src/math.ts::outer",
       "target": "example.com/acme/web::src/math.ts::outer.inner",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 313,
@@ -127,6 +132,7 @@
       "id": "example.com/acme/web::src/math.ts::outer::inner#1",
       "caller": "example.com/acme/web::src/math.ts::outer",
       "target": "example.com/acme/web::src/math.ts::outer.inner",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 323,
@@ -137,6 +143,7 @@
       "id": "example.com/acme/web::src/math.ts::sum::add#0",
       "caller": "example.com/acme/web::src/math.ts::sum",
       "target": "example.com/acme/web::src/math.ts::add",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 176,
@@ -147,6 +154,7 @@
       "id": "example.com/acme/web::src/math.ts::sum::add#1",
       "caller": "example.com/acme/web::src/math.ts::sum",
       "target": "example.com/acme/web::src/math.ts::add",
+      "level": "exact",
       "span": {
         "path": "src/math.ts",
         "start": 204,
@@ -157,6 +165,7 @@
       "id": "example.com/acme/web::src/view.tsx::Badge::label#0",
       "caller": "example.com/acme/web::src/view.tsx::Badge",
       "target": "example.com/acme/web::src/view.tsx::label",
+      "level": "exact",
       "span": {
         "path": "src/view.tsx",
         "start": 126,
@@ -167,6 +176,7 @@
       "id": "example.com/acme/web::src/view.tsx::label::(template_string).trim#0",
       "caller": "example.com/acme/web::src/view.tsx::label",
       "target": null,
+      "level": null,
       "span": {
         "path": "src/view.tsx",
         "start": 45,
