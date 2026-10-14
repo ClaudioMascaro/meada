@@ -239,11 +239,14 @@ impl Question {
 /// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
 /// the file is parsed again; anything else, or a file no pack parses, is not.
 fn function_like(path: &str, source: &[u8], span: &Range<usize>) -> bool {
+    use lang::Kind::{Function, Inline, Method};
     let Some(pack) = lang::pack_for(path).map(lang::pack) else {
         return false;
     };
+    // An allowlist: a kind added later sends its span only once it is listed here.
     (pack.parse(path, source)).is_ok_and(|facts| {
-        (facts.defs.iter()).any(|d| d.range == *span && d.kind != lang::Kind::Class)
+        (facts.defs.iter())
+            .any(|d| d.range == *span && matches!(d.kind, Function | Method | Inline))
     })
 }
 
