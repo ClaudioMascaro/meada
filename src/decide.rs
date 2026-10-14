@@ -163,26 +163,8 @@ fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()>
     if !here.stale.is_empty() || !here.waiting.is_empty() {
         writeln!(out)?;
     }
-    for s in &here.stale {
-        let (call, target, cause) = (&s.call, &s.target, s.cause);
-        writeln!(
-            out,
-            "{}",
-            Msg::StaleDecision {
-                call,
-                target,
-                cause
-            }
-            .text()
-        )?;
-    }
-    for w in &here.waiting {
-        let (call, target, peer) = (&w.call, &w.target, &w.peer);
-        writeln!(
-            out,
-            "{}",
-            Msg::WaitingDecision { call, target, peer }.text()
-        )?;
+    for line in here.lines() {
+        writeln!(out, "{line}")?;
     }
     Ok(())
 }

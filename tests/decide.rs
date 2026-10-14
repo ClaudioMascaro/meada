@@ -4,40 +4,18 @@
 mod common;
 
 use std::fs;
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
 
-use common::{assert_golden, chain};
+use common::{HEALTH, assert_golden, chain, written as file};
 use meada::engine::Engine;
 
 /// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
 /// stderr, and whether it succeeded; the repository's path is replaced by `<repo>`.
 fn decide(repo: &Path, lang: &str, args: &[&str], stdin: &str) -> (String, String, bool) {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
-        .current_dir(repo)
-        .arg("decide")
-        .args(args)
-        .env("LANG", lang)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("meada runs");
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
-    let out = child.wait_with_output().unwrap();
-    let text =
-        |bytes: &[u8]| String::from_utf8_lossy(bytes).replace(repo.to_str().unwrap(), "<repo>");
-    (text(&out.stdout), text(&out.stderr), out.status.success())
-}
-
-fn file(repo: &Path) -> Option<String> {
-    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
+    let args = [&["decide"], args].concat();
+    common::meada(repo, &args, stdin, |c| {
+        c.env("LANG", lang);
+    })
 }
 
 #[test]
@@ -57,8 +35,6 @@ fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
     let export = Engine::open(&cold).unwrap().export().unwrap();
     assert_golden("chain-web.decided-human.export.json", &export);
 }
-
-const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
 
 #[test]
 fn skipping_and_end_of_input_leave_the_rest_undecided() {

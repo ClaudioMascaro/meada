@@ -566,20 +566,7 @@ pub fn status(dir: &Path) -> Result<String> {
             relative(here, &m.root)
         ));
         for e in evaluations.iter().filter(|e| e.repository == m.identity) {
-            let stale = e.stale.iter().map(|s| {
-                let (call, target, cause) = (&s.call, &s.target, s.cause);
-                Msg::StaleDecision {
-                    call,
-                    target,
-                    cause,
-                }
-                .text()
-            });
-            let waiting = e.waiting.iter().map(|w| {
-                let (call, target, peer) = (&w.call, &w.target, &w.peer);
-                Msg::WaitingDecision { call, target, peer }.text()
-            });
-            lines.extend(stale.chain(waiting).map(|l| format!("  {l}")));
+            lines.extend(e.lines().map(|l| format!("  {l}")));
         }
     }
     lines.extend(workspace.missing.iter().map(Missing::text));

@@ -6,12 +6,11 @@ mod common;
 
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
 
 use meada::engine::Engine;
 
 use common::stub::{Reply, Stub};
-use common::{assert_golden, chain, fixture_repo};
+use common::{HEALTH, TRACK, assert_golden, chain, fixture_repo, written};
 
 /// The key every test configures. No output of any test may contain it. The `&` lets a JSON
 /// answer write it escaped (`&`), out of reach of a redaction of the raw body.
@@ -37,45 +36,23 @@ fn meada(
     stdin: &str,
     stub: Option<&Stub>,
 ) -> (String, String, bool) {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_meada"));
-    command
-        .current_dir(repo)
-        .args(args)
-        .env("LANG", "en_US.UTF-8");
-    // No inherited proxy either: the test key must not travel anywhere but to the stub.
-    for var in VARS.iter().chain(&PROXIES) {
-        command.env_remove(var);
-        command.env_remove(var.to_ascii_lowercase());
-    }
-    command.envs(env.iter().map(|(k, v)| (k, v)));
-    let mut child = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("meada runs");
-    use std::io::Write;
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
-    let Output {
-        status,
-        stdout,
-        stderr,
-    } = child.wait_with_output().unwrap();
-    let text = |bytes: &[u8]| {
-        let text = String::from_utf8_lossy(bytes);
+    let (stdout, stderr, ok) = common::meada(repo, args, stdin, |command| {
+        command.env("LANG", "en_US.UTF-8");
+        // No inherited proxy either: the test key must not travel anywhere but to the stub.
+        for var in VARS.iter().chain(&PROXIES) {
+            command.env_remove(var);
+            command.env_remove(var.to_ascii_lowercase());
+        }
+        command.envs(env.iter().map(|(k, v)| (k, v)));
+    });
+    let text = |text: String| {
         assert!(!text.contains(KEY), "the key leaked:\n{text}");
-        let text = text.replace(repo.to_str().unwrap(), "<repo>");
         match stub {
             Some(stub) => text.replace(&stub.url, "<stub>"),
             None => text,
         }
     };
-    (text(&stdout), text(&stderr), status.success())
+    (text(stdout), text(stderr), ok)
 }
 
 /// The `chat` configuration against `stub`, with the key.
@@ -463,15 +440,8 @@ async fn the_mcp_server_never_reaches_the_decider() {
     assert!(stub.requests().is_empty());
 }
 
-const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
-const TRACK: &str = "example.com/chain/web::src/status.ts::track::fetch#0";
-
 fn answer(choice: &str, probability: f64) -> serde_json::Value {
     serde_json::json!({"choice": choice, "probability": probability})
-}
-
-fn written(repo: &Path) -> Option<String> {
-    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
 }
 
 #[test]

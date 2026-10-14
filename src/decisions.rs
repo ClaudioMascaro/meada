@@ -240,6 +240,27 @@ pub struct Evaluation {
     pub waiting: Vec<Waiting>,
 }
 
+impl Evaluation {
+    /// One line per stale decision, then one per waiting decision, as `status` and
+    /// `meada decide --list` print them.
+    pub fn lines(&self) -> impl Iterator<Item = String> {
+        let stale = self.stale.iter().map(|s| {
+            let (call, target, cause) = (&s.call, &s.target, s.cause);
+            Msg::StaleDecision {
+                call,
+                target,
+                cause,
+            }
+            .text()
+        });
+        let waiting = self.waiting.iter().map(|w| {
+            let (call, target, peer) = (&w.call, &w.target, &w.peer);
+            Msg::WaitingDecision { call, target, peer }.text()
+        });
+        stale.chain(waiting)
+    }
+}
+
 enum Verdict {
     /// Links the call to this provider.
     Applies(String),
