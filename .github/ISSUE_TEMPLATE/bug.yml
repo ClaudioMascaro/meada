@@ -1,0 +1,37 @@
+name: Bug
+description: Algo não funciona como esperado · Something does not work as expected · Algo no funciona como se espera
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Escreva em português, español ou English. · Write in Portuguese, Spanish or English. · Escribe en portugués, español o inglés.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: O que aconteceu · What happened · Qué pasó
+      description: O que você esperava e o que aconteceu de fato · What you expected and what actually happened · Qué esperabas y qué pasó en realidad
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Como reproduzir · How to reproduce · Cómo reproducirlo
+      description: Passos, comando e, se possível, um repositório mínimo · Steps, command and, if possible, a minimal repository · Pasos, comando y, si es posible, un repositorio mínimo
+      placeholder: |
+        1. meada ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão do Meada e sistema operacional · Meada version and operating system · Versión de Meada y sistema operativo
+      description: Saída de `meada --version` · Output of `meada --version` · Salida de `meada --version`
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Mais contexto · More context · Más contexto
+      description: Logs, saída do comando ou o que mais ajudar. Não cole código privado. · Logs, command output or anything else that helps. Do not paste private code. · Logs, salida del comando o lo que ayude. No pegues código privado.
