@@ -3,7 +3,9 @@
 
 mod common;
 
-use common::{assert_golden, chain, fixture_repo};
+use std::fs;
+
+use common::{age, assert_golden, chain, fixture_repo};
 use meada::engine::Engine;
 
 fn few(case: &str) -> Engine {
@@ -116,4 +118,39 @@ fn ambiguous_candidates_are_the_listed_providers_sorted_by_repository() {
             "example.com/chain/gateway::src/server.ts::GET /api/health",
         ]
     );
+}
+
+#[test]
+fn a_refreshed_index_lists_the_open_items_a_cold_index_does() {
+    // The method and fragments of an unresolved consumer are not in the export, so this is
+    // where a refresh that loses them shows.
+    let render = |engine: &Engine| {
+        let mut out = engine.search("", Some("unresolved"), None).unwrap();
+        for item in engine.open_items().unwrap() {
+            out += &format!("{} {:?}\n", item.id, item.candidates);
+        }
+        out
+    };
+    let edit = |repo: &std::path::Path| {
+        let latest = repo.join("app/api/reports/latest");
+        fs::create_dir_all(&latest).unwrap();
+        fs::write(
+            latest.join("route.ts"),
+            "export function GET() {\n  return new Response(\"latest\");\n}\n",
+        )
+        .unwrap();
+        fs::write(repo.join("app/api/users/route.ts"), "export const x = 1;\n").unwrap();
+    };
+    let origin = Some("https://example.com/open/few.git");
+    let repo = fixture_repo("items_fresh", "open-few", origin);
+    age(&repo);
+    let before = render(&Engine::open(&repo).unwrap());
+    edit(&repo);
+
+    let refreshed = render(&Engine::open(&repo).unwrap());
+
+    let cold = fixture_repo("items_fresh_cold", "open-few", origin);
+    edit(&cold);
+    assert_ne!(refreshed, before);
+    assert_eq!(refreshed, render(&Engine::open(&cold).unwrap()));
 }

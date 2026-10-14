@@ -111,6 +111,11 @@ fn fragments(parts: &[Part]) -> Vec<String> {
         None => &text,
     };
     let path = path.split(['?', '#']).next().unwrap_or("");
+    // Route paths lose their trailing `/` (`normalize_path`), so a path ending in a literal does.
+    let path = match path.ends_with(GAP) {
+        true => path,
+        false => path.trim_end_matches('/'),
+    };
     (path.split(GAP).filter(|f| !f.is_empty()))
         .map(str::to_string)
         .collect()
@@ -563,6 +568,7 @@ mod tests {
                 true,
             ),
             ("http::GET::/api/orders", None, &["/users"][..], false),
+            ("http::GET::/api/users", None, &["/api/users"][..], true),
             // Both filters apply together.
             (
                 "http::DELETE::/api/users/{}",
@@ -602,6 +608,13 @@ mod tests {
                 vec!["/api/users"],
             ),
             (vec![Hole, Hole], vec![]),
+            // The trailing `/` of the end of the path is dropped, as route paths drop it.
+            (vec![text("/api/users/?page="), Hole], vec!["/api/users"]),
+            (
+                vec![text("/api/users/"), Hole, text("/")],
+                vec!["/api/users/"],
+            ),
+            (vec![text("/api/users/"), Hole], vec!["/api/users/"]),
         ] {
             assert_eq!(fragments(&parts), expected);
         }
