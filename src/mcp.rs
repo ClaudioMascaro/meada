@@ -18,7 +18,7 @@ use crate::engine::{Direction, Engine, Start};
 struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
-    /// Only this kind of match: `symbol` or `contract`.
+    /// Only this kind of match: `symbol`, `contract` or `route` (an HTTP contract).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
