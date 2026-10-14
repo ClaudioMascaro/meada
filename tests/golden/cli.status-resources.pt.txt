@@ -1,0 +1,7 @@
+example.com/chain/gateway (.) indexado, 4 arquivos
+example.com/chain/catalog (../chain-catalog) indexado, 4 arquivos
+  resource::s3-bucket::invoices sem ligação: nenhum escritor e leitor em repositórios diferentes
+  resource::postgres::orders: `via` lib/gone.ts::sync não corresponde a nenhum símbolo, ignorado
+  resource::postgres::orders: nenhum `via` corresponde a um símbolo, então o repositório inteiro é o lado
+example.com/chain/web (../chain-web) indexado, 5 arquivos
+example.com/chain/worker (../chain-worker) indexado, 2 arquivos

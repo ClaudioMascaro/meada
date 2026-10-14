@@ -11,10 +11,10 @@ pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
-use crate::render::{Files, callee, label, unresolved};
+use crate::render::{Files, REPOSITORY_LEVEL, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, decisions, index, items, render, repo, trace};
+use crate::{Result, decisions, index, items, render, repo, resource, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -144,6 +144,19 @@ impl Engine {
         Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
+    /// For each repository of the workspace, in workspace order, the status lines about its
+    /// resources: a `via` that names no symbol, and a resource no link reaches.
+    pub fn resource_report(&self) -> Result<Vec<Vec<String>>> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let repos = self.workspace.repos.iter();
+        Ok(repos
+            .zip(&exports)
+            .map(|(repo, export)| resource::report(repo, export, &links))
+            .collect())
+    }
+
     /// The decisions of the repository where Meada runs that are stale or waiting.
     pub fn local_decisions(&self) -> Result<Evaluation> {
         let all = self.decision_report()?;
@@ -232,8 +245,8 @@ impl Engine {
 
     /// Symbols of the workspace whose name matches `query` case-insensitively, and contracts
     /// whose identifier or route path does, one line each: exact first, then prefix, then
-    /// substring, ties by identity. `kind` keeps only `symbol`, `contract` or `route` (HTTP
-    /// contract) matches; `ambiguous` and `unresolved` list the open items whose enclosing
+    /// substring, ties by identity. `kind` keeps only `symbol`, `contract`, `route` (HTTP
+    /// contract) or `resource` (a declared resource, matched by kind and id) matches; `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -246,8 +259,10 @@ impl Engine {
             Some("symbol") => (true, None),
             Some("contract") => (false, Some("")),
             Some("route") => (false, Some("http::")),
+            Some("resource") => (false, Some("resource::")),
             Some(other) => {
-                let valid = "`symbol`, `contract`, `route`, `ambiguous` or `unresolved`";
+                let valid =
+                    "`symbol`, `contract`, `route`, `resource`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -291,10 +306,13 @@ impl Engine {
                     continue;
                 }
                 // A route path ranks against the path part: `/users` is exact for
-                // `http::GET::/users`.
+                // `http::GET::/users`. A resource ranks against its kind and its id.
                 let lower = contract.to_lowercase();
-                let path = lower.rsplit_once("::").map(|(_, p)| p);
-                let Some(r) = [Some(lower.as_str()), path]
+                let (kind, id) = match lower.strip_prefix("resource::") {
+                    Some(rest) => rest.split_once("::").unzip(),
+                    None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
+                };
+                let Some(r) = [Some(lower.as_str()), kind, id]
                     .into_iter()
                     .flatten()
                     .filter_map(|n| rank(n, &needle))
@@ -311,6 +329,7 @@ impl Engine {
                     span.or_else(|| export.calls.iter().find(|c| c.id == *site).map(|c| &c.span));
                 let location = match span {
                     Some(span) => files.at(&span.path, span.start),
+                    None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     // A route file that serves the contract with no function of its own.
                     None => site
                         .rsplit_once("::")
@@ -366,6 +385,42 @@ impl Engine {
         Ok(render::budgeted(&lines, budget))
     }
 
+    /// The resource `contract`: one line per writer and reader across the workspace, writers
+    /// first, as `<repository> <role> <path>:<line> <name>`, or `<repository> <role>
+    /// (repository-level)` for a side declared with no `via`.
+    fn resource_sides(&self, exports: &[Export], contract: &str) -> Vec<String> {
+        let mut sides: Vec<(bool, String)> = Vec::new();
+        for (export, repo) in exports.iter().zip(&self.workspace.repos) {
+            let mut files = Files::new(&repo.root);
+            let writers =
+                (export.providers.iter()).map(|p| (p.contract.as_str(), &p.site, "writer"));
+            let readers = export
+                .consumers
+                .iter()
+                .filter_map(|c| Some((c.contract.as_deref()?, &c.site, "reader")));
+            for (_, site, role) in writers.chain(readers).filter(|(c, ..)| *c == contract) {
+                let place = match export.symbols.iter().find(|s| s.id == *site) {
+                    Some(s) => {
+                        let at = files.at(&s.span.path, s.span.start);
+                        format!("{at} {}", label(&s.id))
+                    }
+                    None => REPOSITORY_LEVEL.into(),
+                };
+                sides.push((
+                    role == "reader",
+                    format!("{} {role} {place}", repo.identity),
+                ));
+            }
+        }
+        if sides.is_empty() {
+            return vec![format!("no resource matches `{contract}`")];
+        }
+        sides.sort();
+        let mut lines = vec![contract.to_string()];
+        lines.extend(sides.into_iter().map(|(_, line)| format!("  {line}")));
+        lines
+    }
+
     /// One symbol of the workspace: its span text read from disk (only while the file still
     /// has the indexed hash), its callers and its callees. `symbol` is an identity,
     /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
@@ -378,6 +433,12 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
+        if symbol.starts_with("resource::") {
+            return Ok(render::budgeted(
+                &self.resource_sides(&exports, symbol),
+                budget,
+            ));
+        }
         let suffix = format!("::{symbol}");
         let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())
             .flat_map(|(n, e)| e.symbols.iter().map(move |s| (n, s)))
@@ -450,6 +511,16 @@ fn contracts(
         .filter(|p| p.site == symbol.id)
         .map(|p| line(identity, files, symbol, &format!("provides {}", p.contract)))
         .collect();
+    // A resource reader is a symbol, not a call site.
+    let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
+    for contract in readers.filter_map(|c| c.contract.as_ref()) {
+        lines.push(line(
+            identity,
+            files,
+            symbol,
+            &format!("consumes {contract}"),
+        ));
+    }
     for consumer in &export.consumers {
         let Some(call) = export
             .calls
@@ -586,15 +657,20 @@ pub fn status(dir: &Path) -> Result<String> {
     let indexed =
         |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
     // A failure to open or refresh drops the decision lines, not the whole status.
-    let evaluations = if workspace.repos.iter().all(indexed) {
-        Engine::open(dir)
-            .and_then(|engine| engine.decision_report())
-            .unwrap_or_default()
-    } else {
-        Vec::new()
+    let engine = workspace
+        .repos
+        .iter()
+        .all(indexed)
+        .then(|| Engine::open(dir));
+    let (evaluations, resources) = match engine {
+        Some(Ok(engine)) => (
+            engine.decision_report().unwrap_or_default(),
+            engine.resource_report().unwrap_or_default(),
+        ),
+        _ => Default::default(),
     };
     let mut lines = Vec::new();
-    for m in &workspace.repos {
+    for (n, m) in workspace.repos.iter().enumerate() {
         let state = match index::state(&m.root) {
             State::Missing => Msg::NotIndexed.text(),
             State::OtherSchema => Msg::OtherVersion.text(),
@@ -608,6 +684,7 @@ pub fn status(dir: &Path) -> Result<String> {
         for e in evaluations.iter().filter(|e| e.repository == m.identity) {
             lines.extend(e.lines().map(|l| format!("  {l}")));
         }
+        lines.extend((resources.get(n).into_iter().flatten()).map(|l| format!("  {l}")));
     }
     lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())

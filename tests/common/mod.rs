@@ -53,6 +53,19 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     )
 }
 
+/// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
+/// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
+/// gateway, whose workspace holds all four repositories.
+pub fn loose_chain(case: &str) -> PathBuf {
+    let (_, gateway, catalog) = chain(case);
+    let toml = catalog.join("meada.toml");
+    let loose = "\n[[resource]]\nkind = \"s3-bucket\"\nid = \"invoices\"\nrole = \"write\"\n\n\
+                 [[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"write\"\n\
+                 via = [\"lib/gone.ts::sync\"]\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + loose).unwrap();
+    gateway
+}
+
 /// The chain's worker, next to any repository of the chain.
 pub fn worker(sibling: &Path) -> PathBuf {
     sibling.with_file_name("chain-worker")
