@@ -17,7 +17,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -25,7 +25,9 @@ const SCHEMA_VERSION: i64 = 5;
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
 /// file's resolved symbol and call rows. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
-/// fits in `candidates`.
+/// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
+/// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
+/// none); they let `Engine::open_items` list the routes it may reach.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -42,7 +44,8 @@ CREATE INDEX calls_path ON calls (path);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
 CREATE TABLE contracts (
-    role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL
+    role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
+    method TEXT, fragments TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 ";
@@ -390,12 +393,21 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
                 ("consumer", path, id.clone())
             }
         };
-        rows.insert((role, site, &f.contract, &f.via, path));
+        let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
+        rows.insert((
+            role,
+            site,
+            &f.contract,
+            &f.via,
+            path,
+            &f.method,
+            fragments.transpose()?,
+        ));
     }
-    for (role, site, contract, via, path) in rows {
+    for (role, site, contract, via, path, method, fragments) in rows {
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![role, contract, site, via, path],
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![role, contract, site, via, path, method, fragments],
         )?;
     }
     tx.execute("DELETE FROM meta", [])?;
@@ -594,11 +606,17 @@ pub(crate) struct Provider {
 
 /// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
+/// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
+/// that out.
 #[derive(Serialize)]
 pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,
     pub(crate) via: Option<String>,
+    #[serde(skip)]
+    pub(crate) method: Option<String>,
+    #[serde(skip)]
+    pub(crate) fragments: Vec<String>,
 }
 
 /// The index content of the repository attached as `schema`, every list sorted. Links are
@@ -670,14 +688,20 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(&format!(
-            "SELECT contract, site, via FROM {schema}.contracts WHERE role = 'consumer' \
-             ORDER BY site, contract, via"
+            "SELECT contract, site, via, method, fragments FROM {schema}.contracts \
+             WHERE role = 'consumer' ORDER BY site, contract, via"
         ))?
         .query_map([], |r| {
+            let fragments: Option<String> = r.get(4)?;
             Ok(Consumer {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
+                method: r.get(3)?,
+                // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
+                fragments: fragments
+                    .and_then(|f| serde_json::from_str(&f).ok())
+                    .unwrap_or_default(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

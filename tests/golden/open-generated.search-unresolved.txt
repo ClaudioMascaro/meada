@@ -1,0 +1,1 @@
+example.com/open/generated src/client.ts:5 (unresolved) candidates: 55; run `meada decide --item example.com/open/generated::src/client.ts::item::fetch#0`

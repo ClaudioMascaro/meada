@@ -100,6 +100,13 @@ _Avoid_: step, jump
 
 ### Decisions
 
+**Open item**:
+An ambiguous link or an unresolved consumer (a dynamic URL) of a repository that no decision
+resolves. Its id is the call-site identity, and its candidates are the providers the link lists
+or the routes the call's method and evaluated URL fragments leave. `search` lists open items
+and `meada decide` resolves them.
+_Avoid_: pending item, todo
+
 **Decision**:
 A recorded resolution of an ambiguous link or a dynamic URL, kept in `meada.decisions.toml` with
 who made it.

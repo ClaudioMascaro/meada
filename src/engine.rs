@@ -8,11 +8,12 @@ use rusqlite::Connection;
 
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export, State, Symbol};
+pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, index, render, repo, trace};
+use crate::{Result, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -117,6 +118,15 @@ impl Engine {
         links
     }
 
+    /// The open items of the workspace, ambiguous links and unresolved consumers, in id order,
+    /// each with its sorted candidates. Callers keep the ones whose `repository` they own.
+    pub fn open_items(&self) -> Result<Vec<OpenItem>> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        Ok(items::list(&self.workspace.repos, &exports, &links))
+    }
+
     /// The chain from `start`, followed `direction` through calls inside repositories and
     /// links between them, across the whole workspace, until it ends, a cycle closes or the
     /// budget runs out; one indented line per call or hop, then the chain footer and any missing
@@ -142,8 +152,13 @@ impl Engine {
     /// Symbols of the workspace whose name matches `query` case-insensitively, and contracts
     /// whose identifier or route path does, one line each: exact first, then prefix, then
     /// substring, ties by identity. `kind` keeps only `symbol`, `contract` or `route` (HTTP
-    /// contract) matches. The answer is cut at `budget` tokens.
+    /// contract) matches; `ambiguous` and `unresolved` list the open items whose enclosing
+    /// symbol or call expression matches, each with the `meada decide` command that resolves
+    /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
+        if let Some(item_kind) = kind.and_then(ItemKind::parse) {
+            return self.search_items(query, item_kind, budget);
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
             None => (true, Some("")),
@@ -151,7 +166,7 @@ impl Engine {
             Some("contract") => (false, Some("")),
             Some("route") => (false, Some("http::")),
             Some(other) => {
-                let valid = "`symbol`, `contract` or `route`";
+                let valid = "`symbol`, `contract`, `route`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -224,6 +239,43 @@ impl Engine {
                 let line = format!("{} {location} {contract}", repo.identity);
                 hits.push((r, format!("{contract} {site}"), line));
             }
+        }
+        hits.sort();
+        if hits.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+        Ok(render::budgeted(&lines, budget))
+    }
+
+    /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
+    fn search_items(&self, query: &str, kind: ItemKind, budget: Option<usize>) -> Result<String> {
+        let needle = query.to_lowercase();
+        // (rank, id, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for item in self.open_items()?.into_iter().filter(|i| i.kind == kind) {
+            let name = item.enclosing.as_ref().map(|e| e.name.to_lowercase());
+            let last = name.as_deref().and_then(|n| n.rsplit('.').next());
+            let Some(r) = [
+                name.as_deref(),
+                last,
+                Some(&*item.expression.to_lowercase()),
+            ]
+            .into_iter()
+            .flatten()
+            .filter_map(|n| rank(n, &needle))
+            .min() else {
+                continue;
+            };
+            let line = format!(
+                "{} {} ({}) candidates: {}; run `meada decide --item {}`",
+                item.repository,
+                item.location(),
+                kind.name(),
+                item.candidates.len(),
+                item.id
+            );
+            hits.push((r, item.id, line));
         }
         hits.sort();
         if hits.is_empty() {

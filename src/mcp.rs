@@ -18,7 +18,8 @@ use crate::engine::{Direction, Engine, Start};
 struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
-    /// Only this kind of match: `symbol`, `contract` or `route` (an HTTP contract).
+    /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), or `ambiguous` or
+    /// `unresolved` (open items, with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
