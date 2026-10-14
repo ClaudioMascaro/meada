@@ -77,6 +77,11 @@ fn invalid_decisions_errors_name_file_line_and_key() {
             "<repo>/meada.decisions.toml:6: `decision.branch` is not a meada.decisions.toml key",
         ),
         (
+            "decisions_later",
+            "resource = 1\n".to_string(),
+            "<repo>/meada.decisions.toml:1: `resource` is not a meada.decisions.toml key",
+        ),
+        (
             "decisions_kind",
             format!("{}{tail}", head.replace("dynamic-url", "merge")),
             "<repo>/meada.decisions.toml:2: `decision.kind`: unknown variant `merge`, expected \

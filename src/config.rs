@@ -102,7 +102,7 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
         (Some(field), parent) if message.starts_with("missing field") => {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
-        (Some(_), Some(key)) if LATER.contains(&key) => Msg::KeyLater {
+        (Some(_), Some(key)) if file == "meada.toml" && LATER.contains(&key) => Msg::KeyLater {
             key,
             release: &Msg::TrackA.text(),
         }
