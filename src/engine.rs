@@ -14,7 +14,7 @@ use crate::msg::Msg;
 use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, decisions, http, index, items, render, repo, trace};
+use crate::{Result, decisions, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -90,16 +90,15 @@ impl Engine {
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
-    /// The index content of every repository of the workspace, in workspace order.
+    /// The index content of every repository of the workspace, with the contracts its
+    /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
-        self.workspace
-            .repos
-            .iter()
-            .enumerate()
+        let repos = self.workspace.repos.iter().enumerate();
+        repos
             .map(|(n, m)| {
                 let mut export = index::export(&self.db, &schema(n), &m.identity)?;
-                for p in &mut export.providers {
-                    p.gateway = http::gateway_path(&m.config.serve, &p.contract).map(|g| g.0);
+                for kind in contract::KINDS {
+                    kind.declare(m, &mut export);
                 }
                 Ok(export)
             })

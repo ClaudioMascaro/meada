@@ -1,0 +1,9 @@
+# D: the worker. It reads the orders the gateway writes; no call links the two.
+[[peer]]
+repo = "example.com/chain/gateway"
+
+[[resource]]
+kind = "postgres"
+id = "orders"
+role = "read"
+via = ["src/jobs.ts::settleOrders"]

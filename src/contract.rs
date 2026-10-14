@@ -1,23 +1,27 @@
-//! The contract-kind interface: each kind turns pack output into provider and consumer
-//! contracts and matches them into links (ADR 0005). HTTP is the only kind in v0.1; later
-//! kinds (`channel::`, `package::`, `resource::`) plug in behind the same trait.
+//! The contract-kind interface: each kind turns pack output, or what `meada.toml` declares,
+//! into provider and consumer contracts and matches them into links (ADR 0005). The kinds are
+//! HTTP (`http::`) and resources (`resource::`, spec #19); later kinds (`channel::`,
+//! `package::`) plug in behind the same trait.
 
 use std::collections::HashMap;
 
 use serde::Serialize;
 
 use crate::http::Http;
-use crate::index::{Consumer, Provider};
+use crate::index::{Consumer, Export, Provider};
 use crate::resolve::Code;
+use crate::resource::Resource;
 use crate::workspace::Repository;
 
 /// How well a link is established. The order is the strength, strongest first: exact >
-/// inferred > decided > ambiguous, so a chain takes its greatest (weakest) level. ADR 0005
-/// adds declared, between exact and inferred, with spec #19.
+/// declared > inferred > decided > ambiguous (ADR 0005), so a chain takes its greatest
+/// (weakest) level.
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
     Exact,
+    /// From a declaration in `meada.toml`, such as a shared resource (spec #19).
+    Declared,
     Inferred,
     /// From `meada.decisions.toml` (ADR 0006).
     Decided,
@@ -28,6 +32,7 @@ impl Level {
     pub fn name(self) -> &'static str {
         match self {
             Level::Exact => "exact",
+            Level::Declared => "declared",
             Level::Inferred => "inferred",
             Level::Decided => "decided",
             Level::Ambiguous => "ambiguous",
@@ -38,6 +43,7 @@ impl Level {
     pub fn parse(name: &str) -> Option<Self> {
         [
             Level::Exact,
+            Level::Declared,
             Level::Inferred,
             Level::Decided,
             Level::Ambiguous,
@@ -102,6 +108,11 @@ pub trait ContractKind {
     /// facts and the values `code` evaluates.
     fn extract(&self, code: &Code) -> Vec<Found>;
 
+    /// Adds to `export`, the index content of `repo`, the sides `repo` declares for this kind
+    /// in its `meada.toml`, keeping the lists sorted: a kind fed by configuration rather than
+    /// code. A kind also uses it to mark what `meada.toml` says about the sides it found. They derive at query time, so an edit to `meada.toml` needs no reindex.
+    fn declare(&self, _repo: &Repository, _export: &mut Export) {}
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it). Several fitting providers are all
     /// linked as ambiguous; none leaves the consumer unlinked.
@@ -114,7 +125,7 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource];
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {

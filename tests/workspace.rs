@@ -163,6 +163,28 @@ fn invalid_config_errors_name_file_line_and_key() {
             "<repo>/meada.toml:3: `serve.documents` is not in v0.1; the documents release of track A adds it (spec #21)",
         ),
         (
+            "config_resource_key",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"read\"\nschema = \"public\"\n",
+            "<repo>/meada.toml:5: `resource.schema` is not a meada.toml key",
+        ),
+        (
+            "config_resource_kind",
+            "[[resource]]\nkind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:2: `resource.kind`: `Postgres` is not a lowercase identifier \
+             (ASCII letters, digits and hyphens, starting with a letter)",
+        ),
+        (
+            "config_resource_role",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"append\"\n",
+            "<repo>/meada.toml:4: `resource.role`: unknown variant `append`, \
+             expected one of `read`, `write`, `read-write`",
+        ),
+        (
+            "config_resource_id",
+            "[[resource]]\nkind = \"postgres\"\nid = \"\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:3: `resource.id`: is empty",
+        ),
+        (
             "config_prefix",
             "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"api\"\n",
             "<repo>/meada.toml:3: `serve.prefix`: `api` must start with `/`",

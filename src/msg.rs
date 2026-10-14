@@ -45,6 +45,8 @@ pub enum Msg<'a> {
         file: &'a str,
     },
     TrackA,
+    NotLowercase(&'a str),
+    Empty,
     About,
     Index,
     Status,
@@ -173,6 +175,17 @@ impl Msg<'_> {
                 "the documents release of track A adds it (spec #21)".into(),
                 "a versão de documentos da trilha A a adiciona (spec #21)".into(),
             ),
+            Msg::NotLowercase(value) => pick(
+                format!(
+                    "`{value}` is not a lowercase identifier \
+                     (ASCII letters, digits and hyphens, starting with a letter)"
+                ),
+                format!(
+                    "`{value}` não é um identificador em minúsculas \
+                     (letras ASCII, dígitos e hífens, começando por uma letra)"
+                ),
+            ),
+            Msg::Empty => pick("is empty".into(), "está vazio".into()),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
                 "Grafo de código sem LLM para agentes e pessoas".into(),

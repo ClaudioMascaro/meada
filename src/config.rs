@@ -1,12 +1,13 @@
-//! `meada.toml`, the v0.1 subset: what a repository consumes from its peers (`[[peer]]`) and
-//! the hosts it serves on (`[serve]`). Errors name the file, the line and the key.
+//! `meada.toml`: what a repository consumes from its peers (`[[peer]]`), the hosts it serves on
+//! (`[serve]`) and the resources it reads or writes (`[[resource]]`, spec #19). Errors name the
+//! file, the line and the key.
 
 use std::fs;
 use std::ops::Range;
 use std::path::Path;
 
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, Error as _};
+use serde::{Deserialize, Deserializer};
 use toml::de::{DeTable, DeValue};
 
 use crate::msg::Msg;
@@ -19,6 +20,8 @@ pub struct Config {
     pub peers: Vec<Peer>,
     #[serde(default)]
     pub serve: Serve,
+    #[serde(default, rename = "resource")]
+    pub resources: Vec<Resource>,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +94,59 @@ fn gateway_key<'de, D: serde::Deserializer<'de>>(
     ))
 }
 
+/// A shared thing the repository reads or writes, such as a database table or a bucket.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Resource {
+    /// A lowercase identifier with no meaning to Meada: `postgres`, `s3-bucket`.
+    #[serde(deserialize_with = "kind")]
+    pub kind: String,
+    #[serde(deserialize_with = "not_empty")]
+    pub id: String,
+    pub role: Role,
+    /// The symbols that do the access, as `<path>::<qualified name>` of this repository.
+    #[serde(default)]
+    pub via: Vec<String>,
+}
+
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum Role {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+impl Role {
+    pub fn writes(self) -> bool {
+        self != Role::Read
+    }
+
+    pub fn reads(self) -> bool {
+        self != Role::Write
+    }
+}
+
+/// Lowercase ASCII letters, digits and hyphens, starting with a letter.
+fn kind<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::Error> {
+    let kind = String::deserialize(d)?;
+    let mut chars = kind.chars();
+    let valid = chars.next().is_some_and(|c| c.is_ascii_lowercase())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    match valid {
+        true => Ok(kind),
+        false => Err(D::Error::custom(Msg::NotLowercase(&kind).text())),
+    }
+}
+
+fn not_empty<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::Error> {
+    let value = String::deserialize(d)?;
+    match value.is_empty() {
+        true => Err(D::Error::custom(Msg::Empty.text())),
+        false => Ok(value),
+    }
+}
+
 impl Config {
     /// Whether this repository serves on `host`, case-insensitively.
     pub fn serves(&self, host: &str) -> bool {
@@ -108,7 +164,7 @@ impl Config {
 }
 
 /// Keys that track A adds after v0.1.
-const LATER: &[&str] = &["resource", "serve.documents"];
+const LATER: &[&str] = &["serve.documents"];
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {

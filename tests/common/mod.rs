@@ -30,7 +30,14 @@ pub fn fixture_repo(case: &str, fixture: &str, origin: Option<&str>) -> PathBuf 
 }
 
 /// The chain fixture (spec #3) as siblings in one case directory: (web, gateway, catalog).
+/// The worker (spec #19), which reads a resource the gateway writes, is their sibling too, at
+/// [`worker`].
 pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    fixture_repo(
+        case,
+        "chain-worker",
+        Some("https://example.com/chain/worker.git"),
+    );
     (
         fixture_repo(case, "chain-web", Some("https://example.com/chain/web.git")),
         fixture_repo(
@@ -44,6 +51,11 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
             Some("https://example.com/chain/catalog.git"),
         ),
     )
+}
+
+/// The chain's worker, next to any repository of the chain.
+pub fn worker(sibling: &Path) -> PathBuf {
+    sibling.with_file_name("chain-worker")
 }
 
 /// Copies `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml` (spec #18).

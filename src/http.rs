@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::config::Serve;
 use crate::contract::{ContractKind, Found, Level, Link, Site};
-use crate::index::{Consumer, Provider};
+use crate::index::{Consumer, Export as IndexExport, Provider};
 use crate::lang::{Export, Part, Value};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -446,6 +446,12 @@ impl ContractKind for Http {
         }
         found.extend(express(code));
         found
+    }
+
+    fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        for p in &mut export.providers {
+            p.gateway = gateway_path(&repo.config.serve, &p.contract).map(|g| g.0);
+        }
     }
 
     fn link(

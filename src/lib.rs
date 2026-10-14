@@ -16,6 +16,7 @@ pub mod msg;
 mod render;
 pub mod repo;
 mod resolve;
+mod resource;
 mod trace;
 mod workspace;
 

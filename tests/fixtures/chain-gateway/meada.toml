@@ -4,3 +4,10 @@ hosts = ["gateway.example.com"]
 
 [[peer]]
 repo = "example.com/chain/catalog"
+
+# Cancelling an order updates its row in the `orders` table the worker reads.
+[[resource]]
+kind = "postgres"
+id = "orders"
+role = "write"
+via = ["src/orders.ts::cancelOrder"]
