@@ -250,7 +250,7 @@ impl Config {
             .filter_map(|id| questions.iter().find(|q| q.id == *id));
         match self.protocol {
             Protocol::Chat => asked.map(|q| chat::answer(self, q, body)).collect(),
-            Protocol::Decisions => decisions::answers(&asked.collect::<Vec<_>>(), body),
+            Protocol::Decisions => decisions::answers(self, &asked.collect::<Vec<_>>(), body),
         }
     }
 
@@ -298,9 +298,33 @@ impl Config {
             None => body,
         };
         if !status.is_success() {
-            return Err(failure(status.as_u16(), &body).into());
+            return Err(self.failure(status.as_u16(), &body).into());
         }
         Ok(body)
+    }
+
+    /// The error text of a non-success answer: `http status: <code>`, then `: <message>` when
+    /// the body carries one, through `shown`.
+    fn failure(&self, status: u16, body: &str) -> String {
+        let message = serde_json::from_str::<Value>(body)
+            .ok()
+            .and_then(|v| Some(self.shown(v["error"]["message"].as_str()?)));
+        match message {
+            Some(message) if !message.is_empty() => format!("http status: {status}: {message}"),
+            _ => format!("http status: {status}"),
+        }
+    }
+
+    /// Text from upstream made fit to print or record: control characters dropped (so it
+    /// cannot drive the terminal), then the key replaced by `HIDDEN`. Every decoded string an
+    /// answer contributes goes through here, since a JSON escape such as `&` hides the key
+    /// from the redaction of the raw body in `send`.
+    pub(super) fn shown(&self, text: &str) -> String {
+        let text: String = text.chars().filter(|c| !c.is_control()).collect();
+        match &self.key {
+            Some(key) => text.replace(key.as_str(), HIDDEN),
+            None => text,
+        }
     }
 }
 
@@ -396,25 +420,6 @@ pub(crate) fn run(
         }
     }
     Ok(outcome)
-}
-
-/// The error text of a non-success answer: `http status: <code>`, then `: <message>` when the
-/// (already redacted) body carries one, with control characters dropped so that it cannot
-/// drive the terminal.
-fn failure(status: u16, body: &str) -> String {
-    let message = serde_json::from_str::<Value>(body).ok().and_then(|v| {
-        let message = v["error"]["message"].as_str()?;
-        Some(
-            message
-                .chars()
-                .filter(|c| !c.is_control())
-                .collect::<String>(),
-        )
-    });
-    match message {
-        Some(message) if !message.is_empty() => format!("http status: {status}: {message}"),
-        _ => format!("http status: {status}"),
-    }
 }
 
 /// A `--min-p` value, which must be a probability.

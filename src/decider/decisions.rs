@@ -23,7 +23,7 @@ use crate::msg::Msg;
 pub const SUM_TOLERANCE: f64 = 0.01;
 
 /// The question names, in item order: `item1`.. padded to one width, so that the `questions`
-/// map, whose keys serialize sorted, lists the items in their order.
+/// and `state.items` maps, whose keys serialize sorted, list the items in their order.
 fn names(count: usize) -> impl Iterator<Item = String> {
     let width = count.to_string().len();
     (1..=count).map(move |n| format!("item{n:0width$}"))
@@ -31,31 +31,33 @@ fn names(count: usize) -> impl Iterator<Item = String> {
 
 /// The request for `questions`, all from the repository where Meada runs; `None` when there is
 /// none to ask.
+///
+/// Upstream, `state` is "the content to evaluate" and a question's `instructions` its guidance,
+/// and the Jev tutorial puts every independent question about one state in one request. So
+/// `state` holds the task, the repository and each item's excerpt under its question name, and
+/// each question's `instructions` names its item; `criteria` lists the candidates.
 pub(super) fn request(config: &Config, questions: &[Question]) -> Option<Request> {
     let repository = &questions.first()?.repository;
-    let asked: Map<String, Value> = names(questions.len())
-        .zip(questions)
-        .map(|(name, question)| {
-            let criteria: Map<String, Value> = (question.candidates.iter())
-                .map(|(key, description)| (key.clone(), description.as_str().into()))
-                .collect();
-            let question = json!({
-                "type": "choice",
-                "instructions": question.excerpt(),
-                "criteria": criteria,
-            });
-            (name, question)
-        })
-        .collect();
+    let mut items = Map::new();
+    let mut asked = Map::new();
+    for (name, question) in names(questions.len()).zip(questions) {
+        let criteria: Map<String, Value> = (question.candidates.iter())
+            .map(|(key, description)| (key.clone(), description.as_str().into()))
+            .collect();
+        let instructions =
+            format!("Pick the candidate endpoint that the call in `items.{name}` reaches.");
+        asked.insert(
+            name.clone(),
+            json!({"type": "choice", "instructions": instructions, "criteria": criteria}),
+        );
+        items.insert(name, question.excerpt().into());
+    }
     Some(Request {
         items: questions.iter().map(|q| q.id.clone()).collect(),
         url: format!("{}/api/alpha/decisions", config.url),
         body: json!({
             "model": config.model,
-            // ponytail: the spec puts the task and the repository in `state` and each excerpt
-            // in its question's `instructions`; upstream calls `state` "the content to
-            // evaluate" and `instructions` guidance, without fixing either. Unconfirmed.
-            "state": {"task": task(repository), "repository": repository},
+            "state": {"task": task(repository), "repository": repository, "items": items},
             "questions": asked,
             // Fail closed: only endpoints with zero data retention that collect no data.
             // Upstream errors when none qualifies, and Meada never sends without these.
@@ -97,9 +99,9 @@ struct Answer {
 /// Reads the success `body` of the request for `asked` into one result per question, in
 /// order. A body that is not the documented shape, or that answers a question not asked, fails
 /// every question; the values of one answer fail only its question.
-pub(super) fn answers(asked: &[&Question], body: &str) -> Vec<Result<Proposal>> {
+pub(super) fn answers(config: &Config, asked: &[&Question], body: &str) -> Vec<Result<Proposal>> {
     let names: Vec<String> = names(asked.len()).collect();
-    let mut response = match read(&names, body) {
+    let mut response = match read(config, &names, body) {
         Ok(response) => response,
         Err(e) => {
             let text = e.to_string();
@@ -108,17 +110,17 @@ pub(super) fn answers(asked: &[&Question], body: &str) -> Vec<Result<Proposal>> 
     };
     (names.iter().zip(asked))
         .map(|(name, question)| match response.answers.remove(name) {
-            Some(answer) => judge(question, answer, &response.model),
+            Some(answer) => judge(config, question, answer, &response.model),
             None => Err(invalid(Msg::AnswerMissing.text())),
         })
         .collect()
 }
 
-fn read(names: &[String], body: &str) -> Result<Response> {
+fn read(config: &Config, names: &[String], body: &str) -> Result<Response> {
     let response: Response = serde_json::from_str(body)
-        .map_err(|e| invalid(Msg::AnswerUnreadable(&e.to_string()).text()))?;
+        .map_err(|e| invalid(Msg::AnswerUnreadable(&config.shown(&e.to_string())).text()))?;
     match response.answers.keys().find(|name| !names.contains(name)) {
-        Some(name) => Err(invalid(Msg::AnswerUnknown(name).text())),
+        Some(name) => Err(invalid(Msg::AnswerUnknown(&config.shown(name)).text())),
         None => Ok(response),
     }
 }
@@ -126,16 +128,17 @@ fn read(names: &[String], body: &str) -> Result<Response> {
 /// One answer to `question`: a `choice` among the offered keys, a confidence in [0,1], and
 /// probabilities over offered keys, each in [0,1], summing to 1 within `SUM_TOLERANCE`. `p` is
 /// the probability of the chosen key; `by` the model the response names.
-fn judge(question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
+fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
     if answer.kind != "choice" {
-        return Err(invalid(Msg::AnswerType(&answer.kind).text()));
+        return Err(invalid(Msg::AnswerType(&config.shown(&answer.kind)).text()));
     }
-    offered(question, &answer.choice)?;
+    offered(config, question, &answer.choice)?;
     // ponytail: the documentation gives no range for `confidence`; [0,1] is assumed.
     let confidence = probability(answer.confidence)
         .map_err(|_| invalid(Msg::AnswerConfidence(answer.confidence).text()))?;
     for (key, &p) in &answer.probabilities {
-        offered(question, key).map_err(|_| invalid(Msg::AnswerKey(key).text()))?;
+        offered(config, question, key)
+            .map_err(|_| invalid(Msg::AnswerKey(&config.shown(key)).text()))?;
         probability(p)?;
     }
     let sum: f64 = answer.probabilities.values().sum();
@@ -144,17 +147,18 @@ fn judge(question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
         return Err(invalid(Msg::AnswerSum { sum, tolerance }.text()));
     }
     let Some(&p) = answer.probabilities.get(&answer.choice) else {
-        return Err(invalid(Msg::AnswerNoProbability(&answer.choice).text()));
+        let choice = config.shown(&answer.choice);
+        return Err(invalid(Msg::AnswerNoProbability(&choice).text()));
     };
-    let mut proposal = proposal(question, &answer.choice, p, by)?;
+    let mut proposal = proposal(config, question, &answer.choice, p, by)?;
     proposal.confidence = Some(confidence);
     Ok(proposal)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Answer, judge};
-    use crate::decider::Question;
+    use super::{Answer, judge, names};
+    use crate::decider::{Config, Protocol, Question};
     use crate::decisions::Kind;
 
     #[test]
@@ -192,11 +196,27 @@ mod tests {
                     .zip(probabilities)
                     .collect(),
             };
+            let config = Config {
+                protocol: Protocol::Decisions,
+                url: "https://example.com".into(),
+                key: None,
+                model: "m".into(),
+            };
             assert_eq!(
-                judge(&question, answer, "m").is_ok(),
+                judge(&config, &question, answer, "m").is_ok(),
                 valid,
                 "{probabilities:?}"
             );
         }
+    }
+
+    #[test]
+    fn question_names_sort_in_item_order_past_nine_items() {
+        let names: Vec<String> = names(12).collect();
+        assert_eq!(names.first().map(String::as_str), Some("item01"));
+        assert_eq!(names.last().map(String::as_str), Some("item12"));
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(sorted, names);
     }
 }

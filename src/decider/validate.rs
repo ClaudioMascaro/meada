@@ -12,7 +12,7 @@ use crate::Result;
 use crate::decisions::Decision;
 use crate::msg::Msg;
 
-use super::Question;
+use super::{Config, Question};
 
 /// An answer that passed validation: the decision it would record, and the candidate it picks
 /// as a person reads it.
@@ -41,19 +41,26 @@ pub(super) fn probability(p: f64) -> Result<f64> {
 
 /// The answer of a decider to `question`: `choice` must be an offered key, `p` a probability,
 /// and `by` a model id: printed and recorded, so no control characters, and not `human`, which
-/// is the person's.
-pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> Result<Proposal> {
-    let at = offered(question, choice)?;
+/// is the person's. Every upstream string printed or recorded goes through `Config::shown`.
+pub(super) fn proposal(
+    config: &Config,
+    question: &Question,
+    choice: &str,
+    p: f64,
+    by: &str,
+) -> Result<Proposal> {
+    let at = offered(config, question, choice)?;
     let p = probability(p)?;
+    let shown = config.shown(by);
     if by.is_empty() || by == "human" || by.chars().any(char::is_control) {
-        return Err(invalid(Msg::AnswerBy(by).text()));
+        return Err(invalid(Msg::AnswerBy(&shown).text()));
     }
     Ok(Proposal {
         decision: Decision {
             kind: question.kind,
             call: question.id.clone(),
             target: question.targets[at].clone(),
-            by: by.into(),
+            by: shown,
             p: Some(p),
         },
         p,
@@ -63,10 +70,11 @@ pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> R
 }
 
 /// The position of `choice` among the keys `question` offers, or the error naming it.
-pub(super) fn offered(question: &Question, choice: &str) -> Result<usize> {
+pub(super) fn offered(config: &Config, question: &Question, choice: &str) -> Result<usize> {
     let keys = question.keys();
     keys.iter().position(|key| *key == choice).ok_or_else(|| {
         let keys = keys.join(", ");
+        let choice = &config.shown(choice);
         invalid(
             Msg::AnswerChoice {
                 choice,

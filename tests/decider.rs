@@ -13,8 +13,9 @@ use meada::engine::Engine;
 use common::stub::{Reply, Stub};
 use common::{assert_golden, chain, fixture_repo};
 
-/// The key every test configures. No output of any test may contain it.
-const KEY: &str = "sk-meada-test-5f0c1e2d9a";
+/// The key every test configures. No output of any test may contain it. The `&` lets a JSON
+/// answer write it escaped (`&`), out of reach of a redaction of the raw body.
+const KEY: &str = "sk-meada&test-5f0c1e2d9a";
 
 const VARS: [&str; 4] = [
     "MEADA_DECIDER_PROTOCOL",
@@ -564,7 +565,7 @@ fn a_malformed_answer_fails_its_item_alone_and_the_others_are_still_written() {
         (
             "model id with control characters",
             Reply::chat("evil\u{1b}[2J", answer("1", 0.9)),
-            "model id \"evil\\u{1b}[2J\" cannot be recorded",
+            "model id \"evil[2J\" cannot be recorded",
         ),
     ];
 
@@ -859,6 +860,24 @@ fn a_provider_refusal_of_the_data_retention_preferences_writes_nothing_and_is_no
     assert_eq!(
         requests[0].json()["provider"],
         serde_json::json!({"zdr": true, "data_collection": "deny"})
+    );
+}
+
+#[test]
+fn a_key_escaped_in_an_error_message_reaches_no_output() {
+    let (web, _, _) = chain("decider_escaped_key");
+    let escaped = KEY.replace('&', "\\u0026");
+    let body = format!(r#"{{"error": {{"code": 401, "message": "bad key {escaped}"}}}}"#);
+    let stub = Stub::start(vec![Reply::status(401, &body)]);
+
+    // `meada` itself asserts that the key is in neither stream.
+    let args = ["decide", "--decider"];
+    let (stdout, _, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+    assert!(!ok);
+    assert!(
+        stdout.contains("request failed: http status: 401: bad key <hidden>\n"),
+        "{stdout}"
     );
 }
 

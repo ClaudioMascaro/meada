@@ -56,17 +56,21 @@ give byte-identical output.
   `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
   proxy to a loopback host, no redirects, no retries; a non-success status is the error
   `http status: <code>`, plus `: <message>` when the redacted body has
-  `{"error": {"message"}}`, control characters dropped). `Config` has no `Debug`; the key
+  `{"error": {"message"}}`). `Config::shown(text)` is the one gate for every decoded upstream
+  string printed or recorded (error message, model id, serde error text, type, keys, choice):
+  control characters dropped, then the key replaced by `<hidden>`, since a JSON escape hides
+  it from the raw-body redaction in `send`. `Config` has no `Debug`; the key
   leaves it only as the bearer header.
   Protocol adapters are files beside it that build requests and read answers: `chat.rs`
   (`request(config, question)`, one `POST <url>/chat/completions` per item; `answer(config,
   question, body) -> Result<Proposal>` reads `choices[0].message.content` as `{choice,
   probability}`, `by` = the response `model` or the configured one). `decisions.rs`
   (OpenRouter's alpha API: `request(config, questions) -> Option<Request>`, one `POST
-  <url>/api/alpha/decisions` carrying every eligible item, `state {task, repository}`,
-  `questions` named `item1..` zero-padded so the sorted map keeps item order, each `{type:
-  choice, instructions: excerpt, criteria: key -> describe}`, `provider {zdr: true,
-  data_collection: deny}`; `answers(asked, body)` parses `{model, answers, id?, provider?,
+  <url>/api/alpha/decisions` carrying every eligible item, `state {task, repository, items:
+  name -> excerpt}` (upstream: `state` is the content to evaluate), `questions` named
+  `item1..` zero-padded so the sorted maps keep item order, each `{type: choice,
+  instructions: "... the call in items.<name> ...", criteria: key -> describe}`, `provider
+  {zdr: true, data_collection: deny}`; `answers(config, asked, body)` parses `{model, answers, id?, provider?,
   usage?}` and each `{type, choice, confidence, probabilities}` with `deny_unknown_fields`: a
   shape error or an answer to an unknown question fails every item, an answer's values (type
   `choice`, choice and probability keys offered, each in [0,1], sum 1 within `SUM_TOLERANCE` =
