@@ -26,6 +26,18 @@ pub enum Msg<'a> {
     Status,
     Export,
     Mcp,
+    Decide,
+    DecideItemHelp,
+    DecideDryRunHelp,
+    DecideListHelp,
+    DecideNoItems,
+    DecideUnknownItem(&'a str),
+    DecideNoCandidates,
+    DecidePrompt(usize),
+    DecideRetry(usize),
+    DecideNothing,
+    DecideWrote(usize),
+    DecideDryRun,
 }
 
 impl Msg<'_> {
@@ -85,6 +97,52 @@ impl Msg<'_> {
             Msg::Mcp => pick(
                 "Serve the repository in the current directory to agents over MCP (stdio).".into(),
                 "Serve o repositório do diretório atual a agentes por MCP (stdio).".into(),
+            ),
+            Msg::Decide => pick(
+                "Resolve the open items of this repository, ambiguous links and dynamic URLs, \
+                 and record the picks in meada.decisions.toml."
+                    .into(),
+                "Resolve os itens abertos deste repositório, links ambíguos e URLs dinâmicas, \
+                 e registra as escolhas em meada.decisions.toml."
+                    .into(),
+            ),
+            Msg::DecideItemHelp => pick(
+                "Work on this item only (a call-site id, as `meada search` prints it).".into(),
+                "Trabalha só neste item (o id da chamada, como o `meada search` imprime).".into(),
+            ),
+            Msg::DecideDryRunHelp => pick(
+                "Print the decisions the run would write and leave the file unchanged.".into(),
+                "Imprime as decisões que a execução gravaria e deixa o arquivo como está.".into(),
+            ),
+            Msg::DecideListHelp => pick(
+                "Print the open items; neither ask nor write.".into(),
+                "Imprime os itens abertos; não pergunta nem grava.".into(),
+            ),
+            Msg::DecideNoItems => pick("no open items".into(), "nenhum item aberto".into()),
+            Msg::DecideUnknownItem(id) => pick(
+                format!("`{id}` is not an open item of this repository"),
+                format!("`{id}` não é um item aberto deste repositório"),
+            ),
+            Msg::DecideNoCandidates => pick(
+                "no candidate fits; skipped".into(),
+                "nenhum candidato serve; pulado".into(),
+            ),
+            Msg::DecidePrompt(n) => pick(
+                format!("pick 1-{n}, or s to skip:"),
+                format!("escolha 1-{n}, ou s para pular:"),
+            ),
+            Msg::DecideRetry(n) => pick(
+                format!("enter a number from 1 to {n}, or s to skip:"),
+                format!("digite um número de 1 a {n}, ou s para pular:"),
+            ),
+            Msg::DecideNothing => pick("nothing decided".into(), "nada decidido".into()),
+            Msg::DecideWrote(n) => pick(
+                format!("wrote {n} decisions to meada.decisions.toml"),
+                format!("{n} decisões gravadas em meada.decisions.toml"),
+            ),
+            Msg::DecideDryRun => pick(
+                "dry run, meada.decisions.toml would be:".into(),
+                "execução a seco, meada.decisions.toml ficaria assim:".into(),
             ),
         }
     }

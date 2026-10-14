@@ -1,0 +1,12 @@
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/chain/web::src/status.ts::health::fetch#0"
+target = "example.com/chain/gateway::http::GET::/api/health"
+by = "human"
+
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/chain/web::src/status.ts::track::fetch#0"
+target = "example.com/chain/catalog::http::POST::/api/events"
+by = "openrouter/jev"
+p = 0.62
