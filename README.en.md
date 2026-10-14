@@ -28,6 +28,10 @@ how confident it is in each link.
   telemetry.
 - **No LLM to index.** The map comes from the code's syntax tree. No per-token bill in dollars;
   it works offline and fits on an ordinary laptop.
+- **Deterministic.** The same code with the same configuration always gives the same map. When
+  a link is ambiguous, the decision is recorded in a file versioned in git, made by a person
+  or, if you choose, by a language model in a separate command. Indexing only re-reads that
+  decision.
 - **Portuguese first.** Documentation is born in Brazilian Portuguese; English and Spanish are
   translations. Issues and PRs are welcome in any of the three languages. The code is written
   in English so that anyone can read it.

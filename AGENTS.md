@@ -22,9 +22,10 @@ constants stay out of this repo and out of your reading.
 
 ## Invariants
 
-The product invariants (no LLM or network in indexing, local-first, writes only inside its own
-index, read-only and compact MCP) live in `docs/adr/0002-product-invariants.md`. A change that
-breaks one starts with a new ADR.
+The product invariants (no LLM or network in indexing; local-first, with a model only in the
+opt-in `meada decide` command; writes only inside its own index; an MCP server that never
+writes and stays compact; one index per repository; determinism) live in
+`docs/adr/0002-product-invariants.md`. A change that breaks one starts with a new ADR.
 
 ## Workflow
 
@@ -32,3 +33,4 @@ breaks one starts with a new ADR.
 - Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
   `cargo test`.
 - Decisions are recorded as ADRs in `docs/adr/`.
+- Domain terms are defined in `CONTEXT.md`. Use them in code, docs and issues.

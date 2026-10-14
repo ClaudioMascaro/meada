@@ -30,6 +30,10 @@ y decir con qué confianza se hizo cada conexión.
   telemetría.
 - **Sin LLM para indexar.** El mapa sale del árbol sintáctico del código. No hay factura en
   dólares por token, funciona sin conexión y cabe en una laptop común.
+- **Determinista.** El mismo código con la misma configuración siempre da el mismo mapa.
+  Cuando una conexión es ambigua, la decisión queda en un archivo versionado en git, tomada
+  por una persona o, si lo prefieres, por un modelo de lenguaje en un comando aparte. La
+  indexación solo vuelve a leer esa decisión.
 - **Portugués primero.** La documentación nace en portugués de Brasil; inglés y español son
   traducciones. Las issues y los PR pueden abrirse en cualquiera de los tres idiomas. El código
   se escribe en inglés para que cualquier persona pueda leerlo.
