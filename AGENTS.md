@@ -33,4 +33,18 @@ write tools; one index per repository; determinism) live in
 - Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
   `cargo test`.
 - Decisions are recorded as ADRs in `docs/adr/`.
-- Domain terms are defined in `CONTEXT.md`. Use them in code, docs and issues.
+- Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues on `ClaudioMascaro/meada`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
