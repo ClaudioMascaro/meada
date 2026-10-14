@@ -1,0 +1,12 @@
+[package]
+name = "meada"
+version = "0.1.0"
+edition = "2024"
+description = "LLM-free code graph that links repositories through the contracts they share, served over MCP"
+license = "Apache-2.0"
+repository = "https://github.com/ClaudioMascaro/meada"
+readme = "README.md"
+keywords = ["code-graph", "mcp", "tree-sitter", "cross-repo", "code-intelligence"]
+categories = ["development-tools", "command-line-utilities"]
+
+[dependencies]
