@@ -8,14 +8,20 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{assert_golden, chain, fixture_repo};
+use common::{assert_golden, chain, fixture_repo, worker};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
 fn every_expected_link_of_the_chain_appears_at_its_level() {
     let (web, gateway, catalog) = chain("chain_export");
+    let worker = worker(&web);
 
-    for (repo, name) in [(web, "web"), (gateway, "gateway"), (catalog, "catalog")] {
+    for (repo, name) in [
+        (web, "web"),
+        (gateway, "gateway"),
+        (catalog, "catalog"),
+        (worker, "worker"),
+    ] {
         let export = Engine::open(&repo).unwrap().export().unwrap();
         assert_golden(&format!("chain-{name}.export.json"), &export);
     }
@@ -74,6 +80,64 @@ fn trace_up_from_a_route_reaches_every_consumer_upstream() {
         .unwrap();
 
     assert_golden("chain.trace-up.txt", &answer);
+}
+
+/// The gateway's `cancelOrder` writes the `postgres` resource `orders`; the worker's
+/// `settleOrders` reads it.
+const WRITER: &str = "example.com/chain/gateway::src/orders.ts::cancelOrder";
+const READER: &str = "example.com/chain/worker::src/jobs.ts::settleOrders";
+
+#[test]
+fn every_writer_links_to_every_reader_of_another_repository() {
+    let (_, gateway, _) = chain("resource_sides");
+    let worker = worker(&gateway);
+    let append = |repo: &Path, toml: &str| {
+        let path = repo.join("meada.toml");
+        fs::write(&path, fs::read_to_string(&path).unwrap() + toml).unwrap();
+    };
+    let entry = |role: &str, via: &str| {
+        format!(
+            "\n[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"{role}\"\nvia = [{via}]\n"
+        )
+    };
+    // A second writer in the gateway; in the worker, a writer of its own, which links to no
+    // reader of the worker, and a `via` that names no symbol.
+    append(&gateway, &entry("write", "\"src/orders.ts::listOrders\""));
+    append(
+        &worker,
+        &entry(
+            "read-write",
+            "\"src/notify.ts::notify\", \"src/jobs.ts::gone\"",
+        ),
+    );
+
+    let export = Engine::open(&worker).unwrap().export().unwrap();
+
+    assert_golden("chain-worker.resources.export.json", &export);
+}
+
+#[test]
+fn trace_down_from_a_writer_crosses_the_resource_into_its_reader() {
+    let (web, _, _) = chain("trace_resource_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From(WRITER), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("chain.trace-resource-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_from_a_reader_crosses_the_resource_into_its_writer_and_upstream() {
+    let (web, _, _) = chain("trace_resource_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From(READER), Direction::Up, None)
+        .unwrap();
+
+    assert_golden("chain.trace-resource-up.txt", &answer);
 }
 
 #[test]

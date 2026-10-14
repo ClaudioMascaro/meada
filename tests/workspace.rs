@@ -158,9 +158,26 @@ fn config_error(case: &str, toml: &str) -> String {
 fn invalid_config_errors_name_file_line_and_key() {
     for (case, toml, expected) in [
         (
-            "config_resource",
-            "[[peer]]\nrepo = \"example.com/acme/api\"\n\n[[resource]]\nkind = \"db\"\n",
-            "<repo>/meada.toml:4: `resource` is not in v0.1; track A adds it (resources and gateway)",
+            "config_resource_key",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"read\"\nschema = \"public\"\n",
+            "<repo>/meada.toml:5: `resource.schema` is not a meada.toml key",
+        ),
+        (
+            "config_resource_kind",
+            "[[resource]]\nkind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:2: `resource.kind`: `Postgres` is not a lowercase identifier \
+             (ASCII letters, digits and hyphens, starting with a letter)",
+        ),
+        (
+            "config_resource_role",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"append\"\n",
+            "<repo>/meada.toml:4: `resource.role`: unknown variant `append`, \
+             expected one of `read`, `write`, `read-write`",
+        ),
+        (
+            "config_resource_id",
+            "[[resource]]\nkind = \"postgres\"\nid = \"\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:3: `resource.id`: is empty",
         ),
         (
             "config_prefix",
