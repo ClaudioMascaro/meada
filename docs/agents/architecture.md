@@ -141,14 +141,16 @@ give byte-identical output.
   (`.ts .tsx .js .jsx .mjs .cjs`). A pack sees one file at a time and never touches the index.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code` folds
-  constants and client wrapper arguments into values for contract kinds.
+  constants and client wrapper arguments into values for contract kinds, a destructured object
+  parameter reading its names (`Param::fields`) off the literal object the caller passes.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
-  `Link`, `Names`. `http.rs`: `fetch` consumers, Next.js app-router and Express providers,
-  `normalize_path`, and the link rules (host, `base_url_env`, unique provider). `resource.rs`
-  (spec #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository
-  has into a provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link`
-  joins every reader to every writer of another repository at `declared`, reason the
-  contract. A `via` that names no symbol is dropped; entries without `via` get no side yet.
+  `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
+  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules
+  (host, `base_url_env`, unique provider). `resource.rs` (spec #19): reads no code; `declare`
+  turns each `[[resource]]` `via` symbol the repository has into a provider (writer) or
+  consumer (reader) of `resource::<kind>::<id>`, and `link` joins every reader to every writer
+  of another repository at `declared`, reason the contract. A `via` that names no symbol is
+  dropped; entries without `via` get no side yet.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. Starts take only HTTP routes,
@@ -213,7 +215,7 @@ give byte-identical output.
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`, `Param::default` and `Const::value`
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`, `Param::default`, `Field::default` and `Const::value`
   are `serde(skip)`, so unchanged files come back from SQLite without them. `Code` records every
   file it needs but lacks as a miss, and `refresh` re-parses those and extracts again until none
   is missed. A contract kind that reads a value from a new place relies on this loop.
@@ -282,7 +284,8 @@ Each is marked `ponytail:` at its site unless noted.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
 - `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
-  a closure is unknown.
+  a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
+  spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
