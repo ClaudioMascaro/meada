@@ -32,6 +32,10 @@ write tools; one index per repository; determinism) live in
 - Conventional Commits.
 - Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
   `cargo test`.
+- `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
+  Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
+  once per clone with `git config core.hooksPath .githooks`.
+- Prose separates clauses with commas, colons or parentheses rather than em dashes.
 - Decisions are recorded as ADRs in `docs/adr/`.
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
 
