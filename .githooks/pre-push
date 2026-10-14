@@ -1,0 +1,40 @@
+#!/bin/sh
+# Blocks a push whose added lines or commit messages contain a term from a private list: names
+# from the maintainer's private repositories that must never reach this public repository.
+# The list lives outside the repository, one term per line (blank lines and `#` comments are
+# ignored). Without the list the hook does nothing.
+set -eu
+
+list="${MEADA_PRIVATE_TERMS:-$HOME/.config/meada/private-terms}"
+[ -f "$list" ] || exit 0
+
+terms=$(mktemp)
+trap 'rm -f "$terms"' EXIT
+grep -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' "$list" > "$terms" || true
+[ -s "$terms" ] || exit 0
+
+zero=0000000000000000000000000000000000000000
+empty_tree=$(git hash-object -t tree /dev/null)
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || echo "$empty_tree")
+  else
+    base=$remote_sha
+  fi
+  if [ "$base" = "$empty_tree" ]; then
+    messages=$(git log --format=%B "$local_sha")
+  else
+    messages=$(git log --format=%B "$base..$local_sha")
+  fi
+  hits=$( {
+    git diff -U0 "$base" "$local_sha" | grep '^+' | grep -v '^+++' || true
+    printf '%s\n' "$messages"
+  } | grep -iF -f "$terms" || true)
+  if [ -n "$hits" ]; then
+    echo "pre-push: $local_ref adds terms from $list:" >&2
+    printf '%s\n' "$hits" | head -n 5 >&2
+    exit 1
+  fi
+done
