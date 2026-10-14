@@ -81,6 +81,14 @@ Whoever makes a decision: a person or, if the user opts in, a language model rea
 `meada decide`.
 _Avoid_: judge, LLM, oracle
 
+### Testing
+
+**Golden file**:
+A checked-in file holding the expected output of the query engine over a fixture, such as an
+export or a rendered answer. Tests compare against it; it changes only through the explicit
+bless mode (`MEADA_BLESS=1`) and is reviewed as a diff.
+_Avoid_: snapshot, expected output
+
 ### Roadmap
 
 **Track**:

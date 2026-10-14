@@ -1,0 +1,3 @@
+# Fixtures and golden files are compared byte for byte (BLAKE3 hashes, byte ranges).
+tests/fixtures/** -text
+tests/golden/** -text
