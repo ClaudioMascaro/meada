@@ -355,6 +355,31 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object
+    /// parameter destructures) whose default value is the identifier `default`.
+    pub fn param_defaults_to(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        default: &str,
+    ) -> bool {
+        let Binding::Param(function, n, field) =
+            self.resolver.lexical(path, scope, name, &mut Seen::new())
+        else {
+            return false;
+        };
+        let param = self
+            .full(function.path)
+            .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
+            .and_then(|d| d.params.get(n));
+        let value = match field {
+            Some(f) => param.and_then(|p| p.fields.get(f)).map(|f| &f.default),
+            None => param.map(|p| &p.default),
+        };
+        matches!(value, Some(Some(Value::Ref(r))) if r == default)
+    }
+
     /// The definition `name` refers to from `scope` in `path`.
     pub fn definition(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
         match self.resolver.lexical(path, scope, name, &mut Seen::new()) {

@@ -391,7 +391,9 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
-                if call.callee != "fetch" || code.args(path, n).is_none_or(<[_]>::is_empty) {
+                let is_fetch = call.callee == "fetch"
+                    || code.param_defaults_to(path, &call.scope, &call.callee, "fetch");
+                if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
                 for (site, at, read) in code.expand(path, n, &fetch) {
