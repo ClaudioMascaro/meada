@@ -13,8 +13,14 @@ categories = ["development-tools", "command-line-utilities"]
 blake3 = "1.8.7"
 clap = { version = "4.6.7", features = ["derive"] }
 ignore = "0.4.33"
+rmcp = { version = "3.5.1", features = ["server", "macros", "transport-io"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread"] }
 tree-sitter = "0.27.1"
 tree-sitter-typescript = "0.23.2"
+
+[dev-dependencies]
+rmcp = { version = "3.5.1", features = ["client", "transport-child-process"] }

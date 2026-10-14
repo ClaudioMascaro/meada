@@ -17,14 +17,19 @@ enum Command {
     Index,
     /// Print the index as sorted JSON.
     Export,
+    /// Serve the repository in the current directory to agents over MCP (stdio).
+    Mcp,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let result = Engine::open(Path::new(".")).and_then(|engine| match cli.command {
-        Command::Index => Ok(()),
-        Command::Export => engine.export().map(|json| print!("{json}")),
-    });
+    let result = match cli.command {
+        Command::Mcp => meada::mcp::serve(),
+        command => Engine::open(Path::new(".")).and_then(|engine| match command {
+            Command::Export => engine.export().map(|json| print!("{json}")),
+            _ => Ok(()),
+        }),
+    };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {

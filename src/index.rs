@@ -145,38 +145,38 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
 }
 
 #[derive(Serialize)]
-pub struct Export {
-    repository: String,
-    files: Vec<File>,
-    symbols: Vec<Symbol>,
-    calls: Vec<CallSite>,
+pub(crate) struct Export {
+    pub(crate) repository: String,
+    pub(crate) files: Vec<File>,
+    pub(crate) symbols: Vec<Symbol>,
+    pub(crate) calls: Vec<CallSite>,
 }
 
 #[derive(Serialize)]
-struct File {
-    path: String,
-    hash: String,
+pub(crate) struct File {
+    pub(crate) path: String,
+    pub(crate) hash: String,
 }
 
 #[derive(Serialize)]
-struct Span {
-    path: String,
-    start: i64,
-    end: i64,
+pub(crate) struct Span {
+    pub(crate) path: String,
+    pub(crate) start: i64,
+    pub(crate) end: i64,
 }
 
 #[derive(Serialize)]
-struct Symbol {
-    id: String,
-    span: Span,
+pub(crate) struct Symbol {
+    pub(crate) id: String,
+    pub(crate) span: Span,
 }
 
 #[derive(Serialize)]
-struct CallSite {
-    id: String,
-    caller: String,
-    target: Option<String>,
-    span: Span,
+pub(crate) struct CallSite {
+    pub(crate) id: String,
+    pub(crate) caller: String,
+    pub(crate) target: Option<String>,
+    pub(crate) span: Span,
 }
 
 /// The index content, every list sorted.
