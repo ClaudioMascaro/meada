@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::{self, Config};
+use crate::msg::Msg;
 use crate::{Result, repo};
 
 pub struct Workspace {
@@ -28,6 +29,17 @@ pub struct Missing {
     pub repo: String,
     /// The repository whose `meada.toml` names it.
     pub named_by: String,
+}
+
+impl Missing {
+    /// `missing peer: <repo>, named by <repo>`, as `status` and the trace footer show it.
+    pub fn text(&self) -> String {
+        Msg::MissingPeer {
+            repo: &self.repo,
+            named_by: &self.named_by,
+        }
+        .text()
+    }
 }
 
 impl Workspace {

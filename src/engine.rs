@@ -9,8 +9,9 @@ use rusqlite::Connection;
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export, State, Symbol};
 use crate::msg::Msg;
+use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
-use crate::workspace::Workspace;
+use crate::workspace::{Missing, Workspace};
 use crate::{Result, index, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -31,8 +32,8 @@ impl Engine {
     pub fn open(dir: &Path) -> Result<Self> {
         let workspace = Workspace::discover(dir)?;
         if workspace.repos.len() > MAX_PEERS + 1 {
-            // ponytail: one connection attaches every peer; batch the attaches when a
-            // workspace outgrows SQLite's limit.
+            // ponytail: one connection attaches every peer, so a workspace reads at most 10
+            // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
             return Err(Msg::TooManyRepos {
                 found: workspace.repos.len(),
                 max: MAX_PEERS + 1,
@@ -379,10 +380,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
                 .filter_map(|t| symbols.get(t.as_str()).copied())
                 .collect();
             if targets.is_empty() {
-                let callee =
-                    c.id.strip_prefix(&format!("{}::", c.caller))
-                        .unwrap_or(&c.id);
-                let callee = callee.rsplit_once('#').map_or(callee, |(name, _)| name);
+                let callee = callee(&c.id);
                 let location = files.at(&c.span.path, c.span.start);
                 return vec![format!("{identity} {location} (unresolved) {callee}")];
             }
@@ -430,13 +428,7 @@ pub fn status(dir: &Path) -> Result<String> {
             format!("{} ({}) {state}", m.identity, relative(here, &m.root))
         })
         .collect();
-    lines.extend(workspace.missing.iter().map(|m| {
-        Msg::MissingPeer {
-            repo: &m.repo,
-            named_by: &m.named_by,
-        }
-        .text()
-    }));
+    lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
 }
 
@@ -485,58 +477,4 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
     let mut lines = vec![format!("{name}:")];
     lines.extend(items);
     lines
-}
-
-/// The name part of a symbol identity: `<repository>::<path>::<name>`.
-pub(crate) fn label(id: &str) -> &str {
-    id.rsplit_once("::").map_or(id, |(_, name)| name)
-}
-
-/// The callee of the call site `<caller>::<callee>#<ordinal>`.
-pub(crate) fn callee(site: &str) -> &str {
-    let callee = label(site);
-    callee.rsplit_once('#').map_or(callee, |(name, _)| name)
-}
-
-/// How an unresolved consumer shows: `(unresolved) fetch` for the call site
-/// `<caller>::fetch#<ordinal>`.
-pub(crate) fn unresolved(site: &str) -> String {
-    format!("(unresolved) {}", callee(site))
-}
-
-/// Source files read once per answer.
-pub(crate) struct Files<'a> {
-    root: &'a Path,
-    read: HashMap<String, Option<Vec<u8>>>,
-}
-
-impl<'a> Files<'a> {
-    pub(crate) fn new(root: &'a Path) -> Self {
-        Self {
-            root,
-            read: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn get(&mut self, path: &str) -> Option<&[u8]> {
-        self.read
-            .entry(path.to_string())
-            .or_insert_with(|| fs::read(self.root.join(path)).ok())
-            .as_deref()
-    }
-
-    /// `path:line`; just `path` when the file cannot be read. The line is display only: it
-    /// comes from the byte offset and the file as it is now.
-    pub(crate) fn at(&mut self, path: &str, offset: i64) -> String {
-        match self.get(path) {
-            Some(src) => format!("{path}:{}", line_of(src, offset)),
-            None => path.to_string(),
-        }
-    }
-}
-
-/// The 1-based line holding byte `offset` of `src`.
-pub(crate) fn line_of(src: &[u8], offset: i64) -> usize {
-    let before = &src[..(offset.max(0) as usize).min(src.len())];
-    before.iter().filter(|&&b| b == b'\n').count() + 1
 }
