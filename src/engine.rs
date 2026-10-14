@@ -133,6 +133,19 @@ impl Engine {
         Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
+    /// The root of the repository where Meada runs.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// The open items whose call lives in the repository where Meada runs, in id order: the
+    /// ones `meada decide` works on.
+    pub fn local_items(&self) -> Result<Vec<OpenItem>> {
+        let mut items = self.open_items()?;
+        items.retain(|i| i.repository == self.identity);
+        Ok(items)
+    }
+
     /// The open items of the workspace, ambiguous links and unresolved consumers, in id order,
     /// each with its sorted candidates. Callers keep the ones whose `repository` they own.
     pub fn open_items(&self) -> Result<Vec<OpenItem>> {

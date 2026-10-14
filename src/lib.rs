@@ -3,6 +3,7 @@
 
 mod config;
 mod contract;
+pub mod decide;
 mod decisions;
 pub mod engine;
 mod http;

@@ -2,7 +2,7 @@
 //! candidates a decision may pick (spec #18). `search` lists them and `meada decide` resolves
 //! them.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use crate::contract::{Level, Link};
@@ -103,6 +103,11 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     for link in links.iter().filter(|l| l.level == Level::Ambiguous) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
+    // An unresolved consumer a decision applied to has a `decided` link; it is no longer open.
+    let decided: HashSet<&str> = (links.iter())
+        .filter(|l| l.level == Level::Decided)
+        .map(|l| l.consumer.as_str())
+        .collect();
     let routes: Vec<(&str, &str, &str)> = exports
         .iter()
         .flat_map(|e| {
@@ -122,6 +127,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
         for consumer in &export.consumers {
             let (kind, candidates) =
                 match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
+                    (None, _) if decided.contains(&consumer.site.as_str()) => continue,
                     (None, _) => {
                         let method = consumer.method.as_deref();
                         let fits = routes

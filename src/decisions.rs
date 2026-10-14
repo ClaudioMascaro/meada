@@ -12,18 +12,19 @@ use crate::Result;
 use crate::config;
 use crate::contract::{Level, Link};
 use crate::index::Export;
+use crate::items::{Candidate, ItemKind, OpenItem};
 use crate::workspace::{Missing, Workspace};
 
 const FILE: &str = "meada.decisions.toml";
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Decisions {
     #[serde(default, rename = "decision")]
     pub items: Vec<Decision>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(try_from = "Raw")]
 pub struct Decision {
     pub kind: Kind,
@@ -35,10 +36,11 @@ pub struct Decision {
     /// `human` or a model id.
     pub by: String,
     /// The probability a model stated; never set for `human`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub p: Option<f64>,
 }
 
-#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
     /// A call with several fitting providers.
@@ -84,7 +86,42 @@ pub fn load(root: &Path) -> Result<Decisions> {
     config::read(root, FILE)
 }
 
+/// The canonical text of `<root>/meada.decisions.toml` once `new` is in it: `new` replaces the
+/// entry of the same call, stale or not, and the entries are sorted by `call`. No comments and
+/// no timestamps, so the same decisions always give the same bytes.
+pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
+    let mut all = load(root)?.items;
+    all.retain(|d| new.iter().all(|n| n.call != d.call));
+    all.extend(new);
+    all.sort_by(|a, b| a.call.cmp(&b.call));
+    // A hand-edited file may repeat a call; the first entry is the one replay applies.
+    all.dedup_by(|later, first| later.call == first.call);
+    Ok(toml::to_string(&Decisions { items: all })?)
+}
+
+/// Writes `text`, from `canonical`, as `<root>/meada.decisions.toml`. It goes to a temporary
+/// file first and is renamed over the old one, so a failed write keeps the old decisions.
+pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
+    let temp = root.join(format!("{FILE}.tmp"));
+    std::fs::write(&temp, text)?;
+    Ok(std::fs::rename(temp, root.join(FILE))?)
+}
+
 impl Decision {
+    /// A person's pick of `candidate` for `item`.
+    pub(crate) fn human(item: &OpenItem, candidate: &Candidate) -> Self {
+        Self {
+            kind: match item.kind {
+                ItemKind::Ambiguous => Kind::AmbiguousLink,
+                ItemKind::Unresolved => Kind::DynamicUrl,
+            },
+            call: item.id.clone(),
+            target: format!("{}::{}", candidate.repository, candidate.contract),
+            by: "human".into(),
+            p: None,
+        }
+    }
+
     /// `decided by <by> (p=<p>)`, or `decided by human`.
     fn reason(&self) -> String {
         match self.p {
