@@ -163,13 +163,20 @@ pub(crate) struct Question {
     pub call: String,
     /// The enclosing function as it is on disk; `None` for a call at the top level of a file.
     pub enclosing: Option<String>,
-    /// `(key, description)` in candidate order: the key is the candidate's 1-based position,
-    /// as a string; the description its repository identity, method and path.
-    pub candidates: Vec<(String, String)>,
+    /// The candidates, in candidate order.
+    pub offers: Vec<Offer>,
     /// The kind of decision that resolves the item.
     pub kind: Kind,
-    /// The `target` of the decision that picks each candidate, in candidate order.
-    pub targets: Vec<String>,
+}
+
+/// One candidate as a decider is offered it.
+pub(crate) struct Offer {
+    /// The candidate's 1-based position, as a string.
+    pub key: String,
+    /// Its repository identity, method and path.
+    pub description: String,
+    /// The `target` of the decision that picks it.
+    pub target: String,
 }
 
 impl Question {
@@ -187,11 +194,14 @@ impl Question {
             repository: item.repository.clone(),
             call: item.expression.clone(),
             enclosing,
-            candidates: (item.candidates.iter().enumerate())
-                .map(|(n, c)| ((n + 1).to_string(), crate::decide::describe(c)))
+            offers: (item.candidates.iter().enumerate())
+                .map(|(n, c)| Offer {
+                    key: (n + 1).to_string(),
+                    description: c.describe(),
+                    target: Decision::target(c),
+                })
                 .collect(),
             kind: Kind::of(item),
-            targets: item.candidates.iter().map(Decision::target).collect(),
         })
     }
 
@@ -205,16 +215,13 @@ impl Question {
 
     /// The candidates, one `<key>: <description>` per line.
     pub fn listing(&self) -> String {
-        (self.candidates.iter())
-            .map(|(key, description)| format!("{key}: {description}\n"))
+        (self.offers.iter())
+            .map(|o| format!("{}: {}\n", o.key, o.description))
             .collect()
     }
 
     pub fn keys(&self) -> Vec<&str> {
-        self.candidates
-            .iter()
-            .map(|(key, _)| key.as_str())
-            .collect()
+        self.offers.iter().map(|o| o.key.as_str()).collect()
     }
 }
 
@@ -229,10 +236,10 @@ pub(crate) struct Request {
 
 impl Config {
     /// The requests the configured protocol sends for `questions`, in item order.
-    fn requests(&self, questions: &[Question]) -> Result<Vec<Request>> {
+    fn requests(&self, questions: &[Question]) -> Vec<Request> {
         match self.protocol {
-            Protocol::Chat => Ok(questions.iter().map(|q| chat::request(self, q)).collect()),
-            Protocol::Decisions => Ok(decisions::request(self, questions).into_iter().collect()),
+            Protocol::Chat => questions.iter().map(|q| chat::request(self, q)).collect(),
+            Protocol::Decisions => decisions::request(self, questions).into_iter().collect(),
         }
     }
 
@@ -356,7 +363,7 @@ pub(crate) fn run(
         writeln!(out, "{}\n{}", item.id, skip.text())?;
         skipped = true;
     }
-    let requests = config.requests(&questions)?;
+    let requests = config.requests(&questions);
     if show_request {
         for (n, request) in requests.iter().enumerate() {
             if n > 0 || skipped {

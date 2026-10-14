@@ -8,7 +8,7 @@ use std::io::{BufRead, Write};
 use crate::Result;
 use crate::decider;
 use crate::decisions::{self, Decision};
-use crate::engine::{Candidate, Engine, OpenItem};
+use crate::engine::{Engine, OpenItem};
 use crate::msg::Msg;
 
 /// What the command line asked for.
@@ -48,17 +48,9 @@ fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
     for (n, c) in item.candidates.iter().enumerate() {
-        writeln!(out, "  {}) {}", n + 1, describe(c))?;
+        writeln!(out, "  {}) {}", n + 1, c.describe())?;
     }
     Ok(())
-}
-
-/// A candidate as a person or a decider sees it: repository identity, method and path.
-pub(crate) fn describe(c: &Candidate) -> String {
-    match c.method() {
-        "" => format!("{} {}", c.repository, c.contract),
-        method => format!("{} {method} {}", c.repository, c.path()),
-    }
 }
 
 /// Asks about each of `items` on `out` and reads the answers from `input`: a number picks that

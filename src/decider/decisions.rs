@@ -41,8 +41,8 @@ pub(super) fn request(config: &Config, questions: &[Question]) -> Option<Request
     let mut items = Map::new();
     let mut asked = Map::new();
     for (name, question) in names(questions.len()).zip(questions) {
-        let criteria: Map<String, Value> = (question.candidates.iter())
-            .map(|(key, description)| (key.clone(), description.as_str().into()))
+        let criteria: Map<String, Value> = (question.offers.iter())
+            .map(|o| (o.key.clone(), o.description.as_str().into()))
             .collect();
         let instructions =
             format!("Pick the candidate endpoint that the call in `items.{name}` reaches.");
@@ -158,7 +158,7 @@ fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Resu
 #[cfg(test)]
 mod tests {
     use super::{Answer, judge, names};
-    use crate::decider::{Config, Protocol, Question};
+    use crate::decider::{Config, Offer, Protocol, Question};
     use crate::decisions::Kind;
 
     #[test]
@@ -168,13 +168,14 @@ mod tests {
             repository: "r".into(),
             call: "fetch(url)".into(),
             enclosing: None,
-            candidates: ["1", "2", "3"]
-                .map(|k| (k.into(), format!("r GET /{k}")))
+            offers: ["1", "2", "3"]
+                .map(|k| Offer {
+                    key: k.into(),
+                    description: format!("r GET /{k}"),
+                    target: format!("r::http::GET::/{k}"),
+                })
                 .into(),
             kind: Kind::DynamicUrl,
-            targets: ["1", "2", "3"]
-                .map(|k| format!("r::http::GET::/{k}"))
-                .into(),
         };
         for (probabilities, valid) in [
             ([0.5, 0.25, 0.25], true),

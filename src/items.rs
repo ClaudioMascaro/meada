@@ -55,6 +55,14 @@ impl Candidate {
     pub fn path(&self) -> &str {
         http::route(&self.contract).map_or("", |(_, path)| path)
     }
+
+    /// The candidate as a person or a decider sees it: repository identity, method and path.
+    pub fn describe(&self) -> String {
+        match self.method() {
+            "" => format!("{} {}", self.repository, self.contract),
+            method => format!("{} {method} {}", self.repository, self.path()),
+        }
+    }
 }
 
 /// The symbol a call sits in.
@@ -75,8 +83,6 @@ pub struct OpenItem {
     pub path: String,
     /// 1-based line of the call, from the file as it is now; `None` when it cannot be read.
     pub line: Option<usize>,
-    /// Byte range of the call in its file.
-    pub call: Range<usize>,
     /// The call as written, on one line; the callee when the file cannot be read.
     pub expression: String,
     /// `None` for a call at the top level of its file.
@@ -135,7 +141,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                             .filter(|(_, contract, _)| {
                                 http::route_fits(contract, method, &consumer.fragments)
                             })
-                            .map(|&(repository, contract, site)| (repository, contract, site));
+                            .copied();
                         (ItemKind::Unresolved, fits.collect::<Vec<_>>())
                     }
                     (Some(_), Some(links)) => {
@@ -187,7 +193,6 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     .get(&call.span.path)
                     .map(|src| crate::render::line_of(src, call.span.start)),
                 path: call.span.path.clone(),
-                call: range(call.span.start, call.span.end),
                 expression,
                 enclosing: symbols.get(call.caller.as_str()).map(|s| Enclosing {
                     name: crate::render::label(&s.id).to_string(),
