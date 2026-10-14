@@ -81,14 +81,18 @@ fn help_follows_lang() {
 
 #[test]
 fn status_reports_stale_and_waiting_decisions_follow_lang() {
-    let (web, _, catalog) = chain("cli_stale");
+    let (web, _, _) = chain("cli_stale");
     decisions(&web, "chain-web-missing-peer");
     let toml = web.join("meada.toml");
     let peer = "\n[[peer]]\nrepo = \"example.com/chain/billing\"\n";
     fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+    // A third decision, for a call that does not exist, is stale.
+    let file = web.join("meada.decisions.toml");
+    let gone = "\n[[decision]]\nkind = \"dynamic-url\"\n\
+                call = \"example.com/chain/web::src/status.ts::gone::fetch#0\"\n\
+                target = \"example.com/chain/catalog::http::POST::/api/events\"\nby = \"human\"\n";
+    fs::write(&file, fs::read_to_string(&file).unwrap() + gone).unwrap();
     meada(&web, "en_US.UTF-8", "index");
-    // The core now resolves the health check on its own, so its decision is stale.
-    fs::remove_file(catalog.join("app/api/health/route.ts")).unwrap();
     for (lang, name) in LANGS {
         assert_golden(
             &format!("cli.status-stale.{name}.txt"),

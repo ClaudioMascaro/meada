@@ -158,9 +158,10 @@ enum Verdict {
 
 /// Judges `d`, a decision of the repository whose index is `export`, against `core`, the
 /// workspace's links before any decision. The checks run in this order, the first that fails
-/// decides: the call is there, its item is still open (an ambiguous link, or an unresolved
-/// consumer), the target's repository is not a missing peer, the target is still served, and,
-/// for an ambiguous link, it is still among the link's candidates.
+/// decides: the call is there, the target's repository is not a missing peer (the decision
+/// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
+/// consumer), the target is still served, and, for an ambiguous link, it is still among the
+/// link's candidates.
 fn judge(
     d: &Decision,
     export: &Export,
@@ -174,6 +175,13 @@ fn judge(
     {
         return Verdict::Stale(Cause::CallGone);
     }
+    let target = d.target.split_once("::");
+    // Without the peer the core cannot see its providers, so whether the item is open, or the
+    // target served, is unknown: the decision waits.
+    if let Some(peer) = target.and_then(|(identity, _)| missing.iter().find(|m| m.repo == identity))
+    {
+        return Verdict::Waiting(peer.repo.clone());
+    }
     let open = match d.kind {
         Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
         Kind::DynamicUrl => {
@@ -183,12 +191,9 @@ fn judge(
     if !open {
         return Verdict::Stale(Cause::ItemNotOpen);
     }
-    let Some((identity, contract)) = d.target.split_once("::") else {
+    let Some((identity, contract)) = target else {
         return Verdict::Stale(Cause::TargetGone);
     };
-    if let Some(peer) = missing.iter().find(|m| m.repo == identity) {
-        return Verdict::Waiting(peer.repo.clone());
-    }
     // ponytail: a repository serving one contract from several sites links to the first by
     // site; the target names no site.
     let provider = exports

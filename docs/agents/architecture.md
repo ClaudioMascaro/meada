@@ -19,7 +19,8 @@ give byte-identical output.
   it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `stale_decisions`, plus
   `status(dir)` (never creates an index; when every repository is already indexed at the current
   schema it refreshes them like a query, to judge decisions, and writes only inside `.meada/`;
-  otherwise it prints the states and no decision lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+  otherwise, or when that fails, it prints the states and no decision lines). It owns the
+  `context` and `search` rendering; `trace` lives in `trace.rs`.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `Engine::open_items` feeds `list` the exports and links, so
   an item is an ambiguous link or an unresolved consumer, in id order, whose candidates sort by

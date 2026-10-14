@@ -519,8 +519,11 @@ pub fn status(dir: &Path) -> Result<String> {
     let here = &workspace.repos[0].root;
     let indexed =
         |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
+    // A failure to open or refresh drops the decision lines, not the whole status.
     let evaluations = if workspace.repos.iter().all(indexed) {
-        Engine::open(dir)?.stale_decisions()?
+        Engine::open(dir)
+            .and_then(|engine| engine.stale_decisions())
+            .unwrap_or_default()
     } else {
         Vec::new()
     };
