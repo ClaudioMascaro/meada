@@ -190,8 +190,8 @@ impl Msg<'_> {
                 format!("`{key}` não é uma chave do {file}"),
             ),
             Msg::TrackA => pick(
-                "track A adds it (resources and gateway)".into(),
-                "a trilha A a adiciona (recursos e gateway)".into(),
+                "the documents release of track A adds it (spec #21)".into(),
+                "a versão de documentos da trilha A a adiciona (spec #21)".into(),
             ),
             Msg::NotLowercase(value) => pick(
                 format!(

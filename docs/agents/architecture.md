@@ -109,10 +109,12 @@ give byte-identical output.
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config`
-  parses `[[peer]]`, `[serve] hosts` and `[[resource]]` (`kind` checked as a lowercase
+  parses `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`,
+  normalized by `gateway_key`) and `[[resource]]` (`kind` checked as a lowercase
   identifier, `id` not empty, `role` read, write or read-write, optional `via`) with
   `deny_unknown_fields`; keys later track A specs add are listed in `LATER` so the error says
-  "not in v0.1". `config::read<T>(root, name)` is the
+  "not in v0.1". `Serve::gateway_path(code path) -> Option<(gateway path, reason)>` is the one
+  gateway rule (spec #19); document routes reuse it. `config::read<T>(root, name)` is the
   shared TOML reader (file, line and key in every error), also used for the decisions file;
   `Repository` carries both `config` and `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -150,7 +152,9 @@ give byte-identical output.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
   `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules
-  (host, `base_url_env`, unique provider). `resource.rs` (spec #19): reads no code; `declare`
+  (host, `base_url_env`, unique provider). A route also matches by its gateway path
+  (`http::gateway_path`); that link is `inferred`, the rewrite in its reason; `declare` fills
+  `Provider::gateway`. `resource.rs` (spec #19): reads no code; `declare`
   turns each `[[resource]]` `via` symbol the repository has into a provider (writer) or
   consumer (reader) of `resource::<kind>::<id>`, and `link` joins every reader to every writer
   of another repository at `declared`, reason the contract. A `via` that names no symbol is
@@ -182,7 +186,8 @@ give byte-identical output.
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
   parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
+  `gateway` when `[serve]` rewrites its path. An unresolved
   consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
   and are left out of the export. A resource side is a
   provider or consumer whose `site` is the `via` symbol, or the repository identity for a
@@ -259,7 +264,7 @@ give byte-identical output.
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
+  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway` (gateway prefixes), `urls`
   (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, parse
   errors), `stale` (stale and waiting decisions in `status` and `export`), `decide` (the binary
   in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness`

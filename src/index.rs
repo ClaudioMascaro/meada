@@ -606,6 +606,9 @@ pub(crate) struct CallSite {
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) gateway: Option<String>,
 }
 
 /// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
@@ -687,6 +690,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
+                gateway: None,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
