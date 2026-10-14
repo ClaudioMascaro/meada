@@ -309,10 +309,8 @@ impl Config {
         let message = serde_json::from_str::<Value>(body)
             .ok()
             .and_then(|v| Some(self.shown(v["error"]["message"].as_str()?)));
-        match message {
-            Some(message) if !message.is_empty() => format!("http status: {status}: {message}"),
-            _ => format!("http status: {status}"),
-        }
+        let message = message.as_deref().filter(|m| !m.is_empty());
+        Msg::HttpStatus { status, message }.text()
     }
 
     /// Text from upstream made fit to print or record: control characters dropped (so it
@@ -424,7 +422,7 @@ pub(crate) fn run(
 
 /// A `--min-p` value, which must be a probability.
 pub(crate) fn min_p(value: f64) -> Result<f64> {
-    match (0.0..=1.0).contains(&value) {
+    match crate::decisions::probability(value) {
         true => Ok(value),
         false => Err(Msg::DecideMinP.text().into()),
     }

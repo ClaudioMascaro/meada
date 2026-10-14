@@ -33,7 +33,7 @@ pub(super) fn invalid(reason: impl Display) -> Box<dyn std::error::Error> {
 
 /// `p` if it is a number in [0,1] (so neither NaN nor infinite).
 pub(super) fn probability(p: f64) -> Result<f64> {
-    match (0.0..=1.0).contains(&p) {
+    match crate::decisions::probability(p) {
         true => Ok(p),
         false => Err(invalid(Msg::AnswerProbability(p).text())),
     }

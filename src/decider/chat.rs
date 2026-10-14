@@ -80,7 +80,7 @@ pub(super) fn answer(config: &Config, question: &Question, body: &str) -> Result
     let message = completion
         .choices
         .first()
-        .ok_or_else(|| invalid(Msg::AnswerUnreadable("no choices").text()))?;
+        .ok_or_else(|| invalid(Msg::AnswerNoChoices.text()))?;
     let answer: Answer = serde_json::from_str(&message.message.content).map_err(unreadable)?;
     let by = completion.model.as_deref().unwrap_or(&config.model);
     proposal(config, question, &answer.choice, answer.probability, by)

@@ -75,11 +75,9 @@ impl TryFrom<Raw> for Decision {
 
     fn try_from(raw: Raw) -> std::result::Result<Self, String> {
         match (raw.by == "human", raw.p) {
-            (true, Some(_)) => return Err("`p` is for a model, not for `human`".into()),
-            (false, None) => return Err("`p` is missing for a model".into()),
-            (false, Some(p)) if !(0.0..=1.0).contains(&p) => {
-                return Err("`p` must be between 0 and 1".into());
-            }
+            (true, Some(_)) => return Err(Msg::DecisionPHuman.text()),
+            (false, None) => return Err(Msg::DecisionPMissing.text()),
+            (false, Some(p)) if !probability(p) => return Err(Msg::DecisionPRange.text()),
             _ => {}
         }
         Ok(Self {
@@ -90,6 +88,12 @@ impl TryFrom<Raw> for Decision {
             p: raw.p,
         })
     }
+}
+
+/// Whether `p` is a probability: a number in [0,1], so neither NaN nor infinite. The one check
+/// behind the file's `p`, a decider's answer and `--min-p`.
+pub(crate) fn probability(p: f64) -> bool {
+    (0.0..=1.0).contains(&p)
 }
 
 /// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
