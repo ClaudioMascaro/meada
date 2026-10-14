@@ -13,6 +13,7 @@ use crate::config;
 use crate::contract::{Level, Link};
 use crate::index::Export;
 use crate::items::{Candidate, ItemKind, OpenItem};
+use crate::msg::Msg;
 use crate::workspace::{Missing, Workspace};
 
 const FILE: &str = "meada.decisions.toml";
@@ -82,8 +83,27 @@ impl TryFrom<Raw> for Decision {
 }
 
 /// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
+/// The file holds at most one entry per `call`: a repeat is a parse error naming its line.
 pub fn load(root: &Path) -> Result<Decisions> {
-    config::read(root, FILE)
+    let decisions: Decisions = config::read(root, FILE)?;
+    let mut seen = HashSet::new();
+    let Some(repeat) = decisions.items.iter().find(|d| !seen.insert(&d.call)) else {
+        return Ok(decisions);
+    };
+    let file = root.join(FILE);
+    // The repeat is the second `call = "<call>"` line.
+    let line = std::fs::read_to_string(&file)?
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("call") && l.contains(&format!("\"{}\"", repeat.call)))
+        .nth(1)
+        .map_or(1, |(n, _)| n + 1);
+    Err(format!(
+        "{}:{line}: {}",
+        file.display(),
+        Msg::CallRepeated(&repeat.call).text()
+    )
+    .into())
 }
 
 /// The canonical text of `<root>/meada.decisions.toml` once `new` is in it: `new` replaces the
@@ -93,9 +113,27 @@ pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     let mut all = load(root)?.items;
     all.retain(|d| new.iter().all(|n| n.call != d.call));
     all.extend(new);
+    render(all)
+}
+
+/// The canonical text of the decisions file without its `stale` entries, with how many that
+/// removed, or `None` when none of them is in the file. Waiting entries stay.
+pub(crate) fn pruned(root: &Path, stale: &[Stale]) -> Result<Option<(String, usize)>> {
+    let mut all = load(root)?.items;
+    let before = all.len();
+    for s in stale {
+        all.retain(|d| d.call != s.call);
+    }
+    let removed = before - all.len();
+    Ok(if removed == 0 {
+        None
+    } else {
+        Some((render(all)?, removed))
+    })
+}
+
+fn render(mut all: Vec<Decision>) -> Result<String> {
     all.sort_by(|a, b| a.call.cmp(&b.call));
-    // A hand-edited file may repeat a call; the first entry is the one replay applies.
-    all.dedup_by(|later, first| later.call == first.call);
     Ok(toml::to_string(&Decisions { items: all })?)
 }
 
@@ -259,8 +297,7 @@ fn judge(
 
 /// Judges every repository's decisions against `links`, the workspace's links before
 /// decisions, and applies those that fit: each replaces the ambiguous link of its call, or
-/// adds the missing one, with a single link at the level `decided`. A call decided twice
-/// keeps its first decision. `exports` follow the workspace's repositories. Returns the links,
+/// adds the missing one, with a single link at the level `decided`. `exports` follow the workspace's repositories. Returns the links,
 /// sorted, and for each repository the decisions that did not apply. A stale decision or one
 /// that waits on a missing peer changes no link: the core's stands.
 pub(crate) fn replay(
@@ -268,7 +305,6 @@ pub(crate) fn replay(
     workspace: &Workspace,
     exports: &[Export],
 ) -> (Vec<Link>, Vec<Evaluation>) {
-    let mut decided = HashSet::new();
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
     for (repo, export) in workspace.repos.iter().zip(exports) {
@@ -278,12 +314,7 @@ pub(crate) fn replay(
             waiting: Vec::new(),
         };
         for d in &repo.decisions.items {
-            let verdict = match judge(d, export, exports, &links, &workspace.missing) {
-                Verdict::Applies(_) if !decided.insert(&d.call) => {
-                    Verdict::Stale(Cause::ItemNotOpen)
-                }
-                other => other,
-            };
+            let verdict = judge(d, export, exports, &links, &workspace.missing);
             let (call, target) = (d.call.clone(), d.target.clone());
             match verdict {
                 Verdict::Applies(provider) => applied.push((d, provider)),

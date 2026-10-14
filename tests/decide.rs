@@ -126,34 +126,47 @@ fn a_new_decision_replaces_the_entry_of_its_call_stale_or_not() {
 }
 
 #[test]
-fn a_stale_entry_for_another_call_survives_a_rewrite_and_a_repeated_call_keeps_its_first() {
+fn a_stale_entry_for_another_call_survives_a_rewrite() {
     let (web, _, _) = chain("decide_survive");
-    let entry = |call: &str, target: &str| {
-        format!(
-            "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{call}\"\n\
-             target = \"{target}\"\nby = \"human\"\n\n"
-        )
-    };
     let gone = "example.com/chain/web::src/gone.ts::run::fetch#0";
-    let stale = entry(gone, "example.com/chain/ghost::http::GET::/gone");
-    let first = entry(gone, "example.com/chain/ghost::http::GET::/first");
-    let second = entry(gone, "example.com/chain/ghost::http::GET::/second");
-    fs::write(
-        web.join("meada.decisions.toml"),
-        format!("{first}{second}{stale}"),
-    )
-    .unwrap();
+    let stale = format!(
+        "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{gone}\"\n\
+         target = \"example.com/chain/ghost::http::GET::/gone\"\nby = \"human\"\n"
+    );
+    fs::write(web.join("meada.decisions.toml"), stale).unwrap();
 
     let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "2\n");
 
     assert!(ok, "{stderr}");
     let written = file(&web).unwrap();
-    assert_eq!(written.matches(gone).count(), 1, "{written}");
     assert!(
-        written.contains("/first") && !written.contains("/second"),
+        written.contains(gone) && written.contains(HEALTH),
         "{written}"
     );
-    assert!(written.contains(HEALTH), "{written}");
+}
+
+#[test]
+fn a_repeated_call_in_the_file_is_a_parse_error_naming_the_repeat() {
+    let (web, _, _) = chain("decide_repeat");
+    let entry = |target: &str| {
+        format!(
+            "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{HEALTH}\"\n\
+             target = \"{target}\"\nby = \"human\"\n\n"
+        )
+    };
+    let text = format!("{}{}", entry("a::http::GET::/a"), entry("b::http::GET::/b"));
+    fs::write(web.join("meada.decisions.toml"), text).unwrap();
+
+    let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(!ok);
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: <repo>/meada.decisions.toml:9: `call`: `{HEALTH}` is decided twice, \
+             one entry per call\n"
+        )
+    );
 }
 
 #[test]
@@ -224,4 +237,90 @@ fn messages_follow_lang() {
 
     assert!(ok);
     assert_golden("chain-web.decide.pick.pt.txt", &stdout);
+}
+
+/// Names `example.com/chain/billing`, which the chain does not have, as a peer of `web`.
+fn add_missing_peer(web: &Path) {
+    let toml = web.join("meada.toml");
+    let mut src = fs::read_to_string(&toml).unwrap();
+    src.push_str("\n[[peer]]\nrepo = \"example.com/chain/billing\"\n");
+    fs::write(toml, src).unwrap();
+}
+
+#[test]
+fn list_prints_the_stale_and_waiting_decisions_after_the_open_items() {
+    let (web, _, _) = chain("decide_list_stale");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-stale.en.txt", &stdout);
+}
+
+#[test]
+fn list_prints_the_stale_decisions_even_when_no_item_is_open() {
+    let (web, _, catalog) = chain("decide_list_resolved");
+    common::decisions(&web, "chain-web");
+    fs::remove_file(catalog.join("app/api/health/route.ts")).unwrap();
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-resolved.en.txt", &stdout);
+}
+
+#[test]
+fn prune_removes_exactly_the_stale_entries_and_keeps_those_waiting() {
+    let (web, _, _) = chain("decide_prune");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.prune.en.txt", &stdout);
+    assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
+
+    // Nothing is stale any more: a second run leaves the file as it is.
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+    assert!(ok);
+    assert_eq!(stdout, "nothing to prune\n");
+    assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
+}
+
+#[test]
+fn prune_reports_in_portuguese_how_many_entries_it_removed() {
+    let (web, _, _) = chain("decide_prune_pt");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, _, ok) = decide(&web, "pt_BR.UTF-8", &["--prune"], "");
+
+    assert!(ok);
+    assert_eq!(
+        stdout,
+        "1 decisão obsoleta removida de meada.decisions.toml\n"
+    );
+}
+
+#[test]
+fn prune_with_no_file_writes_none() {
+    let (web, _, _) = chain("decide_prune_none");
+
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+
+    assert!(ok);
+    assert_eq!(stdout, "nothing to prune\n");
+    assert_eq!(file(&web), None);
+}
+
+#[test]
+fn prune_does_not_combine_with_the_other_flags() {
+    let (web, _, _) = chain("decide_prune_flags");
+    for other in ["--list", "--dry-run", "--item=x"] {
+        let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--prune", other], "");
+        assert!(!ok && stderr.contains("cannot be used"), "{stderr}");
+    }
 }

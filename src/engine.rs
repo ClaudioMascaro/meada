@@ -133,6 +133,19 @@ impl Engine {
         Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
+    /// The decisions of the repository where Meada runs that are stale or waiting.
+    pub fn local_decisions(&self) -> Result<Evaluation> {
+        let all = self.stale_decisions()?;
+        Ok(all
+            .into_iter()
+            .find(|e| e.repository == self.identity)
+            .unwrap_or_else(|| Evaluation {
+                repository: self.identity.clone(),
+                stale: vec![],
+                waiting: vec![],
+            }))
+    }
+
     /// The root of the repository where Meada runs.
     pub fn root(&self) -> &Path {
         &self.root

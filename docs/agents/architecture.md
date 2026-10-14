@@ -34,10 +34,13 @@ give byte-identical output.
   `ask(items, input, out) -> Vec<Decision>` (human mode: prints each item and its numbered
   candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
   dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
-  writes nothing) and `run`, the public entry. Human mode reads no environment variable and
+  writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
+  decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
+  exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
+  is stale) and `run`, the public entry. Human mode reads no environment variable and
   opens no connection. Model deciders (later tickets) fill `Vec<Decision>` and call `finish`.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
-  `--list`). `search`, `context` and `trace`
+  `--list`, `--prune`, the last excluding the others). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
@@ -61,7 +64,7 @@ give byte-identical output.
   { repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target,
   peer}> }` is per repository, in file order; `Engine::stale_decisions()` returns them for the
   workspace, and `export` and `status` render them (`meada decide --list`/`--prune` reuse the
-  same call). The writer is `canonical(root, new)` (existing entries minus those of the same
+  same call). `load` rejects a file that repeats a `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)` (existing entries minus those of the same
   `call`, plus `new`, sorted by `call`, no comments or timestamps; `Decision::human(item,
   candidate)` builds a human pick) and `save(root, text)`.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by

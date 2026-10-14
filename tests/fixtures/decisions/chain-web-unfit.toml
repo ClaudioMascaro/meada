@@ -21,30 +21,9 @@ call = "example.com/chain/web::src/status.ts::gone::fetch#0"
 target = "example.com/chain/catalog::http::GET::/api/products/{}"
 by = "human"
 
-# The repository of the target is not in the workspace.
-[[decision]]
-kind = "ambiguous-link"
-call = "example.com/chain/web::src/status.ts::health::fetch#0"
-target = "example.com/chain/elsewhere::http::GET::/api/health"
-by = "human"
-
 # The call is no longer ambiguous.
 [[decision]]
 kind = "ambiguous-link"
 call = "example.com/chain/web::src/orders.ts::listOrders::request#0"
 target = "example.com/chain/gateway::http::GET::/api/orders"
-by = "human"
-
-# The call is not an unresolved consumer.
-[[decision]]
-kind = "dynamic-url"
-call = "example.com/chain/web::src/status.ts::health::fetch#0"
-target = "example.com/chain/gateway::http::GET::/api/health"
-by = "human"
-
-# The call is not an ambiguous link.
-[[decision]]
-kind = "ambiguous-link"
-call = "example.com/chain/web::src/status.ts::track::fetch#0"
-target = "example.com/chain/catalog::http::GET::/api/products/{}"
 by = "human"

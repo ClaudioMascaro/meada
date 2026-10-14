@@ -132,6 +132,16 @@ fn a_decision_that_no_longer_fits_is_ignored() {
 }
 
 #[test]
+fn a_decision_of_the_wrong_kind_for_its_call_is_ignored() {
+    let (web, _, _) = chain("decided_unfit_kind");
+    decisions(&web, "chain-web-unfit-kind");
+
+    let export = Engine::open(&web).unwrap().export().unwrap();
+
+    assert_golden("chain-web.unfit-kind.export.json", &export);
+}
+
+#[test]
 fn inserting_a_line_above_a_decided_call_leaves_the_decision_applied() {
     let (web, _, _) = chain("decided_insert");
     decisions(&web, "chain-web");
