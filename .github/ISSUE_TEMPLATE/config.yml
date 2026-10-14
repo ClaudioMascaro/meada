@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vulnerabilidade · Vulnerability · Vulnerabilidad
+    url: https://github.com/ClaudioMascaro/meada/security/advisories/new
+    about: Não abra issue pública. Use o relato privado. · Do not open a public issue. Use private reporting. · No abras un issue público. Usa el reporte privado.

@@ -1,0 +1,27 @@
+name: Funcionalidade · Feature · Funcionalidad
+description: Uma ideia ou melhoria · An idea or improvement · Una idea o mejora
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Escreva em português, español ou English. · Write in Portuguese, Spanish or English. · Escribe en portugués, español o inglés.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema · Problem · Problema
+      description: Que dificuldade você enfrenta hoje? · What difficulty do you face today? · ¿Qué dificultad enfrentas hoy?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposta · Proposal · Propuesta
+      description: Como você imagina a solução, e que alternativas considerou · How you picture the solution, and which alternatives you considered · Cómo imaginas la solución y qué alternativas consideraste
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Mais contexto · More context · Más contexto
+      description: Exemplos, links, ADRs relacionados · Examples, links, related ADRs · Ejemplos, enlaces, ADRs relacionados
