@@ -384,17 +384,27 @@ impl<'a> Walk<'_, 'a> {
             let text = self.node(&s.id).1 + &mark(c.level);
             self.enter(&s.id, depth, Row::call(text, m, c.level));
         }
-        for consumer in graph.consumers.get(c.id.as_str()).into_iter().flatten() {
+        let consumers = graph.consumers.get(c.id.as_str());
+        for consumer in consumers.into_iter().flatten() {
             let site = self.site(call);
-            let Some(contract) = &consumer.contract else {
-                let text = format!("{site} {}", unresolved(&c.id));
-                self.push(depth, Row::call(text, n, None));
-                continue;
-            };
             let out = graph.out.get(c.id.as_str()).into_iter().flatten();
-            let links: Vec<&Link> = out.filter(|l| l.contract == *contract).copied().collect();
+            let links: Vec<&Link> = match &consumer.contract {
+                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
+                // An unresolved consumer has links only through a decision, on a contract no
+                // other consumer of the site has.
+                None => {
+                    let others = |l: &&&Link| {
+                        let mut all = consumers.into_iter().flatten();
+                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
+                    };
+                    out.filter(|l| !others(l)).copied().collect()
+                }
+            };
             if links.is_empty() {
-                let text = format!("{site} consumes {contract}, no provider");
+                let text = match &consumer.contract {
+                    Some(contract) => format!("{site} consumes {contract}, no provider"),
+                    None => format!("{site} {}", unresolved(&c.id)),
+                };
                 self.push(depth, Row::call(text, n, None));
             }
             for link in links {

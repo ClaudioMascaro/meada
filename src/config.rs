@@ -6,6 +6,7 @@ use std::ops::Range;
 use std::path::Path;
 
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use toml::de::{DeTable, DeValue};
 
 use crate::msg::Msg;
@@ -60,22 +61,28 @@ const LATER: &[&str] = &["resource", "serve.prefix", "serve.strip"];
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
-    let file = root.join("meada.toml");
+    read(root, "meada.toml")
+}
+
+/// `<root>/<name>` parsed as `T`, or `T::default()` when the file does not exist. A parse error
+/// names the file, the line and the key; `meada.decisions.toml` is read the same way.
+pub(crate) fn read<T: DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
+    let file = root.join(name);
     let src = match fs::read_to_string(&file) {
         Ok(src) => src,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Config::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
         Err(e) => return Err(format!("{}: {e}", file.display()).into()),
     };
     toml::from_str(&src).map_err(|e| {
         let at = e.span().map_or(0, |s| s.start);
         let line = src[..at.min(src.len())].matches('\n').count() + 1;
-        let what = describe(&src, at, e.message());
+        let what = describe(&src, at, e.message(), name);
         format!("{}:{line}: {what}", file.display()).into()
     })
 }
 
 /// The error message with the dotted key it is about.
-fn describe(src: &str, at: usize, message: &str) -> String {
+fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
     // A syntax error leaves no table to find the key in.
     let Ok(table) = DeTable::parse(src) else {
         return message.to_string();
@@ -100,7 +107,7 @@ fn describe(src: &str, at: usize, message: &str) -> String {
             release: &Msg::TrackA.text(),
         }
         .text(),
-        (Some(_), Some(key)) => Msg::KeyUnknown(key).text(),
+        (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
         (_, None) => message.to_string(),
     }

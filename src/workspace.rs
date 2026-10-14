@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::{self, Config};
+use crate::decisions::{self, Decisions};
 use crate::msg::Msg;
 use crate::{Result, repo};
 
@@ -21,6 +22,7 @@ pub struct Repository {
     pub root: PathBuf,
     pub identity: String,
     pub config: Config,
+    pub decisions: Decisions,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -50,6 +52,7 @@ impl Workspace {
         let identity = found.identity(&start);
         let mut repos = vec![Repository {
             config: config::load(&start)?,
+            decisions: decisions::load(&start)?,
             root: start,
             identity,
         }];
@@ -72,6 +75,7 @@ impl Workspace {
                     match found.peer(&from, &identity, hint.as_deref()) {
                         Some(root) => repos.push(Repository {
                             config: config::load(&root)?,
+                            decisions: decisions::load(&root)?,
                             root,
                             identity,
                         }),
@@ -91,9 +95,12 @@ impl Workspace {
                     if repos.iter().any(|m| m.root == sibling) {
                         continue;
                     }
-                    // ponytail: a sibling with an invalid `meada.toml` is skipped silently; it
-                    // cannot be told apart from one that names no repository of the workspace.
-                    let Ok(config) = config::load(&sibling) else {
+                    // ponytail: a sibling with an invalid `meada.toml` or decisions file is
+                    // skipped silently; it cannot be told apart from one that names no
+                    // repository of the workspace.
+                    let (Ok(config), Ok(decisions)) =
+                        (config::load(&sibling), decisions::load(&sibling))
+                    else {
                         continue;
                     };
                     if config
@@ -110,6 +117,7 @@ impl Workspace {
                             root: sibling,
                             identity,
                             config,
+                            decisions,
                         });
                         joined = true;
                     }

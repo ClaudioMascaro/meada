@@ -1,0 +1,15 @@
+example.com/chain/web src/dashboard.ts:4 dashboard
+  example.com/chain/web src/status.ts:2 health
+    →[decided: decided by human] example.com/chain/gateway src/server.ts:7 GET /api/health
+  example.com/chain/web src/status.ts:7 track
+    →[decided: decided by openrouter/jev (p=0.62)] example.com/chain/catalog app/api/products/[id]/route.ts:3 GET
+      example.com/chain/catalog lib/products.ts:2 load
+        example.com/chain/catalog lib/products.ts:6 parent
+          example.com/chain/catalog lib/products.ts:2 load (cycle)
+        example.com/chain/catalog lib/products.ts:10 find
+  example.com/chain/web src/orders.ts:5 listOrders
+    example.com/chain/web src/api/client.ts:4 request
+    →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/gateway src/orders.ts:5 listOrders
+      example.com/chain/gateway src/catalog.ts:2 productOf
+      →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/catalog app/api/products/[id]/route.ts:3 GET (see above)
+chain: decided · 4 hops · 3 repos · 278 tokens

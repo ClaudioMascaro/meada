@@ -1,0 +1,10 @@
+example.com/chain/web src/status.ts:2 health
+function health() {
+  return fetch("/api/health");
+}
+callers:
+example.com/chain/web src/dashboard.ts:5 dashboard
+callees:
+example.com/chain/web src/status.ts:3 (unresolved) fetch
+contracts:
+example.com/chain/web src/status.ts:3 consumes http::GET::/api/health →[decided: decided by human] example.com/chain/gateway::src/server.ts::GET /api/health

@@ -44,6 +44,15 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     )
 }
 
+/// Copies `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml` (spec #18).
+/// The base chain fixture has no decisions file, so each test picks the variant it needs.
+pub fn decisions(repo: &Path, name: &str) {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/decisions")
+        .join(format!("{name}.toml"));
+    fs::copy(source, repo.join("meada.decisions.toml")).unwrap();
+}
+
 /// Runs `git` in `dir`, isolated from the user's and the system's git configuration, with a
 /// fixed author and date so commits are the same on every machine.
 pub fn git(dir: &Path, args: &[&str]) -> String {
