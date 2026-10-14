@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::contract::{self, Link};
+use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export, State, Symbol};
 use crate::msg::Msg;
 pub use crate::trace::{Direction, Start};
@@ -97,14 +97,14 @@ impl Engine {
 
     /// Every link of the workspace, sorted.
     fn links(&self, exports: &[Export]) -> Vec<Link> {
-        let members = &self.workspace.repos;
+        let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
-            .zip(members)
+            .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
         let mut links = Vec::new();
-        for (export, from) in exports.iter().zip(members) {
+        for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
@@ -118,7 +118,7 @@ impl Engine {
 
     /// The chain from `start`, followed `direction` through calls inside repositories and
     /// links between them, across the whole workspace, until it ends, a cycle closes or the
-    /// budget runs out; one indented line per step, then the chain footer and any missing
+    /// budget runs out; one indented line per call or hop, then the chain footer and any missing
     /// peer. `start` names a symbol, a route (`http::GET::/users/{}`, `GET /users/{}` or
     /// `/users/{}`) or a call site, or takes the symbols the uncommitted changes touch.
     pub fn trace(
@@ -388,7 +388,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             }
             targets
                 .iter()
-                .map(|t| line(identity, files, t, label(&t.id)) + ambiguous(c))
+                .map(|t| line(identity, files, t, label(&t.id)) + &ambiguous(c))
                 .collect()
         })
         .collect();
@@ -405,11 +405,10 @@ fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> Strin
 }
 
 /// ` [ambiguous]` for an ambiguous call, empty otherwise.
-fn ambiguous(call: &CallSite) -> &'static str {
-    if call.level.as_deref() == Some("ambiguous") {
-        " [ambiguous]"
-    } else {
-        ""
+fn ambiguous(call: &CallSite) -> String {
+    match call.level {
+        Some(level @ Level::Ambiguous) => format!(" [{}]", level.name()),
+        _ => String::new(),
     }
 }
 

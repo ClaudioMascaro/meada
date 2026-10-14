@@ -11,12 +11,12 @@ use crate::{Result, repo};
 
 pub struct Workspace {
     /// The repository where Meada runs first, then the others in discovery order.
-    pub repos: Vec<Member>,
+    pub repos: Vec<Repository>,
     /// Peers named in a `meada.toml` but not found on disk, sorted.
     pub missing: Vec<Missing>,
 }
 
-pub struct Member {
+pub struct Repository {
     pub root: PathBuf,
     pub identity: String,
     pub config: Config,
@@ -36,7 +36,7 @@ impl Workspace {
         let start = repo::root(dir)?;
         let mut found = Finder::default();
         let identity = found.identity(&start);
-        let mut repos = vec![Member {
+        let mut repos = vec![Repository {
             config: config::load(&start)?,
             root: start,
             identity,
@@ -58,7 +58,7 @@ impl Workspace {
                     }
                     let from = repos[next].root.clone();
                     match found.peer(&from, &identity, hint.as_deref()) {
-                        Some(root) => repos.push(Member {
+                        Some(root) => repos.push(Repository {
                             config: config::load(&root)?,
                             root,
                             identity,
@@ -94,7 +94,7 @@ impl Workspace {
                         if repos.iter().any(|m| m.identity == identity) {
                             continue;
                         }
-                        repos.push(Member {
+                        repos.push(Repository {
                             root: sibling,
                             identity,
                             config,

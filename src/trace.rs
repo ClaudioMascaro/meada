@@ -114,7 +114,7 @@ impl<'a> Graph<'a> {
                 .map(|m| Files::new(&m.root))
                 .collect(),
             rows: Vec::new(),
-            path: Vec::new(),
+            ancestors: Vec::new(),
             expanded: HashSet::new(),
         };
         match start {
@@ -268,7 +268,7 @@ struct Walk<'g, 'a> {
     rows: Vec<Row>,
     /// The nodes from the start down to the one being followed: meeting one again closes a
     /// cycle.
-    path: Vec<&'a str>,
+    ancestors: Vec<&'a str>,
     /// Nodes already followed once; the chain shows them again but does not repeat what
     /// follows them.
     expanded: HashSet<&'a str>,
@@ -305,7 +305,7 @@ impl<'a> Walk<'_, 'a> {
         link: bool,
     ) {
         let seen = match () {
-            _ if self.path.contains(&id) => " (cycle)",
+            _ if self.ancestors.contains(&id) => " (cycle)",
             _ if self.expanded.contains(id) => " (see above)",
             _ => "",
         };
@@ -314,7 +314,7 @@ impl<'a> Walk<'_, 'a> {
             return;
         }
         self.expanded.insert(id);
-        self.path.push(id);
+        self.ancestors.push(id);
         let graph = self.graph;
         // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
@@ -329,7 +329,7 @@ impl<'a> Walk<'_, 'a> {
                     if !shown.insert((c.caller.as_str(), false)) {
                         continue;
                     }
-                    let level = c.level.as_deref().and_then(Level::parse);
+                    let level = c.level;
                     let text = format!("{} {}{}", self.site(call), self.caller(call), mark(level));
                     self.enter(&c.caller, depth + 1, text, n, level, false);
                 }
@@ -345,7 +345,7 @@ impl<'a> Walk<'_, 'a> {
                 }
             }
         }
-        self.path.pop();
+        self.ancestors.pop();
     }
 
     /// What one call reaches: its targets in its repository, and, when it consumes a
@@ -359,7 +359,7 @@ impl<'a> Walk<'_, 'a> {
         shown: &mut HashSet<(&'a str, bool)>,
     ) {
         let graph = self.graph;
-        let level = c.level.as_deref().and_then(Level::parse);
+        let level = c.level;
         for t in c.target.iter().chain(&c.candidates) {
             let Some(&(m, s)) = graph.symbols.get(t.as_str()) else {
                 continue;
@@ -367,7 +367,7 @@ impl<'a> Walk<'_, 'a> {
             if !shown.insert((&s.id, false)) {
                 continue;
             }
-            let text = self.node(&s.id).1 + mark(level);
+            let text = self.node(&s.id).1 + &mark(level);
             self.enter(&s.id, depth, text, m, level, false);
         }
         for consumer in graph.consumers.get(c.id.as_str()).into_iter().flatten() {
@@ -489,12 +489,11 @@ impl<'a> Walk<'_, 'a> {
     }
 }
 
-/// ` [inferred]` or ` [ambiguous]` after a call that is not exact.
-fn mark(level: Option<Level>) -> &'static str {
+/// ` [<level>]` after a call that is not exact.
+fn mark(level: Option<Level>) -> String {
     match level {
-        Some(Level::Inferred) => " [inferred]",
-        Some(Level::Ambiguous) => " [ambiguous]",
-        _ => "",
+        Some(Level::Exact) | None => String::new(),
+        Some(level) => format!(" [{}]", level.name()),
     }
 }
 

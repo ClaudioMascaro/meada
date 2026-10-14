@@ -6,7 +6,7 @@
 mod common;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use common::{assert_golden, chain, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
