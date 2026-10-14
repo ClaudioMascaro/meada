@@ -5,11 +5,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::contract::{self, Level, Link};
-use crate::engine::{Files, callee, label, line_of, unresolved};
 use crate::index::{CallSite, Consumer, Export, Symbol};
-use crate::msg::Msg;
+use crate::render::{Files, callee, label, line_of, unresolved};
 use crate::repo::Change;
-use crate::workspace::Workspace;
+use crate::workspace::{Missing, Workspace};
 use crate::{http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -42,7 +41,8 @@ pub(crate) struct Graph<'a> {
     /// The calls that may reach each symbol, ambiguous ones included, in workspace and source
     /// order.
     callers: HashMap<&'a str, Vec<Call<'a>>>,
-    consumers: HashMap<&'a str, &'a Consumer>,
+    /// The consumers at each call site: a client wrapper's call holds one per URL it builds.
+    consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
     /// Links by consumer and by provider, each sorted as the engine sorts links.
@@ -76,7 +76,7 @@ impl<'a> Graph<'a> {
                 }
             }
             for c in &export.consumers {
-                graph.consumers.insert(&c.site, c);
+                graph.consumers.entry(&c.site).or_default().push(c);
             }
             let provided = export.providers.iter();
             graph
@@ -113,7 +113,7 @@ impl<'a> Graph<'a> {
                 .map(|m| Files::new(&m.root))
                 .collect(),
             rows: Vec::new(),
-            path: Vec::new(),
+            ancestors: Vec::new(),
             expanded: HashSet::new(),
         };
         match start {
@@ -127,9 +127,9 @@ impl<'a> Graph<'a> {
                 }
             }
             Start::From(from) => match self.find(from, &mut walk) {
-                Found::Nodes(ids) => ids.into_iter().for_each(|id| walk.root(id)),
-                Found::Call(call) => walk.root_call(call),
-                Found::Answer(lines) => return render::budgeted(&lines, budget),
+                Lookup::Nodes(ids) => ids.into_iter().for_each(|id| walk.root(id)),
+                Lookup::Call(call) => walk.root_call(call),
+                Lookup::Answer(lines) => return render::budgeted(&lines, budget),
             },
         }
         walk.finish(budget)
@@ -137,7 +137,7 @@ impl<'a> Graph<'a> {
 
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
     /// A name that fits several symbols or call sites lists them instead of guessing.
-    fn find(&self, from: &str, walk: &mut Walk) -> Found<'a> {
+    fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
         let (contract, path) = if contract::kind_of(from).is_some() {
             (Some(from.to_string()), None)
@@ -161,14 +161,14 @@ impl<'a> Graph<'a> {
         sites.sort();
         sites.dedup();
         if !sites.is_empty() {
-            return Found::Nodes(sites);
+            return Lookup::Nodes(sites);
         }
         let suffix = format!("::{from}");
         let fits = |id: &str| id == from || id.ends_with(&suffix);
         let mut symbols: Vec<&str> = self.symbols.keys().copied().filter(|id| fits(id)).collect();
         symbols.sort();
         if let [id] = symbols[..] {
-            return Found::Nodes(vec![id]);
+            return Lookup::Nodes(vec![id]);
         }
         if !symbols.is_empty() {
             let mut lines = vec![format!(
@@ -176,7 +176,7 @@ impl<'a> Graph<'a> {
                 symbols.len()
             )];
             lines.extend(symbols.iter().map(|id| format!("{} {id}", walk.node(id).1)));
-            return Found::Answer(lines);
+            return Lookup::Answer(lines);
         }
         let mut calls: Vec<Call> = (self.calls.iter())
             .filter(|(id, _)| fits(id))
@@ -184,8 +184,8 @@ impl<'a> Graph<'a> {
             .collect();
         calls.sort_by_key(|(_, c)| &c.id);
         match calls[..] {
-            [call] => Found::Call(call),
-            [] => Found::Answer(vec![format!(
+            [call] => Lookup::Call(call),
+            [] => Lookup::Answer(vec![format!(
                 "no symbol, route or call site matches `{from}`"
             )]),
             _ => {
@@ -198,7 +198,7 @@ impl<'a> Graph<'a> {
                         .iter()
                         .map(|&c| format!("{} {}", walk.site(c), c.1.id)),
                 );
-                Found::Answer(lines)
+                Lookup::Answer(lines)
             }
         }
     }
@@ -242,7 +242,8 @@ impl<'a> Graph<'a> {
     }
 }
 
-enum Found<'a> {
+/// What a `from` names.
+enum Lookup<'a> {
     /// Symbols, or files serving a route, to start from.
     Nodes(Vec<&'a str>),
     Call(Call<'a>),
@@ -259,6 +260,28 @@ struct Row {
     link: bool,
 }
 
+impl Row {
+    /// A line reached through a call at `level`, or a line with no level.
+    fn call(text: String, repo: usize, level: Option<Level>) -> Self {
+        Self {
+            text,
+            repo,
+            level,
+            link: false,
+        }
+    }
+
+    /// A line reached through `link`.
+    fn link(text: String, repo: usize, link: &Link) -> Self {
+        Self {
+            text,
+            repo,
+            level: Some(link.level),
+            link: true,
+        }
+    }
+}
+
 /// A depth-first walk of the graph that writes the chain as it goes.
 struct Walk<'g, 'a> {
     graph: &'g Graph<'a>,
@@ -267,7 +290,7 @@ struct Walk<'g, 'a> {
     rows: Vec<Row>,
     /// The nodes from the start down to the one being followed: meeting one again closes a
     /// cycle.
-    path: Vec<&'a str>,
+    ancestors: Vec<&'a str>,
     /// Nodes already followed once; the chain shows them again but does not repeat what
     /// follows them.
     expanded: HashSet<&'a str>,
@@ -276,44 +299,37 @@ struct Walk<'g, 'a> {
 impl<'a> Walk<'_, 'a> {
     fn root(&mut self, id: &'a str) {
         let (n, text) = self.node(id);
-        self.enter(id, 0, text, n, None, false);
+        self.enter(id, 0, Row::call(text, n, None));
     }
 
     /// A call site as the start: the call, then what it reaches or where it sits.
     fn root_call(&mut self, call: Call<'a>) {
         let text = format!("{} {}", self.site(call), callee(&call.1.id));
-        self.row(0, text, call.0, None, false);
+        self.push(0, Row::call(text, call.0, None));
         match self.direction {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
             Direction::Up => {
                 let text = format!("{} {}", self.site(call), self.caller(call));
-                self.enter(&call.1.caller, 1, text, call.0, None, false);
+                self.enter(&call.1.caller, 1, Row::call(text, call.0, None));
             }
         }
     }
 
     /// Writes the line reaching `id`, then follows `id` unless that closes a cycle or repeats
     /// a node already followed.
-    fn enter(
-        &mut self,
-        id: &'a str,
-        depth: usize,
-        text: String,
-        repo: usize,
-        level: Option<Level>,
-        link: bool,
-    ) {
+    fn enter(&mut self, id: &'a str, depth: usize, mut row: Row) {
         let seen = match () {
-            _ if self.path.contains(&id) => " (cycle)",
+            _ if self.ancestors.contains(&id) => " (cycle)",
             _ if self.expanded.contains(id) => " (see above)",
             _ => "",
         };
-        self.row(depth, text + seen, repo, level, link);
+        row.text += seen;
+        self.push(depth, row);
         if !seen.is_empty() {
             return;
         }
         self.expanded.insert(id);
-        self.path.push(id);
+        self.ancestors.push(id);
         let graph = self.graph;
         // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
@@ -328,9 +344,9 @@ impl<'a> Walk<'_, 'a> {
                     if !shown.insert((c.caller.as_str(), false)) {
                         continue;
                     }
-                    let level = c.level.as_deref().and_then(Level::parse);
-                    let text = format!("{} {}{}", self.site(call), self.caller(call), mark(level));
-                    self.enter(&c.caller, depth + 1, text, n, level, false);
+                    let text =
+                        format!("{} {}{}", self.site(call), self.caller(call), mark(c.level));
+                    self.enter(&c.caller, depth + 1, Row::call(text, n, c.level));
                 }
                 for link in graph.into.get(id).into_iter().flatten() {
                     let Some(&call @ (n, c)) = graph.calls.get(link.consumer.as_str()) else {
@@ -340,11 +356,11 @@ impl<'a> Walk<'_, 'a> {
                         continue;
                     }
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
-                    self.enter(&c.caller, depth + 1, text, n, Some(link.level), true);
+                    self.enter(&c.caller, depth + 1, Row::link(text, n, link));
                 }
             }
         }
-        self.path.pop();
+        self.ancestors.pop();
     }
 
     /// What one call reaches: its targets in its repository, and, when it consumes a
@@ -358,7 +374,6 @@ impl<'a> Walk<'_, 'a> {
         shown: &mut HashSet<(&'a str, bool)>,
     ) {
         let graph = self.graph;
-        let level = c.level.as_deref().and_then(Level::parse);
         for t in c.target.iter().chain(&c.candidates) {
             let Some(&(m, s)) = graph.symbols.get(t.as_str()) else {
                 continue;
@@ -366,46 +381,37 @@ impl<'a> Walk<'_, 'a> {
             if !shown.insert((&s.id, false)) {
                 continue;
             }
-            let text = self.node(&s.id).1 + mark(level);
-            self.enter(&s.id, depth, text, m, level, false);
+            let text = self.node(&s.id).1 + &mark(c.level);
+            self.enter(&s.id, depth, Row::call(text, m, c.level));
         }
-        let Some(consumer) = graph.consumers.get(c.id.as_str()) else {
-            return;
-        };
-        let site = self.site(call);
-        match (&consumer.contract, graph.out.get(c.id.as_str())) {
-            (None, _) => self.row(
-                depth,
-                format!("{site} {}", unresolved(&c.id)),
-                n,
-                None,
-                false,
-            ),
-            (Some(contract), None) => {
+        for consumer in graph.consumers.get(c.id.as_str()).into_iter().flatten() {
+            let site = self.site(call);
+            let Some(contract) = &consumer.contract else {
+                let text = format!("{site} {}", unresolved(&c.id));
+                self.push(depth, Row::call(text, n, None));
+                continue;
+            };
+            let out = graph.out.get(c.id.as_str()).into_iter().flatten();
+            let links: Vec<&Link> = out.filter(|l| l.contract == *contract).copied().collect();
+            if links.is_empty() {
                 let text = format!("{site} consumes {contract}, no provider");
-                self.row(depth, text, n, None, false);
+                self.push(depth, Row::call(text, n, None));
             }
-            (Some(_), Some(links)) => {
-                for link in links {
-                    if !shown.insert((&link.provider, true)) {
-                        continue;
-                    }
-                    let (m, text) = self.node(&link.provider);
-                    let text = format!("{} {text}", arrow(link));
-                    self.enter(&link.provider, depth, text, m, Some(link.level), true);
+            for link in links {
+                if !shown.insert((&link.provider, true)) {
+                    continue;
                 }
+                let (m, text) = self.node(&link.provider);
+                let text = format!("{} {text}", arrow(link));
+                self.enter(&link.provider, depth, Row::link(text, m, link));
             }
         }
     }
 
-    fn row(&mut self, depth: usize, text: String, repo: usize, level: Option<Level>, link: bool) {
-        let text = "  ".repeat(depth) + &text;
-        self.rows.push(Row {
-            text,
-            repo,
-            level,
-            link,
-        });
+    /// Writes `row`, indented `depth` levels.
+    fn push(&mut self, depth: usize, mut row: Row) {
+        row.text.insert_str(0, &"  ".repeat(depth));
+        self.rows.push(row);
     }
 
     /// `<repository> <path>:<line> <name>` at a symbol's definition; a file (the caller of
@@ -444,13 +450,7 @@ impl<'a> Walk<'_, 'a> {
     fn finish(self, budget: Option<usize>) -> String {
         let budget = budget.unwrap_or(render::DEFAULT_BUDGET);
         let missing: Vec<String> = (self.graph.workspace.missing.iter())
-            .map(|m| {
-                Msg::MissingPeer {
-                    repo: &m.repo,
-                    named_by: &m.named_by,
-                }
-                .text()
-            })
+            .map(Missing::text)
             .collect();
         let footer = |weakest: Option<Level>, hops: usize, repos: usize, tokens: usize| {
             let weakest = weakest.map_or("none", Level::name);
@@ -488,12 +488,11 @@ impl<'a> Walk<'_, 'a> {
     }
 }
 
-/// ` [inferred]` or ` [ambiguous]` after a call that is not exact.
-fn mark(level: Option<Level>) -> &'static str {
+/// ` [<level>]` after a call that is not exact.
+fn mark(level: Option<Level>) -> String {
     match level {
-        Some(Level::Inferred) => " [inferred]",
-        Some(Level::Ambiguous) => " [ambiguous]",
-        _ => "",
+        Some(Level::Exact) | None => String::new(),
+        Some(level) => format!(" [{}]", level.name()),
     }
 }
 

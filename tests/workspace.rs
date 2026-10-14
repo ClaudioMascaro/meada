@@ -47,6 +47,52 @@ fn search_finds_contracts_across_the_workspace() {
 }
 
 #[test]
+fn search_finds_symbols_across_the_workspace() {
+    let (web, _) = web_and_api("http_search_symbols");
+    let engine = Engine::open(&web).unwrap();
+
+    assert_golden(
+        "http-web.search-symbol.txt",
+        &engine.search("query", Some("symbol"), None).unwrap(),
+    );
+}
+
+#[test]
+fn search_ranks_a_route_path_against_the_path_of_each_contract() {
+    let (web, _) = web_and_api("http_search_route");
+    let engine = Engine::open(&web).unwrap();
+
+    assert_golden(
+        "http-web.search-route.txt",
+        &engine.search("/api/users", Some("route"), None).unwrap(),
+    );
+}
+
+#[test]
+fn search_rejects_an_unknown_kind_naming_the_valid_ones() {
+    let (web, _) = web_and_api("http_search_kind");
+    let engine = Engine::open(&web).unwrap();
+
+    let error = engine.search("users", Some("file"), None).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "`kind` takes `symbol`, `contract` or `route`, not `file`"
+    );
+}
+
+#[test]
+fn context_opens_a_symbol_of_a_peer() {
+    let (web, _) = web_and_api("http_context_peer");
+    let engine = Engine::open(&web).unwrap();
+
+    assert_golden(
+        "http-web.context-peer.txt",
+        &engine.context("lib/db.ts::query", None).unwrap(),
+    );
+}
+
+#[test]
 fn status_lists_the_workspace_index_states_and_missing_peers() {
     let (web, api) = web_and_api("http_status");
 
@@ -76,6 +122,23 @@ fn a_peer_without_remote_is_found_by_its_path_hint() {
     assert_eq!(
         engine::status(&web).unwrap(),
         "local/http-web (.) not indexed\nlocal/http-api (../../path_hint_api/http-api) not indexed\n"
+    );
+}
+
+#[test]
+fn a_peer_without_remote_is_not_found_among_siblings() {
+    let case = "local_sibling";
+    let web = fixture_repo(case, "http-web", None);
+    fixture_repo(case, "http-api", None);
+    fs::write(
+        web.join("meada.toml"),
+        "[[peer]]\nrepo = \"local/http-api\"\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        engine::status(&web).unwrap(),
+        "local/http-web (.) not indexed\nmissing peer: local/http-api, named by local/http-web\n"
     );
 }
 

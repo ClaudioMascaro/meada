@@ -7,16 +7,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::{self, Config};
+use crate::msg::Msg;
 use crate::{Result, repo};
 
 pub struct Workspace {
     /// The repository where Meada runs first, then the others in discovery order.
-    pub repos: Vec<Member>,
+    pub repos: Vec<Repository>,
     /// Peers named in a `meada.toml` but not found on disk, sorted.
     pub missing: Vec<Missing>,
 }
 
-pub struct Member {
+pub struct Repository {
     pub root: PathBuf,
     pub identity: String,
     pub config: Config,
@@ -30,13 +31,24 @@ pub struct Missing {
     pub named_by: String,
 }
 
+impl Missing {
+    /// `missing peer: <repo>, named by <repo>`, as `status` and the trace footer show it.
+    pub fn text(&self) -> String {
+        Msg::MissingPeer {
+            repo: &self.repo,
+            named_by: &self.named_by,
+        }
+        .text()
+    }
+}
+
 impl Workspace {
     /// The workspace of the repository containing `dir`.
     pub fn discover(dir: &Path) -> Result<Self> {
         let start = repo::root(dir)?;
         let mut found = Finder::default();
         let identity = found.identity(&start);
-        let mut repos = vec![Member {
+        let mut repos = vec![Repository {
             config: config::load(&start)?,
             root: start,
             identity,
@@ -58,7 +70,7 @@ impl Workspace {
                     }
                     let from = repos[next].root.clone();
                     match found.peer(&from, &identity, hint.as_deref()) {
-                        Some(root) => repos.push(Member {
+                        Some(root) => repos.push(Repository {
                             config: config::load(&root)?,
                             root,
                             identity,
@@ -94,7 +106,7 @@ impl Workspace {
                         if repos.iter().any(|m| m.identity == identity) {
                             continue;
                         }
-                        repos.push(Member {
+                        repos.push(Repository {
                             root: sibling,
                             identity,
                             config,
@@ -130,7 +142,8 @@ impl Finder {
     }
 
     /// The root of the peer `identity` named from the repository at `from`: at its `path`
-    /// hint, or among the clones next to `from`.
+    /// hint, or among the clones next to `from`. A repository with no remote (`local/<dir>`)
+    /// is only found at its hint: any clone may share its directory name.
     fn peer(&mut self, from: &Path, identity: &str, hint: Option<&str>) -> Option<PathBuf> {
         if let Some(hint) = hint {
             let dir = from.join(hint);
@@ -140,6 +153,9 @@ impl Finder {
             {
                 return Some(root);
             }
+        }
+        if identity.starts_with("local/") {
+            return None;
         }
         self.siblings(from)
             .into_iter()

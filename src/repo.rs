@@ -51,7 +51,19 @@ pub enum Change {
 
 /// Every repository-relative path whose working-tree content differs from `HEAD`, tracked or
 /// untracked (ignored files are left out, deleted files too, since nothing of theirs is left).
+/// Before the first commit, every file counts as untracked.
 pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
+    let untracked = |more: &[&str]| -> Result<Vec<(String, Change)>> {
+        let args = [&["ls-files", "--others", "--exclude-standard", "-z"], more].concat();
+        Ok(run(root, &args)?
+            .split('\0')
+            .filter(|p| !p.is_empty())
+            .map(|p| (p.to_string(), Change::Untracked))
+            .collect())
+    };
+    if git(root, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_none() {
+        return untracked(&["--cached"]);
+    }
     // Explicit prefixes and no external diff, whatever the user's git configuration says.
     let diff = run(
         root,
@@ -76,8 +88,9 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
             header = true;
             path = None;
         } else if header && let Some(to) = line.strip_prefix("+++ ") {
-            // `/dev/null` for a deleted file. ponytail: a path git still quotes (a tab, a
-            // newline or a quote in the name) is skipped.
+            // `/dev/null` for a deleted file; a name with a space ends with a tab. ponytail: a
+            // path git still quotes (a tab, a newline or a quote in the name) is skipped.
+            let to = to.strip_suffix('\t').unwrap_or(to);
             path = to.strip_prefix("b/").map(str::to_string);
         } else if line.starts_with("@@ ") {
             header = false;
@@ -98,13 +111,7 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
             }
         }
     }
-    let untracked = run(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
-    changes.extend(
-        untracked
-            .split('\0')
-            .filter(|p| !p.is_empty())
-            .map(|p| (p.to_string(), Change::Untracked)),
-    );
+    changes.extend(untracked(&[])?);
     Ok(changes)
 }
 
@@ -122,16 +129,9 @@ fn run(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// `run`'s output trimmed, or `None` when it fails.
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .output()
-        .ok()?;
-    out.status
-        .success()
-        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    run(dir, args).ok().map(|out| out.trim().to_string())
 }
 
 #[cfg(test)]

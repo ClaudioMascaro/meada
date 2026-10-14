@@ -6,11 +6,12 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::contract::{self, Link};
+use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export, State, Symbol};
 use crate::msg::Msg;
+use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
-use crate::workspace::Workspace;
+use crate::workspace::{Missing, Workspace};
 use crate::{Result, index, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -31,8 +32,8 @@ impl Engine {
     pub fn open(dir: &Path) -> Result<Self> {
         let workspace = Workspace::discover(dir)?;
         if workspace.repos.len() > MAX_PEERS + 1 {
-            // ponytail: one connection attaches every peer; batch the attaches when a
-            // workspace outgrows SQLite's limit.
+            // ponytail: one connection attaches every peer, so a workspace reads at most 10
+            // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
             return Err(Msg::TooManyRepos {
                 found: workspace.repos.len(),
                 max: MAX_PEERS + 1,
@@ -97,14 +98,14 @@ impl Engine {
 
     /// Every link of the workspace, sorted.
     fn links(&self, exports: &[Export]) -> Vec<Link> {
-        let members = &self.workspace.repos;
+        let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
-            .zip(members)
+            .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
         let mut links = Vec::new();
-        for (export, from) in exports.iter().zip(members) {
+        for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
@@ -118,7 +119,7 @@ impl Engine {
 
     /// The chain from `start`, followed `direction` through calls inside repositories and
     /// links between them, across the whole workspace, until it ends, a cycle closes or the
-    /// budget runs out; one indented line per step, then the chain footer and any missing
+    /// budget runs out; one indented line per call or hop, then the chain footer and any missing
     /// peer. `start` names a symbol, a route (`http::GET::/users/{}`, `GET /users/{}` or
     /// `/users/{}`) or a call site, or takes the symbols the uncommitted changes touch.
     pub fn trace(
@@ -138,75 +139,90 @@ impl Engine {
         Ok(graph.answer(start, changes.as_deref(), direction, budget))
     }
 
-    /// Symbols of this repository whose name matches `query` case-insensitively, and contracts
-    /// of the workspace whose identifier does, one line each: exact first, then prefix, then
-    /// substring, ties by identity. `kind` keeps only `symbol` or `contract` matches. The
-    /// answer is cut at `budget` tokens.
+    /// Symbols of the workspace whose name matches `query` case-insensitively, and contracts
+    /// whose identifier or route path does, one line each: exact first, then prefix, then
+    /// substring, ties by identity. `kind` keeps only `symbol`, `contract` or `route` (HTTP
+    /// contract) matches. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
+        // Whether symbols match, and the prefix of the contracts that do.
+        let (symbols, contracts) = match kind {
+            None => (true, Some("")),
+            Some("symbol") => (true, None),
+            Some("contract") => (false, Some("")),
+            Some("route") => (false, Some("http::")),
+            Some(other) => {
+                let valid = "`symbol`, `contract` or `route`";
+                return Err(format!("`kind` takes {valid}, not `{other}`").into());
+            }
+        };
         self.refresh()?;
-        let export = index::export(&self.db, "main", &self.identity)?;
+        let exports = self.exports()?;
         let needle = query.to_lowercase();
         // (rank, identity to break ties, line)
         let mut hits: Vec<(u8, String, String)> = Vec::new();
-        let mut files = Files::new(&self.root);
-        if kind.is_none_or(|k| k == "symbol") {
-            // ponytail: scans every symbol; an indexed lookup waits for a repository that
-            // makes this slow.
-            for symbol in &export.symbols {
-                let name = label(&symbol.id).to_lowercase();
-                let last = name.rsplit('.').next().unwrap_or(&name);
-                if let Some(r) = [name.as_str(), last]
-                    .iter()
-                    .filter_map(|n| rank(n, &needle))
-                    .min()
-                {
-                    let line = self.line(&mut files, symbol, label(&symbol.id));
-                    hits.push((r, symbol.id.clone(), line));
+        for (export, repo) in exports.iter().zip(&self.workspace.repos) {
+            let mut files = Files::new(&repo.root);
+            if symbols {
+                // ponytail: scans every symbol; an indexed lookup waits for a workspace that
+                // makes this slow.
+                for symbol in &export.symbols {
+                    let name = label(&symbol.id).to_lowercase();
+                    let last = name.rsplit('.').next().unwrap_or(&name);
+                    if let Some(r) = [name.as_str(), last]
+                        .iter()
+                        .filter_map(|n| rank(n, &needle))
+                        .min()
+                    {
+                        let line = line(&repo.identity, &mut files, symbol, label(&symbol.id));
+                        hits.push((r, symbol.id.clone(), line));
+                    }
                 }
             }
-        }
-        if kind.is_none_or(|k| k == "contract") {
-            for (n, member) in self.workspace.repos.iter().enumerate() {
-                let peer;
-                let export = match n {
-                    0 => &export,
-                    _ => {
-                        peer = index::export(&self.db, &schema(n), &member.identity)?;
-                        &peer
-                    }
-                };
-                let mut files = Files::new(&member.root);
-                let provided = export
-                    .providers
-                    .iter()
-                    .map(|p| (p.contract.clone(), &p.site));
-                // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
-                let consumed = export.consumers.iter().map(|c| {
-                    let contract = c.contract.clone();
-                    (contract.unwrap_or_else(|| unresolved(&c.site)), &c.site)
-                });
-                for (contract, site) in provided.chain(consumed) {
-                    let Some(r) = rank(&contract.to_lowercase(), &needle) else {
-                        continue;
-                    };
-                    let span = export
-                        .symbols
-                        .iter()
-                        .find(|s| s.id == *site)
-                        .map(|s| &s.span);
-                    let span = span
-                        .or_else(|| export.calls.iter().find(|c| c.id == *site).map(|c| &c.span));
-                    let location = match span {
-                        Some(span) => self.at(&mut files, &span.path, span.start),
-                        // A route file that serves the contract with no function of its own.
-                        None => site
-                            .rsplit_once("::")
-                            .map_or(site.as_str(), |(_, p)| p)
-                            .to_string(),
-                    };
-                    let line = format!("{} {location} {contract}", member.identity);
-                    hits.push((r, format!("{contract} {site}"), line));
+            let Some(prefix) = contracts else {
+                continue;
+            };
+            let provided = export
+                .providers
+                .iter()
+                .map(|p| (p.contract.clone(), &p.site));
+            // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
+            let consumed = export.consumers.iter().map(|c| {
+                let contract = c.contract.clone();
+                (contract.unwrap_or_else(|| unresolved(&c.site)), &c.site)
+            });
+            for (contract, site) in provided.chain(consumed) {
+                if !contract.starts_with(prefix) {
+                    continue;
                 }
+                // A route path ranks against the path part: `/users` is exact for
+                // `http::GET::/users`.
+                let lower = contract.to_lowercase();
+                let path = lower.rsplit_once("::").map(|(_, p)| p);
+                let Some(r) = [Some(lower.as_str()), path]
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|n| rank(n, &needle))
+                    .min()
+                else {
+                    continue;
+                };
+                let span = export
+                    .symbols
+                    .iter()
+                    .find(|s| s.id == *site)
+                    .map(|s| &s.span);
+                let span =
+                    span.or_else(|| export.calls.iter().find(|c| c.id == *site).map(|c| &c.span));
+                let location = match span {
+                    Some(span) => files.at(&span.path, span.start),
+                    // A route file that serves the contract with no function of its own.
+                    None => site
+                        .rsplit_once("::")
+                        .map_or(site.as_str(), |(_, p)| p)
+                        .to_string(),
+                };
+                let line = format!("{} {location} {contract}", repo.identity);
+                hits.push((r, format!("{contract} {site}"), line));
             }
         }
         hits.sort();
@@ -217,183 +233,180 @@ impl Engine {
         Ok(render::budgeted(&lines, budget))
     }
 
-    /// One symbol: its span text read from disk (only while the file still has the indexed
-    /// hash), its callers and its callees. `symbol` is an identity, `<path>::<name>` or a
-    /// name; when it fits several symbols, they are listed instead of guessed. The answer is
-    /// cut at `budget` tokens.
+    /// One symbol of the workspace: its span text read from disk (only while the file still
+    /// has the indexed hash), its callers and its callees. `symbol` is an identity,
+    /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
+    /// guessed. The answer is cut at `budget` tokens.
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
     }
 
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
-        let export = index::export(&self.db, "main", &self.identity)?;
+        let exports = self.exports()?;
+        let repos = &self.workspace.repos;
         let suffix = format!("::{symbol}");
-        let found: Vec<&Symbol> = export
-            .symbols
-            .iter()
-            .filter(|s| s.id == symbol || s.id.ends_with(&suffix))
+        let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())
+            .flat_map(|(n, e)| e.symbols.iter().map(move |s| (n, s)))
+            .filter(|(_, s)| s.id == symbol || s.id.ends_with(&suffix))
             .collect();
-        let mut files = Files::new(&self.root);
-        let [symbol_found] = found.as_slice() else {
+        let [(n, symbol_found)] = found[..] else {
             if found.is_empty() {
                 return Ok(format!("no symbol matches `{symbol}`\n"));
             }
+            let short = |s: &Symbol| format!("{}::{}", s.span.path, label(&s.id));
             let mut lines = vec![format!(
                 "`{symbol}` fits {} symbols; pass one of:",
                 found.len()
             )];
-            lines.extend(found.iter().map(|s| {
-                let name = format!("{}::{}", s.span.path, label(&s.id));
-                self.line(&mut files, s, &name)
+            lines.extend(found.iter().map(|&(n, s)| {
+                // `<path>::<name>`, or the identity when another repository has the same one.
+                let name = match found.iter().filter(|(_, o)| short(o) == short(s)).count() {
+                    1 => short(s),
+                    _ => s.id.clone(),
+                };
+                let mut files = Files::new(&repos[n].root);
+                line(&repos[n].identity, &mut files, s, &name)
             }));
             return Ok(render::budgeted(&lines, budget));
         };
-        let text = self.span_text(&export, symbol_found);
+        let (repo, export) = (&repos[n], &exports[n]);
+        let text = span_text(&repo.root, export, symbol_found);
         if text.is_none() && retry {
             // The file changed without its mtime or size showing it: hash it again.
-            index::forget(&self.db, &symbol_found.span.path)?;
+            index::forget(&index::open(&repo.root)?, &symbol_found.span.path)?;
             self.refresh()?;
             return self.context_fresh(symbol, budget, false);
         }
-        let mut lines = vec![self.line(&mut files, symbol_found, label(&symbol_found.id))];
+        let mut files = Files::new(&repo.root);
+        let identity = &repo.identity;
+        let name = label(&symbol_found.id);
+        let mut lines = vec![line(identity, &mut files, symbol_found, name)];
         lines.extend(text.unwrap_or_else(|| {
             vec![format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
             )]
         }));
-        lines.extend(self.relations(&export, &mut files, &symbol_found.id));
-        lines.extend(self.contracts(&export, &mut files, symbol_found));
+        lines.extend(relations(identity, export, &mut files, &symbol_found.id));
+        lines.extend(contracts(identity, export, &mut files, symbol_found));
         Ok(render::budgeted(&lines, budget))
-    }
-
-    /// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
-    /// ones included; nothing when it has none.
-    fn contracts(&self, export: &Export, files: &mut Files, symbol: &Symbol) -> Vec<String> {
-        let mut lines: Vec<String> = export
-            .providers
-            .iter()
-            .filter(|p| p.site == symbol.id)
-            .map(|p| self.line(files, symbol, &format!("provides {}", p.contract)))
-            .collect();
-        for consumer in &export.consumers {
-            let Some(call) = export
-                .calls
-                .iter()
-                .find(|c| c.id == consumer.site && c.caller == symbol.id)
-            else {
-                continue;
-            };
-            let location = self.at(files, &call.span.path, call.span.start);
-            let contract = consumer.contract.clone();
-            let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
-            lines.push(format!("{} {location} consumes {contract}", self.identity));
-        }
-        if lines.is_empty() {
-            return lines;
-        }
-        section("contracts", lines)
-    }
-
-    /// The span's lines, or `None` when its file no longer has the indexed hash.
-    fn span_text(&self, export: &Export, symbol: &Symbol) -> Option<Vec<String>> {
-        let path = &symbol.span.path;
-        let indexed = export
-            .files
-            .iter()
-            .find(|f| f.path == *path)
-            .map(|f| &f.hash);
-        let text = fs::read(self.root.join(path)).ok().filter(|src| {
-            indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str())
-        });
-        let src = text?;
-        let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
-        Some(
-            String::from_utf8_lossy(span)
-                .lines()
-                .map(str::to_string)
-                .collect(),
-        )
-    }
-
-    fn relations(&self, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
-        let symbols: HashMap<&str, &Symbol> =
-            export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
-        let mut callers: Vec<_> = export
-            .calls
-            .iter()
-            .filter(|c| c.target.as_deref() == Some(id) || c.candidates.iter().any(|t| t == id))
-            .collect();
-        callers.sort_by_key(|c| (&c.span.path, c.span.start));
-        let callers: Vec<String> = callers
-            .iter()
-            .map(|c| {
-                let name = symbols
-                    .contains_key(c.caller.as_str())
-                    .then(|| label(&c.caller));
-                let location = self.at(files, &c.span.path, c.span.start);
-                format!(
-                    "{} {location} {}{}",
-                    self.identity,
-                    name.unwrap_or("(top level)"),
-                    ambiguous(c)
-                )
-            })
-            .collect();
-        let mut callees: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
-        callees.sort_by_key(|c| (c.target.is_none(), &c.id));
-        let mut callees: Vec<String> = callees
-            .iter()
-            .flat_map(|c| {
-                // An ambiguous call lists every candidate, marked, instead of a guess.
-                let targets: Vec<&Symbol> = c
-                    .target
-                    .iter()
-                    .chain(&c.candidates)
-                    .filter_map(|t| symbols.get(t.as_str()).copied())
-                    .collect();
-                if targets.is_empty() {
-                    let callee =
-                        c.id.strip_prefix(&format!("{}::", c.caller))
-                            .unwrap_or(&c.id);
-                    let callee = callee.rsplit_once('#').map_or(callee, |(name, _)| name);
-                    let location = self.at(files, &c.span.path, c.span.start);
-                    return vec![format!(
-                        "{} {location} (unresolved) {callee}",
-                        self.identity
-                    )];
-                }
-                targets
-                    .iter()
-                    .map(|t| self.line(files, t, label(&t.id)) + ambiguous(c))
-                    .collect()
-            })
-            .collect();
-        callees.dedup();
-        let mut lines = section("callers", callers);
-        lines.extend(section("callees", callees));
-        lines
-    }
-
-    /// `<repository> <path>:<line> <name>` for a symbol's definition.
-    fn line(&self, files: &mut Files, symbol: &Symbol, name: &str) -> String {
-        let location = self.at(files, &symbol.span.path, symbol.span.start);
-        format!("{} {location} {name}", self.identity)
-    }
-
-    /// `path:line`, as `Files::at` gives it.
-    fn at(&self, files: &mut Files, path: &str, offset: i64) -> String {
-        files.at(path, offset)
     }
 }
 
+/// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
+/// ones included; nothing when it has none.
+fn contracts(identity: &str, export: &Export, files: &mut Files, symbol: &Symbol) -> Vec<String> {
+    let mut lines: Vec<String> = export
+        .providers
+        .iter()
+        .filter(|p| p.site == symbol.id)
+        .map(|p| line(identity, files, symbol, &format!("provides {}", p.contract)))
+        .collect();
+    for consumer in &export.consumers {
+        let Some(call) = export
+            .calls
+            .iter()
+            .find(|c| c.id == consumer.site && c.caller == symbol.id)
+        else {
+            continue;
+        };
+        let location = files.at(&call.span.path, call.span.start);
+        let contract = consumer.contract.clone();
+        let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
+        lines.push(format!("{identity} {location} consumes {contract}"));
+    }
+    if lines.is_empty() {
+        return lines;
+    }
+    section("contracts", lines)
+}
+
+/// The span's lines, or `None` when its file under `root` no longer has the indexed hash.
+fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<Vec<String>> {
+    let path = &symbol.span.path;
+    let indexed = export
+        .files
+        .iter()
+        .find(|f| f.path == *path)
+        .map(|f| &f.hash);
+    let text = fs::read(root.join(path))
+        .ok()
+        .filter(|src| indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str()));
+    let src = text?;
+    let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
+    Some(
+        String::from_utf8_lossy(span)
+            .lines()
+            .map(str::to_string)
+            .collect(),
+    )
+}
+
+/// `callers:` and `callees:` of the symbol `id`, inside the repository `identity`.
+fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
+    let symbols: HashMap<&str, &Symbol> =
+        export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
+    let mut callers: Vec<_> = export
+        .calls
+        .iter()
+        .filter(|c| c.target.as_deref() == Some(id) || c.candidates.iter().any(|t| t == id))
+        .collect();
+    callers.sort_by_key(|c| (&c.span.path, c.span.start));
+    let callers: Vec<String> = callers
+        .iter()
+        .map(|c| {
+            let name = symbols
+                .contains_key(c.caller.as_str())
+                .then(|| label(&c.caller));
+            let location = files.at(&c.span.path, c.span.start);
+            format!(
+                "{identity} {location} {}{}",
+                name.unwrap_or("(top level)"),
+                ambiguous(c)
+            )
+        })
+        .collect();
+    let mut callees: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
+    callees.sort_by_key(|c| (c.target.is_none(), &c.id));
+    let mut callees: Vec<String> = callees
+        .iter()
+        .flat_map(|c| {
+            // An ambiguous call lists every candidate, marked, instead of a guess.
+            let targets: Vec<&Symbol> = c
+                .target
+                .iter()
+                .chain(&c.candidates)
+                .filter_map(|t| symbols.get(t.as_str()).copied())
+                .collect();
+            if targets.is_empty() {
+                let callee = callee(&c.id);
+                let location = files.at(&c.span.path, c.span.start);
+                return vec![format!("{identity} {location} (unresolved) {callee}")];
+            }
+            targets
+                .iter()
+                .map(|t| line(identity, files, t, label(&t.id)) + &ambiguous(c))
+                .collect()
+        })
+        .collect();
+    callees.dedup();
+    let mut lines = section("callers", callers);
+    lines.extend(section("callees", callees));
+    lines
+}
+
+/// `<repository> <path>:<line> <name>` for a symbol's definition.
+fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> String {
+    let location = files.at(&symbol.span.path, symbol.span.start);
+    format!("{identity} {location} {name}")
+}
+
 /// ` [ambiguous]` for an ambiguous call, empty otherwise.
-fn ambiguous(call: &CallSite) -> &'static str {
-    if call.level.as_deref() == Some("ambiguous") {
-        " [ambiguous]"
-    } else {
-        ""
+fn ambiguous(call: &CallSite) -> String {
+    match call.level {
+        Some(level @ Level::Ambiguous) => format!(" [{}]", level.name()),
+        _ => String::new(),
     }
 }
 
@@ -415,13 +428,7 @@ pub fn status(dir: &Path) -> Result<String> {
             format!("{} ({}) {state}", m.identity, relative(here, &m.root))
         })
         .collect();
-    lines.extend(workspace.missing.iter().map(|m| {
-        Msg::MissingPeer {
-            repo: &m.repo,
-            named_by: &m.named_by,
-        }
-        .text()
-    }));
+    lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
 }
 
@@ -470,58 +477,4 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
     let mut lines = vec![format!("{name}:")];
     lines.extend(items);
     lines
-}
-
-/// The name part of a symbol identity: `<repository>::<path>::<name>`.
-pub(crate) fn label(id: &str) -> &str {
-    id.rsplit_once("::").map_or(id, |(_, name)| name)
-}
-
-/// The callee of the call site `<caller>::<callee>#<ordinal>`.
-pub(crate) fn callee(site: &str) -> &str {
-    let callee = label(site);
-    callee.rsplit_once('#').map_or(callee, |(name, _)| name)
-}
-
-/// How an unresolved consumer shows: `(unresolved) fetch` for the call site
-/// `<caller>::fetch#<ordinal>`.
-pub(crate) fn unresolved(site: &str) -> String {
-    format!("(unresolved) {}", callee(site))
-}
-
-/// Source files read once per answer.
-pub(crate) struct Files<'a> {
-    root: &'a Path,
-    read: HashMap<String, Option<Vec<u8>>>,
-}
-
-impl<'a> Files<'a> {
-    pub(crate) fn new(root: &'a Path) -> Self {
-        Self {
-            root,
-            read: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn get(&mut self, path: &str) -> Option<&[u8]> {
-        self.read
-            .entry(path.to_string())
-            .or_insert_with(|| fs::read(self.root.join(path)).ok())
-            .as_deref()
-    }
-
-    /// `path:line`; just `path` when the file cannot be read. The line is display only: it
-    /// comes from the byte offset and the file as it is now.
-    pub(crate) fn at(&mut self, path: &str, offset: i64) -> String {
-        match self.get(path) {
-            Some(src) => format!("{path}:{}", line_of(src, offset)),
-            None => path.to_string(),
-        }
-    }
-}
-
-/// The 1-based line holding byte `offset` of `src`.
-pub(crate) fn line_of(src: &[u8], offset: i64) -> usize {
-    let before = &src[..(offset.max(0) as usize).min(src.len())];
-    before.iter().filter(|&&b| b == b'\n').count() + 1
 }

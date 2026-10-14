@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::http::Http;
 use crate::index::{Consumer, Provider};
 use crate::resolve::Code;
-use crate::workspace::Member;
+use crate::workspace::Repository;
 
 /// How well a link is established. The order is the strength, strongest first: exact >
 /// inferred > ambiguous, so a chain takes its greatest (weakest) level. ADR 0005 adds declared
@@ -89,8 +89,8 @@ pub trait ContractKind {
     fn link(
         &self,
         consumer: &Consumer,
-        from: &Member,
-        providers: &[(&Member, &Provider)],
+        from: &Repository,
+        providers: &[(&Repository, &Provider)],
     ) -> Vec<Link>;
 }
 

@@ -1,6 +1,10 @@
 //! Compact answers: line-oriented text under a token budget (ADR 0008). Every query shares
 //! this, so the CLI and each MCP tool cut answers the same way.
 
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+
 /// Tokens an answer may use unless the caller asks for another budget.
 pub const DEFAULT_BUDGET: usize = 2_000;
 
@@ -50,4 +54,58 @@ pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
         out.push_str(&note(shown));
     }
     (shown, out)
+}
+
+/// The name part of a symbol identity: `<repository>::<path>::<name>`.
+pub(crate) fn label(id: &str) -> &str {
+    id.rsplit_once("::").map_or(id, |(_, name)| name)
+}
+
+/// The callee of the call site `<caller>::<callee>#<ordinal>`.
+pub(crate) fn callee(site: &str) -> &str {
+    let callee = label(site);
+    callee.rsplit_once('#').map_or(callee, |(name, _)| name)
+}
+
+/// How an unresolved consumer shows: `(unresolved) fetch` for the call site
+/// `<caller>::fetch#<ordinal>`.
+pub(crate) fn unresolved(site: &str) -> String {
+    format!("(unresolved) {}", callee(site))
+}
+
+/// Source files read once per answer.
+pub(crate) struct Files<'a> {
+    root: &'a Path,
+    read: HashMap<String, Option<Vec<u8>>>,
+}
+
+impl<'a> Files<'a> {
+    pub(crate) fn new(root: &'a Path) -> Self {
+        Self {
+            root,
+            read: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn get(&mut self, path: &str) -> Option<&[u8]> {
+        self.read
+            .entry(path.to_string())
+            .or_insert_with(|| fs::read(self.root.join(path)).ok())
+            .as_deref()
+    }
+
+    /// `path:line`; just `path` when the file cannot be read. The line is display only: it
+    /// comes from the byte offset and the file as it is now.
+    pub(crate) fn at(&mut self, path: &str, offset: i64) -> String {
+        match self.get(path) {
+            Some(src) => format!("{path}:{}", line_of(src, offset)),
+            None => path.to_string(),
+        }
+    }
+}
+
+/// The 1-based line holding byte `offset` of `src`.
+pub(crate) fn line_of(src: &[u8], offset: i64) -> usize {
+    let before = &src[..(offset.max(0) as usize).min(src.len())];
+    before.iter().filter(|&&b| b == b'\n').count() + 1
 }

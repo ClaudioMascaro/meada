@@ -7,7 +7,7 @@ use crate::contract::{ContractKind, Found, Level, Link, Site};
 use crate::index::{Consumer, Provider};
 use crate::lang::{Export, Part, Value};
 use crate::resolve::Code;
-use crate::workspace::Member;
+use crate::workspace::Repository;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
@@ -356,8 +356,8 @@ impl ContractKind for Http {
     fn link(
         &self,
         consumer: &Consumer,
-        from: &Member,
-        providers: &[(&Member, &Provider)],
+        from: &Repository,
+        providers: &[(&Repository, &Provider)],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -365,24 +365,12 @@ impl ContractKind for Http {
         let via = consumer.via.as_deref();
         let serving = providers.iter().filter(|(_, p)| p.contract == *contract);
         let var = via.and_then(|v| v.strip_prefix("env:"));
-        let peers: Vec<&str> = from
-            .config
-            .peers
-            .iter()
-            .filter(|p| var.is_some_and(|var| p.base_url_env.iter().any(|v| v == var)))
-            .map(|p| p.repo.as_str())
-            .collect();
+        let peers: Vec<&str> = var
+            .map(|var| from.config.peers_reading(var).collect())
+            .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving
-                    .filter(|(m, _)| {
-                        m.config
-                            .serve
-                            .hosts
-                            .iter()
-                            .any(|h| h.eq_ignore_ascii_case(host))
-                    })
-                    .collect();
+                let fits = serving.filter(|(m, _)| m.config.serves(host)).collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving
@@ -412,15 +400,15 @@ impl ContractKind for Http {
             };
         let ambiguous = fits.len() > 1;
         fits.iter()
-            .map(|(member, provider)| Link {
+            .map(|(repo, provider)| Link {
                 consumer: consumer.site.clone(),
                 provider: provider.site.clone(),
                 contract: contract.clone(),
                 level: if ambiguous { Level::Ambiguous } else { level },
                 reason: if ambiguous {
-                    format!("{} providers fit; {reason} {}", fits.len(), member.identity)
+                    format!("{} providers fit; {reason} {}", fits.len(), repo.identity)
                 } else {
-                    format!("{reason} {}", member.identity)
+                    format!("{reason} {}", repo.identity)
                 },
             })
             .collect()

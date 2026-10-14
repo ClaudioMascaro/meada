@@ -11,7 +11,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 
 use crate::Result;
-use crate::contract::{self, Link, Names, Site};
+use crate::contract::{self, Level, Link, Names, Site};
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 
@@ -127,7 +127,7 @@ struct Resolved {
     id: String,
     caller: String,
     target: Option<String>,
-    level: Option<&'static str>,
+    level: Option<Level>,
     start: i64,
     end: i64,
     candidates: Vec<String>,
@@ -345,7 +345,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             tx.execute(
                 "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
-                    row.id, row.caller, row.target, row.level, path, row.start, row.end
+                    row.id,
+                    row.caller,
+                    row.target,
+                    row.level.map(Level::name),
+                    path,
+                    row.start,
+                    row.end
                 ],
             )?;
             for candidate in &row.candidates {
@@ -506,9 +512,11 @@ fn resolve_file<'a>(
         .zip(call_ids(identity, path, facts, names))
         .map(|(call, (caller, call_id))| {
             let (target, level, candidates) = match resolver.call(path, call) {
-                Resolution::Exact(t) => (Some(id(&t)), Some("exact"), Vec::new()),
-                Resolution::Inferred(t) => (Some(id(&t)), Some("inferred"), Vec::new()),
-                Resolution::Ambiguous(ts) => (None, Some("ambiguous"), ts.iter().map(id).collect()),
+                Resolution::Exact(t) => (Some(id(&t)), Some(Level::Exact), Vec::new()),
+                Resolution::Inferred(t) => (Some(id(&t)), Some(Level::Inferred), Vec::new()),
+                Resolution::Ambiguous(ts) => {
+                    (None, Some(Level::Ambiguous), ts.iter().map(id).collect())
+                }
                 Resolution::Unresolved => (None, None, Vec::new()),
             };
             Resolved {
@@ -571,7 +579,7 @@ pub(crate) struct CallSite {
     pub(crate) id: String,
     pub(crate) caller: String,
     pub(crate) target: Option<String>,
-    pub(crate) level: Option<String>,
+    pub(crate) level: Option<Level>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) candidates: Vec<String>,
     pub(crate) span: Span,
@@ -640,7 +648,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 id,
                 caller: r.get(1)?,
                 target: r.get(2)?,
-                level: r.get(3)?,
+                level: r
+                    .get::<_, Option<String>>(3)?
+                    .as_deref()
+                    .and_then(Level::parse),
                 span: span(r, 4)?,
             })
         })?

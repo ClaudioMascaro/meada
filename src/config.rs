@@ -8,8 +8,8 @@ use std::path::Path;
 use serde::Deserialize;
 use toml::de::{DeTable, DeValue};
 
-use crate::Result;
 use crate::msg::Msg;
+use crate::{Result, qualify};
 
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +37,22 @@ pub struct Peer {
 pub struct Serve {
     #[serde(default)]
     pub hosts: Vec<String>,
+}
+
+impl Config {
+    /// Whether this repository serves on `host`, case-insensitively.
+    pub fn serves(&self, host: &str) -> bool {
+        self.serve
+            .hosts
+            .iter()
+            .any(|h| h.eq_ignore_ascii_case(host))
+    }
+
+    /// The peers whose base URL this repository reads from the variable `var`.
+    pub fn peers_reading<'a>(&'a self, var: &'a str) -> impl Iterator<Item = &'a str> {
+        let reads = move |p: &&Peer| p.base_url_env.iter().any(|v| v == var);
+        self.peers.iter().filter(reads).map(|p| p.repo.as_str())
+    }
 }
 
 /// Keys that track A adds after v0.1.
@@ -77,7 +93,7 @@ fn describe(src: &str, at: usize, message: &str) -> String {
         .filter(|_| message.starts_with("unknown field") || message.starts_with("missing field"));
     match (field, around) {
         (Some(field), parent) if message.starts_with("missing field") => {
-            Msg::KeyMissing(&join(parent.unwrap_or(""), field)).text()
+            Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
         (Some(_), Some(key)) if LATER.contains(&key) => Msg::KeyLater {
             key,
@@ -94,7 +110,7 @@ fn describe(src: &str, at: usize, message: &str) -> String {
 /// the table itself.
 fn flatten(table: &DeTable, prefix: &str, out: &mut Vec<(String, Range<usize>, Range<usize>)>) {
     for (key, value) in table.iter() {
-        let name = join(prefix, key.get_ref());
+        let name = qualify(prefix, key.get_ref());
         out.push((name.clone(), key.span(), value.span()));
         match value.get_ref() {
             DeValue::Table(inner) => flatten(inner, &name, out),
@@ -107,13 +123,5 @@ fn flatten(table: &DeTable, prefix: &str, out: &mut Vec<(String, Range<usize>, R
             }
             _ => {}
         }
-    }
-}
-
-fn join(prefix: &str, key: &str) -> String {
-    if prefix.is_empty() {
-        key.to_string()
-    } else {
-        format!("{prefix}.{key}")
     }
 }

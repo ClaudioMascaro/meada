@@ -8,13 +8,13 @@ use super::{
     Call, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, Part,
     Value,
 };
-use crate::Result;
+use crate::{Result, qualify};
 
 pub struct TsJs;
 
 impl LanguagePack for TsJs {
     fn extensions(&self) -> &'static [&'static str] {
-        &["ts", "tsx", "js", "jsx", "mjs", "cjs"]
+        &EXTENSIONS
     }
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
@@ -656,14 +656,6 @@ fn callee(node: Node, src: &[u8]) -> String {
             _ => format!("({})", node.kind()),
         },
         kind => format!("({kind})"),
-    }
-}
-
-fn qualify(scope: &str, name: &str) -> String {
-    if scope.is_empty() {
-        name.to_string()
-    } else {
-        format!("{scope}.{name}")
     }
 }
 
