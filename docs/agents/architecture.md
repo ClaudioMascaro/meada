@@ -39,8 +39,11 @@ give byte-identical output.
   exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
   is stale) and `run`, the public entry. Human mode reads no environment variable and
   opens no connection. With `--decider` (and neither `--list` nor `--prune`), `run` reads
-  `decider::Config` first, then hands the items to `decider::run`, which returns the
-  `Vec<Decision>` for `finish`; `--show-request` stops after printing. `describe(candidate)` is
+  `decider::Config` first (and validates `--min-p` with `decider::min_p`, before the
+  variables), then hands the items to `decider::run`, which returns an `Outcome {decisions,
+  failed}`; the decisions go to `finish` and, when `failed > 0`, `run` then returns an error
+  (`meada: N item(s) failed`, exit 1) so a script sees the failure while the other items are
+  already written. `--show-request` stops after printing. `describe(candidate)` is
   the one candidate line (repository identity, method, path) shared by the prompt and the
   excerpt.
 - `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
@@ -52,13 +55,22 @@ give byte-identical output.
   mode only), `Config::requests` (the protocol dispatch), `show` (`--show-request`, the
   `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
   proxy to a loopback host, no redirects, no retries). `Config` has no `Debug`; the key leaves it only as the bearer header.
-  Protocol adapters are files beside it that only build requests (and later read answers):
-  `chat.rs` (`request(config, question)`, one `POST <url>/chat/completions` per item). A new
-  protocol adds a file and one arm in `Config::requests`. Reading answers into decisions is not
-  there yet (`run` reports failed requests and returns none).
+  Protocol adapters are files beside it that build requests and read answers: `chat.rs`
+  (`request(config, question)`, one `POST <url>/chat/completions` per item; `answer(config,
+  question, body) -> Result<Proposal>` reads `choices[0].message.content` as `{choice,
+  probability}`, `by` = the response `model` or the configured one). A new protocol adds a
+  file and one arm each in `Config::requests` and `Config::answers`.
+  `validate.rs` is shared by every protocol: `proposal(question, choice, p, by) ->
+  Result<Proposal>` (choice among the offered keys, `p` in [0,1] through `probability(p)`,
+  `by` not empty and not `human`; a `Proposal {decision, p, candidate}`) and `invalid(reason)`
+  (the `invalid answer: <reason>` error text). `decisions` (#40) does its strict shape checks,
+  then calls `proposal` once per question. `run` prints per item: `<id>` then `proposed: ...`
+  (`p >= min_p`, returned to be written), `suggestion, not written: ...` (below it, `MIN_P` =
+  0.5 unless `--min-p`), or the error (`request failed: ...` / `invalid answer: ...`, counted
+  in `Outcome::failed`).
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
   `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
-  which requires `--decider`). `search`, `context` and `trace`
+  and `--min-p`, which require `--decider`). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
@@ -204,7 +216,9 @@ give byte-identical output.
   `Reply::chat(model, content)`, `Reply::ok(json)`, `Reply::status(code, body)`.
   `tests/decider.rs` runs the binary with only the decider variables it sets and asserts the
   key is in no output; `--show-request`, `--list`, human mode, `index`, `export`, `status` and
-  the MCP server leave the stub with zero requests.
+  the MCP server leave the stub with zero requests. Answer cases (malformed, threshold,
+  `--min-p`, `--dry-run`) script the stub per test; a malformed first answer must leave the
+  second item written.
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
 

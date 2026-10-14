@@ -50,6 +50,16 @@ pub enum Kind {
     DynamicUrl,
 }
 
+impl Kind {
+    /// The kind of decision that resolves `item`.
+    pub(crate) fn of(item: &OpenItem) -> Self {
+        match item.kind {
+            ItemKind::Ambiguous => Kind::AmbiguousLink,
+            ItemKind::Unresolved => Kind::DynamicUrl,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Raw {
@@ -149,15 +159,17 @@ impl Decision {
     /// A person's pick of `candidate` for `item`.
     pub(crate) fn human(item: &OpenItem, candidate: &Candidate) -> Self {
         Self {
-            kind: match item.kind {
-                ItemKind::Ambiguous => Kind::AmbiguousLink,
-                ItemKind::Unresolved => Kind::DynamicUrl,
-            },
+            kind: Kind::of(item),
             call: item.id.clone(),
-            target: format!("{}::{}", candidate.repository, candidate.contract),
+            target: Self::target(candidate),
             by: "human".into(),
             p: None,
         }
+    }
+
+    /// The `target` that picks `candidate`: its repository identity and contract.
+    pub(crate) fn target(candidate: &Candidate) -> String {
+        format!("{}::{}", candidate.repository, candidate.contract)
     }
 
     /// `decided by <by> (p=<p>)`, or `decided by human`.
