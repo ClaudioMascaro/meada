@@ -141,7 +141,7 @@ give byte-identical output.
   constants and client wrapper arguments into values for contract kinds, a destructured object
   parameter reading its names (`Param::fields`) off the literal object the caller passes.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
-  `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
+  `Names`. `http.rs` is the only kind: `fetch` consumers (also a call to a parameter defaulting to `fetch`), Next.js app-router and Express
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
