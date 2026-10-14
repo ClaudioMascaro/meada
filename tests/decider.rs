@@ -85,6 +85,28 @@ fn show_request_prints_the_golden_chat_requests_and_sends_nothing() {
     assert!(!web.join("meada.decisions.toml").exists());
 }
 
+#[test]
+fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
+    let (web, _, _) = chain("decider_excerpt_class");
+    // Two more ambiguous health checks: one in a class field initializer, whose caller is the
+    // class, and one in a method.
+    let probe = "export class Probe {\n  ready = fetch(\"/api/health\");\n\n  check() {\n    \
+                 return fetch(\"/api/health\");\n  }\n\n  secret = \"not for the model\";\n}\n";
+    fs::write(web.join("src/probe.ts"), probe).unwrap();
+    let stub = Stub::start(vec![]);
+    let show = ["decide", "--decider", "--show-request"];
+
+    let (stdout, stderr, ok) = meada(&web, &show, &chat(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    // The field initializer's call goes alone, the method's call with the method.
+    let field = r#""content": "Call:\nfetch(\"/api/health\")\n\nCandidates:"#;
+    let method = r#""content": "Call:\nfetch(\"/api/health\")\n\nIn:\ncheck() {\n    return"#;
+    assert!(stdout.contains(field), "{stdout}");
+    assert!(stdout.contains(method), "{stdout}");
+    assert!(!stdout.contains("not for the model"), "{stdout}");
+}
+
 /// The `decisions` configuration against `stub`: the protocol and the model are the defaults.
 fn decisions(stub: &Stub) -> Vec<(&'static str, String)> {
     vec![

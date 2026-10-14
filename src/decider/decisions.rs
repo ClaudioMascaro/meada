@@ -168,6 +168,7 @@ mod tests {
             repository: "r".into(),
             call: "fetch(url)".into(),
             enclosing: None,
+            top_level: true,
             offers: ["1", "2", "3"]
                 .map(|k| Offer {
                     key: k.into(),

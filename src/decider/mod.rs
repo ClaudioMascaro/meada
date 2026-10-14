@@ -15,6 +15,7 @@ use std::env::VarError;
 use std::fs;
 use std::io::Write;
 use std::net::IpAddr;
+use std::ops::Range;
 use std::path::Path;
 use std::time::Duration;
 
@@ -23,6 +24,7 @@ use serde_json::Value;
 use crate::Result;
 use crate::decisions::{Decision, Kind};
 use crate::engine::OpenItem;
+use crate::lang;
 use crate::msg::Msg;
 use validate::Proposal;
 
@@ -161,8 +163,12 @@ pub(crate) struct Question {
     pub repository: String,
     /// The call as written, on one line.
     pub call: String,
-    /// The enclosing function as it is on disk; `None` for a call at the top level of a file.
+    /// The enclosing function as it is on disk; `None` for a call at the top level of a file,
+    /// or one whose enclosing symbol is no function (a class field initializer), which goes
+    /// alone: a whole class is more than the decision needs.
     pub enclosing: Option<String>,
+    /// Whether the call is at the top level of its file.
+    pub top_level: bool,
     /// The candidates, in candidate order.
     pub offers: Vec<Offer>,
     /// The kind of decision that resolves the item.
@@ -184,8 +190,10 @@ impl Question {
         let enclosing = match &item.enclosing {
             Some(symbol) => {
                 let source = fs::read(root.join(&item.path))?;
-                let text = source.get(symbol.span.clone()).unwrap_or_default();
-                Some(String::from_utf8_lossy(text).into_owned())
+                function_like(&item.path, &source, &symbol.span).then(|| {
+                    let text = source.get(symbol.span.clone()).unwrap_or_default();
+                    String::from_utf8_lossy(text).into_owned()
+                })
             }
             None => None,
         };
@@ -194,6 +202,7 @@ impl Question {
             repository: item.repository.clone(),
             call: item.expression.clone(),
             enclosing,
+            top_level: item.enclosing.is_none(),
             offers: (item.candidates.iter().enumerate())
                 .map(|(n, c)| Offer {
                     key: (n + 1).to_string(),
@@ -207,9 +216,10 @@ impl Question {
 
     /// The call and its enclosing function, as plain text.
     pub fn excerpt(&self) -> String {
-        match &self.enclosing {
-            Some(function) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
-            None => format!("Call (at the top level of its file):\n{}\n", self.call),
+        match (&self.enclosing, self.top_level) {
+            (Some(function), _) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
+            (None, true) => format!("Call (at the top level of its file):\n{}\n", self.call),
+            (None, false) => format!("Call:\n{}\n", self.call),
         }
     }
 
@@ -223,6 +233,18 @@ impl Question {
     pub fn keys(&self) -> Vec<&str> {
         self.offers.iter().map(|o| o.key.as_str()).collect()
     }
+}
+
+/// Whether the definition at `span` of the file at `path` is a function, a method or an inline
+/// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
+/// the file is parsed again; anything else, or a file no pack parses, is not.
+fn function_like(path: &str, source: &[u8], span: &Range<usize>) -> bool {
+    let Some(pack) = lang::pack_for(path).map(lang::pack) else {
+        return false;
+    };
+    (pack.parse(path, source)).is_ok_and(|facts| {
+        (facts.defs.iter()).any(|d| d.range == *span && d.kind != lang::Kind::Class)
+    })
 }
 
 /// One HTTP request of a run: always a `POST` of a JSON body.
