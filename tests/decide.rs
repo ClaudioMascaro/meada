@@ -126,34 +126,47 @@ fn a_new_decision_replaces_the_entry_of_its_call_stale_or_not() {
 }
 
 #[test]
-fn a_stale_entry_for_another_call_survives_a_rewrite_and_a_repeated_call_keeps_its_first() {
+fn a_stale_entry_for_another_call_survives_a_rewrite() {
     let (web, _, _) = chain("decide_survive");
-    let entry = |call: &str, target: &str| {
-        format!(
-            "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{call}\"\n\
-             target = \"{target}\"\nby = \"human\"\n\n"
-        )
-    };
     let gone = "example.com/chain/web::src/gone.ts::run::fetch#0";
-    let stale = entry(gone, "example.com/chain/ghost::http::GET::/gone");
-    let first = entry(gone, "example.com/chain/ghost::http::GET::/first");
-    let second = entry(gone, "example.com/chain/ghost::http::GET::/second");
-    fs::write(
-        web.join("meada.decisions.toml"),
-        format!("{first}{second}{stale}"),
-    )
-    .unwrap();
+    let stale = format!(
+        "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{gone}\"\n\
+         target = \"example.com/chain/ghost::http::GET::/gone\"\nby = \"human\"\n"
+    );
+    fs::write(web.join("meada.decisions.toml"), stale).unwrap();
 
     let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "2\n");
 
     assert!(ok, "{stderr}");
     let written = file(&web).unwrap();
-    assert_eq!(written.matches(gone).count(), 1, "{written}");
     assert!(
-        written.contains("/first") && !written.contains("/second"),
+        written.contains(gone) && written.contains(HEALTH),
         "{written}"
     );
-    assert!(written.contains(HEALTH), "{written}");
+}
+
+#[test]
+fn a_repeated_call_in_the_file_is_a_parse_error_naming_the_repeat() {
+    let (web, _, _) = chain("decide_repeat");
+    let entry = |target: &str| {
+        format!(
+            "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{HEALTH}\"\n\
+             target = \"{target}\"\nby = \"human\"\n\n"
+        )
+    };
+    let text = format!("{}{}", entry("a::http::GET::/a"), entry("b::http::GET::/b"));
+    fs::write(web.join("meada.decisions.toml"), text).unwrap();
+
+    let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(!ok);
+    assert_eq!(
+        stderr,
+        format!(
+            "meada: <repo>/meada.decisions.toml:9: `call`: `{HEALTH}` is decided twice, \
+             one entry per call\n"
+        )
+    );
 }
 
 #[test]
@@ -275,6 +288,21 @@ fn prune_removes_exactly_the_stale_entries_and_keeps_those_waiting() {
     assert!(ok);
     assert_eq!(stdout, "nothing to prune\n");
     assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
+}
+
+#[test]
+fn prune_reports_in_portuguese_how_many_entries_it_removed() {
+    let (web, _, _) = chain("decide_prune_pt");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, _, ok) = decide(&web, "pt_BR.UTF-8", &["--prune"], "");
+
+    assert!(ok);
+    assert_eq!(
+        stdout,
+        "1 decisão obsoleta removida de meada.decisions.toml\n"
+    );
 }
 
 #[test]

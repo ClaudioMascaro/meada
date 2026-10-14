@@ -56,6 +56,7 @@ pub enum Msg<'a> {
     DecideListHelp,
     DecidePruneHelp,
     DecidePruned(usize),
+    CallRepeated(&'a str),
     DecideNothingToPrune,
     DecideNoItems,
     DecideUnknownItem(&'a str),
@@ -180,6 +181,10 @@ impl Msg<'_> {
                     "{n} {} de meada.decisions.toml",
                     if *n == 1 { "decisão obsoleta removida" } else { "decisões obsoletas removidas" }
                 ),
+            ),
+            Msg::CallRepeated(call) => pick(
+                format!("`call`: `{call}` is decided twice, one entry per call"),
+                format!("`call`: `{call}` aparece duas vezes, uma entrada por chamada"),
             ),
             Msg::DecideNothingToPrune => {
                 pick("nothing to prune".into(), "nada a remover".into())

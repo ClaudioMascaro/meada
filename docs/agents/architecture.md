@@ -64,7 +64,7 @@ give byte-identical output.
   { repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target,
   peer}> }` is per repository, in file order; `Engine::stale_decisions()` returns them for the
   workspace, and `export` and `status` render them (`meada decide --list`/`--prune` reuse the
-  same call). The writer is `canonical(root, new)` (existing entries minus those of the same
+  same call). `load` rejects a file that repeats a `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)` (existing entries minus those of the same
   `call`, plus `new`, sorted by `call`, no comments or timestamps; `Decision::human(item,
   candidate)` builds a human pick) and `save(root, text)`.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by

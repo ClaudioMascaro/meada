@@ -158,9 +158,9 @@ fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()>
 fn prune(engine: &Engine, out: &mut impl Write) -> Result<()> {
     let stale = engine.local_decisions()?.stale;
     match decisions::pruned(engine.root(), &stale)? {
-        Some(text) => {
+        Some((text, removed)) => {
             decisions::save(engine.root(), &text)?;
-            writeln!(out, "{}", Msg::DecidePruned(stale.len()).text())?;
+            writeln!(out, "{}", Msg::DecidePruned(removed).text())?;
         }
         None => writeln!(out, "{}", Msg::DecideNothingToPrune.text())?,
     }
