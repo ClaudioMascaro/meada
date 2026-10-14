@@ -52,3 +52,10 @@ The five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`,
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Vendored skills
+
+The `mattpocock/skills` set lives in `.agents/skills/` (linked from `.claude/skills/`), pinned by
+`.agents/skills-lock.json`: a skill whose `tree` differs from `upstreamTree` carries a local
+adjustment. After staging an edit to a skill, set its `tree` to
+`git rev-parse $(git write-tree):.agents/skills/<name>`.
