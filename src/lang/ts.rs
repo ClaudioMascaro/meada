@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
 
-use super::{Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules};
+use super::{Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Part, Value};
 use crate::Result;
 
 pub struct TsJs;
@@ -57,6 +57,11 @@ impl LanguagePack for TsJs {
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: node.byte_range(),
+                            args: node
+                                .child_by_field_name("arguments")
+                                .filter(|a| a.kind() == "arguments")
+                                .map(|a| named(a).map(|arg| value(arg, src)).collect())
+                                .unwrap_or_default(),
                         });
                     }
                 }
@@ -397,6 +402,130 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
             }
         }
     }
+}
+
+/// What an argument expression is, as far as its own syntax tells.
+fn value(node: Node, src: &[u8]) -> Value {
+    if node.kind() == "object" {
+        // `{ method }` and `{ ...init }` hold values the call does not show.
+        let properties = named(node).filter_map(|property| match property.kind() {
+            "pair" => {
+                let key = property.child_by_field_name("key")?;
+                let key = match key.kind() {
+                    "string" => unquote(key, src),
+                    _ => text(key, src).to_string(),
+                };
+                Some((key, value(property.child_by_field_name("value")?, src)))
+            }
+            "shorthand_property_identifier" => Some((text(property, src).into(), Value::Unknown)),
+            "spread_element" => Some(("...".into(), Value::Unknown)),
+            _ => None,
+        });
+        return Value::Object(properties.collect());
+    }
+    parts(node, src).map_or(Value::Unknown, Value::Str)
+}
+
+/// A string expression folded into literal text, environment reads and holes; `None` when
+/// `node` is not a string expression Meada folds.
+fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
+    // Anything inside a string that is not itself foldable is a hole.
+    let inside = |n: Node| parts(n, src).unwrap_or_else(|| vec![Part::Hole]);
+    match node.kind() {
+        "string" => Some(vec![Part::Text(unquote(node, src))]),
+        "template_string" => {
+            let mut out = Vec::new();
+            let mut at = node.start_byte() + 1;
+            for hole in named(node).filter(|c| c.kind() == "template_substitution") {
+                out.push(Part::Text(lossy(&src[at..hole.start_byte()])));
+                out.extend(named(hole).next().map_or(vec![Part::Hole], inside));
+                at = hole.end_byte();
+            }
+            out.push(Part::Text(lossy(
+                &src[at..node.end_byte().saturating_sub(1)],
+            )));
+            out.retain(|p| !matches!(p, Part::Text(t) if t.is_empty()));
+            Some(out)
+        }
+        "binary_expression" => {
+            let left = node.child_by_field_name("left")?;
+            let right = node.child_by_field_name("right")?;
+            match text(node.child_by_field_name("operator")?, src) {
+                // At least one side must be a string for `+` to concatenate.
+                "+" if parts(left, src).is_some() || parts(right, src).is_some() => {
+                    Some(inside(left).into_iter().chain(inside(right)).collect())
+                }
+                // A fallback keeps the environment read on its left, if it is the only one.
+                "||" | "??" => {
+                    let env = single_env(parts(left, src)?)?;
+                    let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
+                    Some(vec![if more { Part::Hole } else { env }])
+                }
+                _ => None,
+            }
+        }
+        "parenthesized_expression"
+        | "non_null_expression"
+        | "as_expression"
+        | "satisfies_expression" => parts(named(node).next()?, src),
+        _ => env_read(node, src).map(|env| vec![env]),
+    }
+}
+
+/// `process.env.X`, `process.env["X"]` or `import.meta.env.X`, also through string method
+/// calls such as `.replace(...)` or `.trim()`.
+fn env_read(node: Node, src: &[u8]) -> Option<Part> {
+    const STRING_METHODS: &[&str] = &[
+        "replace",
+        "replaceAll",
+        "trim",
+        "trimEnd",
+        "trimStart",
+        "toString",
+        "toLowerCase",
+    ];
+    match node.kind() {
+        "member_expression" | "subscript_expression" => {
+            let object = text(node.child_by_field_name("object")?, src);
+            if object != "process.env" && object != "import.meta.env" {
+                return None;
+            }
+            let name = match node.child_by_field_name("index") {
+                Some(index) if index.kind() == "string" => unquote(index, src),
+                Some(_) => return None,
+                None => text(node.child_by_field_name("property")?, src).to_string(),
+            };
+            Some(Part::Env(name))
+        }
+        "call_expression" => {
+            let function = node.child_by_field_name("function")?;
+            let method = function.child_by_field_name("property")?;
+            if !STRING_METHODS.contains(&text(method, src)) {
+                return None;
+            }
+            single_env(parts(function.child_by_field_name("object")?, src)?)
+        }
+        _ => None,
+    }
+}
+
+/// The environment read that makes up all of `parts`, if that is what they are.
+fn single_env(parts: Vec<Part>) -> Option<Part> {
+    match <[Part; 1]>::try_from(parts) {
+        Ok([env @ Part::Env(_)]) => Some(env),
+        _ => None,
+    }
+}
+
+fn lossy(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .collect::<Vec<_>>()
+        .into_iter()
 }
 
 fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
