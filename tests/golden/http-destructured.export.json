@@ -1,0 +1,213 @@
+{
+  "repository": "example.com/acme/portal",
+  "files": [
+    {
+      "path": "src/call.ts",
+      "hash": "5c204312bee54aca7d6940904891215c4c3376e5083aa7157002a2574e6112b0"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/portal::src/call.ts::call",
+      "span": {
+        "path": "src/call.ts",
+        "start": 181,
+        "end": 265
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::createReport",
+      "span": {
+        "path": "src/call.ts",
+        "start": 905,
+        "end": 939
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::fetchAll",
+      "span": {
+        "path": "src/call.ts",
+        "start": 637,
+        "end": 716
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::forward",
+      "span": {
+        "path": "src/call.ts",
+        "start": 1043,
+        "end": 1105
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::listAll",
+      "span": {
+        "path": "src/call.ts",
+        "start": 955,
+        "end": 981
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::listReports",
+      "span": {
+        "path": "src/call.ts",
+        "start": 767,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::post",
+      "span": {
+        "path": "src/call.ts",
+        "start": 539,
+        "end": 628
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::putReport",
+      "span": {
+        "path": "src/call.ts",
+        "start": 837,
+        "end": 889
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::send",
+      "span": {
+        "path": "src/call.ts",
+        "start": 331,
+        "end": 438
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/portal::src/call.ts::call::fetch#0",
+      "caller": "example.com/acme/portal::src/call.ts::call",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/call.ts",
+        "start": 240,
+        "end": 262
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::createReport::post#0",
+      "caller": "example.com/acme/portal::src/call.ts::createReport",
+      "target": "example.com/acme/portal::src/call.ts::post",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 926,
+        "end": 939
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::fetchAll::call#0",
+      "caller": "example.com/acme/portal::src/call.ts::fetchAll",
+      "target": "example.com/acme/portal::src/call.ts::call",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 700,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::forward::call#0",
+      "caller": "example.com/acme/portal::src/call.ts::forward",
+      "target": "example.com/acme/portal::src/call.ts::call",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 1089,
+        "end": 1102
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::listAll::fetchAll#0",
+      "caller": "example.com/acme/portal::src/call.ts::listAll",
+      "target": "example.com/acme/portal::src/call.ts::fetchAll",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 971,
+        "end": 981
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::listReports::call#0",
+      "caller": "example.com/acme/portal::src/call.ts::listReports",
+      "target": "example.com/acme/portal::src/call.ts::call",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 787,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::post::call#0",
+      "caller": "example.com/acme/portal::src/call.ts::post",
+      "target": "example.com/acme/portal::src/call.ts::call",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 578,
+        "end": 625
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::putReport::send#0",
+      "caller": "example.com/acme/portal::src/call.ts::putReport",
+      "target": "example.com/acme/portal::src/call.ts::send",
+      "level": "exact",
+      "span": {
+        "path": "src/call.ts",
+        "start": 855,
+        "end": 889
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/call.ts::send::fetch#0",
+      "caller": "example.com/acme/portal::src/call.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/call.ts",
+        "start": 404,
+        "end": 435
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::POST::/reports",
+      "site": "example.com/acme/portal::src/call.ts::createReport::post#0",
+      "via": "env:SERVICE_URL"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/portal::src/call.ts::forward::call#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/all",
+      "site": "example.com/acme/portal::src/call.ts::listAll::fetchAll#0",
+      "via": "env:SERVICE_URL"
+    },
+    {
+      "contract": "http::GET::/reports",
+      "site": "example.com/acme/portal::src/call.ts::listReports::call#0",
+      "via": "env:SERVICE_URL"
+    },
+    {
+      "contract": "http::PUT::/reports",
+      "site": "example.com/acme/portal::src/call.ts::putReport::send#0",
+      "via": "env:SERVICE_URL"
+    }
+  ],
+  "links": []
+}
