@@ -54,20 +54,35 @@ give byte-identical output.
   `describe`; `None` enclosing at top level), `MAX_CANDIDATES` (50: more is skipped in decider
   mode only), `Config::requests` (the protocol dispatch), `show` (`--show-request`, the
   `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
-  proxy to a loopback host, no redirects, no retries). `Config` has no `Debug`; the key leaves it only as the bearer header.
+  proxy to a loopback host, no redirects, no retries; a non-success status is the error
+  `http status: <code>`, plus `: <message>` when the redacted body has
+  `{"error": {"message"}}`, control characters dropped). `Config` has no `Debug`; the key
+  leaves it only as the bearer header.
   Protocol adapters are files beside it that build requests and read answers: `chat.rs`
   (`request(config, question)`, one `POST <url>/chat/completions` per item; `answer(config,
   question, body) -> Result<Proposal>` reads `choices[0].message.content` as `{choice,
-  probability}`, `by` = the response `model` or the configured one). A new protocol adds a
-  file and one arm each in `Config::requests` and `Config::answers`.
+  probability}`, `by` = the response `model` or the configured one). `decisions.rs`
+  (OpenRouter's alpha API: `request(config, questions) -> Option<Request>`, one `POST
+  <url>/api/alpha/decisions` carrying every eligible item, `state {task, repository}`,
+  `questions` named `item1..` zero-padded so the sorted map keeps item order, each `{type:
+  choice, instructions: excerpt, criteria: key -> describe}`, `provider {zdr: true,
+  data_collection: deny}`; `answers(asked, body)` parses `{model, answers, id?, provider?,
+  usage?}` and each `{type, choice, confidence, probabilities}` with `deny_unknown_fields`: a
+  shape error or an answer to an unknown question fails every item, an answer's values (type
+  `choice`, choice and probability keys offered, each in [0,1], sum 1 within `SUM_TOLERANCE` =
+  0.01, `confidence` in [0,1]) fail its item; `p` = probability of the choice, `by` = response
+  `model`, `confidence` printed, not recorded). A refusal of the data-retention preferences
+  arrives as a non-success status: every item of the request fails, nothing is written,
+  nothing retries. A new protocol adds a file and one arm each in `Config::requests` and
+  `Config::answers`.
   `validate.rs` is shared by every protocol: `proposal(question, choice, p, by) ->
-  Result<Proposal>` (choice among the offered keys, `p` in [0,1] through `probability(p)`,
-  `by` not empty and not `human`; a `Proposal {decision, p, candidate}`) and `invalid(reason)`
-  (the `invalid answer: <reason>` error text). `decisions` (#40) does its strict shape checks,
-  then calls `proposal` once per question. `run` prints per item: `<id>` then `proposed: ...`
-  (`p >= min_p`, returned to be written), `suggestion, not written: ...` (below it, `MIN_P` =
-  0.5 unless `--min-p`), or the error (`request failed: ...` / `invalid answer: ...`, counted
-  in `Outcome::failed`).
+  Result<Proposal>` (choice among the offered keys through `offered`, `p` in [0,1] through
+  `probability(p)`, `by` not empty and not `human`; a `Proposal {decision, p, candidate,
+  confidence}`) and `invalid(reason)` (the `invalid answer: <reason>` error text). `run`
+  prints per item: `<id>` then `proposed: ...` (`p >= min_p`, returned to be written),
+  `suggestion, not written: ...` (below it, `MIN_P` = 0.5 unless `--min-p`), both with
+  `confidence` when the protocol gives one, or the error (`request failed: ...` /
+  `invalid answer: ...`, counted in `Outcome::failed`).
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
   `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
   and `--min-p`, which require `--decider`). `search`, `context` and `trace`

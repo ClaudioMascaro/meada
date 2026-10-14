@@ -22,6 +22,8 @@ pub(crate) struct Proposal {
     pub p: f64,
     /// The picked candidate: repository identity, method and path.
     pub candidate: String,
+    /// How sure the decider says it is, when the protocol gives it: printed, not recorded.
+    pub confidence: Option<f64>,
 }
 
 /// The error for an answer that is not valid, with `reason` as its detail.
@@ -41,16 +43,7 @@ pub(super) fn probability(p: f64) -> Result<f64> {
 /// and `by` a model id: printed and recorded, so no control characters, and not `human`, which
 /// is the person's.
 pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> Result<Proposal> {
-    let Some(at) = question.keys().iter().position(|key| *key == choice) else {
-        let keys = question.keys().join(", ");
-        return Err(invalid(
-            Msg::AnswerChoice {
-                choice,
-                keys: &keys,
-            }
-            .text(),
-        ));
-    };
+    let at = offered(question, choice)?;
     let p = probability(p)?;
     if by.is_empty() || by == "human" || by.chars().any(char::is_control) {
         return Err(invalid(Msg::AnswerBy(by).text()));
@@ -65,6 +58,22 @@ pub(super) fn proposal(question: &Question, choice: &str, p: f64, by: &str) -> R
         },
         p,
         candidate: question.candidates[at].1.clone(),
+        confidence: None,
+    })
+}
+
+/// The position of `choice` among the keys `question` offers, or the error naming it.
+pub(super) fn offered(question: &Question, choice: &str) -> Result<usize> {
+    let keys = question.keys();
+    keys.iter().position(|key| *key == choice).ok_or_else(|| {
+        let keys = keys.join(", ");
+        invalid(
+            Msg::AnswerChoice {
+                choice,
+                keys: &keys,
+            }
+            .text(),
+        )
     })
 }
 

@@ -2,12 +2,13 @@
 //! the excerpt of each item, the requests of the configured protocol and the HTTP client. This
 //! is the only network path of Meada, and only `meada decide --decider` reaches it.
 //!
-//! The protocol adapters (`chat`, and `decisions` once it lands) only turn questions into
+//! The protocol adapters (`chat` and `decisions`) only turn questions into
 //! requests and answers into proposals; reading the environment, choosing the eligible items,
 //! printing and sending stay here. The key is held by `Config` alone, which has no `Debug`, and
 //! leaves it only as the `Authorization` header of a request on the wire.
 
 mod chat;
+mod decisions;
 mod validate;
 
 use std::env::VarError;
@@ -231,7 +232,7 @@ impl Config {
     fn requests(&self, questions: &[Question]) -> Result<Vec<Request>> {
         match self.protocol {
             Protocol::Chat => Ok(questions.iter().map(|q| chat::request(self, q)).collect()),
-            Protocol::Decisions => Err(Msg::DeciderLater.text().into()),
+            Protocol::Decisions => Ok(decisions::request(self, questions).into_iter().collect()),
         }
     }
 
@@ -249,8 +250,7 @@ impl Config {
             .filter_map(|id| questions.iter().find(|q| q.id == *id));
         match self.protocol {
             Protocol::Chat => asked.map(|q| chat::answer(self, q, body)).collect(),
-            // `requests` refuses this protocol until it lands, so no request reaches here.
-            Protocol::Decisions => Vec::new(),
+            Protocol::Decisions => decisions::answers(&asked.collect::<Vec<_>>(), body),
         }
     }
 
@@ -271,6 +271,10 @@ impl Config {
     /// the key in its answer would put it in what is printed and recorded, so every
     /// occurrence in the body (as is, and as JSON escapes it) becomes `HIDDEN` here, before
     /// anything parses the body.
+    ///
+    /// A non-success answer is an error with its status and, when its body has the usual
+    /// `{"error": {"message": ...}}` shape, that message: it is how a refusal (such as no
+    /// provider honouring the data-retention preferences) reaches the user. Nothing retries.
     fn send(&self, agent: &ureq::Agent, request: &Request) -> Result<String> {
         let mut call = agent
             .post(&request.url)
@@ -279,15 +283,24 @@ impl Config {
             call = call.header("Authorization", format!("Bearer {key}"));
         }
         let mut answer = call.send(request.body.to_string())?;
-        let body = answer.body_mut().read_to_string()?;
-        Ok(match &self.key {
+        let status = answer.status();
+        let body = match answer.body_mut().read_to_string() {
+            Ok(body) => body,
+            Err(_) if !status.is_success() => String::new(),
+            Err(e) => return Err(e.into()),
+        };
+        let body = match &self.key {
             Some(key) => {
                 let escaped = serde_json::to_string(key)?;
                 body.replace(key, HIDDEN)
                     .replace(&escaped[1..escaped.len() - 1], HIDDEN)
             }
             None => body,
-        })
+        };
+        if !status.is_success() {
+            return Err(failure(status.as_u16(), &body).into());
+        }
+        Ok(body)
     }
 }
 
@@ -334,7 +347,9 @@ pub(crate) fn run(
     let mut agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
         // A redirect could carry the key to another host or drop HTTPS.
-        .max_redirects(0);
+        .max_redirects(0)
+        // `send` reads the body of a non-success answer for the reason it gives.
+        .http_status_as_error(false);
     if loopback(&config.url) {
         // A proxy would carry the key and the excerpt off the machine, in clear over HTTP.
         agent = agent.proxy(None);
@@ -355,23 +370,23 @@ pub(crate) fn run(
             writeln!(out, "{id}")?;
             match answer {
                 Ok(proposal) if proposal.p >= min_p => {
-                    let (candidate, p, by) =
-                        (&proposal.candidate, proposal.p, &proposal.decision.by);
-                    writeln!(out, "{}", Msg::DecideProposal { candidate, p, by }.text())?;
+                    let line = Msg::DecideProposal {
+                        candidate: &proposal.candidate,
+                        p: proposal.p,
+                        confidence: proposal.confidence,
+                        by: &proposal.decision.by,
+                    };
+                    writeln!(out, "{}", line.text())?;
                     outcome.decisions.push(proposal.decision);
                 }
                 Ok(proposal) => {
-                    let (candidate, p) = (&proposal.candidate, proposal.p);
-                    writeln!(
-                        out,
-                        "{}",
-                        Msg::DecideSuggestion {
-                            candidate,
-                            p,
-                            min_p
-                        }
-                        .text()
-                    )?;
+                    let line = Msg::DecideSuggestion {
+                        candidate: &proposal.candidate,
+                        p: proposal.p,
+                        confidence: proposal.confidence,
+                        min_p,
+                    };
+                    writeln!(out, "{}", line.text())?;
                 }
                 Err(e) => {
                     writeln!(out, "{e}")?;
@@ -381,6 +396,25 @@ pub(crate) fn run(
         }
     }
     Ok(outcome)
+}
+
+/// The error text of a non-success answer: `http status: <code>`, then `: <message>` when the
+/// (already redacted) body carries one, with control characters dropped so that it cannot
+/// drive the terminal.
+fn failure(status: u16, body: &str) -> String {
+    let message = serde_json::from_str::<Value>(body).ok().and_then(|v| {
+        let message = v["error"]["message"].as_str()?;
+        Some(
+            message
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect::<String>(),
+        )
+    });
+    match message {
+        Some(message) if !message.is_empty() => format!("http status: {status}: {message}"),
+        _ => format!("http status: {status}"),
+    }
 }
 
 /// A `--min-p` value, which must be a probability.
