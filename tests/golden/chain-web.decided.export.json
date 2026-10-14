@@ -229,8 +229,8 @@
     },
     {
       "consumer": "example.com/chain/web::src/status.ts::track::fetch#0",
-      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
-      "contract": "http::GET::/api/products/{}",
+      "provider": "example.com/chain/catalog::app/api/events/route.ts::POST",
+      "contract": "http::POST::/api/events",
       "level": "decided",
       "reason": "decided by openrouter/jev (p=0.62)",
       "by": "openrouter/jev",

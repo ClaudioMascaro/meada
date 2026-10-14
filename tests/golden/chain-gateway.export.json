@@ -11,7 +11,7 @@
     },
     {
       "path": "src/routes.ts",
-      "hash": "fbe79e97ded83b3c0080c9b3c5002823331c96c1c1f2a53cddc26ad8d8023463"
+      "hash": "544a30f831856aaebe8a69f2983a2dbfe891cff6bcef5d7547fc832ecd5d122a"
     },
     {
       "path": "src/server.ts",
@@ -41,6 +41,14 @@
         "path": "src/orders.ts",
         "start": 95,
         "end": 265
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::POST /api/events",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 208,
+        "end": 244
       }
     },
     {
@@ -109,6 +117,28 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/routes.ts::POST /api/events::(call_expression).end#0",
+      "caller": "example.com/chain/gateway::src/routes.ts::POST /api/events",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes.ts",
+        "start": 223,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::POST /api/events::res.status#0",
+      "caller": "example.com/chain/gateway::src/routes.ts::POST /api/events",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes.ts",
+        "start": 223,
+        "end": 238
+      }
+    },
+    {
       "id": "example.com/chain/gateway::src/routes.ts::Router#0",
       "caller": "example.com/chain/gateway::src/routes.ts",
       "target": null,
@@ -139,6 +169,17 @@
         "path": "src/routes.ts",
         "start": 116,
         "end": 146
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::api.post#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes.ts",
+        "start": 188,
+        "end": 245
       }
     },
     {
@@ -209,6 +250,10 @@
     {
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/gateway::src/orders.ts::listOrders"
+    },
+    {
+      "contract": "http::POST::/api/events",
+      "site": "example.com/chain/gateway::src/routes.ts::POST /api/events"
     }
   ],
   "consumers": [

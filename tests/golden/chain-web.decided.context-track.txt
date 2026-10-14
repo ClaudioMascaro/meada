@@ -7,4 +7,4 @@ example.com/chain/web src/dashboard.ts:6 dashboard
 callees:
 example.com/chain/web src/status.ts:8 (unresolved) fetch
 contracts:
-example.com/chain/web src/status.ts:8 consumes http::GET::/api/products/{} →[decided: decided by openrouter/jev (p=0.62)] example.com/chain/catalog::app/api/products/[id]/route.ts::GET
+example.com/chain/web src/status.ts:8 consumes http::POST::/api/events →[decided: decided by openrouter/jev (p=0.62)] example.com/chain/catalog::app/api/events/route.ts::POST

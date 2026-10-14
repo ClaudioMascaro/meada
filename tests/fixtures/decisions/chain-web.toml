@@ -9,6 +9,6 @@ by = "human"
 [[decision]]
 kind = "dynamic-url"
 call = "example.com/chain/web::src/status.ts::track::fetch#0"
-target = "example.com/chain/catalog::http::GET::/api/products/{}"
+target = "example.com/chain/catalog::http::POST::/api/events"
 by = "openrouter/jev"
 p = 0.62
