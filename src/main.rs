@@ -1,33 +1,43 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use meada::engine::{self, Engine};
+use meada::msg::{self, Msg};
 
 #[derive(Parser)]
-#[command(version, about)]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
 }
 
+// Command descriptions are set at runtime from the message catalog (ADR 0008).
 #[derive(Subcommand)]
 enum Command {
-    /// Build the indexes of the workspace of the repository in the current directory.
     Index,
-    /// Show the workspace: each repository, its index state and any peer not found.
     Status,
-    /// Print the index as sorted JSON, with the links that touch it.
     Export,
-    /// Serve the repository in the current directory to agents over MCP (stdio).
     Mcp,
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    msg::init(std::env::var("LANG").ok().as_deref());
+    let matches = Cli::command()
+        .about(Msg::About.text())
+        .mut_subcommand("index", |c| c.about(Msg::Index.text()))
+        .mut_subcommand("status", |c| c.about(Msg::Status.text()))
+        .mut_subcommand("export", |c| c.about(Msg::Export.text()))
+        .mut_subcommand("mcp", |c| c.about(Msg::Mcp.text()))
+        .get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
     let result = match cli.command {
-        Command::Mcp => meada::mcp::serve(),
+        Command::Mcp => {
+            // The MCP surface is English whatever `LANG` says (ADR 0008).
+            msg::init(None);
+            meada::mcp::serve()
+        }
         Command::Status => engine::status(here).map(|status| print!("{status}")),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export => engine.export().map(|json| print!("{json}")),

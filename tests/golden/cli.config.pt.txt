@@ -1,0 +1,1 @@
+meada: <repo>/meada.toml:1: `resource` não existe na v0.1; a trilha A a adiciona (recursos e gateway)

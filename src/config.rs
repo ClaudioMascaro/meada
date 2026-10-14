@@ -9,6 +9,7 @@ use serde::Deserialize;
 use toml::de::{DeTable, DeValue};
 
 use crate::Result;
+use crate::msg::Msg;
 
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -38,12 +39,8 @@ pub struct Serve {
     pub hosts: Vec<String>,
 }
 
-/// Keys a later release adds, with the release that adds them.
-const LATER: &[(&str, &str)] = &[
-    ("resource", "track A adds it (resources and gateway)"),
-    ("serve.prefix", "track A adds it (resources and gateway)"),
-    ("serve.strip", "track A adds it (resources and gateway)"),
-];
+/// Keys that track A adds after v0.1.
+const LATER: &[&str] = &["resource", "serve.prefix", "serve.strip"];
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
@@ -80,12 +77,14 @@ fn describe(src: &str, at: usize, message: &str) -> String {
         .filter(|_| message.starts_with("unknown field") || message.starts_with("missing field"));
     match (field, around) {
         (Some(field), parent) if message.starts_with("missing field") => {
-            format!("`{}` is missing", join(parent.unwrap_or(""), field))
+            Msg::KeyMissing(&join(parent.unwrap_or(""), field)).text()
         }
-        (Some(_), Some(key)) => match LATER.iter().find(|(later, _)| *later == key) {
-            Some((_, release)) => format!("`{key}` is not in v0.1; {release}"),
-            None => format!("`{key}` is not a meada.toml key"),
-        },
+        (Some(_), Some(key)) if LATER.contains(&key) => Msg::KeyLater {
+            key,
+            release: &Msg::TrackA.text(),
+        }
+        .text(),
+        (Some(_), Some(key)) => Msg::KeyUnknown(key).text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
         (_, None) => message.to_string(),
     }
