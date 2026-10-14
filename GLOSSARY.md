@@ -54,9 +54,16 @@ a package.
 _Avoid_: client, caller
 
 **Unresolved consumer**:
-A consumer whose contract Meada could not read from the code, such as a `fetch` of a URL built
-elsewhere. It is shown, never linked.
+A consumer whose contract Meada could not read from the code after folding constants and
+client wrapper arguments, such as a `fetch` of a URL computed at run time. It is shown in
+search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
+
+**Client wrapper**:
+A function whose call to an HTTP client (`fetch` in v0.1) takes its URL or method from the
+function's own parameters. Each call site of the wrapper is a consumer, read with its
+arguments in place of the parameters, through any number of wrapper levels.
+_Avoid_: API client, helper, fetcher
 
 **Contract**:
 What one repository exposes and another depends on, such as an HTTP route, a queue, a package or

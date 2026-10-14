@@ -54,6 +54,9 @@ pub struct Facts {
     pub imports: Vec<Import>,
     pub exports: Vec<Export>,
     pub calls: Vec<Call>,
+    /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
+    /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
+    pub consts: Vec<Const>,
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from
@@ -92,6 +95,11 @@ pub enum Kind {
     Function,
     Class,
     Method,
+    /// An anonymous function passed as an argument, such as a route handler or a callback.
+    /// The last segment of its name is `@<byte offset>`, which no identifier can be: the
+    /// shared side names it when a contract kind says what it is (an inline route handler)
+    /// and folds it into its enclosing definition otherwise.
+    Inline,
 }
 
 /// A definition. `name` is qualified by its enclosing definitions: `outer.inner`,
@@ -101,6 +109,29 @@ pub struct Def {
     pub name: String,
     pub kind: Kind,
     pub range: Range<usize>,
+    /// A function's parameters in order; a destructured one has an empty name.
+    pub params: Vec<Param>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Param {
+    pub name: String,
+    /// The default value, as written. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub default: Option<Value>,
+}
+
+/// A `const` binding, qualified by its enclosing definitions like `Def::name`.
+#[derive(Serialize, Deserialize)]
+pub struct Const {
+    pub name: String,
+    /// Not kept in the index (see `Call::args`).
+    #[serde(skip, default = "unknown")]
+    pub value: Value,
+}
+
+fn unknown() -> Value {
+    Value::Unknown
 }
 
 /// A call site. `scope` is the qualified name of the enclosing definition, empty at the top
@@ -112,24 +143,39 @@ pub struct Call {
     pub callee: String,
     pub range: Range<usize>,
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
-    /// and options from. Not kept in the index: they hold string literals, and contracts are
-    /// extracted when the file is parsed.
+    /// and options from. Not kept in the index: they hold string literals, so the index
+    /// parses a file again when a contract needs them.
     #[serde(skip)]
     pub args: Vec<Value>,
 }
 
-/// An expression as written at the call. Names bound elsewhere are not followed.
+/// An expression as written. The pack does not follow names: the shared side folds
+/// `Ref`s into the constants and arguments they name (`resolve`), and after that only
+/// parameters whose arguments are not known remain as `Ref`s.
+#[derive(Clone)]
 pub enum Value {
     /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
-    /// An object literal's properties; a spread `...x` is the key `...` with an unknown value.
+    /// An object literal's properties; a spread `...x` is the key `...` with the value of `x`.
     Object(Vec<(String, Value)>),
+    /// A name: a constant, a parameter, a definition.
+    Ref(String),
+    /// `undefined`, or an argument the call leaves out.
+    Undefined,
+    /// The result of calling the normalized callee, such as `express.Router`.
+    Call(String),
+    /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
+    /// definition.
+    Function(String),
     /// Anything else.
     Unknown,
 }
 
+#[derive(Clone)]
 pub enum Part {
     Text(String),
+    /// A name inside a string, folded like `Value::Ref`.
+    Ref(String),
     /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
     /// fallbacks and string method calls. Its value is never known.
     Env(String),

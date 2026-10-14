@@ -1,7 +1,7 @@
 //! The index: one SQLite file in `<repo>/.meada/`, holding spans and identities but no
 //! source text (ADR 0004).
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -11,19 +11,19 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 
 use crate::Result;
-use crate::contract::{self, Link, Site};
+use crate::contract::{self, Link, Names, Site};
 use crate::lang::{self, Facts};
-use crate::resolve::{Resolution, Resolver, Target};
+use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
 /// is NULL when it was too recent to trust. `files.facts` is what the pack parsed, as JSON
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
-/// file's resolved call rows. `calls.target` holds the one definition an `exact` or
+/// file's resolved symbol and call rows. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`.
 const SCHEMA: &str = "
@@ -133,13 +133,22 @@ struct Resolved {
     candidates: Vec<String>,
 }
 
+/// The symbol and call rows of one file, before they are written.
+#[derive(Serialize)]
+struct Rows {
+    symbols: Vec<(String, i64, i64)>,
+    calls: Vec<Resolved>,
+}
+
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
 /// and untracked, minus what `.gitignore` excludes. Only files whose mtime or size differ
 /// from the index are hashed, and only those whose hash differs are parsed. Every file's
-/// calls are then resolved against the new facts, and a file's call rows are rewritten when
-/// the file changed or its calls now resolve differently: that covers importers of a changed
-/// file's exports, re-export chains, name inference and config changes alike. Deleted files
-/// leave the index. The result equals a refresh of an empty index over the same files.
+/// calls are then resolved against the new facts, and a file's symbol and call rows are
+/// rewritten when the file changed or its rows now differ: that covers importers of a changed
+/// file's exports, re-export chains, name inference, config changes and inline route
+/// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
+/// repository, since constants and client wrappers reach across files. Deleted files leave
+/// the index. The result equals a refresh of an empty index over the same files.
 pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
     let now = SystemTime::now();
     let tx = db.unchecked_transaction()?;
@@ -239,7 +248,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
     }
     for p in &changed {
-        write_file(&tx, identity, p)?;
+        write_file(&tx, p)?;
     }
 
     // The facts of every file: parsed now, or kept from the index.
@@ -279,11 +288,42 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
 
+    // Contracts, from every file. Values are not kept in the index, so the files whose
+    // values a kind reads are parsed again, until no kind misses one.
+    // ponytail: every contract is extracted again on any change; track which files each
+    // contract read if this shows up in profiles.
+    let mut reparsed: BTreeMap<String, Facts> = BTreeMap::new();
+    let found = loop {
+        let full: BTreeMap<&str, &Facts> = changed
+            .iter()
+            .map(|p| (p.path.as_str(), &p.facts))
+            .chain(reparsed.iter().map(|(path, facts)| (path.as_str(), facts)))
+            .collect();
+        let mut found = Vec::new();
+        let mut misses = Vec::new();
+        for resolver in resolvers.values() {
+            let code = Code::new(resolver, &full);
+            for kind in contract::KINDS {
+                found.extend(kind.extract(&code));
+            }
+            misses.extend(code.misses().into_iter().map(String::from));
+        }
+        if misses.is_empty() {
+            break found;
+        }
+        for path in misses {
+            let src = fs::read(root.join(&path))?;
+            let facts = lang::pack(packs[path.as_str()]).parse(&path, &src)?;
+            reparsed.insert(path, facts);
+        }
+    };
+    let names = Names::new(&found);
+
     // ponytail: every file's calls are resolved again on any change, in memory; only the
     // rows that differ are written. A reverse-import graph can narrow the set if resolution
     // shows up in profiles.
     for (&path, &facts) in &all {
-        let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]]);
+        let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]], &names);
         let resolved = blake3::hash(&serde_json::to_vec(&rows)?)
             .to_hex()
             .to_string();
@@ -294,7 +334,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             continue;
         }
         forget_calls(&tx, path)?;
-        for row in &rows {
+        tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
+        for (id, start, end) in &rows.symbols {
+            tx.execute(
+                "INSERT INTO symbols VALUES (?1, ?2, ?3, ?4)",
+                params![id, path, start, end],
+            )?;
+        }
+        for row in &rows.calls {
             tx.execute(
                 "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
@@ -311,6 +358,38 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         tx.execute(
             "UPDATE files SET resolved = ?2 WHERE path = ?1",
             params![path, resolved],
+        )?;
+    }
+
+    tx.execute("DELETE FROM contracts", [])?;
+    let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
+    let mut rows = BTreeSet::new();
+    for f in &found {
+        let (role, path, site) = match &f.site {
+            Site::Def { path, name }
+            | Site::Inline {
+                path, def: name, ..
+            } => {
+                let name = names.def(path, name).unwrap_or_else(|| name.clone());
+                ("provider", path, format!("{identity}::{path}::{name}"))
+            }
+            Site::File(path) => ("provider", path, format!("{identity}::{path}")),
+            Site::Call { path, index } => {
+                let ids = calls
+                    .entry(path)
+                    .or_insert_with(|| call_ids(identity, path, all[path.as_str()], &names));
+                let Some((_, id)) = ids.get(*index) else {
+                    continue;
+                };
+                ("consumer", path, id.clone())
+            }
+        };
+        rows.insert((role, site, &f.contract, &f.via, path));
+    }
+    for (role, site, contract, via, path) in rows {
+        tx.execute(
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![role, contract, site, via, path],
         )?;
     }
     tx.execute("DELETE FROM meta", [])?;
@@ -350,49 +429,19 @@ fn walk(root: &Path) -> Vec<(String, PathBuf, usize)> {
     files
 }
 
-/// Replaces a changed file's row, facts, symbols and contracts. Contracts depend on the file
-/// alone; its calls are written once resolved, and links are derived from contracts when
-/// queried.
-fn write_file(tx: &Transaction, identity: &str, p: &Parsed) -> Result<()> {
-    let path = p.path.as_str();
+/// Replaces a changed file's row and facts. Its symbols and calls are written once resolved,
+/// its contracts with the repository's, and links are derived from contracts when queried.
+fn write_file(tx: &Transaction, p: &Parsed) -> Result<()> {
     tx.execute(
         "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '')",
         params![
-            path,
+            p.path,
             p.hash,
             p.mtime,
             p.size,
             serde_json::to_string(&p.facts)?
         ],
     )?;
-    tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
-    tx.execute("DELETE FROM contracts WHERE path = ?1", params![path])?;
-    let base = format!("{identity}::{path}");
-    for def in &p.facts.defs {
-        tx.execute(
-            "INSERT INTO symbols VALUES (?1, ?2, ?3, ?4)",
-            params![
-                format!("{base}::{}", def.name),
-                path,
-                def.range.start as i64,
-                def.range.end as i64
-            ],
-        )?;
-    }
-    let calls = call_ids(identity, path, &p.facts);
-    for kind in contract::KINDS {
-        for found in kind.extract(path, &p.facts) {
-            let (role, site) = match found.site {
-                Site::Def(name) => ("provider", format!("{base}::{name}")),
-                Site::File => ("provider", base.clone()),
-                Site::Call(n) => ("consumer", calls[n].1.clone()),
-            };
-            tx.execute(
-                "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![role, found.contract, site, found.via, path],
-            )?;
-        }
-    }
     Ok(())
 }
 
@@ -406,40 +455,55 @@ fn forget_calls(tx: &Transaction, path: &str) -> Result<()> {
 }
 
 /// The caller and id of each call in a file, in source order: `<caller>::<callee>#<ordinal>`.
-fn call_ids(identity: &str, path: &str, facts: &Facts) -> Vec<(String, String)> {
+/// A call inside an inline function that folds belongs to the enclosing definition.
+fn call_ids(identity: &str, path: &str, facts: &Facts, names: &Names) -> Vec<(String, String)> {
     let base = format!("{identity}::{path}");
-    let mut ordinals: HashMap<(&str, &str), usize> = HashMap::new();
+    let mut ordinals: HashMap<(String, &str), usize> = HashMap::new();
     facts
         .calls
         .iter()
         .map(|call| {
-            let ordinal = ordinals
-                .entry((call.scope.as_str(), call.callee.as_str()))
-                .and_modify(|n| *n += 1)
-                .or_insert(0);
-            let caller = if call.scope.is_empty() {
+            let scope = names.scope(path, &call.scope);
+            let caller = if scope.is_empty() {
                 base.clone()
             } else {
-                format!("{base}::{}", call.scope)
+                format!("{base}::{scope}")
             };
+            let ordinal = ordinals
+                .entry((scope, call.callee.as_str()))
+                .and_modify(|n| *n += 1)
+                .or_insert(0);
             let id = format!("{caller}::{}#{ordinal}", call.callee);
             (caller, id)
         })
         .collect()
 }
 
-/// The call rows of one file, in source order.
+/// The symbol and call rows of one file, in source order.
 fn resolve_file<'a>(
     identity: &str,
     path: &'a str,
     facts: &'a Facts,
     resolver: &Resolver<'a>,
-) -> Vec<Resolved> {
-    let id = |t: &Target| format!("{identity}::{}::{}", t.path, t.name);
-    facts
+    names: &Names,
+) -> Rows {
+    let id = |t: &Target| {
+        let name = names.def(t.path, t.name).unwrap_or_else(|| t.name.into());
+        format!("{identity}::{}::{name}", t.path)
+    };
+    let symbols = facts
+        .defs
+        .iter()
+        .filter_map(|def| {
+            let name = names.def(path, &def.name)?;
+            let id = format!("{identity}::{path}::{name}");
+            Some((id, def.range.start as i64, def.range.end as i64))
+        })
+        .collect();
+    let calls = facts
         .calls
         .iter()
-        .zip(call_ids(identity, path, facts))
+        .zip(call_ids(identity, path, facts, names))
         .map(|(call, (caller, call_id))| {
             let (target, level, candidates) = match resolver.call(path, call) {
                 Resolution::Exact(t) => (Some(id(&t)), Some("exact"), Vec::new()),
@@ -457,7 +521,8 @@ fn resolve_file<'a>(
                 candidates,
             }
         })
-        .collect()
+        .collect();
+    Rows { symbols, calls }
 }
 
 /// `path` relative to `root` with `/` separators; `None` for non-UTF-8 paths.

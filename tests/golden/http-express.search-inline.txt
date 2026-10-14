@@ -1,0 +1,3 @@
+example.com/acme/backend src/routes/users.ts:9 register.GET /api/users
+example.com/acme/backend src/routes/users.ts:11 register.GET /api/users/{}
+example.com/acme/backend src/routes/users.ts:13 register.GET /api/users/{}#1

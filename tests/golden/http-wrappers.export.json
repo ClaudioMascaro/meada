@@ -1,0 +1,221 @@
+{
+  "repository": "example.com/acme/admin",
+  "files": [
+    {
+      "path": "src/http.ts",
+      "hash": "bfe5eb4c62fabec37685e7d5d7d46cf088cd2e5af62a5203c4b4fbc9632b1a66"
+    },
+    {
+      "path": "src/users.ts",
+      "hash": "4dc5ac5882d1fcbf2c0443422dccca715128731a8064dfd6ec6bb7f7b3dbca8c"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/admin::src/http.ts::backoff",
+      "span": {
+        "path": "src/http.ts",
+        "start": 610,
+        "end": 698
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::get",
+      "span": {
+        "path": "src/http.ts",
+        "start": 263,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::remove",
+      "span": {
+        "path": "src/http.ts",
+        "start": 326,
+        "end": 393
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::request",
+      "span": {
+        "path": "src/http.ts",
+        "start": 127,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::retry",
+      "span": {
+        "path": "src/http.ts",
+        "start": 478,
+        "end": 608
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::deleteUser",
+      "span": {
+        "path": "src/users.ts",
+        "start": 237,
+        "end": 309
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsers",
+      "span": {
+        "path": "src/users.ts",
+        "start": 110,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsersPatiently",
+      "span": {
+        "path": "src/users.ts",
+        "start": 385,
+        "end": 451
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/admin::src/http.ts::backoff::retry#0",
+      "caller": "example.com/acme/admin::src/http.ts::backoff",
+      "target": "example.com/acme/admin::src/http.ts::retry",
+      "level": "exact",
+      "span": {
+        "path": "src/http.ts",
+        "start": 670,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::get::request#0",
+      "caller": "example.com/acme/admin::src/http.ts::get",
+      "target": "example.com/acme/admin::src/http.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/http.ts",
+        "start": 301,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::remove::request#0",
+      "caller": "example.com/acme/admin::src/http.ts::remove",
+      "target": "example.com/acme/admin::src/http.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/http.ts",
+        "start": 367,
+        "end": 390
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::request::fetch#0",
+      "caller": "example.com/acme/admin::src/http.ts::request",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/http.ts",
+        "start": 185,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::retry::backoff#0",
+      "caller": "example.com/acme/admin::src/http.ts::retry",
+      "target": "example.com/acme/admin::src/http.ts::backoff",
+      "level": "exact",
+      "span": {
+        "path": "src/http.ts",
+        "start": 570,
+        "end": 593
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/http.ts::retry::get#0",
+      "caller": "example.com/acme/admin::src/http.ts::retry",
+      "target": "example.com/acme/admin::src/http.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/http.ts",
+        "start": 596,
+        "end": 605
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
+      "caller": "example.com/acme/admin::src/users.ts::deleteUser",
+      "target": "example.com/acme/admin::src/http.ts::remove",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 280,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsers::get#0",
+      "caller": "example.com/acme/admin::src/users.ts::listUsers",
+      "target": "example.com/acme/admin::src/http.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 142,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
+      "caller": "example.com/acme/admin::src/users.ts::listUsersPatiently",
+      "target": "example.com/acme/admin::src/http.ts::retry",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 426,
+        "end": 448
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::DELETE::/api/users/{}",
+      "site": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
+      "via": "env:BACKEND_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/admin::src/users.ts::listUsers::get#0",
+      "via": "env:BACKEND_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
+      "via": "env:BACKEND_URL"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
+      "provider": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "contract": "http::DELETE::/api/users/{}",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsers::get#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    }
+  ]
+}

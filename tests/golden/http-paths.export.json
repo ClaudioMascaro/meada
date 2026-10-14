@@ -1,0 +1,119 @@
+{
+  "repository": "example.com/acme/paths",
+  "files": [
+    {
+      "path": "src/index.ts",
+      "hash": "8c322a510f8b0c0997ebca0155db1eaa87d9fd59a841fc199ee086b242d8d205"
+    },
+    {
+      "path": "src/routes.ts",
+      "hash": "81aa92809ed2f2f56228979829cd7f9446ac2f206c973ef7e4142ffc7ada20b0"
+    },
+    {
+      "path": "src/users.ts",
+      "hash": "0fb22e3b5df080ef5edc7eefbd3a5f34188a23df3640abfbb89e8cfabeb19256"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/paths::src/users.ts::firstPage",
+      "span": {
+        "path": "src/users.ts",
+        "start": 502,
+        "end": 616
+      }
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::getUser",
+      "span": {
+        "path": "src/users.ts",
+        "start": 362,
+        "end": 424
+      }
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::listUsers",
+      "span": {
+        "path": "src/users.ts",
+        "start": 205,
+        "end": 269
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/paths::src/users.ts::firstPage::fetch#0",
+      "caller": "example.com/acme/paths::src/users.ts::firstPage",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 584,
+        "end": 613
+      }
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::getUser::fetch#0",
+      "caller": "example.com/acme/paths::src/users.ts::getUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 398,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::listUsers::fetch#0",
+      "caller": "example.com/acme/paths::src/users.ts::listUsers",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 243,
+        "end": 266
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/paths::src/users.ts::firstPage::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/api/users/{}",
+      "site": "example.com/acme/paths::src/users.ts::getUser::fetch#0",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/paths::src/users.ts::listUsers::fetch#0",
+      "via": "host:api.example.com"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/paths::src/users.ts::firstPage::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/paths::src/users.ts::getUser::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/[id]/route.ts::GET",
+      "contract": "http::GET::/api/users/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/paths::src/users.ts::listUsers::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/acme/api"
+    }
+  ]
+}

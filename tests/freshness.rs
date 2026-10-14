@@ -167,3 +167,76 @@ fn context_refreshes_when_the_span_hash_no_longer_matches() {
         &engine.context("add", None).unwrap(),
     );
 }
+
+/// Repositories whose contracts read values from other files: path constants (`http-paths`,
+/// with its provider `http-api`), client wrappers (`http-wrappers`) and Express mounts
+/// (`http-express`, whose inline handlers are named by the mounts above them).
+fn values(case: &str) -> [PathBuf; 3] {
+    fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"));
+    [
+        fixture_repo(
+            case,
+            "http-paths",
+            Some("https://example.com/acme/paths.git"),
+        ),
+        fixture_repo(
+            case,
+            "http-wrappers",
+            Some("https://example.com/acme/admin.git"),
+        ),
+        fixture_repo(
+            case,
+            "http-express",
+            Some("https://example.com/acme/backend.git"),
+        ),
+    ]
+}
+
+/// Edits only the files that hold values: a constant other files import, a wrapper's default
+/// method, and the mount prefix that names the inline handlers of another file.
+fn edit_values([paths, admin, backend]: &[PathBuf; 3]) {
+    let replace = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    replace(
+        paths.join("src/routes.ts"),
+        "\"/api/users\"",
+        "\"/api/v2/users\"",
+    );
+    replace(
+        admin.join("src/http.ts"),
+        "method = \"GET\"",
+        "method = \"POST\"",
+    );
+    replace(backend.join("src/server.ts"), "\"/api\"", "\"/v1\"");
+}
+
+#[test]
+fn contracts_follow_values_edited_in_other_files() {
+    let repos = values("fresh_values");
+    let exports = |repos: &[PathBuf; 3]| -> Vec<String> {
+        repos
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    repos.iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_values(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = values("fresh_values_cold");
+    edit_values(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}

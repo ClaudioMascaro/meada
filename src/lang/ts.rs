@@ -4,7 +4,10 @@ use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
 
-use super::{Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Part, Value};
+use super::{
+    Call, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, Part,
+    Value,
+};
 use crate::Result;
 
 pub struct TsJs;
@@ -45,6 +48,7 @@ impl LanguagePack for TsJs {
             if let Some((name, kind, range)) = definition(node, binding, src) {
                 inner = qualify(&scope, &name);
                 facts.defs.push(Def {
+                    params: params(node, src, &inner),
                     name: inner.clone(),
                     kind,
                     range,
@@ -60,7 +64,7 @@ impl LanguagePack for TsJs {
                             args: node
                                 .child_by_field_name("arguments")
                                 .filter(|a| a.kind() == "arguments")
-                                .map(|a| named(a).map(|arg| value(arg, src)).collect())
+                                .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
                                 .unwrap_or_default(),
                         });
                     }
@@ -70,6 +74,16 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src);
+            if node.kind() == "variable_declarator"
+                && let Some((value_node, name, _)) = &named
+                && !FUNCTIONS.contains(&value_node.kind())
+                && !matches!(value_node.kind(), "class")
+            {
+                facts.consts.push(Const {
+                    name: qualify(&scope, name),
+                    value: value(*value_node, src, &scope),
+                });
+            }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();
             stack.extend(children.into_iter().rev().map(|child| {
                 Visit {
@@ -266,13 +280,71 @@ fn definition(
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
         // Methods of object literals are not definitions: only those of a class body.
         "method_definition" if node.parent()?.kind() == "class_body" => (Kind::Method, own()?),
-        "arrow_function" | "function_expression" | "function" | "generator_function" => {
-            (Kind::Function, binding?)
-        }
+        kind if FUNCTIONS.contains(&kind) => match binding {
+            Some(binding) => (Kind::Function, binding),
+            None if node.parent()?.kind() == "arguments" => {
+                (Kind::Inline, (inline(node), node.byte_range()))
+            }
+            None => return None,
+        },
         "class" => (Kind::Class, binding?),
         _ => return None,
     };
     Some((name, kind, range))
+}
+
+/// The kinds of anonymous function expressions.
+const FUNCTIONS: &[&str] = &[
+    "arrow_function",
+    "function_expression",
+    "function",
+    "generator_function",
+];
+
+/// The last name segment of the `Kind::Inline` definition an anonymous function argument
+/// makes.
+fn inline(node: Node) -> String {
+    format!("@{}", node.start_byte())
+}
+
+/// The parameters of a function `node`; `scope` is the function's own qualified name, where
+/// default values are read.
+fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
+    let Some(list) = node
+        .child_by_field_name("parameters")
+        .or_else(|| node.child_by_field_name("parameter"))
+    else {
+        return Vec::new();
+    };
+    if list.kind() == "identifier" {
+        return vec![Param {
+            name: text(list, src).to_string(),
+            default: None,
+        }];
+    }
+    named(list)
+        .filter(|p| p.kind() != "comment")
+        .map(|p| {
+            let (pattern, default) = match p.kind() {
+                "required_parameter" | "optional_parameter" => (
+                    p.child_by_field_name("pattern"),
+                    p.child_by_field_name("value"),
+                ),
+                "assignment_pattern" => (
+                    p.child_by_field_name("left"),
+                    p.child_by_field_name("right"),
+                ),
+                _ => (Some(p), None),
+            };
+            Param {
+                name: pattern
+                    .filter(|n| n.kind() == "identifier")
+                    .map_or("", |n| text(n, src))
+                    .to_string(),
+                default: default.map(|d| value(d, src, scope)),
+            }
+        })
+        .collect()
 }
 
 /// The child of `node` that a binding names, with that name and the binding's span:
@@ -404,26 +476,48 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
-/// What an argument expression is, as far as its own syntax tells.
-fn value(node: Node, src: &[u8]) -> Value {
-    if node.kind() == "object" {
-        // `{ method }` and `{ ...init }` hold values the call does not show.
-        let properties = named(node).filter_map(|property| match property.kind() {
-            "pair" => {
-                let key = property.child_by_field_name("key")?;
-                let key = match key.kind() {
-                    "string" => unquote(key, src),
-                    _ => text(key, src).to_string(),
-                };
-                Some((key, value(property.child_by_field_name("value")?, src)))
-            }
-            "shorthand_property_identifier" => Some((text(property, src).into(), Value::Unknown)),
-            "spread_element" => Some(("...".into(), Value::Unknown)),
-            _ => None,
-        });
-        return Value::Object(properties.collect());
+/// What an expression is, as far as its own syntax tells; `scope` is the qualified name of
+/// the enclosing definition.
+fn value(node: Node, src: &[u8], scope: &str) -> Value {
+    match node.kind() {
+        "object" => {
+            let properties = named(node).filter_map(|property| match property.kind() {
+                "pair" => {
+                    let key = property.child_by_field_name("key")?;
+                    let key = match key.kind() {
+                        "string" => unquote(key, src),
+                        _ => text(key, src).to_string(),
+                    };
+                    let value = value(property.child_by_field_name("value")?, src, scope);
+                    Some((key, value))
+                }
+                "shorthand_property_identifier" => {
+                    let name = text(property, src).to_string();
+                    Some((name.clone(), Value::Ref(name)))
+                }
+                "spread_element" => {
+                    let spread = named(property).next()?;
+                    Some(("...".into(), value(spread, src, scope)))
+                }
+                _ => None,
+            });
+            Value::Object(properties.collect())
+        }
+        "identifier" if text(node, src) == "undefined" => Value::Undefined,
+        "identifier" => Value::Ref(text(node, src).to_string()),
+        kind if FUNCTIONS.contains(&kind)
+            && node.parent().is_some_and(|p| p.kind() == "arguments") =>
+        {
+            Value::Function(qualify(scope, &inline(node)))
+        }
+        kind => match parts(node, src) {
+            Some(parts) => Value::Str(parts),
+            None if kind == "call_expression" => node
+                .child_by_field_name("function")
+                .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
+            None => Value::Unknown,
+        },
     }
-    parts(node, src).map_or(Value::Unknown, Value::Str)
 }
 
 /// A string expression folded into literal text, environment reads and holes; `None` when
@@ -463,6 +557,9 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
                 }
                 _ => None,
             }
+        }
+        "identifier" if text(node, src) != "undefined" => {
+            Some(vec![Part::Ref(text(node, src).to_string())])
         }
         "parenthesized_expression"
         | "non_null_expression"

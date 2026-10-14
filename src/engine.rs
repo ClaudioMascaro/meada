@@ -147,11 +147,15 @@ impl Engine {
                     }
                 };
                 let mut files = Files::new(&member.root);
-                let provided = export.providers.iter().map(|p| (&p.contract, &p.site));
-                let consumed = export
-                    .consumers
+                let provided = export
+                    .providers
                     .iter()
-                    .filter_map(|c| Some((c.contract.as_ref()?, &c.site)));
+                    .map(|p| (p.contract.clone(), &p.site));
+                // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
+                let consumed = export.consumers.iter().map(|c| {
+                    let contract = c.contract.clone();
+                    (contract.unwrap_or_else(|| unresolved(&c.site)), &c.site)
+                });
                 for (contract, site) in provided.chain(consumed) {
                     let Some(r) = rank(&contract.to_lowercase(), &needle) else {
                         continue;
@@ -231,7 +235,36 @@ impl Engine {
             )]
         }));
         lines.extend(self.relations(&export, &mut files, &symbol_found.id));
+        lines.extend(self.contracts(&export, &mut files, symbol_found));
         Ok(render::budgeted(&lines, budget))
+    }
+
+    /// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
+    /// ones included; nothing when it has none.
+    fn contracts(&self, export: &Export, files: &mut Files, symbol: &Symbol) -> Vec<String> {
+        let mut lines: Vec<String> = export
+            .providers
+            .iter()
+            .filter(|p| p.site == symbol.id)
+            .map(|p| self.line(files, symbol, &format!("provides {}", p.contract)))
+            .collect();
+        for consumer in &export.consumers {
+            let Some(call) = export
+                .calls
+                .iter()
+                .find(|c| c.id == consumer.site && c.caller == symbol.id)
+            else {
+                continue;
+            };
+            let location = self.at(files, &call.span.path, call.span.start);
+            let contract = consumer.contract.clone();
+            let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
+            lines.push(format!("{} {location} consumes {contract}", self.identity));
+        }
+        if lines.is_empty() {
+            return lines;
+        }
+        section("contracts", lines)
     }
 
     /// The span's lines, or `None` when its file no longer has the indexed hash.
@@ -421,6 +454,14 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
 /// The name part of a symbol identity: `<repository>::<path>::<name>`.
 fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)
+}
+
+/// How an unresolved consumer shows: `(unresolved) fetch` for the call site
+/// `<caller>::fetch#<ordinal>`.
+fn unresolved(site: &str) -> String {
+    let callee = label(site);
+    let callee = callee.rsplit_once('#').map_or(callee, |(name, _)| name);
+    format!("(unresolved) {callee}")
 }
 
 /// Source files read once per answer.

@@ -1,4 +1,4 @@
-// Consumers that stay unlinked.
+// Consumers that stay unlinked, and two that only the unresolved-host rule links.
 
 // Unresolved: the URL is not written at the call.
 export async function dynamic(url: string) {
@@ -15,7 +15,7 @@ export async function logo() {
   return fetch("https://cdn.example.com/assets/logo.png");
 }
 
-// The variable is no peer's `base_url_env`.
+// inferred: the variable is no peer's `base_url_env`, and one repository serves the route.
 export async function other() {
   return fetch(`${process.env.OTHER_URL}/api/users`);
 }
@@ -25,7 +25,7 @@ export async function invoices() {
   return fetch(`${process.env.BILLING_URL}/invoices`);
 }
 
-// A relative URL names no repository.
+// inferred: a relative URL names no repository, and one repository serves the route.
 export async function local() {
   return fetch("/api/users");
 }

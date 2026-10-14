@@ -234,6 +234,20 @@
   "consumers": [],
   "links": [
     {
+      "consumer": "example.com/acme/web::src/unlinked.ts::local::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/unlinked.ts::other::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from OTHER_URL, no peer's base_url_env; the only repository serving it is example.com/acme/api"
+    },
+    {
       "consumer": "example.com/acme/web::src/users.ts::createUser::fetch#0",
       "provider": "example.com/acme/api::app/api/users/route.ts::POST",
       "contract": "http::POST::/api/users",
