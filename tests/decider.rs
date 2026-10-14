@@ -4,8 +4,11 @@
 
 mod common;
 
+use std::fs;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
+
+use meada::engine::Engine;
 
 use common::stub::{Reply, Stub};
 use common::{assert_golden, chain, fixture_repo};
@@ -241,7 +244,8 @@ fn a_failed_request_is_reported_with_its_item() {
         Some(&stub),
     );
 
-    assert!(ok, "{stderr}");
+    assert!(!ok);
+    assert!(stderr.contains("2 item(s) failed"), "{stderr}");
     assert!(
         stdout.contains(
             "example.com/chain/web::src/status.ts::health::fetch#0\n\
@@ -436,4 +440,293 @@ async fn the_mcp_server_never_reaches_the_decider() {
     client.cancel().await.unwrap();
 
     assert!(stub.requests().is_empty());
+}
+
+const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
+const TRACK: &str = "example.com/chain/web::src/status.ts::track::fetch#0";
+
+fn answer(choice: &str, probability: f64) -> serde_json::Value {
+    serde_json::json!({"choice": choice, "probability": probability})
+}
+
+fn written(repo: &Path) -> Option<String> {
+    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
+}
+
+#[test]
+fn chat_answers_are_written_with_the_response_model_and_p_and_replayed_as_decided_links() {
+    let (web, _, _) = chain("decider_write");
+    // The health check is the second candidate (gateway); the tracking URL the first (catalog).
+    // The response names a dated model id, which is the one recorded.
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model-2026", answer("2", 0.9)),
+        Reply::chat("local/test-model-2026", answer("1", 0.62)),
+    ]);
+
+    let (stdout, stderr, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decider.chat.en.txt", &stdout);
+    let file = written(&web).expect("the file is written");
+    assert_golden("chain-web.decisions.chat.toml", &file);
+    // A cold index of the chain with the file gives the decided export.
+    let (cold, _, _) = chain("decider_write_cold");
+    fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
+    let export = Engine::open(&cold).unwrap().export().unwrap();
+    assert_golden("chain-web.decided-chat.export.json", &export);
+}
+
+/// The `chat` answer whose message content is `content`, as the model's text.
+fn raw(content: &str) -> Reply {
+    Reply::ok(serde_json::json!({
+        "model": "local/test-model",
+        "choices": [{"message": {"role": "assistant", "content": content}}],
+    }))
+}
+
+#[test]
+fn a_malformed_answer_fails_its_item_alone_and_the_others_are_still_written() {
+    let valid = || Reply::chat("local/test-model", answer("1", 0.8));
+    let cases = [
+        ("not json", Reply::status(200, "<html>"), "unreadable"),
+        (
+            "no choices",
+            Reply::ok(serde_json::json!({"choices": []})),
+            "no choices",
+        ),
+        (
+            "no content",
+            Reply::ok(serde_json::json!({"choices": [{"message": {}}]})),
+            "unreadable",
+        ),
+        ("prose", raw("I think the second one."), "unreadable"),
+        (
+            "no choice",
+            raw(r#"{"probability": 0.9}"#),
+            "missing field `choice`",
+        ),
+        (
+            "no probability",
+            raw(r#"{"choice": "1"}"#),
+            "missing field `probability`",
+        ),
+        (
+            "text probability",
+            raw(r#"{"choice": "1", "probability": "high"}"#),
+            "unreadable",
+        ),
+        (
+            "unoffered key",
+            Reply::chat("local/test-model", answer("3", 0.9)),
+            "choice `3` is not one of the offered keys (1, 2)",
+        ),
+        (
+            "probability above one",
+            Reply::chat("local/test-model", answer("1", 1.5)),
+            "probability 1.5 is not between 0 and 1",
+        ),
+        (
+            "negative probability",
+            Reply::chat("local/test-model", answer("1", -0.1)),
+            "probability -0.1 is not between 0 and 1",
+        ),
+        (
+            "model id human",
+            Reply::chat("human", answer("1", 0.9)),
+            "model id \"human\" cannot be recorded",
+        ),
+        (
+            "model id with control characters",
+            Reply::chat("evil\u{1b}[2J", answer("1", 0.9)),
+            "model id \"evil\\u{1b}[2J\" cannot be recorded",
+        ),
+    ];
+
+    for (name, bad, reason) in cases {
+        let (web, _, _) = chain(&format!("decider_bad_{}", name.replace(' ', "_")));
+        let stub = Stub::start(vec![bad, valid()]);
+
+        let (stdout, stderr, ok) = meada(
+            &web,
+            &["decide", "--decider"],
+            &chat(&stub),
+            "",
+            Some(&stub),
+        );
+
+        assert!(!ok, "{name}");
+        assert!(stderr.contains("1 item(s) failed"), "{name}: {stderr}");
+        let report = format!("{HEALTH}\ninvalid answer: ");
+        let at = stdout
+            .find(&report)
+            .unwrap_or_else(|| panic!("{name}: {stdout}"));
+        assert!(
+            stdout[at + report.len()..].contains(reason),
+            "{name}: {stdout}"
+        );
+        // Nothing for the failed item; the other item's decision is written.
+        let file = written(&web).unwrap_or_else(|| panic!("{name}: no file\n{stdout}"));
+        assert!(!file.contains(HEALTH), "{name}: {file}");
+        assert!(file.contains(TRACK), "{name}: {file}");
+        assert!(
+            stdout.contains("wrote 1 decision to meada.decisions.toml"),
+            "{name}: {stdout}"
+        );
+    }
+}
+
+#[test]
+fn a_response_with_no_model_id_is_recorded_under_the_configured_model() {
+    let (web, _, _) = chain("decider_model_fallback");
+    let content = answer("2", 0.7).to_string();
+    let no_model =
+        || Reply::ok(serde_json::json!({"choices": [{"message": {"content": content}}]}));
+    let stub = Stub::start(vec![no_model(), no_model()]);
+
+    let (_, stderr, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(ok, "{stderr}");
+    let file = written(&web).unwrap();
+    assert_eq!(
+        file.matches("by = \"local/test-model\"").count(),
+        2,
+        "{file}"
+    );
+}
+
+#[test]
+fn a_proposal_below_the_threshold_is_printed_as_a_suggestion_and_one_at_it_is_written() {
+    let (web, _, _) = chain("decider_threshold");
+    // 0.5 is the default threshold: the health check sits exactly on it, the tracking URL
+    // just below.
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model", answer("2", 0.5)),
+        Reply::chat("local/test-model", answer("1", 0.49)),
+    ]);
+
+    let (stdout, stderr, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decider.chat.suggestion.en.txt", &stdout);
+    let file = written(&web).unwrap();
+    assert!(file.contains(HEALTH) && !file.contains(TRACK), "{file}");
+}
+
+#[test]
+fn min_p_moves_the_threshold_and_values_outside_zero_to_one_are_errors() {
+    let (web, _, _) = chain("decider_min_p");
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model", answer("2", 0.8)),
+        Reply::chat("local/test-model", answer("1", 0.79)),
+    ]);
+
+    let mut args = vec!["decide", "--decider", "--min-p", "0.8"];
+    let (stdout, stderr, ok) = meada(&web, &args, &chat(&stub), "", Some(&stub));
+    assert!(ok, "{stderr}");
+    assert!(stdout.contains("below --min-p 0.80"), "{stdout}");
+    let file = written(&web).unwrap();
+    assert!(file.contains(HEALTH) && !file.contains(TRACK), "{file}");
+
+    // Out of range or not a number: an error before any request.
+    let before = stub.requests().len();
+    for value in ["1.1", "-0.1", "nan", "inf"] {
+        args[3] = value;
+        let (stdout, stderr, ok) = meada(&web, &args, &chat(&stub), "", Some(&stub));
+        assert!(!ok && stdout.is_empty(), "{value}: {stdout}");
+        assert!(
+            stderr.starts_with("meada: `--min-p` must be a number from 0 to 1"),
+            "{value}: {stderr}"
+        );
+    }
+    assert_eq!(stub.requests().len(), before);
+}
+
+#[test]
+fn dry_run_sends_and_prints_the_proposals_and_leaves_the_file_alone() {
+    let (web, _, _) = chain("decider_dry");
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model", answer("2", 0.9)),
+        Reply::chat("local/test-model", answer("1", 0.2)),
+    ]);
+
+    let (stdout, stderr, ok) = meada(
+        &web,
+        &["decide", "--decider", "--dry-run"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(ok, "{stderr}");
+    assert_eq!(stub.requests().len(), 2);
+    assert!(
+        stdout.contains("proposed: ") && stdout.contains("suggestion, not written: "),
+        "{stdout}"
+    );
+    assert!(stdout.contains(&format!("call = \"{HEALTH}\"")), "{stdout}");
+    assert!(!stdout.contains(&format!("call = \"{TRACK}\"")), "{stdout}");
+    assert!(written(&web).is_none());
+}
+
+#[test]
+fn a_key_reflected_in_a_success_answer_reaches_no_output_and_no_file() {
+    let (web, _, _) = chain("decider_reflect");
+    // The first answer names the key as its model id, which would be recorded; the second
+    // has it as the probability, which a parse error would quote.
+    let stub = Stub::start(vec![
+        Reply::chat(KEY, answer("2", 0.9)),
+        Reply::ok(serde_json::json!({
+            "model": "local/test-model",
+            "choices": [{"message": {"content": format!(r#"{{"choice": "1", "probability": "{KEY}"}}"#)}}],
+        })),
+    ]);
+
+    // `meada` itself asserts that the key is in neither stream.
+    let (stdout, _, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(!ok);
+    assert!(stdout.contains("<hidden>"), "{stdout}");
+    let file = written(&web).unwrap();
+    assert!(
+        !file.contains(KEY) && file.contains("by = \"<hidden>\""),
+        "{file}"
+    );
+}
+
+#[test]
+fn min_p_is_validated_with_list_and_prune_too() {
+    let (web, _, _) = chain("decider_min_p_list");
+    for mode in ["--list", "--prune"] {
+        let args = ["decide", "--decider", mode, "--min-p", "7"];
+        let (_, stderr, ok) = meada(&web, &args, &[], "", None);
+        assert!(!ok, "{mode}");
+        assert!(
+            stderr.starts_with("meada: `--min-p` must be a number from 0 to 1"),
+            "{mode}: {stderr}"
+        );
+    }
 }

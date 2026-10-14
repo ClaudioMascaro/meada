@@ -73,6 +73,27 @@ pub enum Msg<'a> {
         max: usize,
     },
     DecideFailed(&'a str),
+    DecideProposal {
+        candidate: &'a str,
+        p: f64,
+        by: &'a str,
+    },
+    DecideSuggestion {
+        candidate: &'a str,
+        p: f64,
+        min_p: f64,
+    },
+    DecideInvalid(&'a str),
+    AnswerUnreadable(&'a str),
+    AnswerChoice {
+        choice: &'a str,
+        keys: &'a str,
+    },
+    AnswerProbability(f64),
+    AnswerBy(&'a str),
+    DecideMinP,
+    DecideMinPHelp,
+    DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
     DeciderHttps,
@@ -252,6 +273,48 @@ impl Msg<'_> {
             Msg::DecideFailed(error) => pick(
                 format!("request failed: {error}"),
                 format!("a requisição falhou: {error}"),
+            ),
+            Msg::DecideProposal { candidate, p, by } => pick(
+                format!("proposed: {candidate} (p={p:.2}, by {by})"),
+                format!("proposto: {candidate} (p={p:.2}, por {by})"),
+            ),
+            Msg::DecideSuggestion { candidate, p, min_p } => pick(
+                format!("suggestion, not written: {candidate} (p={p:.2}, below --min-p {min_p:.2})"),
+                format!(
+                    "sugestão, não gravada: {candidate} (p={p:.2}, abaixo de --min-p {min_p:.2})"
+                ),
+            ),
+            Msg::DecideInvalid(reason) => pick(
+                format!("invalid answer: {reason}"),
+                format!("resposta inválida: {reason}"),
+            ),
+            Msg::AnswerUnreadable(why) => pick(
+                format!("unreadable: {why}"),
+                format!("ilegível: {why}"),
+            ),
+            Msg::AnswerChoice { choice, keys } => pick(
+                format!("choice `{choice}` is not one of the offered keys ({keys})"),
+                format!("a escolha `{choice}` não é uma das chaves oferecidas ({keys})"),
+            ),
+            Msg::AnswerProbability(p) => pick(
+                format!("probability {p} is not between 0 and 1"),
+                format!("a probabilidade {p} não está entre 0 e 1"),
+            ),
+            Msg::AnswerBy(by) => pick(
+                format!("model id {by:?} cannot be recorded"),
+                format!("o id de modelo {by:?} não pode ser gravado"),
+            ),
+            Msg::DecideMinP => pick(
+                "`--min-p` must be a number from 0 to 1".into(),
+                "`--min-p` deve ser um número de 0 a 1".into(),
+            ),
+            Msg::DecideMinPHelp => pick(
+                format!("With --decider: write a model decision only from this probability up (default {}).", crate::decider::MIN_P),
+                format!("Com --decider: grava a decisão do modelo só a partir desta probabilidade (padrão {}).", crate::decider::MIN_P),
+            ),
+            Msg::DecideFailures(n) => pick(
+                format!("{n} item(s) failed, see above; the other decisions were handled"),
+                format!("{n} item(ns) falharam, veja acima; as demais decisões foram tratadas"),
             ),
             Msg::DeciderInvalid(var) => pick(
                 format!("`{var}` is not valid"),

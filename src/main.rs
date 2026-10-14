@@ -33,6 +33,8 @@ enum Command {
         decider: bool,
         #[arg(long, requires = "decider")]
         show_request: bool,
+        #[arg(long, requires = "decider", allow_negative_numbers = true)]
+        min_p: Option<f64>,
     },
 }
 
@@ -54,6 +56,7 @@ fn main() -> ExitCode {
                 .mut_arg("show_request", |a| {
                     a.help(Msg::DecideShowRequestHelp.text())
                 })
+                .mut_arg("min_p", |a| a.help(Msg::DecideMinPHelp.text()))
         })
         .get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
@@ -72,6 +75,7 @@ fn main() -> ExitCode {
             prune,
             decider,
             show_request,
+            min_p,
         } => Engine::open(here).and_then(|engine| {
             let options = decide::Options {
                 item,
@@ -80,6 +84,7 @@ fn main() -> ExitCode {
                 prune,
                 decider,
                 show_request,
+                min_p,
             };
             decide::run(
                 &engine,

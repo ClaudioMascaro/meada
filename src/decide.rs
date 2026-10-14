@@ -26,6 +26,8 @@ pub struct Options {
     pub decider: bool,
     /// Decider mode: print every request the run would send, and send none.
     pub show_request: bool,
+    /// Decider mode: write a model decision only from this probability up; `MIN_P` when unset.
+    pub min_p: Option<f64>,
 }
 
 /// The open items of this repository to work on, in id order; with `only`, that one item.
@@ -110,11 +112,13 @@ pub fn run(
     input: &mut impl BufRead,
     out: &mut impl Write,
 ) -> Result<()> {
+    // Checked whenever it is given, whatever else the run does.
+    let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
     if options.prune {
         return prune(engine, out);
     }
     let config = match options.decider && !options.list {
-        true => Some(decider::Config::from_env()?),
+        true => Some((decider::Config::from_env()?, min_p)),
         false => None,
     };
     let items = items(engine, options.item.as_deref())?;
@@ -125,17 +129,23 @@ pub fn run(
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
         return Ok(());
     }
-    let picks = match &config {
-        Some(config) => {
-            let picks = decider::run(config, engine.root(), &items, options.show_request, out)?;
-            if options.show_request {
+    let (picks, failed) = match &config {
+        Some((config, min_p)) => {
+            let (items, show) = (&items, options.show_request);
+            let outcome = decider::run(config, engine.root(), items, show, *min_p, out)?;
+            if show {
                 return Ok(());
             }
-            picks
+            (outcome.decisions, outcome.failed)
         }
-        None => ask(&items, input, out)?,
+        None => (ask(&items, input, out)?, 0),
     };
-    finish(engine, picks, options.dry_run, out)
+    finish(engine, picks, options.dry_run, out)?;
+    // The decisions of the other items are written; the status tells a script some failed.
+    match failed {
+        0 => Ok(()),
+        n => Err(Msg::DecideFailures(n).text().into()),
+    }
 }
 
 /// `--list`: the open items, then the stale decisions and those waiting on a missing peer.

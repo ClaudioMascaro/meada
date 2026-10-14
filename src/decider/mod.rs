@@ -8,6 +8,7 @@
 //! leaves it only as the `Authorization` header of a request on the wire.
 
 mod chat;
+mod validate;
 
 use std::env::VarError;
 use std::fs;
@@ -19,9 +20,10 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::Result;
-use crate::decisions::Decision;
+use crate::decisions::{Decision, Kind};
 use crate::engine::OpenItem;
 use crate::msg::Msg;
+use validate::Proposal;
 
 /// An item with more candidates than this is skipped in decider mode and reported as such; the
 /// excerpt would grow past what a judgment of one call needs. Human mode still offers it.
@@ -29,6 +31,11 @@ pub const MAX_CANDIDATES: usize = 50;
 
 /// How long one request may take, connection to last byte. There are no retries.
 const TIMEOUT: Duration = Duration::from_secs(120);
+
+/// A model decision is written when its `p` is at least this, unless `--min-p` says otherwise;
+/// below it the proposal is only printed, as a suggestion. Changed by a PR with data (ADR 0006).
+/// With `chat` the probability is the model's own report about itself, not a calibrated measure.
+pub const MIN_P: f64 = 0.5;
 
 /// What `--show-request` prints in place of the `Authorization` header value.
 const HIDDEN: &str = "<hidden>";
@@ -158,6 +165,10 @@ pub(crate) struct Question {
     /// `(key, description)` in candidate order: the key is the candidate's 1-based position,
     /// as a string; the description its repository identity, method and path.
     pub candidates: Vec<(String, String)>,
+    /// The kind of decision that resolves the item.
+    pub kind: Kind,
+    /// The `target` of the decision that picks each candidate, in candidate order.
+    pub targets: Vec<String>,
 }
 
 impl Question {
@@ -178,6 +189,8 @@ impl Question {
             candidates: (item.candidates.iter().enumerate())
                 .map(|(n, c)| ((n + 1).to_string(), crate::decide::describe(c)))
                 .collect(),
+            kind: Kind::of(item),
+            targets: item.candidates.iter().map(Decision::target).collect(),
         })
     }
 
@@ -222,6 +235,25 @@ impl Config {
         }
     }
 
+    /// What the configured protocol reads out of the success `body` of `request`: one result
+    /// per item of the request, in order, each a validated proposal or its error text.
+    fn answers(
+        &self,
+        request: &Request,
+        questions: &[Question],
+        body: &str,
+    ) -> Vec<Result<Proposal>> {
+        let asked = request
+            .items
+            .iter()
+            .filter_map(|id| questions.iter().find(|q| q.id == *id));
+        match self.protocol {
+            Protocol::Chat => asked.map(|q| chat::answer(self, q, body)).collect(),
+            // `requests` refuses this protocol until it lands, so no request reaches here.
+            Protocol::Decisions => Vec::new(),
+        }
+    }
+
     /// Prints `request` as it would leave the machine, with the key replaced by `HIDDEN`.
     fn show(&self, request: &Request, out: &mut impl Write) -> Result<()> {
         writeln!(out, "POST {}", request.url)?;
@@ -235,7 +267,10 @@ impl Config {
     }
 
     /// Sends `request` and returns the body of a success answer. The key goes only into the
-    /// `Authorization` header; no error message carries a header.
+    /// `Authorization` header; no error message carries a header. An endpoint that reflects
+    /// the key in its answer would put it in what is printed and recorded, so every
+    /// occurrence in the body (as is, and as JSON escapes it) becomes `HIDDEN` here, before
+    /// anything parses the body.
     fn send(&self, agent: &ureq::Agent, request: &Request) -> Result<String> {
         let mut call = agent
             .post(&request.url)
@@ -244,21 +279,31 @@ impl Config {
             call = call.header("Authorization", format!("Bearer {key}"));
         }
         let mut answer = call.send(request.body.to_string())?;
-        Ok(answer.body_mut().read_to_string()?)
+        let body = answer.body_mut().read_to_string()?;
+        Ok(match &self.key {
+            Some(key) => {
+                let escaped = serde_json::to_string(key)?;
+                body.replace(key, HIDDEN)
+                    .replace(&escaped[1..escaped.len() - 1], HIDDEN)
+            }
+            None => body,
+        })
     }
 }
 
 /// Decider mode over `items`: skips the items with no candidate or more than `MAX_CANDIDATES`
 /// and reports them, then prints the requests (`show_request`) or sends them in item order.
-/// Reading the answers into decisions belongs to the next ticket; until then the run returns
-/// none and reports each failed request with its items.
+/// Each answer is validated for its item alone: a proposal with `p` at least `min_p` is printed
+/// and returned to be written, a weaker one is printed as a suggestion, and a failed request
+/// or an invalid answer is printed under the item id and counted in `Outcome::failed`.
 pub(crate) fn run(
     config: &Config,
     root: &Path,
     items: &[OpenItem],
     show_request: bool,
+    min_p: f64,
     out: &mut impl Write,
-) -> Result<Vec<Decision>> {
+) -> Result<Outcome> {
     let mut questions = Vec::new();
     let mut skipped = false;
     for item in items {
@@ -284,7 +329,7 @@ pub(crate) fn run(
             }
             config.show(request, out)?;
         }
-        return Ok(Vec::new());
+        return Ok(Outcome::default());
     }
     let mut agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
@@ -295,12 +340,62 @@ pub(crate) fn run(
         agent = agent.proxy(None);
     }
     let agent: ureq::Agent = agent.build().into();
+    let mut outcome = Outcome::default();
     for request in &requests {
-        if let Err(e) = config.send(&agent, request) {
-            for id in &request.items {
-                writeln!(out, "{id}\n{}", Msg::DecideFailed(&e.to_string()).text())?;
+        let answers = match config.send(&agent, request) {
+            Ok(body) => config.answers(request, &questions, &body),
+            Err(e) => {
+                let failed = Msg::DecideFailed(&e.to_string()).text();
+                (request.items.iter())
+                    .map(|_| Err(failed.clone().into()))
+                    .collect()
+            }
+        };
+        for (id, answer) in request.items.iter().zip(answers) {
+            writeln!(out, "{id}")?;
+            match answer {
+                Ok(proposal) if proposal.p >= min_p => {
+                    let (candidate, p, by) =
+                        (&proposal.candidate, proposal.p, &proposal.decision.by);
+                    writeln!(out, "{}", Msg::DecideProposal { candidate, p, by }.text())?;
+                    outcome.decisions.push(proposal.decision);
+                }
+                Ok(proposal) => {
+                    let (candidate, p) = (&proposal.candidate, proposal.p);
+                    writeln!(
+                        out,
+                        "{}",
+                        Msg::DecideSuggestion {
+                            candidate,
+                            p,
+                            min_p
+                        }
+                        .text()
+                    )?;
+                }
+                Err(e) => {
+                    writeln!(out, "{e}")?;
+                    outcome.failed += 1;
+                }
             }
         }
     }
-    Ok(Vec::new())
+    Ok(outcome)
+}
+
+/// A `--min-p` value, which must be a probability.
+pub(crate) fn min_p(value: f64) -> Result<f64> {
+    match (0.0..=1.0).contains(&value) {
+        true => Ok(value),
+        false => Err(Msg::DecideMinP.text().into()),
+    }
+}
+
+/// What a decider run produced.
+#[derive(Default)]
+pub(crate) struct Outcome {
+    /// The decisions to write: model decisions with `p` at least the threshold.
+    pub decisions: Vec<Decision>,
+    /// How many items had a failed request or an invalid answer.
+    pub failed: usize,
 }
