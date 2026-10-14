@@ -1,0 +1,45 @@
+name: Caso de uso entre repositórios · Cross-repository use case · Caso de uso entre repositorios
+description: Um fio que atravessa mais de um repositório e que o Meada deveria seguir · A thread across more than one repository that Meada should follow · Un hilo que cruza más de un repositorio y que Meada debería seguir
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Escreva em português, español ou English. · Write in Portuguese, Spanish or English. · Escribe en portugués, español o inglés.
+
+        Use nomes neutros e não cole código privado. · Use neutral names and do not paste private code. · Usa nombres neutros y no pegues código privado.
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Cenário · Scenario · Escenario
+      description: Quais repositórios participam e o que um espera do outro · Which repositories take part and what each expects of the other · Qué repositorios participan y qué espera uno del otro
+      placeholder: |
+        repo-a (consumer) calls POST /orders in repo-b (provider).
+        repo-b publishes to the queue `order-created`, which repo-c consumes.
+    validations:
+      required: true
+  - type: dropdown
+    id: contract-kind
+    attributes:
+      label: Tipo de contrato · Contract kind · Tipo de contrato
+      multiple: true
+      options:
+        - Rota HTTP · HTTP route · Ruta HTTP
+        - Fila · Queue · Cola
+        - Pacote · Package · Paquete
+        - Recurso compartilhado · Shared resource · Recurso compartido
+        - Outro · Other · Otro
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: O que Meada deveria mostrar · What Meada should show · Qué debería mostrar Meada
+      description: A corrente (chain) esperada e o nível (level) que você esperaria para cada ligação · The expected chain and the level you would expect for each link · La cadena (chain) esperada y el nivel (level) que esperarías para cada enlace
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: O que acontece hoje · What happens today · Qué pasa hoy
+      description: O que Meada mostra hoje, ou deixa de mostrar · What Meada shows today, or fails to show · Qué muestra Meada hoy, o qué deja de mostrar
