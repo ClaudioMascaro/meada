@@ -27,7 +27,7 @@ that. Neither may enter indexing (invariant 1).
 - Indexing replays the file and gives the link the `decided` level. A model's output is an
   input artifact, never a step of the pipeline, so invariants 1 and 6 hold.
 - The decidable kinds through v1 are ambiguous links and dynamic URLs. Community names and
-  shape drift triage are not decidable.
+  shape drift triage are not decision kinds in v1.
 - Decisions apply as soon as they are written. There is no offline evaluation gate. Safety comes
   from three things: the deterministic core stays primary, the command is opt-in, and git
   history plus PR review cover the file. How decisions with a low `p` are treated is left to the

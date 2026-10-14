@@ -5,8 +5,8 @@
 
 ## Context
 
-Agents pay for every tool description on every turn, and three of the four projects in
-`docs/prior-art.md` ship 13 to 19 tools. Meada is also a Portuguese-first project (ADR 0001),
+Agents pay for every tool description on every turn, and comparable code-graph
+servers ship 13 to 19 tools. Meada is also a Portuguese-first project (ADR 0001),
 and its output is read both by agents and by people. This ADR fixes how many tools the MCP
 server has, what they return, and in which language.
 
@@ -14,7 +14,7 @@ server has, what they return, and in which language.
 
 ### Tools
 
-The MCP server has three tools and never writes (ADR 0002, invariant 4).
+The MCP server has three tools, and none of them writes (ADR 0002, invariant 4).
 
 - `search` finds a symbol, a route or a contract by name.
 - `context` describes one symbol: its span read from disk, its callers, its callees and its

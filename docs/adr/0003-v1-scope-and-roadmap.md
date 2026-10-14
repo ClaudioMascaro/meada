@@ -7,7 +7,7 @@
 
 ADR 0001 founded the project and ADR 0002 fixed its invariants. Neither says what Meada has to
 do, in what order, or when it counts as ready. Scoping only the first release would hide the
-work that makes Meada different from the projects in `docs/prior-art.md`: chains across
+work that makes Meada different from earlier code-graph tools: chains across
 repositories, decided links and shape drift. The scope was therefore set for v1 as a whole, and
 this ADR records it with its order and its acceptance numbers.
 
@@ -47,7 +47,7 @@ this ADR records it with its order and its acceptance numbers.
 - **Track C**: deterministic communities and processes.
 - At most two runs go at once, usually A and B. Each has its own integration branch and draft
   PR. Tracks touch disjoint directories.
-- Planning is pipelined: the next spec is grilled and ticketed while the current one is
+- Planning is pipelined: the next spec is planned and ticketed while the current one is
   implemented. A spec builds only on merged `main`.
 - The roadmap lives in this ADR. Each spec is written when its work starts. The v0.1 trunk is
   the first one.
@@ -70,7 +70,7 @@ Acceptance:
 - On the dogfood repositories, v0.1 links the five consumer calls of one repository and the
   three of another. A call whose URL comes from a runtime value is dynamic, so it waits for the
   decisions of track A.
-- On the 633-file TypeScript repository measured in `docs/prior-art.md`:
+- On a 633-file TypeScript repository measured on 2026-10-11:
 
   | Metric | Target |
   | --- | --- |
@@ -80,8 +80,7 @@ Acceptance:
   | Tool list | ≤ 1k tokens |
   | Default answer | ≤ 2k tokens |
 
-  The baseline is the measurement in `docs/prior-art.md` (CodeGraph: 7.4 s and 37 MB), plus
-  about 6k tokens per CodeGraph answer, measured the same day.
+  The baseline is CodeGraph on that repository: 7.4 s, 37 MB and about 6k tokens per answer.
 
 ## Considered options
 

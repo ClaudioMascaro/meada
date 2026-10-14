@@ -6,7 +6,7 @@
 ## Context
 
 A link that holds can still break: the provider stops returning a field that the consumer reads.
-Prior art does not report it (`docs/prior-art.md`, gap 3). Many repositories have no OpenAPI
+Prior art does not report it. Many repositories have no OpenAPI
 document, so comparing only against one would miss them. In the maintainer's private dogfood
 repositories, the provider validates with zod and the consumers mirror the response by hand.
 

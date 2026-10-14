@@ -7,7 +7,7 @@
 
 Meada keeps one index per repository (ADR 0002, invariant 5) and answers across several of them.
 Prior art stores source text on every node, which inflates the index, and goes stale as soon as
-the user edits a file (`docs/prior-art.md`, gaps 5 and 8). Decisions and links also have to
+the user edits a file. Decisions and links also have to
 survive unrelated edits (ADRs 0005 and 0006). This ADR fixes where the index lives, how it stays
 fresh, and how things in it are named.
 

@@ -17,14 +17,14 @@ through the contracts they share, answers over MCP. Rust, Apache-2.0.
 ## Clean room
 
 Meada covers ground that GitNexus (PolyForm Noncommercial) also covers. Build from Meada's own
-ADRs and specs and from `docs/prior-art.md`. GitNexus source, its npm `dist/` and its tuned
+ADRs and specs. GitNexus source, its npm `dist/` and its tuned
 constants stay out of this repo and out of your reading.
 
 ## Invariants
 
 The product invariants (no LLM or network in indexing; local-first, with a model only in the
-opt-in `meada decide` command; writes only inside its own index; an MCP server that never
-writes and stays compact; one index per repository; determinism) live in
+opt-in `meada decide` command; writes only inside its own index; a compact MCP server with no
+write tools; one index per repository; determinism) live in
 `docs/adr/0002-product-invariants.md`. A change that breaks one starts with a new ADR.
 
 ## Workflow

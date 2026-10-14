@@ -26,10 +26,11 @@ amended for it (2 and 4) and one was added (6).
 3. Meada writes only inside its own index directory. Changes to the user's files (agent
    instructions, editor configuration, hooks) happen only through an explicit command the user
    runs.
-4. The MCP server never writes. It exposes few tools and returns compact output under a default
-   token budget. A write tool needs a new ADR. Peers are local paths only: Meada never clones
-   or fetches a peer, so the network stays out of indexing. The one write an MCP call makes is
-   refreshing Meada's own index (invariant 3, ADR 0004).
+4. The MCP server has no tool that writes: it never changes the user's files, configuration or
+   decisions. Its only write is refreshing Meada's own index before it answers (invariant 3,
+   ADR 0004). It exposes few tools and returns compact output under a default token budget. A
+   write tool needs a new ADR. Peers are local paths only: Meada never clones or fetches a peer,
+   so the network stays out of indexing.
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file

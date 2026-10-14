@@ -6,7 +6,7 @@
 > coinciden, vale el original, y cualquier corrección a esta página es bienvenida.
 
 Meada lee tus repositorios, arma el mapa de quién llama a quién y cose un repositorio con otro
-a través de los contratos que comparten: rutas HTTP, colas, paquetes, variables de entorno. Los
+a través de los contratos que comparten: rutas HTTP, colas, paquetes, recursos compartidos. Los
 agentes de código, y también las personas, consultan ese mapa por MCP. Ninguna etapa de la
 indexación usa un LLM.
 
@@ -43,13 +43,12 @@ y decir con qué confianza se hizo cada conexión.
 - **Poco ruido para el agente.** Meada no escribe en tu `CLAUDE.md`, no instala hooks ni toca
   la configuración de tu editor sin un comando tuyo. Las respuestas son cortas.
 - **Crédito a quienes vinieron antes.** Meada aprende de GitNexus, CodeGraph,
-  codebase-memory-mcp y kivgraph. Lo que hace cada uno está en
-  [`docs/prior-art.md`](docs/prior-art.md).
+  codebase-memory-mcp y kivgraph.
 
 ## Cómo participar
 
-El proyecto está empezando, y el alcance de la primera versión se va a decidir de forma
-abierta. Ya puedes ayudar:
+El proyecto está empezando. El alcance de la v1 y el orden del trabajo están en el
+[ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md). Ya puedes ayudar:
 
 - abriendo una issue con tu caso de uso entre repositorios, en portugués, español o inglés;
 - revisando las traducciones: si el inglés o el español suenan raros, la corrección es

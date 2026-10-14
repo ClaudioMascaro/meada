@@ -6,7 +6,7 @@
 > disagree, it wins, and a fix to this page is welcome.
 
 Meada reads your repositories, maps who calls whom, and stitches one repository to the next
-through the contracts they share: HTTP routes, queues, packages, environment variables. Coding
+through the contracts they share: HTTP routes, queues, packages, shared resources. Coding
 agents, and people too, query that map over MCP. No step of indexing uses an LLM.
 
 > **Status:** under construction. There is nothing to install yet. The decisions made so far
@@ -41,13 +41,12 @@ how confident it is in each link.
 - **Little noise for the agent.** Meada does not write to your `CLAUDE.md`, install hooks or
   touch your editor configuration unless you run a command for it. Answers are short.
 - **Credit to those who came first.** Meada learns from GitNexus, CodeGraph,
-  codebase-memory-mcp and kivgraph. What each one does is in
-  [`docs/prior-art.md`](docs/prior-art.md).
+  codebase-memory-mcp and kivgraph.
 
 ## How to take part
 
-The project is just starting, and the scope of the first version will be decided in the open.
-You can already help:
+The project is just starting. The v1 scope and the order of work are in
+[ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md). You can already help:
 
 - open an issue describing your cross-repository use case, in Portuguese, Spanish or English;
 - review the translations: if the English or the Spanish sounds off, a fix is welcome;
