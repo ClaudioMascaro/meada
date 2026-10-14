@@ -73,7 +73,8 @@ configuration (for example Claude Code's `.mcp.json`):
 
 There are three tools, always in English, and none of them writes:
 
-- `search` finds a symbol, a route or a contract by name;
+- `search` finds a symbol, a route or a contract by name; with the kind `ambiguous` or
+  `unresolved`, it lists the open items (see Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
   contracts it touches;
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
@@ -88,14 +89,17 @@ and the tokens used.
 ## Decisions
 
 An ambiguous link (several providers serve the route) or a dynamic URL (the call builds its URL
-at run time) stays an open item: `meada search` lists it, with its candidates. You resolve it
-in human mode, or a model does if you ask.
+at run time) stays an open item. The MCP `search` tool, with the kind `ambiguous` or
+`unresolved`, lists these items with how many candidates each has, not the candidates;
+`meada decide --list` lists the items with their candidates. You resolve them in human mode, or
+a model does if you ask.
 
 - `meada decide` shows each open item of the repository, with numbered candidates; you pick a
   number, or `s` to skip. At the end it writes the picks to `meada.decisions.toml`, at the
   root. Nothing picked, nothing written.
-- `--item <id>` works on that item only (the id `meada search` prints); `--dry-run` prints the
-  file that would be written and writes nothing; `--list` prints the open items plus the stale
+- `--item <id>` works on that item only (the id `meada decide --list` or the `search` tool
+  prints), even one already decided, to redo its decision; `--dry-run` prints the file that
+  would be written and writes nothing; `--list` prints the open items plus the stale
   decisions and asks nothing; `--prune` removes the stale decisions (it does not combine with
   the previous three).
 - `--decider` swaps the person for a model (see below); `--show-request` (only with
@@ -157,8 +161,8 @@ Fixed constants:
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) and links repositories through HTTP contracts: `fetch` on the consuming
 side, Next.js (app router) and Express on the serving side. Each link has the level `exact`,
-`inferred` or `ambiguous`; a call whose URL cannot be resolved shows up as unresolved, never as
-a link. Not there yet: other languages, HTTP clients other than `fetch`, queues, packages and the
+`inferred`, `decided` or `ambiguous`; a call whose URL cannot be resolved shows up as
+unresolved and becomes a link only through a decision, at the level `decided`. Not there yet: other languages, HTTP clients other than `fetch`, queues, packages and the
 npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).
