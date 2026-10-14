@@ -59,7 +59,11 @@ fn config_errors_follow_lang() {
         "ts-basic",
         Some("https://example.com/acme/web.git"),
     );
-    fs::write(repo.join("meada.toml"), "[[resource]]\nkind = \"db\"\n").unwrap();
+    fs::write(
+        repo.join("meada.toml"),
+        "[serve]\ndocuments = [\"openapi.yaml\"]\n",
+    )
+    .unwrap();
     for (lang, name) in LANGS {
         assert_golden(
             &format!("cli.config.{name}.txt"),

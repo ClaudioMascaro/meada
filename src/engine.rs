@@ -14,7 +14,7 @@ use crate::msg::Msg;
 use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, decisions, index, items, render, repo, trace};
+use crate::{Result, decisions, http, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -96,7 +96,13 @@ impl Engine {
             .repos
             .iter()
             .enumerate()
-            .map(|(n, m)| index::export(&self.db, &schema(n), &m.identity))
+            .map(|(n, m)| {
+                let mut export = index::export(&self.db, &schema(n), &m.identity)?;
+                for p in &mut export.providers {
+                    p.gateway = http::gateway_path(&m.config.serve, &p.contract).map(|g| g.0);
+                }
+                Ok(export)
+            })
             .collect()
     }
 

@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::config::Serve;
 use crate::contract::{ContractKind, Found, Level, Link, Site};
 use crate::index::{Consumer, Provider};
 use crate::lang::{Export, Part, Value};
@@ -124,6 +125,12 @@ fn fragments(parts: &[Part]) -> Vec<String> {
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
 pub fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
+}
+
+/// The gateway path of the HTTP route `contract` under `serve`, with the reason (see
+/// `Serve::gateway_path`).
+pub fn gateway_path(serve: &Serve, contract: &str) -> Option<(String, String)> {
+    serve.gateway_path(route(contract)?.1)
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -451,18 +458,28 @@ impl ContractKind for Http {
             return Vec::new();
         };
         let via = consumer.via.as_deref();
-        let serving = providers.iter().filter(|(_, p)| p.contract == *contract);
+        // A route serves a consumer by its code path, or by its gateway path with the reason
+        // for the rewrite. The two never meet on one route: a gateway path differs from it.
+        let wanted = route(contract);
+        let serving = providers.iter().filter_map(|&(m, p)| {
+            if p.contract == *contract {
+                return Some((m, p, None));
+            }
+            let (method, _) = route(&p.contract)?;
+            let (path, reason) = gateway_path(&m.config.serve, &p.contract)?;
+            (wanted == Some((method, path.as_str()))).then_some((m, p, Some(reason)))
+        });
         let var = via.and_then(|v| v.strip_prefix("env:"));
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving.filter(|(m, _)| m.config.serves(host)).collect();
+                let fits = serving.filter(|(m, ..)| m.config.serves(host)).collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving
-                    .filter(|(m, _)| peers.contains(&m.identity.as_str()))
+                    .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
                     .collect();
                 (
                     fits,
@@ -473,7 +490,7 @@ impl ContractKind for Http {
                 // The host is unresolved: a relative URL, an unknown base, or a variable no
                 // peer names. Exactly one repository serving the route is enough.
                 let fits: Vec<_> = serving.collect();
-                let mut repos: Vec<&str> = fits.iter().map(|(m, _)| m.identity.as_str()).collect();
+                let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
                 repos.sort();
                 repos.dedup();
                 let why = match var {
@@ -488,18 +505,28 @@ impl ContractKind for Http {
             };
         let ambiguous = fits.len() > 1;
         fits.iter()
-            .map(|(repo, provider)| Link {
-                consumer: consumer.site.clone(),
-                provider: provider.site.clone(),
-                contract: contract.clone(),
-                level: if ambiguous { Level::Ambiguous } else { level },
-                reason: if ambiguous {
-                    format!("{} providers fit; {reason} {}", fits.len(), repo.identity)
-                } else {
-                    format!("{reason} {}", repo.identity)
-                },
-                by: None,
-                p: None,
+            .map(|(repo, provider, gateway)| {
+                // Through a gateway the link is inferred, whatever the consumer side gave.
+                let rewrite = gateway.as_ref().map(|g| format!(" ({g})"));
+                let rewrite = rewrite.as_deref().unwrap_or("");
+                Link {
+                    consumer: consumer.site.clone(),
+                    provider: provider.site.clone(),
+                    contract: contract.clone(),
+                    level: match (ambiguous, gateway) {
+                        (true, _) => Level::Ambiguous,
+                        (_, Some(_)) => Level::Inferred,
+                        _ => level,
+                    },
+                    reason: if ambiguous {
+                        let n = fits.len();
+                        format!("{n} providers fit; {reason} {}{rewrite}", repo.identity)
+                    } else {
+                        format!("{reason} {}{rewrite}", repo.identity)
+                    },
+                    by: None,
+                    p: None,
+                }
             })
             .collect()
     }

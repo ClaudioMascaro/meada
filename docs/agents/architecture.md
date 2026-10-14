@@ -104,8 +104,11 @@ give byte-identical output.
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config`
-  parses the v0.1 subset (`[[peer]]`, `[serve] hosts`) with `deny_unknown_fields`; keys track A
-  adds are listed in `LATER` so the error says "not in v0.1". `config::read<T>(root, name)` is the
+  parses the v0.1 subset (`[[peer]]`, `[serve] hosts`) plus `[serve] prefix` and `strip` (each
+  must start with `/`, normalized by `gateway_key`) with `deny_unknown_fields`; keys track A
+  adds later are listed in `LATER` so the error says "not in v0.1". `Serve::gateway_path(code
+  path) -> Option<(gateway path, reason)>` is the one gateway rule (spec #19); document routes
+  reuse it. `config::read<T>(root, name)` is the
   shared TOML reader (file, line and key in every error), also used for the decisions file;
   `Repository` carries both `config` and `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -142,7 +145,9 @@ give byte-identical output.
   parameter reading its names (`Param::fields`) off the literal object the caller passes.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
   `Names`. `http.rs` is the only kind: `fetch` consumers (also a call to a parameter defaulting to `fetch`), Next.js app-router and Express
-  providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
+  providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider). A route
+  matches by its code path and by its gateway path (`http::gateway_path`); a gateway match links
+  `inferred` with the rewrite in the reason. `Engine::exports` fills `Provider::gateway`.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
@@ -161,7 +166,8 @@ give byte-identical output.
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`. A path parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
+  `gateway` when `[serve]` rewrites its path. An unresolved
   consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
   and are left out of the export. A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
@@ -232,7 +238,7 @@ give byte-identical output.
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
+  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway` (gateway prefixes), `urls`
   (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, parse
   errors), `stale` (stale and waiting decisions in `status` and `export`), `decide` (the binary
   in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness`

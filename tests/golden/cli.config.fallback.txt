@@ -1,1 +1,1 @@
-meada: <repo>/meada.toml:1: `resource` is not in v0.1; track A adds it (resources and gateway)
+meada: <repo>/meada.toml:2: `serve.documents` is not in v0.1; the documents release of track A adds it (spec #21)

@@ -158,14 +158,19 @@ fn config_error(case: &str, toml: &str) -> String {
 fn invalid_config_errors_name_file_line_and_key() {
     for (case, toml, expected) in [
         (
-            "config_resource",
-            "[[peer]]\nrepo = \"example.com/acme/api\"\n\n[[resource]]\nkind = \"db\"\n",
-            "<repo>/meada.toml:4: `resource` is not in v0.1; track A adds it (resources and gateway)",
+            "config_documents",
+            "[serve]\nhosts = [\"api.example.com\"]\ndocuments = [\"openapi.yaml\"]\n",
+            "<repo>/meada.toml:3: `serve.documents` is not in v0.1; the documents release of track A adds it (spec #21)",
         ),
         (
             "config_prefix",
-            "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"/api\"\n",
-            "<repo>/meada.toml:3: `serve.prefix` is not in v0.1; track A adds it (resources and gateway)",
+            "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"api\"\n",
+            "<repo>/meada.toml:3: `serve.prefix`: `api` must start with `/`",
+        ),
+        (
+            "config_strip",
+            "[serve]\nstrip = \"v1/\"\n",
+            "<repo>/meada.toml:2: `serve.strip`: `v1/` must start with `/`",
         ),
         (
             "config_unknown",
