@@ -125,6 +125,23 @@ fn a_peer_without_remote_is_found_by_its_path_hint() {
     );
 }
 
+#[test]
+fn a_peer_without_remote_is_not_found_among_siblings() {
+    let case = "local_sibling";
+    let web = fixture_repo(case, "http-web", None);
+    fixture_repo(case, "http-api", None);
+    fs::write(
+        web.join("meada.toml"),
+        "[[peer]]\nrepo = \"local/http-api\"\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        engine::status(&web).unwrap(),
+        "local/http-web (.) not indexed\nmissing peer: local/http-api, named by local/http-web\n"
+    );
+}
+
 /// The error `Engine::open` gives for a repository whose `meada.toml` is `toml`, with the
 /// repository's path replaced by `<repo>`.
 fn config_error(case: &str, toml: &str) -> String {

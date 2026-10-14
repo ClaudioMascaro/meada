@@ -130,7 +130,8 @@ impl Finder {
     }
 
     /// The root of the peer `identity` named from the repository at `from`: at its `path`
-    /// hint, or among the clones next to `from`.
+    /// hint, or among the clones next to `from`. A repository with no remote (`local/<dir>`)
+    /// is only found at its hint: any clone may share its directory name.
     fn peer(&mut self, from: &Path, identity: &str, hint: Option<&str>) -> Option<PathBuf> {
         if let Some(hint) = hint {
             let dir = from.join(hint);
@@ -140,6 +141,9 @@ impl Finder {
             {
                 return Some(root);
             }
+        }
+        if identity.starts_with("local/") {
+            return None;
         }
         self.siblings(from)
             .into_iter()
