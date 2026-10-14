@@ -9,7 +9,19 @@ pub const DEFAULT_BUDGET: usize = 2_000;
 /// keeps the lines that fit and ends with a line saying where it stopped.
 pub fn budgeted(lines: &[String], budget: Option<usize>) -> String {
     let budget = budget.unwrap_or(DEFAULT_BUDGET);
-    let cap = budget * 4;
+    cut(lines, budget, budget).1
+}
+
+/// The estimated tokens of `text`: one per four bytes, rounded up.
+pub fn tokens(text: &str) -> usize {
+    text.len().div_ceil(4)
+}
+
+/// `lines` within `room` tokens, cut as `budgeted` cuts them, with the cut note naming
+/// `budget`, and how many lines it kept. `room` is below `budget` when the caller appends
+/// lines of its own.
+pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
+    let cap = room * 4;
     let all: usize = lines.iter().map(|l| l.len() + 1).sum();
     let note = |shown: usize| {
         format!(
@@ -37,5 +49,5 @@ pub fn budgeted(lines: &[String], budget: Option<usize>) -> String {
     if shown < lines.len() {
         out.push_str(&note(shown));
     }
-    out
+    (shown, out)
 }

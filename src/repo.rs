@@ -40,6 +40,88 @@ pub fn normalize_remote(url: &str) -> String {
     format!("{host}/{path}").trim_matches('/').to_lowercase()
 }
 
+/// What a path of the working tree changed against `HEAD`.
+pub enum Change {
+    /// Inclusive 1-based line ranges of the file as it is now; a deletion touches the line
+    /// before it.
+    Lines(Vec<(usize, usize)>),
+    /// An untracked file: all of it.
+    Untracked,
+}
+
+/// Every repository-relative path whose working-tree content differs from `HEAD`, tracked or
+/// untracked (ignored files are left out, deleted files too, since nothing of theirs is left).
+pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
+    // Explicit prefixes and no external diff, whatever the user's git configuration says.
+    let diff = run(
+        root,
+        &[
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "HEAD",
+            "--no-renames",
+            "--no-ext-diff",
+            "--no-color",
+            "--unified=0",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+        ],
+    )?;
+    let mut changes: Vec<(String, Change)> = Vec::new();
+    let mut header = false;
+    let mut path: Option<String> = None;
+    for line in diff.lines() {
+        if line.starts_with("diff --git ") {
+            header = true;
+            path = None;
+        } else if header && let Some(to) = line.strip_prefix("+++ ") {
+            // `/dev/null` for a deleted file. ponytail: a path git still quotes (a tab, a
+            // newline or a quote in the name) is skipped.
+            path = to.strip_prefix("b/").map(str::to_string);
+        } else if line.starts_with("@@ ") {
+            header = false;
+            let Some(path) = &path else { continue };
+            // `@@ -a,b +c,d @@`: `d` lines from line `c` on; `d` is 1 when left out.
+            let new = line.split_whitespace().nth(2).unwrap_or("+0");
+            let new = new.trim_start_matches('+');
+            let (start, count) = new.split_once(',').unwrap_or((new, "1"));
+            let start: usize = start.parse().unwrap_or(0);
+            let count: usize = count.parse().unwrap_or(1);
+            let range = match count {
+                0 => (start.max(1), start.max(1)),
+                n => (start, start + n - 1),
+            };
+            match changes.last_mut() {
+                Some((p, Change::Lines(ranges))) if p == path => ranges.push(range),
+                _ => changes.push((path.clone(), Change::Lines(vec![range]))),
+            }
+        }
+    }
+    let untracked = run(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    changes.extend(
+        untracked
+            .split('\0')
+            .filter(|p| !p.is_empty())
+            .map(|p| (p.to_string(), Change::Untracked)),
+    );
+    Ok(changes)
+}
+
+/// `git` in `dir`, its standard output, or its error output as the error.
+fn run(dir: &Path, args: &[&str]) -> Result<String> {
+    let out = Command::new("git").arg("-C").arg(dir).args(args).output()?;
+    if !out.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+        .into());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git")
         .arg("-C")

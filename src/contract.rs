@@ -22,6 +22,23 @@ pub enum Level {
     Ambiguous,
 }
 
+impl Level {
+    pub fn name(self) -> &'static str {
+        match self {
+            Level::Exact => "exact",
+            Level::Inferred => "inferred",
+            Level::Ambiguous => "ambiguous",
+        }
+    }
+
+    /// The level `name` names, as the index stores call levels.
+    pub fn parse(name: &str) -> Option<Self> {
+        [Level::Exact, Level::Inferred, Level::Ambiguous]
+            .into_iter()
+            .find(|l| l.name() == name)
+    }
+}
+
 /// A consumer call site linked to a provider symbol through a contract.
 #[derive(Serialize)]
 pub struct Link {

@@ -8,9 +8,9 @@ use rmcp::{
 };
 
 /// `meada mcp` in a fixture repository: the tools it lists stay within 1,000 tokens (one per
-/// four bytes of description and parameter schema, ADR 0008), and `search` answers.
+/// four bytes of description and parameter schema, ADR 0008), and `trace` answers.
 #[tokio::test]
-async fn serves_search_and_context_over_stdio_within_the_description_budget() {
+async fn serves_three_tools_over_stdio_within_the_description_budget() {
     let repo = fixture_repo(
         "mcp_smoke",
         "ts-basic",
@@ -27,7 +27,7 @@ async fn serves_search_and_context_over_stdio_within_the_description_budget() {
     let tools = client.list_all_tools().await.unwrap();
     let mut names: Vec<&str> = tools.iter().map(|t| &*t.name).collect();
     names.sort();
-    assert_eq!(names, ["context", "search"]);
+    assert_eq!(names, ["context", "search", "trace"]);
     let bytes: usize = tools
         .iter()
         .map(|t| {
@@ -43,8 +43,8 @@ async fn serves_search_and_context_over_stdio_within_the_description_budget() {
 
     let answer = client
         .call_tool(
-            CallToolRequestParams::new("search").with_arguments(
-                serde_json::json!({"query": "sum"})
+            CallToolRequestParams::new("trace").with_arguments(
+                serde_json::json!({"from": "sum", "direction": "down"})
                     .as_object()
                     .unwrap()
                     .clone(),
@@ -53,6 +53,10 @@ async fn serves_search_and_context_over_stdio_within_the_description_budget() {
         .await
         .unwrap();
     let text = answer.content.first().and_then(|c| c.as_text()).unwrap();
-    assert_eq!(text.text, "example.com/acme/web src/math.ts:5 sum\n");
+    assert_eq!(
+        text.text,
+        "example.com/acme/web src/math.ts:5 sum\n  example.com/acme/web src/math.ts:1 add\n\
+         chain: exact · 0 hops · 1 repos · 32 tokens\n"
+    );
     client.cancel().await.unwrap();
 }
