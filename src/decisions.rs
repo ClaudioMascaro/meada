@@ -75,11 +75,9 @@ impl TryFrom<Raw> for Decision {
 
     fn try_from(raw: Raw) -> std::result::Result<Self, String> {
         match (raw.by == "human", raw.p) {
-            (true, Some(_)) => return Err("`p` is for a model, not for `human`".into()),
-            (false, None) => return Err("`p` is missing for a model".into()),
-            (false, Some(p)) if !(0.0..=1.0).contains(&p) => {
-                return Err("`p` must be between 0 and 1".into());
-            }
+            (true, Some(_)) => return Err(Msg::DecisionPHuman.text()),
+            (false, None) => return Err(Msg::DecisionPMissing.text()),
+            (false, Some(p)) if !probability(p) => return Err(Msg::DecisionPRange.text()),
             _ => {}
         }
         Ok(Self {
@@ -90,6 +88,12 @@ impl TryFrom<Raw> for Decision {
             p: raw.p,
         })
     }
+}
+
+/// Whether `p` is a probability: a number in [0,1], so neither NaN nor infinite. The one check
+/// behind the file's `p`, a decider's answer and `--min-p`.
+pub(crate) fn probability(p: f64) -> bool {
+    (0.0..=1.0).contains(&p)
 }
 
 /// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
@@ -226,7 +230,7 @@ pub struct Waiting {
     pub peer: String,
 }
 
-/// What the decisions of one repository come to, once judged against the current index.
+/// What the decisions of one repository come to, once evaluated against the current index.
 #[derive(Debug)]
 pub struct Evaluation {
     pub repository: String,
@@ -236,38 +240,60 @@ pub struct Evaluation {
     pub waiting: Vec<Waiting>,
 }
 
-enum Verdict {
+impl Evaluation {
+    /// One line per stale decision, then one per waiting decision, as `status` and
+    /// `meada decide --list` print them.
+    pub fn lines(&self) -> impl Iterator<Item = String> {
+        let stale = self.stale.iter().map(|s| {
+            let (call, target, cause) = (&s.call, &s.target, s.cause);
+            Msg::StaleDecision {
+                call,
+                target,
+                cause,
+            }
+            .text()
+        });
+        let waiting = self.waiting.iter().map(|w| {
+            let (call, target, peer) = (&w.call, &w.target, &w.peer);
+            Msg::WaitingDecision { call, target, peer }.text()
+        });
+        stale.chain(waiting)
+    }
+}
+
+/// What a decision comes to against the current index.
+enum Fate {
     /// Links the call to this provider.
     Applies(String),
     Stale(Cause),
     Waiting(String),
 }
 
-/// Judges `d`, a decision of the repository whose index is `export`, against `core`, the
+/// Evaluates `d`, a decision of the repository whose index is `export`, against `core`, the
 /// workspace's links before any decision. The checks run in this order, the first that fails
 /// decides: the call is there, the target's repository is not a missing peer (the decision
 /// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
 /// consumer), the target is still served, and, for an ambiguous link, it is still among the
 /// link's candidates.
-fn judge(
+fn evaluate(
     d: &Decision,
     export: &Export,
     exports: &[Export],
     core: &[Link],
     missing: &[Missing],
-) -> Verdict {
+) -> Fate {
     let at = |l: &&Link| l.consumer == d.call && l.level == Level::Ambiguous;
     if !(export.calls.iter().any(|c| c.id == d.call)
         || export.consumers.iter().any(|c| c.site == d.call))
     {
-        return Verdict::Stale(Cause::CallGone);
+        return Fate::Stale(Cause::CallGone);
     }
     let target = d.target.split_once("::");
     // Without the peer the core cannot see its providers, so whether the item is open, or the
     // target served, is unknown: the decision waits.
     if let Some(peer) = target.and_then(|(identity, _)| missing.iter().find(|m| m.repo == identity))
     {
-        return Verdict::Waiting(peer.repo.clone());
+        return Fate::Waiting(peer.repo.clone());
     }
     let open = match d.kind {
         Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
@@ -276,10 +302,10 @@ fn judge(
         }
     };
     if !open {
-        return Verdict::Stale(Cause::ItemNotOpen);
+        return Fate::Stale(Cause::ItemNotOpen);
     }
     let Some((identity, contract)) = target else {
-        return Verdict::Stale(Cause::TargetGone);
+        return Fate::Stale(Cause::TargetGone);
     };
     // ponytail: a repository serving one contract from several sites links to the first by
     // site; the target names no site.
@@ -291,23 +317,23 @@ fn judge(
         .map(|p| &p.site)
         .min();
     let Some(provider) = provider else {
-        return Verdict::Stale(Cause::TargetGone);
+        return Fate::Stale(Cause::TargetGone);
     };
     match d.kind {
-        Kind::DynamicUrl => Verdict::Applies(provider.clone()),
+        Kind::DynamicUrl => Fate::Applies(provider.clone()),
         Kind::AmbiguousLink => {
             let prefix = format!("{identity}::");
             core.iter()
                 .filter(at)
                 .find(|l| l.contract == contract && l.provider.starts_with(&prefix))
-                .map_or(Verdict::Stale(Cause::NotCandidate), |l| {
-                    Verdict::Applies(l.provider.clone())
+                .map_or(Fate::Stale(Cause::NotCandidate), |l| {
+                    Fate::Applies(l.provider.clone())
                 })
         }
     }
 }
 
-/// Judges every repository's decisions against `links`, the workspace's links before
+/// Evaluates every repository's decisions against `links`, the workspace's links before
 /// decisions, and applies those that fit: each replaces the ambiguous link of its call, or
 /// adds the missing one, with a single link at the level `decided`. `exports` follow the workspace's repositories. Returns the links,
 /// sorted, and for each repository the decisions that did not apply. A stale decision or one
@@ -326,22 +352,25 @@ pub(crate) fn replay(
             waiting: Vec::new(),
         };
         for d in &repo.decisions.items {
-            let verdict = judge(d, export, exports, &links, &workspace.missing);
+            let fate = evaluate(d, export, exports, &links, &workspace.missing);
             let (call, target) = (d.call.clone(), d.target.clone());
-            match verdict {
-                Verdict::Applies(provider) => applied.push((d, provider)),
-                Verdict::Stale(cause) => evaluation.stale.push(Stale {
+            match fate {
+                Fate::Applies(provider) => applied.push((d, provider)),
+                Fate::Stale(cause) => evaluation.stale.push(Stale {
                     call,
                     target,
                     cause,
                 }),
-                Verdict::Waiting(peer) => evaluation.waiting.push(Waiting { call, target, peer }),
+                Fate::Waiting(peer) => evaluation.waiting.push(Waiting { call, target, peer }),
             }
         }
         evaluations.push(evaluation);
     }
     for (d, provider) in applied {
-        let (_, contract) = d.target.split_once("::").expect("a judged target has `::`");
+        let (_, contract) = d
+            .target
+            .split_once("::")
+            .expect("an evaluated target has `::`");
         links.retain(|l| !(l.consumer == d.call && l.level == Level::Ambiguous));
         links.push(d.link(&provider, contract));
     }

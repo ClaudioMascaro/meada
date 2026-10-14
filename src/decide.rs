@@ -8,7 +8,7 @@ use std::io::{BufRead, Write};
 use crate::Result;
 use crate::decider;
 use crate::decisions::{self, Decision};
-use crate::engine::{Candidate, Engine, OpenItem};
+use crate::engine::{Engine, OpenItem};
 use crate::msg::Msg;
 
 /// What the command line asked for.
@@ -30,16 +30,16 @@ pub struct Options {
     pub min_p: Option<f64>,
 }
 
-/// The open items of this repository to work on, in id order; with `only`, that one item.
+/// The open items of this repository to work on, in id order; with `only`, that one item,
+/// open or decided, so that a decision can be redone.
 pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>> {
-    let mut items = engine.local_items()?;
-    if let Some(id) = only {
-        items.retain(|i| i.id == id);
-        if items.is_empty() {
-            return Err(Msg::DecideUnknownItem(id).text().into());
-        }
+    let Some(id) = only else {
+        return engine.local_items();
+    };
+    match engine.local_item(id)? {
+        Some(item) => Ok(vec![item]),
+        None => Err(Msg::DecideUnknownItem(id).text().into()),
     }
-    Ok(items)
 }
 
 /// The item as `--list` and the prompt show it: id, location and call, then every candidate
@@ -48,17 +48,9 @@ fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
     for (n, c) in item.candidates.iter().enumerate() {
-        writeln!(out, "  {}) {}", n + 1, describe(c))?;
+        writeln!(out, "  {}) {}", n + 1, c.describe())?;
     }
     Ok(())
-}
-
-/// A candidate as a person or a decider sees it: repository identity, method and path.
-pub(crate) fn describe(c: &Candidate) -> String {
-    match c.method() {
-        "" => format!("{} {}", c.repository, c.contract),
-        method => format!("{} {method} {}", c.repository, c.path()),
-    }
 }
 
 /// Asks about each of `items` on `out` and reads the answers from `input`: a number picks that
@@ -163,26 +155,8 @@ fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()>
     if !here.stale.is_empty() || !here.waiting.is_empty() {
         writeln!(out)?;
     }
-    for s in &here.stale {
-        let (call, target, cause) = (&s.call, &s.target, s.cause);
-        writeln!(
-            out,
-            "{}",
-            Msg::StaleDecision {
-                call,
-                target,
-                cause
-            }
-            .text()
-        )?;
-    }
-    for w in &here.waiting {
-        let (call, target, peer) = (&w.call, &w.target, &w.peer);
-        writeln!(
-            out,
-            "{}",
-            Msg::WaitingDecision { call, target, peer }.text()
-        )?;
+    for line in here.lines() {
+        writeln!(out, "{line}")?;
     }
     Ok(())
 }

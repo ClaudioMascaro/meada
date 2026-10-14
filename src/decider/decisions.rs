@@ -41,8 +41,8 @@ pub(super) fn request(config: &Config, questions: &[Question]) -> Option<Request
     let mut items = Map::new();
     let mut asked = Map::new();
     for (name, question) in names(questions.len()).zip(questions) {
-        let criteria: Map<String, Value> = (question.candidates.iter())
-            .map(|(key, description)| (key.clone(), description.as_str().into()))
+        let criteria: Map<String, Value> = (question.offers.iter())
+            .map(|o| (o.key.clone(), o.description.as_str().into()))
             .collect();
         let instructions =
             format!("Pick the candidate endpoint that the call in `items.{name}` reaches.");
@@ -110,7 +110,7 @@ pub(super) fn answers(config: &Config, asked: &[&Question], body: &str) -> Vec<R
     };
     (names.iter().zip(asked))
         .map(|(name, question)| match response.answers.remove(name) {
-            Some(answer) => judge(config, question, answer, &response.model),
+            Some(answer) => validated(config, question, answer, &response.model),
             None => Err(invalid(Msg::AnswerMissing.text())),
         })
         .collect()
@@ -128,7 +128,7 @@ fn read(config: &Config, names: &[String], body: &str) -> Result<Response> {
 /// One answer to `question`: a `choice` among the offered keys, a confidence in [0,1], and
 /// probabilities over offered keys, each in [0,1], summing to 1 within `SUM_TOLERANCE`. `p` is
 /// the probability of the chosen key; `by` the model the response names.
-fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
+fn validated(config: &Config, question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
     if answer.kind != "choice" {
         return Err(invalid(Msg::AnswerType(&config.shown(&answer.kind)).text()));
     }
@@ -157,8 +157,8 @@ fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Resu
 
 #[cfg(test)]
 mod tests {
-    use super::{Answer, judge, names};
-    use crate::decider::{Config, Protocol, Question};
+    use super::{Answer, names, validated};
+    use crate::decider::{Config, Offer, Protocol, Question};
     use crate::decisions::Kind;
 
     #[test]
@@ -168,13 +168,15 @@ mod tests {
             repository: "r".into(),
             call: "fetch(url)".into(),
             enclosing: None,
-            candidates: ["1", "2", "3"]
-                .map(|k| (k.into(), format!("r GET /{k}")))
+            top_level: true,
+            offers: ["1", "2", "3"]
+                .map(|k| Offer {
+                    key: k.into(),
+                    description: format!("r GET /{k}"),
+                    target: format!("r::http::GET::/{k}"),
+                })
                 .into(),
             kind: Kind::DynamicUrl,
-            targets: ["1", "2", "3"]
-                .map(|k| format!("r::http::GET::/{k}"))
-                .into(),
         };
         for (probabilities, valid) in [
             ([0.5, 0.25, 0.25], true),
@@ -203,7 +205,7 @@ mod tests {
                 model: "m".into(),
             };
             assert_eq!(
-                judge(&config, &question, answer, "m").is_ok(),
+                validated(&config, &question, answer, "m").is_ok(),
                 valid,
                 "{probabilities:?}"
             );

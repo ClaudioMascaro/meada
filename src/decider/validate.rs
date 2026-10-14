@@ -12,7 +12,7 @@ use crate::Result;
 use crate::decisions::Decision;
 use crate::msg::Msg;
 
-use super::{Config, Question};
+use super::{Config, Offer, Question};
 
 /// An answer that passed validation: the decision it would record, and the candidate it picks
 /// as a person reads it.
@@ -33,7 +33,7 @@ pub(super) fn invalid(reason: impl Display) -> Box<dyn std::error::Error> {
 
 /// `p` if it is a number in [0,1] (so neither NaN nor infinite).
 pub(super) fn probability(p: f64) -> Result<f64> {
-    match (0.0..=1.0).contains(&p) {
+    match crate::decisions::probability(p) {
         true => Ok(p),
         false => Err(invalid(Msg::AnswerProbability(p).text())),
     }
@@ -49,7 +49,7 @@ pub(super) fn proposal(
     p: f64,
     by: &str,
 ) -> Result<Proposal> {
-    let at = offered(config, question, choice)?;
+    let offer = offered(config, question, choice)?;
     let p = probability(p)?;
     let shown = config.shown(by);
     if by.is_empty() || by == "human" || by.chars().any(char::is_control) {
@@ -59,21 +59,25 @@ pub(super) fn proposal(
         decision: Decision {
             kind: question.kind,
             call: question.id.clone(),
-            target: question.targets[at].clone(),
+            target: offer.target.clone(),
             by: shown,
             p: Some(p),
         },
         p,
-        candidate: question.candidates[at].1.clone(),
+        candidate: offer.description.clone(),
         confidence: None,
     })
 }
 
-/// The position of `choice` among the keys `question` offers, or the error naming it.
-pub(super) fn offered(config: &Config, question: &Question, choice: &str) -> Result<usize> {
-    let keys = question.keys();
-    keys.iter().position(|key| *key == choice).ok_or_else(|| {
-        let keys = keys.join(", ");
+/// The offer of `question` whose key is `choice`, or the error naming it.
+pub(super) fn offered<'q>(
+    config: &Config,
+    question: &'q Question,
+    choice: &str,
+) -> Result<&'q Offer> {
+    let found = question.offers.iter().find(|o| o.key == choice);
+    found.ok_or_else(|| {
+        let keys = question.keys().join(", ");
         let choice = &config.shown(choice);
         invalid(
             Msg::AnswerChoice {

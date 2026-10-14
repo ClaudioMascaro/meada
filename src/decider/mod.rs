@@ -15,6 +15,7 @@ use std::env::VarError;
 use std::fs;
 use std::io::Write;
 use std::net::IpAddr;
+use std::ops::Range;
 use std::path::Path;
 use std::time::Duration;
 
@@ -23,6 +24,7 @@ use serde_json::Value;
 use crate::Result;
 use crate::decisions::{Decision, Kind};
 use crate::engine::OpenItem;
+use crate::lang;
 use crate::msg::Msg;
 use validate::Proposal;
 
@@ -161,15 +163,26 @@ pub(crate) struct Question {
     pub repository: String,
     /// The call as written, on one line.
     pub call: String,
-    /// The enclosing function as it is on disk; `None` for a call at the top level of a file.
+    /// The enclosing function as it is on disk; `None` for a call at the top level of a file,
+    /// or one whose enclosing symbol is no function (a class field initializer), which goes
+    /// alone: a whole class is more than the decision needs.
     pub enclosing: Option<String>,
-    /// `(key, description)` in candidate order: the key is the candidate's 1-based position,
-    /// as a string; the description its repository identity, method and path.
-    pub candidates: Vec<(String, String)>,
+    /// Whether the call is at the top level of its file.
+    pub top_level: bool,
+    /// The candidates, in candidate order.
+    pub offers: Vec<Offer>,
     /// The kind of decision that resolves the item.
     pub kind: Kind,
-    /// The `target` of the decision that picks each candidate, in candidate order.
-    pub targets: Vec<String>,
+}
+
+/// One candidate as a decider is offered it.
+pub(crate) struct Offer {
+    /// The candidate's 1-based position, as a string.
+    pub key: String,
+    /// Its repository identity, method and path.
+    pub description: String,
+    /// The `target` of the decision that picks it.
+    pub target: String,
 }
 
 impl Question {
@@ -177,8 +190,10 @@ impl Question {
         let enclosing = match &item.enclosing {
             Some(symbol) => {
                 let source = fs::read(root.join(&item.path))?;
-                let text = source.get(symbol.span.clone()).unwrap_or_default();
-                Some(String::from_utf8_lossy(text).into_owned())
+                function_like(&item.path, &source, &symbol.span).then(|| {
+                    let text = source.get(symbol.span.clone()).unwrap_or_default();
+                    String::from_utf8_lossy(text).into_owned()
+                })
             }
             None => None,
         };
@@ -187,35 +202,52 @@ impl Question {
             repository: item.repository.clone(),
             call: item.expression.clone(),
             enclosing,
-            candidates: (item.candidates.iter().enumerate())
-                .map(|(n, c)| ((n + 1).to_string(), crate::decide::describe(c)))
+            top_level: item.enclosing.is_none(),
+            offers: (item.candidates.iter().enumerate())
+                .map(|(n, c)| Offer {
+                    key: (n + 1).to_string(),
+                    description: c.describe(),
+                    target: Decision::target(c),
+                })
                 .collect(),
             kind: Kind::of(item),
-            targets: item.candidates.iter().map(Decision::target).collect(),
         })
     }
 
     /// The call and its enclosing function, as plain text.
     pub fn excerpt(&self) -> String {
-        match &self.enclosing {
-            Some(function) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
-            None => format!("Call (at the top level of its file):\n{}\n", self.call),
+        match (&self.enclosing, self.top_level) {
+            (Some(function), _) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
+            (None, true) => format!("Call (at the top level of its file):\n{}\n", self.call),
+            (None, false) => format!("Call:\n{}\n", self.call),
         }
     }
 
     /// The candidates, one `<key>: <description>` per line.
     pub fn listing(&self) -> String {
-        (self.candidates.iter())
-            .map(|(key, description)| format!("{key}: {description}\n"))
+        (self.offers.iter())
+            .map(|o| format!("{}: {}\n", o.key, o.description))
             .collect()
     }
 
     pub fn keys(&self) -> Vec<&str> {
-        self.candidates
-            .iter()
-            .map(|(key, _)| key.as_str())
-            .collect()
+        self.offers.iter().map(|o| o.key.as_str()).collect()
     }
+}
+
+/// Whether the definition at `span` of the file at `path` is a function, a method or an inline
+/// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
+/// the file is parsed again; anything else, or a file no pack parses, is not.
+fn function_like(path: &str, source: &[u8], span: &Range<usize>) -> bool {
+    use lang::Kind::{Function, Inline, Method};
+    let Some(pack) = lang::pack_for(path).map(lang::pack) else {
+        return false;
+    };
+    // An allowlist: a kind added later sends its span only once it is listed here.
+    (pack.parse(path, source)).is_ok_and(|facts| {
+        (facts.defs.iter())
+            .any(|d| d.range == *span && matches!(d.kind, Function | Method | Inline))
+    })
 }
 
 /// One HTTP request of a run: always a `POST` of a JSON body.
@@ -229,10 +261,10 @@ pub(crate) struct Request {
 
 impl Config {
     /// The requests the configured protocol sends for `questions`, in item order.
-    fn requests(&self, questions: &[Question]) -> Result<Vec<Request>> {
+    fn requests(&self, questions: &[Question]) -> Vec<Request> {
         match self.protocol {
-            Protocol::Chat => Ok(questions.iter().map(|q| chat::request(self, q)).collect()),
-            Protocol::Decisions => Ok(decisions::request(self, questions).into_iter().collect()),
+            Protocol::Chat => questions.iter().map(|q| chat::request(self, q)).collect(),
+            Protocol::Decisions => decisions::request(self, questions).into_iter().collect(),
         }
     }
 
@@ -309,10 +341,8 @@ impl Config {
         let message = serde_json::from_str::<Value>(body)
             .ok()
             .and_then(|v| Some(self.shown(v["error"]["message"].as_str()?)));
-        match message {
-            Some(message) if !message.is_empty() => format!("http status: {status}: {message}"),
-            _ => format!("http status: {status}"),
-        }
+        let message = message.as_deref().filter(|m| !m.is_empty());
+        Msg::HttpStatus { status, message }.text()
     }
 
     /// Text from upstream made fit to print or record: control characters dropped (so it
@@ -358,7 +388,7 @@ pub(crate) fn run(
         writeln!(out, "{}\n{}", item.id, skip.text())?;
         skipped = true;
     }
-    let requests = config.requests(&questions)?;
+    let requests = config.requests(&questions);
     if show_request {
         for (n, request) in requests.iter().enumerate() {
             if n > 0 || skipped {
@@ -424,7 +454,7 @@ pub(crate) fn run(
 
 /// A `--min-p` value, which must be a probability.
 pub(crate) fn min_p(value: f64) -> Result<f64> {
-    match (0.0..=1.0).contains(&value) {
+    match crate::decisions::probability(value) {
         true => Ok(value),
         false => Err(Msg::DecideMinP.text().into()),
     }

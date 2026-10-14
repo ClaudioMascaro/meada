@@ -71,7 +71,8 @@ seu agente (por exemplo o `.mcp.json` do Claude Code):
 
 São três ferramentas, sempre em inglês, e nenhuma escreve:
 
-- `search` acha um símbolo, uma rota ou um contrato pelo nome;
+- `search` acha um símbolo, uma rota ou um contrato pelo nome; com o tipo `ambiguous` ou
+  `unresolved`, lista os itens abertos (veja Decisões);
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
   chama e os contratos que ele toca;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
@@ -86,14 +87,17 @@ repositórios envolvidos e os tokens usados.
 ## Decisões
 
 Uma ligação ambígua (vários provedores servem a rota) ou uma URL dinâmica (a chamada monta a
-URL em tempo de execução) fica como item aberto: `meada search` lista, com os candidatos. Quem
-resolve é você, no modo humano, ou um modelo, se você pedir.
+URL em tempo de execução) fica como item aberto. A ferramenta `search` do MCP, com o tipo
+`ambiguous` ou `unresolved`, lista esses itens com o número de candidatos de cada um, não os
+candidatos; `meada decide --list` lista os itens com os candidatos. Quem resolve é você, no
+modo humano, ou um modelo, se você pedir.
 
 - `meada decide` mostra cada item aberto do repositório, com os candidatos numerados; você
   escolhe um número, ou `s` para pular. Ao fim grava as escolhas em `meada.decisions.toml`, na
   raiz. Não escolheu nada, não grava.
-- `--item <id>` trata só aquele item (o id que o `meada search` imprime); `--dry-run` imprime
-  o arquivo que seria gravado e não escreve; `--list` imprime os itens abertos, mais as
+- `--item <id>` trata só aquele item (o id que `meada decide --list` ou a ferramenta `search`
+  imprime), mesmo que já decidido, para refazer a decisão; `--dry-run` imprime o arquivo que
+  seria gravado e não escreve; `--list` imprime os itens abertos, mais as
   decisões obsoletas, e não pergunta nada; `--prune` remove as decisões obsoletas (não combina
   com as três anteriores).
 - `--decider` troca a pessoa por um modelo (veja abaixo); `--show-request` (só com `--decider`)
@@ -154,9 +158,9 @@ Constantes fixas:
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP: `fetch` no lado que consome,
-Next.js (app router) e Express no lado que serve. Cada ligação tem o nível `exact`, `inferred`
-ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida, nunca
-como ligação. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, filas,
+Next.js (app router) e Express no lado que serve. Cada ligação tem o nível `exact`, `inferred`,
+`decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida
+e só vira ligação por uma decisão, no nível `decided`. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, filas,
 pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).

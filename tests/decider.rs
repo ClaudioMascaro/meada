@@ -6,12 +6,11 @@ mod common;
 
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
 
 use meada::engine::Engine;
 
 use common::stub::{Reply, Stub};
-use common::{assert_golden, chain, fixture_repo};
+use common::{HEALTH, TRACK, assert_golden, chain, fixture_repo, written};
 
 /// The key every test configures. No output of any test may contain it. The `&` lets a JSON
 /// answer write it escaped (`&`), out of reach of a redaction of the raw body.
@@ -37,45 +36,23 @@ fn meada(
     stdin: &str,
     stub: Option<&Stub>,
 ) -> (String, String, bool) {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_meada"));
-    command
-        .current_dir(repo)
-        .args(args)
-        .env("LANG", "en_US.UTF-8");
-    // No inherited proxy either: the test key must not travel anywhere but to the stub.
-    for var in VARS.iter().chain(&PROXIES) {
-        command.env_remove(var);
-        command.env_remove(var.to_ascii_lowercase());
-    }
-    command.envs(env.iter().map(|(k, v)| (k, v)));
-    let mut child = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("meada runs");
-    use std::io::Write;
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
-    let Output {
-        status,
-        stdout,
-        stderr,
-    } = child.wait_with_output().unwrap();
-    let text = |bytes: &[u8]| {
-        let text = String::from_utf8_lossy(bytes);
+    let (stdout, stderr, ok) = common::meada(repo, args, stdin, |command| {
+        command.env("LANG", "en_US.UTF-8");
+        // No inherited proxy either: the test key must not travel anywhere but to the stub.
+        for var in VARS.iter().chain(&PROXIES) {
+            command.env_remove(var);
+            command.env_remove(var.to_ascii_lowercase());
+        }
+        command.envs(env.iter().map(|(k, v)| (k, v)));
+    });
+    let text = |text: String| {
         assert!(!text.contains(KEY), "the key leaked:\n{text}");
-        let text = text.replace(repo.to_str().unwrap(), "<repo>");
         match stub {
             Some(stub) => text.replace(&stub.url, "<stub>"),
             None => text,
         }
     };
-    (text(&stdout), text(&stderr), status.success())
+    (text(stdout), text(stderr), ok)
 }
 
 /// The `chat` configuration against `stub`, with the key.
@@ -106,6 +83,28 @@ fn show_request_prints_the_golden_chat_requests_and_sends_nothing() {
     assert_golden("chain-web.decide.show-request.chat.txt", &stdout);
     assert!(stub.requests().is_empty());
     assert!(!web.join("meada.decisions.toml").exists());
+}
+
+#[test]
+fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
+    let (web, _, _) = chain("decider_excerpt_class");
+    // Two more ambiguous health checks: one in a class field initializer, whose caller is the
+    // class, and one in a method.
+    let probe = "export class Probe {\n  ready = fetch(\"/api/health\");\n\n  check() {\n    \
+                 return fetch(\"/api/health\");\n  }\n\n  secret = \"not for the model\";\n}\n";
+    fs::write(web.join("src/probe.ts"), probe).unwrap();
+    let stub = Stub::start(vec![]);
+    let show = ["decide", "--decider", "--show-request"];
+
+    let (stdout, stderr, ok) = meada(&web, &show, &chat(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    // The field initializer's call goes alone, the method's call with the method.
+    let field = r#""content": "Call:\nfetch(\"/api/health\")\n\nCandidates:"#;
+    let method = r#""content": "Call:\nfetch(\"/api/health\")\n\nIn:\ncheck() {\n    return"#;
+    assert!(stdout.contains(field), "{stdout}");
+    assert!(stdout.contains(method), "{stdout}");
+    assert!(!stdout.contains("not for the model"), "{stdout}");
 }
 
 /// The `decisions` configuration against `stub`: the protocol and the model are the defaults.
@@ -463,15 +462,8 @@ async fn the_mcp_server_never_reaches_the_decider() {
     assert!(stub.requests().is_empty());
 }
 
-const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
-const TRACK: &str = "example.com/chain/web::src/status.ts::track::fetch#0";
-
 fn answer(choice: &str, probability: f64) -> serde_json::Value {
     serde_json::json!({"choice": choice, "probability": probability})
-}
-
-fn written(repo: &Path) -> Option<String> {
-    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
 }
 
 #[test]
@@ -810,6 +802,11 @@ fn decisions_asks_every_item_in_one_request_and_records_the_returned_model() {
     );
     let names: Vec<_> = body["questions"].as_object().unwrap().keys().collect();
     assert_eq!(names, ["item1", "item2"]);
+    // A cold index of the chain with the file gives the decided export.
+    let (cold, _, _) = chain("decider_decisions_cold");
+    fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
+    let export = Engine::open(&cold).unwrap().export().unwrap();
+    assert_golden("chain-web.decided-decisions.export.json", &export);
 }
 
 #[test]

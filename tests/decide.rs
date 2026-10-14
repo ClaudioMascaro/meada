@@ -4,40 +4,18 @@
 mod common;
 
 use std::fs;
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
 
-use common::{assert_golden, chain};
+use common::{HEALTH, TRACK, assert_golden, chain, written as file};
 use meada::engine::Engine;
 
 /// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
 /// stderr, and whether it succeeded; the repository's path is replaced by `<repo>`.
 fn decide(repo: &Path, lang: &str, args: &[&str], stdin: &str) -> (String, String, bool) {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
-        .current_dir(repo)
-        .arg("decide")
-        .args(args)
-        .env("LANG", lang)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("meada runs");
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
-    let out = child.wait_with_output().unwrap();
-    let text =
-        |bytes: &[u8]| String::from_utf8_lossy(bytes).replace(repo.to_str().unwrap(), "<repo>");
-    (text(&out.stdout), text(&out.stderr), out.status.success())
-}
-
-fn file(repo: &Path) -> Option<String> {
-    fs::read_to_string(repo.join("meada.decisions.toml")).ok()
+    let args = [&["decide"], args].concat();
+    common::meada(repo, &args, stdin, |c| {
+        c.env("LANG", lang);
+    })
 }
 
 #[test]
@@ -57,8 +35,6 @@ fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
     let export = Engine::open(&cold).unwrap().export().unwrap();
     assert_golden("chain-web.decided-human.export.json", &export);
 }
-
-const HEALTH: &str = "example.com/chain/web::src/status.ts::health::fetch#0";
 
 #[test]
 fn skipping_and_end_of_input_leave_the_rest_undecided() {
@@ -181,7 +157,7 @@ fn item_limits_the_run_and_an_unknown_id_is_an_error() {
     assert!(!ok);
     assert_eq!(
         stderr,
-        "meada: `nope` is not an open item of this repository\n"
+        "meada: `nope` is not an open or decided item of this repository\n"
     );
 }
 
@@ -230,6 +206,42 @@ fn decided_items_are_not_open_and_a_run_without_open_items_writes_nothing() {
 }
 
 #[test]
+fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_entry() {
+    let (web, _, _) = chain("decide_redo");
+    // Health decided for the gateway by a person, tracking for the catalog by a model.
+    common::decisions(&web, "chain-web");
+
+    // The decided health check is offered with its candidates as if undecided.
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "1\n");
+    assert!(ok, "{stderr}");
+    assert!(
+        stdout.starts_with(&format!(
+            "{HEALTH}\nsrc/status.ts:3  fetch(\"/api/health\")\n\
+             \x20 1) example.com/chain/catalog GET /api/health\n\
+             \x20 2) example.com/chain/gateway GET /api/health\n"
+        )),
+        "{stdout}"
+    );
+    // The decided tracking URL too; the person's pick replaces the model's entry.
+    let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", TRACK], "2\n");
+    assert!(ok, "{stderr}");
+    assert_eq!(
+        file(&web).unwrap(),
+        format!(
+            "[[decision]]\nkind = \"ambiguous-link\"\ncall = \"{HEALTH}\"\n\
+             target = \"example.com/chain/catalog::http::GET::/api/health\"\nby = \"human\"\n\n\
+             [[decision]]\nkind = \"dynamic-url\"\ncall = \"{TRACK}\"\n\
+             target = \"example.com/chain/gateway::http::POST::/api/events\"\nby = \"human\"\n"
+        )
+    );
+
+    // Without `--item`, decided calls stay closed (`search` too, see the test below).
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &[], "");
+    assert!(ok);
+    assert_eq!(stdout, "no open items\n");
+}
+
+#[test]
 fn messages_follow_lang() {
     let (web, _, _) = chain("decide_pt");
 
@@ -257,6 +269,18 @@ fn list_prints_the_stale_and_waiting_decisions_after_the_open_items() {
 
     assert!(ok, "{stderr}");
     assert_golden("chain-web.decide.list-stale.en.txt", &stdout);
+}
+
+#[test]
+fn list_prints_every_cause_of_a_stale_decision() {
+    let (web, _, _) = chain("decide_list_unfit");
+    // Not a candidate, target gone, call gone, item not open: one entry each.
+    common::decisions(&web, "chain-web-unfit");
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-unfit.en.txt", &stdout);
 }
 
 #[test]

@@ -110,6 +110,14 @@ pub enum Msg<'a> {
     DeciderInvalid(&'a str),
     DeciderProtocol,
     DeciderHttps,
+    DecisionPHuman,
+    DecisionPMissing,
+    DecisionPRange,
+    HttpStatus {
+        status: u16,
+        message: Option<&'a str>,
+    },
+    AnswerNoChoices,
 }
 
 impl Msg<'_> {
@@ -197,8 +205,12 @@ impl Msg<'_> {
                     .into(),
             ),
             Msg::DecideItemHelp => pick(
-                "Work on this item only (a call-site id, as `meada search` prints it).".into(),
-                "Trabalha só neste item (o id da chamada, como o `meada search` imprime).".into(),
+                "Work on this item only, even one already decided, to redo it (a call-site id, \
+                 as `meada decide --list` or the MCP `search` tool prints it)."
+                    .into(),
+                "Trabalha só neste item, mesmo que já decidido, para refazê-lo (o id da chamada, \
+                 como `meada decide --list` ou a ferramenta `search` do MCP o imprime)."
+                    .into(),
             ),
             Msg::DecideDryRunHelp => pick(
                 "Print the decisions the run would write and leave the file unchanged.".into(),
@@ -235,8 +247,8 @@ impl Msg<'_> {
             }
             Msg::DecideNoItems => pick("no open items".into(), "nenhum item aberto".into()),
             Msg::DecideUnknownItem(id) => pick(
-                format!("`{id}` is not an open item of this repository"),
-                format!("`{id}` não é um item aberto deste repositório"),
+                format!("`{id}` is not an open or decided item of this repository"),
+                format!("`{id}` não é um item aberto nem decidido deste repositório"),
             ),
             Msg::DecideNoCandidates => pick(
                 "no candidate fits; skipped".into(),
@@ -387,6 +399,29 @@ impl Msg<'_> {
             Msg::DeciderHttps => pick(
                 "`MEADA_DECIDER_URL` must use https, or http to a loopback address".into(),
                 "`MEADA_DECIDER_URL` deve usar https, ou http para um endereço de loopback".into(),
+            ),
+            Msg::DecisionPHuman => pick(
+                "`p` is for a model, not for `human`".into(),
+                "`p` é para um modelo, não para `human`".into(),
+            ),
+            Msg::DecisionPMissing => pick(
+                "`p` is missing for a model".into(),
+                "falta `p` para um modelo".into(),
+            ),
+            Msg::DecisionPRange => pick(
+                "`p` must be between 0 and 1".into(),
+                "`p` deve estar entre 0 e 1".into(),
+            ),
+            Msg::HttpStatus { status, message } => {
+                let message = message.map(|m| format!(": {m}")).unwrap_or_default();
+                pick(
+                    format!("http status: {status}{message}"),
+                    format!("status http: {status}{message}"),
+                )
+            }
+            Msg::AnswerNoChoices => pick(
+                "unreadable: no choices".into(),
+                "ilegível: nenhuma escolha em `choices`".into(),
             ),
         }
     }
