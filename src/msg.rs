@@ -73,14 +73,17 @@ pub enum Msg<'a> {
         max: usize,
     },
     DecideFailed(&'a str),
+    /// `confidence` is printed when the protocol gives one (`decisions`), never recorded.
     DecideProposal {
         candidate: &'a str,
         p: f64,
+        confidence: Option<f64>,
         by: &'a str,
     },
     DecideSuggestion {
         candidate: &'a str,
         p: f64,
+        confidence: Option<f64>,
         min_p: f64,
     },
     DecideInvalid(&'a str),
@@ -91,13 +94,22 @@ pub enum Msg<'a> {
     },
     AnswerProbability(f64),
     AnswerBy(&'a str),
+    AnswerType(&'a str),
+    AnswerConfidence(f64),
+    AnswerKey(&'a str),
+    AnswerSum {
+        sum: f64,
+        tolerance: f64,
+    },
+    AnswerNoProbability(&'a str),
+    AnswerMissing,
+    AnswerUnknown(&'a str),
     DecideMinP,
     DecideMinPHelp,
     DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
     DeciderHttps,
-    DeciderLater,
 }
 
 impl Msg<'_> {
@@ -274,16 +286,36 @@ impl Msg<'_> {
                 format!("request failed: {error}"),
                 format!("a requisição falhou: {error}"),
             ),
-            Msg::DecideProposal { candidate, p, by } => pick(
-                format!("proposed: {candidate} (p={p:.2}, by {by})"),
-                format!("proposto: {candidate} (p={p:.2}, por {by})"),
-            ),
-            Msg::DecideSuggestion { candidate, p, min_p } => pick(
-                format!("suggestion, not written: {candidate} (p={p:.2}, below --min-p {min_p:.2})"),
-                format!(
-                    "sugestão, não gravada: {candidate} (p={p:.2}, abaixo de --min-p {min_p:.2})"
-                ),
-            ),
+            Msg::DecideProposal {
+                candidate,
+                p,
+                confidence,
+                by,
+            } => {
+                let (en, pt_br) = confidence_of(*confidence);
+                pick(
+                    format!("proposed: {candidate} (p={p:.2}{en}, by {by})"),
+                    format!("proposto: {candidate} (p={p:.2}{pt_br}, por {by})"),
+                )
+            }
+            Msg::DecideSuggestion {
+                candidate,
+                p,
+                confidence,
+                min_p,
+            } => {
+                let (en, pt_br) = confidence_of(*confidence);
+                pick(
+                    format!(
+                        "suggestion, not written: {candidate} (p={p:.2}{en}, below --min-p \
+                         {min_p:.2})"
+                    ),
+                    format!(
+                        "sugestão, não gravada: {candidate} (p={p:.2}{pt_br}, abaixo de --min-p \
+                         {min_p:.2})"
+                    ),
+                )
+            }
             Msg::DecideInvalid(reason) => pick(
                 format!("invalid answer: {reason}"),
                 format!("resposta inválida: {reason}"),
@@ -303,6 +335,34 @@ impl Msg<'_> {
             Msg::AnswerBy(by) => pick(
                 format!("model id {by:?} cannot be recorded"),
                 format!("o id de modelo {by:?} não pode ser gravado"),
+            ),
+            Msg::AnswerType(kind) => pick(
+                format!("answer type `{kind}` is not `choice`"),
+                format!("o tipo de resposta `{kind}` não é `choice`"),
+            ),
+            Msg::AnswerConfidence(c) => pick(
+                format!("confidence {c} is not between 0 and 1"),
+                format!("a confiança {c} não está entre 0 e 1"),
+            ),
+            Msg::AnswerKey(key) => pick(
+                format!("probability key `{key}` is not an offered key"),
+                format!("a chave de probabilidade `{key}` não é uma chave oferecida"),
+            ),
+            Msg::AnswerSum { sum, tolerance } => pick(
+                format!("probabilities sum to {sum:.4}, not 1 (tolerance {tolerance})"),
+                format!("as probabilidades somam {sum:.4}, não 1 (tolerância {tolerance})"),
+            ),
+            Msg::AnswerNoProbability(choice) => pick(
+                format!("no probability for the choice `{choice}`"),
+                format!("nenhuma probabilidade para a escolha `{choice}`"),
+            ),
+            Msg::AnswerMissing => pick(
+                "no answer for this item".into(),
+                "nenhuma resposta para este item".into(),
+            ),
+            Msg::AnswerUnknown(name) => pick(
+                format!("answer to unknown question `{name}`"),
+                format!("resposta a uma pergunta desconhecida `{name}`"),
             ),
             Msg::DecideMinP => pick(
                 "`--min-p` must be a number from 0 to 1".into(),
@@ -328,14 +388,17 @@ impl Msg<'_> {
                 "`MEADA_DECIDER_URL` must use https, or http to a loopback address".into(),
                 "`MEADA_DECIDER_URL` deve usar https, ou http para um endereço de loopback".into(),
             ),
-            Msg::DeciderLater => pick(
-                "the `decisions` protocol of `MEADA_DECIDER_PROTOCOL` is not available yet; \
-                 use `chat`"
-                    .into(),
-                "o protocolo `decisions` de `MEADA_DECIDER_PROTOCOL` ainda não está disponível; \
-                 use `chat`"
-                    .into(),
-            ),
         }
+    }
+}
+
+/// The `, confidence 0.80` part of a proposal line, in English and in pt-BR; empty without one.
+fn confidence_of(confidence: Option<f64>) -> (String, String) {
+    match confidence {
+        Some(c) => (
+            format!(", confidence {c:.2}"),
+            format!(", confiança {c:.2}"),
+        ),
+        None => Default::default(),
     }
 }

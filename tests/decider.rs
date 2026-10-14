@@ -13,8 +13,9 @@ use meada::engine::Engine;
 use common::stub::{Reply, Stub};
 use common::{assert_golden, chain, fixture_repo};
 
-/// The key every test configures. No output of any test may contain it.
-const KEY: &str = "sk-meada-test-5f0c1e2d9a";
+/// The key every test configures. No output of any test may contain it. The `&` lets a JSON
+/// answer write it escaped (`&`), out of reach of a redaction of the raw body.
+const KEY: &str = "sk-meada&test-5f0c1e2d9a";
 
 const VARS: [&str; 4] = [
     "MEADA_DECIDER_PROTOCOL",
@@ -103,6 +104,36 @@ fn show_request_prints_the_golden_chat_requests_and_sends_nothing() {
 
     assert!(ok, "{stderr}");
     assert_golden("chain-web.decide.show-request.chat.txt", &stdout);
+    assert!(stub.requests().is_empty());
+    assert!(!web.join("meada.decisions.toml").exists());
+}
+
+/// The `decisions` configuration against `stub`: the protocol and the model are the defaults.
+fn decisions(stub: &Stub) -> Vec<(&'static str, String)> {
+    vec![
+        ("MEADA_DECIDER_URL", stub.url.clone()),
+        ("MEADA_DECIDER_KEY", KEY.into()),
+    ]
+}
+
+#[test]
+fn show_request_prints_the_golden_decisions_request_and_sends_nothing() {
+    let (web, _, _) = chain("decider_show_decisions");
+    let stub = Stub::start(vec![]);
+    let show = ["decide", "--decider", "--show-request"];
+
+    let (stdout, stderr, ok) = meada(&web, &show, &decisions(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.show-request.decisions.txt", &stdout);
+    // With only the key set, the request would go to OpenRouter; `--show-request` sends nothing.
+    let key = [("MEADA_DECIDER_KEY", KEY.to_string())];
+    let (stdout, stderr, ok) = meada(&web, &show, &key, "", None);
+    assert!(ok, "{stderr}");
+    assert!(
+        stdout.starts_with("POST https://openrouter.ai/api/alpha/decisions\n"),
+        "{stdout}"
+    );
     assert!(stub.requests().is_empty());
     assert!(!web.join("meada.decisions.toml").exists());
 }
@@ -265,7 +296,6 @@ fn a_missing_or_invalid_variable_is_an_error_naming_it_before_any_request() {
     let (web, _, _) = chain("decider_config");
     let stub = Stub::start(vec![]);
     let url = format!("{}/v1", stub.url);
-    let not_yet = "the `decisions` protocol of `MEADA_DECIDER_PROTOCOL` is not available yet";
     fn chat_to(url: &str) -> Vec<(&'static str, &str)> {
         vec![
             ("MEADA_DECIDER_PROTOCOL", "chat"),
@@ -303,15 +333,6 @@ fn a_missing_or_invalid_variable_is_an_error_naming_it_before_any_request() {
         // `decisions` is the default protocol: the URL and the model have defaults, the key
         // has none.
         (vec![], "`MEADA_DECIDER_KEY` is missing"),
-        (vec![("MEADA_DECIDER_KEY", KEY)], not_yet),
-        (
-            vec![
-                ("MEADA_DECIDER_PROTOCOL", "decisions"),
-                ("MEADA_DECIDER_URL", &url),
-                ("MEADA_DECIDER_KEY", KEY),
-            ],
-            not_yet,
-        ),
     ];
 
     for (env, error) in cases {
@@ -544,7 +565,7 @@ fn a_malformed_answer_fails_its_item_alone_and_the_others_are_still_written() {
         (
             "model id with control characters",
             Reply::chat("evil\u{1b}[2J", answer("1", 0.9)),
-            "model id \"evil\\u{1b}[2J\" cannot be recorded",
+            "model id \"evil[2J\" cannot be recorded",
         ),
     ];
 
@@ -727,6 +748,260 @@ fn min_p_is_validated_with_list_and_prune_too() {
         assert!(
             stderr.starts_with("meada: `--min-p` must be a number from 0 to 1"),
             "{mode}: {stderr}"
+        );
+    }
+}
+
+/// A `decisions` answer of type `choice`.
+fn choice(choice: &str, confidence: f64, probabilities: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "type": "choice",
+        "choice": choice,
+        "confidence": confidence,
+        "probabilities": probabilities,
+    })
+}
+
+/// A `decisions` response with `answers`, served by a dated id of the default model, with every
+/// field the upstream documentation lists.
+fn verdict(answers: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": "gen-dec-stub",
+        "model": "typesafe/jev-1.13-20260301",
+        "provider": "TypeSafe",
+        "answers": answers,
+        "usage": {"input_tokens": 420, "output_tokens": 0, "cost": 0.0001},
+    })
+}
+
+/// The health check picks the gateway (`2`), the tracking URL the catalog (`1`).
+fn valid_answers() -> serde_json::Value {
+    serde_json::json!({
+        "item1": choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9})),
+        "item2": choice("1", 0.4, serde_json::json!({"1": 0.62, "2": 0.38})),
+    })
+}
+
+#[test]
+fn decisions_asks_every_item_in_one_request_and_records_the_returned_model() {
+    let (web, _, _) = chain("decider_decisions");
+    let stub = Stub::start(vec![Reply::ok(verdict(valid_answers()))]);
+
+    let args = ["decide", "--decider"];
+    let (stdout, stderr, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decider.decisions.en.txt", &stdout);
+    let file = written(&web).expect("the file is written");
+    assert_golden("chain-web.decisions.decisions.toml", &file);
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 1);
+    let request = &requests[0];
+    assert_eq!(
+        (request.method.as_str(), request.path.as_str()),
+        ("POST", "/api/alpha/decisions")
+    );
+    let bearer = format!("Bearer {KEY}");
+    assert_eq!(request.header("authorization"), Some(bearer.as_str()));
+    let body = request.json();
+    assert_eq!(
+        body["provider"],
+        serde_json::json!({"zdr": true, "data_collection": "deny"})
+    );
+    let names: Vec<_> = body["questions"].as_object().unwrap().keys().collect();
+    assert_eq!(names, ["item1", "item2"]);
+}
+
+#[test]
+fn a_decisions_suggestion_below_the_threshold_prints_its_confidence_too() {
+    let (web, _, _) = chain("decider_decisions_min_p");
+    let stub = Stub::start(vec![Reply::ok(verdict(valid_answers()))]);
+
+    let args = ["decide", "--decider", "--min-p", "0.7"];
+    let (stdout, stderr, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+    assert!(ok, "{stderr}");
+    assert!(
+        stdout.contains(&format!(
+            "{TRACK}\nsuggestion, not written: example.com/chain/catalog POST /api/events \
+             (p=0.62, confidence 0.40, below --min-p 0.70)\n"
+        )),
+        "{stdout}"
+    );
+    assert!(!written(&web).unwrap().contains(TRACK));
+}
+
+#[test]
+fn a_provider_refusal_of_the_data_retention_preferences_writes_nothing_and_is_not_retried() {
+    let (web, _, _) = chain("decider_refusal");
+    // A retry would get the valid answer and write it.
+    let refusal =
+        r#"{"error": {"code": 404, "message": "No endpoints found matching your data policy"}}"#;
+    let stub = Stub::start(vec![
+        Reply::status(404, refusal),
+        Reply::ok(verdict(valid_answers())),
+    ]);
+
+    let args = ["decide", "--decider"];
+    let (stdout, stderr, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+    assert!(!ok);
+    assert!(stderr.contains("2 item(s) failed"), "{stderr}");
+    for item in [HEALTH, TRACK] {
+        let report = format!(
+            "{item}\nrequest failed: http status: 404: No endpoints found matching your data \
+             policy\n"
+        );
+        assert!(stdout.contains(&report), "{stdout}");
+    }
+    assert!(written(&web).is_none());
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].json()["provider"],
+        serde_json::json!({"zdr": true, "data_collection": "deny"})
+    );
+}
+
+#[test]
+fn a_key_escaped_in_an_error_message_reaches_no_output() {
+    let (web, _, _) = chain("decider_escaped_key");
+    let escaped = KEY.replace('&', "\\u0026");
+    let body = format!(r#"{{"error": {{"code": 401, "message": "bad key {escaped}"}}}}"#);
+    let stub = Stub::start(vec![Reply::status(401, &body)]);
+
+    // `meada` itself asserts that the key is in neither stream.
+    let args = ["decide", "--decider"];
+    let (stdout, _, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+    assert!(!ok);
+    assert!(
+        stdout.contains("request failed: http status: 401: bad key <hidden>\n"),
+        "{stdout}"
+    );
+}
+
+#[test]
+fn a_malformed_decisions_answer_fails_its_item_or_the_whole_response() {
+    let item2 = || choice("1", 0.4, serde_json::json!({"1": 0.62, "2": 0.38}));
+    // A bad answer for the first item, beside a valid one for the second.
+    let one =
+        |item1: serde_json::Value| verdict(serde_json::json!({"item1": item1, "item2": item2()}));
+    let mut no_confidence = choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9}));
+    no_confidence.as_object_mut().unwrap().remove("confidence");
+    let mut rationale = choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9}));
+    rationale["rationale"] = "because".into();
+    let mut warnings = verdict(valid_answers());
+    warnings["warnings"] = serde_json::json!([]);
+    let mut extra = valid_answers();
+    extra["item3"] = item2();
+    let mut no_model = verdict(valid_answers());
+    no_model.as_object_mut().unwrap().remove("model");
+    let mut scored = choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9}));
+    scored["type"] = "score".into();
+
+    // (name, response, reason, whether the whole response fails)
+    let cases = [
+        (
+            "sum below one",
+            one(choice("2", 0.8, serde_json::json!({"1": 0.2, "2": 0.7}))),
+            "sum to 0.9",
+            false,
+        ),
+        (
+            "key outside the candidates",
+            one(choice("2", 0.8, serde_json::json!({"2": 0.9, "3": 0.1}))),
+            "`3` is not an offered key",
+            false,
+        ),
+        (
+            "choice outside the candidates",
+            one(choice("3", 0.8, serde_json::json!({"1": 0.5, "2": 0.5}))),
+            "choice `3` is not one of the offered keys",
+            false,
+        ),
+        (
+            "probability outside zero to one",
+            one(choice("2", 0.8, serde_json::json!({"1": -0.1, "2": 1.1}))),
+            "probability -0.1 is not between 0 and 1",
+            false,
+        ),
+        (
+            "confidence outside zero to one",
+            one(choice("2", 1.5, serde_json::json!({"1": 0.1, "2": 0.9}))),
+            "confidence 1.5 is not between 0 and 1",
+            false,
+        ),
+        (
+            "no probability for the choice",
+            one(choice("2", 0.8, serde_json::json!({"1": 1.0}))),
+            "no probability for the choice `2`",
+            false,
+        ),
+        ("not a choice", one(scored), "type `score`", false),
+        (
+            "no answer for an item",
+            verdict(serde_json::json!({"item2": item2()})),
+            "no answer",
+            false,
+        ),
+        (
+            "missing field",
+            one(no_confidence),
+            "missing field `confidence`",
+            true,
+        ),
+        (
+            "unknown field in an answer",
+            one(rationale),
+            "unknown field `rationale`",
+            true,
+        ),
+        (
+            "unknown field in the response",
+            warnings,
+            "unknown field `warnings`",
+            true,
+        ),
+        (
+            "answer to an unknown question",
+            verdict(extra),
+            "`item3`",
+            true,
+        ),
+        ("no model", no_model, "missing field `model`", true),
+    ];
+
+    for (name, response, reason, whole) in cases {
+        let (web, _, _) = chain(&format!("decider_bad_decisions_{}", name.replace(' ', "_")));
+        let stub = Stub::start(vec![Reply::ok(response)]);
+
+        let args = ["decide", "--decider"];
+        let (stdout, stderr, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
+
+        assert!(!ok, "{name}");
+        let failing = if whole {
+            &[HEALTH, TRACK][..]
+        } else {
+            &[HEALTH]
+        };
+        let summary = format!("{} item(s) failed", failing.len());
+        assert!(stderr.contains(&summary), "{name}: {stderr}");
+        for item in failing {
+            let report = format!("{item}\ninvalid answer: ");
+            let at = (stdout.find(&report)).unwrap_or_else(|| panic!("{name}: {stdout}"));
+            let line = stdout[at + report.len()..].lines().next().unwrap();
+            assert!(line.contains(reason), "{name}: {stdout}");
+        }
+        let file = written(&web);
+        assert!(
+            !file.as_deref().unwrap_or_default().contains(HEALTH),
+            "{name}"
+        );
+        assert_eq!(
+            file.is_some_and(|f| f.contains(TRACK)),
+            !whole,
+            "{name}: {stdout}"
         );
     }
 }

@@ -74,7 +74,8 @@ struct Answer {
 /// Reads the body of the answer to `question` into a validated proposal. `by` is the model id
 /// in the response, or the configured model when the response omits it.
 pub(super) fn answer(config: &Config, question: &Question, body: &str) -> Result<Proposal> {
-    let unreadable = |e: serde_json::Error| invalid(Msg::AnswerUnreadable(&e.to_string()).text());
+    let unreadable =
+        |e: serde_json::Error| invalid(Msg::AnswerUnreadable(&config.shown(&e.to_string())).text());
     let completion: Completion = serde_json::from_str(body).map_err(unreadable)?;
     let message = completion
         .choices
@@ -82,5 +83,5 @@ pub(super) fn answer(config: &Config, question: &Question, body: &str) -> Result
         .ok_or_else(|| invalid(Msg::AnswerUnreadable("no choices").text()))?;
     let answer: Answer = serde_json::from_str(&message.message.content).map_err(unreadable)?;
     let by = completion.model.as_deref().unwrap_or(&config.model);
-    proposal(question, &answer.choice, answer.probability, by)
+    proposal(config, question, &answer.choice, answer.probability, by)
 }
