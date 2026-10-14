@@ -10,11 +10,12 @@ use rusqlite::{Connection, params};
 use serde::Serialize;
 
 use crate::Result;
+use crate::contract::{self, Link, Site};
 use crate::lang::{self, Facts};
 use crate::resolve::{Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 /// `calls.target` holds the one definition an `exact` or `inferred` call reaches; an
 /// `ambiguous` call has no target and lists every definition that fits in `candidates`.
@@ -26,14 +27,46 @@ CREATE TABLE calls (
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
 );
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
+CREATE TABLE contracts (role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT);
 ";
+
+/// Where the index of the repository at `root` lives.
+pub fn path(root: &Path) -> PathBuf {
+    root.join(".meada/index.db")
+}
+
+/// What `status` reports about one repository's index, read without writing.
+pub enum State {
+    Missing,
+    OtherSchema,
+    Indexed { files: i64 },
+}
+
+pub fn state(root: &Path) -> State {
+    let path = path(root);
+    if !path.is_file() {
+        return State::Missing;
+    }
+    let Ok(db) = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
+        return State::OtherSchema;
+    };
+    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0));
+    if version.ok() != Some(SCHEMA_VERSION) {
+        return State::OtherSchema;
+    }
+    match db.query_row("SELECT count(*) FROM files", [], |r| r.get(0)) {
+        Ok(files) => State::Indexed { files },
+        Err(_) => State::OtherSchema,
+    }
+}
 
 /// Opens `<root>/.meada/index.db`, creating `.meada/` with a `.gitignore` of `*`.
 pub fn open(root: &Path) -> Result<Connection> {
     let dir = root.join(".meada");
     fs::create_dir_all(&dir)?;
     fs::write(dir.join(".gitignore"), "*\n")?;
-    let path = dir.join("index.db");
+    let path = path(root);
     let db = Connection::open(&path)?;
     // An unreadable file counts as a mismatch: `.meada/` is Meada's own directory.
     let version = db
@@ -116,7 +149,8 @@ pub fn rebuild(db: &mut Connection, root: &Path, identity: &str) -> Result<()> {
     let id = |t: &Target| format!("{identity}::{}::{}", t.path, t.name);
     let tx = db.transaction()?;
     tx.execute_batch(
-        "DELETE FROM files; DELETE FROM symbols; DELETE FROM calls; DELETE FROM candidates;",
+        "DELETE FROM files; DELETE FROM symbols; DELETE FROM calls; DELETE FROM candidates; \
+         DELETE FROM contracts;",
     )?;
     for p in &parsed {
         let rel = p.path.as_str();
@@ -134,6 +168,7 @@ pub fn rebuild(db: &mut Connection, root: &Path, identity: &str) -> Result<()> {
             )?;
         }
         let mut ordinals: HashMap<(&str, &str), usize> = HashMap::new();
+        let mut call_ids = Vec::new();
         for call in &p.facts.calls {
             let ordinal = ordinals
                 .entry((call.scope.as_str(), call.callee.as_str()))
@@ -169,6 +204,20 @@ pub fn rebuild(db: &mut Connection, root: &Path, identity: &str) -> Result<()> {
                     params![call_id, id(candidate)],
                 )?;
             }
+            call_ids.push(call_id);
+        }
+        for kind in contract::KINDS {
+            for found in kind.extract(rel, &p.facts) {
+                let (role, site) = match found.site {
+                    Site::Def(name) => ("provider", format!("{base}::{name}")),
+                    Site::File => ("provider", base.clone()),
+                    Site::Call(n) => ("consumer", call_ids[n].clone()),
+                };
+                tx.execute(
+                    "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4)",
+                    params![role, found.contract, site, found.via],
+                )?;
+            }
         }
     }
     tx.commit()?;
@@ -192,6 +241,9 @@ pub(crate) struct Export {
     pub(crate) files: Vec<File>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
+    pub(crate) providers: Vec<Provider>,
+    pub(crate) consumers: Vec<Consumer>,
+    pub(crate) links: Vec<Link>,
 }
 
 #[derive(Serialize)]
@@ -224,10 +276,29 @@ pub(crate) struct CallSite {
     pub(crate) span: Span,
 }
 
-/// The index content, every list sorted.
-pub fn export(db: &Connection, identity: &str) -> Result<Export> {
+/// A symbol that serves a contract.
+#[derive(Serialize)]
+pub(crate) struct Provider {
+    pub(crate) contract: String,
+    pub(crate) site: String,
+}
+
+/// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
+/// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
+#[derive(Serialize)]
+pub(crate) struct Consumer {
+    pub(crate) contract: Option<String>,
+    pub(crate) site: String,
+    pub(crate) via: Option<String>,
+}
+
+/// The index content of the repository attached as `schema`, every list sorted. Links are
+/// left empty: they span repositories, so the engine adds them.
+pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let files = db
-        .prepare("SELECT path, hash FROM files ORDER BY path")?
+        .prepare(&format!(
+            "SELECT path, hash FROM {schema}.files ORDER BY path"
+        ))?
         .query_map([], |r| {
             Ok(File {
                 path: r.get(0)?,
@@ -236,7 +307,9 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     let symbols = db
-        .prepare("SELECT id, path, start, end FROM symbols ORDER BY id, path, start, end")?
+        .prepare(&format!(
+            "SELECT id, path, start, end FROM {schema}.symbols ORDER BY id, path, start, end"
+        ))?
         .query_map([], |r| {
             Ok(Symbol {
                 id: r.get(0)?,
@@ -246,17 +319,19 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
     for row in db
-        .prepare("SELECT call, target FROM candidates ORDER BY call, target")?
+        .prepare(&format!(
+            "SELECT call, target FROM {schema}.candidates ORDER BY call, target"
+        ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
     {
         let (call, target) = row?;
         candidates.entry(call).or_default().push(target);
     }
     let calls = db
-        .prepare(
-            "SELECT id, caller, target, level, path, start, end FROM calls \
-             ORDER BY id, path, start, end",
-        )?
+        .prepare(&format!(
+            "SELECT id, caller, target, level, path, start, end FROM {schema}.calls \
+             ORDER BY id, path, start, end"
+        ))?
         .query_map([], |r| {
             let id: String = r.get(0)?;
             Ok(CallSite {
@@ -269,11 +344,39 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let providers = db
+        .prepare(&format!(
+            "SELECT contract, site FROM {schema}.contracts WHERE role = 'provider' \
+             ORDER BY contract, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Provider {
+                contract: r.get(0)?,
+                site: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let consumers = db
+        .prepare(&format!(
+            "SELECT contract, site, via FROM {schema}.contracts WHERE role = 'consumer' \
+             ORDER BY site, contract, via"
+        ))?
+        .query_map([], |r| {
+            Ok(Consumer {
+                contract: r.get(0)?,
+                site: r.get(1)?,
+                via: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
         symbols,
         calls,
+        providers,
+        consumers,
+        links: Vec::new(),
     })
 }
 

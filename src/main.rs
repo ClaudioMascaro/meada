@@ -2,7 +2,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use meada::engine::Engine;
+use meada::engine::{self, Engine};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -13,9 +13,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Build the index of the repository in the current directory.
+    /// Build the indexes of the workspace of the repository in the current directory.
     Index,
-    /// Print the index as sorted JSON.
+    /// Show the workspace: each repository, its index state and any peer not found.
+    Status,
+    /// Print the index as sorted JSON, with the links that touch it.
     Export,
     /// Serve the repository in the current directory to agents over MCP (stdio).
     Mcp,
@@ -23,9 +25,11 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let here = Path::new(".");
     let result = match cli.command {
         Command::Mcp => meada::mcp::serve(),
-        command => Engine::open(Path::new(".")).and_then(|engine| match command {
+        Command::Status => engine::status(here).map(|status| print!("{status}")),
+        command => Engine::open(here).and_then(|engine| match command {
             Command::Export => engine.export().map(|json| print!("{json}")),
             _ => Ok(()),
         }),

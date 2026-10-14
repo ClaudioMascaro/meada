@@ -1,0 +1,6 @@
+example.com/acme/api app/api/users/route.ts:3 http::GET::/api/users
+example.com/acme/web src/unlinked.ts:30 http::GET::/api/users
+example.com/acme/web src/unlinked.ts:20 http::GET::/api/users
+example.com/acme/web src/users.ts:3 http::GET::/api/users
+example.com/acme/api app/api/users/[id]/route.ts:3 http::GET::/api/users/{}
+example.com/acme/web src/users.ts:13 http::GET::/api/users/{}

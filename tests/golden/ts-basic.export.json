@@ -183,5 +183,8 @@
         "end": 59
       }
     }
-  ]
+  ],
+  "providers": [],
+  "consumers": [],
+  "links": []
 }

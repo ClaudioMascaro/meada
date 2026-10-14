@@ -1,0 +1,3 @@
+example.com/acme/web (.) indexed, 2 files
+example.com/acme/api (../http-api) indexed, 7 files
+missing peer: example.com/acme/billing, named by example.com/acme/web

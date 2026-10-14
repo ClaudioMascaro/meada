@@ -37,6 +37,12 @@ _Avoid_: driver, frontend, bridge
 A repository that another repository's `meada.toml` names as one it shares contracts with.
 _Avoid_: member, group, neighbour, dependency
 
+**Workspace**:
+The repositories one query can see: the repository where Meada runs, its peers through their
+`meada.toml` files (transitively), and the sibling clones whose `meada.toml` names a repository
+already in it. Each keeps its own index.
+_Avoid_: group, monorepo, organization
+
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the
 manifest of a package.
@@ -46,6 +52,11 @@ _Avoid_: server, backend
 The side of a contract that calls or uses it, such as a client call to a route or a dependent of
 a package.
 _Avoid_: client, caller
+
+**Unresolved consumer**:
+A consumer whose contract Meada could not read from the code, such as a `fetch` of a URL built
+elsewhere. It is shown, never linked.
+_Avoid_: dynamic call, unknown call
 
 **Contract**:
 What one repository exposes and another depends on, such as an HTTP route, a queue, a package or
