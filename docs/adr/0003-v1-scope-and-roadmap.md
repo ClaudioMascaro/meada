@@ -47,10 +47,12 @@ this ADR records it with its order and its acceptance numbers.
 - **Track C**: deterministic communities and processes.
 - At most two runs go at once, usually A and B. Each has its own integration branch and draft
   PR. Tracks touch disjoint directories.
-- Planning is pipelined: the next spec is planned and ticketed while the current one is
+- Planning is pipelined: the next spec is revised and ticketed while the current one is
   implemented. A spec builds only on merged `main`.
-- The roadmap lives in this ADR. Each spec is written when its work starts. The v0.1 trunk is
-  the first one.
+- The roadmap lives in this ADR. Every v1 spec is written up front, so the whole road is
+  visible. A spec's tickets are cut when its work starts, against merged `main`, and the spec
+  may be revised before that. The v0.1 trunk is the first one. (Amended 2026-10-14; the first
+  version wrote each spec only when its work started.)
 
 ### Benchmark and acceptance
 
