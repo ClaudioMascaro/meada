@@ -56,6 +56,11 @@ pub struct Found {
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`.
     pub via: Option<String>,
+    /// For an unresolved consumer, the method it calls with when Meada could read it.
+    pub method: Option<String>,
+    /// For an unresolved consumer, the literal fragments of its URL path Meada could
+    /// evaluate, in order.
+    pub fragments: Vec<String>,
 }
 
 /// Where a contract sits; every path is repository-relative.

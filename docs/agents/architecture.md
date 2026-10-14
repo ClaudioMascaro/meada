@@ -16,8 +16,14 @@ give byte-identical output.
 ## Modules (`src/`)
 
 - `engine.rs`: `Engine` is the one query seam. The CLI, the MCP server and almost every test call
-  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, plus `status(dir)` (reads only,
+  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, plus `status(dir)` (reads only,
   never indexes). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+- `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
+  the one place that derives them. `Engine::open_items` feeds `list` the exports and links, so
+  an item is an ambiguous link or an unresolved consumer, in id order, whose candidates sort by
+  repository, method, path. The routes a dynamic URL may reach come from `http::route_fits`
+  (method and ordered literal fragments, see `Found::method` / `fragments`). `search` with kind
+  `ambiguous` or `unresolved` renders them; `meada decide` reuses them.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp` only. `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
@@ -60,7 +66,9 @@ give byte-identical output.
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`. A path parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. A call has
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
+  consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
+  and are left out of the export. A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
   repository where Meada runs.
@@ -89,7 +97,8 @@ give byte-identical output.
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
-- The index holds no source text and no values. `Call::args`, `Param::default` and `Const::value`
+- The index holds no source text and no values, apart from the literal URL path fragments and the
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`, `Param::default` and `Const::value`
   are `serde(skip)`, so unchanged files come back from SQLite without them. `Code` records every
   file it needs but lacks as a miss, and `refresh` re-parses those and extracts again until none
   is missed. A contract kind that reads a value from a new place relies on this loop.
@@ -115,7 +124,8 @@ give byte-identical output.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
   (constants, wrappers, Express, inferred links), `trace`, `freshness` (cold vs refreshed),
-  `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp` (the binary over stdio).
+  `items` (open items and their `search` goldens, fixtures `open-few` and `open-generated`), `cli`
+  (the binary under pt_BR, en_US and de_DE `LANG`), `mcp` (the binary over stdio).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
 

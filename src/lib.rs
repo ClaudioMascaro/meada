@@ -6,6 +6,7 @@ mod contract;
 pub mod engine;
 mod http;
 mod index;
+mod items;
 mod lang;
 pub mod mcp;
 pub mod msg;
