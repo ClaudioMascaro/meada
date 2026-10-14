@@ -4,6 +4,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::decisions::Cause;
+
 static PT: AtomicBool = AtomicBool::new(false);
 
 /// Picks the language from the value of `LANG`; `None` is English.
@@ -15,11 +17,33 @@ pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
     Indexed(i64),
-    MissingPeer { repo: &'a str, named_by: &'a str },
-    TooManyRepos { found: usize, max: usize },
+    MissingPeer {
+        repo: &'a str,
+        named_by: &'a str,
+    },
+    StaleDecision {
+        call: &'a str,
+        target: &'a str,
+        cause: Cause,
+    },
+    WaitingDecision {
+        call: &'a str,
+        target: &'a str,
+        peer: &'a str,
+    },
+    TooManyRepos {
+        found: usize,
+        max: usize,
+    },
     KeyMissing(&'a str),
-    KeyLater { key: &'a str, release: &'a str },
-    KeyUnknown { key: &'a str, file: &'a str },
+    KeyLater {
+        key: &'a str,
+        release: &'a str,
+    },
+    KeyUnknown {
+        key: &'a str,
+        file: &'a str,
+    },
     TrackA,
     About,
     Index,
@@ -30,6 +54,10 @@ pub enum Msg<'a> {
     DecideItemHelp,
     DecideDryRunHelp,
     DecideListHelp,
+    DecidePruneHelp,
+    DecidePruned(usize),
+    CallRepeated(&'a str),
+    DecideNothingToPrune,
     DecideNoItems,
     DecideUnknownItem(&'a str),
     DecideNoCandidates,
@@ -40,7 +68,10 @@ pub enum Msg<'a> {
     DecideDryRun,
     DecideDeciderHelp,
     DecideShowRequestHelp,
-    DecideTooMany { count: usize, max: usize },
+    DecideTooMany {
+        count: usize,
+        max: usize,
+    },
     DecideFailed(&'a str),
     DeciderInvalid(&'a str),
     DeciderProtocol,
@@ -65,6 +96,24 @@ impl Msg<'_> {
             Msg::MissingPeer { repo, named_by } => pick(
                 format!("missing peer: {repo}, named by {named_by}"),
                 format!("par não encontrado: {repo}, citado por {named_by}"),
+            ),
+            Msg::StaleDecision { call, target, cause } => {
+                let (en, pt_br) = match cause {
+                    Cause::CallGone => ("call site gone", "chamada removida"),
+                    Cause::ItemNotOpen => ("item no longer open", "item não está mais aberto"),
+                    Cause::TargetGone => ("target gone", "alvo removido"),
+                    Cause::NotCandidate => {
+                        ("target no longer a candidate", "alvo não é mais candidato")
+                    }
+                };
+                pick(
+                    format!("stale decision: {call} -> {target} ({en})"),
+                    format!("decisão obsoleta: {call} -> {target} ({pt_br})"),
+                )
+            }
+            Msg::WaitingDecision { call, target, peer } => pick(
+                format!("decision waiting on missing peer {peer}: {call} -> {target}"),
+                format!("decisão aguardando o par ausente {peer}: {call} -> {target}"),
             ),
             Msg::TooManyRepos { found, max } => pick(
                 format!("the workspace has {found} repositories; v0.1 reads at most {max}"),
@@ -126,6 +175,31 @@ impl Msg<'_> {
                 "Print the open items; neither ask nor write.".into(),
                 "Imprime os itens abertos; não pergunta nem grava.".into(),
             ),
+            Msg::DecidePruneHelp => pick(
+                "Remove the stale decisions from meada.decisions.toml; keep those waiting on a \
+                 missing peer."
+                    .into(),
+                "Remove as decisões obsoletas de meada.decisions.toml; mantém as que aguardam \
+                 um par ausente."
+                    .into(),
+            ),
+            Msg::DecidePruned(n) => pick(
+                format!(
+                    "pruned {n} stale decision{} from meada.decisions.toml",
+                    if *n == 1 { "" } else { "s" }
+                ),
+                format!(
+                    "{n} {} de meada.decisions.toml",
+                    if *n == 1 { "decisão obsoleta removida" } else { "decisões obsoletas removidas" }
+                ),
+            ),
+            Msg::CallRepeated(call) => pick(
+                format!("`call`: `{call}` is decided twice, one entry per call"),
+                format!("`call`: `{call}` aparece duas vezes, uma entrada por chamada"),
+            ),
+            Msg::DecideNothingToPrune => {
+                pick("nothing to prune".into(), "nada a remover".into())
+            }
             Msg::DecideNoItems => pick("no open items".into(), "nenhum item aberto".into()),
             Msg::DecideUnknownItem(id) => pick(
                 format!("`{id}` is not an open item of this repository"),

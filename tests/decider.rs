@@ -288,19 +288,24 @@ fn an_item_with_more_than_fifty_candidates_is_skipped_in_decider_mode_only() {
 }
 
 #[test]
-fn list_and_human_mode_read_no_decider_variable_and_send_nothing() {
+fn list_prune_and_human_mode_read_no_decider_variable_and_send_nothing() {
     let (web, _, _) = chain("decider_list");
     let stub = Stub::start(vec![]);
     let mut env = chat(&stub);
     let list = ["decide", "--decider", "--list"];
+    let prune = ["decide", "--decider", "--prune"];
 
-    let (_, stderr, ok) = meada(&web, &list, &env, "", Some(&stub));
-    assert!(ok, "{stderr}");
+    for args in [list, prune] {
+        let (_, stderr, ok) = meada(&web, &args, &env, "", Some(&stub));
+        assert!(ok, "{stderr}");
+    }
 
     // Invalid variables do not matter where nothing reads them.
     env.push(("MEADA_DECIDER_PROTOCOL", "grpc".into()));
-    let (_, stderr, ok) = meada(&web, &list, &env, "", Some(&stub));
-    assert!(ok, "{stderr}");
+    for args in [list, prune] {
+        let (_, stderr, ok) = meada(&web, &args, &env, "", Some(&stub));
+        assert!(ok, "{stderr}");
+    }
     let (_, stderr, ok) = meada(&web, &["decide", "--dry-run"], &env, "1\n1\n", Some(&stub));
     assert!(ok, "{stderr}");
     assert!(stub.requests().is_empty());

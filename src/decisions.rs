@@ -3,6 +3,7 @@
 //! `decided`; a decision that no longer fits is ignored. The file is an input like the source
 //! tree: indexing and replay read no model and no network.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,8 @@ use crate::config;
 use crate::contract::{Level, Link};
 use crate::index::Export;
 use crate::items::{Candidate, ItemKind, OpenItem};
-use crate::workspace::Repository;
+use crate::msg::Msg;
+use crate::workspace::{Missing, Workspace};
 
 const FILE: &str = "meada.decisions.toml";
 
@@ -81,8 +83,27 @@ impl TryFrom<Raw> for Decision {
 }
 
 /// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
+/// The file holds at most one entry per `call`: a repeat is a parse error naming its line.
 pub fn load(root: &Path) -> Result<Decisions> {
-    config::read(root, FILE)
+    let decisions: Decisions = config::read(root, FILE)?;
+    let mut seen = HashSet::new();
+    let Some(repeat) = decisions.items.iter().find(|d| !seen.insert(&d.call)) else {
+        return Ok(decisions);
+    };
+    let file = root.join(FILE);
+    // The repeat is the second `call = "<call>"` line.
+    let line = std::fs::read_to_string(&file)?
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("call") && l.contains(&format!("\"{}\"", repeat.call)))
+        .nth(1)
+        .map_or(1, |(n, _)| n + 1);
+    Err(format!(
+        "{}:{line}: {}",
+        file.display(),
+        Msg::CallRepeated(&repeat.call).text()
+    )
+    .into())
 }
 
 /// The canonical text of `<root>/meada.decisions.toml` once `new` is in it: `new` replaces the
@@ -92,9 +113,27 @@ pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     let mut all = load(root)?.items;
     all.retain(|d| new.iter().all(|n| n.call != d.call));
     all.extend(new);
+    render(all)
+}
+
+/// The canonical text of the decisions file without its `stale` entries, with how many that
+/// removed, or `None` when none of them is in the file. Waiting entries stay.
+pub(crate) fn pruned(root: &Path, stale: &[Stale]) -> Result<Option<(String, usize)>> {
+    let mut all = load(root)?.items;
+    let before = all.len();
+    for s in stale {
+        all.retain(|d| d.call != s.call);
+    }
+    let removed = before - all.len();
+    Ok(if removed == 0 {
+        None
+    } else {
+        Some((render(all)?, removed))
+    })
+}
+
+fn render(mut all: Vec<Decision>) -> Result<String> {
     all.sort_by(|a, b| a.call.cmp(&b.call));
-    // A hand-edited file may repeat a call; the first entry is the one replay applies.
-    all.dedup_by(|later, first| later.call == first.call);
     Ok(toml::to_string(&Decisions { items: all })?)
 }
 
@@ -142,63 +181,158 @@ impl Decision {
     }
 }
 
-/// Applies every repository's decisions to `links`, the workspace's links before decisions.
-/// `exports` follow `repos`. A decision applies when its item is still open (an ambiguous link
-/// among whose candidates the target is, or an unresolved consumer) and its target is still
-/// provided; it then replaces the ambiguous link, or adds the missing one, with a single link
-/// at the level `decided`. Anything else is stale and ignored.
-pub(crate) fn replay(links: &mut Vec<Link>, repos: &[Repository], exports: &[Export]) {
-    for (repo, export) in repos.iter().zip(exports) {
-        for d in &repo.decisions.items {
-            let Some((identity, contract)) = d.target.split_once("::") else {
-                continue;
-            };
-            let consumes = |contract: Option<&str>| {
-                export
-                    .consumers
-                    .iter()
-                    .any(|c| c.site == d.call && c.contract.as_deref() == contract)
-            };
-            match d.kind {
-                Kind::AmbiguousLink => {
-                    let open = |l: &Link| {
-                        l.consumer == d.call
-                            && l.level == Level::Ambiguous
-                            && l.contract == contract
-                    };
-                    let prefix = format!("{identity}::");
-                    let Some(provider) = links
-                        .iter()
-                        .find(|l| open(l) && l.provider.starts_with(&prefix))
-                        .map(|l| l.provider.clone())
-                    else {
-                        continue;
-                    };
-                    if !consumes(Some(contract)) {
-                        continue;
-                    }
-                    links.retain(|l| !open(l));
-                    links.push(d.link(&provider, contract));
-                }
-                Kind::DynamicUrl => {
-                    // ponytail: a repository serving one contract from several sites links to
-                    // the first by site; the target names no site.
-                    let provider = exports
-                        .iter()
-                        .filter(|e| e.repository == identity)
-                        .flat_map(|e| &e.providers)
-                        .filter(|p| p.contract == contract)
-                        .map(|p| &p.site)
-                        .min();
-                    let linked = links
-                        .iter()
-                        .any(|l| l.consumer == d.call && l.level == Level::Decided);
-                    if let (Some(provider), true, false) = (provider, consumes(None), linked) {
-                        links.push(d.link(provider, contract));
-                    }
-                }
-            }
+/// Why a decision does not apply. A decision that waits on a missing peer has none: it is
+/// neither applied nor stale.
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum Cause {
+    /// No call with the decision's `call` id is in the repository.
+    CallGone,
+    /// The call is there, but the core resolves it on its own or it is no item of the
+    /// decision's kind: nothing is left to decide.
+    ItemNotOpen,
+    /// No repository of the workspace serves the target's contract.
+    TargetGone,
+    /// The target is served, but is not among the candidates of the ambiguous link.
+    NotCandidate,
+}
+
+/// A decision that does not apply.
+#[derive(Serialize, Debug)]
+pub struct Stale {
+    pub call: String,
+    pub target: String,
+    pub cause: Cause,
+}
+
+/// A decision whose target repository is a peer the workspace names and cannot find.
+#[derive(Debug)]
+pub struct Waiting {
+    pub call: String,
+    pub target: String,
+    /// The identity of the missing peer.
+    pub peer: String,
+}
+
+/// What the decisions of one repository come to, once judged against the current index.
+#[derive(Debug)]
+pub struct Evaluation {
+    pub repository: String,
+    /// In file order.
+    pub stale: Vec<Stale>,
+    /// In file order.
+    pub waiting: Vec<Waiting>,
+}
+
+enum Verdict {
+    /// Links the call to this provider.
+    Applies(String),
+    Stale(Cause),
+    Waiting(String),
+}
+
+/// Judges `d`, a decision of the repository whose index is `export`, against `core`, the
+/// workspace's links before any decision. The checks run in this order, the first that fails
+/// decides: the call is there, the target's repository is not a missing peer (the decision
+/// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
+/// consumer), the target is still served, and, for an ambiguous link, it is still among the
+/// link's candidates.
+fn judge(
+    d: &Decision,
+    export: &Export,
+    exports: &[Export],
+    core: &[Link],
+    missing: &[Missing],
+) -> Verdict {
+    let at = |l: &&Link| l.consumer == d.call && l.level == Level::Ambiguous;
+    if !(export.calls.iter().any(|c| c.id == d.call)
+        || export.consumers.iter().any(|c| c.site == d.call))
+    {
+        return Verdict::Stale(Cause::CallGone);
+    }
+    let target = d.target.split_once("::");
+    // Without the peer the core cannot see its providers, so whether the item is open, or the
+    // target served, is unknown: the decision waits.
+    if let Some(peer) = target.and_then(|(identity, _)| missing.iter().find(|m| m.repo == identity))
+    {
+        return Verdict::Waiting(peer.repo.clone());
+    }
+    let open = match d.kind {
+        Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
+        Kind::DynamicUrl => {
+            (export.consumers.iter()).any(|c| c.site == d.call && c.contract.is_none())
+        }
+    };
+    if !open {
+        return Verdict::Stale(Cause::ItemNotOpen);
+    }
+    let Some((identity, contract)) = target else {
+        return Verdict::Stale(Cause::TargetGone);
+    };
+    // ponytail: a repository serving one contract from several sites links to the first by
+    // site; the target names no site.
+    let provider = exports
+        .iter()
+        .filter(|e| e.repository == identity)
+        .flat_map(|e| &e.providers)
+        .filter(|p| p.contract == contract)
+        .map(|p| &p.site)
+        .min();
+    let Some(provider) = provider else {
+        return Verdict::Stale(Cause::TargetGone);
+    };
+    match d.kind {
+        Kind::DynamicUrl => Verdict::Applies(provider.clone()),
+        Kind::AmbiguousLink => {
+            let prefix = format!("{identity}::");
+            core.iter()
+                .filter(at)
+                .find(|l| l.contract == contract && l.provider.starts_with(&prefix))
+                .map_or(Verdict::Stale(Cause::NotCandidate), |l| {
+                    Verdict::Applies(l.provider.clone())
+                })
         }
     }
+}
+
+/// Judges every repository's decisions against `links`, the workspace's links before
+/// decisions, and applies those that fit: each replaces the ambiguous link of its call, or
+/// adds the missing one, with a single link at the level `decided`. `exports` follow the workspace's repositories. Returns the links,
+/// sorted, and for each repository the decisions that did not apply. A stale decision or one
+/// that waits on a missing peer changes no link: the core's stands.
+pub(crate) fn replay(
+    mut links: Vec<Link>,
+    workspace: &Workspace,
+    exports: &[Export],
+) -> (Vec<Link>, Vec<Evaluation>) {
+    let mut evaluations = Vec::new();
+    let mut applied = Vec::new();
+    for (repo, export) in workspace.repos.iter().zip(exports) {
+        let mut evaluation = Evaluation {
+            repository: repo.identity.clone(),
+            stale: Vec::new(),
+            waiting: Vec::new(),
+        };
+        for d in &repo.decisions.items {
+            let verdict = judge(d, export, exports, &links, &workspace.missing);
+            let (call, target) = (d.call.clone(), d.target.clone());
+            match verdict {
+                Verdict::Applies(provider) => applied.push((d, provider)),
+                Verdict::Stale(cause) => evaluation.stale.push(Stale {
+                    call,
+                    target,
+                    cause,
+                }),
+                Verdict::Waiting(peer) => evaluation.waiting.push(Waiting { call, target, peer }),
+            }
+        }
+        evaluations.push(evaluation);
+    }
+    for (d, provider) in applied {
+        let (_, contract) = d.target.split_once("::").expect("a judged target has `::`");
+        links.retain(|l| !(l.consumer == d.call && l.level == Level::Ambiguous));
+        links.push(d.link(&provider, contract));
+    }
     links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
+    (links, evaluations)
 }

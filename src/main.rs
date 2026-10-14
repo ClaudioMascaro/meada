@@ -27,6 +27,8 @@ enum Command {
         dry_run: bool,
         #[arg(long)]
         list: bool,
+        #[arg(long, conflicts_with_all = ["item", "dry_run", "list"])]
+        prune: bool,
         #[arg(long)]
         decider: bool,
         #[arg(long, requires = "decider")]
@@ -47,6 +49,7 @@ fn main() -> ExitCode {
                 .mut_arg("item", |a| a.help(Msg::DecideItemHelp.text()))
                 .mut_arg("dry_run", |a| a.help(Msg::DecideDryRunHelp.text()))
                 .mut_arg("list", |a| a.help(Msg::DecideListHelp.text()))
+                .mut_arg("prune", |a| a.help(Msg::DecidePruneHelp.text()))
                 .mut_arg("decider", |a| a.help(Msg::DecideDeciderHelp.text()))
                 .mut_arg("show_request", |a| {
                     a.help(Msg::DecideShowRequestHelp.text())
@@ -66,6 +69,7 @@ fn main() -> ExitCode {
             item,
             dry_run,
             list,
+            prune,
             decider,
             show_request,
         } => Engine::open(here).and_then(|engine| {
@@ -73,6 +77,7 @@ fn main() -> ExitCode {
                 item,
                 dry_run,
                 list,
+                prune,
                 decider,
                 show_request,
             };

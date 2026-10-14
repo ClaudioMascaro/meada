@@ -16,8 +16,11 @@ give byte-identical output.
 ## Modules (`src/`)
 
 - `engine.rs`: `Engine` is the one query seam. The CLI, the MCP server and almost every test call
-  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `local_items`, plus `status(dir)` (reads only,
-  never indexes). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `local_items`,
+  `stale_decisions`, plus `status(dir)` (never creates an index; when every repository is already
+  indexed at the current schema it refreshes them like a query, to judge decisions, and writes
+  only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
+  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `Engine::open_items` feeds `list` the exports and links, so
   an item is an ambiguous link or an unresolved consumer, in id order, whose candidates sort by
@@ -31,11 +34,15 @@ give byte-identical output.
   `ask(items, input, out) -> Vec<Decision>` (human mode: prints each item and its numbered
   candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
   dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
-  writes nothing) and `run`, the public entry. Human mode reads no environment variable and
-  opens no connection. With `--decider` (and not `--list`), `run` reads `decider::Config` first,
-  then hands the items to `decider::run`, which returns the `Vec<Decision>` for `finish`;
-  `--show-request` stops after printing. `describe(candidate)` is the one candidate line
-  (repository identity, method, path) shared by the prompt and the excerpt.
+  writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
+  decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
+  exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
+  is stale) and `run`, the public entry. Human mode reads no environment variable and
+  opens no connection. With `--decider` (and neither `--list` nor `--prune`), `run` reads
+  `decider::Config` first, then hands the items to `decider::run`, which returns the
+  `Vec<Decision>` for `finish`; `--show-request` stops after printing. `describe(candidate)` is
+  the one candidate line (repository identity, method, path) shared by the prompt and the
+  excerpt.
 - `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
   `Config::from_env` (the four `MEADA_DECIDER_*` variables, read nowhere else: errors name the
   variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.13` and needs the key, `chat`
@@ -50,7 +57,8 @@ give byte-identical output.
   protocol adds a file and one arm in `Config::requests`. Reading answers into decisions is not
   there yet (`run` reports failed requests and returns none).
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
-  `--list`, `--decider`, `--show-request`, which requires `--decider`). `search`, `context` and `trace`
+  `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
+  which requires `--decider`). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
@@ -63,12 +71,20 @@ give byte-identical output.
   `Repository` carries both `config` and `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
   `Decision { kind (ambiguous-link | dynamic-url), call, target, by, p }`, `load(root)` and
-  `replay(&mut links, repos, exports)`, called by `Engine::links` at the end. Replay is a pure
-  function of links, exports and the files, so nothing is stored and a changed file needs no
-  reindex. A decision applies only while its call is still an open item and its target still
-  exists (see formats below); otherwise it is ignored. The writer is `canonical(root, new)`
-  (existing entries minus those of the same `call`, plus `new`, sorted by `call`, no comments or
-  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`.
+  `replay(links, workspace, exports) -> (links, Vec<Evaluation>)`, called by
+  `Engine::links_and_decisions` at the end. Replay is a pure function of links, exports and the
+  files, so nothing is stored and a changed file needs no reindex. `judge` is the one place that
+  decides a decision's fate, in this order: call gone (`Cause::CallGone`), target repository a
+  missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no longer open
+  (the core resolves the call on its own, or the item is not of the decision's kind:
+  `ItemNotOpen`), target gone (`TargetGone`), target not among the ambiguous link's candidates
+  (`NotCandidate`); else it applies. A stale or waiting decision changes no link. `Evaluation
+  { repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target,
+  peer}> }` is per repository, in file order; `Engine::stale_decisions()` returns them for the
+  workspace, and `export` and `status` render them (`meada decide --list`/`--prune` reuse the
+  same call). `load` rejects a file that repeats a `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)` (existing entries minus those of the same
+  `call`, plus `new`, sorted by `call`, no comments or timestamps; `Decision::human(item,
+  candidate)` builds a human pick) and `save(root, text)`.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -107,7 +123,9 @@ give byte-identical output.
   and are left out of the export. A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
-  repository where Meada runs. A `decided` link also has `by` (`human` or a model id) and, for
+  repository where Meada runs. A repository with stale decisions also has `stale_decisions:
+  [{call, target, cause}]` (`call-gone`, `item-not-open`, `target-gone`, `not-candidate`), absent
+  when empty; decisions waiting on a missing peer are not exported. A `decided` link also has `by` (`human` or a model id) and, for
   a model, `p`; its reason is `decided by <by> (p=<p>)` (two decimals) or `decided by human`.
 - Decision `target`: `<provider repository identity>::<contract>`, such as
   `example.com/chain/gateway::http::GET::/api/health`; split at the first `::`. The target names
@@ -172,9 +190,11 @@ give byte-identical output.
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
-  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, stale, parse
-  errors), `decide` (the binary in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness` (cold vs refreshed), `items` (open items and their `search` goldens,
-  fixtures `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
+  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, parse
+  errors), `stale` (stale and waiting decisions in `status` and `export`), `decide` (the binary
+  in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness`
+  (cold vs refreshed), `items` (open items and their `search` goldens, fixtures `open-few` and
+  `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
   `LANG`), `mcp` (the binary over stdio).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers

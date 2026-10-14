@@ -1,0 +1,6 @@
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/chain/web::src/status.ts::track::fetch#0"
+target = "example.com/chain/billing::http::POST::/api/events"
+by = "openrouter/jev"
+p = 0.62

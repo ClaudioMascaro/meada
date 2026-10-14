@@ -12,6 +12,7 @@ use serde::Serialize;
 
 use crate::Result;
 use crate::contract::{self, Level, Link, Names, Site};
+use crate::decisions::Stale;
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 
@@ -565,6 +566,9 @@ pub(crate) struct Export {
     pub(crate) providers: Vec<Provider>,
     pub(crate) consumers: Vec<Consumer>,
     pub(crate) links: Vec<Link>,
+    /// The repository's decisions that do not apply, each with its cause (`meada export` only).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) stale_decisions: Vec<Stale>,
 }
 
 #[derive(Serialize)]
@@ -713,6 +717,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         providers,
         consumers,
         links: Vec::new(),
+        stale_decisions: Vec::new(),
     })
 }
 
