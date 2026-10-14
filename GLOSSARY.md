@@ -74,6 +74,13 @@ _Avoid_: interface, integration
 A category of contract with its own matching rules, such as HTTP route, queue or package.
 _Avoid_: contract type, protocol
 
+**Gateway prefix**:
+The rewrite a gateway applies to the paths of a repository, declared in `[serve]`: `prefix` is
+added in front, `strip` is removed from the start. A route is also matched by its gateway path
+(the prefix followed by its code path without the stripped part); a link made that way is
+inferred and its reason names the rewrite.
+_Avoid_: base path, path rewrite
+
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content
 dataset, declared in `meada.toml`.

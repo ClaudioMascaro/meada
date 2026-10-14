@@ -110,7 +110,7 @@ pub trait ContractKind {
 
     /// Adds to `export`, the index content of `repo`, the sides `repo` declares for this kind
     /// in its `meada.toml`, keeping the lists sorted: a kind fed by configuration rather than
-    /// code. They derive at query time, so an edit to `meada.toml` needs no reindex.
+    /// code. A kind also uses it to mark what `meada.toml` says about the sides it found. They derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the

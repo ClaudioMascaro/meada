@@ -41,6 +41,57 @@ pub struct Peer {
 pub struct Serve {
     #[serde(default)]
     pub hosts: Vec<String>,
+    /// What a gateway adds in front of every path this repository serves.
+    #[serde(default, deserialize_with = "gateway_key")]
+    pub prefix: Option<String>,
+    /// What a gateway removes from the start of every path this repository serves.
+    #[serde(default, deserialize_with = "gateway_key")]
+    pub strip: Option<String>,
+}
+
+impl Serve {
+    /// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
+    /// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
+    /// when no rewrite applies. Routes of code and of documents (spec #21) both use this rule.
+    pub fn gateway_path(&self, code_path: &str) -> Option<(String, String)> {
+        let prefix = self.prefix.as_deref().filter(|p| !p.is_empty());
+        let strip = self.strip.as_deref().filter(|s| !s.is_empty());
+        let stripped = strip.and_then(|s| {
+            let rest = code_path.strip_prefix(s)?;
+            (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
+        });
+        let rest = stripped.map_or(code_path, |(_, rest)| rest);
+        let path = format!("{}{rest}", prefix.unwrap_or(""));
+        let path = if path.is_empty() { "/".into() } else { path };
+        let reasons: Vec<String> = [
+            prefix.map(|p| format!("gateway prefix {p}")),
+            stripped.map(|(s, _)| format!("gateway strip {s}")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
+    }
+}
+
+/// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
+/// trailing `/` dropped; `/` alone is no rewrite.
+fn gateway_key<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Option<String>, D::Error> {
+    let Some(value) = Option::<String>::deserialize(d)? else {
+        return Ok(None);
+    };
+    if !value.starts_with('/') {
+        return Err(serde::de::Error::custom(format!(
+            "`{value}` must start with `/`"
+        )));
+    }
+    Ok(Some(
+        crate::http::normalize_path(&value)
+            .trim_end_matches('/')
+            .into(),
+    ))
 }
 
 /// A shared thing the repository reads or writes, such as a database table or a bucket.
@@ -113,7 +164,7 @@ impl Config {
 }
 
 /// Keys that track A adds after v0.1.
-const LATER: &[&str] = &["serve.prefix", "serve.strip"];
+const LATER: &[&str] = &["serve.documents"];
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
@@ -185,6 +236,69 @@ fn flatten(table: &DeTable, prefix: &str, out: &mut Vec<(String, Range<usize>, R
                 }
             }
             _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Serve;
+
+    fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {
+        Serve {
+            hosts: Vec::new(),
+            prefix: prefix.map(Into::into),
+            strip: strip.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn the_gateway_path_is_the_prefix_then_the_code_path_without_strip() {
+        let p = "gateway prefix /shop";
+        let s = "gateway strip /v1";
+        let both = "gateway prefix /shop, gateway strip /v1";
+        for (prefix, strip, code, gateway) in [
+            // Nothing declared: no gateway path.
+            (None, None, "/orders", None),
+            (Some("/shop"), None, "/orders", Some(("/shop/orders", p))),
+            (None, Some("/v1"), "/v1/orders", Some(("/orders", s))),
+            (
+                Some("/shop"),
+                Some("/v1"),
+                "/v1/orders/{}",
+                Some(("/shop/orders/{}", both)),
+            ),
+            // A code path that does not start with `strip` keeps all of it under `prefix`...
+            (
+                Some("/shop"),
+                Some("/v1"),
+                "/health",
+                Some(("/shop/health", p)),
+            ),
+            // ... and has no gateway path without a prefix.
+            (None, Some("/v1"), "/health", None),
+            // `strip` matches whole segments; a version goes only when it is written.
+            (
+                Some("/shop"),
+                Some("/v1"),
+                "/v10/x",
+                Some(("/shop/v10/x", p)),
+            ),
+            (
+                Some("/shop"),
+                None,
+                "/v1/orders",
+                Some(("/shop/v1/orders", p)),
+            ),
+            // Stripping the whole path leaves the root.
+            (None, Some("/v1"), "/v1", Some(("/", s))),
+            (Some("/shop"), Some("/v1"), "/v1", Some(("/shop", both))),
+            // A rewrite that changes nothing is no gateway path.
+            (Some("/v1"), Some("/v1"), "/v1/orders", None),
+        ] {
+            let got = serve(prefix, strip).gateway_path(code);
+            let want = gateway.map(|(g, r)| (g.to_string(), r.to_string()));
+            assert_eq!(got, want, "{prefix:?} {strip:?} {code}");
         }
     }
 }
