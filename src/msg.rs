@@ -54,6 +54,9 @@ pub enum Msg<'a> {
     DecideItemHelp,
     DecideDryRunHelp,
     DecideListHelp,
+    DecidePruneHelp,
+    DecidePruned(usize),
+    DecideNothingToPrune,
     DecideNoItems,
     DecideUnknownItem(&'a str),
     DecideNoCandidates,
@@ -160,6 +163,27 @@ impl Msg<'_> {
                 "Print the open items; neither ask nor write.".into(),
                 "Imprime os itens abertos; não pergunta nem grava.".into(),
             ),
+            Msg::DecidePruneHelp => pick(
+                "Remove the stale decisions from meada.decisions.toml; keep those waiting on a \
+                 missing peer."
+                    .into(),
+                "Remove as decisões obsoletas de meada.decisions.toml; mantém as que aguardam \
+                 um par ausente."
+                    .into(),
+            ),
+            Msg::DecidePruned(n) => pick(
+                format!(
+                    "pruned {n} stale decision{} from meada.decisions.toml",
+                    if *n == 1 { "" } else { "s" }
+                ),
+                format!(
+                    "{n} {} de meada.decisions.toml",
+                    if *n == 1 { "decisão obsoleta removida" } else { "decisões obsoletas removidas" }
+                ),
+            ),
+            Msg::DecideNothingToPrune => {
+                pick("nothing to prune".into(), "nada a remover".into())
+            }
             Msg::DecideNoItems => pick("no open items".into(), "nenhum item aberto".into()),
             Msg::DecideUnknownItem(id) => pick(
                 format!("`{id}` is not an open item of this repository"),

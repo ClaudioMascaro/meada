@@ -27,6 +27,8 @@ enum Command {
         dry_run: bool,
         #[arg(long)]
         list: bool,
+        #[arg(long, conflicts_with_all = ["item", "dry_run", "list"])]
+        prune: bool,
     },
 }
 
@@ -43,6 +45,7 @@ fn main() -> ExitCode {
                 .mut_arg("item", |a| a.help(Msg::DecideItemHelp.text()))
                 .mut_arg("dry_run", |a| a.help(Msg::DecideDryRunHelp.text()))
                 .mut_arg("list", |a| a.help(Msg::DecideListHelp.text()))
+                .mut_arg("prune", |a| a.help(Msg::DecidePruneHelp.text()))
         })
         .get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
@@ -58,11 +61,13 @@ fn main() -> ExitCode {
             item,
             dry_run,
             list,
+            prune,
         } => Engine::open(here).and_then(|engine| {
             let options = decide::Options {
                 item,
                 dry_run,
                 list,
+                prune,
             };
             decide::run(
                 &engine,

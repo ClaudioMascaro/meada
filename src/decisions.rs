@@ -93,6 +93,31 @@ pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     let mut all = load(root)?.items;
     all.retain(|d| new.iter().all(|n| n.call != d.call));
     all.extend(new);
+    render(all)
+}
+
+/// The canonical text of the decisions file without its `stale` entries, or `None` when none
+/// of them is in the file. Waiting entries stay.
+pub(crate) fn pruned(root: &Path, stale: &[Stale]) -> Result<Option<String>> {
+    let mut all = load(root)?.items;
+    let before = all.len();
+    for s in stale {
+        // A repeated call is judged entry by entry and the first applies, so the later one goes.
+        if let Some(at) = all
+            .iter()
+            .rposition(|d| d.call == s.call && d.target == s.target)
+        {
+            all.remove(at);
+        }
+    }
+    Ok(if all.len() == before {
+        None
+    } else {
+        Some(render(all)?)
+    })
+}
+
+fn render(mut all: Vec<Decision>) -> Result<String> {
     all.sort_by(|a, b| a.call.cmp(&b.call));
     // A hand-edited file may repeat a call; the first entry is the one replay applies.
     all.dedup_by(|later, first| later.call == first.call);

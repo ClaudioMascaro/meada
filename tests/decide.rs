@@ -225,3 +225,74 @@ fn messages_follow_lang() {
     assert!(ok);
     assert_golden("chain-web.decide.pick.pt.txt", &stdout);
 }
+
+/// Names `example.com/chain/billing`, which the chain does not have, as a peer of `web`.
+fn add_missing_peer(web: &Path) {
+    let toml = web.join("meada.toml");
+    let mut src = fs::read_to_string(&toml).unwrap();
+    src.push_str("\n[[peer]]\nrepo = \"example.com/chain/billing\"\n");
+    fs::write(toml, src).unwrap();
+}
+
+#[test]
+fn list_prints_the_stale_and_waiting_decisions_after_the_open_items() {
+    let (web, _, _) = chain("decide_list_stale");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-stale.en.txt", &stdout);
+}
+
+#[test]
+fn list_prints_the_stale_decisions_even_when_no_item_is_open() {
+    let (web, _, catalog) = chain("decide_list_resolved");
+    common::decisions(&web, "chain-web");
+    fs::remove_file(catalog.join("app/api/health/route.ts")).unwrap();
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-resolved.en.txt", &stdout);
+}
+
+#[test]
+fn prune_removes_exactly_the_stale_entries_and_keeps_those_waiting() {
+    let (web, _, _) = chain("decide_prune");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.prune.en.txt", &stdout);
+    assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
+
+    // Nothing is stale any more: a second run leaves the file as it is.
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+    assert!(ok);
+    assert_eq!(stdout, "nothing to prune\n");
+    assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
+}
+
+#[test]
+fn prune_with_no_file_writes_none() {
+    let (web, _, _) = chain("decide_prune_none");
+
+    let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
+
+    assert!(ok);
+    assert_eq!(stdout, "nothing to prune\n");
+    assert_eq!(file(&web), None);
+}
+
+#[test]
+fn prune_does_not_combine_with_the_other_flags() {
+    let (web, _, _) = chain("decide_prune_flags");
+    for other in ["--list", "--dry-run", "--item=x"] {
+        let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--prune", other], "");
+        assert!(!ok && stderr.contains("cannot be used"), "{stderr}");
+    }
+}

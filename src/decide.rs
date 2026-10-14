@@ -18,6 +18,8 @@ pub struct Options {
     pub dry_run: bool,
     /// Print the open items and neither ask nor write.
     pub list: bool,
+    /// Remove the stale decisions from the file, and do nothing else.
+    pub prune: bool,
 }
 
 /// The open items of this repository to work on, in id order; with `only`, that one item.
@@ -97,22 +99,72 @@ pub fn run(
     input: &mut impl BufRead,
     out: &mut impl Write,
 ) -> Result<()> {
+    if options.prune {
+        return prune(engine, out);
+    }
     let items = items(engine, options.item.as_deref())?;
+    if options.list {
+        return list(engine, &items, out);
+    }
     if items.is_empty() {
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
         return Ok(());
     }
-    if options.list {
-        for (n, item) in items.iter().enumerate() {
-            if n > 0 {
-                writeln!(out)?;
-            }
-            show(item, out)?;
-        }
-        return Ok(());
-    }
     let picks = ask(&items, input, out)?;
     finish(engine, picks, options.dry_run, out)
+}
+
+/// `--list`: the open items, then the stale decisions and those waiting on a missing peer.
+fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()> {
+    if items.is_empty() {
+        writeln!(out, "{}", Msg::DecideNoItems.text())?;
+    }
+    for (n, item) in items.iter().enumerate() {
+        if n > 0 {
+            writeln!(out)?;
+        }
+        show(item, out)?;
+    }
+    let here = engine.local_decisions()?;
+    if !here.stale.is_empty() || !here.waiting.is_empty() {
+        writeln!(out)?;
+    }
+    for s in &here.stale {
+        let (call, target, cause) = (&s.call, &s.target, s.cause);
+        writeln!(
+            out,
+            "{}",
+            Msg::StaleDecision {
+                call,
+                target,
+                cause
+            }
+            .text()
+        )?;
+    }
+    for w in &here.waiting {
+        let (call, target, peer) = (&w.call, &w.target, &w.peer);
+        writeln!(
+            out,
+            "{}",
+            Msg::WaitingDecision { call, target, peer }.text()
+        )?;
+    }
+    Ok(())
+}
+
+/// `--prune`: rewrites the file without its stale entries, in canonical form. It asks nothing
+/// and reads no network; a decision waiting on a missing peer stays.
+fn prune(engine: &Engine, out: &mut impl Write) -> Result<()> {
+    let stale = engine.local_decisions()?.stale;
+    match decisions::pruned(engine.root(), &stale)? {
+        Some(text) => {
+            decisions::save(engine.root(), &text)?;
+            writeln!(out, "{}", Msg::DecidePruned(stale.len()).text())?;
+        }
+        None => writeln!(out, "{}", Msg::DecideNothingToPrune.text())?,
+    }
+    Ok(())
 }
 
 /// Records `picks` in the repository's decisions file, or prints what the file would be.

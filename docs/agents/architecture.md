@@ -34,10 +34,13 @@ give byte-identical output.
   `ask(items, input, out) -> Vec<Decision>` (human mode: prints each item and its numbered
   candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
   dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
-  writes nothing) and `run`, the public entry. Human mode reads no environment variable and
+  writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
+  decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
+  exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
+  is stale) and `run`, the public entry. Human mode reads no environment variable and
   opens no connection. Model deciders (later tickets) fill `Vec<Decision>` and call `finish`.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
-  `--list`). `search`, `context` and `trace`
+  `--list`, `--prune`, the last excluding the others). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.

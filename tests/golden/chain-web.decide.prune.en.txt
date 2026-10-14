@@ -1,0 +1,1 @@
+pruned 1 stale decision from meada.decisions.toml
