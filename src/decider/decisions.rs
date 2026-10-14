@@ -110,7 +110,7 @@ pub(super) fn answers(config: &Config, asked: &[&Question], body: &str) -> Vec<R
     };
     (names.iter().zip(asked))
         .map(|(name, question)| match response.answers.remove(name) {
-            Some(answer) => judge(config, question, answer, &response.model),
+            Some(answer) => validated(config, question, answer, &response.model),
             None => Err(invalid(Msg::AnswerMissing.text())),
         })
         .collect()
@@ -128,7 +128,7 @@ fn read(config: &Config, names: &[String], body: &str) -> Result<Response> {
 /// One answer to `question`: a `choice` among the offered keys, a confidence in [0,1], and
 /// probabilities over offered keys, each in [0,1], summing to 1 within `SUM_TOLERANCE`. `p` is
 /// the probability of the chosen key; `by` the model the response names.
-fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
+fn validated(config: &Config, question: &Question, answer: Answer, by: &str) -> Result<Proposal> {
     if answer.kind != "choice" {
         return Err(invalid(Msg::AnswerType(&config.shown(&answer.kind)).text()));
     }
@@ -157,7 +157,7 @@ fn judge(config: &Config, question: &Question, answer: Answer, by: &str) -> Resu
 
 #[cfg(test)]
 mod tests {
-    use super::{Answer, judge, names};
+    use super::{Answer, names, validated};
     use crate::decider::{Config, Offer, Protocol, Question};
     use crate::decisions::Kind;
 
@@ -204,7 +204,7 @@ mod tests {
                 model: "m".into(),
             };
             assert_eq!(
-                judge(&config, &question, answer, "m").is_ok(),
+                validated(&config, &question, answer, "m").is_ok(),
                 valid,
                 "{probabilities:?}"
             );

@@ -128,14 +128,14 @@ impl Engine {
 
     /// For each repository of the workspace, in workspace order, the decisions that do not
     /// apply with their cause (stale), and those that wait on a missing peer.
-    pub fn stale_decisions(&self) -> Result<Vec<Evaluation>> {
+    pub fn decision_report(&self) -> Result<Vec<Evaluation>> {
         self.refresh()?;
         Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
     /// The decisions of the repository where Meada runs that are stale or waiting.
     pub fn local_decisions(&self) -> Result<Evaluation> {
-        let all = self.stale_decisions()?;
+        let all = self.decision_report()?;
         Ok(all
             .into_iter()
             .find(|e| e.repository == self.identity)
@@ -538,7 +538,7 @@ fn ambiguous(call: &CallSite) -> String {
 /// relative to the one Meada runs in, and its index state, each followed by the decisions of
 /// its `meada.decisions.toml` that are stale or wait on a missing peer; then every peer not
 /// found. It never creates an index: only when every repository is indexed at the current
-/// schema does it refresh them, like a query, to judge the decisions against the files as they
+/// schema does it refresh them, like a query, to evaluate the decisions against the files as they
 /// are; otherwise it reports the states and no decision.
 pub fn status(dir: &Path) -> Result<String> {
     let workspace = Workspace::discover(dir)?;
@@ -548,7 +548,7 @@ pub fn status(dir: &Path) -> Result<String> {
     // A failure to open or refresh drops the decision lines, not the whole status.
     let evaluations = if workspace.repos.iter().all(indexed) {
         Engine::open(dir)
-            .and_then(|engine| engine.stale_decisions())
+            .and_then(|engine| engine.decision_report())
             .unwrap_or_default()
     } else {
         Vec::new()
