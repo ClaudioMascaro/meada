@@ -3,7 +3,7 @@
 **Português (Brasil)** · [English](README.en.md) · [Español](README.es.md)
 
 Meada lê os seus repositórios, monta o mapa de quem chama quem e costura um repositório no
-outro pelos contratos que eles compartilham: rotas HTTP, filas, pacotes, variáveis de ambiente.
+outro pelos contratos que eles compartilham: rotas HTTP, filas, pacotes, recursos compartilhados.
 Agentes de código, e gente também, consultam esse mapa por MCP. Nenhuma etapa da indexação usa
 LLM.
 
@@ -26,6 +26,10 @@ com que confiança cada ligação foi feita.
   telemetria.
 - **Sem LLM para indexar.** O mapa sai da árvore sintática do código. Não tem conta em dólar
   por token, funciona offline e cabe num notebook comum.
+- **Determinístico.** O mesmo código com a mesma configuração sempre dá o mesmo mapa. Quando
+  uma ligação é ambígua, a decisão fica num arquivo versionado no git, tomada por uma pessoa
+  ou, se você quiser, por um modelo de linguagem em um comando separado. A indexação só relê
+  essa decisão.
 - **Português primeiro.** A documentação nasce em português do Brasil; inglês e espanhol são
   traduções. Issues e PRs podem ser abertos em qualquer uma das três línguas. O código é
   escrito em inglês para que qualquer pessoa consiga ler.
@@ -34,12 +38,12 @@ com que confiança cada ligação foi feita.
 - **Pouco ruído para o agente.** Meada não escreve no seu `CLAUDE.md`, não instala hooks e não
   mexe na configuração do editor sem um comando seu. As respostas são curtas.
 - **Crédito a quem veio antes.** Meada aprende com GitNexus, CodeGraph, codebase-memory-mcp e
-  kivgraph. O que cada um faz está em [`docs/prior-art.md`](docs/prior-art.md).
+  kivgraph.
 
 ## Como participar
 
-O projeto está começando, e o escopo da primeira versão vai ser decidido em aberto. Já dá para
-ajudar:
+O projeto está começando. O escopo da v1 e a ordem do trabalho estão no
+[ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md). Já dá para ajudar:
 
 - abrindo uma issue com o seu caso de uso entre repositórios, em português, español ou English;
 - revisando as traduções: se o inglês ou o espanhol soarem estranhos, a correção é bem-vinda;
