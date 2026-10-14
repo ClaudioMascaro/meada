@@ -272,6 +272,18 @@ fn list_prints_the_stale_and_waiting_decisions_after_the_open_items() {
 }
 
 #[test]
+fn list_prints_every_cause_of_a_stale_decision() {
+    let (web, _, _) = chain("decide_list_unfit");
+    // Not a candidate, target gone, call gone, item not open: one entry each.
+    common::decisions(&web, "chain-web-unfit");
+
+    let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
+
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.list-unfit.en.txt", &stdout);
+}
+
+#[test]
 fn list_prints_the_stale_decisions_even_when_no_item_is_open() {
     let (web, _, catalog) = chain("decide_list_resolved");
     common::decisions(&web, "chain-web");

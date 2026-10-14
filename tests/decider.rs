@@ -802,6 +802,11 @@ fn decisions_asks_every_item_in_one_request_and_records_the_returned_model() {
     );
     let names: Vec<_> = body["questions"].as_object().unwrap().keys().collect();
     assert_eq!(names, ["item1", "item2"]);
+    // A cold index of the chain with the file gives the decided export.
+    let (cold, _, _) = chain("decider_decisions_cold");
+    fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
+    let export = Engine::open(&cold).unwrap().export().unwrap();
+    assert_golden("chain-web.decided-decisions.export.json", &export);
 }
 
 #[test]

@@ -1,0 +1,14 @@
+example.com/chain/web::src/status.ts::health::fetch#0
+src/status.ts:3  fetch("/api/health")
+  1) example.com/chain/catalog GET /api/health
+  2) example.com/chain/gateway GET /api/health
+
+example.com/chain/web::src/status.ts::track::fetch#0
+src/status.ts:8  fetch(event.url, { method: "POST" })
+  1) example.com/chain/catalog POST /api/events
+  2) example.com/chain/gateway POST /api/events
+
+stale decision: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/catalog::http::GET::/api/products/{} (target no longer a candidate)
+stale decision: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/catalog::http::GET::/api/removed (target gone)
+stale decision: example.com/chain/web::src/status.ts::gone::fetch#0 -> example.com/chain/catalog::http::GET::/api/products/{} (call site gone)
+stale decision: example.com/chain/web::src/orders.ts::listOrders::request#0 -> example.com/chain/gateway::http::GET::/api/orders (item no longer open)
