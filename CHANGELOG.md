@@ -36,4 +36,27 @@ tagging.
   macOS and Windows on x86_64 and arm64 and a shell installer, published to GitHub Releases.
   The crate is ready for `cargo install meada`.
 
+### Measured
+
+The maintainer ran this release on the private dogfood set on 2026-10-14 (ADR 0003).
+
+Links. One consumer repository calls the provider from four sites in its current code (ADR 0003
+counted five); all four link to the right route at `inferred`, through `base_url_env`. The other
+consumer repository's three calls do not link: its client receives `fetch` as a parameter and
+takes the URL from a destructured object, two patterns this release does not read (#157, #158).
+
+Cost, on the provider repository at the 2026-10-11 commit nearest to 633 files (634 TypeScript
+and JavaScript files), median of three runs on a 16-thread Linux laptop:
+
+| Metric | Target | Result |
+| --- | --- | --- |
+| Cold index time | ≤ 7 s | 1.2 s |
+| Cold index size | ≤ 37 MB | 21.8 MB |
+| Single-file reindex | ≤ 1 s | 0.24 s |
+| Tool list | ≤ 1k tokens | 454 tokens |
+| Default answer | ≤ 2k tokens | 1,834 tokens, the largest of 11 answers |
+
+At today's 664 files: 1.3 s, 23.6 MB and 0.26 s. Tokens count 4 bytes each, as the answer budget
+does. These numbers gate 1.0, not this release.
+
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0
