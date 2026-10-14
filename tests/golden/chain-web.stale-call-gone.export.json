@@ -1,0 +1,183 @@
+{
+  "repository": "example.com/chain/web",
+  "files": [
+    {
+      "path": "src/api/client.ts",
+      "hash": "59ac1e664f20160e491431efbc9923888aebb2744958e6704b0f67c6ba868562"
+    },
+    {
+      "path": "src/api/paths.ts",
+      "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
+    },
+    {
+      "path": "src/dashboard.ts",
+      "hash": "74f647de1ae0c993b4dcd83051b9d7c95034032101df53d1a017c4765287400f"
+    },
+    {
+      "path": "src/orders.ts",
+      "hash": "986abf5b87e61db849de0470c50cafd3d75a780216894b78240fceee40ff6db8"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 127,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 221,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 102,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 247,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 182,
+        "end": 238
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request::fetch#0",
+      "caller": "example.com/chain/web::src/api/client.ts::request",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 185,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::cancel",
+      "target": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 260,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::health#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 139,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::listOrders#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/orders.ts::listOrders",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 197,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::track#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 157,
+        "end": 186
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 291,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::listOrders",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 215,
+        "end": 235
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::DELETE::/api/orders/{}",
+      "site": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "via": "env:GATEWAY_URL"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "http::DELETE::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    }
+  ],
+  "stale_decisions": [
+    {
+      "call": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "target": "example.com/chain/gateway::http::GET::/api/health",
+      "cause": "call-gone"
+    },
+    {
+      "call": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "target": "example.com/chain/catalog::http::POST::/api/events",
+      "cause": "call-gone"
+    }
+  ]
+}

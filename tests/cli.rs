@@ -6,7 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, chain, decisions, fixture_repo};
 
 /// Runs `meada <arg>` in `repo` under `lang`; returns stdout and stderr, with the repository's
 /// path replaced by `<repo>`.
@@ -75,6 +75,28 @@ fn help_follows_lang() {
         assert_golden(
             &format!("cli.help.{name}.txt"),
             &meada(&repo, lang, "--help"),
+        );
+    }
+}
+
+#[test]
+fn status_reports_stale_and_waiting_decisions_follow_lang() {
+    let (web, _, _) = chain("cli_stale");
+    decisions(&web, "chain-web-missing-peer");
+    let toml = web.join("meada.toml");
+    let peer = "\n[[peer]]\nrepo = \"example.com/chain/billing\"\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
+    // A third decision, for a call that does not exist, is stale.
+    let file = web.join("meada.decisions.toml");
+    let gone = "\n[[decision]]\nkind = \"dynamic-url\"\n\
+                call = \"example.com/chain/web::src/status.ts::gone::fetch#0\"\n\
+                target = \"example.com/chain/catalog::http::POST::/api/events\"\nby = \"human\"\n";
+    fs::write(&file, fs::read_to_string(&file).unwrap() + gone).unwrap();
+    meada(&web, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-stale.{name}.txt"),
+            &meada(&web, lang, "status"),
         );
     }
 }

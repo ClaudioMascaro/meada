@@ -125,7 +125,10 @@ fn a_decision_that_no_longer_fits_is_ignored() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_golden("chain-web.export.json", &export);
+    // Every decision is stale, so the rest of the export is the core's.
+    let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
+    assert_golden("chain-web.export.json", &format!("{core}\n}}\n"));
+    assert_golden("chain-web.unfit.export.json", &export);
 }
 
 #[test]
