@@ -1,0 +1,111 @@
+{
+  "repository": "example.com/acme/client",
+  "files": [
+    {
+      "path": "src/client.ts",
+      "hash": "45eba812cc02c3f5a62ef9abc1a100fa93be262330882b2d0cd826cfc686ae1b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/client::src/client.ts::dynamic",
+      "span": {
+        "path": "src/client.ts",
+        "start": 384,
+        "end": 456
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::health",
+      "span": {
+        "path": "src/client.ts",
+        "start": 231,
+        "end": 327
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::users",
+      "span": {
+        "path": "src/client.ts",
+        "start": 87,
+        "end": 143
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/client::src/client.ts::dynamic::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::dynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 433,
+        "end": 453
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::health::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 292,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::users::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::users",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 121,
+        "end": 140
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": null,
+      "site": "example.com/acme/client::src/client.ts::dynamic::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/client::src/client.ts::health::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/client::src/client.ts::users::fetch#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/client::src/client.ts::health::fetch#0",
+      "provider": "example.com/acme/backend::src/server.ts::GET /health",
+      "contract": "http::GET::/health",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::users::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::users::fetch#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/acme/backend"
+    }
+  ]
+}

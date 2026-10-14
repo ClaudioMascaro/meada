@@ -1,0 +1,14 @@
+LLM-free code graph for agents and people
+
+Usage: meada <COMMAND>
+
+Commands:
+  index   Build the indexes of the workspace of the repository in the current directory.
+  status  Show the workspace: each repository, its index state and any peer not found.
+  export  Print the index as sorted JSON, with the links that touch it.
+  mcp     Serve the repository in the current directory to agents over MCP (stdio).
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version

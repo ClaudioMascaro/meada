@@ -1,0 +1,446 @@
+{
+  "repository": "example.com/acme/web",
+  "files": [
+    {
+      "path": "src/unlinked.ts",
+      "hash": "1ed60bc71c7d43da80c0f38ec03308d095bc23e12988d2a20b1776d833478c76"
+    },
+    {
+      "path": "src/users.ts",
+      "hash": "fa9ff0859461847b48778c9d207a842cf233f7d1a351cdb102a32fb93e6d96be"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::anyMethod",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 265,
+        "end": 374
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::dynamic",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 142,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::invoices",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 738,
+        "end": 822
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::local",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 917,
+        "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::logo",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 412,
+        "end": 496
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::missingRoute",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 1013,
+        "end": 1099
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::other",
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 597,
+        "end": 677
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::createUser",
+      "span": {
+        "path": "src/users.ts",
+        "start": 601,
+        "end": 767
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::getUser",
+      "span": {
+        "path": "src/users.ts",
+        "start": 431,
+        "end": 539
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::health",
+      "span": {
+        "path": "src/users.ts",
+        "start": 1057,
+        "end": 1223
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::listUsers",
+      "span": {
+        "path": "src/users.ts",
+        "start": 57,
+        "end": 140
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::removeUser",
+      "span": {
+        "path": "src/users.ts",
+        "start": 235,
+        "end": 358
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::report",
+      "span": {
+        "path": "src/users.ts",
+        "start": 834,
+        "end": 987
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::anyMethod::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::anyMethod",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 317,
+        "end": 371
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::dynamic::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::dynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 189,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::invoices::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::invoices",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 775,
+        "end": 819
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::local::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::local",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 951,
+        "end": 970
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::logo::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::logo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 445,
+        "end": 493
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::missingRoute::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::missingRoute",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 1054,
+        "end": 1096
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/unlinked.ts::other::fetch#0",
+      "caller": "example.com/acme/web::src/unlinked.ts::other",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unlinked.ts",
+        "start": 631,
+        "end": 674
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::createUser::JSON.stringify#0",
+      "caller": "example.com/acme/web::src/users.ts::createUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 738,
+        "end": 758
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::createUser::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::createUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 652,
+        "end": 764
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::getUser::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::getUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 477,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::health::(subscript_expression).trim#0",
+      "caller": "example.com/acme/web::src/users.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 1155,
+        "end": 1184
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::health::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 1091,
+        "end": 1138
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::health::fetch#1",
+      "caller": "example.com/acme/web::src/users.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 1149,
+        "end": 1220
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::listUsers::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::listUsers",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 95,
+        "end": 137
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::removeUser::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::removeUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 284,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::report::(parenthesized_expression).replace#0",
+      "caller": "example.com/acme/web::src/users.ts::report",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 890,
+        "end": 957
+      }
+    },
+    {
+      "id": "example.com/acme/web::src/users.ts::report::fetch#0",
+      "caller": "example.com/acme/web::src/users.ts::report",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/users.ts",
+        "start": 881,
+        "end": 984
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": null,
+      "site": "example.com/acme/web::src/unlinked.ts::anyMethod::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/web::src/unlinked.ts::dynamic::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/invoices",
+      "site": "example.com/acme/web::src/unlinked.ts::invoices::fetch#0",
+      "via": "env:BILLING_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/web::src/unlinked.ts::local::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/assets/logo.png",
+      "site": "example.com/acme/web::src/unlinked.ts::logo::fetch#0",
+      "via": "host:cdn.example.com"
+    },
+    {
+      "contract": "http::GET::/api/teams",
+      "site": "example.com/acme/web::src/unlinked.ts::missingRoute::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/web::src/unlinked.ts::other::fetch#0",
+      "via": "env:OTHER_URL"
+    },
+    {
+      "contract": "http::POST::/api/users",
+      "site": "example.com/acme/web::src/users.ts::createUser::fetch#0",
+      "via": "env:NEXT_PUBLIC_API_URL"
+    },
+    {
+      "contract": "http::GET::/api/users/{}",
+      "site": "example.com/acme/web::src/users.ts::getUser::fetch#0",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/acme/web::src/users.ts::health::fetch#0",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/acme/web::src/users.ts::health::fetch#1",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/web::src/users.ts::listUsers::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::DELETE::/api/users/{}",
+      "site": "example.com/acme/web::src/users.ts::removeUser::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/api/reports/{}",
+      "site": "example.com/acme/web::src/users.ts::report::fetch#0",
+      "via": "env:API_URL"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/web::src/unlinked.ts::local::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/unlinked.ts::other::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from OTHER_URL, no peer's base_url_env; the only repository serving it is example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::createUser::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::POST",
+      "contract": "http::POST::/api/users",
+      "level": "inferred",
+      "reason": "base URL from NEXT_PUBLIC_API_URL, a base_url_env of peer example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::getUser::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/[id]/route.ts::GET",
+      "contract": "http::GET::/api/users/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::health::fetch#0",
+      "provider": "example.com/acme/api::app/api/health/route.js",
+      "contract": "http::GET::/api/health",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::health::fetch#1",
+      "provider": "example.com/acme/api::app/api/health/route.js",
+      "contract": "http::GET::/api/health",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::listUsers::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::removeUser::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE",
+      "contract": "http::DELETE::/api/users/{}",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/users.ts::report::fetch#0",
+      "provider": "example.com/acme/api::app/(admin)/api/reports/[...slug]/route.ts::GET",
+      "contract": "http::GET::/api/reports/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
+    }
+  ]
+}

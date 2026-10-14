@@ -38,6 +38,7 @@ write tools; one index per repository; determinism) live in
 - Prose separates clauses with commas, colons or parentheses rather than em dashes.
 - Decisions are recorded as ADRs in `docs/adr/`.
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
+- Repository map in `docs/agents/architecture.md`: read it before exploring or changing code.
 
 ## Agent skills
 

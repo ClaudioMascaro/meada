@@ -1,0 +1,8 @@
+example.com/acme/api lib/db.ts:1 query
+function query(table: string, id?: string) {
+  return { table, id };
+}
+callers:
+example.com/acme/api app/api/users/[id]/route.ts:4 GET
+example.com/acme/api app/api/users/route.ts:4 GET
+callees: none

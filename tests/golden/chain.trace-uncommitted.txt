@@ -1,0 +1,10 @@
+example.com/chain/catalog lib/cache.ts:1 warm
+example.com/chain/catalog lib/products.ts:10 find
+  example.com/chain/catalog lib/products.ts:3 load
+    example.com/chain/catalog app/api/products/[id]/route.ts:4 GET
+      →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/gateway src/orders.ts:6 listOrders
+        →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:6 listOrders
+          example.com/chain/web src/dashboard.ts:7 dashboard
+    example.com/chain/catalog lib/products.ts:7 parent
+      example.com/chain/catalog lib/products.ts:3 load (cycle)
+chain: inferred · 2 hops · 3 repos · 182 tokens

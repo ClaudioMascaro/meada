@@ -1,0 +1,8 @@
+example.com/acme/web src/view.tsx:1 label
+function label(n: number): string {
+  return `#${n}`.trim();
+}
+callers:
+example.com/acme/web src/view.tsx:6 Badge
+callees:
+example.com/acme/web src/view.tsx:2 (unresolved) (template_string).trim

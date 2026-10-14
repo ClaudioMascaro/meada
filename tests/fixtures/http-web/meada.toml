@@ -1,0 +1,8 @@
+[[peer]]
+repo = "example.com/acme/api"
+base_url_env = ["API_URL", "NEXT_PUBLIC_API_URL"]
+
+# Not cloned next to this repository: status reports it, the rest still answers.
+[[peer]]
+repo = "example.com/acme/billing"
+base_url_env = ["BILLING_URL"]

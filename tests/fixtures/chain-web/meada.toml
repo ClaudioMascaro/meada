@@ -1,0 +1,4 @@
+# A: the browser app. It reaches the gateway through a base URL variable.
+[[peer]]
+repo = "example.com/chain/gateway"
+base_url_env = ["GATEWAY_URL"]

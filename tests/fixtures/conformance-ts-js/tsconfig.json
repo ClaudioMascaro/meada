@@ -1,0 +1,10 @@
+{
+  // Comments and trailing commas are allowed, as tsc allows them.
+  "compilerOptions": {
+    "strict": true,
+    /* `@/` names the source root; without `baseUrl`, targets are relative to this file. */
+    "paths": {
+      "@/*": ["./src/*"],
+    },
+  },
+}

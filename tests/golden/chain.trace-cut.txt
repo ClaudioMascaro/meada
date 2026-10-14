@@ -1,0 +1,5 @@
+example.com/chain/web src/dashboard.ts:4 dashboard
+  example.com/chain/web src/status.ts:2 health
+    →[ambiguous: 2 providers fit; host unresolved; served by example.com/chain/catalog] example.com/chain/catalog app/api/health/route.ts:1 GET
+… cut after 3 of 15 lines (budget 120 tokens); raise budget for more
+chain: ambiguous · 1 hops · 2 repos · 92 tokens

@@ -1,0 +1,8 @@
+example.com/acme/backend src/routes/users.ts:13 register.GET /api/users/{}#1
+(req, res) => res.json(find(req.params.id))
+callers: none
+callees:
+example.com/acme/backend src/routes/users.ts:24 find
+example.com/acme/backend src/routes/users.ts:13 (unresolved) res.json
+contracts:
+example.com/acme/backend src/routes/users.ts:13 provides http::GET::/api/users/{}

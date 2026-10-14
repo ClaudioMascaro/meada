@@ -1,0 +1,6 @@
+# B: the Express gateway. It serves the web app and calls the catalog by its host.
+[serve]
+hosts = ["gateway.example.com"]
+
+[[peer]]
+repo = "example.com/chain/catalog"

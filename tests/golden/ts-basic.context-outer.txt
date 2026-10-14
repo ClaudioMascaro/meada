@@ -1,0 +1,11 @@
+example.com/acme/web src/math.ts:13 outer
+function outer(): number {
+  function inner(): number {
+    return add(1, 2);
+  }
+  return inner() + inner();
+}
+callers:
+example.com/acme/web src/math.ts:20 (top level)
+callees:
+example.com/acme/web src/math.ts:14 outer.inner

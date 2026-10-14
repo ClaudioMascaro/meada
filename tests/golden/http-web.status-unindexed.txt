@@ -1,0 +1,3 @@
+example.com/acme/web (.) not indexed
+example.com/acme/api (../http-api) not indexed
+missing peer: example.com/acme/billing, named by example.com/acme/web

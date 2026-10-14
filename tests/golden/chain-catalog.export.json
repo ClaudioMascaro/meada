@@ -1,0 +1,143 @@
+{
+  "repository": "example.com/chain/catalog",
+  "files": [
+    {
+      "path": "app/api/health/route.ts",
+      "hash": "fc112243d7c86477ef19dd4a789114daeb1179870fd562faef220175aef990a6"
+    },
+    {
+      "path": "app/api/products/[id]/route.ts",
+      "hash": "faa5f3dcd718e5dd3c0013b2c54f4cb5a09ef452aeb565b31841ab562b29bef1"
+    },
+    {
+      "path": "lib/products.ts",
+      "hash": "2ede1b6743ae3a01020d1b39b8ec7d50218d4140a954f4e19959915ec59b6ce2"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "span": {
+        "path": "app/api/health/route.ts",
+        "start": 7,
+        "end": 54
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 57,
+        "end": 182
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::find",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 277,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 81,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::parent",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 187,
+        "end": 275
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::Response.json#0",
+      "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 146,
+        "end": 179
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "exact",
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 160,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load::find#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::load",
+      "target": "example.com/chain/catalog::lib/products.ts::find",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 174,
+        "end": 182
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load::parent#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::load",
+      "target": "example.com/chain/catalog::lib/products.ts::parent",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 154,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::parent::load#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::parent",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 241,
+        "end": 272
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/chain/catalog::app/api/health/route.ts::GET"
+    },
+    {
+      "contract": "http::GET::/api/products/{}",
+      "site": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    }
+  ]
+}
