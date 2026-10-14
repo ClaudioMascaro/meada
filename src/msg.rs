@@ -4,6 +4,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::decisions::Cause;
+
 static PT: AtomicBool = AtomicBool::new(false);
 
 /// Picks the language from the value of `LANG`; `None` is English.
@@ -15,11 +17,33 @@ pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
     Indexed(i64),
-    MissingPeer { repo: &'a str, named_by: &'a str },
-    TooManyRepos { found: usize, max: usize },
+    MissingPeer {
+        repo: &'a str,
+        named_by: &'a str,
+    },
+    StaleDecision {
+        call: &'a str,
+        target: &'a str,
+        cause: Cause,
+    },
+    WaitingDecision {
+        call: &'a str,
+        target: &'a str,
+        peer: &'a str,
+    },
+    TooManyRepos {
+        found: usize,
+        max: usize,
+    },
     KeyMissing(&'a str),
-    KeyLater { key: &'a str, release: &'a str },
-    KeyUnknown { key: &'a str, file: &'a str },
+    KeyLater {
+        key: &'a str,
+        release: &'a str,
+    },
+    KeyUnknown {
+        key: &'a str,
+        file: &'a str,
+    },
     TrackA,
     About,
     Index,
@@ -45,6 +69,24 @@ impl Msg<'_> {
             Msg::MissingPeer { repo, named_by } => pick(
                 format!("missing peer: {repo}, named by {named_by}"),
                 format!("par não encontrado: {repo}, citado por {named_by}"),
+            ),
+            Msg::StaleDecision { call, target, cause } => {
+                let (en, pt_br) = match cause {
+                    Cause::CallGone => ("call site gone", "chamada removida"),
+                    Cause::ItemNotOpen => ("item no longer open", "item não está mais aberto"),
+                    Cause::TargetGone => ("target gone", "alvo removido"),
+                    Cause::NotCandidate => {
+                        ("target no longer a candidate", "alvo não é mais candidato")
+                    }
+                };
+                pick(
+                    format!("stale decision: {call} -> {target} ({en})"),
+                    format!("decisão obsoleta: {call} -> {target} ({pt_br})"),
+                )
+            }
+            Msg::WaitingDecision { call, target, peer } => pick(
+                format!("decision waiting on missing peer {peer}: {call} -> {target}"),
+                format!("decisão aguardando o par ausente {peer}: {call} -> {target}"),
             ),
             Msg::TooManyRepos { found, max } => pick(
                 format!("the workspace has {found} repositories; v0.1 reads at most {max}"),

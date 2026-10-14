@@ -1,0 +1,6 @@
+example.com/chain/web (.) indexado, 5 arquivos
+  decisão obsoleta: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/billing::http::GET::/api/health (item não está mais aberto)
+  decisão aguardando o par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/billing::http::POST::/api/events
+example.com/chain/gateway (../chain-gateway) indexado, 4 arquivos
+example.com/chain/catalog (../chain-catalog) indexado, 3 arquivos
+par não encontrado: example.com/chain/billing, citado por example.com/chain/web

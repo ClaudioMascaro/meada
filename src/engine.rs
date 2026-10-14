@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::contract::{self, Level, Link};
+pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -79,11 +80,13 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let links = self.links(&exports).into_iter();
+        let (links, mut evaluations) = self.links_and_decisions(&exports);
+        let links = links.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
         export.links = links.collect();
+        export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
 
@@ -99,6 +102,12 @@ impl Engine {
 
     /// Every link of the workspace, sorted.
     fn links(&self, exports: &[Export]) -> Vec<Link> {
+        self.links_and_decisions(exports).0
+    }
+
+    /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
+    /// each repository that did not apply, in workspace order.
+    fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
         let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
             .iter()
@@ -114,8 +123,14 @@ impl Engine {
                 links.extend(kind.link(consumer, from, &providers));
             }
         }
-        decisions::replay(&mut links, repos, exports);
-        links
+        decisions::replay(links, &self.workspace, exports)
+    }
+
+    /// For each repository of the workspace, in workspace order, the decisions that do not
+    /// apply with their cause (stale), and those that wait on a missing peer.
+    pub fn stale_decisions(&self) -> Result<Vec<Evaluation>> {
+        self.refresh()?;
+        Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
     /// The open items of the workspace, ambiguous links and unresolved consumers, in id order,
@@ -494,23 +509,50 @@ fn ambiguous(call: &CallSite) -> String {
 }
 
 /// The workspace of the repository containing `dir`: each repository with where it is,
-/// relative to the one Meada runs in, and its index state, then every peer not found. It
-/// reads only; nothing is indexed.
+/// relative to the one Meada runs in, and its index state, each followed by the decisions of
+/// its `meada.decisions.toml` that are stale or wait on a missing peer; then every peer not
+/// found. It never creates an index: only when every repository is indexed at the current
+/// schema does it refresh them, like a query, to judge the decisions against the files as they
+/// are; otherwise it reports the states and no decision.
 pub fn status(dir: &Path) -> Result<String> {
     let workspace = Workspace::discover(dir)?;
     let here = &workspace.repos[0].root;
-    let mut lines: Vec<String> = workspace
-        .repos
-        .iter()
-        .map(|m| {
-            let state = match index::state(&m.root) {
-                State::Missing => Msg::NotIndexed.text(),
-                State::OtherSchema => Msg::OtherVersion.text(),
-                State::Indexed { files } => Msg::Indexed(files).text(),
-            };
-            format!("{} ({}) {state}", m.identity, relative(here, &m.root))
-        })
-        .collect();
+    let indexed =
+        |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
+    let evaluations = if workspace.repos.iter().all(indexed) {
+        Engine::open(dir)?.stale_decisions()?
+    } else {
+        Vec::new()
+    };
+    let mut lines = Vec::new();
+    for m in &workspace.repos {
+        let state = match index::state(&m.root) {
+            State::Missing => Msg::NotIndexed.text(),
+            State::OtherSchema => Msg::OtherVersion.text(),
+            State::Indexed { files } => Msg::Indexed(files).text(),
+        };
+        lines.push(format!(
+            "{} ({}) {state}",
+            m.identity,
+            relative(here, &m.root)
+        ));
+        for e in evaluations.iter().filter(|e| e.repository == m.identity) {
+            let stale = e.stale.iter().map(|s| {
+                let (call, target, cause) = (&s.call, &s.target, s.cause);
+                Msg::StaleDecision {
+                    call,
+                    target,
+                    cause,
+                }
+                .text()
+            });
+            let waiting = e.waiting.iter().map(|w| {
+                let (call, target, peer) = (&w.call, &w.target, &w.peer);
+                Msg::WaitingDecision { call, target, peer }.text()
+            });
+            lines.extend(stale.chain(waiting).map(|l| format!("  {l}")));
+        }
+    }
     lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
 }

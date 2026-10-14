@@ -16,8 +16,10 @@ give byte-identical output.
 ## Modules (`src/`)
 
 - `engine.rs`: `Engine` is the one query seam. The CLI, the MCP server and almost every test call
-  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, plus `status(dir)` (reads only,
-  never indexes). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `stale_decisions`, plus
+  `status(dir)` (never creates an index; when every repository is already indexed at the current
+  schema it refreshes them like a query, to judge decisions, and writes only inside `.meada/`;
+  otherwise it prints the states and no decision lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `Engine::open_items` feeds `list` the exports and links, so
   an item is an ambiguous link or an unresolved consumer, in id order, whose candidates sort by
@@ -37,10 +39,17 @@ give byte-identical output.
   `Repository` carries both `config` and `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
   `Decision { kind (ambiguous-link | dynamic-url), call, target, by, p }`, `load(root)` and
-  `replay(&mut links, repos, exports)`, called by `Engine::links` at the end. Replay is a pure
-  function of links, exports and the files, so nothing is stored and a changed file needs no
-  reindex. A decision applies only while its call is still an open item and its target still
-  exists (see formats below); otherwise it is ignored.
+  `replay(links, workspace, exports) -> (links, Vec<Evaluation>)`, called by
+  `Engine::links_and_decisions` at the end. Replay is a pure function of links, exports and the
+  files, so nothing is stored and a changed file needs no reindex. `judge` is the one place that
+  decides a decision's fate, in this order: call gone (`Cause::CallGone`), item no longer open
+  (the core resolves the call on its own, or the item is not of the decision's kind:
+  `ItemNotOpen`), target repository a missing peer (`Waiting`, neither applied nor stale),
+  target gone (`TargetGone`), target not among the ambiguous link's candidates (`NotCandidate`);
+  else it applies. A stale or waiting decision changes no link. `Evaluation { repository, stale:
+  Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target, peer}> }` is per
+  repository, in file order; `Engine::stale_decisions()` returns them for the workspace, and
+  `export` and `status` render them (`meada decide --list`/`--prune` reuse the same call).
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -79,7 +88,9 @@ give byte-identical output.
   and are left out of the export. A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
-  repository where Meada runs. A `decided` link also has `by` (`human` or a model id) and, for
+  repository where Meada runs. A repository with stale decisions also has `stale_decisions:
+  [{call, target, cause}]` (`call-gone`, `item-not-open`, `target-gone`, `not-candidate`), absent
+  when empty; decisions waiting on a missing peer are not exported. A `decided` link also has `by` (`human` or a model id) and, for
   a model, `p`; its reason is `decided by <by> (p=<p>)` (two decimals) or `decided by human`.
 - Decision `target`: `<provider repository identity>::<contract>`, such as
   `example.com/chain/gateway::http::GET::/api/health`; split at the first `::`. The target names
@@ -140,9 +151,10 @@ give byte-identical output.
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
-  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, stale, parse
-  errors), `freshness` (cold vs refreshed), `items` (open items and their `search` goldens,
-  fixtures `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
+  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, parse
+  errors), `stale` (stale and waiting decisions in `status` and `export`), `freshness` (cold vs
+  refreshed), `items` (open items and their `search` goldens, fixtures `open-few` and
+  `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
   `LANG`), `mcp` (the binary over stdio).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
