@@ -3,9 +3,10 @@
 
 pub mod engine;
 mod index;
+mod lang;
 pub mod mcp;
 mod render;
 pub mod repo;
-mod ts;
+mod resolve;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

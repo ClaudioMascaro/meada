@@ -1,0 +1,469 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "src/app.ts",
+      "hash": "57087710dfb0c68c27e6af8fbd3a2235048a986fb6ab8a8c8527e0880f22a3f6"
+    },
+    {
+      "path": "src/legacy.cjs",
+      "hash": "96061baec6b851852f232dad574d63195738d55c10b8e27b07ffaf7e4d7a0ee5"
+    },
+    {
+      "path": "src/math.ts",
+      "hash": "673e8154604d801ca80ebeb8abbe955d0c4f4dbf982ec42de7c4d48ab40e0ae9"
+    },
+    {
+      "path": "src/shapes/circle.ts",
+      "hash": "0d6a842df74ebec2b924f1aa6a06a82dde7147fe6dc3a686fa9165053f32883e"
+    },
+    {
+      "path": "src/shapes/index.ts",
+      "hash": "e35a6a18b890499958a676d0220e129e93020a6518c1636018f4353c9747c988"
+    },
+    {
+      "path": "src/shapes/shape.ts",
+      "hash": "4024a22b0752890a565e1ecabcaac372c0c5bd6ff77de60ca3345e52870f6250"
+    },
+    {
+      "path": "src/util/format.mjs",
+      "hash": "15d3fa046fd3eddc4cc179d63eaeeb6e8301ce5f6948fc7a3a3764c6ee58a4e5"
+    },
+    {
+      "path": "src/util/index.ts",
+      "hash": "f840c062ec00ba49bea42b396657f1a09a13ed1987d9a9e24dcea885d378827e"
+    },
+    {
+      "path": "src/util/log.js",
+      "hash": "3eedad37b6fae12e7427c1b8c2c33732c59056b6469e539d0a7e9a36bcb7de24"
+    },
+    {
+      "path": "src/view.tsx",
+      "hash": "a8a7a941bbc94b5dca6b5700cd00fe1fe9092d8e7a1128550774a1402e65750a"
+    },
+    {
+      "path": "src/widget.jsx",
+      "hash": "1ed4a85b8e401f7751ae0ca4979273cbb50a613ee9b15ba05cc5cfef78e38410"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main",
+      "span": {
+        "path": "src/app.ts",
+        "start": 249,
+        "end": 509
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/legacy.cjs::legacy",
+      "span": {
+        "path": "src/legacy.cjs",
+        "start": 0,
+        "end": 33
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::add",
+      "span": {
+        "path": "src/math.ts",
+        "start": 7,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::double",
+      "span": {
+        "path": "src/math.ts",
+        "start": 84,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::scale",
+      "span": {
+        "path": "src/math.ts",
+        "start": 216,
+        "end": 343
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::scale.times",
+      "span": {
+        "path": "src/math.ts",
+        "start": 266,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::square",
+      "span": {
+        "path": "src/math.ts",
+        "start": 141,
+        "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle",
+      "span": {
+        "path": "src/shapes/circle.ts",
+        "start": 75,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+      "span": {
+        "path": "src/shapes/circle.ts",
+        "start": 159,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.constructor",
+      "span": {
+        "path": "src/shapes/circle.ts",
+        "start": 106,
+        "end": 155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 7,
+        "end": 175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 77,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 115,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 23,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/util/format.mjs::format",
+      "span": {
+        "path": "src/util/format.mjs",
+        "start": 7,
+        "end": 64
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/util/log.js::default",
+      "span": {
+        "path": "src/util/log.js",
+        "start": 0,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/view.tsx::render",
+      "span": {
+        "path": "src/view.tsx",
+        "start": 41,
+        "end": 100
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/widget.jsx::render",
+      "span": {
+        "path": "src/widget.jsx",
+        "start": 7,
+        "end": 58
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::Circle.unit#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+      "level": "inferred",
+      "span": {
+        "path": "src/app.ts",
+        "start": 418,
+        "end": 431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::Shape.unit#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 402,
+        "end": 414
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::double#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/math.ts::double",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 301,
+        "end": 310
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::legacy#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/legacy.cjs::legacy",
+      "level": "inferred",
+      "span": {
+        "path": "src/app.ts",
+        "start": 471,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::log#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/util/log.js::default",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 386,
+        "end": 398
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::math.add#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/math.ts::add",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 350,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::numbers.square#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/math.ts::square",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 329,
+        "end": 346
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::plus#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/math.ts::add",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 287,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::render#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/view.tsx::render",
+        "example.com/acme/conformance::src/widget.jsx::render"
+      ],
+      "span": {
+        "path": "src/app.ts",
+        "start": 483,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::scale#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/math.ts::scale",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 314,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::shape.area#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.area"
+      ],
+      "span": {
+        "path": "src/app.ts",
+        "start": 455,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::shape.describe#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe",
+      "level": "inferred",
+      "span": {
+        "path": "src/app.ts",
+        "start": 435,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::useState#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/app.ts",
+        "start": 496,
+        "end": 506
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/app.ts::main::util.format#0",
+      "caller": "example.com/acme/conformance::src/app.ts::main",
+      "target": "example.com/acme/conformance::src/util/format.mjs::format",
+      "level": "exact",
+      "span": {
+        "path": "src/app.ts",
+        "start": 368,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::double::add#0",
+      "caller": "example.com/acme/conformance::src/math.ts::double",
+      "target": "example.com/acme/conformance::src/math.ts::add",
+      "level": "exact",
+      "span": {
+        "path": "src/math.ts",
+        "start": 116,
+        "end": 125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::scale::double#0",
+      "caller": "example.com/acme/conformance::src/math.ts::scale",
+      "target": "example.com/acme/conformance::src/math.ts::double",
+      "level": "exact",
+      "span": {
+        "path": "src/math.ts",
+        "start": 325,
+        "end": 340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/math.ts::scale::times#0",
+      "caller": "example.com/acme/conformance::src/math.ts::scale",
+      "target": "example.com/acme/conformance::src/math.ts::scale.times",
+      "level": "exact",
+      "span": {
+        "path": "src/math.ts",
+        "start": 332,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area::square#0",
+      "caller": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+      "target": "example.com/acme/conformance::src/math.ts::square",
+      "level": "exact",
+      "span": {
+        "path": "src/shapes/circle.ts",
+        "start": 191,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.constructor::super#0",
+      "caller": "example.com/acme/conformance::src/shapes/circle.ts::Circle.constructor",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shapes/circle.ts",
+        "start": 143,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe::this.area#0",
+      "caller": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
+      "level": "exact",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 155,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/util/format.mjs::format::(call_expression).trim#0",
+      "caller": "example.com/acme/conformance::src/util/format.mjs::format",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/util/format.mjs",
+        "start": 41,
+        "end": 61
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/util/format.mjs::format::String#0",
+      "caller": "example.com/acme/conformance::src/util/format.mjs::format",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/util/format.mjs",
+        "start": 41,
+        "end": 54
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/util/log.js::default::console.log#0",
+      "caller": "example.com/acme/conformance::src/util/log.js::default",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/util/log.js",
+        "start": 32,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/view.tsx::render::format#0",
+      "caller": "example.com/acme/conformance::src/view.tsx::render",
+      "target": "example.com/acme/conformance::src/util/format.mjs::format",
+      "level": "exact",
+      "span": {
+        "path": "src/view.tsx",
+        "start": 83,
+        "end": 92
+      }
+    }
+  ]
+}

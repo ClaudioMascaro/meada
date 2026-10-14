@@ -1,0 +1,446 @@
+//! The TypeScript and JavaScript language pack.
+
+use std::ops::Range;
+
+use tree_sitter::{Language, Node, Parser};
+
+use super::{Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules};
+use crate::Result;
+
+pub struct TsJs;
+
+impl LanguagePack for TsJs {
+    fn extensions(&self) -> &'static [&'static str] {
+        &["ts", "tsx", "js", "jsx", "mjs", "cjs"]
+    }
+
+    fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
+        let language: Language = if path.ends_with(".ts") {
+            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
+        } else if path.ends_with(".tsx") {
+            tree_sitter_typescript::LANGUAGE_TSX.into()
+        } else {
+            tree_sitter_javascript::LANGUAGE.into()
+        };
+        let mut parser = Parser::new();
+        parser.set_language(&language)?;
+        let tree = parser
+            .parse(src, None)
+            .ok_or("tree-sitter returned no tree")?;
+        let mut facts = Facts::default();
+        // Explicit stack instead of recursion: generated code can nest deeper than the call
+        // stack.
+        let mut stack = vec![Visit {
+            node: tree.root_node(),
+            scope: String::new(),
+            binding: None,
+        }];
+        while let Some(Visit {
+            node,
+            scope,
+            binding,
+        }) = stack.pop()
+        {
+            let mut inner = scope.clone();
+            if let Some((name, kind, range)) = definition(node, binding, src) {
+                inner = qualify(&scope, &name);
+                facts.defs.push(Def {
+                    name: inner.clone(),
+                    kind,
+                    range,
+                });
+            }
+            match node.kind() {
+                "call_expression" => {
+                    if let Some(function) = node.child_by_field_name("function") {
+                        facts.calls.push(Call {
+                            scope: scope.clone(),
+                            callee: callee(function, src),
+                            range: node.byte_range(),
+                        });
+                    }
+                }
+                "import_statement" => imports(node, src, &mut facts.imports),
+                "export_statement" => exports(node, src, &mut facts.exports),
+                _ => {}
+            }
+            let named = binds(node, src);
+            let children: Vec<Node> = node.children(&mut node.walk()).collect();
+            stack.extend(children.into_iter().rev().map(|child| {
+                Visit {
+                    binding: named
+                        .as_ref()
+                        .filter(|(value, _, _)| value.id() == child.id())
+                        .map(|(_, name, range)| (name.clone(), range.clone())),
+                    node: child,
+                    scope: inner.clone(),
+                }
+            }));
+        }
+        Ok(facts)
+    }
+
+    fn config_files(&self) -> &'static [&'static str] {
+        &["tsconfig.json", "jsconfig.json"]
+    }
+
+    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
+        let aliases = match configs.first() {
+            Some((name, src)) => Aliases::parse(src).map_err(|e| format!("{name}: {e}"))?,
+            None => Aliases::default(),
+        };
+        Ok(Box::new(move |importer, specifier| {
+            let bases: Vec<String> = if specifier.starts_with('.') {
+                let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
+                join(dir, specifier).into_iter().collect()
+            } else {
+                aliases.expand(specifier)
+            };
+            bases
+                .iter()
+                .flat_map(|base| with_extensions(base))
+                .collect()
+        }))
+    }
+}
+
+/// `compilerOptions.baseUrl` and `paths` of the root `tsconfig.json` (or `jsconfig.json`).
+// ponytail: `extends` and nested project configs are not followed.
+#[derive(Default)]
+struct Aliases {
+    base_url: Option<String>,
+    paths: Vec<(String, Vec<String>)>,
+}
+
+impl Aliases {
+    fn parse(src: &[u8]) -> Result<Self> {
+        let config: serde_json::Value =
+            serde_json::from_str(&strip_jsonc(std::str::from_utf8(src)?))?;
+        let options = &config["compilerOptions"];
+        let paths = options["paths"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(pattern, targets)| {
+                let targets = targets.as_array().into_iter().flatten();
+                let targets = targets.filter_map(|t| t.as_str().map(String::from));
+                (pattern.clone(), targets.collect())
+            })
+            .collect();
+        Ok(Self {
+            base_url: options["baseUrl"].as_str().and_then(|b| join("", b)),
+            paths,
+        })
+    }
+
+    /// The paths a bare specifier names: the targets of the `paths` pattern with the
+    /// longest prefix that matches, then the specifier under `baseUrl`. Without `baseUrl`,
+    /// targets are relative to the config file, at the repository root.
+    fn expand(&self, specifier: &str) -> Vec<String> {
+        let mut best: Option<(usize, &str, &[String])> = None;
+        for (pattern, targets) in &self.paths {
+            let matched = match pattern.split_once('*') {
+                Some((prefix, suffix)) => specifier
+                    .strip_prefix(prefix)
+                    .and_then(|rest| rest.strip_suffix(suffix))
+                    .map(|star| (prefix.len(), star)),
+                None => (specifier == pattern).then_some((usize::MAX, "")),
+            };
+            if let Some((rank, star)) = matched
+                && best.is_none_or(|(top, _, _)| rank > top)
+            {
+                best = Some((rank, star, targets));
+            }
+        }
+        let root = self.base_url.as_deref().unwrap_or("");
+        let mut out: Vec<String> = best
+            .into_iter()
+            .flat_map(|(_, star, targets)| {
+                targets
+                    .iter()
+                    .filter_map(move |t| join(root, &t.replacen('*', star, 1)))
+            })
+            .collect();
+        out.extend(self.base_url.as_deref().and_then(|b| join(b, specifier)));
+        out
+    }
+}
+
+/// JSON with comments and trailing commas, as `tsconfig.json` allows, made plain JSON.
+fn strip_jsonc(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut chars = src.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                out.push(c);
+                while let Some(c) = chars.next() {
+                    out.push(c);
+                    if c == '\\' {
+                        out.extend(chars.next());
+                    } else if c == '"' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&'/') => while chars.next_if(|&c| c != '\n').is_some() {},
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next();
+                let mut previous = ' ';
+                for c in chars.by_ref() {
+                    if previous == '*' && c == '/' {
+                        break;
+                    }
+                    previous = c;
+                }
+            }
+            ',' if matches!(chars.clone().find(|c| !c.is_whitespace()), Some('}' | ']')) => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+const EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+
+/// The files a module path may name: itself, its `.ts` source when it names `.js` output,
+/// itself with each extension, and its `index` file.
+fn with_extensions(base: &str) -> Vec<String> {
+    let mut out = vec![base.to_string()];
+    if let Some(stem) = base.strip_suffix(".js") {
+        out.extend([format!("{stem}.ts"), format!("{stem}.tsx")]);
+    } else if let Some(stem) = base.strip_suffix(".jsx") {
+        out.push(format!("{stem}.tsx"));
+    }
+    out.extend(EXTENSIONS.iter().map(|ext| format!("{base}.{ext}")));
+    let dir = if base.is_empty() {
+        String::new()
+    } else {
+        format!("{base}/")
+    };
+    out.extend(EXTENSIONS.iter().map(|ext| format!("{dir}index.{ext}")));
+    out
+}
+
+/// `path` resolved against the repository-relative directory `dir`; `None` when it leaves
+/// the repository.
+fn join(dir: &str, path: &str) -> Option<String> {
+    let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            part => parts.push(part),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+struct Visit<'t> {
+    node: Node<'t>,
+    scope: String,
+    /// The name and span a binding gives an anonymous function or class: `const f = () => {}`,
+    /// `export default () => {}`.
+    binding: Option<(String, Range<usize>)>,
+}
+
+/// The definition `node` makes, named by itself or by the binding that holds it.
+fn definition(
+    node: Node,
+    binding: Option<(String, Range<usize>)>,
+    src: &[u8],
+) -> Option<(String, Kind, Range<usize>)> {
+    let own = || {
+        let name = node.child_by_field_name("name")?;
+        Some((text(name, src).to_string(), node.byte_range()))
+    };
+    let (kind, (name, range)) = match node.kind() {
+        "function_declaration" | "generator_function_declaration" => (Kind::Function, own()?),
+        "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
+        // Methods of object literals are not definitions: only those of a class body.
+        "method_definition" if node.parent()?.kind() == "class_body" => (Kind::Method, own()?),
+        "arrow_function" | "function_expression" | "function" | "generator_function" => {
+            (Kind::Function, binding?)
+        }
+        "class" => (Kind::Class, binding?),
+        _ => return None,
+    };
+    Some((name, kind, range))
+}
+
+/// The child of `node` that a binding names, with that name and the binding's span:
+/// the value of a `const` declarator, or of an `export default`.
+fn binds<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, String, Range<usize>)> {
+    let value = node.child_by_field_name("value")?;
+    match node.kind() {
+        "variable_declarator" => {
+            let declaration = node.parent()?;
+            let is_const = declaration
+                .child_by_field_name("kind")
+                .is_some_and(|k| text(k, src) == "const");
+            let name = node.child_by_field_name("name")?;
+            (is_const && name.kind() == "identifier")
+                .then(|| (value, text(name, src).to_string(), node.byte_range()))
+        }
+        "export_statement" => {
+            let is_default = node
+                .children(&mut node.walk())
+                .any(|c| c.kind() == "default");
+            is_default.then(|| (value, "default".to_string(), node.byte_range()))
+        }
+        _ => None,
+    }
+}
+
+/// The bindings of `import d, { a, b as c } from 's'` and `import * as ns from 's'`.
+fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
+    let (Some(source), Some(clause)) = (
+        node.child_by_field_name("source"),
+        children(node).find(|c| c.kind() == "import_clause"),
+    ) else {
+        return;
+    };
+    let source = unquote(source, src);
+    let mut add = |local: Node, name| {
+        out.push(Import {
+            local: text(local, src).to_string(),
+            source: source.clone(),
+            name,
+        })
+    };
+    for part in children(clause) {
+        match part.kind() {
+            "identifier" => add(part, Imported::Name("default".to_string())),
+            "namespace_import" => {
+                if let Some(local) = children(part).find(|c| c.kind() == "identifier") {
+                    add(local, Imported::Namespace);
+                }
+            }
+            "named_imports" => {
+                for spec in children(part).filter(|c| c.kind() == "import_specifier") {
+                    if let Some(name) = spec.child_by_field_name("name") {
+                        let local = spec.child_by_field_name("alias").unwrap_or(name);
+                        add(local, Imported::Name(text(name, src).to_string()));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// What an `export` statement adds to the file's exports.
+fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
+    let local = |exported: &str, local: &str| Export::Local {
+        exported: exported.to_string(),
+        local: local.to_string(),
+    };
+    let declaration = node.child_by_field_name("declaration");
+    let own_name = declaration
+        .and_then(|d| d.child_by_field_name("name"))
+        .map(|n| text(n, src));
+    if children(node).any(|c| c.kind() == "default") {
+        let value = node.child_by_field_name("value");
+        let name = match (own_name, value) {
+            (Some(name), _) => name,
+            (None, Some(v)) if v.kind() == "identifier" => text(v, src),
+            // An anonymous function or class: its definition is named `default`.
+            _ => "default",
+        };
+        out.push(local("default", name));
+        return;
+    }
+    if let Some(source) = node.child_by_field_name("source") {
+        let source = unquote(source, src);
+        let from = |exported: Node, name| Export::From {
+            exported: text(exported, src).to_string(),
+            source: source.clone(),
+            name,
+        };
+        match children(node).find(|c| matches!(c.kind(), "export_clause" | "namespace_export")) {
+            Some(clause) if clause.kind() == "export_clause" => {
+                for spec in children(clause).filter(|c| c.kind() == "export_specifier") {
+                    if let Some(name) = spec.child_by_field_name("name") {
+                        let exported = spec.child_by_field_name("alias").unwrap_or(name);
+                        out.push(from(exported, Imported::Name(text(name, src).to_string())));
+                    }
+                }
+            }
+            Some(namespace) => {
+                if let Some(exported) = children(namespace).find(|c| c.kind() == "identifier") {
+                    out.push(from(exported, Imported::Namespace));
+                }
+            }
+            None => out.push(Export::All { source }),
+        }
+        return;
+    }
+    if let Some(name) = own_name {
+        out.push(local(name, name));
+    } else if let Some(declaration) = declaration {
+        // `export const a = ..., b = ...`
+        for declarator in children(declaration).filter(|c| c.kind() == "variable_declarator") {
+            if let Some(name) = declarator
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "identifier")
+            {
+                out.push(local(text(name, src), text(name, src)));
+            }
+        }
+    } else if let Some(clause) = children(node).find(|c| c.kind() == "export_clause") {
+        for spec in children(clause).filter(|c| c.kind() == "export_specifier") {
+            if let Some(name) = spec.child_by_field_name("name") {
+                let exported = spec.child_by_field_name("alias").unwrap_or(name);
+                out.push(local(text(exported, src), text(name, src)));
+            }
+        }
+    }
+}
+
+fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
+}
+
+/// A string literal's content: `'./m'` is `./m`.
+fn unquote(node: Node, src: &[u8]) -> String {
+    let quoted = text(node, src);
+    quoted
+        .get(1..quoted.len().saturating_sub(1))
+        .unwrap_or("")
+        .to_string()
+}
+
+/// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
+/// so no source text beyond names reaches the index.
+fn callee(node: Node, src: &[u8]) -> String {
+    match node.kind() {
+        "identifier" | "this" | "super" | "property_identifier" | "private_property_identifier" => {
+            text(node, src).to_string()
+        }
+        "member_expression" => match (
+            node.child_by_field_name("object"),
+            node.child_by_field_name("property"),
+        ) {
+            (Some(object), Some(property)) => {
+                format!("{}.{}", callee(object, src), text(property, src))
+            }
+            _ => format!("({})", node.kind()),
+        },
+        kind => format!("({kind})"),
+    }
+}
+
+fn qualify(scope: &str, name: &str) -> String {
+    if scope.is_empty() {
+        name.to_string()
+    } else {
+        format!("{scope}.{name}")
+    }
+}
+
+fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
+    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
+}

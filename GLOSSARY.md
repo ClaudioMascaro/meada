@@ -20,6 +20,17 @@ A range in a source file, stored as a location and a content hash. Its text is r
 when shown.
 _Avoid_: snippet, line range
 
+**Language pack**:
+What Meada knows about one language: the file extensions it handles and the tree-sitter
+queries that read what one file defines, imports, exports and calls. It never touches the index
+or other files. A pack is done when it passes the conformance suite over its fixture.
+_Avoid_: plugin, parser, grammar
+
+**Language adapter**:
+The seam between a language pack and Meada's shared scope and import resolution, which
+connects each call to the definitions it reaches and gives the call a level.
+_Avoid_: driver, frontend, bridge
+
 ### Across repositories
 
 **Peer**:
