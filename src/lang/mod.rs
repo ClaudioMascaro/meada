@@ -4,6 +4,8 @@
 
 use std::ops::Range;
 
+use serde::{Deserialize, Serialize};
+
 use crate::Result;
 
 pub mod ts;
@@ -44,8 +46,9 @@ pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
 
-/// One file's facts, each list in source order.
-#[derive(Default)]
+/// One file's facts, each list in source order. The index keeps them, so a refresh resolves
+/// unchanged files without parsing them again.
+#[derive(Default, Serialize, Deserialize)]
 pub struct Facts {
     pub defs: Vec<Def>,
     pub imports: Vec<Import>,
@@ -55,12 +58,14 @@ pub struct Facts {
 
 /// A file-level binding to what another module exports: `import { name as local } from
 /// 'source'`.
+#[derive(Serialize, Deserialize)]
 pub struct Import {
     pub local: String,
     pub source: String,
     pub name: Imported,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum Imported {
     /// One exported name; a default import is the name `default`.
     Name(String),
@@ -68,6 +73,7 @@ pub enum Imported {
     Namespace,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum Export {
     /// `exported` names the file-level binding `local`: a definition or an import.
     Local { exported: String, local: String },
@@ -81,7 +87,7 @@ pub enum Export {
     All { source: String },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Kind {
     Function,
     Class,
@@ -90,6 +96,7 @@ pub enum Kind {
 
 /// A definition. `name` is qualified by its enclosing definitions: `outer.inner`,
 /// `Class.method`.
+#[derive(Serialize, Deserialize)]
 pub struct Def {
     pub name: String,
     pub kind: Kind,
@@ -99,6 +106,7 @@ pub struct Def {
 /// A call site. `scope` is the qualified name of the enclosing definition, empty at the top
 /// level; `callee` is the normalized call expression: `a.b.c` for identifier and member
 /// chains, `(<node kind>)` for any other expression.
+#[derive(Serialize, Deserialize)]
 pub struct Call {
     pub scope: String,
     pub callee: String,

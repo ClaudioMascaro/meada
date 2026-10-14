@@ -27,7 +27,7 @@ fn main() -> ExitCode {
         Command::Mcp => meada::mcp::serve(),
         command => Engine::open(Path::new(".")).and_then(|engine| match command {
             Command::Export => engine.export().map(|json| print!("{json}")),
-            _ => Ok(()),
+            _ => engine.refresh(),
         }),
     };
     match result {

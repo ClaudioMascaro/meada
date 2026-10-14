@@ -1,5 +1,5 @@
 //! The MCP server: a thin adapter over the query engine (ADR 0008). No tool writes; the only
-//! write is the index refresh that `Engine::open` does. Stdout is the protocol channel, so
+//! write is the index refresh every query does first. Stdout is the protocol channel, so
 //! anything else goes to stderr.
 
 use std::path::Path;
@@ -37,7 +37,7 @@ struct Meada {
     tool_router: ToolRouter<Self>,
 }
 
-/// Opens the repository of the current directory, refreshing its index, and runs `ask`.
+/// Opens the repository of the current directory and runs `ask`, which refreshes the index.
 fn answer(ask: impl FnOnce(&Engine) -> crate::Result<String>) -> Result<String, String> {
     Engine::open(Path::new("."))
         .and_then(|engine| ask(&engine))

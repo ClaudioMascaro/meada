@@ -1,0 +1,7 @@
+example.com/acme/conformance src/widget.jsx:1 render
+function render(label) {
+  return <i>{label}</i>;
+}
+callers:
+example.com/acme/conformance src/app.ts:21 main [ambiguous]
+callees: none

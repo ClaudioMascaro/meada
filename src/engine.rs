@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::index::{Export, Symbol};
+use crate::index::{CallSite, Export, Symbol};
 use crate::{Result, index, render, repo};
 
 pub struct Engine {
@@ -16,19 +16,23 @@ pub struct Engine {
 }
 
 impl Engine {
-    /// Opens the repository that contains `dir` and brings its index up to date.
+    /// Opens the repository that contains `dir`. Every query refreshes its index first.
     pub fn open(dir: &Path) -> Result<Self> {
         let root = repo::root(dir)?;
         let identity = repo::identity(&root);
-        let mut db = index::open(&root)?;
-        // ponytail: full rebuild on every open; incremental refresh by mtime and size comes
-        // with the freshness ticket.
-        index::rebuild(&mut db, &root, &identity)?;
+        let db = index::open(&root)?;
         Ok(Self { db, root, identity })
+    }
+
+    /// Brings the index up to date with the files on disk (ADR 0004), with no watcher: only
+    /// files whose mtime or size changed are hashed.
+    pub fn refresh(&self) -> Result<()> {
+        index::refresh(&self.db, &self.root, &self.identity)
     }
 
     /// The canonical export: the whole index as sorted, pretty-printed JSON.
     pub fn export(&self) -> Result<String> {
+        self.refresh()?;
         let export = index::export(&self.db, &self.identity)?;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
     }
@@ -37,6 +41,7 @@ impl Engine {
     /// first, then prefix, then substring, ties by identity. `kind` keeps only that kind of
     /// match (`symbol` is the only kind so far). The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
         let export = index::export(&self.db, &self.identity)?;
         let needle = query.to_lowercase();
         let mut hits: Vec<(u8, &Symbol)> = Vec::new();
@@ -75,6 +80,11 @@ impl Engine {
     /// name; when it fits several symbols, they are listed instead of guessed. The answer is
     /// cut at `budget` tokens.
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        self.context_fresh(symbol, budget, true)
+    }
+
+    fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let export = index::export(&self.db, &self.identity)?;
         let suffix = format!("::{symbol}");
         let found: Vec<&Symbol> = export
@@ -97,13 +107,26 @@ impl Engine {
             }));
             return Ok(render::budgeted(&lines, budget));
         };
+        let text = self.span_text(&export, symbol_found);
+        if text.is_none() && retry {
+            // The file changed without its mtime or size showing it: hash it again.
+            index::forget(&self.db, &symbol_found.span.path)?;
+            self.refresh()?;
+            return self.context_fresh(symbol, budget, false);
+        }
         let mut lines = vec![self.line(&mut files, symbol_found, label(&symbol_found.id))];
-        lines.extend(self.span_text(&export, symbol_found));
+        lines.extend(text.unwrap_or_else(|| {
+            vec![format!(
+                "(span text unavailable: {} changed since indexing)",
+                symbol_found.span.path
+            )]
+        }));
         lines.extend(self.relations(&export, &mut files, &symbol_found.id));
         Ok(render::budgeted(&lines, budget))
     }
 
-    fn span_text(&self, export: &Export, symbol: &Symbol) -> Vec<String> {
+    /// The span's lines, or `None` when its file no longer has the indexed hash.
+    fn span_text(&self, export: &Export, symbol: &Symbol) -> Option<Vec<String>> {
         let path = &symbol.span.path;
         let indexed = export
             .files
@@ -113,15 +136,14 @@ impl Engine {
         let text = fs::read(self.root.join(path)).ok().filter(|src| {
             indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str())
         });
-        match text.and_then(|src| {
-            let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
-            Some(String::from_utf8_lossy(span).into_owned())
-        }) {
-            Some(text) => text.lines().map(str::to_string).collect(),
-            None => vec![format!(
-                "(span text unavailable: {path} changed since indexing)"
-            )],
-        }
+        let src = text?;
+        let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
+        Some(
+            String::from_utf8_lossy(span)
+                .lines()
+                .map(str::to_string)
+                .collect(),
+        )
     }
 
     fn relations(&self, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
@@ -130,7 +152,7 @@ impl Engine {
         let mut callers: Vec<_> = export
             .calls
             .iter()
-            .filter(|c| c.target.as_deref() == Some(id))
+            .filter(|c| c.target.as_deref() == Some(id) || c.candidates.iter().any(|t| t == id))
             .collect();
         callers.sort_by_key(|c| (&c.span.path, c.span.start));
         let callers: Vec<String> = callers
@@ -141,9 +163,10 @@ impl Engine {
                     .then(|| label(&c.caller));
                 let location = self.at(files, &c.span.path, c.span.start);
                 format!(
-                    "{} {location} {}",
+                    "{} {location} {}{}",
                     self.identity,
-                    name.unwrap_or("(top level)")
+                    name.unwrap_or("(top level)"),
+                    ambiguous(c)
                 )
             })
             .collect();
@@ -151,16 +174,29 @@ impl Engine {
         callees.sort_by_key(|c| (c.target.is_none(), &c.id));
         let mut callees: Vec<String> = callees
             .iter()
-            .map(|c| match c.target.as_deref().and_then(|t| symbols.get(t)) {
-                Some(target) => self.line(files, target, label(&target.id)),
-                None => {
+            .flat_map(|c| {
+                // An ambiguous call lists every candidate, marked, instead of a guess.
+                let targets: Vec<&Symbol> = c
+                    .target
+                    .iter()
+                    .chain(&c.candidates)
+                    .filter_map(|t| symbols.get(t.as_str()).copied())
+                    .collect();
+                if targets.is_empty() {
                     let callee =
                         c.id.strip_prefix(&format!("{}::", c.caller))
                             .unwrap_or(&c.id);
                     let callee = callee.rsplit_once('#').map_or(callee, |(name, _)| name);
                     let location = self.at(files, &c.span.path, c.span.start);
-                    format!("{} {location} (unresolved) {callee}", self.identity)
+                    return vec![format!(
+                        "{} {location} (unresolved) {callee}",
+                        self.identity
+                    )];
                 }
+                targets
+                    .iter()
+                    .map(|t| self.line(files, t, label(&t.id)) + ambiguous(c))
+                    .collect()
             })
             .collect();
         callees.dedup();
@@ -186,6 +222,15 @@ impl Engine {
             }
             None => path.to_string(),
         }
+    }
+}
+
+/// ` [ambiguous]` for an ambiguous call, empty otherwise.
+fn ambiguous(call: &CallSite) -> &'static str {
+    if call.level.as_deref() == Some("ambiguous") {
+        " [ambiguous]"
+    } else {
+        ""
     }
 }
 

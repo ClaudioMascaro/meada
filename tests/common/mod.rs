@@ -87,3 +87,29 @@ fn copy_dir(from: &Path, to: &Path) {
         }
     }
 }
+
+/// Sets the modification time of every file under `dir` but `.git/` to an instant long past,
+/// so no file counts as just written and a later edit always changes it.
+pub fn age(dir: &Path) {
+    let past = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.ends_with(".git") {
+            continue;
+        }
+        if path.is_dir() {
+            age(&path);
+        } else {
+            set_mtime(&path, past);
+        }
+    }
+}
+
+pub fn set_mtime(path: &Path, time: std::time::SystemTime) {
+    fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(time)
+        .unwrap();
+}
