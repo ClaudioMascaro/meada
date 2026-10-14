@@ -8,6 +8,7 @@ mod http;
 mod index;
 mod lang;
 pub mod mcp;
+pub mod msg;
 mod render;
 pub mod repo;
 mod resolve;

@@ -8,6 +8,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, Link};
 use crate::index::{CallSite, Export, State, Symbol};
+use crate::msg::Msg;
 use crate::workspace::{Member, Workspace};
 use crate::{Result, index, render};
 
@@ -31,11 +32,11 @@ impl Engine {
         if workspace.repos.len() > MAX_PEERS + 1 {
             // ponytail: one connection attaches every peer; batch the attaches when a
             // workspace outgrows SQLite's limit.
-            return Err(format!(
-                "the workspace has {} repositories; v0.1 reads at most {}",
-                workspace.repos.len(),
-                MAX_PEERS + 1
-            )
+            return Err(Msg::TooManyRepos {
+                found: workspace.repos.len(),
+                max: MAX_PEERS + 1,
+            }
+            .text()
             .into());
         }
         // Opening creates a missing index, or recreates one of another schema, before it is
@@ -353,19 +354,20 @@ pub fn status(dir: &Path) -> Result<String> {
         .iter()
         .map(|m| {
             let state = match index::state(&m.root) {
-                State::Missing => "not indexed".to_string(),
-                State::OtherSchema => "indexed by another version; rebuilt on next use".into(),
-                State::Indexed { files } => format!("indexed, {files} files"),
+                State::Missing => Msg::NotIndexed.text(),
+                State::OtherSchema => Msg::OtherVersion.text(),
+                State::Indexed { files } => Msg::Indexed(files).text(),
             };
             format!("{} ({}) {state}", m.identity, relative(here, &m.root))
         })
         .collect();
-    lines.extend(
-        workspace
-            .missing
-            .iter()
-            .map(|m| format!("missing peer: {}, named by {}", m.repo, m.named_by)),
-    );
+    lines.extend(workspace.missing.iter().map(|m| {
+        Msg::MissingPeer {
+            repo: &m.repo,
+            named_by: &m.named_by,
+        }
+        .text()
+    }));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
 }
 
