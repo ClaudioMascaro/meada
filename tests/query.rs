@@ -84,18 +84,23 @@ fn context_lists_candidates_instead_of_guessing() {
 }
 
 #[test]
-fn context_withholds_span_text_of_a_file_that_changed_since_indexing() {
+fn context_lists_every_candidate_of_an_ambiguous_call() {
+    // `render(1)` in `main` fits `render` in both `view.tsx` and `widget.jsx`.
     let repo = fixture_repo(
-        "context_stale",
-        "ts-basic",
-        Some("https://example.com/acme/web.git"),
+        "context_ambiguous_call",
+        "conformance-ts-js",
+        Some("https://example.com/acme/conformance.git"),
     );
     let engine = Engine::open(&repo).unwrap();
-    std::fs::write(repo.join("src/math.ts"), "// edited\n").unwrap();
 
-    let answer = engine.context("sum", None).unwrap();
-
-    assert!(answer.contains("(span text unavailable: src/math.ts changed since indexing)"));
+    assert_golden(
+        "conformance-ts-js.context-main.txt",
+        &engine.context("main", None).unwrap(),
+    );
+    assert_golden(
+        "conformance-ts-js.context-render.txt",
+        &engine.context("src/widget.jsx::render", None).unwrap(),
+    );
 }
 
 #[test]

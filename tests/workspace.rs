@@ -54,8 +54,8 @@ fn status_lists_the_workspace_index_states_and_missing_peers() {
         "http-web.status-unindexed.txt",
         &engine::status(&web).unwrap(),
     );
-    // Opening the consumer builds the peer's index inside the peer's own `.meada/`.
-    Engine::open(&web).unwrap();
+    // The consumer's first query builds the peer's index inside the peer's own `.meada/`.
+    Engine::open(&web).unwrap().refresh().unwrap();
     assert_golden("http-web.status.txt", &engine::status(&web).unwrap());
     assert_eq!(
         common::git(&api, &["status", "--porcelain", "--ignored"]),

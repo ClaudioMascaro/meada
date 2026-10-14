@@ -31,7 +31,7 @@ fn main() -> ExitCode {
         Command::Status => engine::status(here).map(|status| print!("{status}")),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export => engine.export().map(|json| print!("{json}")),
-            _ => Ok(()),
+            _ => engine.refresh(),
         }),
     };
     match result {
