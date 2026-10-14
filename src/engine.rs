@@ -13,7 +13,7 @@ use crate::msg::Msg;
 use crate::render::{Files, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, index, items, render, repo, trace};
+use crate::{Result, decisions, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -114,7 +114,7 @@ impl Engine {
                 links.extend(kind.link(consumer, from, &providers));
             }
         }
-        links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
+        decisions::replay(&mut links, repos, exports);
         links
     }
 
@@ -341,14 +341,28 @@ impl Engine {
             )]
         }));
         lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        lines.extend(contracts(identity, export, &mut files, symbol_found));
+        let links = self.links(&exports);
+        lines.extend(contracts(
+            identity,
+            export,
+            &links,
+            &mut files,
+            symbol_found,
+        ));
         Ok(render::budgeted(&lines, budget))
     }
 }
 
 /// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
-/// ones included; nothing when it has none.
-fn contracts(identity: &str, export: &Export, files: &mut Files, symbol: &Symbol) -> Vec<String> {
+/// ones included, each followed by its decided links (`links` are the workspace's); nothing
+/// when it has none.
+fn contracts(
+    identity: &str,
+    export: &Export,
+    links: &[Link],
+    files: &mut Files,
+    symbol: &Symbol,
+) -> Vec<String> {
     let mut lines: Vec<String> = export
         .providers
         .iter()
@@ -364,9 +378,26 @@ fn contracts(identity: &str, export: &Export, files: &mut Files, symbol: &Symbol
             continue;
         };
         let location = files.at(&call.span.path, call.span.start);
-        let contract = consumer.contract.clone();
-        let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
-        lines.push(format!("{identity} {location} consumes {contract}"));
+        let decided = links
+            .iter()
+            .filter(|l| l.consumer == consumer.site && l.level == Level::Decided)
+            .filter(|l| consumer.contract.as_ref().is_none_or(|c| *c == l.contract));
+        let mut any = false;
+        for link in decided {
+            any = true;
+            lines.push(format!(
+                "{identity} {location} consumes {} →[{}: {}] {}",
+                link.contract,
+                link.level.name(),
+                link.reason,
+                link.provider
+            ));
+        }
+        if !any {
+            let contract = consumer.contract.clone();
+            let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
+            lines.push(format!("{identity} {location} consumes {contract}"));
+        }
     }
     if lines.is_empty() {
         return lines;

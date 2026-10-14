@@ -32,7 +32,15 @@ give byte-identical output.
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively). Peers not found go to `Workspace::missing`. `config`
   parses the v0.1 subset (`[[peer]]`, `[serve] hosts`) with `deny_unknown_fields`; keys track A
-  adds are listed in `LATER` so the error says "not in v0.1".
+  adds are listed in `LATER` so the error says "not in v0.1". `config::read<T>(root, name)` is the
+  shared TOML reader (file, line and key in every error), also used for the decisions file;
+  `Repository` carries both `config` and `decisions`, loaded together at discovery.
+- `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
+  `Decision { kind (ambiguous-link | dynamic-url), call, target, by, p }`, `load(root)` and
+  `replay(&mut links, repos, exports)`, called by `Engine::links` at the end. Replay is a pure
+  function of links, exports and the files, so nothing is stored and a changed file needs no
+  reindex. A decision applies only while its call is still an open item and its target still
+  exists (see formats below); otherwise it is ignored.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -71,7 +79,12 @@ give byte-identical output.
   and are left out of the export. A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
-  repository where Meada runs.
+  repository where Meada runs. A `decided` link also has `by` (`human` or a model id) and, for
+  a model, `p`; its reason is `decided by <by> (p=<p>)` (two decimals) or `decided by human`.
+- Decision `target`: `<provider repository identity>::<contract>`, such as
+  `example.com/chain/gateway::http::GET::/api/health`; split at the first `::`. The target names
+  no site: if the repository serves the contract from several, the link goes to the first by site.
+  Decision `call` is a consumer's call-site identity.
 
 ## Seams and what extends them
 
@@ -102,8 +115,10 @@ give byte-identical output.
   are `serde(skip)`, so unchanged files come back from SQLite without them. `Code` records every
   file it needs but lacks as a miss, and `refresh` re-parses those and extracts again until none
   is missed. A contract kind that reads a value from a new place relies on this loop.
-- Links are never stored. They derive from the stored provider and consumer contracts when a
-  query runs, so a change on either side needs no relinking.
+- Links are never stored. They derive from the stored provider and consumer contracts, then the
+  decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
+  no relinking. `Level` order: `exact` < `inferred` < `decided` < `ambiguous` (`declared` joins
+  with spec #19).
 - One index per identity: a second clone of a repository already in the workspace is skipped.
 - `context` shows span text only while the file's BLAKE3 still equals the indexed hash; on a
   mismatch it forgets the file's mtime, refreshes and retries once.
@@ -116,16 +131,19 @@ give byte-identical output.
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
   the three-repository chain as siblings. `git()` pins config, author and dates; `age()` pushes
-  mtimes into the past so a later edit always changes them.
+  mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
+  `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
+  has none.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
-  (constants, wrappers, Express, inferred links), `trace`, `freshness` (cold vs refreshed),
-  `items` (open items and their `search` goldens, fixtures `open-few` and `open-generated`), `cli`
-  (the binary under pt_BR, en_US and de_DE `LANG`), `mcp` (the binary over stdio).
+  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, stale, parse
+  errors), `freshness` (cold vs refreshed), `items` (open items and their `search` goldens,
+  fixtures `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
+  `LANG`), `mcp` (the binary over stdio).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
 

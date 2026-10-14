@@ -1,0 +1,10 @@
+example.com/chain/web src/status.ts:7 track
+function track(event: { url: string }) {
+  return fetch(event.url, { method: "POST" });
+}
+callers:
+example.com/chain/web src/dashboard.ts:6 dashboard
+callees:
+example.com/chain/web src/status.ts:8 (unresolved) fetch
+contracts:
+example.com/chain/web src/status.ts:8 consumes http::POST::/api/events →[decided: decided by openrouter/jev (p=0.62)] example.com/chain/catalog::app/api/events/route.ts::POST

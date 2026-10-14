@@ -1,1 +1,1 @@
-example.com/chain/web src/status.ts:8 (unresolved) candidates: 0; run `meada decide --item example.com/chain/web::src/status.ts::track::fetch#0`
+example.com/chain/web src/status.ts:8 (unresolved) candidates: 2; run `meada decide --item example.com/chain/web::src/status.ts::track::fetch#0`

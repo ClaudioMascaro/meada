@@ -19,7 +19,7 @@ pub enum Msg<'a> {
     TooManyRepos { found: usize, max: usize },
     KeyMissing(&'a str),
     KeyLater { key: &'a str, release: &'a str },
-    KeyUnknown(&'a str),
+    KeyUnknown { key: &'a str, file: &'a str },
     TrackA,
     About,
     Index,
@@ -55,9 +55,9 @@ impl Msg<'_> {
                 format!("`{key}` is not in v0.1; {release}"),
                 format!("`{key}` não existe na v0.1; {release}"),
             ),
-            Msg::KeyUnknown(key) => pick(
-                format!("`{key}` is not a meada.toml key"),
-                format!("`{key}` não é uma chave do meada.toml"),
+            Msg::KeyUnknown { key, file } => pick(
+                format!("`{key}` is not a {file} key"),
+                format!("`{key}` não é uma chave do {file}"),
             ),
             Msg::TrackA => pick(
                 "track A adds it (resources and gateway)".into(),

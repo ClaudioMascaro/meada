@@ -496,6 +496,8 @@ impl ContractKind for Http {
                 } else {
                     format!("{reason} {}", repo.identity)
                 },
+                by: None,
+                p: None,
             })
             .collect()
     }
