@@ -35,6 +35,12 @@ pub enum Msg<'a> {
         found: usize,
         max: usize,
     },
+    ViaUnmatched {
+        contract: &'a str,
+        via: &'a str,
+    },
+    ViaFallback(&'a str),
+    UnlinkedResource(&'a str),
     KeyMissing(&'a str),
     KeyLater {
         key: &'a str,
@@ -161,6 +167,18 @@ impl Msg<'_> {
             Msg::TooManyRepos { found, max } => pick(
                 format!("the workspace has {found} repositories; v0.1 reads at most {max}"),
                 format!("o workspace tem {found} repositórios; a v0.1 lê no máximo {max}"),
+            ),
+            Msg::ViaUnmatched { contract, via } => pick(
+                format!("{contract}: `via` {via} matches no symbol, ignored"),
+                format!("{contract}: `via` {via} não corresponde a nenhum símbolo, ignorado"),
+            ),
+            Msg::ViaFallback(contract) => pick(
+                format!("{contract}: no `via` matches a symbol, so the repository as a whole is the side"),
+                format!("{contract}: nenhum `via` corresponde a um símbolo, então o repositório inteiro é o lado"),
+            ),
+            Msg::UnlinkedResource(contract) => pick(
+                format!("{contract} is unlinked: no writer and reader in different repositories"),
+                format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
             ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
             Msg::KeyLater { key, release } => pick(

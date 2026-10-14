@@ -18,8 +18,9 @@ use crate::engine::{Direction, Engine, Start};
 struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
-    /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), or `ambiguous` or
-    /// `unresolved` (open items, with the `meada decide` command for each).
+    /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), `resource` (a
+    /// declared one, matched by kind and id), or `ambiguous` or `unresolved` (open items, with
+    /// the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -27,7 +28,7 @@ struct SearchArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct ContextArgs {
-    /// Symbol name, `<path>::<name>` or full identity.
+    /// Symbol name, `<path>::<name>` or full identity; or a resource, `resource::<kind>::<id>`.
     symbol: String,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,

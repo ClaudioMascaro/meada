@@ -6,7 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use common::{assert_golden, chain, decisions, fixture_repo};
+use common::{assert_golden, chain, decisions, fixture_repo, loose_chain};
 
 /// Runs `meada <arg>` in `repo` under `lang`; returns stdout and stderr, with the repository's
 /// path replaced by `<repo>`.
@@ -97,6 +97,18 @@ fn status_reports_stale_and_waiting_decisions_follow_lang() {
         assert_golden(
             &format!("cli.status-stale.{name}.txt"),
             &meada(&web, lang, "status"),
+        );
+    }
+}
+
+#[test]
+fn status_reports_loose_resources_follow_lang() {
+    let gateway = loose_chain("cli_resources");
+    meada(&gateway, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-resources.{name}.txt"),
+            &meada(&gateway, lang, "status"),
         );
     }
 }

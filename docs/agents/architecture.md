@@ -22,7 +22,11 @@ give byte-identical output.
   an index; when every repository is already indexed at the current schema it refreshes them
   like a query, to evaluate decisions, and writes
   only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. `search`
+  kind `resource` is the contracts under `resource::` (matched by kind and id), the same lines
+  `contract` and no kind list; `context` on `resource::<kind>::<id>` lists the writers and
+  readers across the workspace (`resource_sides`). `status` also prints, under each
+  repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -150,11 +154,16 @@ give byte-identical output.
   turns each `[[resource]]` `via` symbol the repository has into a provider (writer) or
   consumer (reader) of `resource::<kind>::<id>`, and `link` joins every reader to every writer
   of another repository at `declared`, reason the contract. A `via` that names no symbol is
-  dropped; entries without `via` get no side yet.
+  dropped. An entry without `via`, or with none matched, makes the repository the side: the
+  `site` is the bare repository identity (no `::`), the **repository-level** side. `report`
+  gives the status lines per repository: each unmatched `via`, the fallback to repository
+  level, and a resource with no link in the workspace (unlinked).
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
-  down and back going up; a call-site consumer the other way. Starts take only HTTP routes,
-  not resources.
+  down and back going up; a call-site consumer the other way. A repository-level side
+  (`Graph::is_repo`) prints as `<repository> (repository-level)` and ends its branch: it is
+  pushed as a row, never entered. Starts take only HTTP routes, symbols and call sites; a
+  `resource::...` start gets an answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
@@ -176,7 +185,8 @@ give byte-identical output.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
   consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
   and are left out of the export. A resource side is a
-  provider or consumer whose `site` is the `via` symbol (a consumer's `via` is null). A call has
+  provider or consumer whose `site` is the `via` symbol, or the repository identity for a
+  repository-level side (a consumer's `via` is null). A call has
   `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
   `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
   repository where Meada runs. A repository with stale decisions also has `stale_decisions:
@@ -238,7 +248,9 @@ give byte-identical output.
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
   the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
-  the `postgres` `orders` resource the gateway writes. `git()` pins config, author and dates; `age()` pushes
+  the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
+  level). `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
+  catalog. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
   has none.
@@ -253,7 +265,8 @@ give byte-identical output.
   in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness`
   (cold vs refreshed), `items` (open items and their `search` goldens, fixtures `open-few` and
   `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
-  `LANG`), `mcp` (the binary over stdio).
+  `LANG`), `mcp` (the binary over stdio), `resources` (resource `search`, `context`, `trace`
+  start and `status` over the chain).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -290,8 +303,6 @@ Each is marked `ponytail:` at its site unless noted.
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
-- `resource.rs`: a `[[resource]]` entry without `via`, or none of whose `via` names a symbol,
-  has no side (the repository-level side is #44 of spec #19).
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

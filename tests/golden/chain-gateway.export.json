@@ -269,6 +269,13 @@
   ],
   "links": [
     {
+      "consumer": "example.com/chain/catalog",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    },
+    {
       "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "contract": "http::GET::/api/products/{}",
