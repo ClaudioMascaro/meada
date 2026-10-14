@@ -3,6 +3,8 @@
 
 pub mod engine;
 mod index;
+pub mod mcp;
+mod render;
 pub mod repo;
 mod ts;
 

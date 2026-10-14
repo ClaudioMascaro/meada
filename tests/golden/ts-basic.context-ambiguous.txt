@@ -1,0 +1,3 @@
+`add` fits 2 symbols; pass one of:
+example.com/acme/web src/math.ts:1 src/math.ts::add
+example.com/acme/web src/other.ts:1 src/other.ts::add
