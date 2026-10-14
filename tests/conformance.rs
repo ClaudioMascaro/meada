@@ -183,3 +183,306 @@ fn typescript_and_javascript() {
         ],
     );
 }
+
+#[test]
+fn python() {
+    conform(
+        "conformance-python",
+        &[
+            "defs.py::Registry",
+            "defs.py::Registry.Meta",
+            "defs.py::Registry.Meta.label",
+            "defs.py::Registry.add",
+            "defs.py::Registry.build",
+            "defs.py::Registry.load",
+            "defs.py::Registry.tagged",
+            "defs.py::Registry.unit",
+            "defs.py::decorated",
+            "defs.py::fetch_all",
+            "defs.py::outer",
+            "defs.py::outer.inner",
+            "defs.py::plain",
+            "defs.py::register",
+            "defs.py::register.wrapper",
+            "defs.py::sorted_names",
+            "geometry/extra/measure.py::perimeter",
+            "geometry/shapes.py::Circle",
+            "geometry/shapes.py::Circle.__init__",
+            "geometry/shapes.py::Circle.area",
+            "geometry/shapes.py::Circle.describe",
+            "geometry/shapes.py::Shape",
+            "geometry/shapes.py::Shape.area",
+            "geometry/shapes.py::Shape.unit",
+            "geometry/shapes.py::area_of",
+            "geometry/shapes.py::scale",
+            "geometry/units.py::to_cm",
+            "helpers.py::clamp",
+            "helpers.py::format_name",
+            "legacy.py::legacy",
+            "main.py::main",
+            "src/billing/invoice.py::total",
+            "src/billing/tax.py::fee",
+            "src/billing/tax.py::vat",
+            "stars/computed.py::named",
+            "stars/computed.py::unnamed",
+            "stars/literal.py::Shown",
+            "stars/literal.py::listed",
+            "stars/literal.py::unlisted",
+            "stars/underscore.py::_internal",
+            "stars/underscore.py::visible",
+        ],
+        &[
+            // In-file scope: a comprehension and a nested function, a nested function called
+            // from its parent, a class body, methods, and lambdas, whose calls belong to the
+            // enclosing symbol (the module, here, or `sorted_names`).
+            ("defs.py::fetch_all::plain#0", EXACT, &["defs.py::plain"]),
+            ("defs.py::outer.inner::plain#0", EXACT, &["defs.py::plain"]),
+            ("defs.py::outer::inner#0", EXACT, &["defs.py::outer.inner"]),
+            ("defs.py::decorated::plain#0", EXACT, &["defs.py::plain"]),
+            ("defs.py::Registry::plain#0", EXACT, &["defs.py::plain"]),
+            (
+                "defs.py::Registry.load::fetch_all#0",
+                EXACT,
+                &["defs.py::fetch_all"],
+            ),
+            (
+                "defs.py::Registry.unit::plain#0",
+                EXACT,
+                &["defs.py::plain"],
+            ),
+            (
+                "defs.py::Registry.tagged::plain#0",
+                EXACT,
+                &["defs.py::plain"],
+            ),
+            (
+                "defs.py::Registry.Meta.label::plain#0",
+                EXACT,
+                &["defs.py::plain"],
+            ),
+            ("defs.py::plain#0", EXACT, &["defs.py::plain"]),
+            ("defs.py::sorted_names::plain#0", EXACT, &["defs.py::plain"]),
+            // Built-ins, a decorator from an imported package, parameters and `self`: no
+            // definition fits.
+            ("defs.py::register::functools.wraps#0", None, &[]),
+            ("defs.py::register.wrapper::func#0", None, &[]),
+            ("defs.py::Registry.add::self.items.append#0", None, &[]),
+            ("defs.py::Registry.build::cls#0", None, &[]),
+            ("defs.py::sorted_names::sorted#0", None, &[]),
+            // Relative imports: `from .m import f`, and `from . import m` and `from .. import
+            // m`, where `m` is a module of the package.
+            (
+                "geometry/shapes.py::scale::to_cm#0",
+                EXACT,
+                &["geometry/units.py::to_cm"],
+            ),
+            (
+                "geometry/shapes.py::Circle.area::scale#0",
+                EXACT,
+                &["geometry/shapes.py::scale"],
+            ),
+            (
+                "geometry/shapes.py::Circle.describe::to_cm#0",
+                EXACT,
+                &["geometry/units.py::to_cm"],
+            ),
+            (
+                "geometry/extra/measure.py::perimeter::units.to_cm#0",
+                EXACT,
+                &["geometry/units.py::to_cm"],
+            ),
+            (
+                "geometry/extra/measure.py::perimeter::area_of#0",
+                EXACT,
+                &["geometry/shapes.py::area_of"],
+            ),
+            // `import a.b` binds `a.b` as a whole.
+            (
+                "geometry/extra/measure.py::perimeter::geometry.shapes.scale#0",
+                EXACT,
+                &["geometry/shapes.py::scale"],
+            ),
+            // The `src/` layout, with `from . import tax` and `from .tax import vat`.
+            (
+                "src/billing/invoice.py::total::vat#0",
+                EXACT,
+                &["src/billing/tax.py::vat"],
+            ),
+            (
+                "src/billing/invoice.py::total::tax.fee#0",
+                EXACT,
+                &["src/billing/tax.py::fee"],
+            ),
+            // Imports through a package: a re-export of a class and of a function, the
+            // function as an attribute of the package, a submodule `__init__.py` imports, a
+            // deeper module named in full, and an alias of a module.
+            (
+                "main.py::main::Round#0",
+                EXACT,
+                &["geometry/shapes.py::Circle"],
+            ),
+            (
+                "main.py::main::area_of#0",
+                EXACT,
+                &["geometry/shapes.py::area_of"],
+            ),
+            (
+                "main.py::main::geometry.area_of#0",
+                EXACT,
+                &["geometry/shapes.py::area_of"],
+            ),
+            (
+                "main.py::main::geometry.units.to_cm#0",
+                EXACT,
+                &["geometry/units.py::to_cm"],
+            ),
+            (
+                "main.py::main::geometry.extra.measure.perimeter#0",
+                EXACT,
+                &["geometry/extra/measure.py::perimeter"],
+            ),
+            (
+                "main.py::main::gu.to_cm#0",
+                EXACT,
+                &["geometry/units.py::to_cm"],
+            ),
+            // `from a.b import c as d`, a package re-export from the `src/` layout and a
+            // module alias in it.
+            (
+                "main.py::main::grow#0",
+                EXACT,
+                &["geometry/shapes.py::scale"],
+            ),
+            (
+                "main.py::main::total#0",
+                EXACT,
+                &["src/billing/invoice.py::total"],
+            ),
+            (
+                "main.py::main::tax.vat#0",
+                EXACT,
+                &["src/billing/tax.py::vat"],
+            ),
+            // `import *` brings in the exports: all public names, only `__all__` when it is
+            // a literal, and every public name when it is computed. What it leaves out is
+            // found by name alone.
+            (
+                "main.py::main::format_name#0",
+                EXACT,
+                &["helpers.py::format_name"],
+            ),
+            ("main.py::main::clamp#0", EXACT, &["helpers.py::clamp"]),
+            (
+                "main.py::main::listed#0",
+                EXACT,
+                &["stars/literal.py::listed"],
+            ),
+            (
+                "main.py::main::Shown#0",
+                EXACT,
+                &["stars/literal.py::Shown"],
+            ),
+            (
+                "main.py::main::unlisted#0",
+                INFERRED,
+                &["stars/literal.py::unlisted"],
+            ),
+            (
+                "main.py::main::visible#0",
+                EXACT,
+                &["stars/underscore.py::visible"],
+            ),
+            (
+                "main.py::main::_internal#0",
+                INFERRED,
+                &["stars/underscore.py::_internal"],
+            ),
+            (
+                "main.py::main::named#0",
+                EXACT,
+                &["stars/computed.py::named"],
+            ),
+            (
+                "main.py::main::unnamed#0",
+                EXACT,
+                &["stars/computed.py::unnamed"],
+            ),
+            // A package outside the repository stays unresolved.
+            ("main.py::main::np.array#0", None, &[]),
+            // Only a unique name match finds these: a function no import names, a method on
+            // a local.
+            ("main.py::main::legacy#0", INFERRED, &["legacy.py::legacy"]),
+            (
+                "main.py::main::circle.describe#0",
+                INFERRED,
+                &["geometry/shapes.py::Circle.describe"],
+            ),
+            // Several definitions fit: a method on a parameter.
+            (
+                "geometry/shapes.py::area_of::shape.area#0",
+                AMBIGUOUS,
+                &[
+                    "geometry/shapes.py::Circle.area",
+                    "geometry/shapes.py::Shape.area",
+                ],
+            ),
+        ],
+    );
+}
+
+/// The levels of `checkout`'s two calls in `python-roots` under a given `pyproject.toml`: the
+/// call into `lib/shop` and the call into `src/other`.
+fn python_roots(case: &str, pyproject: &str) -> [Option<String>; 2] {
+    let repo = fixture_repo(case, "python-roots", Some(ORIGIN));
+    std::fs::write(repo.join("pyproject.toml"), pyproject).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    ["total", "helper"].map(|callee| {
+        let id = format!("{REPO}::app.py::checkout::{callee}#0");
+        let calls = json["calls"].as_array().unwrap();
+        let call = calls.iter().find(|c| c["id"] == id).unwrap();
+        call["level"].as_str().map(String::from)
+    })
+}
+
+#[test]
+fn python_source_roots_come_from_pyproject() {
+    let exact = Some("exact".to_string());
+    // Nothing declared: `src` is a root, `lib` is not.
+    assert_eq!(python_roots("python_roots_none", ""), [None, exact.clone()]);
+    // A declared root replaces `src`, in each of the three forms.
+    for (case, pyproject) in [
+        (
+            "python_roots_package_dir",
+            "[tool.setuptools.package-dir]\n\"\" = \"lib\"\n",
+        ),
+        (
+            "python_roots_package_dir_named",
+            "[tool.setuptools]\npackage-dir = { shop = \"./lib/shop\" }\n",
+        ),
+        (
+            "python_roots_find",
+            "[tool.setuptools.packages.find]\nwhere = [\"lib\"]\n",
+        ),
+        (
+            "python_roots_poetry",
+            "[tool.poetry]\npackages = [{ include = \"shop\", from = \"lib\" }]\n",
+        ),
+    ] {
+        assert_eq!(
+            python_roots(case, pyproject),
+            [exact.clone(), None],
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn python_pyproject_that_does_not_parse_names_the_file() {
+    let repo = fixture_repo("python_roots_invalid", "python-roots", Some(ORIGIN));
+    std::fs::write(repo.join("pyproject.toml"), "[tool\n").unwrap();
+
+    let error = Engine::open(&repo).and_then(|e| e.export()).unwrap_err();
+
+    assert!(error.to_string().contains("pyproject.toml"), "{error}");
+}

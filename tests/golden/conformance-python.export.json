@@ -1,0 +1,936 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "defs.py",
+      "hash": "6e030b5535a854cae283df549ca1c4ab3601286c75333208733052370d8121e7"
+    },
+    {
+      "path": "geometry/__init__.py",
+      "hash": "75ae69b68c41125e96d8110830a74d354f294f2ef138a5b623eab781da65e300"
+    },
+    {
+      "path": "geometry/extra/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "geometry/extra/measure.py",
+      "hash": "c90e8085fd0432049007e83a3ba1524a1152951aea9771d36f8c5ca612899a48"
+    },
+    {
+      "path": "geometry/shapes.py",
+      "hash": "4a6f693b7c0d3e12c4ec699f2bf60887dd41058c4b3462a4cfdf2cafdaf527b7"
+    },
+    {
+      "path": "geometry/units.py",
+      "hash": "da2f794915089d1d396be3a53cd9183ed3018b10ba864f052399b86af69199e4"
+    },
+    {
+      "path": "helpers.py",
+      "hash": "5c9887d7189b98db02c1d831ca18fd50f13c5308eef6792e3ff610af5358c017"
+    },
+    {
+      "path": "legacy.py",
+      "hash": "ef0019cbf84f93e1cf81329df83340675bee4854a2d6ba10ef248282e045bd0d"
+    },
+    {
+      "path": "main.py",
+      "hash": "e2515ba3bb1eb8331e862cee8cbb2900fcd19706dbcf1653446751723e731a5e"
+    },
+    {
+      "path": "src/billing/__init__.py",
+      "hash": "87b3735bfe77674bc3457658da641991b179e4857b3e6d66e812975498270c06"
+    },
+    {
+      "path": "src/billing/invoice.py",
+      "hash": "3a9bc812a386d6735becf5d1ef1f7330222eb297ca48ecdbaad599fd87ce1805"
+    },
+    {
+      "path": "src/billing/tax.py",
+      "hash": "03645a3b9613d82efad5a317278bbb8703c943185f7cbdf945754a639e8679ae"
+    },
+    {
+      "path": "stars/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "stars/computed.py",
+      "hash": "a52c7fc43fc6b01a06a140d30cecaf23234159caf212823b303b1c884d6fb583"
+    },
+    {
+      "path": "stars/literal.py",
+      "hash": "8ab6af4d6ea61d1b71b88b8b3a60674cfbf0f04fb32f237f01bc08c8890347c8"
+    },
+    {
+      "path": "stars/underscore.py",
+      "hash": "36913ef496402542036e921b759c23afaf839a3b99886bc7bfd63da37138726c"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry",
+      "span": {
+        "path": "defs.py",
+        "start": 424,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.Meta",
+      "span": {
+        "path": "defs.py",
+        "start": 792,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.Meta.label",
+      "span": {
+        "path": "defs.py",
+        "start": 812,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.add",
+      "span": {
+        "path": "defs.py",
+        "start": 478,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.build",
+      "span": {
+        "path": "defs.py",
+        "start": 672,
+        "end": 725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.load",
+      "span": {
+        "path": "defs.py",
+        "start": 543,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.tagged",
+      "span": {
+        "path": "defs.py",
+        "start": 731,
+        "end": 786
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.unit",
+      "span": {
+        "path": "defs.py",
+        "start": 613,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::decorated",
+      "span": {
+        "path": "defs.py",
+        "start": 375,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::fetch_all",
+      "span": {
+        "path": "defs.py",
+        "start": 86,
+        "end": 156
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::outer",
+      "span": {
+        "path": "defs.py",
+        "start": 159,
+        "end": 232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::outer.inner",
+      "span": {
+        "path": "defs.py",
+        "start": 176,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::plain",
+      "span": {
+        "path": "defs.py",
+        "start": 49,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::register",
+      "span": {
+        "path": "defs.py",
+        "start": 235,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::register.wrapper",
+      "span": {
+        "path": "defs.py",
+        "start": 259,
+        "end": 352
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::sorted_names",
+      "span": {
+        "path": "defs.py",
+        "start": 894,
+        "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+      "span": {
+        "path": "geometry/extra/measure.py",
+        "start": 76,
+        "end": 163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 178,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle.__init__",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 203,
+        "end": 259
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 265,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 320,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Shape",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 71,
+        "end": 175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Shape.area",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 88,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Shape.unit",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 126,
+        "end": 175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::area_of",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 382,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::scale",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 27,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "span": {
+        "path": "geometry/units.py",
+        "start": 0,
+        "end": 40
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::helpers.py::clamp",
+      "span": {
+        "path": "helpers.py",
+        "start": 49,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::helpers.py::format_name",
+      "span": {
+        "path": "helpers.py",
+        "start": 0,
+        "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::legacy.py::legacy",
+      "span": {
+        "path": "legacy.py",
+        "start": 0,
+        "end": 26
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main",
+      "span": {
+        "path": "main.py",
+        "start": 399,
+        "end": 798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/billing/invoice.py::total",
+      "span": {
+        "path": "src/billing/invoice.py",
+        "start": 41,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/billing/tax.py::fee",
+      "span": {
+        "path": "src/billing/tax.py",
+        "start": 57,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/billing/tax.py::vat",
+      "span": {
+        "path": "src/billing/tax.py",
+        "start": 13,
+        "end": 54
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/computed.py::named",
+      "span": {
+        "path": "stars/computed.py",
+        "start": 50,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/computed.py::unnamed",
+      "span": {
+        "path": "stars/computed.py",
+        "start": 78,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/literal.py::Shown",
+      "span": {
+        "path": "stars/literal.py",
+        "start": 92,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/literal.py::listed",
+      "span": {
+        "path": "stars/literal.py",
+        "start": 32,
+        "end": 58
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/literal.py::unlisted",
+      "span": {
+        "path": "stars/literal.py",
+        "start": 61,
+        "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/underscore.py::_internal",
+      "span": {
+        "path": "stars/underscore.py",
+        "start": 30,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/underscore.py::visible",
+      "span": {
+        "path": "stars/underscore.py",
+        "start": 0,
+        "end": 27
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.Meta.label::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.Meta.label",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 848,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.add::self.items.append#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.add",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "defs.py",
+        "start": 514,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.build::cls#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.build",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "defs.py",
+        "start": 720,
+        "end": 725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.load::fetch_all#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.load",
+      "target": "example.com/acme/conformance::defs.py::fetch_all",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 586,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.tagged::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.tagged",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 778,
+        "end": 786
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry.unit::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry.unit",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 658,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::Registry::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::Registry",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 463,
+        "end": 471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::decorated::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::decorated",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 413,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::fetch_all::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::fetch_all",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 126,
+        "end": 137
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::outer.inner::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::outer.inner",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 204,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::outer::inner#0",
+      "caller": "example.com/acme/conformance::defs.py::outer",
+      "target": "example.com/acme/conformance::defs.py::outer.inner",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 225,
+        "end": 232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::plain#0",
+      "caller": "example.com/acme/conformance::defs.py",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 879,
+        "end": 891
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::register.wrapper::func#0",
+      "caller": "example.com/acme/conformance::defs.py::register.wrapper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "defs.py",
+        "start": 331,
+        "end": 352
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::register::functools.wraps#0",
+      "caller": "example.com/acme/conformance::defs.py::register",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "defs.py",
+        "start": 260,
+        "end": 281
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::sorted_names::plain#0",
+      "caller": "example.com/acme/conformance::defs.py::sorted_names",
+      "target": "example.com/acme/conformance::defs.py::plain",
+      "level": "exact",
+      "span": {
+        "path": "defs.py",
+        "start": 961,
+        "end": 972
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::defs.py::sorted_names::sorted#0",
+      "caller": "example.com/acme/conformance::defs.py::sorted_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "defs.py",
+        "start": 930,
+        "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter::area_of#0",
+      "caller": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+      "target": "example.com/acme/conformance::geometry/shapes.py::area_of",
+      "level": "exact",
+      "span": {
+        "path": "geometry/extra/measure.py",
+        "start": 121,
+        "end": 135
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter::geometry.shapes.scale#0",
+      "caller": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+      "target": "example.com/acme/conformance::geometry/shapes.py::scale",
+      "level": "exact",
+      "span": {
+        "path": "geometry/extra/measure.py",
+        "start": 139,
+        "end": 163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter::units.to_cm#0",
+      "caller": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+      "target": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "level": "exact",
+      "span": {
+        "path": "geometry/extra/measure.py",
+        "start": 109,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle.area::scale#0",
+      "caller": "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+      "target": "example.com/acme/conformance::geometry/shapes.py::scale",
+      "level": "exact",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 296,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::Circle.describe::to_cm#0",
+      "caller": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
+      "target": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "level": "exact",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 361,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::area_of::shape.area#0",
+      "caller": "example.com/acme/conformance::geometry/shapes.py::area_of",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+        "example.com/acme/conformance::geometry/shapes.py::Shape.area"
+      ],
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 413,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::geometry/shapes.py::scale::to_cm#0",
+      "caller": "example.com/acme/conformance::geometry/shapes.py::scale",
+      "target": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "level": "exact",
+      "span": {
+        "path": "geometry/shapes.py",
+        "start": 56,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::helpers.py::clamp::min#0",
+      "caller": "example.com/acme/conformance::helpers.py::clamp",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "helpers.py",
+        "start": 85,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::helpers.py::format_name::name.title#0",
+      "caller": "example.com/acme/conformance::helpers.py::format_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "helpers.py",
+        "start": 34,
+        "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::Round#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/shapes.py::Circle",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 424,
+        "end": 432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::Shown#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/literal.py::Shown",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 667,
+        "end": 674
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::_internal#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/underscore.py::_internal",
+      "level": "inferred",
+      "span": {
+        "path": "main.py",
+        "start": 708,
+        "end": 719
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::area_of#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/shapes.py::area_of",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 437,
+        "end": 452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::circle.describe#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
+      "level": "inferred",
+      "span": {
+        "path": "main.py",
+        "start": 781,
+        "end": 798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::clamp#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::helpers.py::clamp",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 638,
+        "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::format_name#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::helpers.py::format_name",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 617,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::geometry.area_of#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/shapes.py::area_of",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 457,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::geometry.extra.measure.perimeter#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 514,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::geometry.units.to_cm#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 486,
+        "end": 509
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::grow#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/shapes.py::scale",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 575,
+        "end": 582
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::gu.to_cm#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::geometry/units.py::to_cm",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 559,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::legacy#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::legacy.py::legacy",
+      "level": "inferred",
+      "span": {
+        "path": "main.py",
+        "start": 768,
+        "end": 776
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::listed#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/literal.py::listed",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 654,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::named#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/computed.py::named",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 724,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::np.array#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.py",
+        "start": 750,
+        "end": 763
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::tax.vat#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::src/billing/tax.py::vat",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 601,
+        "end": 612
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::total#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::src/billing/invoice.py::total",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 587,
+        "end": 596
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::unlisted#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/literal.py::unlisted",
+      "level": "inferred",
+      "span": {
+        "path": "main.py",
+        "start": 679,
+        "end": 689
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::unnamed#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/computed.py::unnamed",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 736,
+        "end": 745
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::main.py::main::visible#0",
+      "caller": "example.com/acme/conformance::main.py::main",
+      "target": "example.com/acme/conformance::stars/underscore.py::visible",
+      "level": "exact",
+      "span": {
+        "path": "main.py",
+        "start": 694,
+        "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/billing/invoice.py::total::tax.fee#0",
+      "caller": "example.com/acme/conformance::src/billing/invoice.py::total",
+      "target": "example.com/acme/conformance::src/billing/tax.py::fee",
+      "level": "exact",
+      "span": {
+        "path": "src/billing/invoice.py",
+        "start": 94,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/billing/invoice.py::total::vat#0",
+      "caller": "example.com/acme/conformance::src/billing/invoice.py::total",
+      "target": "example.com/acme/conformance::src/billing/tax.py::vat",
+      "level": "exact",
+      "span": {
+        "path": "src/billing/invoice.py",
+        "start": 80,
+        "end": 91
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "links": []
+}

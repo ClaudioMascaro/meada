@@ -6,7 +6,7 @@ use tree_sitter::{Language, Node, Parser};
 
 use super::{
     Call, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Value,
+    Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -618,18 +618,6 @@ fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
-        .collect::<Vec<_>>()
-        .into_iter()
-}
-
-fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
-}
-
 /// A string literal's content: `'./m'` is `./m`.
 fn unquote(node: Node, src: &[u8]) -> String {
     let quoted = text(node, src);
@@ -657,8 +645,4 @@ fn callee(node: Node, src: &[u8]) -> String {
         },
         kind => format!("({kind})"),
     }
-}
-
-fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
-    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
 }

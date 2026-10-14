@@ -54,6 +54,46 @@ fn refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
     );
 }
 
+/// Renames a function others import, adds a module whose function turns an inferred call
+/// into an ambiguous one, deletes a module star-imported elsewhere, and declares a source
+/// root, which drops the implicit `src` one.
+fn edit_python(repo: &Path) {
+    let units = fs::read_to_string(repo.join("geometry/units.py")).unwrap();
+    fs::write(
+        repo.join("geometry/units.py"),
+        units.replace("def to_cm", "def to_mm"),
+    )
+    .unwrap();
+    fs::write(repo.join("stars/extra.py"), "def legacy():\n    return 2\n").unwrap();
+    fs::remove_file(repo.join("helpers.py")).unwrap();
+    fs::write(
+        repo.join("pyproject.toml"),
+        "[tool.setuptools.packages.find]\nwhere = [\"lib\"]\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_python", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python
+        )
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.

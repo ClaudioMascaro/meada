@@ -5,9 +5,11 @@
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
+use tree_sitter::Node;
 
 use crate::Result;
 
+pub mod python;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -32,7 +34,7 @@ pub trait LanguagePack {
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -60,7 +62,8 @@ pub struct Facts {
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from
-/// 'source'`.
+/// 'source'`. Several imports may bind one `local`: the first that resolves wins. A `local`
+/// may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its head.
 #[derive(Serialize, Deserialize)]
 pub struct Import {
     pub local: String,
@@ -74,6 +77,9 @@ pub enum Imported {
     Name(String),
     /// The whole module.
     Namespace,
+    /// Every name the module exports, as `from source import *` binds them (`local` is
+    /// unused). A name no import binds is looked up here, the last such import first.
+    All,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -181,4 +187,22 @@ pub enum Part {
     Env(String),
     /// Any other expression inside a string.
     Hole,
+}
+
+// Tree-sitter helpers every pack uses.
+
+fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .collect::<Vec<_>>()
+        .into_iter()
+}
+
+fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
+}
+
+fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
+    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
 }
