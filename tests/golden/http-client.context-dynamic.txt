@@ -1,0 +1,9 @@
+example.com/acme/client src/client.ts:12 dynamic
+async function dynamic(endpoint: URL) {
+  return fetch(endpoint.href);
+}
+callers: none
+callees:
+example.com/acme/client src/client.ts:13 (unresolved) fetch
+contracts:
+example.com/acme/client src/client.ts:13 consumes (unresolved) fetch

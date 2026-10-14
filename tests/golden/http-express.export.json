@@ -1,0 +1,377 @@
+{
+  "repository": "example.com/acme/backend",
+  "files": [
+    {
+      "path": "src/handlers.ts",
+      "hash": "3ba4855f750edff3a024ffb1ac44ce5262f04ae246902c425490280f89e255e2"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "hash": "877cd32b467d849ff27c170741f1a2a39c5e7c47415a487566d247cc582fddc5"
+    },
+    {
+      "path": "src/routes/users.ts",
+      "hash": "be83ef12fad7cb307e7d434a9ae578942933a9c8552b51a309361510e339990b"
+    },
+    {
+      "path": "src/server.ts",
+      "hash": "3bac308f9c2edd1b2015535688e3b8a2fdc85b4f13c93951b2623b2f3b46bc2b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "span": {
+        "path": "src/handlers.ts",
+        "start": 7,
+        "end": 118
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::find",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 600,
+        "end": 646
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::list",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 566,
+        "end": 598
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 227,
+        "end": 491
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 281,
+        "end": 312
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 357,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 440,
+        "end": 483
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::GET /health",
+      "span": {
+        "path": "src/server.ts",
+        "start": 256,
+        "end": 285
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/backend::src/handlers.ts::removeUser::(call_expression).end#0",
+      "caller": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/handlers.ts",
+        "start": 94,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/handlers.ts::removeUser::res.status#0",
+      "caller": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/handlers.ts",
+        "start": 94,
+        "end": 109
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/index.ts::Router#0",
+      "caller": "example.com/acme/backend::src/routes/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/index.ts",
+        "start": 83,
+        "end": 91
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/index.ts::api.use#0",
+      "caller": "example.com/acme/backend::src/routes/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/index.ts",
+        "start": 166,
+        "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::Router#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 91,
+        "end": 99
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1::find#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1",
+      "target": "example.com/acme/backend::src/routes/users.ts::find",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 463,
+        "end": 482
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1::res.json#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 454,
+        "end": 483
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}::find#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+      "target": "example.com/acme/backend::src/routes/users.ts::find",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 380,
+        "end": 403
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}::res.json#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 371,
+        "end": 404
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users::list#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "target": "example.com/acme/backend::src/routes/users.ts::list",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 305,
+        "end": 311
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users::res.json#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 296,
+        "end": 312
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register::users.get#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 266,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register::users.get#1",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 335,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::register::users.get#2",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 422,
+        "end": 484
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::users.delete#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 531,
+        "end": 563
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::GET /health::res.send#0",
+      "caller": "example.com/acme/backend::src/server.ts::GET /health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 271,
+        "end": 285
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::app.get#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 237,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::app.listen#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 289,
+        "end": 305
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::app.use#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 87,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::app.use#1",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 175,
+        "end": 195
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::express#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 76,
+        "end": 85
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::express.json#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/server.ts",
+        "start": 95,
+        "end": 109
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::DELETE::/api/users/{}",
+      "site": "example.com/acme/backend::src/handlers.ts::removeUser"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+    },
+    {
+      "contract": "http::GET::/api/users/{}",
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}"
+    },
+    {
+      "contract": "http::GET::/api/users/{}",
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1"
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/backend::src/server.ts::GET /health"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
+      "provider": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "contract": "http::DELETE::/api/users/{}",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsers::get#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    }
+  ]
+}

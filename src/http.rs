@@ -1,9 +1,12 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
+use std::collections::BTreeMap;
+
 use crate::contract::{ContractKind, Found, Level, Link, Site};
 use crate::index::{Consumer, Provider};
-use crate::lang::{Export, Facts, Part, Value};
+use crate::lang::{Export, Part, Value};
+use crate::resolve::Code;
 use crate::workspace::Member;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
@@ -58,26 +61,18 @@ fn next_route(path: &str) -> Option<String> {
     Some(format!("/{}", segments.join("/")))
 }
 
-/// The contract and `via` of `fetch(url, init)`; the contract is `None` when the URL or the
-/// method cannot be read at the call.
-fn fetch(args: &[Value]) -> (Option<String>, Option<String>) {
-    let method = match args.get(1) {
-        None => Some("GET".to_string()),
-        // The last `method` wins, as in JavaScript; a spread may hide one.
-        Some(Value::Object(properties)) => {
-            match properties
-                .iter()
-                .rfind(|(k, _)| k == "method" || k == "...")
-            {
-                None => Some("GET".to_string()),
-                Some((_, Value::Str(parts))) => literal(parts),
-                Some(_) => None,
-            }
-        }
-        Some(_) => None,
-    };
-    let Some(Value::Str(parts)) = args.first() else {
-        return (None, None);
+/// What a reader needs depends on a parameter of the enclosing function: a client wrapper.
+struct Depends;
+
+/// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
+/// depends on a parameter; the contract is `None` when the URL or the method cannot be read.
+fn fetch(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
+    let method = method(args.get(1)).ok()?;
+    let parts = match args.first() {
+        Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
+        Some(Value::Str(parts)) => parts,
+        Some(Value::Ref(_)) => return None,
+        _ => return Some((None, None)),
     };
     let (via, path) = match parts.split_first() {
         Some((Part::Env(var), rest)) => (Some(format!("env:{var}")), Some(render(rest))),
@@ -94,16 +89,64 @@ fn fetch(args: &[Value]) -> (Option<String>, Option<String>) {
                         (Some(via), Some(rest[end..].to_string()))
                     }
                 }
-                None => (None, Some(url)),
+                None => {
+                    // `${base}/users`: an unknown base, the host unresolved.
+                    let base = parts.iter().take_while(|p| matches!(p, Part::Hole)).count();
+                    let rest = render(&parts[base..]);
+                    (None, (base == 0 || rest.starts_with('/')).then_some(rest))
+                }
             }
         }
     };
     // A path that does not start at the root, such as `${base}${path}`, is not read.
     let path = path.filter(|p| p.is_empty() || p.starts_with(['/', '?', '#']));
-    match (method, path) {
+    Some(match (method, path) {
         (Some(method), Some(path)) => (Some(contract(&method, &path)), via),
         _ => (None, via),
+    })
+}
+
+/// The method `init` gives: `GET` when it gives none (the `fetch` default), `None` when it
+/// cannot be read.
+fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
+    let Some(init) = init else {
+        return Ok(Some("GET".into()));
+    };
+    let value = match init {
+        Value::Object(properties) => match method_property(properties)? {
+            Some(value) => value,
+            None => return Ok(Some("GET".into())),
+        },
+        value => value,
+    };
+    match value {
+        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => Err(Depends),
+        Value::Str(parts) => Ok(literal(parts)),
+        Value::Ref(_) => Err(Depends),
+        Value::Undefined => Ok(Some("GET".into())),
+        _ => Ok(None),
     }
+}
+
+/// The value of the last `method` of an object, as in JavaScript, through spreads.
+fn method_property(properties: &[(String, Value)]) -> Result<Option<&Value>, Depends> {
+    static UNKNOWN: Value = Value::Unknown;
+    for (key, value) in properties.iter().rev() {
+        match (key.as_str(), value) {
+            ("method", value) => return Ok(Some(value)),
+            ("...", Value::Object(inner)) => {
+                if let Some(found) = method_property(inner)? {
+                    return Ok(Some(found));
+                }
+            }
+            ("...", Value::Undefined) => {}
+            ("...", Value::Ref(_)) => return Err(Depends),
+            // A spread of something unknown may hide a method.
+            ("...", _) => return Ok(Some(&UNKNOWN)),
+            _ => {}
+        }
+    }
+    Ok(None)
 }
 
 /// The text of `parts` when every part is literal.
@@ -123,9 +166,138 @@ fn render(parts: &[Part]) -> String {
         .iter()
         .map(|p| match p {
             Part::Text(t) => t.as_str(),
-            Part::Env(_) | Part::Hole => PARAM,
+            Part::Env(_) | Part::Ref(_) | Part::Hole => PARAM,
         })
         .collect()
+}
+
+/// What `express()`, `Router()` and `express.Router()` return: an app or a router.
+const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
+
+/// The route-registering methods of an Express app or router.
+const EXPRESS_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
+
+/// An app or router: the file and qualified name of the constant holding it.
+type Router<'a> = (&'a str, &'a str);
+
+/// `prefix` and `path` joined with one `/`.
+fn join(prefix: &str, path: &str) -> String {
+    let prefix = prefix.trim_end_matches('/');
+    match path.starts_with('/') {
+        true => format!("{prefix}{path}"),
+        false => format!("{prefix}/{path}"),
+    }
+}
+
+/// Every prefix `router` is mounted under, sorted: the empty one when nothing mounts it.
+fn prefixes<'a>(
+    router: Router<'a>,
+    mounts: &BTreeMap<Router<'a>, Vec<(Router<'a>, String)>>,
+    seen: &mut Vec<Router<'a>>,
+) -> Vec<String> {
+    let Some(parents) = mounts.get(&router) else {
+        return vec![String::new()];
+    };
+    // A router mounted inside itself, through any depth, adds nothing.
+    if seen.contains(&router) {
+        return Vec::new();
+    }
+    seen.push(router);
+    let mut out: Vec<String> = parents
+        .iter()
+        .flat_map(|(parent, prefix)| {
+            prefixes(*parent, mounts, seen)
+                .into_iter()
+                .map(|above| join(&above, prefix))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    seen.pop();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on a constant
+/// holding an app or a router, under every prefix of `app.use(prefix, router)` mounts,
+/// through imports and at any depth.
+// ponytail: an app or router passed as a parameter, `router.route(path)` chains and
+// `require` are not followed.
+fn express(code: &Code) -> Vec<Found> {
+    let router = |path, scope, name| -> Option<Router> {
+        let (at, value) = code.constant(path, scope, name)?;
+        matches!(value, Value::Call(c) if ROUTERS.contains(&c.as_str())).then_some(at)
+    };
+    let mut mounts: BTreeMap<Router, Vec<(Router, String)>> = BTreeMap::new();
+    let mut routes = Vec::new();
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            let Some((receiver, member)) = call.callee.split_once('.') else {
+                continue;
+            };
+            let registers = EXPRESS_METHODS.contains(&member);
+            if !(registers || member == "use") || receiver.starts_with('(') {
+                continue;
+            }
+            let Some(at) = router(path, &call.scope, receiver) else {
+                continue;
+            };
+            if registers {
+                routes.push((path, n, at, member.to_uppercase()));
+                continue;
+            }
+            let Some(args) = code.args(path, n) else {
+                continue;
+            };
+            let (prefix, rest) = match args.first().map(|a| code.value(path, &call.scope, a)) {
+                Some(Value::Str(parts)) => (render(&parts), &args[1..]),
+                _ => (String::new(), args),
+            };
+            for arg in rest {
+                if let Value::Ref(name) = arg
+                    && let Some(child) = router(path, &call.scope, name)
+                {
+                    mounts.entry(child).or_default().push((at, prefix.clone()));
+                }
+            }
+        }
+    }
+    let mut found = Vec::new();
+    for (path, n, at, method) in routes {
+        let scope = &code.files()[path].calls[n].scope;
+        // `app.get("env")` reads a setting.
+        let Some([first, .., handler]) = code.args(path, n) else {
+            continue;
+        };
+        let Value::Str(parts) = code.value(path, scope, first) else {
+            continue;
+        };
+        let route = render(&parts);
+        for prefix in prefixes(at, &mounts, &mut Vec::new()) {
+            let full = normalize_path(&join(&prefix, &route));
+            let site = match handler {
+                Value::Function(def) => Site::Inline {
+                    path: path.into(),
+                    def: def.clone(),
+                    name: format!("{method} {full}"),
+                },
+                Value::Ref(name) => match code.definition(path, scope, name) {
+                    Some(t) => Site::Def {
+                        path: t.path.into(),
+                        name: t.name.into(),
+                    },
+                    None => Site::File(path.into()),
+                },
+                _ => Site::File(path.into()),
+            };
+            found.push(Found {
+                site,
+                contract: Some(contract(&method, &full)),
+                via: None,
+            });
+        }
+    }
+    found
 }
 
 impl ContractKind for Http {
@@ -133,22 +305,27 @@ impl ContractKind for Http {
         "http"
     }
 
-    fn extract(&self, path: &str, facts: &Facts) -> Vec<Found> {
-        let mut found: Vec<Found> = facts
-            .calls
-            .iter()
-            .enumerate()
-            .filter(|(_, call)| call.callee == "fetch" && !call.args.is_empty())
-            .map(|(n, call)| {
-                let (contract, via) = fetch(&call.args);
-                Found {
-                    site: Site::Call(n),
-                    contract,
-                    via,
+    fn extract(&self, code: &Code) -> Vec<Found> {
+        let mut found = Vec::new();
+        for (&path, facts) in code.files() {
+            for (n, call) in facts.calls.iter().enumerate() {
+                if call.callee != "fetch" || code.args(path, n).is_none_or(<[_]>::is_empty) {
+                    continue;
                 }
-            })
-            .collect();
-        if let Some(route) = next_route(path) {
+                for (site, at, (contract, via)) in code.expand(path, n, &fetch) {
+                    found.push(Found {
+                        site: Site::Call {
+                            path: site.into(),
+                            index: at,
+                        },
+                        contract,
+                        via,
+                    });
+                }
+            }
+            let Some(route) = next_route(path) else {
+                continue;
+            };
             for export in &facts.exports {
                 let Export::Local { exported, local } = export else {
                     continue;
@@ -158,9 +335,12 @@ impl ContractKind for Http {
                 }
                 // `export const GET = withAuth(...)` defines no function: the file serves it.
                 let site = if facts.defs.iter().any(|d| d.name == *local) {
-                    Site::Def(local.clone())
+                    Site::Def {
+                        path: path.into(),
+                        name: local.clone(),
+                    }
                 } else {
-                    Site::File
+                    Site::File(path.into())
                 };
                 found.push(Found {
                     site,
@@ -169,6 +349,7 @@ impl ContractKind for Http {
                 });
             }
         }
+        found.extend(express(code));
         found
     }
 
@@ -178,40 +359,57 @@ impl ContractKind for Http {
         from: &Member,
         providers: &[(&Member, &Provider)],
     ) -> Vec<Link> {
-        let (Some(contract), Some(via)) = (&consumer.contract, &consumer.via) else {
+        let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
+        let via = consumer.via.as_deref();
         let serving = providers.iter().filter(|(_, p)| p.contract == *contract);
-        let (fits, level, reason): (Vec<_>, _, _) = if let Some(host) = via.strip_prefix("host:") {
-            let fits = serving
-                .filter(|(m, _)| {
-                    m.config
-                        .serve
-                        .hosts
-                        .iter()
-                        .any(|h| h.eq_ignore_ascii_case(host))
-                })
-                .collect();
-            (fits, Level::Exact, format!("host {host} is served by"))
-        } else if let Some(var) = via.strip_prefix("env:") {
-            let peers: Vec<&str> = from
-                .config
-                .peers
-                .iter()
-                .filter(|p| p.base_url_env.iter().any(|v| v == var))
-                .map(|p| p.repo.as_str())
-                .collect();
-            let fits = serving
-                .filter(|(m, _)| peers.contains(&m.identity.as_str()))
-                .collect();
-            (
-                fits,
-                Level::Inferred,
-                format!("base URL from {var}, a base_url_env of peer"),
-            )
-        } else {
-            return Vec::new();
-        };
+        let var = via.and_then(|v| v.strip_prefix("env:"));
+        let peers: Vec<&str> = from
+            .config
+            .peers
+            .iter()
+            .filter(|p| var.is_some_and(|var| p.base_url_env.iter().any(|v| v == var)))
+            .map(|p| p.repo.as_str())
+            .collect();
+        let (fits, level, reason): (Vec<_>, _, _) =
+            if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
+                let fits = serving
+                    .filter(|(m, _)| {
+                        m.config
+                            .serve
+                            .hosts
+                            .iter()
+                            .any(|h| h.eq_ignore_ascii_case(host))
+                    })
+                    .collect();
+                (fits, Level::Exact, format!("host {host} is served by"))
+            } else if let (Some(var), false) = (var, peers.is_empty()) {
+                let fits = serving
+                    .filter(|(m, _)| peers.contains(&m.identity.as_str()))
+                    .collect();
+                (
+                    fits,
+                    Level::Inferred,
+                    format!("base URL from {var}, a base_url_env of peer"),
+                )
+            } else {
+                // The host is unresolved: a relative URL, an unknown base, or a variable no
+                // peer names. Exactly one repository serving the route is enough.
+                let fits: Vec<_> = serving.collect();
+                let mut repos: Vec<&str> = fits.iter().map(|(m, _)| m.identity.as_str()).collect();
+                repos.sort();
+                repos.dedup();
+                let why = match var {
+                    Some(var) => format!("base URL from {var}, no peer's base_url_env"),
+                    None => "host unresolved".to_string(),
+                };
+                let reason = match repos.len() {
+                    1 => format!("{why}; the only repository serving it is"),
+                    _ => format!("{why}; served by"),
+                };
+                (fits, Level::Inferred, reason)
+            };
         let ambiguous = fits.len() > 1;
         fits.iter()
             .map(|(member, provider)| Link {

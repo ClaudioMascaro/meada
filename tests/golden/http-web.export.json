@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "src/unlinked.ts",
-      "hash": "6976baa6be5fea9da111e3c02a52b27add40abe1fac9b6ef920a4c99f7a61763"
+      "hash": "1ed60bc71c7d43da80c0f38ec03308d095bc23e12988d2a20b1776d833478c76"
     },
     {
       "path": "src/users.ts",
@@ -15,56 +15,56 @@
       "id": "example.com/acme/web::src/unlinked.ts::anyMethod",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 215,
-        "end": 324
+        "start": 265,
+        "end": 374
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::dynamic",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 92,
-        "end": 152
+        "start": 142,
+        "end": 202
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::invoices",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 641,
-        "end": 725
+        "start": 738,
+        "end": 822
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::local",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 773,
-        "end": 829
+        "start": 917,
+        "end": 973
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::logo",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 362,
-        "end": 446
+        "start": 412,
+        "end": 496
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::missingRoute",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 869,
-        "end": 955
+        "start": 1013,
+        "end": 1099
       }
     },
     {
       "id": "example.com/acme/web::src/unlinked.ts::other",
       "span": {
         "path": "src/unlinked.ts",
-        "start": 500,
-        "end": 580
+        "start": 597,
+        "end": 677
       }
     },
     {
@@ -124,8 +124,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 267,
-        "end": 321
+        "start": 317,
+        "end": 371
       }
     },
     {
@@ -135,8 +135,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 139,
-        "end": 149
+        "start": 189,
+        "end": 199
       }
     },
     {
@@ -146,8 +146,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 678,
-        "end": 722
+        "start": 775,
+        "end": 819
       }
     },
     {
@@ -157,8 +157,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 807,
-        "end": 826
+        "start": 951,
+        "end": 970
       }
     },
     {
@@ -168,8 +168,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 395,
-        "end": 443
+        "start": 445,
+        "end": 493
       }
     },
     {
@@ -179,8 +179,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 910,
-        "end": 952
+        "start": 1054,
+        "end": 1096
       }
     },
     {
@@ -190,8 +190,8 @@
       "level": null,
       "span": {
         "path": "src/unlinked.ts",
-        "start": 534,
-        "end": 577
+        "start": 631,
+        "end": 674
       }
     },
     {
@@ -379,6 +379,20 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/acme/web::src/unlinked.ts::local::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/api"
+    },
+    {
+      "consumer": "example.com/acme/web::src/unlinked.ts::other::fetch#0",
+      "provider": "example.com/acme/api::app/api/users/route.ts::GET",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from OTHER_URL, no peer's base_url_env; the only repository serving it is example.com/acme/api"
+    },
     {
       "consumer": "example.com/acme/web::src/users.ts::createUser::fetch#0",
       "provider": "example.com/acme/api::app/api/users/route.ts::POST",
