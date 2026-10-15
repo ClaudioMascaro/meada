@@ -342,6 +342,11 @@ give byte-identical output.
   a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
   calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
   whole workspace's providers. A kind's rules stay in its own file.
+- New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
+  candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
+  `meada decide` writes the candidate's contract as the decision's target and
+  `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
+  consumer's contract instead of the provider's own makes every decision on it stale.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
