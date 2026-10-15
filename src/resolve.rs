@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Value};
+use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Star, Value};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -104,16 +104,19 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        let mut segments = call.callee.split('.');
-        let head = segments.next().unwrap_or("");
+        let callee = call.callee.as_str();
         let seen = &mut Seen::new();
-        let mut binding = match head {
-            "this" => self.class(path, &call.scope),
-            "super" => Binding::Unknown,
-            _ if head.starts_with('(') => Binding::Unknown,
-            _ => self.lexical(path, &call.scope, head, seen),
-        };
-        for member in segments {
+        let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
+            let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
+            let binding = match head {
+                "this" => self.class(path, &call.scope),
+                "super" => Binding::Unknown,
+                _ if head.starts_with('(') => Binding::Unknown,
+                _ => self.lexical(path, &call.scope, head, seen),
+            };
+            (binding, members)
+        });
+        for member in members.split('.').filter(|m| !m.is_empty()) {
             binding = match binding {
                 Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
                 Binding::Module(m) => self.export(m, member, seen),
@@ -207,10 +210,53 @@ impl<'a> Resolver<'a> {
             }
             scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
         }
-        match self.files[path].imports.iter().find(|i| i.local == name) {
-            Some(import) => self.import(path, &import.source, &import.name, seen),
-            None => Binding::Unknown,
+        self.imported(path, name, seen)
+    }
+
+    /// What the file's imports bind `name` to. Several imports may bind one name: the last
+    /// that resolves wins, else the last one's answer stands. A name no import binds is
+    /// looked up in the modules of `import *`, the last first.
+    fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        let imports = &self.files[path].imports;
+        let mut last = None;
+        for import in imports.iter().rev().filter(|i| i.local == name) {
+            let found = self.import(path, &import.source, &import.name, seen);
+            if !matches!(found, Binding::Unknown | Binding::External) {
+                return found;
+            }
+            last.get_or_insert(found);
         }
+        if let Some(found) = last {
+            return found;
+        }
+        for import in imports.iter().rev() {
+            if matches!(import.name, Imported::All)
+                && let Some(module) = self.module(path, &import.source)
+                && let found @ (Binding::Def(_) | Binding::Module(_)) =
+                    self.star(module, name, seen)
+            {
+                return found;
+            }
+        }
+        Binding::Unknown
+    }
+
+    /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
+    /// the longest such name first, and the members left after it.
+    fn dotted(
+        &self,
+        path: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<(Binding<'a>, &'a str)> {
+        callee
+            .rmatch_indices('.')
+            .map(|(at, _)| at)
+            .filter(|&at| callee[..at].contains('.'))
+            .find_map(|at| match self.imported(path, &callee[..at], seen) {
+                Binding::Unknown => None,
+                found => Some((found, &callee[at + 1..])),
+            })
     }
 
     fn import(
@@ -226,10 +272,25 @@ impl<'a> Resolver<'a> {
         match name {
             Imported::Namespace => Binding::Module(module),
             Imported::Name(name) => self.export(module, name, seen),
+            Imported::All => Binding::Unknown,
         }
     }
 
-    /// What `path` exports as `name`.
+    /// What a star import of `path` takes as `name`.
+    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        let taken = match &self.files[path].star {
+            Star::ExceptDefault => name != "default",
+            Star::Public => !name.starts_with('_'),
+            Star::Only(names) => names.iter().any(|n| n == name),
+        };
+        if taken {
+            self.export(path, name, seen)
+        } else {
+            Binding::Unknown
+        }
+    }
+
+    /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         if !seen.insert((path, name)) {
             return Binding::Unknown;
@@ -248,15 +309,13 @@ impl<'a> Resolver<'a> {
                 _ => {}
             }
         }
-        if name != "default" {
-            for export in exports {
-                if let Export::All { source } = export
-                    && let Some(module) = self.module(path, source)
-                    && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                        self.export(module, name, seen)
-                {
-                    return found;
-                }
+        for export in exports {
+            if let Export::All { source } = export
+                && let Some(module) = self.module(path, source)
+                && let found @ (Binding::Def(_) | Binding::Module(_)) =
+                    self.star(module, name, seen)
+            {
+                return found;
             }
         }
         Binding::Unknown

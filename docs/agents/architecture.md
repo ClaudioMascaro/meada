@@ -134,11 +134,26 @@ give byte-identical output.
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`), and the `Facts`/`Value` types. `lang/ts.rs` is the only pack
-  (`.ts .tsx .js .jsx .mjs .cjs`). A pack sees one file at a time and never touches the index.
+  `config_files`, `modules`), and the `Facts`/`Value` types, plus the tree-sitter helpers
+  (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
+  .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
+  `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
+  `python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
+  two definitions of one name, spans a decorated definition with its decorators, and exports
+  every module-level name (imports included), as an explicit import or `m.x` sees them; what
+  `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
+  Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
+  and `a.b.c` (dotted `Import::local`s); `from p import m` binds `m` twice, as a name `p`
+  exports and as the submodule `p.m` (the last that resolves wins); `from p import *` is
+  `Imported::All`. `modules` resolves them against the repository root, then the roots
+  `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
+  `packages.from`), or `src` when none is declared; a package comes before a module of the
+  same name.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
-  imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code` folds
-  constants and client wrapper arguments into values for contract kinds.
+  imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
+  bound by several imports (the last that resolves wins), a callee may start with a dotted
+  import, and a name no import binds is looked up in what the `Facts::star` of each
+  `Imported::All` import takes, last first. `Code` folds constants and client wrapper arguments into values for contract kinds.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
   `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
@@ -271,6 +286,12 @@ Each is marked `ponytail:` at its site unless noted.
   a closure is unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
+- `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
+  root declarations. `src` is a source root when nothing is declared, whether or not it holds
+  packages (a pack sees no file list). An import binds its names for the whole file, wherever
+  it sits. `self`, `cls`, base classes and typed receivers are not resolved yet (a method call
+  resolves by name), `__all__` is read only as one literal list or tuple, and call arguments
+  and parameter defaults are not read (no `Value`s, so no contracts).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
