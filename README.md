@@ -35,7 +35,28 @@ Quem serve a rota declara os hosts em que responde:
 ```toml
 [serve]
 hosts = ["api.example.com"]
+prefix = "/shop"                         # opcional: o gateway põe isto na frente dos caminhos
+strip = "/v1"                            # opcional: e tira isto do começo deles
 ```
+
+Com `prefix` e `strip`, uma chamada a `/shop/orders` chega à rota `/v1/orders` do código, no
+nível `inferred` e com o motivo `gateway prefix /shop, gateway strip /v1`. Um segmento de versão
+só sai quando você o escreve em `strip`, e quem chama o caminho do código continua ligando como
+antes.
+
+Um recurso compartilhado que nenhum código nomeia, como uma tabela ou um bucket, entra como
+`[[resource]]`:
+
+```toml
+[[resource]]
+kind = "postgres"                        # identificador em minúsculas
+id = "orders"
+role = "write"                           # read, write ou read-write
+via = ["src/orders.ts::cancelOrder"]     # opcional: os símbolos que fazem o acesso
+```
+
+Cada escritor liga a cada leitor do mesmo recurso em outro repositório, no nível `declared`.
+Sem `via`, ou se nenhum `via` corresponde a um símbolo, o lado é o repositório inteiro.
 
 Meada acha os pares pelo remoto git, mesmo que o clone fique em outro caminho em cada máquina.
 Uma chave desconhecida ou mal escrita dá um erro com o arquivo, a linha e a chave. Sem
@@ -47,7 +68,8 @@ Na raiz do repositório:
 
 - `meada index` monta o índice, em `.meada/`, do repositório e dos pares;
 - `meada status` mostra o conjunto de repositórios, o estado de cada índice e os pares que não
-  foram encontrados;
+  foram encontrados; sob cada repositório, os recursos sem ligação e os `via` que não
+  correspondem a nenhum símbolo;
 - `meada export` imprime o índice inteiro em JSON ordenado, bom para `diff` entre duas execuções;
 - `meada decide` resolve ligações ambíguas e URLs dinâmicas, veja Decisões;
 - `meada mcp` serve as ferramentas abaixo por MCP.
@@ -71,10 +93,13 @@ seu agente (por exemplo o `.mcp.json` do Claude Code):
 
 São três ferramentas, sempre em inglês, e nenhuma escreve:
 
-- `search` acha um símbolo, uma rota ou um contrato pelo nome; com o tipo `ambiguous` ou
-  `unresolved`, lista os itens abertos (veja Decisões);
+- `search` acha um símbolo, uma rota ou um contrato pelo nome; com o tipo `resource`, um
+  recurso pelo tipo ou pelo id; com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
+  (veja Decisões);
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
-  chama e os contratos que ele toca;
+  chama e os contratos que ele toca; num recurso (`resource::postgres::orders`), lista quem
+  escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
+  inteiro;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
   acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
   analisar o impacto do que acabou de ser editado.
@@ -157,11 +182,12 @@ Constantes fixas:
 ## Estado
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP: `fetch` no lado que consome,
-Next.js (app router) e Express no lado que serve. Cada ligação tem o nível `exact`, `inferred`,
-`decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida
-e só vira ligação por uma decisão, no nível `decided`. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, filas,
-pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
+`.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP (`fetch` no lado que consome,
+Next.js (app router) e Express no lado que serve, também atrás de um gateway) e pelos recursos
+declarados no `meada.toml`. Cada ligação tem o nível `exact`, `declared`, `inferred`, `decided`
+ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida e só vira
+ligação por uma decisão, no nível `decided`. Ainda não há: outras linguagens, outros clientes
+HTTP além do `fetch`, filas, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).
 

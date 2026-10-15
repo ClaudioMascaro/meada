@@ -37,7 +37,26 @@ A repository that serves the route declares the hosts it answers on:
 ```toml
 [serve]
 hosts = ["api.example.com"]
+prefix = "/shop"                         # optional: what the gateway adds in front of paths
+strip = "/v1"                            # optional: what it removes from their start
 ```
+
+With `prefix` and `strip`, a call to `/shop/orders` reaches the code route `/v1/orders`, at the
+level `inferred` with the reason `gateway prefix /shop, gateway strip /v1`. A version segment
+goes only when you write it in `strip`, and callers of the code path keep linking as before.
+
+A shared resource no code names, such as a table or a bucket, goes in as `[[resource]]`:
+
+```toml
+[[resource]]
+kind = "postgres"                        # lowercase identifier
+id = "orders"
+role = "write"                           # read, write or read-write
+via = ["src/orders.ts::cancelOrder"]     # optional: the symbols that do the access
+```
+
+Every writer links to every reader of the same resource in another repository, at the level
+`declared`. Without `via`, or when no `via` matches a symbol, the side is the whole repository.
 
 Meada finds peers by their git remote, even when the clone sits at a different path on each
 machine. An unknown or misspelled key gives an error naming the file, the line and the key.
@@ -49,7 +68,8 @@ At the root of the repository:
 
 - `meada index` builds the index, in `.meada/`, of the repository and its peers;
 - `meada status` shows the set of repositories, the state of each index and any peer that was
-  not found;
+  not found; under each repository, the unlinked resources and each `via` that matches no
+  symbol;
 - `meada export` prints the whole index as sorted JSON, good for diffing two runs;
 - `meada decide` resolves ambiguous links and dynamic URLs, see Decisions;
 - `meada mcp` serves the tools below over MCP.
@@ -73,10 +93,12 @@ configuration (for example Claude Code's `.mcp.json`):
 
 There are three tools, always in English, and none of them writes:
 
-- `search` finds a symbol, a route or a contract by name; with the kind `ambiguous` or
-  `unresolved`, it lists the open items (see Decisions);
+- `search` finds a symbol, a route or a contract by name; with the kind `resource`, a resource
+  by its kind or id; with the kind `ambiguous` or `unresolved`, it lists the open items (see
+  Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
-  contracts it touches;
+  contracts it touches; on a resource (`resource::postgres::orders`), it lists who writes and
+  who reads it, with the symbol and line, or `(repository-level)` for the whole repository;
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
   with `changes: uncommitted`, it starts from the working-tree diff, which covers the impact
   analysis of what was just edited.
@@ -159,11 +181,12 @@ Fixed constants:
 ## Status
 
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) and links repositories through HTTP contracts: `fetch` on the consuming
-side, Next.js (app router) and Express on the serving side. Each link has the level `exact`,
+`.jsx`, `.mjs`, `.cjs`) and links repositories through HTTP contracts (`fetch` on the consuming
+side, Next.js (app router) and Express on the serving side, also behind a gateway) and through
+the resources declared in `meada.toml`. Each link has the level `exact`, `declared`,
 `inferred`, `decided` or `ambiguous`; a call whose URL cannot be resolved shows up as
-unresolved and becomes a link only through a decision, at the level `decided`. Not there yet: other languages, HTTP clients other than `fetch`, queues, packages and the
-npm package. The scope and order of the work are in
+unresolved and becomes a link only through a decision, at the level `decided`. Not there yet:
+other languages, HTTP clients other than `fetch`, queues, packages and the npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).
 
