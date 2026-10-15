@@ -50,6 +50,17 @@
   ],
   "calls": [
     {
+      "id": "example.com/chain/worker::src/consumer.ts::Kafka#0",
+      "caller": "example.com/chain/worker::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 83,
+        "end": 141
+      }
+    },
+    {
       "id": "example.com/chain/worker::src/consumer.ts::kafka.consumer#0",
       "caller": "example.com/chain/worker::src/consumer.ts",
       "target": null,
