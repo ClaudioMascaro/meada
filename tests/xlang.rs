@@ -31,6 +31,18 @@ fn two_exports_of_the_cross_language_fixture_are_byte_identical() {
 }
 
 #[test]
+fn context_of_a_python_function_shows_its_linked_and_unresolved_consumers() {
+    let (_, inventory) = xlang("xlang_context");
+
+    let answer = Engine::open(&inventory)
+        .unwrap()
+        .context("restock", None)
+        .unwrap();
+
+    assert_golden("xlang.context-restock.txt", &answer);
+}
+
+#[test]
 fn trace_down_crosses_into_python_and_back_to_typescript() {
     let (storefront, _) = xlang("xlang_down");
 

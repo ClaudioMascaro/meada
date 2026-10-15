@@ -7,7 +7,7 @@
     },
     {
       "path": "inventory/jobs.py",
-      "hash": "9c304424dae4f43c2f40c60e1fe4debbd930a9e062cde383a662456a77c1b900"
+      "hash": "5726c6c1bf145f35943a97c7565d0c0f381e56e18ae3ac7407db5587bfc3599c"
     },
     {
       "path": "inventory/main.py",
@@ -21,6 +21,14 @@
         "path": "inventory/jobs.py",
         "start": 29,
         "end": 197
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 329,
+        "end": 614
       }
     },
     {
@@ -77,6 +85,39 @@
         "path": "inventory/jobs.py",
         "start": 108,
         "end": 197
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::(string).format#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 555,
+        "end": 613
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.get#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 542,
+        "end": 614
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 473,
+        "end": 530
       }
     },
     {
@@ -229,6 +270,16 @@
       "via": "env:STOREFRONT_URL"
     },
     {
+      "contract": null,
+      "site": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "via": "host:storefront.example.com"
+    },
+    {
       "contract": "http::GET::/api/health",
       "site": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
       "via": "host:storefront.example.com"
@@ -256,6 +307,13 @@
       "contract": "http::GET::/api/prices/{}",
       "level": "inferred",
       "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "provider": "example.com/xlang/storefront::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host storefront.example.com is served by example.com/xlang/storefront"
     },
     {
       "consumer": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
