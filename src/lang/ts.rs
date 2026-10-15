@@ -351,8 +351,9 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
         .collect()
 }
 
-/// The names an object pattern binds: `{ a, b = 1, c: d, e: f = 2 }`. Rest and nested
-/// patterns bind nothing here.
+/// The names an object pattern binds: `{ a, b = 1, c: d, e: f = 2 }`.
+// ponytail: a rest (`...rest`) or nested (`{ a: { b } }`) pattern binds nothing, so a name it
+// holds stays unknown; bind them when a wrapper reads through one.
 fn fields(pattern: Node, src: &[u8], scope: &str) -> Vec<Field> {
     named(pattern)
         .filter_map(|p| {
