@@ -80,6 +80,7 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     expected.sort();
     assert_eq!(links, expected);
     // `mailer.send` is no producer, and `orders.shipped` has no consumer yet stays exported.
+    // The two producers whose topic Meada cannot evaluate are `channel::kafka`, never linked.
     let providers: Vec<&str> = (json["providers"].as_array().unwrap())
         .iter()
         .map(|p| p["contract"].as_str().unwrap())
@@ -87,6 +88,8 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     assert_eq!(
         providers,
         [
+            "channel::kafka",
+            "channel::kafka",
             "channel::kafka::audit.log",
             "channel::kafka::billing.invoices",
             "channel::kafka::orders.created",

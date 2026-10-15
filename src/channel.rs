@@ -38,6 +38,19 @@ pub fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
     })
 }
 
+/// Whether `contract` is a channel side whose name could not be evaluated.
+pub fn is_unresolved(contract: &str) -> bool {
+    matches!(parse(contract), Some((_, None)))
+}
+
+/// `contract` as a person reads it: an unresolved channel side says so.
+pub fn shown(contract: &str) -> String {
+    match is_unresolved(contract) {
+        true => format!("{contract} (unresolved)"),
+        false => contract.to_string(),
+    }
+}
+
 impl ContractKind for Channel {
     fn prefix(&self) -> &'static str {
         "channel"

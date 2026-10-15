@@ -100,11 +100,14 @@ tu agente (por ejemplo el `.mcp.json` de Claude Code):
 Son tres herramientas, siempre en inglés, y ninguna escribe:
 
 - `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
-  un recurso por su tipo o su id; con el tipo `ambiguous` o `unresolved`, lista los ítems
+  un recurso por su tipo o su id; con el tipo `channel`, un canal (cola o tópico) por el broker
+  o el nombre; con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
   contratos que toca; en un recurso (`resource::postgres::orders`), lista quién lo escribe y
-  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero;
+  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero; en
+  un canal (`channel::kafka::orders.created`), lista productores y consumidores, y un lado cuyo
+  nombre Meada no puede evaluar aparece como `(unresolved)` y nunca se enlaza;
 - `trace` sigue una cadena de llamadas por varios repositorios, río abajo (`down`) o río arriba
   (`up`); con `changes: uncommitted`, parte del diff del árbol de trabajo y sirve para analizar
   el impacto de lo que se acaba de editar.

@@ -1,0 +1,8 @@
+example.com/channels/worker src/pattern.ts:12 seen
+async function seen({ message }: { message: { value: string } }) {
+  return message.value;
+}
+callers: none
+callees: none
+contracts:
+example.com/channels/worker src/pattern.ts:12 consumes channel::kafka (unresolved)
