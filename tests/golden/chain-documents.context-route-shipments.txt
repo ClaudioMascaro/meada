@@ -1,0 +1,2 @@
+http::GET::/api/shipments/{}
+  example.com/chain/gateway provider openapi.yaml (documented only)

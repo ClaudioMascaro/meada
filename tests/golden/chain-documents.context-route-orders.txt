@@ -1,0 +1,4 @@
+http::GET::/api/orders
+  example.com/chain/gateway provider src/orders.ts:5 listOrders
+    example.com/chain/gateway openapi.yaml response fields: [], [].id, [].product
+    example.com/chain/gateway openapi.yaml response open: [].product

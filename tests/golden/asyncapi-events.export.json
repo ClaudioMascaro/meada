@@ -209,9 +209,21 @@
       ]
     },
     {
+      "path": "routing.asyncapi.yaml",
+      "format": "asyncapi",
+      "version": "2.6.0",
+      "contracts": []
+    },
+    {
       "path": "sensors.asyncapi.yml",
       "format": "asyncapi",
       "version": "2.6.0",
+      "contracts": []
+    },
+    {
+      "path": "serverless.asyncapi.yaml",
+      "format": "asyncapi",
+      "version": "3.0.0",
       "contracts": []
     }
   ],

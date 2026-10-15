@@ -38,12 +38,29 @@ fn named(path: &str, format: &str) -> bool {
         && (stem == format || stem.strip_suffix(format).is_some_and(|s| s.ends_with('.')))
 }
 
+/// The kind of a document read, named by its top-level field: `openapi` or `asyncapi`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Format {
+    Openapi,
+    Asyncapi,
+}
+
+impl Format {
+    pub fn name(self) -> &'static str {
+        match self {
+            Format::Openapi => "openapi",
+            Format::Asyncapi => "asyncapi",
+        }
+    }
+}
+
 /// What Meada read from one document. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
-    /// `openapi` or `asyncapi` for a document read; `None` when it was ignored (see `problems`).
+    /// For a document read; `None` when it was ignored (see `problems`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<Format>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     /// `info.title`.
@@ -52,7 +69,7 @@ pub struct Summary {
     /// Sorted by path, then method, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub routes: Vec<Route>,
-    /// The root `servers` URLs that name a host or a base path, sorted, each once.
+    /// The root `servers` URLs that name a host or a server path, sorted, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub servers: Vec<Server>,
     /// The channel sides an AsyncAPI document lists, sorted by broker kind, name and role, each
@@ -67,12 +84,21 @@ impl Summary {
     /// What `search` shows of a document read: `openapi 3.1.0, routes: 3`, or `asyncapi 3.0.0,
     /// channels: 2`. Nothing for one ignored.
     pub fn shown(&self) -> Option<String> {
-        let (format, version) = (self.format.as_ref()?, self.version.as_ref()?);
-        let count = match format.as_str() {
-            "asyncapi" => format!("channels: {}", self.channel_count()),
-            _ => format!("routes: {}", self.routes.len()),
+        let (format, version) = (self.format?, self.version.as_ref()?);
+        let counted = match format {
+            Format::Asyncapi => "channels",
+            Format::Openapi => "routes",
         };
-        Some(format!("{format} {version}, {count}"))
+        let count = self.count(format);
+        Some(format!("{} {version}, {counted}: {count}", format.name()))
+    }
+
+    /// How many routes an OpenAPI document lists, or channels an AsyncAPI one.
+    pub fn count(&self, format: Format) -> usize {
+        match format {
+            Format::Openapi => self.routes.len(),
+            Format::Asyncapi => self.channel_count(),
+        }
     }
 
     /// How many channels the sides are of: a channel both sent to and received from counts once.
@@ -90,8 +116,8 @@ impl Summary {
 }
 
 /// What a root `servers` URL gives: the host it is served on (lower case, as a consumer's URL
-/// names it) and its base path (normalized, no trailing `/`, empty for none). A relative URL has
-/// no host.
+/// names it) and its server path (normalized, no trailing `/`, empty for none). A relative URL
+/// has no host.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Server {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -172,19 +198,35 @@ pub enum Problem {
     Protocol { protocol: String },
     /// A channel name with parameters, ignored. Each once, sorted.
     Parameters { channel: String },
+    /// An AsyncAPI document with channels and no root `servers`: no channel has a broker kind,
+    /// so every one is ignored.
+    NoServers,
+    /// A server a channel uses has no `protocol`: the channel is ignored on it. Each once,
+    /// sorted.
+    NoProtocol { server: String },
+    /// A channel lists a server the document does not have: ignored on it. Each pair once,
+    /// sorted.
+    UnknownServer { channel: String, server: String },
     /// It parses, but is not OpenAPI 3.0 or 3.1; `found` is what it says it is, such as
     /// `swagger 2.0`.
     Format { found: Option<String> },
     /// A `$ref` to another file or a URL in a response schema: not followed, so the part of
     /// the shape behind it is open. Each reference once, sorted.
     ExternalRef { reference: String },
+    /// A path item that is a `$ref` to another file or a URL: not followed, so the routes
+    /// behind it are not read. Each reference once, sorted.
+    ExternalPathItem { reference: String },
 }
 
 /// The summary of the document at `path` (repository-relative) holding `src`. JSON by the
 /// extension, YAML otherwise. It never fails: what cannot be read is a problem.
+///
+/// The content decides the format, since a listed document can have any name: a top-level
+/// `openapi` field is OpenAPI, an `asyncapi` one AsyncAPI. With neither, the name only picks
+/// which format the document is reported as not being.
 pub fn read(path: &str, src: &[u8]) -> Summary {
     match parse(path, src) {
-        // The content decides, since a listed document can have any name.
+        Ok(doc) if doc.get("openapi").is_some() => openapi::read(path, &doc),
         Ok(doc) if doc.get("asyncapi").is_some() || named(path, "asyncapi") => {
             asyncapi::read(path, &doc)
         }
@@ -229,14 +271,13 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
     let mut first: BTreeMap<String, &str> = BTreeMap::new();
     for doc in &export.documents {
         let path = doc.path.as_str();
-        if let (Some(format), Some(version)) = (&doc.summary.format, &doc.summary.version) {
+        if let (Some(format), Some(version)) = (doc.summary.format, &doc.summary.version) {
             lines.push(
                 Msg::DocumentRead {
                     path,
                     format,
                     version,
-                    routes: doc.summary.routes.len(),
-                    channels: doc.summary.channel_count(),
+                    count: doc.summary.count(format),
                 }
                 .text(),
             );
@@ -259,7 +300,17 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
                     },
                     Problem::Protocol { protocol } => Msg::DocumentProtocol { path, protocol },
                     Problem::Parameters { channel } => Msg::DocumentParameters { path, channel },
+                    Problem::NoServers => Msg::DocumentNoServers { path },
+                    Problem::NoProtocol { server } => Msg::DocumentNoProtocol { path, server },
+                    Problem::UnknownServer { channel, server } => Msg::DocumentUnknownServer {
+                        path,
+                        channel,
+                        server,
+                    },
                     Problem::ExternalRef { reference } => Msg::ExternalRef { path, reference },
+                    Problem::ExternalPathItem { reference } => {
+                        Msg::ExternalPathItem { path, reference }
+                    }
                 }
                 .text(),
             );
@@ -290,7 +341,7 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Problem, is_document, read};
+    use super::{Format, Problem, is_document, read};
 
     #[test]
     fn documents_are_found_by_file_name() {
@@ -329,7 +380,7 @@ mod tests {
                 other => panic!("{other:?}"),
             }
         };
-        let ok = |v: &str| Ok(("openapi".to_string(), v.to_string()));
+        let ok = |v: &str| Ok((Format::Openapi, v.to_string()));
         let not = |f: Option<&str>| Err(f.map(String::from));
         for (path, src, expected) in [
             ("openapi.yaml", "openapi: 3.1.0\n", ok("3.1.0")),
@@ -354,6 +405,85 @@ mod tests {
         ] {
             assert_eq!(found(path, src), expected, "{src}");
         }
+    }
+
+    #[test]
+    fn the_format_field_decides_whatever_the_name() {
+        let format = |path: &str, src: &str| {
+            let summary = read(path, src.as_bytes());
+            (summary.format, summary.problems)
+        };
+        let openapi = "openapi: 3.1.0\npaths: {/x: {get: {}}}\n";
+        let asyncapi = "asyncapi: 2.6.0\n";
+        for path in [
+            "api.asyncapi.yaml",
+            "api.openapi.yaml",
+            "docs/contract.yaml",
+        ] {
+            assert_eq!(
+                format(path, openapi),
+                (Some(Format::Openapi), vec![]),
+                "{path}"
+            );
+            assert_eq!(
+                format(path, asyncapi),
+                (Some(Format::Asyncapi), vec![]),
+                "{path}"
+            );
+        }
+        assert_eq!(
+            read("api.asyncapi.yaml", openapi.as_bytes()).routes.len(),
+            1
+        );
+        // Neither field: the name picks the message, OpenAPI's for any other name.
+        let swagger = "swagger: '2.0'\n";
+        let found = Some("swagger 2.0".to_string());
+        for (path, problem) in [
+            ("asyncapi.yaml", Problem::AsyncFormat { found: None }),
+            ("openapi.yaml", Problem::Format { found: None }),
+            ("docs/contract.yaml", Problem::Format { found: None }),
+        ] {
+            assert_eq!(format(path, "info: {}\n"), (None, vec![problem]), "{path}");
+        }
+        assert_eq!(
+            format("api.asyncapi.yaml", swagger),
+            (None, vec![Problem::AsyncFormat { found }])
+        );
+    }
+
+    #[test]
+    fn a_path_item_reference_is_followed_when_local() {
+        let src = r##"
+openapi: 3.1.0
+paths:
+  /items:
+    $ref: '#/components/pathItems/Items'
+  /chained:
+    $ref: '#/components/pathItems/Alias'
+  /elsewhere:
+    $ref: 'shared.yaml#/paths/~1elsewhere'
+  /gone:
+    $ref: '#/components/pathItems/Gone'
+components:
+  pathItems:
+    Items:
+      get: {}
+      post: {}
+    Alias:
+      $ref: '#/components/pathItems/Items'
+"##;
+        let summary = read("openapi.yaml", src.as_bytes());
+        let routes: Vec<String> = summary.routes.iter().map(|r| r.label()).collect();
+        assert_eq!(
+            routes,
+            ["GET /chained", "POST /chained", "GET /items", "POST /items"]
+        );
+        assert_eq!(
+            summary.problems,
+            [Problem::ExternalPathItem {
+                reference: "shared.yaml#/paths/~1elsewhere".into()
+            }]
+        );
     }
 
     #[test]
@@ -460,7 +590,7 @@ paths:
                 }
             ]
         );
-        assert_eq!(summary.format.as_deref(), Some("openapi"));
+        assert_eq!(summary.format, Some(Format::Openapi));
     }
 
     #[test]

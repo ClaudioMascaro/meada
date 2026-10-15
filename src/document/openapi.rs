@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-use super::{Problem, Route, Server, Summary, schema};
+use super::{Format, Problem, Route, Server, Summary, schema};
 use crate::http::{PARAM, normalize_path};
 use crate::shape::Source;
 
@@ -28,11 +28,19 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         return Summary::problem(Problem::Format { found });
     };
     let mut operations = Vec::new();
+    let (mut external, mut items) = (BTreeSet::new(), BTreeSet::new());
     let paths = doc.get("paths").and_then(Value::as_object);
     for (route, item) in paths.into_iter().flatten() {
         if !route.starts_with('/') {
             continue;
         }
+        // A path item may be a local reference (`#/components/pathItems/...`); an external
+        // one is not followed.
+        let Some(item) = local(doc, item) else {
+            let reference = item.get("$ref").and_then(Value::as_str);
+            items.extend(reference.filter(|r| !r.starts_with('#')).map(String::from));
+            continue;
+        };
         for &method in METHODS {
             if let Some(operation) = item.get(method).filter(|o| o.is_object()) {
                 let route = normalize_path(&template(route));
@@ -43,12 +51,12 @@ pub fn read(path: &str, doc: &Value) -> Summary {
     // Stable: of `/users/{id}` and `/users/{name}`, one route, the first key gives the shape.
     operations.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
     operations.dedup_by(|a, b| (&a.0, &a.1) == (&b.0, &b.1));
-    let mut external = BTreeSet::new();
+    let mut work = schema::Work::default();
     let routes = (operations.into_iter())
         .map(|(route, method, operation)| {
             let shape = response(doc, operation).map(|response| {
                 let source = Source::Document(path.to_string());
-                let (shape, refs) = schema::read(doc, response, source);
+                let (shape, refs) = schema::read(doc, response, source, &mut work);
                 external.extend(refs);
                 shape
             });
@@ -60,14 +68,15 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         })
         .collect();
     Summary {
-        format: Some("openapi".into()),
+        format: Some(Format::Openapi),
         version: Some(version),
         title: doc.pointer("/info/title").and_then(text),
         routes,
         servers: servers(doc),
         channels: Vec::new(),
-        problems: (external.into_iter())
-            .map(|reference| Problem::ExternalRef { reference })
+        problems: (items.into_iter())
+            .map(|reference| Problem::ExternalPathItem { reference })
+            .chain((external.into_iter()).map(|reference| Problem::ExternalRef { reference }))
             .collect(),
     }
 }
@@ -113,13 +122,10 @@ fn servers(doc: &Value) -> Vec<Server> {
     let entries = doc.get("servers").and_then(Value::as_array);
     let mut found: Vec<Server> = (entries.into_iter().flatten())
         .filter_map(|entry| {
-            let mut url = entry.get("url")?.as_str()?.to_string();
             let variables = entry.get("variables").and_then(Value::as_object);
-            for (name, variable) in variables.into_iter().flatten() {
-                if let Some(default) = variable.get("default").and_then(text) {
-                    url = url.replace(&format!("{{{name}}}"), &default);
-                }
-            }
+            let url = substitute(entry.get("url")?.as_str()?, |name| {
+                variables?.get(name)?.get("default").and_then(text)
+            });
             if url.contains(['{', '}']) {
                 return None;
             }
@@ -147,6 +153,26 @@ fn servers(doc: &Value) -> Vec<Server> {
     found.sort();
     found.dedup();
     found
+}
+
+/// `template` with each `{name}` that `value` knows replaced, in one pass over the template:
+/// the text a value brings is never read again, so a value naming a variable stays as written.
+fn substitute(template: &str, value: impl Fn(&str) -> Option<String>) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        let Some(close) = rest[open..].find('}').map(|c| open + c) else {
+            break;
+        };
+        out.push_str(&rest[..open]);
+        match value(&rest[open + 1..close]) {
+            Some(v) => out.push_str(&v),
+            None => out.push_str(&rest[open..=close]),
+        }
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// A string, or a number as written in JSON (`openapi: 3.0` in YAML is a number).
@@ -186,7 +212,7 @@ mod tests {
     use crate::document::Server;
 
     #[test]
-    fn root_servers_give_hosts_and_base_paths() {
+    fn root_servers_give_hosts_and_server_paths() {
         let doc = serde_json::json!({
             "openapi": "3.1.0",
             "servers": [
@@ -214,6 +240,29 @@ mod tests {
                 server(Some("eu.example.com:8443"), "/v3"),
             ]
         );
+    }
+
+    #[test]
+    fn server_variables_are_replaced_in_one_pass() {
+        // Each default names the next variable ten times: substituting into the substituted
+        // text again grows the URL tenfold per variable (a million copies here, a billion with
+        // three more). One pass leaves `{v1}` in it.
+        let mut variables = serde_json::Map::new();
+        for n in 0..6 {
+            let default = format!("{{v{}}}", n + 1).repeat(10);
+            variables.insert(format!("v{n}"), serde_json::json!({ "default": default }));
+        }
+        variables.insert("v6".into(), serde_json::json!({"default": "x"}));
+        let doc = serde_json::json!({
+            "openapi": "3.1.0",
+            "servers": [
+                {"url": "https://api.example.com/{v0}", "variables": variables},
+                {"url": "https://{a}.example.com/{a}/{b}", "variables": {
+                    "a": {"default": "{b}"}, "b": {"default": "v2"}}},
+            ],
+        });
+        // The second URL: `{a}` gives `{b}` as written, which is not read again.
+        assert_eq!(read("openapi.json", &doc).servers, vec![]);
     }
 
     #[test]

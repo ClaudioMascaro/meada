@@ -191,7 +191,11 @@ the resources declared in `meada.toml` and through channels: Kafka topics (`kafk
 queues (`amqplib`, with a `publish` to an exchange reaching the queues its bindings tie to it),
 Amazon SQS queues (AWS SDK v3 and `sqs-consumer`), NATS subjects (with the `*` and `>`
 wildcards), BullMQ jobs and Redis streams (`ioredis` and `node-redis`), with the producer linked
-to the handler of each consumer, in the same repository too. Each link has the
+to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
+also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
+listed in `[serve] documents`: the routes and channels they describe become contracts, with the
+fields of each response or payload, and `meada status` says what it read and what it ignored.
+Each link has the
 level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
 `decided`. Broker clusters are not modelled: two clusters that each have a topic with the same

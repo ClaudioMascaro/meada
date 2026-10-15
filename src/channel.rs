@@ -10,9 +10,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::document;
-use crate::index::{Binding, Consumer, Export, Provider, Publish};
+use crate::index::{self, Binding, Consumer, Export, Provider, Publish};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
+use crate::shape::Shape;
 use crate::workspace::Repository;
 
 pub struct Channel;
@@ -190,56 +191,50 @@ impl ContractKind for Channel {
     /// with the contract of a code side of the same direction merges into it: the code keeps the
     /// handler or the producing call, and takes the document's payload shape. Any other is a side
     /// of its own, without a handler, at `<repository>::<document>::<broker> send|receive
-    /// <name>`; a side an earlier document (by path) already lists adds nothing. It runs after
-    /// `Http::declare`, which sets every provider's shape to what its route documents.
+    /// <name>`; a side an earlier document (by path) already lists adds nothing.
     fn declare(&self, _repo: &Repository, export: &mut Export) {
         for doc in &export.documents {
             for side in &doc.summary.channels {
                 let contract = side.contract();
+                let merged = match side.role {
+                    document::Role::Producer => merge(
+                        (export.providers.iter_mut())
+                            .filter(|p| p.contract == contract)
+                            .map(|p| &mut p.shape),
+                        &side.shape,
+                    ),
+                    document::Role::Consumer => merge(
+                        (export.consumers.iter_mut())
+                            .filter(|c| c.contract.as_ref() == Some(&contract))
+                            .map(|c| &mut c.shape),
+                        &side.shape,
+                    ),
+                };
+                if merged {
+                    continue;
+                }
                 let site = format!("{}::{}::{}", export.repository, doc.path, side.label());
+                let shape = side.shape.clone();
                 match side.role {
-                    document::Role::Producer => {
-                        let same = |p: &&mut Provider| p.contract == contract;
-                        let mut found = false;
-                        for p in export.providers.iter_mut().filter(same) {
-                            found = true;
-                            p.shape = p.shape.take().or_else(|| side.shape.clone());
-                        }
-                        if !found {
-                            export.providers.push(Provider {
-                                contract,
-                                site,
-                                shape: side.shape.clone(),
-                                ..Provider::default()
-                            });
-                        }
-                    }
-                    document::Role::Consumer => {
-                        let same = |c: &&mut Consumer| c.contract.as_ref() == Some(&contract);
-                        let mut found = false;
-                        for c in export.consumers.iter_mut().filter(same) {
-                            found = true;
-                            c.shape = c.shape.take().or_else(|| side.shape.clone());
-                        }
-                        if !found {
-                            export.consumers.push(Consumer {
-                                contract: Some(contract),
-                                site,
-                                via: None,
-                                shape: side.shape.clone(),
-                                method: None,
-                                fragments: Vec::new(),
-                            });
-                        }
-                    }
+                    document::Role::Producer => export.providers.push(Provider {
+                        contract,
+                        site,
+                        shape,
+                        ..Provider::default()
+                    }),
+                    document::Role::Consumer => export.consumers.push(Consumer {
+                        contract: Some(contract),
+                        site,
+                        via: None,
+                        shape,
+                        method: None,
+                        fragments: Vec::new(),
+                    }),
                 }
             }
         }
-        // The index's orders.
-        let providers = &mut export.providers;
-        providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
-        let key = |c: &Consumer| (c.site.clone(), c.contract.clone(), c.via.clone());
-        export.consumers.sort_by_key(key);
+        index::sort_providers(&mut export.providers);
+        index::sort_consumers(&mut export.consumers);
     }
 
     /// The consumer links to every producer that reaches its channel (`reaching`), in any
@@ -267,6 +262,19 @@ impl ContractKind for Channel {
             })
             .collect()
     }
+}
+
+/// Gives each code side a document side merges into (`own`, their shapes) the document's
+/// `shape`, unless it has one; whether there was any.
+fn merge<'a>(own: impl Iterator<Item = &'a mut Option<Shape>>, shape: &Option<Shape>) -> bool {
+    let mut any = false;
+    for own in own {
+        any = true;
+        if own.is_none() {
+            own.clone_from(shape);
+        }
+    }
+    any
 }
 
 /// How a producer of the channel `produced` reaches a consumer of the channel `consumed`, the
