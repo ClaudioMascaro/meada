@@ -77,7 +77,15 @@ pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-documents");
     copy_dir(&overlay.join("gateway"), &gateway);
     copy_dir(&overlay.join("web"), &web);
-    // The overlay cannot hold it: Meada's own git would ignore it there.
+    // The gateway lists the gitignored document, one with a name discovery does not know, and
+    // a path that does not exist.
+    let toml = gateway.join("meada.toml");
+    let hosts = "hosts = [\"gateway.example.com\"]\n";
+    let listed = "documents = [\"generated/openapi.yaml\", \"docs/api-contract.yaml\", \
+                  \"docs/missing.yaml\"]\n";
+    let src = fs::read_to_string(&toml).unwrap();
+    fs::write(&toml, src.replace(hosts, &format!("{hosts}{listed}"))).unwrap();
+    // The overlay cannot hold the gitignored document: Meada's own git would ignore it there.
     fs::create_dir_all(gateway.join("generated")).unwrap();
     fs::copy(
         overlay.join("generated-openapi.yaml"),

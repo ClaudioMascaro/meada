@@ -202,8 +202,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .collect::<rusqlite::Result<_>>()?;
 
     let all = walk(root);
-    let documents = (all.iter()).filter(|(path, _)| serve.declared && document::is_document(path));
-    refresh_documents(&tx, documents, now)?;
+    refresh_documents(&tx, &documents_found(root, &all, serve), now)?;
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -445,14 +444,35 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
+/// The documents of a repository (path and absolute path): those `walk` found by file name,
+/// then each path `[serve] documents` lists that is a file, ignored by `.gitignore` or not. A
+/// listed path that is not a file is no document; `document::report` says so. Without a
+/// `[serve]` table there are none.
+fn documents_found(
+    root: &Path,
+    walked: &[(String, PathBuf)],
+    serve: &Serve,
+) -> Vec<(String, PathBuf)> {
+    if !serve.declared {
+        return Vec::new();
+    }
+    let mut found: Vec<_> = (walked.iter())
+        .filter(|(path, _)| document::is_document(path))
+        .cloned()
+        .collect();
+    for path in &serve.documents {
+        let abs = root.join(path);
+        if abs.is_file() && !found.iter().any(|(p, _)| p == path) {
+            found.push((path.clone(), abs));
+        }
+    }
+    found
+}
+
 /// Brings the `documents` table up to date with `found`, the documents on disk (path and
 /// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
 /// stored document not found leaves the table.
-fn refresh_documents<'a>(
-    tx: &Transaction,
-    found: impl Iterator<Item = &'a (String, PathBuf)>,
-    now: SystemTime,
-) -> Result<()> {
+fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemTime) -> Result<()> {
     let stored: HashMap<String, (String, Option<i64>, i64)> = tx
         .prepare("SELECT path, hash, mtime, size FROM documents")?
         .query_map([], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?, r.get(3)?))))?

@@ -1,0 +1,11 @@
+openapi: 3.0.3
+info:
+  title: Carriers contract
+  version: "2.0"
+# A name discovery does not know: only `[serve] documents` lists it.
+paths:
+  /api/carriers:
+    get:
+      responses:
+        "200":
+          description: The carriers
