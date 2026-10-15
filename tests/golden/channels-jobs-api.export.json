@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "src/bullmq.ts",
-      "hash": "1e6013fc4a44e6a08ab5674193a52bff18550ba0fe852965533dc0116eb1726c"
+      "hash": "00c6bf52f9865498b5178af163cd5f3ac65396ec36e325c4397c66c7829f3026"
     },
     {
       "path": "src/ioredis.ts",
@@ -15,6 +15,14 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 575,
+        "end": 695
+      }
+    },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::remember",
       "span": {
@@ -29,6 +37,14 @@
         "path": "src/bullmq.ts",
         "start": 333,
         "end": 403
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 704,
+        "end": 767
       }
     },
     {
@@ -99,6 +115,28 @@
       }
     },
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue::Queue#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 645,
+        "end": 660
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue::queue.add#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 670,
+        "end": 692
+      }
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::remember::seen.add#0",
       "caller": "example.com/jobs/api::src/bullmq.ts::remember",
       "target": null,
@@ -118,6 +156,17 @@
         "path": "src/bullmq.ts",
         "start": 374,
         "end": 400
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
+      "target": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 743,
+        "end": 764
       }
     },
     {
@@ -190,6 +239,10 @@
   "providers": [
     {
       "contract": "channel::bullmq::emails",
+      "site": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0"
+    },
+    {
+      "contract": "channel::bullmq::emails",
       "site": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0"
     },
     {
@@ -211,6 +264,13 @@
   ],
   "consumers": [],
   "links": [
+    {
+      "consumer": "example.com/jobs/worker::src/bullmq.ts::sendEmail",
+      "provider": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0",
+      "contract": "channel::bullmq::emails",
+      "level": "exact",
+      "reason": "channel::bullmq::emails"
+    },
     {
       "consumer": "example.com/jobs/worker::src/bullmq.ts::sendEmail",
       "provider": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0",

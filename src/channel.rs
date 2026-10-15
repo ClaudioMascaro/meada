@@ -3,13 +3,13 @@
 //! message libraries (`LanguagePack::messages`); this kind turns them into contracts and links
 //! every consumer of a channel to every producer of it, in any repository of the workspace,
 //! its own included. Producers are the provider side: messages go from the producing call to
-//! the consumer's handler. Broker clusters are not modelled: one name of one broker kind is
-//! one channel across the workspace.
+//! the consumer's handler. A RabbitMQ publish to a named exchange is no channel's side by
+//! itself: the bindings of the workspace route it to queues (`Routes`).
 
 use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Binding, Consumer, Provider};
+use crate::index::{Binding, Consumer, Export, Provider, Publish};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -22,6 +22,8 @@ pub const PREFIX: &str = "channel::";
 /// The contract identifier of the channel `name` of `broker`, kept as evaluated. A side whose
 /// name could not be evaluated is `channel::<broker>`: it names its broker kind, never links
 /// and is not an open item.
+// ponytail: broker clusters are not modelled, so one name of one broker kind is one channel
+// across the workspace; a connection identity in the contract would split them.
 pub fn contract(broker: &str, name: Option<&str>) -> String {
     match name {
         Some(name) => format!("{PREFIX}{broker}::{name}"),
@@ -29,24 +31,38 @@ pub fn contract(broker: &str, name: Option<&str>) -> String {
     }
 }
 
-/// The contract of a publish to the named exchange `exchange` with routing key `key`: not a
-/// queue (the bindings decide which queues it reaches), so it lives under its own broker kind
-/// and never equals a queue's contract. A publish to the empty exchange is the queue `key`.
-fn publication(exchange: &str, key: &str) -> String {
-    contract("amqp-exchange", Some(&format!("{exchange}::{key}")))
+/// The RabbitMQ routing of the workspace: every binding and every publish to a named
+/// exchange, from any repository, since the broker is shared.
+pub struct Routes<'a> {
+    pub bindings: Vec<&'a Binding>,
+    pub publishes: Vec<&'a Publish>,
 }
 
-/// The routing key of a `publication` to `exchange`.
-fn routing_key<'c>(contract: &'c str, exchange: &str) -> Option<&'c str> {
-    contract
-        .strip_prefix(PREFIX)?
-        .strip_prefix("amqp-exchange::")?
-        .strip_prefix(exchange)?
-        .strip_prefix("::")
+impl<'a> Routes<'a> {
+    pub fn new(exports: &'a [Export]) -> Self {
+        Self {
+            bindings: exports.iter().flat_map(|e| &e.bindings).collect(),
+            publishes: exports.iter().flat_map(|e| &e.publishes).collect(),
+        }
+    }
+
+    /// The queues `publish` reaches, each with the level and reason of the strongest binding
+    /// that routes it there.
+    pub fn reached(&self, publish: &Publish) -> BTreeMap<&'a str, (Level, String)> {
+        let mut found = BTreeMap::new();
+        for b in self.bindings.iter().copied() {
+            if let Some(matched) = routed(publish, b) {
+                strongest(&mut found, &b.contract, matched);
+            }
+        }
+        found
+    }
 }
 
 /// Whether the topic-exchange `pattern` matches the routing `key`: words split at `.`, `*` is
-/// exactly one word and `#` zero or more. Meada applies it whatever the exchange type.
+/// exactly one word and `#` zero or more.
+// ponytail: an exchange's type (`assertExchange`) is not read, so every pattern follows
+// topic-exchange rules, a direct or fanout exchange included.
 fn pattern_matches(pattern: &str, key: &str) -> bool {
     fn go(pattern: &[&str], key: &[&str]) -> bool {
         match pattern.split_first() {
@@ -90,9 +106,22 @@ pub fn shown(contract: &str) -> String {
     }
 }
 
+/// The contract a person typed as `shown` printed it: `channel::kafka (unresolved)` is
+/// `channel::kafka`.
+pub fn typed(text: &str) -> &str {
+    match text.strip_suffix(" (unresolved)") {
+        Some(contract) if is_unresolved(contract) => contract,
+        _ => text,
+    }
+}
+
 impl ContractKind for Channel {
     fn prefix(&self) -> &'static str {
         "channel"
+    }
+
+    fn sides(&self) -> Option<(&'static str, &'static str)> {
+        Some(("producer", "consumer"))
     }
 
     fn extract(&self, code: &Code) -> Vec<Found> {
@@ -111,16 +140,20 @@ impl ContractKind for Channel {
         messages
             .iter()
             .map(|m| {
-                let mut contract = contract(m.broker, m.name.as_deref());
+                let mut contract = Some(contract(m.broker, m.name.as_deref()));
                 let (mut via, mut method) = (None, None);
                 let (role, site) = match &m.role {
                     lang::Role::Producer => (Role::Provider, call(m)),
-                    lang::Role::Publish { exchange } => {
-                        if let Some(key) = &m.name {
-                            contract = publication(exchange, key);
+                    // A publish whose routing key could not be evaluated is an unresolved
+                    // producer.
+                    lang::Role::Publish { exchange } => match &m.name {
+                        Some(key) => {
+                            (contract, via, method) =
+                                (None, Some(exchange.clone()), Some(key.clone()));
+                            (Role::Publish, call(m))
                         }
-                        (Role::Provider, call(m))
-                    }
+                        None => (Role::Provider, call(m)),
+                    },
                     lang::Role::Binding { exchange, pattern } => {
                         (via, method) = (Some(exchange.clone()), Some(pattern.clone()));
                         (Role::Binding, call(m))
@@ -143,7 +176,7 @@ impl ContractKind for Channel {
                 Found {
                     role,
                     site,
-                    contract: Some(contract),
+                    contract,
                     via,
                     method,
                     fragments: Vec::new(),
@@ -152,26 +185,23 @@ impl ContractKind for Channel {
             .collect()
     }
 
-    /// The consumer links to every producer of its channel, in any repository: at `exact` when
-    /// the names are equal, at `inferred` when its wildcard pattern matches the producer's name
-    /// (`wildcard`), and, for a queue, when a binding of the workspace routes a publish to it
-    /// (`binding`, see `matched`). Several producers or consumers are fan-in or fan-out, never
-    /// ambiguity.
+    /// The consumer links to every producer that reaches its channel (`reaching`), in any
+    /// repository. Several producers or consumers are fan-in or fan-out, never ambiguity.
     fn link(
         &self,
         consumer: &Consumer,
         _from: &Repository,
         providers: &[(&Repository, &Provider)],
-        bindings: &[&Binding],
+        routes: &Routes,
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
-        matched(contract, providers, bindings)
-            .into_iter()
-            .map(|(provider, level, reason)| Link {
+        let providers = providers.iter().map(|&(_, p)| p);
+        (reaching(contract, providers, routes).into_iter())
+            .map(|(provider, (level, reason))| Link {
                 consumer: consumer.site.clone(),
-                provider,
+                provider: provider.to_string(),
                 contract: contract.clone(),
                 level,
                 reason,
@@ -182,60 +212,75 @@ impl ContractKind for Channel {
     }
 }
 
-/// The producers (by site) that reach the channel `contract`, with the level and reason of
-/// each, and the one place a match is decided: the producers of the same contract at `exact`,
-/// reason the contract; the producers whose name the consumer's wildcard pattern matches
-/// (`wildcard`, the broker kind's own rules) at `inferred`, reason `<producer contract> wildcard
-/// <pattern>`; and, for each binding of the queue, the publishes to its exchange whose routing
-/// key the pattern matches, `exact` when the pattern is the key and `inferred` for a wildcard,
-/// reason `<contract> binding <exchange> <pattern>`. Of several matches to one producer the
-/// strongest level wins. An unresolved side (no name) matches nothing.
-fn matched(
-    contract: &str,
-    providers: &[(&Repository, &Provider)],
-    bindings: &[&Binding],
-) -> Vec<(String, Level, String)> {
-    let Some((broker, Some(pattern))) = parse(contract) else {
-        return Vec::new();
+/// How a producer of the channel `produced` reaches a consumer of the channel `consumed`, the
+/// one place a name match is decided: at `exact` when they are the same channel, reason the
+/// contract; at `inferred` when the consumer's name is a wildcard pattern of the same broker
+/// kind that matches the producer's (`wildcard`), reason `<produced> wildcard <pattern>`. An
+/// unresolved side reaches nothing.
+pub fn fits(produced: &str, consumed: &str) -> Option<(Level, String)> {
+    let (Some((broker, Some(name))), Some((kind, Some(pattern)))) =
+        (parse(produced), parse(consumed))
+    else {
+        return None;
     };
-    let mut found: BTreeMap<&str, (Level, String)> = BTreeMap::new();
-    for (_, p) in providers {
-        let mut matches = Vec::new();
-        if p.contract == contract {
-            matches.push((Level::Exact, contract.to_string()));
-        } else if let Some((b, Some(name))) = parse(&p.contract)
-            && b == broker
-            && wildcard(broker, pattern, name)
-        {
-            matches.push((
-                Level::Inferred,
-                format!("{} wildcard {pattern}", p.contract),
-            ));
-        }
-        for b in bindings.iter().filter(|b| b.contract == contract) {
-            let Some(key) = routing_key(&p.contract, &b.exchange) else {
-                continue;
-            };
-            if pattern_matches(&b.pattern, key) {
-                let level = if b.pattern == key {
-                    Level::Exact
-                } else {
-                    Level::Inferred
-                };
-                let reason = format!("{contract} binding {} {}", b.exchange, b.pattern);
-                matches.push((level, reason));
-            }
-        }
-        if let Some(best) = matches.into_iter().min() {
-            found
-                .entry(&p.site)
-                .and_modify(|b| *b = best.clone().min(b.clone()))
-                .or_insert(best);
+    if produced == consumed {
+        return Some((Level::Exact, consumed.to_string()));
+    }
+    let reason = || format!("{produced} wildcard {pattern}");
+    (kind == broker && wildcard(broker, pattern, name)).then(|| (Level::Inferred, reason()))
+}
+
+/// How `binding` routes `publish` to its queue: when the exchanges are the same and the
+/// pattern matches the routing key (`pattern_matches`), at `exact` when the pattern is the
+/// key and `inferred` for a wildcard, reason `<queue contract> binding <exchange> <pattern>`.
+fn routed(publish: &Publish, binding: &Binding) -> Option<(Level, String)> {
+    if publish.exchange != binding.exchange || !pattern_matches(&binding.pattern, &publish.key) {
+        return None;
+    }
+    let level = match binding.pattern == publish.key {
+        true => Level::Exact,
+        false => Level::Inferred,
+    };
+    let (exchange, pattern) = (&binding.exchange, &binding.pattern);
+    Some((
+        level,
+        format!("{} binding {exchange} {pattern}", binding.contract),
+    ))
+}
+
+/// The producers that reach the channel `contract`, by site, with the level and reason of
+/// each: the providers that `fit` it, and the publishes its bindings route to it (`routed`).
+/// Of several matches to one producer the strongest wins.
+pub fn reaching<'p>(
+    contract: &str,
+    providers: impl IntoIterator<Item = &'p Provider>,
+    routes: &Routes<'p>,
+) -> BTreeMap<&'p str, (Level, String)> {
+    let mut found = BTreeMap::new();
+    for p in providers {
+        if let Some(matched) = fits(&p.contract, contract) {
+            strongest(&mut found, &p.site, matched);
         }
     }
-    (found.into_iter())
-        .map(|(site, (level, reason))| (site.to_string(), level, reason))
-        .collect()
+    for b in routes.bindings.iter().filter(|b| b.contract == contract) {
+        for p in routes.publishes.iter().copied() {
+            if let Some(matched) = routed(p, b) {
+                strongest(&mut found, &p.site, matched);
+            }
+        }
+    }
+    found
+}
+
+/// Keeps the strongest of the matches to `key`.
+fn strongest<'k>(
+    found: &mut BTreeMap<&'k str, (Level, String)>,
+    key: &'k str,
+    matched: (Level, String),
+) {
+    if found.get(key).is_none_or(|known| matched < *known) {
+        found.insert(key, matched);
+    }
 }
 
 /// Whether the consumer's `pattern` matches the producer's `name` through a wildcard of the
@@ -249,8 +294,12 @@ fn wildcard(broker: &str, pattern: &str, name: &str) -> bool {
 }
 
 /// NATS subjects are dot-separated tokens: `*` stands for exactly one token, and `>` as the
-/// last token for one or more.
+/// last token for one or more. A subject holding a wildcard token is a pattern, which no
+/// message is published to, so it matches nothing.
 fn nats(pattern: &str, subject: &str) -> bool {
+    if subject.split('.').any(|t| t == "*" || t == ">") {
+        return false;
+    }
     let mut subject = subject.split('.');
     let mut pattern = pattern.split('.').peekable();
     while let Some(token) = pattern.next() {
@@ -320,6 +369,8 @@ mod tests {
             ("orders.created", "orders.created", true),
             ("orders.created", "orders.created.late", false),
             ("orders.created.late", "orders.created", false),
+            ("orders.*", "orders.>", false),
+            (">", "orders.*", false),
         ] {
             assert_eq!(
                 nats(pattern, subject),

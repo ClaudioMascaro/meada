@@ -63,6 +63,9 @@ fn context_on_an_unresolved_channel_lists_the_sides_with_no_name() {
 
     let answer = engine.context("channel::kafka", None).unwrap();
     assert_golden("channels.context-unresolved.txt", &answer);
+    // As `search` prints it.
+    let printed = engine.context("channel::kafka (unresolved)", None).unwrap();
+    assert_eq!(printed, answer);
 }
 
 #[test]
@@ -74,6 +77,8 @@ fn context_on_a_symbol_names_the_channels_it_produces_to_and_consumes() {
         ("src/dynamic.ts::replay", "producer-unresolved"),
         ("src/consumer.ts::handleOrder", "handler"),
         ("src/pattern.ts::seen", "handler-unresolved"),
+        // Publishes to an exchange, each with the queues the bindings route it to.
+        ("src/amqp.ts::announce", "publisher"),
     ] {
         let answer = engine.context(symbol, None).unwrap();
         assert_golden(&format!("channels.context-{golden}.txt"), &answer);
@@ -120,7 +125,8 @@ fn the_export_keeps_the_unresolved_sides_and_links_none_of_them() {
 fn context_on_a_queue_lists_the_bindings_that_reach_it() {
     let engine = channels("channel_bindings");
 
-    // The binding is declared in the worker, the publishes are in the api.
+    // The binding is declared in the worker, the publish it routes to the queue is in the
+    // api, with the binding as its reason.
     let bound = engine.context("channel::amqp::audit", None).unwrap();
     assert_golden("channels.context-queue-bound.txt", &bound);
     // A queue and a topic that share a name stay apart.
@@ -128,4 +134,7 @@ fn context_on_a_queue_lists_the_bindings_that_reach_it() {
     assert_golden("channels.context-queue.txt", &queue);
     let topic = engine.context("channel::kafka::orders", None).unwrap();
     assert_golden("channels.context-topic-same-name.txt", &topic);
+    // A queue named like the exchange: only its own consumer, no publish to the exchange.
+    let lookalike = engine.context("channel::amqp::events", None).unwrap();
+    assert_golden("channels.context-queue-lookalike.txt", &lookalike);
 }

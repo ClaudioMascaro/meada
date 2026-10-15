@@ -1,3 +1,4 @@
 channel::amqp::audit
-  example.com/channels/worker consumer src/queues.ts:27 onAudit
+  example.com/channels/api producer src/amqp.ts:18 announce [exact: channel::amqp::audit binding events order.created]
+  example.com/channels/worker consumer src/queues.ts:34 onAudit
   example.com/channels/worker binding events order.created src/queues.ts:8 bind

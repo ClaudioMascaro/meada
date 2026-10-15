@@ -3,8 +3,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Binding, Consumer, Export as IndexExport, Provider};
+use crate::index::{Consumer, Export as IndexExport, Provider};
 use crate::lang::{Depends, Export, Part, Value, literal, property};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -434,7 +435,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _bindings: &[&Binding],
+        _routes: &Routes,
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();

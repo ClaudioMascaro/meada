@@ -18,7 +18,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -28,7 +28,10 @@ const SCHEMA_VERSION: i64 = 9;
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach.
+/// none); they let `Engine::open_items` list the routes it may reach. A RabbitMQ `binding` row
+/// keeps the queue's channel in `contract`, the exchange in `via` and the pattern in `method`;
+/// a `publish` row (a publish to a named exchange) has no `contract`, the exchange in `via` and
+/// the routing key in `method`.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -571,6 +574,10 @@ pub(crate) struct Export {
     /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) bindings: Vec<Binding>,
+    /// The RabbitMQ publishes to a named exchange (spec #20), producers of the queues the
+    /// bindings route them to.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) publishes: Vec<Publish>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -626,6 +633,17 @@ pub(crate) struct Binding {
     pub(crate) contract: String,
     pub(crate) exchange: String,
     pub(crate) pattern: String,
+    pub(crate) site: String,
+}
+
+/// A publish to the named exchange `exchange` with the routing key `key`, at the call `site`.
+/// It is no channel's side by itself: it produces to every queue a binding of `exchange`
+/// whose pattern matches `key` routes it to, and to no other (a publish to the empty exchange
+/// is a plain producer of the queue its key names).
+#[derive(Serialize)]
+pub(crate) struct Publish {
+    pub(crate) exchange: String,
+    pub(crate) key: String,
     pub(crate) site: String,
 }
 
@@ -746,6 +764,19 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let publishes = db
+        .prepare(&format!(
+            "SELECT via, method, site FROM {schema}.contracts \
+             WHERE role = 'publish' ORDER BY via, method, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Publish {
+                exchange: r.get(0)?,
+                key: r.get(1)?,
+                site: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -754,6 +785,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         providers,
         consumers,
         bindings,
+        publishes,
         links: Vec::new(),
         stale_decisions: Vec::new(),
     })

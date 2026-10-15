@@ -58,28 +58,13 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let Some(origin) = code.origin(path, &call.scope, chain) else {
                 continue;
             };
-            let produce = |broker, read: Read| {
-                (code.expand(path, n, read).into_iter())
-                    .flat_map(|(site, at, names)| {
-                        names.into_iter().map(move |name| Message {
-                            broker,
-                            name,
-                            path: site.into(),
-                            call: at,
-                            role: Role::Producer,
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            };
+            let produce = |broker, read: Read| producers(broker, code.expand(path, n, read));
             // The handler of the call itself (its `option` of argument `arg`), else the
             // function the call is in.
             let consume = |broker, read: Read, handler: Option<Handler>| {
                 (code.expand(path, n, read).into_iter())
                     .flat_map(|(site, at, names)| {
-                        let handler = handler.clone().unwrap_or_else(|| Handler::Def {
-                            path: site.into(),
-                            name: code.files()[site].calls[at].scope.clone(),
-                        });
+                        let handler = handler.clone().unwrap_or_else(|| enclosing(code, site, at));
                         names.into_iter().map(move |name| Message {
                             broker,
                             name,
@@ -98,7 +83,9 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     subscriptions.push((path, n, origin.binding));
                 }
                 (KAFKAJS, KAFKA_CONSUMER, "run") => {
-                    if let (Some(binding), Some(handler)) = (origin.binding, run(code, path, n)) {
+                    let handler = handler(code, path, n, 0, &["eachMessage", "eachBatch"]);
+                    if let (Some(binding), Some(handler)) = (origin.binding, handler) {
+                        // ponytail: only the first `run` on a consumer binding counts.
                         handlers.entry(binding).or_insert(handler);
                     }
                 }
@@ -120,19 +107,19 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     let handler = handler(code, path, n, 1, &["callback"]);
                     out.extend(consume("nats", &first, handler));
                 }
-                // The queue is named where the binding is made, not at the `add`.
+                // The queue is named where the binding is made, not at the `add`: the `add` is
+                // the producer, or, when the name is a parameter of the function that makes
+                // the binding, each call site of that wrapper.
+                // ponytail: a `Queue` with no `const` binding (`new Queue(name).add(...)`, a
+                // class field, a parameter) and `addBulk` are not recognized.
                 (BULLMQ, BULLMQ_QUEUE, "add") => {
-                    let name = (origin.binding.and_then(|b| code.constructed(b)))
-                        .and_then(|args| name(args.first()?))
-                        .flatten();
-                    out.push(Message {
-                        broker: "bullmq",
-                        name,
-                        path: path.into(),
-                        call: n,
-                        role: Role::Producer,
-                    });
+                    if let Some(binding) = origin.binding {
+                        let found = code.expand_constructed(binding, (path, n), &first);
+                        out.extend(producers("bullmq", found));
+                    }
                 }
+                // ponytail: a processor given as a file path is not followed (the function
+                // that makes the `Worker` handles).
                 (BULLMQ, "Worker", _) => {
                     let processor = (code.args(path, n).and_then(|a| a.get(1)))
                         .and_then(|value| function(code, path, &call.scope, value));
@@ -141,6 +128,8 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 (IOREDIS, expr, "xadd") if IOREDIS_CLIENT.contains(&expr) => {
                     out.extend(produce("redis", &first));
                 }
+                // ponytail: a client made as `await createClient().connect()` is not traced
+                // (the `connect` chain has no binding).
                 (NODE_REDIS, NODE_REDIS_CLIENT, "xAdd") => {
                     out.extend(produce("redis", &first));
                 }
@@ -151,11 +140,11 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume("redis", &keys, None));
                 }
                 (AMQPLIB, expr, "sendToQueue") if AMQP_CHANNELS.contains(&expr) => {
-                    out.extend(produce("amqp", &|a| Some(vec![arg_name(a, 0)?])));
+                    out.extend(produce("amqp", &first));
                 }
                 (AMQPLIB, expr, "consume") if AMQP_CHANNELS.contains(&expr) => {
                     let handler = function_arg(code, path, n, 1);
-                    out.extend(consume("amqp", &|a| Some(vec![arg_name(a, 0)?]), handler));
+                    out.extend(consume("amqp", &first, handler));
                 }
                 (AMQPLIB, expr, "publish") if AMQP_CHANNELS.contains(&expr) => {
                     let read = |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?));
@@ -181,7 +170,8 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     let read =
                         |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?, arg_name(a, 2)?));
                     for (site, at, bound) in code.expand(path, n, &read) {
-                        // A binding that cannot be fully evaluated is dropped.
+                        // ponytail: a binding that cannot be fully evaluated is dropped, not
+                        // shown as unresolved.
                         if let (Some(queue), Some(exchange), Some(pattern)) = bound {
                             out.push(Message {
                                 broker: "amqp",
@@ -201,11 +191,9 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         let read = |a: &[Value]| names(a, &["topics", "topic"]);
         for (site, at, names) in code.expand(path, n, &read) {
             // With no `run` handler Meada can read, the function that subscribes handles.
+            // ponytail: a handler passed through a wrapper's parameter is not followed.
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
-            let handler = handler.unwrap_or_else(|| Handler::Def {
-                path: site.into(),
-                name: code.files()[site].calls[at].scope.clone(),
-            });
+            let handler = handler.unwrap_or_else(|| enclosing(code, site, at));
             out.extend(names.into_iter().map(|name| Message {
                 broker: "kafka",
                 name,
@@ -218,10 +206,27 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
-/// The handler a kafkajs `run({ eachMessage })` or `run({ eachBatch })` gives, when it is a
-/// function written in place or a definition of the repository.
-fn run<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Handler> {
-    handler(code, path, n, 0, &["eachMessage", "eachBatch"])
+/// A producer per name read at each site an expansion found.
+fn producers(broker: &'static str, found: Vec<(&str, usize, Vec<Option<String>>)>) -> Vec<Message> {
+    (found.into_iter())
+        .flat_map(|(site, at, names)| {
+            names.into_iter().map(move |name| Message {
+                broker,
+                name,
+                path: site.into(),
+                call: at,
+                role: Role::Producer,
+            })
+        })
+        .collect()
+}
+
+/// The function the call `at` of `path` is in, as the handler of what it consumes.
+fn enclosing(code: &Code, path: &str, at: usize) -> Handler {
+    Handler::Def {
+        path: path.into(),
+        name: code.files()[path].calls[at].scope.clone(),
+    }
 }
 
 /// The handler the options object that argument `arg` of the call gives under the first of
@@ -273,10 +278,8 @@ fn function<'a>(
 /// it sets, a list giving several. `None` when one depends on a parameter (a client wrapper);
 /// a name that is not a literal string is unresolved (`None` in the list).
 fn names(args: &[Value], keys: &[&str]) -> Option<Vec<Option<String>>> {
-    let options = match args.first() {
-        Some(Value::Object(properties)) => properties,
-        Some(Value::Ref(_)) => return None,
-        _ => return Some(vec![None]),
+    let Some(options) = options(args)? else {
+        return Some(vec![None]);
     };
     let mut given = None;
     for key in keys {
@@ -292,6 +295,16 @@ fn names(args: &[Value], keys: &[&str]) -> Option<Vec<Option<String>>> {
     }
 }
 
+/// The options object a call takes first: `None` when it is a parameter (a client wrapper),
+/// `Some(None)` when it is not an object.
+fn options(args: &[Value]) -> Option<Option<&[(String, Value)]>> {
+    match args.first() {
+        Some(Value::Object(properties)) => Some(Some(properties)),
+        Some(Value::Ref(_)) => None,
+        _ => Some(None),
+    }
+}
+
 /// A channel name as evaluated: `None` when it depends on a parameter, `Some(None)` when it is
 /// not a literal string (an environment read, a runtime value, a regular expression).
 fn name(value: &Value) -> Option<Option<String>> {
@@ -304,7 +317,7 @@ fn name(value: &Value) -> Option<Option<String>> {
 }
 
 /// The channel name a call gives as its first argument: a NATS subject, the queue of a BullMQ
-/// `Worker`, the key of a Redis `xadd`.
+/// `Queue` or `Worker`, the key of a Redis `xadd`, an amqplib queue.
 fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
     Some(vec![name(args.first().unwrap_or(&Value::Undefined))?])
 }
@@ -312,10 +325,8 @@ fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
 /// The SQS queue the URL under `key` of the options object a call takes first names: the last
 /// segment of the URL, whatever precedes it (an account and a region are often dynamic).
 fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
-    let options = match args.first() {
-        Some(Value::Object(properties)) => properties,
-        Some(Value::Ref(_)) => return None,
-        _ => return Some(vec![None]),
+    let Some(options) = options(args)? else {
+        return Some(vec![None]);
     };
     let parts = match property(options, key).ok()? {
         Some(Value::Str(parts)) => parts,

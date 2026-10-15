@@ -58,6 +58,12 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
             "api::src/bullmq.ts::sendWelcome::emails.add#0",
             "channel::bullmq::emails",
         ),
+        // A wrapper whose `new Queue(name)` takes its parameter: its call site produces.
+        link(
+            "worker::src/bullmq.ts::sendEmail",
+            "api::src/bullmq.ts::sendInvoice::enqueue#0",
+            "channel::bullmq::emails",
+        ),
         // A processor written in place.
         link(
             "worker::src/bullmq.ts::startReports.bullmq reports",
@@ -95,6 +101,6 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
     expected.sort();
     assert_eq!(links, expected);
     // `Set.add` is no producer.
-    assert_eq!(json["providers"].as_array().unwrap().len(), 5);
+    assert_eq!(json["providers"].as_array().unwrap().len(), 6);
     assert_golden("channels-jobs-api.export.json", &export);
 }

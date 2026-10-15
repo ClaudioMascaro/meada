@@ -449,18 +449,6 @@
   ],
   "providers": [
     {
-      "contract": "channel::amqp-exchange::events::order.created",
-      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0"
-    },
-    {
-      "contract": "channel::amqp-exchange::events::order.refunded",
-      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#2"
-    },
-    {
-      "contract": "channel::amqp-exchange::events::order.shipped",
-      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1"
-    },
-    {
       "contract": "channel::amqp::jobs",
       "site": "example.com/channels/api::src/amqp.ts::dispatch::channel.publish#0"
     },
@@ -502,6 +490,23 @@
       "contract": "channel::kafka::audit.log",
       "site": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
       "via": null
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "events",
+      "key": "order.created",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0"
+    },
+    {
+      "exchange": "events",
+      "key": "order.refunded",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#2"
+    },
+    {
+      "exchange": "events",
+      "key": "order.shipped",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1"
     }
   ],
   "links": [

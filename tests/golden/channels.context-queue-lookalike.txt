@@ -1,0 +1,2 @@
+channel::amqp::events
+  example.com/channels/worker consumer src/queues.ts:21 lookalikes
