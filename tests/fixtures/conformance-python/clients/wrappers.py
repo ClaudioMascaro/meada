@@ -79,3 +79,26 @@ def not_a_client(data):
     data.fetch_item("/items")
     cfg = {}
     return cfg.fetch_item("/orders")
+
+
+class Pages:
+    """Methods called on the class: the instance passed explicitly, or a class method."""
+
+    def __init__(self):
+        self.http = httpx.Client(base_url=HOST)
+
+    def load(self, path):
+        return self.http.get(path)
+
+    @classmethod
+    def load_shared(cls, path):
+        return requests.get(HOST + path)
+
+
+def explicit_instance():
+    pages = Pages()
+    return Pages.load(pages, "/pages")
+
+
+def class_method():
+    return Pages.load_shared("/shared")

@@ -248,6 +248,12 @@ fn python() {
             "clients/wrappers.py::backoff",
             "clients/wrappers.py::drop_order",
             "clients/wrappers.py::get",
+            "clients/wrappers.py::Pages",
+            "clients/wrappers.py::Pages.__init__",
+            "clients/wrappers.py::Pages.load",
+            "clients/wrappers.py::Pages.load_shared",
+            "clients/wrappers.py::class_method",
+            "clients/wrappers.py::explicit_instance",
             "clients/wrappers.py::Inventory",
             "clients/wrappers.py::Inventory.__init__",
             "clients/wrappers.py::Inventory.fetch_item",
@@ -1561,6 +1567,18 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
             "http::GET::/stock",
             host,
             &site("stock", "inventory.fetch_item#0"),
+        ),
+        // Called on the class: the instance passed explicitly takes the receiver, a class
+        // method's receiver is the class.
+        (
+            "http::GET::/pages",
+            host,
+            &site("explicit_instance", "Pages.load#0"),
+        ),
+        (
+            "http::GET::/shared",
+            host,
+            &site("class_method", "Pages.load_shared#0"),
         ),
     ]);
 

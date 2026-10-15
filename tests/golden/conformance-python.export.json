@@ -35,7 +35,7 @@
     },
     {
       "path": "clients/wrappers.py",
-      "hash": "24ae12c9e96ca81b25e551c77c0bb7ef55ad05d9436e3b54bcbf70fbe183c0a0"
+      "hash": "15058bb03b424f2098e2623e9b1322a16930f75c84e37234c2aa0904ff4e1106"
     },
     {
       "path": "cycle_a.py",
@@ -1056,6 +1056,38 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1631,
+        "end": 1959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1739,
+        "end": 1806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1812,
+        "end": 1868
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1874,
+        "end": 1959
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "span": {
         "path": "clients/wrappers.py",
@@ -1064,11 +1096,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::class_method",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2048,
+        "end": 2107
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::drop_order",
       "span": {
         "path": "clients/wrappers.py",
         "start": 448,
         "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1962,
+        "end": 2045
       }
     },
     {
@@ -3957,6 +4005,43 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__::httpx.Client#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1779,
+        "end": 1806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load::self.http.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::clients/sessions.py::Cache.get",
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+      ],
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1849,
+        "end": 1868
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1934,
+        "end": 1959
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff::retry#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "target": "example.com/acme/conformance::clients/wrappers.py::retry",
@@ -3968,6 +4053,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::class_method::Pages.load_shared#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::class_method",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2079,
+        "end": 2107
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::drop_order::remove#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::drop_order",
       "target": "example.com/acme/conformance::clients/wrappers.py::remove",
@@ -3976,6 +4072,28 @@
         "path": "clients/wrappers.py",
         "start": 485,
         "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1999,
+        "end": 2006
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages.load#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2018,
+        "end": 2045
       }
     },
     {
@@ -6549,8 +6667,18 @@
       "via": "host:api.example.com"
     },
     {
+      "contract": "http::GET::/shared",
+      "site": "example.com/acme/conformance::clients/wrappers.py::class_method::Pages.load_shared#0",
+      "via": "host:api.example.com"
+    },
+    {
       "contract": "http::DELETE::/orders/{}",
       "site": "example.com/acme/conformance::clients/wrappers.py::drop_order::remove#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/pages",
+      "site": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages.load#0",
       "via": "host:api.example.com"
     },
     {

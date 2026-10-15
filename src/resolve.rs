@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Star,
-    Value,
+    Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
+    Star, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -101,6 +101,8 @@ pub struct Resolver<'a> {
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
     receiver: Option<&'static str>,
+    /// The pack's keyword for the base of the enclosing class (`LanguagePack::base_receiver`).
+    base_receiver: Option<&'static str>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
@@ -160,6 +162,7 @@ impl<'a> Resolver<'a> {
             locals,
             families: HashMap::new(),
             receiver: language.receiver(),
+            base_receiver: language.base_receiver(),
             globals: language.globals(),
             callers: HashMap::new(),
             by_name,
@@ -226,7 +229,7 @@ impl<'a> Resolver<'a> {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
-                "super" => Binding::Unknown,
+                _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
                 _ => self.lexical(path, scope, head, seen),
             };
@@ -697,21 +700,28 @@ impl<'a> Code<'a> {
     ) -> Option<&'a Value> {
         let call = self.call(path, index)?;
         let params = &self.resolver.defs[function.path][function.name].params;
-        let locals = &self.resolver.locals[function.path];
-        let bound = call.callee.contains('.')
-            && params.first().is_some_and(|p| {
-                locals.get(&(function.name, p.name.as_str())) == Some(&&Class::Enclosing)
-            });
+        let param = params.get(n)?;
+        // The call's receiver binds a class method's first parameter, and a method's when it
+        // is called on an instance rather than on the class.
+        let bound = match params.first().map(|p| p.binds) {
+            Some(Binds::Class) => true,
+            Some(Binds::Instance) => call.callee.rsplit_once('.').is_some_and(|(receiver, _)| {
+                let class = self.definition(path, &call.scope, receiver);
+                !class.is_some_and(|c| self.resolver.is_class(c))
+            }),
+            _ => false,
+        };
         let position = match bound {
             true => n.checked_sub(1),
             false => Some(n),
         };
-        // A starred parameter (`*args`, `**kwargs`, the bare `*`) ends the positional ones.
-        let open = params.iter().take(n + 1).all(|p| !p.name.starts_with('*'));
-        position
-            .filter(|_| open)
-            .and_then(|at| call.args.get(at))
-            .or_else(|| call.keyword(&params.get(n)?.name))
+        match param.binds {
+            Binds::Rest => None,
+            Binds::Keyword => call.keyword(&param.name),
+            Binds::Any | Binds::Instance | Binds::Class => (position)
+                .and_then(|at| call.args.get(at))
+                .or_else(|| call.keyword(&param.name)),
+        }
     }
 
     /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
@@ -1106,6 +1116,13 @@ impl<'a> Code<'a> {
                 let folded = self.eval(at, within, &found.value, frames, depth, seen, wants);
                 seen.pop();
                 folded
+            }
+            // `*args` and `**kwargs` hold what no single argument gives.
+            Binding::Param(function, n, _)
+                if self.resolver.defs[function.path][function.name].params[n].binds
+                    == Binds::Rest =>
+            {
+                Value::Unknown
             }
             Binding::Param(function, n, field) => match frames.get(depth) {
                 Some(frame) if frame.def == function => {
