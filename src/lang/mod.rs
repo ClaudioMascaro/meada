@@ -90,6 +90,8 @@ pub enum Class {
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
+    /// Bound by an import in the scope: what the file's imports bind the name to.
+    Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
     Unknown,
 }

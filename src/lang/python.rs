@@ -72,6 +72,9 @@ impl LanguagePack for Python {
                             locals.params(node, &inner, in_class, src);
                         }
                     }
+                    if is_class {
+                        locals.classes.insert(inner.clone());
+                    }
                     inner_class = is_class;
                 }
                 "call" => {
@@ -84,13 +87,21 @@ impl LanguagePack for Python {
                         });
                     }
                 }
-                // ponytail: an import binds its names for the whole file, wherever it sits;
-                // a function-local import is not scoped to the function.
+                // ponytail: an import binds its names for the whole file, wherever it sits; a
+                // function-local one also hides an outer binding there, but other functions
+                // see it too.
                 "import_statement" | "import_from_statement" => {
                     let first = facts.imports.len();
                     imports(node, src, &mut facts.imports);
                     if scope.is_empty() {
                         module.import(&facts.imports[first..]);
+                    } else {
+                        // In a function or a class, the import also hides an outer binding.
+                        for import in &facts.imports[first..] {
+                            if !import.local.contains('.') && import.local != "*" {
+                                locals.bind(&scope, &import.local, Class::Imported, How::Assigned);
+                            }
+                        }
                     }
                 }
                 "assignment" | "augmented_assignment" => {
@@ -111,7 +122,16 @@ impl LanguagePack for Python {
                     };
                     let target = node.child_by_field_name(field);
                     for target in target.map(targets).unwrap_or_default() {
-                        locals.bind(&scope, text(target, src), Class::Unknown, How::Assigned);
+                        locals.target(target, &scope, Class::Unknown, How::Assigned, src);
+                    }
+                }
+                "case_clause" => {
+                    let mut found = Vec::new();
+                    for pattern in named(node).filter(|n| n.kind() == "case_pattern") {
+                        captures(pattern, &mut found);
+                    }
+                    for name in found {
+                        locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
                     }
                 }
                 // A lambda's calls belong to the enclosing scope, which its parameters bind.
@@ -123,12 +143,10 @@ impl LanguagePack for Python {
                     }
                 }
                 "global_statement" | "nonlocal_statement" => {
-                    let target = match node.kind() {
-                        "global_statement" => "",
-                        _ => scope.rsplit_once('.').map_or("", |(parent, _)| parent),
-                    };
+                    let global = node.kind() == "global_statement";
                     for name in named(node).filter(|n| n.kind() == "identifier") {
-                        locals.redirect(&scope, text(name, src), target);
+                        let key = (scope.clone(), text(name, src).to_string());
+                        locals.declared.insert(key, global);
                     }
                 }
                 _ => {}
@@ -381,36 +399,48 @@ enum How {
 /// The names each scope binds and what the syntax says of their class.
 #[derive(Default)]
 struct Locals {
-    bound: BTreeMap<(String, String), (Class, How)>,
+    /// Every binding as written, in source order: its scope, name, class and how.
+    written: Vec<(String, String, Class, How)>,
     /// The receiver parameter (`self`, `cls`) of each method, by the method's scope.
     receivers: HashMap<String, String>,
-    /// The names `global` or `nonlocal` makes a scope bind in another, by scope and name.
-    elsewhere: HashMap<(String, String), String>,
+    /// The names a scope declares `global` (`true`) or `nonlocal` (`false`).
+    declared: HashMap<(String, String), bool>,
+    /// The scopes that are class bodies.
+    classes: HashSet<String>,
 }
 
 impl Locals {
-    /// Records that `scope` binds `name` to `class`, in the scope `global` or `nonlocal` sends
-    /// it to, if any.
     fn bind(&mut self, scope: &str, name: &str, class: Class, how: How) {
-        let key = (scope.to_string(), name.to_string());
-        let scope = self.elsewhere.get(&key).cloned();
-        let key = (scope.unwrap_or(key.0), key.1);
-        let annotated = |how| how == How::Annotated;
-        let merged = match self.bound.remove(&key) {
-            None => (class, how),
-            Some(old) if annotated(old.1) && !annotated(how) => old,
-            Some(old) if annotated(how) && !annotated(old.1) => (class, how),
-            Some((old, old_how)) if old == class => (old, old_how.max(how)),
-            Some((_, old_how)) => (Class::Unknown, old_how.max(how)),
-        };
-        self.bound.insert(key, merged);
+        (self.written).push((scope.to_string(), name.to_string(), class, how));
     }
 
-    /// `global name` (`target` empty) or `nonlocal name` (`target` the enclosing scope) in
-    /// `scope`: its bindings there bind it in `target`.
-    fn redirect(&mut self, scope: &str, name: &str, target: &str) {
-        let key = (scope.to_string(), name.to_string());
-        self.elsewhere.insert(key, target.to_string());
+    /// Binds a target: a name in `scope`, or `self.x` as the attribute `x` of the class whose
+    /// method binds `self`, also from a function nested in the method. An attribute of any
+    /// other object is not a binding.
+    // ponytail: a write from outside the class (`obj.x = ...`) is not seen.
+    fn target(&mut self, node: Node, scope: &str, class: Class, how: How, src: &[u8]) {
+        match node.kind() {
+            "identifier" => self.bind(scope, text(node, src), class, how),
+            "attribute" => {
+                let object = node.child_by_field_name("object");
+                let attribute = node.child_by_field_name("attribute");
+                let (Some(object), Some(attribute)) = (object, attribute) else {
+                    return;
+                };
+                let mut method = scope;
+                while !self.receivers.contains_key(method) {
+                    if method.is_empty() || self.classes.contains(method) {
+                        return;
+                    }
+                    method = parent(method);
+                }
+                if self.receivers[method] == text(object, src) {
+                    let owner = parent(method).to_string();
+                    self.bind(&owner, text(attribute, src), class, how);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// The parameters of the function `node`, qualified `scope`: the first one of a method
@@ -433,33 +463,14 @@ impl Locals {
     }
 
     /// An assignment in `scope`: `x = C(...)` gives `x` what `C` names, `x: T` annotates `x`,
-    /// `self.x: T` in a method annotates the class's attribute `x` and `self.x = ...` binds it
-    /// to something unknown; any other target is bound to something unknown.
+    /// `self.x: T` in a method annotates the class's attribute `x`, and any other target,
+    /// `self.x` included, is bound to something unknown.
     fn assign(&mut self, node: Node, scope: &str, src: &[u8]) {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
-        let annotation = node.child_by_field_name("type").map(|a| class(a, src));
-        if left.kind() == "attribute" {
-            let object = left.child_by_field_name("object");
-            let attribute = left.child_by_field_name("attribute");
-            let receiver = self.receivers.get(scope).map(String::as_str);
-            if let (Some(object), Some(attribute)) = (object, attribute)
-                && Some(text(object, src)) == receiver
-            {
-                let owner = scope.rsplit_once('.').map_or("", |(owner, _)| owner);
-                let (class, how) = match annotation {
-                    Some(class) => (class, How::Annotated),
-                    None => (Class::Unknown, How::Assigned),
-                };
-                self.bind(owner, text(attribute, src), class, how);
-            }
-            return;
-        }
-        if let Some(class) = annotation {
-            if left.kind() == "identifier" {
-                self.bind(scope, text(left, src), class, How::Annotated);
-            }
+        if let Some(annotation) = node.child_by_field_name("type") {
+            self.target(left, scope, class(annotation, src), How::Annotated, src);
             return;
         }
         let right = node.child_by_field_name("right");
@@ -472,26 +483,86 @@ impl Locals {
         };
         let class = constructed.map_or(Class::Unknown, Class::Named);
         for target in targets(left) {
-            self.bind(scope, text(target, src), class.clone(), How::Assigned);
+            self.target(target, scope, class.clone(), How::Assigned, src);
         }
     }
 
-    /// The facts: every binding but a plain parameter, which its definition already lists.
+    /// The facts: one per scope and name, every binding but a plain parameter (its definition
+    /// already lists it). A name declared `global` is bound at the module; one declared
+    /// `nonlocal`, in the nearest enclosing function that binds it, class bodies skipped. An
+    /// annotation decides; other bindings that disagree make the class unknown.
     fn finish(self) -> Vec<Local> {
-        (self.bound.into_iter())
+        let own: HashSet<(&str, &str)> = (self.written.iter())
+            .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
+            .filter(|&(scope, name)| !self.declared.contains_key(&(scope.into(), name.into())))
+            .collect();
+        let home = |scope: &str, name: &str| -> String {
+            match self.declared.get(&(scope.to_string(), name.to_string())) {
+                None => scope.to_string(),
+                Some(true) => String::new(),
+                Some(false) => {
+                    let mut at = parent(scope);
+                    while !at.is_empty() {
+                        if !self.classes.contains(at) && own.contains(&(at, name)) {
+                            return at.to_string();
+                        }
+                        at = parent(at);
+                    }
+                    scope.to_string()
+                }
+            }
+        };
+        let annotated = |how| how == How::Annotated;
+        let mut bound: BTreeMap<(String, String), (Class, How)> = BTreeMap::new();
+        for (scope, name, class, how) in &self.written {
+            let key = (home(scope, name), name.clone());
+            let merged = match bound.remove(&key) {
+                None => (class.clone(), *how),
+                Some(old) if annotated(old.1) && !annotated(*how) => old,
+                Some(old) if annotated(*how) && !annotated(old.1) => (class.clone(), *how),
+                Some((old, old_how)) if old == *class => (old, old_how.max(*how)),
+                Some((_, old_how)) => (Class::Unknown, old_how.max(*how)),
+            };
+            bound.insert(key, merged);
+        }
+        (bound.into_iter())
             .filter(|(_, (_, how))| *how != How::Param)
             .map(|((scope, name), (class, _))| Local { scope, name, class })
             .collect()
     }
 }
 
-/// The names a binding target binds: `x`, and those in `a, (b, c)`.
+/// The scope enclosing `scope`, empty at the top level.
+fn parent(scope: &str) -> &str {
+    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
+}
+
+/// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also
+/// inside `a, (b, c)`.
 fn targets(node: Node) -> Vec<Node> {
     match node.kind() {
-        "identifier" => vec![node],
+        "identifier" | "attribute" => vec![node],
         "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
         | "as_pattern_target" => named(node).flat_map(targets).collect(),
         _ => Vec::new(),
+    }
+}
+
+/// The names a `case` pattern captures: a bare name, the name after `as` or `*`, and those
+/// inside sequences, mappings and class patterns; not a class's name or a dotted value.
+fn captures<'t>(node: Node<'t>, out: &mut Vec<Node<'t>>) {
+    match node.kind() {
+        "dotted_name" => {
+            let parts: Vec<Node> = named(node).collect();
+            if let [name] = parts[..] {
+                out.push(name);
+            }
+        }
+        "identifier" => out.push(node),
+        "class_pattern" | "keyword_pattern" => {
+            named(node).skip(1).for_each(|n| captures(n, out));
+        }
+        _ => named(node).for_each(|n| captures(n, out)),
     }
 }
 
