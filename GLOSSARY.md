@@ -96,14 +96,23 @@ _Avoid_: producer, subscriber
 A queue or topic of a broker, identified by its broker kind and its name as evaluated:
 `channel::kafka::orders.created`. The same name under two broker kinds is two channels; broker
 clusters are not modelled, so one name of one kind is one channel across the workspace. Every
-consumer of a channel links to every producer of it, in the same repository too.
-_Avoid_: queue (for the kind), topic (for the kind), stream
+consumer of a channel links to every producer of it, in the same repository too. A Redis stream
+is a channel of the broker kind `redis`.
+_Avoid_: queue (for the kind), topic (for the kind), stream (for the kind)
 
 **Producer**:
 The provider side of a channel: the call that sends to it, or the call site of a client wrapper
 that leads to one. Its consumer side is the handler of the messages, the function a subscription
-names. Messages go from producer to handler, so `trace` goes down that way.
+names. Messages go from producer to handler, so `trace` goes down that way. A RabbitMQ publish
+to a named exchange is a producer of no channel by itself: it produces to each queue a binding
+routes it to.
 _Avoid_: publisher, sender, writer
+
+**Unresolved side**:
+A producer or consumer of a channel whose name Meada could not evaluate, such as a topic read
+from the environment. Its contract names only the broker kind (`channel::kafka`), it shows as
+`(unresolved)` in search, context, trace and the export, and it is never linked nor an open item.
+_Avoid_: hole, dynamic channel
 
 **Binding**:
 A RabbitMQ `bindQueue(queue, exchange, pattern)`: neither side of a channel, but the rule that

@@ -28,10 +28,17 @@ give byte-identical output.
   readers across the workspace (`contract_sides`, shared with channels). `search` kind
   `channel` is the contracts under `channel::`, matched by broker kind and name (an unresolved
   side by its broker kind, printed `channel::kafka (unresolved)`); `context` on
-  `channel::<broker>::<name>` (or `channel::<broker>`, the unresolved sides of that broker) lists
-  the producers (the symbol around the producing call) and consumers (the handler) across the
-  workspace, and `context` on a symbol adds `produces <channel>` (at the producing call) or
-  `consumes <channel>` (the handler) to its `contracts:`. `status` also prints, under each
+  `channel::<broker>::<name>` (or `channel::<broker>`, the unresolved sides of that broker, also
+  accepted as `search` prints it, through `channel::typed`) lists the producers (the symbol
+  around the producing call) and consumers (the handler) across the workspace, those linked
+  through another name included with `[<level>: <reason>]` after them: the producers a
+  wildcard consumer matches (`channel::fits`), the wildcard consumers that match the channel,
+  and the publishes its bindings route to a queue (`Routes::reached`). `context` on a symbol adds
+  `produces <channel>` (at the producing call), `publishes <exchange> <key>` followed by
+  `produces <queue> [<level>: <reason>]` for each queue the bindings route it to, or `consumes
+  <channel>` (the handler) to its `contracts:`. Which contracts `context` lists by side, and
+  the words for them, is `ContractKind::sides` (`writer`/`reader`, `producer`/`consumer`).
+  `status` also prints, under each
   repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
@@ -153,7 +160,7 @@ give byte-identical output.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
-  the index. `Value` has `New(callee)` (`new X(...)` as a value) and `List` (an array literal);
+  the index. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
@@ -175,8 +182,9 @@ give byte-identical output.
   its enclosing function); `sqs-consumer` `Consumer.create({queueUrl, handleMessage})`; NATS
   `publish(subject)` / `subscribe(subject, {callback})` on a `connect()` connection (the
   handler is the `callback`, else the enclosing function); BullMQ `add` on a binding that holds
-  `new Queue(name)` (the queue is named by the binding, read with `Code::constructed`, so a
-  wrapper around the `add` adds nothing: the `add` call is the producer) and `new Worker(name,
+  `new Queue(name)` (the queue is named by the binding, read with `Code::expand_constructed`:
+  the `add` call is the producer, or, when `name` is a parameter of the function that makes the
+  binding, each call site of that wrapper) and `new Worker(name,
   processor)` (the processor, a definition or a function in place, is the handler); ioredis
   `xadd(stream, ...)` and `xreadgroup(..., 'STREAMS', s1, s2, id1, id2)` (every stream of the
   first half after `STREAMS`; the enclosing function handles) on a `new Redis()` or default
@@ -200,9 +208,12 @@ give byte-identical output.
   the repository (`Binding::External` keeps the specifier and imported name), and spells what
   the code did with it from that name: `new Kafka().producer()` for `kafkajs`. A namespace import
   adds no name, a default import is `default`; `binding` is the constant the chain's head names
-  (how a pack pairs calls on the same client). `Code::pack()` is the pack of the files.
-- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
-  `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`, `Consumer` or `Binding`),
+  (how a pack pairs calls on the same client). `Code::expand_constructed(binding, at, read)` is
+  `expand` over the arguments of the `new` a binding holds, on behalf of the call `at` made on
+  it. `Code::pack()` is the pack of the files.
+- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `sides`, `link`),
+  `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
+  `Consumer`, `Binding` or `Publish`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
@@ -226,34 +237,40 @@ give byte-identical output.
   `channel::<broker>` for an unresolved side (`channel::parse`, `is_unresolved`, and `shown`, which
   prints it with `(unresolved)`), which `link` skips: it is in the export and never
   linked, and since its contract is not `None` it is no open item (`search` kind `unresolved`
-  and `meada decide` never see it). `link` joins every consumer to every producer of the same
-  contract at `exact`, reason the contract, in any repository including its own; a consumer whose
-  name is a wildcard pattern also joins the producers its pattern matches (`wildcard(broker,
-  pattern, name)`, the one place a broker's matching rules live: NATS `*` one token and `>` the
-  rest, table-tested), at `inferred`, reason `<producer contract> wildcard <pattern>`. RabbitMQ
-  (`amqp`): a binding is a `Found` with role `Binding`, stored in `contracts` (`contract` the
-  queue's channel, `via` the exchange, `method` the pattern, `site` the `bindQueue` call) and
-  exported as `bindings` (absent when empty). A publish to a named exchange is a provider whose
-  contract is `channel::amqp-exchange::<exchange>::<key>` (a publish to the empty exchange is
-  the queue `key`'s own contract), so it never equals a queue's. `matched` is the one match
-  hook `link` calls (the equal-name, wildcard and binding matches): for a queue consumer it
-  also takes, for each binding of that queue in any repository, the publishes to its exchange
-  whose key `pattern_matches` (topic-exchange rules whatever the exchange type): `exact` when
-  the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
-  <pattern>`; of several matches to one producer the strongest wins. `ContractKind::link`
-  takes the workspace's bindings beside its providers.
+  and `meada decide` never see it). `link` joins every consumer to every producer that
+  `reaching(contract, providers, routes)` gives, in any repository including its own. Name
+  matches are `fits(produced, consumed)`: the same contract at `exact`, reason the contract,
+  and a consumer whose name is a wildcard pattern to the producers its pattern matches
+  (`wildcard(broker, pattern, name)`, the one place a broker's matching rules live: NATS `*` one
+  token and `>` the rest, a subject holding a wildcard matching nothing, table-tested), at
+  `inferred`, reason `<producer contract> wildcard <pattern>`. RabbitMQ (`amqp`): a binding is a
+  `Found` with role `Binding`, stored in `contracts` (`contract` the queue's channel, `via` the
+  exchange, `method` the pattern, `site` the `bindQueue` call) and exported as `bindings`
+  (absent when empty). A publish to a named exchange holds no channel: it is a `Found` with
+  role `Publish` and no contract (`via` the exchange, `method` the routing key, `site` the
+  `publish` call), exported as `publishes: [{exchange, key, site}]` (absent when empty), so no
+  queue named like its exchange or its key ever equals it; a publish to the empty exchange is
+  a plain producer of the queue `key`, and one whose key cannot be evaluated an unresolved
+  producer `channel::amqp`. `Routes` holds the workspace's bindings and publishes (the broker
+  is shared); `routed(publish, binding)` is the one routing rule: same exchange and the
+  pattern `pattern_matches` the key (topic-exchange rules whatever the exchange type), `exact`
+  when the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
+  <pattern>`. `reaching` adds those publishes to a queue's producers, and `Routes::reached`
+  gives the queues one publish reaches; of several matches to one producer the strongest wins.
+  `ContractKind::link` takes the workspace's `Routes` beside its providers.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,
   handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
   handler, and up from the handler (`out[handler]`, a provider that is a call) to the producing
-  call and its caller. An unresolved channel side has no link, so `Graph::holes` (by site) gives
+  call and its caller (a publish to a named exchange is such a call, linked through the bindings).
+  An unresolved channel side has no link, so `Graph::unresolved_sides` (by site) gives
   the walk one row for it under the producing call (down, and from a call start) or the handler symbol:
   `<repository> <path>:<line> produces|consumes channel::<broker> (unresolved)`, no level and no
   hop. A repository-level side (`Graph::is_repo`) prints as `<repository>
   (repository-level)` and ends its branch: it is pushed as a row, never entered. Starts take
-  only HTTP routes, symbols and call sites; a `resource::...` or `channel::...` start gets an
-  answer pointing to `context`.
+  only HTTP routes, symbols and call sites; a start in a kind with `ContractKind::sides`
+  (`resource::...`, `channel::...`) gets an answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
@@ -274,7 +291,8 @@ give byte-identical output.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, links}`; a provider has
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, publishes,
+  links}`; a provider has
   `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
   resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
@@ -283,7 +301,11 @@ give byte-identical output.
   handler symbol (or file, at the top level), `via` null. A RabbitMQ binding is neither: it is in
   `bindings: [{contract, exchange, pattern, site}]` (the queue's channel, the exchange, the
   pattern, the `bindQueue` call site), sorted, absent when empty; `context` on the queue lists
-  it as `<repository> binding <exchange> <pattern> <path>:<line> <symbol>` after the sides. A call has `level` (`exact`,
+  it as `<repository> binding <exchange> <pattern> <path>:<line> <symbol>` after the sides. A
+  RabbitMQ publish to a named exchange is in `publishes: [{exchange, key, site}]` (the `publish`
+  call site), sorted, absent when empty: it is no channel's side by itself, and a link from a
+  queue's consumer names its site as the provider. Every channel the export names has the form
+  `channel::<broker>::<name>` (or `channel::<broker>`) of a v1 broker kind. A call has `level` (`exact`,
   `inferred`, `ambiguous` or null) and `target`; an ambiguous call has `target: null` and a sorted
   `candidates`. `export` keeps only the links that touch the repository where Meada runs. A
   repository with stale decisions also has `stale_decisions: [{call, target, cause}]`
@@ -308,12 +330,14 @@ give byte-identical output.
   its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
-  <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `matched` calls
-  from `link`; a binding match (reason `<queue contract> binding <exchange> <p>`) is in
-  `matched` too, which `link` calls with the whole workspace's providers and bindings (the
-  AMQP pattern matcher is `pattern_matches`). Something that is neither side, like a binding,
-  is a `Found` with its own `Role`, an export list of its own (`Export::bindings`) and, to show
-  in `context` on a channel, a line in `Engine::contract_sides`. A form whose site is a
+  <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
+  binding match (reason `<queue contract> binding <exchange> <p>`) is `routed`. `reaching`
+  joins both for `link` (with the whole workspace's providers and `Routes`) and
+  `Engine::contract_sides` uses `fits` and `Routes::reached`, so `context` on a channel shows
+  every side a link would join. Something that is neither side, like a binding or a publish to
+  a named exchange, is a `Found` with its own `Role`, an export list of its own
+  (`Export::bindings`, `Export::publishes`) and, to show in `context` on a channel, a line in
+  `Engine::contract_sides`. A form whose site is a
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
@@ -386,10 +410,13 @@ give byte-identical output.
   (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
-  publishes through a binding of another repository, the empty exchange, and a Kafka topic
-  that shares a queue's name; the `channels-queues-api` and `channels-queues-worker` fixtures:
-  SQS by queue name and NATS wildcards at `inferred`), `channels_jobs` (the `channels-jobs-api`
-  and `channels-jobs-worker` fixtures: BullMQ queues and Redis streams in both client styles).
+  publishes through a binding of another repository, the empty exchange, queues named like the
+  exchange and like an unbound key that no publish reaches, and a Kafka topic that shares a
+  queue's name; the `channels-queues-api` and `channels-queues-worker` fixtures: SQS by queue
+  name and NATS wildcards at `inferred`, also in `context` on a subject and on a pattern),
+  `channel_queries` (`search`, `context` and `trace` on channels over the first fixture),
+  `channels_jobs` (the `channels-jobs-api` and `channels-jobs-worker` fixtures: BullMQ queues,
+  a `new Queue(name)` wrapper, and Redis streams in both client styles).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -430,13 +457,15 @@ Each is marked `ponytail:` at its site unless noted.
   binding (`new Kafka().producer().send`), is not recognized (no marker).
 - `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
   (the function that subscribes handles); only the first `run` on a consumer binding counts. An
-  amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped, and an
-  exchange's type is not read: every pattern follows topic-exchange rules.
+  amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped.
   A BullMQ `Queue` is named by its own `new Queue(name)` binding: `new Queue(name).add(...)` with
   no binding, a `Queue` that is a class field or a parameter, and `addBulk` are not recognized. A
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
+- `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
+  across the workspace), and an exchange's type is not read: every binding pattern follows
+  topic-exchange rules.
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
