@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-use super::{Problem, Route, Summary, schema};
+use super::{Problem, Route, Server, Summary, schema};
 use crate::http::{PARAM, normalize_path};
 use crate::shape::Source;
 
@@ -64,6 +64,7 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         version: Some(version),
         title: doc.pointer("/info/title").and_then(text),
         routes,
+        servers: servers(doc),
         problems: (external.into_iter())
             .map(|reference| Problem::ExternalRef { reference })
             .collect(),
@@ -104,6 +105,49 @@ fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Value> {
     None
 }
 
+/// The root `servers` URLs of `doc`. Server variables take their default; a URL that still holds
+/// one has nothing to say. A relative URL gives its path only, a URL with neither host nor
+/// path nothing.
+fn servers(doc: &Value) -> Vec<Server> {
+    let entries = doc.get("servers").and_then(Value::as_array);
+    let mut found: Vec<Server> = (entries.into_iter().flatten())
+        .filter_map(|entry| {
+            let mut url = entry.get("url")?.as_str()?.to_string();
+            let variables = entry.get("variables").and_then(Value::as_object);
+            for (name, variable) in variables.into_iter().flatten() {
+                if let Some(default) = variable.get("default").and_then(text) {
+                    url = url.replace(&format!("{{{name}}}"), &default);
+                }
+            }
+            if url.contains(['{', '}']) {
+                return None;
+            }
+            let url = url.trim();
+            let (host, path) = match url.split_once("://") {
+                Some((_, rest)) => {
+                    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+                    let authority = &rest[..end];
+                    let host = authority.rsplit('@').next().unwrap_or(authority);
+                    let host = Some(host.to_lowercase()).filter(|h| !h.is_empty());
+                    (host, &rest[end..])
+                }
+                None => (None, url),
+            };
+            let path = path.split(['?', '#']).next().unwrap_or("");
+            let path = if path.is_empty() || path.starts_with('/') {
+                normalize_path(path)
+            } else {
+                normalize_path(&format!("/{path}"))
+            };
+            let path = path.trim_end_matches('/').to_string();
+            (host.is_some() || !path.is_empty()).then_some(Server { host, path })
+        })
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
 /// A string, or a number as written in JSON (`openapi: 3.0` in YAML is a number).
 fn text(value: &Value) -> Option<String> {
     match value {
@@ -137,7 +181,39 @@ fn template(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::template;
+    use super::{read, template};
+    use crate::document::Server;
+
+    #[test]
+    fn root_servers_give_hosts_and_base_paths() {
+        let doc = serde_json::json!({
+            "openapi": "3.1.0",
+            "servers": [
+                {"url": "https://API.example.com/v2/"},
+                {"url": "https://{region}.example.com:8443/{ver}", "variables": {
+                    "region": {"default": "eu"}, "ver": {"default": "v3"}}},
+                {"url": "https://{env}.example.com/v4", "variables": {"env": {"enum": ["a"]}}},
+                {"url": "/relative/base"},
+                {"url": "https://bare.example.com"},
+                {"url": "/"},
+                {"url": "https://api.example.com/v2"},
+            ],
+            "paths": {"/y": {"servers": [{"url": "https://no.example.com"}]}},
+        });
+        let server = |host: Option<&str>, path: &str| Server {
+            host: host.map(String::from),
+            path: path.into(),
+        };
+        assert_eq!(
+            read("openapi.json", &doc).servers,
+            vec![
+                server(None, "/relative/base"),
+                server(Some("api.example.com"), "/v2"),
+                server(Some("bare.example.com"), ""),
+                server(Some("eu.example.com:8443"), "/v3"),
+            ]
+        );
+    }
 
     #[test]
     fn path_templates_become_the_parameter_marker() {

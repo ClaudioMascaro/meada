@@ -745,6 +745,11 @@ pub(crate) struct Provider {
     /// `http::gateway_contracts`.
     #[serde(skip)]
     pub(crate) gateways: Vec<Gateway>,
+    /// The hosts the repository serves on, lower case: `[serve] hosts` and the host of every
+    /// `servers` URL of its documents. `Http::declare` fills it; `link` matches a URL's host
+    /// against it.
+    #[serde(skip)]
+    pub(crate) hosts: Vec<String>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.

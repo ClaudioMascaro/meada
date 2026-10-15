@@ -1,6 +1,12 @@
 {
   "openapi": "3.0.3",
   "info": { "title": "Chain gateway orders", "version": "1.0" },
+  "servers": [
+    { "url": "https://{region}.example.com/{version}", "variables": {
+      "region": { "default": "eu" }, "version": { "default": "v3" } } },
+    { "url": "https://{unset}.example.com/v9" },
+    { "url": "/relative/base" }
+  ],
   "paths": {
     "/api/shipments/{shipmentId}": {
       "get": { "responses": { "200": { "description": "Also in openapi.yaml" } } }

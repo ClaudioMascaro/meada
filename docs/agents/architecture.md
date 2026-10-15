@@ -124,9 +124,10 @@ give byte-identical output.
   which makes the repository's documents provider sources) and `[[resource]]` (`kind` checked
   as a lowercase identifier, `id` not empty,
   `role` read, write or read-write, optional `via`) with `deny_unknown_fields`; keys later track A
-  specs add are listed in `LATER` so the error says "not in v0.1". `Serve::gateway_path(code path)
-  -> Option<(gateway path, reason)>` is the one gateway rule (spec #19), written for A4's document
-  routes to reuse. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
+  specs add are listed in `LATER` so the error says "not in v0.1". `config::gateway_path(prefix,
+  strip, path) -> Option<(gateway path, reason)>` is the one gateway rule (spec #19); `Serve::
+  gateway_path(path)` applies it with `[serve]` prefix and strip, `Http::declare` with a
+  document's server path as the prefix. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
   every error), also used for the decisions file; `Repository` carries both `config` and
   `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -166,9 +167,12 @@ give byte-identical output.
   name: `openapi.{yaml,yml,json}` and `*.openapi.{yaml,yml,json}`), `read(path, bytes) ->
   Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
   becomes a `Problem`, with the line clamped to the file's last line), `Summary {format,
-  version, title, routes: Vec<Route {path, method, shape}>, problems: Vec<Problem>}` (stored as
-  JSON; `Route::contract`, `Route::label` = `GET /users/{}`), `Problem::Unreadable {line,
-  error}`, `Problem::Format {found}` and `Problem::ExternalRef {reference}` (structured,
+  version, title, routes: Vec<Route {path, method, shape}>, servers: Vec<Server {host, path}>,
+  problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
+  /users/{}`; `servers` are the root `servers[].url` entries with variables replaced by their
+  defaults, a URL still holding one dropped, a relative URL giving only its path, host lower
+  case, path normalized with no trailing `/`), `Problem::Unreadable {line, error}`,
+  `Problem::Format {found}` and `Problem::ExternalRef {reference}` (structured,
   rendered through `Msg`), and `report(export)`: the status lines (each problem, then each
   route a later document by path lists again: `Msg::DuplicateRoute`). `openapi.rs`: `read(path,
   value)`: a top-level `openapi` of `3.0` or `3.1` (any patch; a YAML number counts), else
@@ -269,7 +273,11 @@ give byte-identical output.
   document's route has no shape). A document provider is a written contract: it lowers
   no level (a host match is `exact`). A route also matches by its gateway paths: `declare`
   fills `Provider::gateways` (`Gateway {path, reason}`, not exported; the `[serve]` form, which
-  is also the exported `Provider::gateway`), `http::gateway_contracts(provider)` yields each as
+  is also the exported `Provider::gateway`, followed by one form per server path of each
+  document listing the route, with `[serve] strip`; for a route only documents list, a server
+  path replaces the `[serve]` prefix, so its `[serve]` form is dropped), `Provider::hosts` (not
+  exported: `[serve] hosts` plus the host of every `servers` URL of the repository's documents,
+  checked by `link` for a `host:` consumer), `http::gateway_contracts(provider)` yields each as
   `(contract, reason)` and `http::serves(provider, contract)` is the one check of any path (also
   used by open items and decision replay, so a gateway candidate carries the provider's own
   contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
@@ -393,9 +401,10 @@ give byte-identical output.
   bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` sees
   only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
   through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
-  (HTTP: `Http::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`. A
-  payload schema becomes a shape through `schema::read`; a new kind of shape source is a
-  `shape::Source` variant, never a new shape type.
+  (HTTP: `Http::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
+  new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
+  `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
+  type.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -423,8 +432,9 @@ give byte-identical output.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
-  and methods, the field paths of their response shapes and the external references met, and
-  the parser's reason and line for a document it could not read). `Call::args`,
+  and methods, the field paths of their response shapes and the external references met, the
+  hosts and base paths of the root `servers` URLs, and the parser's reason and line for a
+  document it could not read). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
@@ -459,10 +469,12 @@ give byte-identical output.
   `generated/openapi.yaml`, which Meada's own git would ignore inside the overlay), then commits:
   the gateway gains `openapi.yaml` (3.1: `GET /api/orders`, merged with the Express route and
   given a response shape with an open part, and
-  the documented-only `GET /api/shipments/{id}`), `orders.openapi.json` (3.0, the same
-  shipments route again: a duplicate), a Swagger 2.0 `legacy.openapi.yaml` and an invalid
+  the documented-only `GET /api/shipments/{id}`; a `servers` URL on `api.example.com` with base
+  path `/gw`), `orders.openapi.json` (3.0, the same shipments route again: a duplicate; servers
+  with variable defaults `https://{region}.example.com/{version}` and a relative `/relative/base`,
+  and one URL with a variable without default, which gives nothing), a Swagger 2.0 `legacy.openapi.yaml` and an invalid
   `broken.openapi.yaml`; the web app gains `src/shipments.ts` (the shipments route through
-  `GATEWAY_URL` and through the gateway's host) and a vendored `vendor/openapi.yaml`, ignored
+  `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
   since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
   goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with

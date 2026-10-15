@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: Chain gateway
   version: "1.0"
+# The public URL in front of the gateway: a host of its own and a base path.
+servers:
+  - url: https://api.example.com/gw
 paths:
   # Also an Express route in src/routes.ts: the two merge into one provider.
   /api/orders:

@@ -42,6 +42,9 @@ pub struct Summary {
     /// Sorted by path, then method, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub routes: Vec<Route>,
+    /// The root `servers` URLs that name a host or a base path, sorted, each once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub servers: Vec<Server>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<Problem>,
 }
@@ -53,6 +56,17 @@ impl Summary {
             ..Summary::default()
         }
     }
+}
+
+/// What a root `servers` URL gives: the host it is served on (lower case, as a consumer's URL
+/// names it) and its base path (normalized, no trailing `/`, empty for none). A relative URL has
+/// no host.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Server {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub path: String,
 }
 
 /// One path and method of a document; `path` is normalized like a code path.
