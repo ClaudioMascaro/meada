@@ -28,6 +28,11 @@
       "via": null
     },
     {
+      "contract": "package::npm::@example/c",
+      "site": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/c",
+      "via": null
+    },
+    {
       "contract": "package::npm::@example/a",
       "site": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",
       "via": null
@@ -65,6 +70,12 @@
       "range": "workspace:*"
     },
     {
+      "manifest": "packages/b/package.json",
+      "field": "dependencies",
+      "name": "@example/c",
+      "range": "workspace:*"
+    },
+    {
       "manifest": "packages/c/package.json",
       "field": "dependencies",
       "name": "@example/a",
@@ -78,6 +89,13 @@
       "contract": "package::npm::@example/a",
       "level": "exact",
       "reason": "package::npm::@example/a workspace:* (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/c",
+      "provider": "example.com/pkg/mono::packages/c/package.json",
+      "contract": "package::npm::@example/c",
+      "level": "exact",
+      "reason": "package::npm::@example/c workspace:* (local none)"
     },
     {
       "consumer": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",

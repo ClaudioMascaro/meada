@@ -538,7 +538,8 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
 
 /// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
 /// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// hash, then `summarize` only what changed. A stored row not found leaves the table.
+/// hash, then `summarize` only what changed. A stored row not found, or whose file cannot be
+/// statted or read, leaves the table.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
@@ -555,14 +556,21 @@ fn refresh_stamped(
         .collect::<rusqlite::Result<_>>()?;
     let mut seen = HashSet::new();
     for (path, abs) in found {
+        // A file that vanished or cannot be read since the walk has no row, and a stored one
+        // leaves the table; it never fails the refresh.
+        let Ok((size, mtime, trusted)) = stat(abs, now) else {
+            continue;
+        };
         seen.insert(path.as_str());
-        let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
         if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
-        let src = fs::read(abs)?;
+        let Ok(src) = fs::read(abs) else {
+            seen.remove(path.as_str());
+            continue;
+        };
         let hash = blake3::hash(&src).to_hex().to_string();
         if known.is_some_and(|k| k.hash == hash) {
             tx.execute(
@@ -1106,8 +1114,46 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION};
+    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
     use crate::{document, lang, package};
+
+    #[test]
+    fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {
+        let mut db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        db.execute(
+            "INSERT INTO manifests VALUES ('gone/package.json', 'h', 1, 1, '{}')",
+            [],
+        )
+        .unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let found = vec![
+            (
+                "gone/package.json".to_string(),
+                root.join("gone/package.json"),
+            ),
+            // A directory stats fine and cannot be read as a file.
+            ("src".to_string(), root.join("src")),
+            ("Cargo.toml".to_string(), root.join("Cargo.toml")),
+        ];
+        let tx = db.transaction().unwrap();
+
+        refresh_stamped(
+            &tx,
+            "manifests",
+            &found,
+            std::time::SystemTime::now(),
+            |_, _| Ok("{}".into()),
+        )
+        .unwrap();
+
+        let paths: Vec<String> = (tx.prepare("SELECT path FROM manifests").unwrap())
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(paths, ["Cargo.toml"]);
+    }
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
     /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never

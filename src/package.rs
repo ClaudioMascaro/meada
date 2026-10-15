@@ -25,7 +25,7 @@ pub const PREFIX: &str = "package::";
 /// The ecosystem segment of the identifier: `package::npm::<name>`.
 const ECOSYSTEM: &str = "package::npm::";
 
-/// The longest package name npm accepts; a longer one makes no provider.
+/// The longest package name npm accepts, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit; a name past it is not a package.
 const MAX_NAME: usize = 214;
 
@@ -34,7 +34,7 @@ const MAX_NAME: usize = 214;
 // ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
 const MAX_BYTES: usize = 1 << 20;
 
-/// The dependency fields of a manifest, in the order the export lists them within a manifest.
+/// The dependency fields of a manifest that `read` collects.
 const FIELDS: [&str; 4] = [
     "dependencies",
     "devDependencies",
@@ -133,7 +133,7 @@ pub fn read(src: &[u8]) -> Summary {
     }
 }
 
-/// Whether `name` can be a package name: not empty, at most `MAX_NAME` characters, and no
+/// Whether `name` can be a package name: not empty, at most `MAX_NAME` bytes, and no
 /// control character, whitespace or `:` (which would break the `::` of a contract identifier).
 fn valid_name(name: &str) -> bool {
     !name.is_empty()

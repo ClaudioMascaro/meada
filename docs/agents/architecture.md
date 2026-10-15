@@ -632,7 +632,7 @@ give byte-identical output.
   name and a non-string range; `web` also names `express` and `left-pad`, outside the workspace);
   `mono` has `packages/{a,b,c}` (`b` on `a` through `workspace:*`, `c` on `a` with `^1.0.0`) and a
   `.gitignore`d `ignored/`, and `fork` holds another `@example/a`. Goldens `pkg-*.export.json`;
-  a freshness test edits manifests in four repositories and compares with a cold export; a test
+  a freshness test edits manifests in three repositories (`shared`, `web`, `mono`) and compares the exports of all four with a cold set; a test
   shows an ambiguous package link is no open item.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
@@ -736,8 +736,12 @@ give byte-identical output.
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
-  (1 MiB; a larger file reads as empty) and `MAX_NAME` (214 characters; a longer name is no
-  package). A range is stored as written and has no length limit of its own beyond `MAX_BYTES`.
+  (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
+  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written and has no
+  length limit of its own beyond `MAX_BYTES`.
+- `index.rs` (`refresh_stamped`): a `package.json` or document that cannot be statted or read
+  (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
+  `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
   larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
