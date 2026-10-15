@@ -83,9 +83,7 @@ fn gateway_key<'de, D: serde::Deserializer<'de>>(
         return Ok(None);
     };
     if !value.starts_with('/') {
-        return Err(serde::de::Error::custom(format!(
-            "`{value}` must start with `/`"
-        )));
+        return Err(serde::de::Error::custom(Msg::NoLeadingSlash(&value).text()));
     }
     Ok(Some(
         crate::http::normalize_path(&value)

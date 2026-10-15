@@ -160,7 +160,7 @@ fn invalid_config_errors_name_file_line_and_key() {
         (
             "config_documents",
             "[serve]\nhosts = [\"api.example.com\"]\ndocuments = [\"openapi.yaml\"]\n",
-            "<repo>/meada.toml:3: `serve.documents` is not in v0.1; the documents release of track A adds it (spec #21)",
+            "<repo>/meada.toml:3: `serve.documents` is not in v0.1; track A adds it (OpenAPI and AsyncAPI documents)",
         ),
         (
             "config_resource_key",
