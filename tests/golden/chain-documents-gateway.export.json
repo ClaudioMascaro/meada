@@ -388,7 +388,16 @@
     },
     {
       "contract": "http::GET::/api/health",
-      "site": "example.com/chain/gateway::src/server.ts::GET /api/health"
+      "site": "example.com/chain/gateway::src/server.ts::GET /api/health",
+      "shape": {
+        "source": {
+          "literals": "src/server.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/orders",

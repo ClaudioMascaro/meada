@@ -648,31 +648,94 @@
     },
     {
       "contract": "http::GET::/api/users",
-      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "shape": {
+        "source": {
+          "literals": "src/routes/users.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/users/{}",
-      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}"
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+      "shape": {
+        "source": {
+          "literals": "src/routes/users.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/users/{}",
-      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1"
+      "site": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1",
+      "shape": {
+        "source": {
+          "literals": "src/routes/users.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/guarded",
-      "site": "example.com/acme/backend::src/unreadable.ts::GET /guarded"
+      "site": "example.com/acme/backend::src/unreadable.ts::GET /guarded",
+      "shape": {
+        "source": {
+          "literals": "src/unreadable.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/health",
-      "site": "example.com/acme/backend::src/server.ts::GET /health"
+      "site": "example.com/acme/backend::src/server.ts::GET /health",
+      "shape": {
+        "source": {
+          "literals": "src/server.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/orders/{}",
-      "site": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}"
+      "site": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}",
+      "shape": {
+        "source": {
+          "literals": "src/unreadable.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/v1/old",
-      "site": "example.com/acme/backend::src/unreadable.ts::GET /v1/old"
+      "site": "example.com/acme/backend::src/unreadable.ts::GET /v1/old",
+      "shape": {
+        "source": {
+          "literals": "src/unreadable.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     }
   ],
   "consumers": [],

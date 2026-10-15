@@ -8,6 +8,7 @@ use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Step, Value, literal, property};
+use crate::literals::{Handler, Literals};
 use crate::resolve::{Code, Frame};
 use crate::shape::{self, Shape, Source};
 use crate::workspace::Repository;
@@ -399,7 +400,7 @@ fn prefixes<'a>(
 /// through imports and at any depth.
 // ponytail: an app or router passed as a parameter, `router.route(path)` chains and
 // `require` are not followed.
-fn express(code: &Code) -> Vec<Found> {
+fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
     let router = |path, scope, name| -> Option<Router> {
         let (at, value) = code.constant(path, scope, name)?;
         matches!(value, Value::Call(c) if ROUTERS.contains(&c.as_str())).then_some(at)
@@ -466,6 +467,14 @@ fn express(code: &Code) -> Vec<Found> {
         let Some(route) = literal(&parts) else {
             continue;
         };
+        // The handler's literals (spec #23), read once for every prefix it is mounted under.
+        let target = match handler {
+            Value::Function(def) => Some((path, def.as_str())),
+            Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
+            _ => None,
+        };
+        let shape =
+            target.and_then(|(at, name)| literals.returned(code, at, name, Handler::Express));
         for prefix in prefixes(at, &mounts, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
@@ -490,7 +499,7 @@ fn express(code: &Code) -> Vec<Found> {
                 via: None,
                 method: None,
                 fragments: Vec::new(),
-                shape: None,
+                shape: shape.clone(),
             });
         }
     }
@@ -504,6 +513,7 @@ impl ContractKind for Http {
 
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
+        let mut literals = Literals::default();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
                 let is_fetch = call.callee == "fetch"
@@ -537,13 +547,15 @@ impl ContractKind for Http {
                     continue;
                 }
                 // `export const GET = withAuth(...)` defines no function: the file serves it.
-                let site = if facts.defs.iter().any(|d| d.name == *local) {
-                    Site::Def {
+                let defined = facts.defs.iter().any(|d| d.name == *local);
+                let (site, shape) = if defined {
+                    let site = Site::Def {
                         path: path.into(),
                         name: local.clone(),
-                    }
+                    };
+                    (site, literals.returned(code, path, local, Handler::Next))
                 } else {
-                    Site::File(path.into())
+                    (Site::File(path.into()), None)
                 };
                 found.push(Found {
                     role: Role::Provider,
@@ -552,11 +564,11 @@ impl ContractKind for Http {
                     via: None,
                     method: None,
                     fragments: Vec::new(),
-                    shape: None,
+                    shape,
                 });
             }
         }
-        found.extend(express(code));
+        found.extend(express(code, &mut literals));
         found
     }
 

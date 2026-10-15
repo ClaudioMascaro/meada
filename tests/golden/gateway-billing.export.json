@@ -79,17 +79,35 @@
     {
       "contract": "http::GET::/audit",
       "site": "example.com/acme/billing::app/audit/route.ts::GET",
-      "gateway": "/billing/audit"
+      "gateway": "/billing/audit",
+      "shape": {
+        "source": {
+          "literals": "app/audit/route.ts"
+        },
+        "fields": []
+      }
     },
     {
       "contract": "http::GET::/status",
       "site": "example.com/acme/billing::app/status/route.ts::GET",
-      "gateway": "/billing/status"
+      "gateway": "/billing/status",
+      "shape": {
+        "source": {
+          "literals": "app/status/route.ts"
+        },
+        "fields": []
+      }
     },
     {
       "contract": "http::GET::/v1/invoices",
       "site": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
-      "gateway": "/billing/invoices"
+      "gateway": "/billing/invoices",
+      "shape": {
+        "source": {
+          "literals": "app/v1/invoices/route.ts"
+        },
+        "fields": []
+      }
     }
   ],
   "consumers": [],

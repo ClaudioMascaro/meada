@@ -238,19 +238,57 @@
     },
     {
       "contract": "http::GET::/api/reports/{}",
-      "site": "example.com/acme/api::app/(admin)/api/reports/[...slug]/route.ts::GET"
+      "site": "example.com/acme/api::app/(admin)/api/reports/[...slug]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/(admin)/api/reports/[...slug]/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/users",
-      "site": "example.com/acme/api::app/api/users/route.ts::GET"
+      "site": "example.com/acme/api::app/api/users/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/users/route.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/users/{}",
-      "site": "example.com/acme/api::app/api/users/[id]/route.ts::GET"
+      "site": "example.com/acme/api::app/api/users/[id]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/users/[id]/route.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::POST::/api/users",
-      "site": "example.com/acme/api::app/api/users/route.ts::POST"
+      "site": "example.com/acme/api::app/api/users/route.ts::POST",
+      "shape": {
+        "source": {
+          "literals": "app/api/users/route.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
     }
   ],
   "consumers": [],

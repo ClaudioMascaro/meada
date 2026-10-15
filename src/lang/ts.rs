@@ -665,6 +665,8 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         "await_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, scope)),
+        "number" => Value::Scalar(text(node, src).parse().ok()),
+        "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node) => {
