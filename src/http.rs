@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::channel::Routes;
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Consumer, Export as IndexExport, Gateway, Provider};
+use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Value, literal, property};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -429,16 +429,17 @@ impl ContractKind for Http {
     /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
     /// already listed adds nothing of its own.
     ///
-    /// Every `servers` path of a document is a gateway prefix for its routes (with the
-    /// `[serve]` strip), so a merged route serves its code path, its `[serve]` form and the
-    /// forms of every document listing it. A route only documents has no `[serve]` prefix when
-    /// a document gives it a server path: the server path replaces it. The hosts are the
+    /// Each document listing a route gives it its own gateway forms: one per `servers` path of
+    /// the document (the server path as the prefix, with the `[serve]` strip), or the `[serve]`
+    /// form when the document has no server path. A code route keeps its `[serve]` form and
+    /// adds those of the documents listing it. The hosts of every HTTP provider are the
     /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
         let serve = &repo.config.serve;
-        let mut listed: HashSet<String> = (export.providers.iter())
+        let code: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
             .collect();
+        let mut listed = code.clone();
         let mut documented = Vec::new();
         let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
         // The first document by path listing a route gives its shape, merged or not.
@@ -451,16 +452,16 @@ impl ContractKind for Http {
             for route in &doc.summary.routes {
                 let contract = route.contract();
                 shapes.entry(contract.clone()).or_insert(&route.shape);
-                let found = prefixes.iter().filter_map(|prefix| {
-                    gateway_path(Some(prefix), serve.strip.as_deref(), &route.path)
-                });
-                let found = found.map(|(path, reason)| Gateway { path, reason });
+                let found: Vec<(String, String)> = match prefixes.is_empty() {
+                    true => serve.gateway_path(&route.path).into_iter().collect(),
+                    false => (prefixes.iter())
+                        .filter_map(|p| gateway_path(Some(p), serve.strip.as_deref(), &route.path))
+                        .collect(),
+                };
                 let own = forms.entry(contract.clone()).or_default();
-                for form in found {
-                    if !own
-                        .iter()
-                        .any(|g| g.path == form.path && g.reason == form.reason)
-                    {
+                for (path, reason) in found {
+                    let form = Gateway { path, reason };
+                    if !own.contains(&form) {
                         own.push(form);
                     }
                 }
@@ -474,30 +475,33 @@ impl ContractKind for Http {
                 }
             }
         }
-        let documented_only: HashSet<String> =
-            documented.iter().map(|p| p.contract.clone()).collect();
-        // The index's order.
         export.providers.extend(documented);
-        let providers = &mut export.providers;
-        providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+        index::sort_providers(&mut export.providers);
         let mut hosts: Vec<String> = serve.hosts.iter().map(|h| h.to_lowercase()).collect();
         let servers = export.documents.iter().flat_map(|d| &d.summary.servers);
         hosts.extend(servers.filter_map(|s| s.host.clone()));
         hosts.sort();
         hosts.dedup();
         for p in &mut export.providers {
+            let Some((_, path)) = route(&p.contract) else {
+                continue;
+            };
             p.shape = shapes.get(&p.contract).and_then(|s| (*s).clone());
-            let path = route(&p.contract).map(|(_, path)| path);
-            let from_document = forms.remove(&p.contract).unwrap_or_default();
-            // The server path replaces `[serve] prefix` for what only a document lists.
-            let replaced = documented_only.contains(&p.contract) && !from_document.is_empty();
-            let served = path.and_then(|path| serve.gateway_path(path));
-            let own = served.filter(|_| !replaced);
-            p.gateway = own.as_ref().map(|(path, _)| path.clone());
-            p.gateways = (own.into_iter())
-                .map(|(path, reason)| Gateway { path, reason })
-                .chain(from_document)
-                .collect();
+            let served = serve
+                .gateway_path(path)
+                .map(|(path, reason)| Gateway { path, reason });
+            let from_documents = forms.get(&p.contract).cloned().unwrap_or_default();
+            // The `[serve]` form first: a code route has it, a documented one when a document
+            // without server paths lists it.
+            let served =
+                served.filter(|s| code.contains(&p.contract) || from_documents.contains(s));
+            p.gateway = served.as_ref().map(|s| s.path.clone());
+            p.gateways = served.into_iter().collect();
+            for form in from_documents {
+                if !p.gateways.contains(&form) {
+                    p.gateways.push(form);
+                }
+            }
             p.hosts = hosts.clone();
         }
     }

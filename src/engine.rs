@@ -16,7 +16,9 @@ use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, unr
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, channel, decisions, document, index, items, render, repo, resource, trace};
+use crate::{
+    Result, channel, decisions, document, http, index, items, render, repo, resource, trace,
+};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -446,10 +448,15 @@ impl Engine {
         Ok(render::budgeted(&lines, budget))
     }
 
-    /// The resource or channel `contract`: one line per provider and consumer across the
+    /// The resource, channel or route `contract`: one line per provider and consumer across the
     /// workspace, providers first, as `<repository> <role> <path>:<line> <name>`, where `role`
-    /// is `writer` or `reader` (a resource, `<name>` its `via` symbol) or `producer` or
-    /// `consumer` (a channel, `<name>` the symbol around the producing call, or the handler).
+    /// is `writer` or `reader` (a resource, `<name>` its `via` symbol), `producer` or
+    /// `consumer` (a channel, `<name>` the symbol around the producing call, or the handler) or
+    /// `provider` (a route, `<name>` its handler; its consumers are calls, which `trace` and
+    /// the `contracts:` of their symbols show, so `consumer` is `None` and they are left out).
+    /// A side only a document lists is `<repository> <role> <document> (documented only)`;
+    /// the shape a document gives a side follows it, `response` for a route and `payload`
+    /// for a channel.
     /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
     /// the top level of a file `<repository> <role> <path> (top level)`. A channel also lists
     /// the sides linked to it through another name, each followed by `[<level>: <reason>]`:
@@ -459,9 +466,13 @@ impl Engine {
         &self,
         exports: &[Export],
         contract: &str,
-        (provider, consumer): (&str, &str),
+        (provider, consumer): (&str, Option<&str>),
         what: &str,
     ) -> Vec<String> {
+        let carried = match http::route(contract) {
+            Some(_) => "response",
+            None => "payload",
+        };
         let routes = Routes::new(exports);
         // How a side reaches `contract`: its own (no tag), a match through another name, or
         // not at all.
@@ -484,7 +495,7 @@ impl Engine {
                 Some((&q.site, 0, String::from(provider), tag, &None))
             });
             let consumed = export.consumers.iter().filter_map(|c| {
-                let own = c.contract.as_ref()?;
+                let (own, consumer) = (c.contract.as_ref()?, consumer?);
                 let tag = tag(own == contract, channel::fits(contract, own))?;
                 Some((&c.site, 1, String::from(consumer), tag, &c.shape))
             });
@@ -511,7 +522,7 @@ impl Engine {
                 };
                 let shape = shape.as_ref();
                 let shape =
-                    shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, "payload"));
+                    shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, carried));
                 let line = format!("{} {role} {place}{tag}", repo.identity);
                 sides.push((order, line, shape));
             }
@@ -540,13 +551,18 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
-        // A contract listed by its sides, as `search` prints it.
+        // A contract listed by its sides, as `search` prints it; a route by its providers.
         let contract = channel::typed(symbol);
-        if let Some(kind) = contract::kind_of(contract)
-            && let Some(roles) = kind.sides()
-        {
-            let lines = self.contract_sides(&exports, contract, roles, kind.prefix());
-            return Ok(render::budgeted(&lines, budget));
+        if let Some(kind) = contract::kind_of(contract) {
+            let roles = match (kind.sides(), http::route(contract)) {
+                (Some((provider, consumer)), _) => Some((provider, Some(consumer))),
+                (None, Some(_)) => Some(("provider", None)),
+                (None, None) => None,
+            };
+            if let Some(roles) = roles {
+                let lines = self.contract_sides(&exports, contract, roles, kind.prefix());
+                return Ok(render::budgeted(&lines, budget));
+            }
         }
         let suffix = format!("::{symbol}");
         let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())

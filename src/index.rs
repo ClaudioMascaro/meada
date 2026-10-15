@@ -14,14 +14,14 @@ use crate::Result;
 use crate::config::Serve;
 use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
-use crate::document::{self, Summary};
+use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 13;
+const SCHEMA_VERSION: i64 = 14;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -36,8 +36,9 @@ const SCHEMA_VERSION: i64 = 13;
 /// a `publish` row (a publish to a named exchange) has no `contract`, the exchange in `via` and
 /// the routing key in `method`. `documents` holds each provider document (spec #21) with the
 /// same stat and hash as `files`, and its `summary` (`document::Summary` as JSON: format,
-/// version, title, routes and problems, derived from the bytes alone); a document that could
-/// not be read keeps its row, so its hash is cached too.
+/// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
+/// derived from the bytes alone); a document that could not be read keeps its row, so its hash
+/// is cached too.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -127,6 +128,13 @@ struct Stored {
     mtime: Option<i64>,
     size: i64,
     resolved: String,
+}
+
+/// What the index knows of a document: its hash and the stat seen when it was hashed.
+struct Stamp {
+    hash: String,
+    mtime: Option<i64>,
+    size: i64,
 }
 
 /// A file whose content differs from the index, parsed again.
@@ -450,8 +458,8 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
 
 /// The documents of a repository (path and absolute path): those `walk` found by file name,
 /// then each path `[serve] documents` lists that is a file, ignored by `.gitignore` or not. A
-/// listed path that is not a file is no document; `document::report` says so. Without a
-/// `[serve]` table there are none.
+/// listed path that is not a file, or that goes through a symbolic link, is no document;
+/// `document::report` says so. Without a `[serve]` table there are none.
 fn documents_found(
     root: &Path,
     walked: &[(String, PathBuf)],
@@ -465,34 +473,55 @@ fn documents_found(
         .cloned()
         .collect();
     for path in &serve.documents {
-        let abs = root.join(path);
-        if abs.is_file() && !found.iter().any(|(p, _)| p == path) {
+        if found.iter().any(|(p, _)| p == path) {
+            continue;
+        }
+        if let Some(abs) = plain_file(root, path) {
             found.push((path.clone(), abs));
         }
     }
     found
 }
 
+/// The file at `path` under `root`, when no segment of `path` is a symbolic link: like the
+/// walk, a listed path never leads out of the repository.
+fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
+    let mut abs = root.to_path_buf();
+    let mut file = false;
+    for segment in path.split('/') {
+        abs.push(segment);
+        let kind = fs::symlink_metadata(&abs).ok()?.file_type();
+        if kind.is_symlink() {
+            return None;
+        }
+        file = kind.is_file();
+    }
+    file.then_some(abs)
+}
+
 /// Brings the `documents` table up to date with `found`, the documents on disk (path and
 /// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
 /// stored document not found leaves the table.
 fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemTime) -> Result<()> {
-    let stored: HashMap<String, (String, Option<i64>, i64)> = tx
+    let stored: HashMap<String, Stamp> = tx
         .prepare("SELECT path, hash, mtime, size FROM documents")?
-        .query_map([], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?, r.get(3)?))))?
+        .query_map([], |r| {
+            let (hash, mtime, size) = (r.get(1)?, r.get(2)?, r.get(3)?);
+            Ok((r.get(0)?, Stamp { hash, mtime, size }))
+        })?
         .collect::<rusqlite::Result<_>>()?;
     let mut seen = HashSet::new();
     for (path, abs) in found {
         seen.insert(path.as_str());
         let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
-        if known.is_some_and(|k| k.1.is_some() && k.1 == mtime && k.2 == size) {
+        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
-        if known.is_some_and(|k| k.0 == hash) {
+        if known.is_some_and(|k| k.hash == hash) {
             tx.execute(
                 "UPDATE documents SET mtime = ?2, size = ?3 WHERE path = ?1",
                 params![path, mtime, size],
@@ -675,6 +704,18 @@ pub(crate) struct Export {
     pub(crate) stale_decisions: Vec<Stale>,
 }
 
+/// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
+/// some.
+pub(crate) fn sort_providers(providers: &mut [Provider]) {
+    providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+}
+
+/// Puts `consumers` back in the order `export` reads them in, after a kind's `declare` added
+/// some.
+pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
+    consumers.sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+}
+
 impl Export {
     /// The document whose route `site` is, when `site` is a route only a document of this
     /// repository lists: `<repository>::<document path>::<METHOD> <path>`.
@@ -699,7 +740,7 @@ impl Serialize for Document {
         #[derive(Serialize)]
         struct Shown<'a> {
             path: &'a str,
-            format: &'a Option<String>,
+            format: &'a Option<Format>,
             version: &'a Option<String>,
             contracts: BTreeSet<String>,
         }
@@ -782,6 +823,7 @@ pub(crate) struct Provider {
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.
+#[derive(Clone, PartialEq)]
 pub(crate) struct Gateway {
     pub(crate) path: String,
     pub(crate) reason: String,

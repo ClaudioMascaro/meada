@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Value, json};
 
 use super::openapi::{local, text};
-use super::{Problem, Role, Side, Summary, schema};
+use super::{Format, Problem, Role, Side, Summary, schema};
 use crate::shape::Source;
 
 /// What `doc`, the document at `path`, gives: its channel sides when its `asyncapi` field is a
@@ -24,29 +24,45 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         true => operations_v2(doc),
         false => operations_v3(doc),
     };
-    let servers: BTreeMap<&str, String> = (doc.get("servers").and_then(Value::as_object))
+    // Each server with its protocol, lower case, when it has one.
+    let servers: BTreeMap<&str, Option<String>> = (doc.get("servers").and_then(Value::as_object))
         .into_iter()
         .flatten()
-        .filter_map(|(name, server)| {
-            let protocol = server.get("protocol")?.as_str()?;
-            Some((name.as_str(), protocol.to_lowercase()))
+        .map(|(name, server)| {
+            let protocol = server.get("protocol").and_then(Value::as_str);
+            (name.as_str(), protocol.map(str::to_lowercase))
         })
         .collect();
     let mut payloads: BTreeMap<(String, String, Role), Vec<&Value>> = BTreeMap::new();
     let (mut protocols, mut parameters) = (BTreeSet::new(), BTreeSet::new());
+    let (mut no_servers, mut no_protocol, mut unknown) = (false, BTreeSet::new(), BTreeSet::new());
     for op in operations {
         if op.name.contains(['{', '}']) {
             parameters.insert(op.name);
             continue;
         }
+        if servers.is_empty() {
+            no_servers = true;
+            continue;
+        }
         // The servers the channel lists, else every server of the document.
-        let used: Vec<&String> = match op.servers.is_empty() {
-            true => servers.values().collect(),
+        let used: Vec<(&str, &Option<String>)> = match op.servers.is_empty() {
+            true => servers.iter().map(|(n, p)| (*n, p)).collect(),
             false => (op.servers.iter())
-                .filter_map(|n| servers.get(n.as_str()))
+                .filter_map(|n| match servers.get_key_value(n.as_str()) {
+                    Some((n, p)) => Some((*n, p)),
+                    None => {
+                        unknown.insert((op.name.clone(), n.clone()));
+                        None
+                    }
+                })
                 .collect(),
         };
-        for protocol in used {
+        for (server, protocol) in used {
+            let Some(protocol) = protocol else {
+                no_protocol.insert(server.to_string());
+                continue;
+            };
             match broker(protocol) {
                 Some(broker) => {
                     let key = (broker.to_string(), op.name.clone(), op.role);
@@ -64,6 +80,7 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         }
     }
     let mut external = BTreeSet::new();
+    let mut work = schema::Work::default();
     let channels = (payloads.into_iter())
         .map(|((broker, name, role), payloads)| {
             let schema = match payloads[..] {
@@ -73,7 +90,7 @@ pub fn read(path: &str, doc: &Value) -> Summary {
             };
             let shape = schema.map(|schema| {
                 let source = Source::Document(path.to_string());
-                let (shape, refs) = schema::read(doc, &schema, source);
+                let (shape, refs) = schema::read(doc, &schema, source, &mut work);
                 external.extend(refs);
                 shape
             });
@@ -88,9 +105,15 @@ pub fn read(path: &str, doc: &Value) -> Summary {
     let problems = (external.into_iter())
         .map(|reference| Problem::ExternalRef { reference })
         .chain((protocols.into_iter()).map(|protocol| Problem::Protocol { protocol }))
-        .chain((parameters.into_iter()).map(|channel| Problem::Parameters { channel }));
+        .chain((parameters.into_iter()).map(|channel| Problem::Parameters { channel }))
+        .chain(no_servers.then_some(Problem::NoServers))
+        .chain((no_protocol.into_iter()).map(|server| Problem::NoProtocol { server }))
+        .chain(
+            (unknown.into_iter())
+                .map(|(channel, server)| Problem::UnknownServer { channel, server }),
+        );
     Summary {
-        format: Some("asyncapi".into()),
+        format: Some(Format::Asyncapi),
         version: Some(version),
         title: doc.pointer("/info/title").and_then(text),
         channels,
@@ -217,7 +240,7 @@ fn supported(version: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::document::{Problem, Role, read};
+    use crate::document::{Format, Problem, Role, read};
 
     /// The sides of the document `src` as `broker role name`, with its problems.
     fn sides(src: &str) -> (Vec<String>, Vec<Problem>) {
@@ -261,7 +284,7 @@ channels:
         );
         assert_eq!(problems, []);
         let summary = read("asyncapi.yaml", V2.as_bytes());
-        assert_eq!(summary.format.as_deref(), Some("asyncapi"));
+        assert_eq!(summary.format, Some(Format::Asyncapi));
         assert_eq!(summary.version.as_deref(), Some("2.6.0"));
         assert_eq!(summary.title.as_deref(), Some("Orders events"));
         let fields = |n: usize| summary.channels[n].shape.as_ref().unwrap().fields.clone();
@@ -403,6 +426,65 @@ channels:
     }
 
     #[test]
+    fn channels_without_a_server_protocol_are_ignored_and_reported() {
+        // No root `servers`: no channel has a broker kind.
+        let src = "asyncapi: 2.6.0\nchannels:\n  a:\n    subscribe: {}\n";
+        assert_eq!(sides(src), (vec![], vec![Problem::NoServers]));
+        // A server without `protocol`, and a channel naming a server the document lacks.
+        let src = "
+asyncapi: 2.6.0
+servers:
+  bare: {url: k}
+  logs: {url: k, protocol: kafka}
+channels:
+  a:
+    servers: [bare]
+    subscribe: {}
+  b:
+    servers: [gone, logs]
+    subscribe: {}
+";
+        let server = |s: &str| s.to_string();
+        assert_eq!(
+            sides(src),
+            (
+                vec!["kafka producer b".to_string()],
+                vec![
+                    Problem::NoProtocol {
+                        server: server("bare")
+                    },
+                    Problem::UnknownServer {
+                        channel: "b".into(),
+                        server: server("gone")
+                    },
+                ]
+            )
+        );
+        // 3.0: a channel's servers are references.
+        let src = "
+asyncapi: 3.0.0
+channels:
+  c: {address: c.queue, servers: [{$ref: '#/servers/gone'}]}
+operations:
+  o: {action: send, channel: {$ref: '#/channels/c'}}
+";
+        assert_eq!(sides(src), (vec![], vec![Problem::NoServers]));
+        let src = format!("{src}servers:\n  real: {{host: h, protocol: amqp}}\n");
+        assert_eq!(
+            sides(&src),
+            (
+                vec![],
+                vec![Problem::UnknownServer {
+                    channel: "c.queue".into(),
+                    server: "gone".into()
+                }]
+            )
+        );
+        // A document without channels ignores nothing.
+        assert_eq!(sides("asyncapi: 3.0.0\n"), (vec![], vec![]));
+    }
+
+    #[test]
     fn a_channel_with_parameters_is_ignored_and_reported() {
         let src = "
 asyncapi: 2.6.0
@@ -435,9 +517,9 @@ channels:
             assert_eq!(summary.problems, [Problem::AsyncFormat { found }], "{src}");
             assert_eq!(summary.format, None);
         }
-        // A file named like an AsyncAPI document that says it is something else.
-        let summary = read("asyncapi.yaml", b"openapi: 3.0.0\n");
-        let found = Some("openapi 3.0.0".to_string());
+        // A file named like an AsyncAPI document with neither format field.
+        let summary = read("asyncapi.yaml", b"swagger: '2.0'\n");
+        let found = Some("swagger 2.0".to_string());
         assert_eq!(summary.problems, [Problem::AsyncFormat { found }]);
     }
 
