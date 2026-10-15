@@ -258,6 +258,9 @@ fn python() {
             "clients/wrappers.py::Inventory.__init__",
             "clients/wrappers.py::Inventory.fetch_item",
             "clients/wrappers.py::not_a_client",
+            "clients/wrappers.py::Reports",
+            "clients/wrappers.py::Reports.pull",
+            "clients/wrappers.py::unrelated",
             "clients/wrappers.py::stock",
             "clients/wrappers.py::list_by_keyword",
             "clients/wrappers.py::list_orders",
@@ -1582,6 +1585,8 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
         ),
     ]);
 
+    // `Reports.pull` called on a receiver of unknown class (`unrelated`) is a name match: its
+    // `client.get` is no consumer.
     assert_eq!(
         python_clients("python_http_wrappers", "wrappers.py"),
         expected
@@ -1697,5 +1702,50 @@ fn python_environment_reads_name_the_base_url_variable() {
     assert_eq!(
         python_clients("python_http_environment", "environment.py"),
         expected
+    );
+}
+
+#[test]
+fn express_router_passed_to_a_function_found_only_by_name_is_no_provider() {
+    let repo = fixture_repo("express_by_name", "ts-basic", Some(ORIGIN));
+    let providers = |file: &str, src: &str| -> Vec<String> {
+        std::fs::write(repo.join(file), src).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        (json["providers"].as_array().unwrap().iter())
+            .map(|p| p["contract"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let plugin = "import express from 'express';\n\
+        export class Plugin {\n  install(router) { router.get('/plugin', handler); }\n}\n\
+        function handler(req, res) {}\n\
+        export function unknown(registry) {\n  const app = express();\n  registry.install(app);\n}\n";
+    let found = providers("src/plugin.ts", plugin);
+    assert!(
+        !found.iter().any(|c| c == "http::GET::/plugin"),
+        "{found:?}"
+    );
+
+    // A receiver of known class is an exact call: the router flows.
+    let known = plugin.replace(
+        "  install(router)",
+        "  run() { this.install(express()); }\n  install(router)",
+    );
+    let found = providers("src/plugin.ts", &known);
+    assert!(found.iter().any(|c| c == "http::GET::/plugin"), "{found:?}");
+
+    // A bare call no import binds, matched only by the function's name, may reach any function.
+    providers(
+        "src/mount.ts",
+        "export function mount(router) { router.get('/mounted', handler); }\n\
+         function handler(req, res) {}\n",
+    );
+    let found = providers(
+        "src/main.ts",
+        "import express from 'express';\nmount(express());\n",
+    );
+    assert!(
+        !found.iter().any(|c| c == "http::GET::/mounted"),
+        "{found:?}"
     );
 }

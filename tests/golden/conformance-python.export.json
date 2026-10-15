@@ -35,7 +35,7 @@
     },
     {
       "path": "clients/wrappers.py",
-      "hash": "15058bb03b424f2098e2623e9b1322a16930f75c84e37234c2aa0904ff4e1106"
+      "hash": "f9ba89b93136db32e4431c109133ae80c37b57e1812728df9a9a357a4f3df56e"
     },
     {
       "path": "cycle_a.py",
@@ -1088,6 +1088,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Reports",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2286,
+        "end": 2366
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Reports.pull",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2305,
+        "end": 2366
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "span": {
         "path": "clients/wrappers.py",
@@ -1189,6 +1205,14 @@
         "path": "clients/wrappers.py",
         "start": 1360,
         "end": 1442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::unrelated",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2369,
+        "end": 2457
       }
     },
     {
@@ -4042,6 +4066,21 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Reports.pull::client.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Reports.pull",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::clients/sessions.py::Cache.get",
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+      ],
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2344,
+        "end": 2366
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff::retry#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "target": "example.com/acme/conformance::clients/wrappers.py::retry",
@@ -4226,6 +4265,28 @@
         "path": "clients/wrappers.py",
         "start": 1412,
         "end": 1442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::unrelated::httpx.Client#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::unrelated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2402,
+        "end": 2429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::unrelated::store.pull#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::unrelated",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Reports.pull",
+      "level": "inferred",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2441,
+        "end": 2457
       }
     },
     {

@@ -222,12 +222,13 @@ give byte-identical output.
   on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
   `Code::expand(path, index, read)` hands
   `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
-  with them; a member call found only by a name match (`data.get(...)` matched to a wrapper
-  method, `Caller::by_name`) is not climbed, since its receiver may be any object, so a
-  wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
+  with them; a call found only by a name match (`Caller::by_name`: `data.get(...)` matched to
+  a wrapper method, or a bare name no import binds) is not climbed, since it may be on any
+  object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
   `value_origins` for a value as written) is the shared value flow: the call sites whose result
   a name may hold, followed through constants, imports and module attributes, the arguments
-  every caller passes to a parameter, the values a function of the repository returns (its
+  every caller passes to a parameter (a caller found only by a name match is not climbed, as in
+  `Code::expand`), the values a function of the repository returns (its
   parameters then bound by that call only) and the items of a list or tuple; an attribute
   assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
   reaches no function of the repository is the origin. A constant, parameter or function met
@@ -476,10 +477,11 @@ Each is marked `ponytail:` at its site unless noted.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers, and does not climb a
-  member call found only by a name match, so a wrapper method called on a receiver whose class
-  Meada cannot tell is read where it stands; a parameter captured by
-  a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
+- `resolve.rs`: wrapper expansion walks every simple path up the callers, and neither it nor
+  value flow (for a parameter's arguments) climbs a call found only by a name match, so a
+  wrapper method called on a receiver whose class Meada cannot tell, or a function called by a
+  bare name no import binds (`require` in TypeScript), is read where it stands; a parameter
+  captured by a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
   more than once, or an attribute not assigned a call once in its class); a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
