@@ -583,6 +583,10 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             });
             Value::Object(properties.collect())
         }
+        // `await x` is what `x` is: a client made with `await amqp.connect()` traces back.
+        "await_expression" => named(node)
+            .next()
+            .map_or(Value::Unknown, |inner| value(inner, src, scope)),
         "array" => Value::List(named(node).map(|item| value(item, src, scope)).collect()),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),

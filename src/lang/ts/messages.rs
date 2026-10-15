@@ -11,6 +11,15 @@ const KAFKAJS: &str = "kafkajs";
 const KAFKA_PRODUCER: &str = "new Kafka().producer()";
 const KAFKA_CONSUMER: &str = "new Kafka().consumer()";
 
+const AMQPLIB: &str = "amqplib";
+/// What a channel of amqplib is, from the default import, a namespace or a named `connect`.
+const AMQP_CHANNELS: [&str; 4] = [
+    "default.connect().createChannel()",
+    "default.connect().createConfirmChannel()",
+    "connect().createChannel()",
+    "connect().createConfirmChannel()",
+];
+
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     let mut out = Vec::new();
     // kafkajs subscriptions, each with the consumer binding it is made on.
@@ -22,7 +31,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let Some((receiver, method)) = call.callee.rsplit_once('.') else {
                 continue;
             };
-            if !matches!(method, "send" | "subscribe" | "run") {
+            if !matches!(
+                method,
+                "send" | "subscribe" | "run" | "sendToQueue" | "consume" | "publish" | "bindQueue"
+            ) {
                 continue;
             }
             let Some(origin) = code.origin(path, &call.scope, receiver) else {
@@ -46,6 +58,68 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 (KAFKAJS, KAFKA_CONSUMER, "run") => {
                     if let (Some(binding), Some(handler)) = (origin.binding, run(code, path, n)) {
                         handlers.entry(binding).or_insert(handler);
+                    }
+                }
+                (AMQPLIB, expr, "sendToQueue") if AMQP_CHANNELS.contains(&expr) => {
+                    for (site, at, queue) in code.expand(path, n, &|a| queue(a, 0)) {
+                        out.push(Message {
+                            broker: "amqp",
+                            name: queue,
+                            path: site.into(),
+                            call: at,
+                            role: Role::Producer,
+                        });
+                    }
+                }
+                (AMQPLIB, expr, "consume") if AMQP_CHANNELS.contains(&expr) => {
+                    let handler = handler(code, path, n, 1);
+                    for (site, at, queue) in code.expand(path, n, &|a| queue(a, 0)) {
+                        out.push(Message {
+                            broker: "amqp",
+                            name: queue,
+                            path: site.into(),
+                            call: at,
+                            role: Role::Consumer(handler.clone()),
+                        });
+                    }
+                }
+                (AMQPLIB, expr, "publish") if AMQP_CHANNELS.contains(&expr) => {
+                    let read = |a: &[Value]| Some((queue(a, 0)?, queue(a, 1)?));
+                    for (site, at, (exchange, key)) in code.expand(path, n, &read) {
+                        // The empty exchange is the queue named by the key; one that cannot
+                        // be evaluated leaves the producer unresolved.
+                        let (name, role) = match exchange.as_deref() {
+                            Some("") => (key, Role::Producer),
+                            Some(exchange) => (
+                                key,
+                                Role::Publish {
+                                    exchange: exchange.into(),
+                                },
+                            ),
+                            None => (None, Role::Producer),
+                        };
+                        out.push(Message {
+                            broker: "amqp",
+                            name,
+                            path: site.into(),
+                            call: at,
+                            role,
+                        });
+                    }
+                }
+                (AMQPLIB, expr, "bindQueue") if AMQP_CHANNELS.contains(&expr) => {
+                    let read = |a: &[Value]| Some((queue(a, 0)?, queue(a, 1)?, queue(a, 2)?));
+                    for (site, at, bound) in code.expand(path, n, &read) {
+                        // A binding that cannot be fully evaluated is dropped.
+                        if let (Some(queue), Some(exchange), Some(pattern)) = bound {
+                            out.push(Message {
+                                broker: "amqp",
+                                name: Some(queue),
+                                path: site.into(),
+                                call: at,
+                                role: Role::Binding { exchange, pattern },
+                            });
+                        }
                     }
                 }
                 _ => {}
@@ -83,7 +157,29 @@ fn run<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Handler> {
     let handler = ["eachMessage", "eachBatch"]
         .iter()
         .find_map(|key| property(options, key).ok().flatten())?;
-    match handler {
+    function(code, path, scope, handler)
+}
+
+/// The handler of a `consume` call: its argument `at`, else the function that calls it.
+fn handler<'a>(code: &Code<'a>, path: &'a str, n: usize, at: usize) -> Handler {
+    let call = &code.files()[path].calls[n];
+    let given = code.args(path, n).and_then(|a| a.get(at));
+    given
+        .and_then(|v| function(code, path, &call.scope, v))
+        .unwrap_or_else(|| Handler::Def {
+            path: path.into(),
+            name: call.scope.clone(),
+        })
+}
+
+/// A function written in place or a definition of the repository, as a handler.
+fn function<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    value: &'a Value,
+) -> Option<Handler> {
+    match value {
         Value::Function(def) => Some(Handler::Inline {
             path: path.into(),
             def: def.clone(),
@@ -94,6 +190,12 @@ fn run<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Handler> {
         }),
         _ => None,
     }
+}
+
+/// The queue or exchange name argument `at` of a call: `None` when it depends on a parameter,
+/// `Some(None)` when it is not a literal string.
+fn queue(args: &[Value], at: usize) -> Option<Option<String>> {
+    args.get(at).map_or(Some(None), name)
 }
 
 /// The channel names the options object a call takes first gives under the first of `keys`

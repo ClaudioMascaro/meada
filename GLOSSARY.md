@@ -105,6 +105,13 @@ that leads to one. Its consumer side is the handler of the messages, the functio
 names. Messages go from producer to handler, so `trace` goes down that way.
 _Avoid_: publisher, sender, writer
 
+**Binding**:
+A RabbitMQ `bindQueue(queue, exchange, pattern)`: neither side of a channel, but the rule that
+sends a publish to an exchange to a queue whose pattern matches the routing key. Bindings from
+any repository of the workspace apply, whatever the exchange type. The match is `exact` when the
+pattern is the key and `inferred` for a wildcard.
+_Avoid_: route, subscription
+
 **Repository-level**:
 A resource side that is the repository as a whole, because its entry names no `via` symbol the
 repository has. It shows as `(repository-level)` and a trace does not enter it.

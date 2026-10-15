@@ -18,7 +18,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -568,6 +568,9 @@ pub(crate) struct Export {
     pub(crate) calls: Vec<CallSite>,
     pub(crate) providers: Vec<Provider>,
     pub(crate) consumers: Vec<Consumer>,
+    /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) bindings: Vec<Binding>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -613,6 +616,17 @@ pub(crate) struct Provider {
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
+}
+
+/// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
+/// queue channel `contract`. A publish to the exchange reaches the queue when the pattern
+/// matches its routing key.
+#[derive(Serialize)]
+pub(crate) struct Binding {
+    pub(crate) contract: String,
+    pub(crate) exchange: String,
+    pub(crate) pattern: String,
+    pub(crate) site: String,
 }
 
 /// The consumer side of a contract: a call site that uses it, or the symbol that reads a
@@ -718,6 +732,20 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let bindings = db
+        .prepare(&format!(
+            "SELECT contract, via, method, site FROM {schema}.contracts \
+             WHERE role = 'binding' ORDER BY contract, via, method, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Binding {
+                contract: r.get(0)?,
+                exchange: r.get(1)?,
+                pattern: r.get(2)?,
+                site: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -725,6 +753,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         calls,
         providers,
         consumers,
+        bindings,
         links: Vec::new(),
         stale_decisions: Vec::new(),
     })

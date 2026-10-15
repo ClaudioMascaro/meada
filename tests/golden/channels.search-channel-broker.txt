@@ -5,6 +5,7 @@ example.com/channels/api src/audit.ts:6 channel::kafka::audit.log
 example.com/channels/api src/orders.ts:21 channel::kafka::audit.log
 example.com/channels/api src/orders.ts:11 channel::kafka::billing.invoices
 example.com/channels/billing src/listen.ts:10 channel::kafka::billing.invoices
+example.com/channels/api src/amqp.ts:13 channel::kafka::orders
 example.com/channels/api src/orders.ts:6 channel::kafka::orders.created
 example.com/channels/billing src/listen.ts:10 channel::kafka::orders.created
 example.com/channels/worker src/consumer.ts:11 channel::kafka::orders.created

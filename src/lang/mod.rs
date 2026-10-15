@@ -53,6 +53,12 @@ pub struct Message {
 pub enum Role {
     /// The provider side of the channel.
     Producer,
+    /// A publish to a named exchange (`name` is its routing key): the message reaches the
+    /// queues bound to the exchange whose pattern matches, wherever the binding is declared.
+    Publish { exchange: String },
+    /// A binding of the queue `name` to an exchange by a pattern. It is neither side of a
+    /// channel; the channel kind keeps it for the links.
+    Binding { exchange: String, pattern: String },
     /// The consumer side, with the function that handles what it receives.
     Consumer(Handler),
 }

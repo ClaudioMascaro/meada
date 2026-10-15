@@ -125,13 +125,14 @@ impl Engine {
             .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
+        let bindings: Vec<_> = exports.iter().flat_map(|e| &e.bindings).collect();
         let mut links = Vec::new();
         for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
-                links.extend(kind.link(consumer, from, &providers));
+                links.extend(kind.link(consumer, from, &providers, &bindings));
             }
         }
         links
@@ -406,16 +407,21 @@ impl Engine {
         (provider, consumer): (&str, &str),
         what: &str,
     ) -> Vec<String> {
-        let mut sides: Vec<(bool, String)> = Vec::new();
+        // Providers, then consumers, then the bindings that reach a queue.
+        let mut sides: Vec<(u8, String)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
-            let provided =
-                (export.providers.iter()).map(|p| (p.contract.as_str(), &p.site, provider));
-            let consumed = export
-                .consumers
-                .iter()
-                .filter_map(|c| Some((c.contract.as_deref()?, &c.site, consumer)));
-            for (_, site, role) in provided.chain(consumed).filter(|(c, ..)| *c == contract) {
+            // Each side: its contract, site, order and the words naming its role.
+            let provided = (export.providers.iter())
+                .map(|p| (&p.contract, &p.site, 0, String::from(provider)));
+            let consumed = (export.consumers.iter())
+                .filter_map(|c| Some((c.contract.as_ref()?, &c.site, 1, String::from(consumer))));
+            let bound = export.bindings.iter().map(|b| {
+                let role = format!("binding {} {}", b.exchange, b.pattern);
+                (&b.contract, &b.site, 2, role)
+            });
+            let all = provided.chain(consumed).chain(bound);
+            for (_, site, order, role) in all.filter(|(c, ..)| *c == contract) {
                 let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
@@ -428,10 +434,7 @@ impl Engine {
                 } else {
                     format!("{} (top level)", label(site))
                 };
-                sides.push((
-                    role == consumer,
-                    format!("{} {role} {place}", repo.identity),
-                ));
+                sides.push((order, format!("{} {role} {place}", repo.identity)));
             }
         }
         if sides.is_empty() {

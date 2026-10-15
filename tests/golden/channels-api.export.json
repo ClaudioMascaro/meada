@@ -2,6 +2,10 @@
   "repository": "example.com/channels/api",
   "files": [
     {
+      "path": "src/amqp.ts",
+      "hash": "2b34409f261817b482f509b510371ff03456c0544d862c3fe104e4af121a6607"
+    },
+    {
       "path": "src/audit.ts",
       "hash": "176705d9f96b1c86e6df0c5089874eec6a629746b496e5b035dffbbdaf2d2434"
     },
@@ -23,6 +27,38 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 537,
+        "end": 766
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::dispatch",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 836,
+        "end": 923
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::kafkaOrder",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 347,
+        "end": 459
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::queueOrder",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 247,
+        "end": 338
+      }
+    },
     {
       "id": "example.com/channels/api::src/audit.ts::auditLog",
       "span": {
@@ -113,6 +149,149 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/channels/api::src/amqp.ts::amqp.connect#0",
+      "caller": "example.com/channels/api::src/amqp.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 90,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::Buffer.from#0",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 620,
+        "end": 635
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::Buffer.from#1",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 683,
+        "end": 698
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::Buffer.from#2",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 747,
+        "end": 762
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 577,
+        "end": 636
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 640,
+        "end": 699
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::channel.publish#2",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 703,
+        "end": 763
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::connection.createChannel#0",
+      "caller": "example.com/channels/api::src/amqp.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 146,
+        "end": 172
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::dispatch::Buffer.from#0",
+      "caller": "example.com/channels/api::src/amqp.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 904,
+        "end": 919
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::dispatch::channel.publish#0",
+      "caller": "example.com/channels/api::src/amqp.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 876,
+        "end": 920
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::kafkaOrder::producer.send#0",
+      "caller": "example.com/channels/api::src/amqp.ts::kafkaOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 395,
+        "end": 456
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::queueOrder::Buffer.from#0",
+      "caller": "example.com/channels/api::src/amqp.ts::queueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 319,
+        "end": 334
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::queueOrder::channel.sendToQueue#0",
+      "caller": "example.com/channels/api::src/amqp.ts::queueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 289,
+        "end": 335
+      }
+    },
     {
       "id": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log::store#0",
       "caller": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
@@ -259,6 +438,26 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp-exchange::events::order.created",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0"
+    },
+    {
+      "contract": "channel::amqp-exchange::events::order.refunded",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#2"
+    },
+    {
+      "contract": "channel::amqp-exchange::events::order.shipped",
+      "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1"
+    },
+    {
+      "contract": "channel::amqp::jobs",
+      "site": "example.com/channels/api::src/amqp.ts::dispatch::channel.publish#0"
+    },
+    {
+      "contract": "channel::amqp::orders",
+      "site": "example.com/channels/api::src/amqp.ts::queueOrder::channel.sendToQueue#0"
+    },
+    {
       "contract": "channel::kafka",
       "site": "example.com/channels/api::src/dynamic.ts::announce::producer.send#0"
     },
@@ -273,6 +472,10 @@
     {
       "contract": "channel::kafka::billing.invoices",
       "site": "example.com/channels/api::src/orders.ts::invoice::producer.send#0"
+    },
+    {
+      "contract": "channel::kafka::orders",
+      "site": "example.com/channels/api::src/amqp.ts::kafkaOrder::producer.send#0"
     },
     {
       "contract": "channel::kafka::orders.created",
@@ -318,6 +521,34 @@
       "contract": "channel::kafka::orders.created",
       "level": "exact",
       "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onAudit",
+      "provider": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0",
+      "contract": "channel::amqp::audit",
+      "level": "exact",
+      "reason": "channel::amqp::audit binding events order.created"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onJob",
+      "provider": "example.com/channels/api::src/amqp.ts::dispatch::channel.publish#0",
+      "contract": "channel::amqp::jobs",
+      "level": "exact",
+      "reason": "channel::amqp::jobs"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onOrder",
+      "provider": "example.com/channels/api::src/amqp.ts::queueOrder::channel.sendToQueue#0",
+      "contract": "channel::amqp::orders",
+      "level": "exact",
+      "reason": "channel::amqp::orders"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onShipment",
+      "provider": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1",
+      "contract": "channel::amqp::shipments",
+      "level": "inferred",
+      "reason": "channel::amqp::shipments binding events *.shipped"
     }
   ]
 }
