@@ -26,7 +26,7 @@
       "manifest": "package.json",
       "field": "dependencies",
       "name": "@example/shared",
-      "range": "1.2.0"
+      "range": "1.1.0"
     },
     {
       "manifest": "package.json",
@@ -46,14 +46,14 @@
       "provider": "example.com/pkg/shared::package.json",
       "contract": "package::npm::@example/shared",
       "level": "exact",
-      "reason": "package::npm::@example/shared 1.2.0 (local 1.2.0)"
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch"
     },
     {
       "consumer": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
       "provider": "example.com/pkg/shared::package.json",
       "contract": "package::npm::@example/shared",
       "level": "exact",
-      "reason": "package::npm::@example/shared none (local 1.2.0)"
+      "reason": "package::npm::@example/shared none (local 1.2.0), range unchecked"
     },
     {
       "consumer": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
