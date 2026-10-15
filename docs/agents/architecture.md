@@ -146,8 +146,10 @@ give byte-identical output.
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's instance,
-  `this` for TS/JS, none for Python, and `globals`: names bound everywhere that contract kinds
-  read, `fetch` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
+  `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose members
+  are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
+  `globals`: names bound everywhere that contract kinds read, `fetch` for TS/JS, none for
+  Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
   (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
   .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
   `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
@@ -175,13 +177,16 @@ give byte-identical output.
   class, only for a call). `xs += ...` and `xs = xs + ...` on a name whose latest
   value in that scope is a list literal do not bind it again: a list literal added joins the
   `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
-  as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
+  as `Value`s (strings, f-strings and `+` folded into parts, a name or a member chain in them,
+  `config.BASE`, a `Part::Ref`; `[...]`/`(...)` a `Value::List`, a call
   a `Value::Call` at its range), a decorator call names the definition it decorates
   (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
   callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`).
-  A function's parameters carry their defaults as written (`Param::default`); `*args`,
-  `**kwargs` and the bare `*` keep their stars in `Param::name`, so no argument binds them and
-  the parameters after the first of them take an argument only by keyword. A target that is `self.x`, also inside unpacking, a `for`
+  A function's parameters carry their defaults as written (`Param::default`) and which
+  argument binds them (`Param::binds`, a `Binds`): `*args` and `**kwargs` are `Rest` (no single
+  argument), the parameters after them or after the bare `*` (which is no parameter) are
+  `Keyword`, a method's first one is `Instance` (`Class` for a `@classmethod`, neither for a
+  `@staticmethod`), any other `Any`. A target that is `self.x`, also inside unpacking, a `for`
   or an `as`, and also written in a function nested in the method, binds the class's attribute
   `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
   and resolves through the file's imports. An annotation decides; other bindings that
@@ -211,11 +216,15 @@ give byte-identical output.
   without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
   keyword). `Code` folds constants and client wrapper arguments into values for contract kinds,
   a destructured object parameter reading its names (`Param::fields`) off the literal object the
-  caller passes. An argument binds a parameter by position or by the parameter's name among the
-  keyword arguments, and a method called on an instance (`x.m(a)`, whose first parameter is a
-  receiver local) passes nothing for the receiver. `Code::expand(path, index, read)` hands
+  caller passes. An argument binds a parameter as its `Param::binds` says: by position or by
+  the parameter's name among the keyword arguments, only by name, or not at all (`Rest`); a
+  method called on an instance (`x.m(a)`) passes nothing for an `Instance` receiver, one called
+  on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
+  `Code::expand(path, index, read)` hands
   `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
-  with them. `Code::origins(path, scope, name)` (and
+  with them; a member call found only by a name match (`data.get(...)` matched to a wrapper
+  method, `Caller::by_name`) is not climbed, since its receiver may be any object, so a
+  wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
   `value_origins` for a value as written) is the shared value flow: the call sites whose result
   a name may hold, followed through constants, imports and module attributes, the arguments
   every caller passes to a parameter, the values a function of the repository returns (its
@@ -247,17 +256,31 @@ give byte-identical output.
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,
-  `include_router`, `register_blueprint`) under every prefix of the router it is mounted on,
-  or the router's own prefix (`APIRouter(prefix=)`, `Blueprint(url_prefix=)`) when nothing
-  mounts it; FastAPI's mount segment is the given prefix then the router's own, Flask's given
-  `url_prefix` replaces the own one. A prefix that cannot be read adds no route. FastAPI method
+  `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
+  prefix of the router it is mounted on; FastAPI's mount segment is the given prefix (or
+  `mount`'s path) then the router's own (`APIRouter(prefix=)`), Flask's given `url_prefix`
+  replaces the own one (`Blueprint(url_prefix=)`). What nothing mounts is served at its root
+  (`prefixes`' `root`): every Express app or router; a FastAPI or Flask app, unless a mount
+  whose child cannot be read (no origin of the child is an app or router of the framework),
+  called on another app or router of its framework and able to hold an app (FastAPI's
+  `include_router(app.router)` and `mount`, not Flask's `register_blueprint`), may mount it;
+  never an `APIRouter` or a `Blueprint`, which serves only where a mount Meada reads puts it,
+  so a router mounted through an import that does not resolve is not guessed at the root. A
+  prefix or a path with a part that cannot be read (an f-string hole, a parameter) adds no
+  route; a path parameter written in the literal (`{id}`, `<int:id>`) stays one. FastAPI method
   decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
-  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): a root
-  URLconf is a file whose module-level `urlpatterns` no `include()` names; its `path()` and
+  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
+  `include()` argument names is an `Include`: a module of the repository (by dotted name or
+  as a module), the entries of a list, either of them first in the tuple form `(module or
+  list, "app_name")`, a dotted name no module answers to from the source roots (an import
+  from outside the repository, or one that does not resolve: `Named`), or `Unknown` (anything
+  else, or a value whose origins are not all `path()`/`re_path()` entries). A root URLconf is
+  a file with a module-level `urlpatterns` that no `include()` may name: none resolves to it,
+  no `Named` is its dotted path or a suffix of it (`may_be`: `backend/shop/urls.py` may be
+  `shop.urls`), and no `include()` is `Unknown` (then there is no root). Its `path()` and
   `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
-  view (of a module by dotted name or as a module, else of the list it is given) adding its
-  route before the entries it holds, at any depth, an `include()` met again on the walk (a
-  cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
+  view adding its route before the entries it holds, at any depth, an `include()` met again
+  on the walk (a cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
   `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
   (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
   `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
@@ -269,7 +292,11 @@ give byte-identical output.
   is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
   to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
   `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
-  attribute, or a parameter the callers pass one to. A `get` on any other object is nothing.
+  attribute, or a parameter the callers pass one to, or a value a function of the repository
+  returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
+  `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
+  a value counts (module constants, caller parameters, return values). A `get` on any other
+  object is nothing.
   `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like
@@ -352,7 +379,13 @@ give byte-identical output.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
-  A pack is done when that suite passes.
+  A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
+  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
+  its family), `Facts::locals` (the class each binding gives a name), `Facts::star` (what a
+  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  writes none of them (TypeScript writes no bases or locals) gets name matches where those
+  would have resolved.
 - New **config key**: add the field to `Config`, delete it from `LATER`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
@@ -401,7 +434,9 @@ give byte-identical output.
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
-- Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
+- Test files by subject: `conformance` (pack; for Python also its HTTP providers and consumers,
+  over `conformance-python`, `python-mounts` and `python-django`), `xlang` (a TypeScript and a
+  Python repository linked both ways: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
@@ -439,7 +474,9 @@ Each is marked `ponytail:` at its site unless noted.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
+- `resolve.rs`: wrapper expansion walks every simple path up the callers, and does not climb a
+  member call found only by a name match, so a wrapper method called on a receiver whose class
+  Meada cannot tell is read where it stands; a parameter captured by
   a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
   more than once, or an attribute not assigned a call once in its class); a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
@@ -454,16 +491,18 @@ Each is marked `ponytail:` at its site unless noted.
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. A `**k` splat
   in a call is not read; a `*a` splat is read as one positional argument.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
-  that depends on a parameter is not read through callers. Django: what an extension of
-  `urlpatterns` adds other than a list literal is left out, and a single `urlpatterns = [...] +
-  other` (no list literal as a whole) yields no entry; `include((patterns, "app"))`,
-  `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
+  that depends on a parameter is not read through callers (it yields no route). A FastAPI
+  mount whose child cannot be read hides every other app of its framework that nothing else
+  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; what
+  an extension of `urlpatterns` adds other than a list literal is left out (marked in
+  `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
+  yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
   handler method a class-based view inherits and `as_view()` on a class outside the repository
   yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
   backslashes yields nothing. Python clients: a receiver that is the result of a call
   (`Session().get(...)`, `make().get(...)`) or an attribute set from anything but a call
-  (`self.http = http`) is not read; a parameter given a client takes the base of every caller
-  that passes one, and several different bases make it a hole.
+  (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a client
+  takes the base of every caller that passes one, and several different bases make it a hole.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
