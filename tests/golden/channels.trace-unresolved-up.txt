@@ -1,0 +1,3 @@
+example.com/channels/worker src/pattern.ts:12 seen
+  example.com/channels/worker src/pattern.ts:12 consumes channel::kafka (unresolved)
+chain: none · 0 hops · 1 repos · 46 tokens

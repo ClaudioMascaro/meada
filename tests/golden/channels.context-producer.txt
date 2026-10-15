@@ -1,0 +1,9 @@
+example.com/channels/api src/orders.ts:5 createOrder
+async function createOrder(id: string) {
+  await producer.send({ topic: ORDERS_CREATED, messages: [{ key: id, value: id }] });
+}
+callers: none
+callees:
+example.com/channels/api src/orders.ts:6 (unresolved) producer.send
+contracts:
+example.com/channels/api src/orders.ts:6 produces channel::kafka::orders.created

@@ -46,6 +46,10 @@ pub(crate) struct Graph<'a> {
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
+    /// The channel sides whose name Meada could not evaluate, by site (the producing call or
+    /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
+    /// chain would not otherwise show them.
+    holes: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
     /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
     /// handles it: data goes from the provider (a writer, or the call that produces) to that
@@ -65,6 +69,7 @@ impl<'a> Graph<'a> {
             callers: HashMap::new(),
             consumers: HashMap::new(),
             providers: Vec::new(),
+            holes: HashMap::new(),
             out: HashMap::new(),
             into: HashMap::new(),
         };
@@ -86,6 +91,16 @@ impl<'a> Graph<'a> {
             graph
                 .providers
                 .extend(provided.map(|p| (p.contract.as_str(), p.site.as_str())));
+            let produced = export.providers.iter();
+            let consumed = export.consumers.iter();
+            let sides = produced
+                .map(|p| ("produces", Some(&p.contract), &p.site))
+                .chain(consumed.map(|c| ("consumes", c.contract.as_ref(), &c.site)));
+            for (verb, contract, site) in sides {
+                if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
+                    graph.holes.entry(site).or_default().push((verb, contract));
+                }
+            }
         }
         let order = |(n, c): &Call| (*n, c.span.path.clone(), c.span.start, c.id.clone());
         for calls in graph.callees.values_mut().chain(graph.callers.values_mut()) {
@@ -331,7 +346,9 @@ impl<'a> Walk<'_, 'a> {
         match self.direction {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
             Direction::Up => {
-                let text = format!("{} {}", self.site(call), self.caller(call));
+                let site = self.site(call);
+                self.holes(&call.1.id, 1, call.0, &site);
+                let text = format!("{site} {}", self.caller(call));
                 self.enter(&call.1.caller, 1, Row::call(text, call.0, None));
             }
         }
@@ -353,6 +370,14 @@ impl<'a> Walk<'_, 'a> {
         self.expanded.insert(id);
         self.ancestors.push(id);
         let graph = self.graph;
+        if let Some(&(n, s)) = graph.symbols.get(id) {
+            let place = format!(
+                "{} {}",
+                graph.workspace.repos[n].identity,
+                self.files[n].at(&s.span.path, s.span.start)
+            );
+            self.holes(id, depth + 1, n, &place);
+        }
         // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
         match self.direction {
@@ -479,6 +504,8 @@ impl<'a> Walk<'_, 'a> {
                 self.enter(&link.provider, depth, Row::link(text, m, link));
             }
         }
+        let place = self.site(call);
+        self.holes(&c.id, depth, n, &place);
         // A call that produces to a channel goes on to the handlers of its consumers.
         for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
             let handler = link.consumer.as_str();
@@ -488,6 +515,15 @@ impl<'a> Walk<'_, 'a> {
             let (m, text) = self.node(handler);
             let text = format!("{} {text}", arrow(link));
             self.enter(handler, depth, Row::link(text, m, link));
+        }
+    }
+
+    /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
+    fn holes(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
+        let holes = self.graph.holes.get(site).into_iter().flatten();
+        for &(verb, contract) in holes {
+            let text = format!("{place} {verb} {}", channel::shown(contract));
+            self.push(depth, Row::call(text, repo, None));
         }
     }
 
