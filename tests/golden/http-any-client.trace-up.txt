@@ -1,0 +1,3 @@
+example.com/acme/conformance shop/views.py:4 health
+  →[inferred: host unresolved; the only repository serving it is example.com/acme/conformance; any method] example.com/acme/client src/client.ts:3 ping
+chain: inferred · 1 hops · 2 repos · 64 tokens

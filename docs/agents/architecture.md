@@ -31,8 +31,8 @@ give byte-identical output.
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
-  reach come from `http::route_fits` (method and ordered literal fragments, see `Found::method`
-  / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
+  reach come from `http::route_fits` (method, or a route of every method, and ordered literal
+  fragments, see `Found::method` / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
   path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
@@ -170,10 +170,13 @@ give byte-identical output.
   binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
   `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
   and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
-  also a `Const` holding that value. Calls carry their positional `args` and keyword `kwargs`
+  also a `Const` holding that value. `xs += ...` and `xs = xs + ...` on a name whose latest
+  value in that scope is a list literal do not bind it again: a list literal added joins the
+  `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
   as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
   a `Value::Call` at its range), a decorator call names the definition it decorates
-  (`Call::decorates`), and a function lists the values it returns (`Def::returns`). A target that is `self.x`, also inside unpacking, a `for`
+  (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
+  callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`). A target that is `self.x`, also inside unpacking, a `for`
   or an `as`, and also written in a function nested in the method, binds the class's attribute
   `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
   and resolves through the file's imports. An annotation decides; other bindings that
@@ -208,20 +211,27 @@ give byte-identical output.
   receiver local) passes nothing for the receiver. `Code::origins(path, scope, name)` (and
   `value_origins` for a value as written) is the shared value flow: the call sites whose result
   a name may hold, followed through constants, imports and module attributes, the arguments
-  every caller passes to a parameter, and the values a function of the repository returns (its
-  parameters then bound by that call only); a call that reaches no function of the repository
-  is the origin. A constant, parameter or function met again on one path (a cycle) adds
-  nothing. `Code::external(path, scope, callee)` names what an import from outside the
-  repository binds a callee to (`fastapi.APIRouter`, `express.default`): contract kinds
-  recognize framework constructors with it.
+  every caller passes to a parameter, the values a function of the repository returns (its
+  parameters then bound by that call only) and the items of a list or tuple; a call that
+  reaches no function of the repository is the origin. A constant, parameter or function met
+  again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
+  import from outside the repository binds a callee to (`fastapi.APIRouter`,
+  `express.default`): contract kinds recognize framework constructors with it.
+  `Code::definition` resolves a name or a member chain (`views.index`) to a definition,
+  `Code::module` a name to the file it binds as a whole module, and `Code::import_file` an
+  import specifier (`shop.orders.urls`) to its file.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
   `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`; only in a pack whose `globals` has it), Next.js app-router, Express, FastAPI and
-  Flask providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
-  `Provider::gateway`, `http::gateway_contract` turns it into a contract and
-  `http::serves(provider, contract)` is the one check of either path (also used by open items and
-  decision replay, so a gateway candidate carries the provider's own contract). That link is
+  `fetch`; only in a pack whose `globals` has it), Next.js app-router, Express, FastAPI, Flask
+  and Django providers, `normalize_path`, and the link rules (host,
+  `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
+  (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
+  on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
+  (`POST /health`) take it the same way. A route also matches by its gateway path: `declare`
+  fills `Provider::gateway`, `http::gateway_contract` turns it into a contract and
+  `http::serves(provider, contract)` is the one check of either path, through `fits` (also used
+  by open items and decision replay, so a gateway candidate carries the provider's own
+  contract). That link is
   `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
   within one repository a code path match wins over gateway path matches. An app or router
   (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
@@ -234,7 +244,18 @@ give byte-identical output.
   mounts it; FastAPI's mount segment is the given prefix then the router's own, Flask's given
   `url_prefix` replaces the own one. A prefix that cannot be read adds no route. FastAPI method
   decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
-  is the decorated function, the methods `methods=[...]` or `GET`. `resource.rs` (spec
+  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): a root
+  URLconf is a file whose module-level `urlpatterns` no `include()` names; its `path()` and
+  `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
+  view (of a module by dotted name or as a module, else of the list it is given) adding its
+  route before the entries it holds, at any depth, an `include()` met again on the walk (a
+  cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
+  `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
+  (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
+  `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
+  `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
+  `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
+  the provider's site. `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -268,7 +289,8 @@ give byte-identical output.
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
-  parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`) is `{}`.
+  parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`) is `{}`. A provider of
+  every method is `http::ANY::<path>`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
   `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
@@ -349,7 +371,7 @@ give byte-identical output.
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
-  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `decisions`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
   `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
@@ -400,7 +422,13 @@ Each is marked `ponytail:` at its site unless noted.
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. Parameter
   defaults are not read, nor `**k` splats; a `*a` splat is read as one positional argument.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
-  that depends on a parameter is not read through callers.
+  that depends on a parameter is not read through callers. Django: what an extension of
+  `urlpatterns` adds other than a list literal is left out, and a single `urlpatterns = [...] +
+  other` (no list literal as a whole) yields no entry; `include((patterns, "app"))`,
+  `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
+  handler method a class-based view inherits and `as_view()` on a class outside the repository
+  yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
+  backslashes yields nothing.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
