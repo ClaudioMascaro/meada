@@ -273,7 +273,14 @@ give byte-identical output.
   `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like
-  any `Value` (`str.format` and `%` do not), and `Code::expand` follows a function whose URL
+  any `Value` (`str.format` and `%` do not). `python.rs` folds an environment read into
+  `Part::Env`, as `ts.rs` does (`env_read`/`single_env`): `os.environ["X"]`,
+  `os.environ.get("X")`, `os.getenv("X")` and the bare `environ`/`getenv`, matched as written
+  (not through the file's imports), alone or in an f-string hole, through `or` fallbacks (the
+  read on the left, no other variable on the right), a default argument (ignored, unless it
+  reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
+  `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
+  reads the value. `Code::expand` follows a function whose URL
   or method depends on its parameters, so each of its call sites is a consumer (an argument
   it leaves out takes the parameter's default). `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a

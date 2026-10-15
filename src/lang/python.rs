@@ -947,7 +947,7 @@ fn value(node: Node, src: &[u8]) -> Value {
             name if name.starts_with('(') => Value::Unknown,
             name => Value::Ref(name),
         },
-        "call" => Value::Call(node.byte_range()),
+        "call" => parts(node, src).map_or(Value::Call(node.byte_range()), Value::Str),
         "list" | "tuple" => Value::List(named(node).map(|item| value(item, src)).collect()),
         "parenthesized_expression" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
         _ => parts(node, src).map_or(Value::Unknown, Value::Str),
@@ -965,7 +965,8 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
                         Some(e) if e.kind() == "identifier" => Part::Ref(text(e, src).into()),
-                        _ => Part::Hole,
+                        Some(e) => parts(e, src).and_then(single_env).unwrap_or(Part::Hole),
+                        None => Part::Hole,
                     }),
                     _ => None,
                 })
@@ -979,8 +980,77 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             (plus && (parts(left, src).is_some() || parts(right, src).is_some()))
                 .then(|| inside(left).into_iter().chain(inside(right)).collect())
         }
+        // A fallback keeps the environment read on its left, if it is the only one.
+        "boolean_operator" => {
+            let left = node.child_by_field_name("left")?;
+            let right = node.child_by_field_name("right")?;
+            if text(node.child_by_field_name("operator")?, src) != "or" {
+                return None;
+            }
+            let env = single_env(parts(left, src)?)?;
+            let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
+            Some(vec![if more { Part::Hole } else { env }])
+        }
         "identifier" => Some(vec![Part::Ref(text(node, src).to_string())]),
         "parenthesized_expression" => parts(named(node).next()?, src),
+        "subscript" | "call" => env_read(node, src).map(|env| vec![env]),
+        _ => None,
+    }
+}
+
+/// `os.environ["X"]`, `os.environ.get("X")` or `os.getenv("X")` (also `environ` and `getenv`
+/// imported from `os`), with or without a default, also through string method calls such as
+/// `.rstrip("/")`. Meada never reads the value, so a default is ignored; one that reads
+/// another variable makes the whole read a hole.
+// ponytail: the names are matched as written, not through the file's imports, so `import os
+// as o` is not read and a local `getenv` function is.
+fn env_read(node: Node, src: &[u8]) -> Option<Part> {
+    const STRING_METHODS: &[&str] = &[
+        "strip",
+        "lstrip",
+        "rstrip",
+        "replace",
+        "removeprefix",
+        "removesuffix",
+        "lower",
+    ];
+    match node.kind() {
+        "subscript" => {
+            let name = string(node.child_by_field_name("subscript")?, src)?;
+            let environ = callee(node.child_by_field_name("value")?, src);
+            matches!(environ.as_str(), "os.environ" | "environ").then_some(Part::Env(name))
+        }
+        "call" => {
+            let function = node.child_by_field_name("function")?;
+            if let "os.getenv" | "getenv" | "os.environ.get" | "environ.get" =
+                callee(function, src).as_str()
+            {
+                let (args, kwargs) = arguments(node, src);
+                let name = string(named(node.child_by_field_name("arguments")?).next()?, src)?;
+                let default = args
+                    .get(1)
+                    .or(kwargs.iter().find(|(k, _)| k == "default").map(|(_, v)| v));
+                return Some(match default {
+                    Some(Value::Str(p)) if p.iter().any(|p| matches!(p, Part::Env(_))) => {
+                        Part::Hole
+                    }
+                    _ => Part::Env(name),
+                });
+            }
+            let method = function.child_by_field_name("attribute")?;
+            if !STRING_METHODS.contains(&text(method, src)) {
+                return None;
+            }
+            single_env(parts(function.child_by_field_name("object")?, src)?)
+        }
+        _ => None,
+    }
+}
+
+/// The environment read that makes up all of `parts`, if that is what they are.
+fn single_env(parts: Vec<Part>) -> Option<Part> {
+    match <[Part; 1]>::try_from(parts) {
+        Ok([env @ Part::Env(_)]) => Some(env),
         _ => None,
     }
 }

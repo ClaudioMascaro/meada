@@ -19,7 +19,11 @@
     },
     {
       "path": "clients/dynamic.py",
-      "hash": "2acf9e3d447d386bf62f30308258b332c60b8924610143c2514380b78fa57cbd"
+      "hash": "39b56b03a7e8d0f7515db379c39f84586707946b3120b16dc171a831b3b3c1a6"
+    },
+    {
+      "path": "clients/environment.py",
+      "hash": "5c885836e738c22e112cdb1ebf803c9a5bc22b69607bb94d7a593ab9205a9cf4"
     },
     {
       "path": "clients/modules.py",
@@ -676,7 +680,7 @@
       "span": {
         "path": "clients/dynamic.py",
         "start": 474,
-        "end": 632
+        "end": 645
       }
     },
     {
@@ -691,8 +695,128 @@
       "id": "example.com/acme/conformance::clients/dynamic.py::unknown_method",
       "span": {
         "path": "clients/dynamic.py",
-        "start": 635,
-        "end": 765
+        "start": 648,
+        "end": 778
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1209,
+        "end": 1358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::computed_name",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1635,
+        "end": 1791
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_argument",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 730,
+        "end": 839
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_in_environ_get",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 842,
+        "end": 959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_reads_another",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1521,
+        "end": 1632
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::environ_get",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 370,
+        "end": 454
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::fallback",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 622,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::getenv_call",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 457,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::imported_getenv",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 539,
+        "end": 619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::imported_subscript",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 283,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::interpolated",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1125,
+        "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::named",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1068,
+        "end": 1122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::string_methods",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 962,
+        "end": 1065
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::subscript",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 202,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::two_variables",
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1361,
+        "end": 1518
       }
     },
     {
@@ -2912,8 +3036,8 @@
       "level": null,
       "span": {
         "path": "clients/dynamic.py",
-        "start": 582,
-        "end": 632
+        "start": 595,
+        "end": 645
       }
     },
     {
@@ -2934,8 +3058,338 @@
       "level": null,
       "span": {
         "path": "clients/dynamic.py",
-        "start": 723,
-        "end": 765
+        "start": 736,
+        "end": 778
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::client_base_url::(call).rstrip#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1267,
+        "end": 1324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::client_base_url::client.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1337,
+        "end": 1358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::client_base_url::getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1267,
+        "end": 1312
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::client_base_url::httpx.Client#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1245,
+        "end": 1325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::computed_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1749,
+        "end": 1791
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_argument::os.getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_argument",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 778,
+        "end": 826
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_argument::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_argument",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 765,
+        "end": 839
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_in_environ_get::environ.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_in_environ_get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 896,
+        "end": 946
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_in_environ_get::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_in_environ_get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 883,
+        "end": 959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_reads_another::os.getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_reads_another",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1574,
+        "end": 1619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_reads_another::os.getenv#1",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_reads_another",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1598,
+        "end": 1618
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::default_reads_another",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1561,
+        "end": 1632
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::environ_get::os.environ.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::environ_get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 413,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::environ_get::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::environ_get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 400,
+        "end": 454
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::fallback::os.getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::fallback",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 663,
+        "end": 686
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::fallback::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::fallback",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 649,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::getenv_call::os.getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::getenv_call",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 500,
+        "end": 523
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::getenv_call::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::getenv_call",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 487,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::imported_getenv::getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::imported_getenv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 586,
+        "end": 606
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::imported_getenv::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::imported_getenv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 573,
+        "end": 619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::imported_subscript::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::imported_subscript",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 320,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::interpolated::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::interpolated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1156,
+        "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::named::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::named",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1092,
+        "end": 1122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::string_methods::(call).rstrip#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::string_methods",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1008,
+        "end": 1052
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::string_methods::(subscript).strip#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::string_methods",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1008,
+        "end": 1040
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::string_methods::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::string_methods",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 995,
+        "end": 1065
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::subscript::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::subscript",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 230,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::two_variables::os.getenv#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::two_variables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1457,
+        "end": 1480
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::two_variables::os.getenv#1",
+      "caller": "example.com/acme/conformance::clients/environment.py::two_variables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1484,
+        "end": 1504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/environment.py::two_variables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/environment.py",
+        "start": 1443,
+        "end": 1518
       }
     },
     {
@@ -5601,7 +6055,7 @@
     {
       "contract": "http::GET::/orders",
       "site": "example.com/acme/conformance::clients/dynamic.py::from_environment::requests.get#0",
-      "via": null
+      "via": "env:ORDERS_URL"
     },
     {
       "contract": null,
@@ -5612,6 +6066,81 @@
       "contract": null,
       "site": "example.com/acme/conformance::clients/dynamic.py::unknown_method::requests.request#0",
       "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::client_base_url::client.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::default_argument::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::default_in_environ_get::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::environ_get::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::fallback::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::getenv_call::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::imported_getenv::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::imported_subscript::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::interpolated::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::named::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::string_methods::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::subscript::requests.get#0",
+      "via": "env:ORDERS_URL"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
+      "via": null
     },
     {
       "contract": "http::POST::/users",
