@@ -6,8 +6,8 @@ use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Call, Class, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local, Modules, Param,
-    Star, children, named, text,
+    Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local, Modules,
+    Param, Part, Star, Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -30,6 +30,10 @@ impl LanguagePack for Python {
         // symbol: the first definition.
         let mut defined = HashSet::new();
         let mut locals = Locals::default();
+        // Each function's position in `facts.defs`, for its `return`s.
+        let mut functions: HashMap<String, usize> = HashMap::new();
+        // The decorator calls not yet met, by node, and the definition each one decorates.
+        let mut decorators: HashMap<usize, String> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -55,6 +59,9 @@ impl LanguagePack for Python {
                             module.names.push(name.to_string());
                         }
                         if defined.insert(inner.clone()) {
+                            if !is_class {
+                                functions.insert(inner.clone(), facts.defs.len());
+                            }
                             let kind = match (is_class, in_class) {
                                 (true, _) => Kind::Class,
                                 (false, true) => Kind::Method,
@@ -66,6 +73,7 @@ impl LanguagePack for Python {
                                 range: span(node),
                                 params: params(node, src),
                                 bases: bases(node, src),
+                                returns: Vec::new(),
                             });
                         }
                         if !is_class {
@@ -77,14 +85,34 @@ impl LanguagePack for Python {
                     }
                     inner_class = is_class;
                 }
+                "decorated_definition" => {
+                    let name = (node.child_by_field_name("definition"))
+                        .and_then(|d| d.child_by_field_name("name"));
+                    if let Some(name) = name {
+                        for decorator in named(node).filter(|n| n.kind() == "decorator") {
+                            if let Some(call) = named(decorator).find(|n| n.kind() == "call") {
+                                decorators.insert(call.id(), qualify(&scope, text(name, src)));
+                            }
+                        }
+                    }
+                }
                 "call" => {
                     if let Some(function) = node.child_by_field_name("function") {
+                        let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: node.byte_range(),
-                            args: Vec::new(),
+                            args,
+                            kwargs,
+                            decorates: decorators.remove(&node.id()),
                         });
+                    }
+                }
+                "return_statement" => {
+                    if let (Some(&at), Some(returned)) = (functions.get(&scope), named(node).next())
+                    {
+                        facts.defs[at].returns.push(value(returned, src));
                     }
                 }
                 // ponytail: an import binds its names for the whole file, wherever it sits; a
@@ -159,7 +187,7 @@ impl LanguagePack for Python {
             }));
         }
         (facts.exports, facts.star) = module.exports();
-        facts.locals = locals.finish();
+        (facts.locals, facts.consts) = locals.finish();
         Ok(facts)
     }
 
@@ -407,6 +435,8 @@ struct Locals {
     declared: HashMap<(String, String), bool>,
     /// The scopes that are class bodies.
     classes: HashSet<String>,
+    /// The value each `name = value` assigns, by the position of its binding in `written`.
+    values: Vec<(usize, Value)>,
 }
 
 impl Locals {
@@ -469,6 +499,11 @@ impl Locals {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
+        if let ("assignment", "identifier", Some(right)) =
+            (node.kind(), left.kind(), node.child_by_field_name("right"))
+        {
+            self.values.push((self.written.len(), value(right, src)));
+        }
         if let Some(annotation) = node.child_by_field_name("type") {
             self.target(left, scope, class(annotation, src), How::Annotated, src);
             return;
@@ -490,8 +525,9 @@ impl Locals {
     /// The facts: one per scope and name, every binding but a plain parameter (its definition
     /// already lists it). A name declared `global` is bound at the module; one declared
     /// `nonlocal`, in the nearest enclosing function that binds it, class bodies skipped. An
-    /// annotation decides; other bindings that disagree make the class unknown.
-    fn finish(self) -> Vec<Local> {
+    /// annotation decides; other bindings that disagree make the class unknown. A name its
+    /// scope binds once, by `name = value`, is also a constant holding that value.
+    fn finish(self) -> (Vec<Local>, Vec<Const>) {
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
             .filter(|&(scope, name)| !self.declared.contains_key(&(scope.into(), name.into())))
@@ -513,9 +549,23 @@ impl Locals {
             }
         };
         let annotated = |how| how == How::Annotated;
+        let homes: Vec<(String, String)> = (self.written.iter())
+            .map(|(scope, name, ..)| (home(scope, name), name.clone()))
+            .collect();
+        let mut times: HashMap<&(String, String), usize> = HashMap::new();
+        for key in &homes {
+            *times.entry(key).or_default() += 1;
+        }
+        let consts = (self.values.into_iter())
+            .filter(|(at, _)| times[&homes[*at]] == 1 && homes[*at].0 == self.written[*at].0)
+            .map(|(at, value)| Const {
+                name: qualify(&homes[at].0, &homes[at].1),
+                value,
+            })
+            .collect();
         let mut bound: BTreeMap<(String, String), (Class, How)> = BTreeMap::new();
-        for (scope, name, class, how) in &self.written {
-            let key = (home(scope, name), name.clone());
+        for (key, (_, _, class, how)) in homes.iter().zip(&self.written) {
+            let key = key.clone();
             let merged = match bound.remove(&key) {
                 None => (class.clone(), *how),
                 Some(old) if annotated(old.1) && !annotated(*how) => old,
@@ -525,10 +575,11 @@ impl Locals {
             };
             bound.insert(key, merged);
         }
-        (bound.into_iter())
+        let locals = (bound.into_iter())
             .filter(|(_, (_, how))| *how != How::Param)
             .map(|((scope, name), (class, _))| Local { scope, name, class })
-            .collect()
+            .collect();
+        (locals, consts)
     }
 }
 
@@ -746,6 +797,78 @@ fn string(node: Node, src: &[u8]) -> Option<String> {
     }
     let content = src.get(start?..end?)?;
     Some(String::from_utf8_lossy(content).into_owned())
+}
+
+/// The positional and keyword arguments of a call `node`, as written. A splat (`*a`, `**k`)
+/// is not read.
+// ponytail: a `*a` splat shifts the positions after it, which are read as if it held one value.
+fn arguments(node: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Value)>) {
+    let (mut args, mut kwargs) = (Vec::new(), Vec::new());
+    let list = node.child_by_field_name("arguments");
+    for arg in list
+        .filter(|l| l.kind() == "argument_list")
+        .into_iter()
+        .flat_map(named)
+    {
+        match arg.kind() {
+            "keyword_argument" => {
+                let name = arg.child_by_field_name("name");
+                if let (Some(name), Some(v)) = (name, arg.child_by_field_name("value")) {
+                    kwargs.push((text(name, src).to_string(), value(v, src)));
+                }
+            }
+            "comment" | "dictionary_splat" => {}
+            _ => args.push(value(arg, src)),
+        }
+    }
+    (args, kwargs)
+}
+
+/// What an expression is, as far as its own syntax tells.
+fn value(node: Node, src: &[u8]) -> Value {
+    match node.kind() {
+        "identifier" => Value::Ref(text(node, src).to_string()),
+        "none" => Value::Undefined,
+        "attribute" => match callee(node, src) {
+            name if name.starts_with('(') => Value::Unknown,
+            name => Value::Ref(name),
+        },
+        "call" => Value::Call(node.byte_range()),
+        "list" | "tuple" => Value::List(named(node).map(|item| value(item, src)).collect()),
+        "parenthesized_expression" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
+        _ => parts(node, src).map_or(Value::Unknown, Value::Str),
+    }
+}
+
+/// A string expression folded into literal text, names and holes: string literals, f-strings,
+/// implicit and `+` concatenation; `None` when `node` is not one.
+fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
+    let inside = |n: Node| parts(n, src).unwrap_or_else(|| vec![Part::Hole]);
+    match node.kind() {
+        "string" => Some(
+            children(node)
+                .filter_map(|part| match part.kind() {
+                    "string_content" => Some(Part::Text(text(part, src).to_string())),
+                    "interpolation" => Some(match part.child_by_field_name("expression") {
+                        Some(e) if e.kind() == "identifier" => Part::Ref(text(e, src).into()),
+                        _ => Part::Hole,
+                    }),
+                    _ => None,
+                })
+                .collect(),
+        ),
+        "concatenated_string" => Some(named(node).flat_map(inside).collect()),
+        "binary_operator" => {
+            let left = node.child_by_field_name("left")?;
+            let right = node.child_by_field_name("right")?;
+            let plus = text(node.child_by_field_name("operator")?, src) == "+";
+            (plus && (parts(left, src).is_some() || parts(right, src).is_some()))
+                .then(|| inside(left).into_iter().chain(inside(right)).collect())
+        }
+        "identifier" => Some(vec![Part::Ref(text(node, src).to_string())]),
+        "parenthesized_expression" => parts(named(node).next()?, src),
+        _ => None,
+    }
 }
 
 /// `a.b.c` for identifier and attribute chains; any other expression becomes `(<node kind>)`,

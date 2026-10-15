@@ -32,6 +32,12 @@ pub trait LanguagePack {
     fn receiver(&self) -> Option<&'static str> {
         None
     }
+
+    /// Names every file of the language may call without binding them, which contract kinds
+    /// read, such as `fetch`.
+    fn globals(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 /// The repository-relative paths an import of a specifier (second argument) from a file
@@ -175,6 +181,10 @@ pub struct Def {
     /// enclosing the class.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bases: Vec<String>,
+    /// What a function returns, one value per `return`. Not kept in the index (see
+    /// `Call::args`).
+    #[serde(skip)]
+    pub returns: Vec<Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -225,6 +235,20 @@ pub struct Call {
     /// parses a file again when a contract needs them.
     #[serde(skip)]
     pub args: Vec<Value>,
+    /// The keyword arguments, as written, after the positional ones. Not kept in the index.
+    #[serde(skip)]
+    pub kwargs: Vec<(String, Value)>,
+    /// The qualified name of the definition a decorator call applies to: `@app.get("/")`
+    /// written on `def index()` decorates `index`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decorates: Option<String>,
+}
+
+impl Call {
+    /// The keyword argument `name`.
+    pub fn keyword(&self, name: &str) -> Option<&Value> {
+        self.kwargs.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
 }
 
 /// An expression as written. The pack does not follow names: the shared side folds
@@ -240,8 +264,10 @@ pub enum Value {
     Ref(String),
     /// `undefined`, or an argument the call leaves out.
     Undefined,
-    /// The result of calling the normalized callee, such as `express.Router`.
-    Call(String),
+    /// The result of a call: the range of that call among the file's calls.
+    Call(Range<usize>),
+    /// A list or tuple literal's items.
+    List(Vec<Value>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),

@@ -5,7 +5,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Call, Class, Def, Export, Facts, Imported, Kind, Modules, Param, Part, Star, Value,
+    Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Star,
+    Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -91,6 +92,8 @@ pub struct Resolver<'a> {
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
     receiver: Option<&'static str>,
+    /// The pack's names bound everywhere (`LanguagePack::globals`).
+    globals: &'static [&'static str],
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
@@ -103,7 +106,7 @@ impl<'a> Resolver<'a> {
     pub fn new(
         files: &'a BTreeMap<&'a str, &'a Facts>,
         modules: Modules,
-        receiver: Option<&'static str>,
+        language: &dyn LanguagePack,
     ) -> Self {
         let defs = files
             .iter()
@@ -147,7 +150,8 @@ impl<'a> Resolver<'a> {
             consts,
             locals,
             families: HashMap::new(),
-            receiver,
+            receiver: language.receiver(),
+            globals: language.globals(),
             callers: HashMap::new(),
             by_name,
             modules,
@@ -242,6 +246,11 @@ impl<'a> Resolver<'a> {
                 (f.path, f.name, name)
             }
             Binding::Local(path, scope, name) => (path, scope, name),
+            // A constant is a name its scope binds once.
+            Binding::Const(path, constant) => match constant.rsplit_once('.') {
+                Some((scope, name)) => (path, scope, name),
+                None => (path, "", constant),
+            },
             other => return other,
         };
         let Some(class) = self.locals[path].get(&(scope, name)) else {
@@ -592,6 +601,14 @@ struct Frame<'a> {
     index: usize,
 }
 
+/// What `Code::origins` follows: a constant, a parameter, a function's return values.
+#[derive(PartialEq)]
+enum Flow<'a> {
+    Const(&'a str, &'a str),
+    Param(Target<'a>, usize),
+    Returns(Target<'a>),
+}
+
 /// Values evaluated across files for contract kinds: constants folded where they are
 /// defined, imported ones included, and the arguments of client wrapper calls substituted
 /// for their parameters.
@@ -626,7 +643,200 @@ impl<'a> Code<'a> {
 
     /// The arguments of the call at `index` of `path`, as written.
     pub fn args(&self, path: &'a str, index: usize) -> Option<&'a [Value]> {
-        Some(self.full(path)?.calls.get(index)?.args.as_slice())
+        Some(self.call(path, index)?.args.as_slice())
+    }
+
+    /// The call at `index` of `path`, with its arguments.
+    pub fn call(&self, path: &'a str, index: usize) -> Option<&'a Call> {
+        self.full(path)?.calls.get(index)
+    }
+
+    /// Whether the pack binds `name` everywhere, as JavaScript does `fetch`.
+    pub fn is_global(&self, name: &str) -> bool {
+        self.resolver.globals.contains(&name)
+    }
+
+    /// What `callee`, written in `scope` of `path`, names outside the repository: the module
+    /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
+    /// the repository binds it.
+    pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
+        let binding =
+            (self.resolver).resolve(path, scope, callee, &mut Seen::new(), &mut Work::default());
+        matches!(binding, Binding::External).then(|| self.resolver.imported_name(path, callee))
+    }
+
+    /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
+    /// position, or by the parameter's name among its keyword arguments. A method called on
+    /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
+    fn arg(
+        &self,
+        path: &'a str,
+        index: usize,
+        function: Target<'a>,
+        n: usize,
+    ) -> Option<&'a Value> {
+        let call = self.call(path, index)?;
+        let params = &self.resolver.defs[function.path][function.name].params;
+        let locals = &self.resolver.locals[function.path];
+        let bound = call.callee.contains('.')
+            && params.first().is_some_and(|p| {
+                locals.get(&(function.name, p.name.as_str())) == Some(&&Class::Enclosing)
+            });
+        let position = match bound {
+            true => n.checked_sub(1),
+            false => Some(n),
+        };
+        position
+            .and_then(|at| call.args.get(at))
+            .or_else(|| call.keyword(&params.get(n)?.name))
+    }
+
+    /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
+    /// through constants and imports, the arguments callers pass to parameters and the values
+    /// functions of the repository return. A call that reaches no such function is where the
+    /// value comes from, such as a constructor (`APIRouter()`); whatever else the name may
+    /// hold (an assignment that is not its only binding, an attribute) is left out.
+    pub fn origins(&self, path: &'a str, scope: &'a str, name: &'a str) -> Vec<(&'a str, usize)> {
+        let mut out = BTreeSet::new();
+        self.flow_name(
+            path,
+            scope,
+            name,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut out,
+        );
+        out.into_iter().collect()
+    }
+
+    /// `origins` of a value as written.
+    pub fn value_origins(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+    ) -> Vec<(&'a str, usize)> {
+        let mut out = BTreeSet::new();
+        self.flow(
+            path,
+            scope,
+            value,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut out,
+        );
+        out.into_iter().collect()
+    }
+
+    /// `frames` bind the parameters of the functions whose return values are being followed,
+    /// innermost last; `busy` is what is being followed, met again only through a cycle.
+    fn flow(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &mut Vec<Frame<'a>>,
+        busy: &mut Vec<Flow<'a>>,
+        out: &mut BTreeSet<(&'a str, usize)>,
+    ) {
+        match value {
+            Value::Ref(name) => self.flow_name(path, scope, name, frames, busy, out),
+            Value::Call(range) => {
+                let calls = &self.resolver.files[path].calls;
+                let Some(index) = calls.iter().position(|c| c.range == *range) else {
+                    return;
+                };
+                let function = match self.resolver.call(path, &calls[index]) {
+                    Resolution::Exact(t) if !self.resolver.is_class(t) => t,
+                    _ => {
+                        out.insert((path, index));
+                        return;
+                    }
+                };
+                let Some(def) = (self.full(function.path))
+                    .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
+                else {
+                    return;
+                };
+                if busy.contains(&Flow::Returns(function)) {
+                    return;
+                }
+                busy.push(Flow::Returns(function));
+                frames.push(Frame {
+                    def: function,
+                    path,
+                    index,
+                });
+                for returned in &def.returns {
+                    self.flow(function.path, function.name, returned, frames, busy, out);
+                }
+                frames.pop();
+                busy.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn flow_name(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        frames: &mut Vec<Frame<'a>>,
+        busy: &mut Vec<Flow<'a>>,
+        out: &mut BTreeSet<(&'a str, usize)>,
+    ) {
+        let work = &mut Work::default();
+        match self
+            .resolver
+            .resolve(path, scope, name, &mut Seen::new(), work)
+        {
+            Binding::Const(at, constant) => {
+                let found = self
+                    .full(at)
+                    .and_then(|f| f.consts.iter().find(|c| c.name == constant));
+                let Some(found) = found else {
+                    return;
+                };
+                if busy.contains(&Flow::Const(at, constant)) {
+                    return;
+                }
+                busy.push(Flow::Const(at, constant));
+                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                self.flow(at, within, &found.value, frames, busy, out);
+                busy.pop();
+            }
+            Binding::Param(function, n, None) => {
+                // Inside a function whose return value is followed, its call binds the
+                // parameter; else every call of it does.
+                let sites = match frames.last() {
+                    Some(frame) if frame.def == function => vec![(frame.path, frame.index)],
+                    // ponytail: a parameter of an outer function, captured by a closure, is
+                    // not followed.
+                    Some(_) => return,
+                    None => self
+                        .resolver
+                        .callers
+                        .get(&function)
+                        .cloned()
+                        .unwrap_or_default(),
+                };
+                if busy.contains(&Flow::Param(function, n)) {
+                    return;
+                }
+                busy.push(Flow::Param(function, n));
+                let frame = frames.pop();
+                for (caller, index) in sites {
+                    let scope = &self.resolver.files[caller].calls[index].scope;
+                    if let Some(arg) = self.arg(caller, index, function, n) {
+                        self.flow(caller, scope, arg, frames, busy, out);
+                    }
+                }
+                frames.extend(frame);
+                busy.pop();
+            }
+            _ => {}
+        }
     }
 
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
@@ -651,24 +861,6 @@ impl<'a> Code<'a> {
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
         unbind(self.eval(path, scope, value, &[], 0, &mut Vec::new(), &mut None))
-    }
-
-    /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
-    /// its value as written.
-    pub fn constant(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        name: &'a str,
-    ) -> Option<((&'a str, &'a str), &'a Value)> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
-            Binding::Const(at, constant) => {
-                let facts = self.full(at)?;
-                let value = &facts.consts.iter().find(|c| c.name == constant)?.value;
-                Some(((at, constant), value))
-            }
-            _ => None,
-        }
     }
 
     /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object
@@ -805,6 +997,11 @@ impl<'a> Code<'a> {
                     })
                     .collect(),
             ),
+            Value::List(items) => Value::List(
+                (items.iter())
+                    .map(|v| self.eval(path, scope, v, frames, depth, seen, wants))
+                    .collect(),
+            ),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, seen, wants),
             other => other.clone(),
         }
@@ -821,7 +1018,9 @@ impl<'a> Code<'a> {
         seen: &mut Vec<(&'a str, &'a str)>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        let binding =
+            (self.resolver).resolve(path, scope, name, &mut Seen::new(), &mut Work::default());
+        match binding {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if seen.contains(&(at, constant)) {
@@ -844,11 +1043,12 @@ impl<'a> Code<'a> {
                     let Some(call) = self.resolver.files[frame.path].calls.get(frame.index) else {
                         return Value::Unknown;
                     };
-                    let Some(args) = self.args(frame.path, frame.index) else {
+                    if self.args(frame.path, frame.index).is_none() {
                         return Value::Unknown;
-                    };
+                    }
+                    let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
-                    let bound = match (args.get(n), param.and_then(|p| p.default.as_ref())) {
+                    let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
                         (Some(arg), _) => {
                             self.eval(frame.path, &call.scope, arg, frames, depth + 1, seen, wants)
                         }
@@ -929,6 +1129,7 @@ fn unbind(value: Value) -> Value {
                 .map(|(k, v)| (k, unbind(v)))
                 .collect(),
         ),
+        Value::List(items) => Value::List(items.into_iter().map(unbind).collect()),
         other => other,
     }
 }

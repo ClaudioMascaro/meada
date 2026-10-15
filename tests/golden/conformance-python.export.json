@@ -148,6 +148,30 @@
     {
       "path": "stars/underscore.py",
       "hash": "36913ef496402542036e921b759c23afaf839a3b99886bc7bfd63da37138726c"
+    },
+    {
+      "path": "web/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "web/accounts.py",
+      "hash": "3984d0b73a71d0382621966a7ac42842ca0529937b316ae060f390f1e62e285a"
+    },
+    {
+      "path": "web/api.py",
+      "hash": "457b5136402e2f8417cbeafeb50a095039c84cb3503e477040f04962edf523dd"
+    },
+    {
+      "path": "web/factory.py",
+      "hash": "02c55e60a82faa8ad64cd420de36b5b36b143241065cc9dd48d801ea5a1615a1"
+    },
+    {
+      "path": "web/items.py",
+      "hash": "69eada87d2185d38e9cada3eaaf414e824dd4248d76d3901b5dda7aac1fe1540"
+    },
+    {
+      "path": "web/pages.py",
+      "hash": "d754de37df2ee33ccebc0cbf7c37abf9ae3504f18abfbf31c223fbc6d924527b"
     }
   ],
   "symbols": [
@@ -1677,6 +1701,126 @@
         "path": "stars/underscore.py",
         "start": 0,
         "end": 27
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/accounts.py::update",
+      "span": {
+        "path": "web/accounts.py",
+        "start": 98,
+        "end": 175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::echo",
+      "span": {
+        "path": "web/api.py",
+        "start": 364,
+        "end": 417
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::health",
+      "span": {
+        "path": "web/api.py",
+        "start": 223,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::ping",
+      "span": {
+        "path": "web/api.py",
+        "start": 283,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::build_admin",
+      "span": {
+        "path": "web/factory.py",
+        "start": 96,
+        "end": 268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::build_admin.remove_user",
+      "span": {
+        "path": "web/factory.py",
+        "start": 159,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::mount",
+      "span": {
+        "path": "web/factory.py",
+        "start": 271,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::relay",
+      "span": {
+        "path": "web/factory.py",
+        "start": 354,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/items.py::create_item",
+      "span": {
+        "path": "web/items.py",
+        "start": 169,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/items.py::read_item",
+      "span": {
+        "path": "web/items.py",
+        "start": 87,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::daily",
+      "span": {
+        "path": "web/pages.py",
+        "start": 414,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::fetch",
+      "span": {
+        "path": "web/pages.py",
+        "start": 585,
+        "end": 694
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::index",
+      "span": {
+        "path": "web/pages.py",
+        "start": 253,
+        "end": 299
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::order",
+      "span": {
+        "path": "web/pages.py",
+        "start": 302,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::shortcut",
+      "span": {
+        "path": "web/pages.py",
+        "start": 478,
+        "end": 582
       }
     }
   ],
@@ -3471,9 +3615,415 @@
         "start": 80,
         "end": 91
       }
+    },
+    {
+      "id": "example.com/acme/conformance::web/accounts.py::Blueprint#0",
+      "caller": "example.com/acme/conformance::web/accounts.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/accounts.py",
+        "start": 40,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/accounts.py::accounts.route#0",
+      "caller": "example.com/acme/conformance::web/accounts.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/accounts.py",
+        "start": 99,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::APIRouter#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 425,
+        "end": 454
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::FastAPI#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 211,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.api_route#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 284,
+        "end": 331
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.api_route#1",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 365,
+        "end": 387
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.get#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 224,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.include_router#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 504,
+        "end": 526
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.include_router#1",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 527,
+        "end": 577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::app.include_router#2",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 578,
+        "end": 637
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::build_admin#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": "example.com/acme/conformance::web/factory.py::build_admin",
+      "level": "exact",
+      "span": {
+        "path": "web/api.py",
+        "start": 649,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::mount#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": "example.com/acme/conformance::web/factory.py::mount",
+      "level": "exact",
+      "span": {
+        "path": "web/api.py",
+        "start": 638,
+        "end": 663
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::relay#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": "example.com/acme/conformance::web/factory.py::relay",
+      "level": "exact",
+      "span": {
+        "path": "web/api.py",
+        "start": 597,
+        "end": 619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/api.py::v1.include_router#0",
+      "caller": "example.com/acme/conformance::web/api.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/api.py",
+        "start": 455,
+        "end": 503
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::build_admin::APIRouter#0",
+      "caller": "example.com/acme/conformance::web/factory.py::build_admin",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/factory.py",
+        "start": 127,
+        "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::build_admin::admin.delete#0",
+      "caller": "example.com/acme/conformance::web/factory.py::build_admin",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/factory.py",
+        "start": 160,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::mount::target.include_router#0",
+      "caller": "example.com/acme/conformance::web/factory.py::mount",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/factory.py",
+        "start": 302,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/factory.py::relay::relay#0",
+      "caller": "example.com/acme/conformance::web/factory.py::relay",
+      "target": "example.com/acme/conformance::web/factory.py::relay",
+      "level": "exact",
+      "span": {
+        "path": "web/factory.py",
+        "start": 409,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/items.py::APIRouter#0",
+      "caller": "example.com/acme/conformance::web/items.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/items.py",
+        "start": 40,
+        "end": 84
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/items.py::router.get#0",
+      "caller": "example.com/acme/conformance::web/items.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/items.py",
+        "start": 88,
+        "end": 112
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/items.py::router.post#0",
+      "caller": "example.com/acme/conformance::web/items.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/items.py",
+        "start": 170,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::Blueprint#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 197,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::Flask#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 171,
+        "end": 186
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::app.get#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 479,
+        "end": 499
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::app.register_blueprint#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 714,
+        "end": 745
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::app.register_blueprint#1",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 746,
+        "end": 801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::app.route#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 254,
+        "end": 268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::app.route#1",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 303,
+        "end": 365
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::fetch#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": "example.com/acme/conformance::web/pages.py::fetch",
+      "level": "exact",
+      "span": {
+        "path": "web/pages.py",
+        "start": 697,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::order::str#0",
+      "caller": "example.com/acme/conformance::web/pages.py::order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 398,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/pages.py::reports.route#0",
+      "caller": "example.com/acme/conformance::web/pages.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/pages.py",
+        "start": 415,
+        "end": 444
+      }
     }
   ],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "http::DELETE::/internal/admin/users/{}",
+      "site": "example.com/acme/conformance::web/factory.py::build_admin.remove_user"
+    },
+    {
+      "contract": "http::DELETE::/orders/{}",
+      "site": "example.com/acme/conformance::web/pages.py::order"
+    },
+    {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::web/pages.py::index"
+    },
+    {
+      "contract": "http::GET::/api/v1/items/catalog/{}",
+      "site": "example.com/acme/conformance::web/items.py::read_item"
+    },
+    {
+      "contract": "http::GET::/echo",
+      "site": "example.com/acme/conformance::web/api.py::echo"
+    },
+    {
+      "contract": "http::GET::/health",
+      "site": "example.com/acme/conformance::web/api.py::health"
+    },
+    {
+      "contract": "http::GET::/legacy/catalog/{}",
+      "site": "example.com/acme/conformance::web/items.py::read_item"
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/acme/conformance::web/pages.py::order"
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::web/api.py::ping"
+    },
+    {
+      "contract": "http::GET::/relay/catalog/{}",
+      "site": "example.com/acme/conformance::web/items.py::read_item"
+    },
+    {
+      "contract": "http::GET::/reports/daily/{}",
+      "site": "example.com/acme/conformance::web/pages.py::daily"
+    },
+    {
+      "contract": "http::POST::/api/v1/items/catalog",
+      "site": "example.com/acme/conformance::web/items.py::create_item"
+    },
+    {
+      "contract": "http::POST::/legacy/catalog",
+      "site": "example.com/acme/conformance::web/items.py::create_item"
+    },
+    {
+      "contract": "http::POST::/ping",
+      "site": "example.com/acme/conformance::web/api.py::ping"
+    },
+    {
+      "contract": "http::POST::/relay/catalog",
+      "site": "example.com/acme/conformance::web/items.py::create_item"
+    },
+    {
+      "contract": "http::PUT::/members/{}",
+      "site": "example.com/acme/conformance::web/accounts.py::update"
+    }
+  ],
   "consumers": [],
   "links": []
 }
