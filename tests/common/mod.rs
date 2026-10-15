@@ -53,6 +53,23 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     )
 }
 
+/// The cross-language fixture (spec #24) as siblings in one case directory: the TypeScript
+/// storefront and the Python inventory service, which call each other.
+pub fn xlang(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-storefront",
+            Some("https://example.com/xlang/storefront.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-inventory",
+            Some("git@example.com:xlang/inventory.git"),
+        ),
+    )
+}
+
 /// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
 /// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
 /// gateway, whose workspace holds all four repositories.

@@ -356,6 +356,55 @@ fn edit_resources(gateway: &Path) {
     );
 }
 
+/// Edits, adds and deletes `.py` files of the inventory and deletes a route of the storefront:
+/// a route path changes, a module with a consumer on the declared host appears, the jobs
+/// module goes.
+fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
+    let main = inventory.join("inventory/main.py");
+    let src = fs::read_to_string(&main).unwrap();
+    assert!(src.contains("\"/stock/{sku}\""));
+    fs::write(
+        &main,
+        src.replace("\"/stock/{sku}\"", "\"/stock/{sku}/level\""),
+    )
+    .unwrap();
+    fs::write(
+        inventory.join("inventory/report.py"),
+        "import requests\n\n\ndef report():\n    return requests.post(\"https://storefront.example.com/api/audit\")\n",
+    )
+    .unwrap();
+    fs::remove_file(inventory.join("inventory/jobs.py")).unwrap();
+    fs::remove_file(storefront.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(storefront, inventory): &(PathBuf, PathBuf)| -> Vec<String> {
+        [storefront, inventory]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang("fresh_xlang");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang("fresh_xlang_cold");
+    edit_xlang(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {

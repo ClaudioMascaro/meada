@@ -204,6 +204,21 @@ fn python() {
             "clients/dynamic.py::from_environment",
             "clients/dynamic.py::percent",
             "clients/dynamic.py::unknown_method",
+            "clients/environment.py::client_base_url",
+            "clients/environment.py::computed_name",
+            "clients/environment.py::default_argument",
+            "clients/environment.py::default_in_environ_get",
+            "clients/environment.py::default_reads_another",
+            "clients/environment.py::environ_get",
+            "clients/environment.py::fallback",
+            "clients/environment.py::getenv_call",
+            "clients/environment.py::imported_getenv",
+            "clients/environment.py::imported_subscript",
+            "clients/environment.py::interpolated",
+            "clients/environment.py::named",
+            "clients/environment.py::string_methods",
+            "clients/environment.py::subscript",
+            "clients/environment.py::two_variables",
             "clients/modules.py::create_user",
             "clients/modules.py::list_users",
             "clients/modules.py::lookup",
@@ -1539,16 +1554,53 @@ fn python_calls_whose_path_cannot_be_evaluated_are_unresolved_consumers() {
             "host:api.example.com",
             &site("unknown_method", "requests.request#0"),
         ),
-        // An environment read is a hole in the base: the path is still read.
+        // An environment read is the base, named by its variable.
         (
             "http::GET::/orders",
-            "",
+            "env:ORDERS_URL",
             &site("from_environment", "requests.get#0"),
         ),
     ]);
 
     assert_eq!(
         python_clients("python_http_dynamic", "dynamic.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_environment_reads_name_the_base_url_variable() {
+    let site = |function: &str, call: &str| format!("clients/environment.py::{function}::{call}");
+    let orders = "http::GET::/orders";
+    let env = "env:ORDERS_URL";
+    let expected = triples(&[
+        // `os.environ[...]`, `os.environ.get(...)` and `os.getenv(...)`, also imported from `os`.
+        (orders, env, &site("subscript", "requests.get#0")),
+        (orders, env, &site("imported_subscript", "requests.get#0")),
+        (orders, env, &site("environ_get", "requests.get#0")),
+        (orders, env, &site("getenv_call", "requests.get#0")),
+        (orders, env, &site("imported_getenv", "requests.get#0")),
+        // `or` fallbacks and default arguments: the variable, whatever its value would be.
+        (orders, env, &site("fallback", "requests.get#0")),
+        (orders, env, &site("default_argument", "requests.get#0")),
+        (
+            orders,
+            env,
+            &site("default_in_environ_get", "requests.get#0"),
+        ),
+        // String methods, a module name, an f-string hole and a client's `base_url`.
+        (orders, env, &site("string_methods", "requests.get#0")),
+        (orders, env, &site("named", "requests.get#0")),
+        (orders, env, &site("interpolated", "requests.get#0")),
+        (orders, env, &site("client_base_url", "client.get#0")),
+        // Two variables, or a name only known at run time, name no base.
+        (orders, "", &site("two_variables", "requests.get#0")),
+        (orders, "", &site("default_reads_another", "requests.get#0")),
+        (orders, "", &site("computed_name", "requests.get#0")),
+    ]);
+
+    assert_eq!(
+        python_clients("python_http_environment", "environment.py"),
         expected
     );
 }

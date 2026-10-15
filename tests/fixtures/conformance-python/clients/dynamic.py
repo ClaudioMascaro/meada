@@ -26,7 +26,7 @@ def build_url():
 
 
 def from_environment():
-    # An environment read is a hole in the base: the path is still read.
+    # An environment read is the base: the path is still read (see `environment.py`).
     return requests.get(os.environ["ORDERS_URL"] + "/orders")
 
 
