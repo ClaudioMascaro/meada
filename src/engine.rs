@@ -522,7 +522,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             format!(
                 "{identity} {location} {}{}",
                 name.unwrap_or("(top level)"),
-                mark(c.level)
+                mark(c)
             )
         })
         .collect();
@@ -545,7 +545,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             }
             targets
                 .iter()
-                .map(|t| line(identity, files, t, label(&t.id)) + &mark(c.level))
+                .map(|t| line(identity, files, t, label(&t.id)) + &mark(c))
                 .collect()
         })
         .collect();

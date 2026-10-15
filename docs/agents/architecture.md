@@ -175,9 +175,10 @@ give byte-identical output.
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>]`
-  after a call that is not exact, in `trace` and in `context`'s callers and callees). Display
-  only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>: <reason>]`
+  after a call that is not exact, in `trace` and in `context`'s callers and callees; the reason
+  is derived when rendering, never stored: `one method named render`, `2 functions or classes
+  named render`). Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
 

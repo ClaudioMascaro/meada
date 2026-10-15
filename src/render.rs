@@ -6,13 +6,29 @@ use std::fs;
 use std::path::Path;
 
 use crate::contract::Level;
+use crate::index::CallSite;
 
-/// ` [<level>]` after a call that is not exact.
-pub fn mark(level: Option<Level>) -> String {
-    match level {
-        Some(Level::Exact) | None => String::new(),
-        Some(level) => format!(" [{}]", level.name()),
-    }
+/// ` [<level>: <reason>]` after a call that is not exact. Only a name match makes a call
+/// inferred or ambiguous, so the reason is how many definitions have its name: methods for a
+/// member call, top-level functions and classes for a plain one.
+pub(crate) fn mark(call: &CallSite) -> String {
+    let count = match call.level {
+        Some(Level::Exact) | None => return String::new(),
+        Some(Level::Inferred) => 1,
+        Some(Level::Ambiguous) => call.candidates.len(),
+        Some(level) => return format!(" [{}]", level.name()),
+    };
+    let callee = callee(&call.id);
+    let (one, many, name) = match callee.rsplit_once('.') {
+        Some((_, name)) => ("method", "methods", name),
+        None => ("function or class", "functions or classes", callee),
+    };
+    let what = match count {
+        1 => format!("one {one}"),
+        n => format!("{n} {many}"),
+    };
+    let level = call.level.map_or("", Level::name);
+    format!(" [{level}: {what} named {name}]")
 }
 
 /// Tokens an answer may use unless the caller asks for another budget.

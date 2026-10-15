@@ -260,6 +260,7 @@ fn python() {
             "methods.py::Root.hook",
             "methods.py::make",
             "methods.py::module_level",
+            "methods.py::outside",
             "methods.py::shadowed",
             "methods.py::use",
             "scopes.py::Helper",
@@ -636,6 +637,11 @@ fn python() {
                     "geometry/shapes.py::Shape.area",
                 ],
             ),
+            // A receiver whose class, or whose value's callee, is outside the repository:
+            // what its methods are is not known, and no name match is tried.
+            ("methods.py::outside::session.render#0", None, &[]),
+            ("methods.py::outside::client.render#0", None, &[]),
+            ("methods.py::outside::log.render#0", None, &[]),
             // A class body's names are in scope for its own statements, not for its methods.
             (
                 "scopes.py::Outer::Helper#0",

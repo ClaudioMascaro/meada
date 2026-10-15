@@ -83,7 +83,7 @@
     },
     {
       "path": "methods.py",
-      "hash": "7cd97537d6d272ddb268dd90352cdd4a42f5e6232cfc0eb7613299d0c96d3ec1"
+      "hash": "9d69dae48911f404a295f730f4d22162e26c1eba4f64866e1bd5a0e4e36a65d8"
     },
     {
       "path": "scopes.py",
@@ -499,216 +499,224 @@
       "id": "example.com/acme/conformance::methods.py::Base",
       "span": {
         "path": "methods.py",
-        "start": 186,
-        "end": 274
+        "start": 215,
+        "end": 303
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Base.ping",
       "span": {
         "path": "methods.py",
-        "start": 202,
-        "end": 234
+        "start": 231,
+        "end": 263
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Base.shared",
       "span": {
         "path": "methods.py",
-        "start": 240,
-        "end": 274
+        "start": 269,
+        "end": 303
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Dial",
       "span": {
         "path": "methods.py",
-        "start": 370,
-        "end": 418
+        "start": 399,
+        "end": 447
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Dial.spin",
       "span": {
         "path": "methods.py",
-        "start": 386,
-        "end": 418
+        "start": 415,
+        "end": 447
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Leaf",
       "span": {
         "path": "methods.py",
-        "start": 1178,
-        "end": 1248
+        "start": 1207,
+        "end": 1277
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Leaf.run",
       "span": {
         "path": "methods.py",
-        "start": 1207,
-        "end": 1248
+        "start": 1236,
+        "end": 1277
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Left",
       "span": {
         "path": "methods.py",
-        "start": 1091,
-        "end": 1117
+        "start": 1120,
+        "end": 1146
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin",
       "span": {
         "path": "methods.py",
-        "start": 277,
-        "end": 367
+        "start": 306,
+        "end": 396
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin.mixed",
       "span": {
         "path": "methods.py",
-        "start": 334,
-        "end": 367
+        "start": 363,
+        "end": 396
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin.shared",
       "span": {
         "path": "methods.py",
-        "start": 294,
-        "end": 328
+        "start": 323,
+        "end": 357
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel",
       "span": {
         "path": "methods.py",
-        "start": 421,
-        "end": 1037
+        "start": 450,
+        "end": 1066
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.__init__",
       "span": {
         "path": "methods.py",
-        "start": 470,
-        "end": 537
+        "start": 499,
+        "end": 566
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.build",
       "span": {
         "path": "methods.py",
-        "start": 844,
-        "end": 904
+        "start": 873,
+        "end": 933
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.check",
       "span": {
         "path": "methods.py",
-        "start": 974,
-        "end": 1037
+        "start": 1003,
+        "end": 1066
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.create",
       "span": {
         "path": "methods.py",
-        "start": 910,
-        "end": 968
+        "start": 939,
+        "end": 997
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.draw",
       "span": {
         "path": "methods.py",
-        "start": 543,
-        "end": 798
+        "start": 572,
+        "end": 827
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.draw.later",
       "span": {
         "path": "methods.py",
-        "start": 729,
-        "end": 774
+        "start": 758,
+        "end": 803
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.render",
       "span": {
         "path": "methods.py",
-        "start": 804,
-        "end": 838
+        "start": 833,
+        "end": 867
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Right",
       "span": {
         "path": "methods.py",
-        "start": 1120,
-        "end": 1175
+        "start": 1149,
+        "end": 1204
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Right.hook",
       "span": {
         "path": "methods.py",
-        "start": 1143,
-        "end": 1175
+        "start": 1172,
+        "end": 1204
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Root",
       "span": {
         "path": "methods.py",
-        "start": 1040,
-        "end": 1088
+        "start": 1069,
+        "end": 1117
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::Root.hook",
       "span": {
         "path": "methods.py",
-        "start": 1056,
-        "end": 1088
+        "start": 1085,
+        "end": 1117
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::make",
       "span": {
         "path": "methods.py",
-        "start": 1251,
-        "end": 1285
+        "start": 1280,
+        "end": 1314
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::module_level",
       "span": {
         "path": "methods.py",
-        "start": 1525,
-        "end": 1572
+        "start": 1554,
+        "end": 1601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside",
+      "span": {
+        "path": "methods.py",
+        "start": 1716,
+        "end": 1837
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::shadowed",
       "span": {
         "path": "methods.py",
-        "start": 1575,
-        "end": 1648
+        "start": 1604,
+        "end": 1677
       }
     },
     {
       "id": "example.com/acme/conformance::methods.py::use",
       "span": {
         "path": "methods.py",
-        "start": 1288,
-        "end": 1498
+        "start": 1317,
+        "end": 1527
       }
     },
     {
@@ -1501,8 +1509,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1237,
-        "end": 1248
+        "start": 1266,
+        "end": 1277
       }
     },
     {
@@ -1512,8 +1520,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1511,
-        "end": 1522
+        "start": 1540,
+        "end": 1551
       }
     },
     {
@@ -1523,8 +1531,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 892,
-        "end": 904
+        "start": 921,
+        "end": 933
       }
     },
     {
@@ -1534,8 +1542,8 @@
       "level": "inferred",
       "span": {
         "path": "methods.py",
-        "start": 1025,
-        "end": 1037
+        "start": 1054,
+        "end": 1066
       }
     },
     {
@@ -1545,8 +1553,8 @@
       "level": null,
       "span": {
         "path": "methods.py",
-        "start": 959,
-        "end": 968
+        "start": 988,
+        "end": 997
       }
     },
     {
@@ -1556,8 +1564,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 761,
-        "end": 774
+        "start": 790,
+        "end": 803
       }
     },
     {
@@ -1567,8 +1575,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 791,
-        "end": 798
+        "start": 820,
+        "end": 827
       }
     },
     {
@@ -1578,8 +1586,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 678,
-        "end": 699
+        "start": 707,
+        "end": 728
       }
     },
     {
@@ -1589,8 +1597,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 609,
-        "end": 621
+        "start": 638,
+        "end": 650
       }
     },
     {
@@ -1600,8 +1608,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 567,
-        "end": 578
+        "start": 596,
+        "end": 607
       }
     },
     {
@@ -1611,8 +1619,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 630,
-        "end": 643
+        "start": 659,
+        "end": 672
       }
     },
     {
@@ -1622,8 +1630,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 652,
-        "end": 669
+        "start": 681,
+        "end": 698
       }
     },
     {
@@ -1633,8 +1641,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 587,
-        "end": 600
+        "start": 616,
+        "end": 629
       }
     },
     {
@@ -1644,8 +1652,19 @@
       "level": "inferred",
       "span": {
         "path": "methods.py",
-        "start": 708,
-        "end": 719
+        "start": 737,
+        "end": 748
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::logging.getLogger#0",
+      "caller": "example.com/acme/conformance::methods.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1686,
+        "end": 1713
       }
     },
     {
@@ -1655,8 +1674,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1274,
-        "end": 1285
+        "start": 1303,
+        "end": 1314
       }
     },
     {
@@ -1666,8 +1685,52 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1556,
-        "end": 1572
+        "start": 1585,
+        "end": 1601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::client.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1805,
+        "end": 1820
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::httpx.Client#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1765,
+        "end": 1779
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::log.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1825,
+        "end": 1837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::session.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1784,
+        "end": 1800
       }
     },
     {
@@ -1677,8 +1740,8 @@
       "level": "inferred",
       "span": {
         "path": "methods.py",
-        "start": 1632,
-        "end": 1648
+        "start": 1661,
+        "end": 1677
       }
     },
     {
@@ -1688,8 +1751,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1418,
-        "end": 1429
+        "start": 1447,
+        "end": 1458
       }
     },
     {
@@ -1699,8 +1762,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1391,
-        "end": 1405
+        "start": 1420,
+        "end": 1434
       }
     },
     {
@@ -1710,8 +1773,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1434,
-        "end": 1446
+        "start": 1463,
+        "end": 1475
       }
     },
     {
@@ -1725,8 +1788,8 @@
       ],
       "span": {
         "path": "methods.py",
-        "start": 1487,
-        "end": 1498
+        "start": 1516,
+        "end": 1527
       }
     },
     {
@@ -1736,8 +1799,8 @@
       "level": "inferred",
       "span": {
         "path": "methods.py",
-        "start": 1469,
-        "end": 1482
+        "start": 1498,
+        "end": 1511
       }
     },
     {
@@ -1747,8 +1810,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1458,
-        "end": 1464
+        "start": 1487,
+        "end": 1493
       }
     },
     {
@@ -1758,8 +1821,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1372,
-        "end": 1386
+        "start": 1401,
+        "end": 1415
       }
     },
     {
@@ -1769,8 +1832,8 @@
       "level": "exact",
       "span": {
         "path": "methods.py",
-        "start": 1355,
-        "end": 1367
+        "start": 1384,
+        "end": 1396
       }
     },
     {

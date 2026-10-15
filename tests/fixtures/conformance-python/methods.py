@@ -1,6 +1,9 @@
 """Method calls: receivers whose class the source writes, and those only a name matches."""
 
+import logging
 from typing import Optional
+
+import httpx
 
 from geometry import Circle
 from geometry.shapes import Shape
@@ -107,3 +110,13 @@ def module_level():
 def shadowed(panels):
     current = panels[0]
     return current.render()
+
+
+log = logging.getLogger(__name__)
+
+
+def outside(client: httpx.Client):
+    session = httpx.Client()
+    session.render()
+    client.render()
+    log.render()
