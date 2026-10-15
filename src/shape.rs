@@ -20,6 +20,36 @@ pub struct Shape {
     /// Anything below an open path may be present.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub open: BTreeSet<String>,
+    /// The fields known to be scalars (a string, a number, a boolean), by path; the empty path
+    /// is a payload that is itself one. Nothing lies below a scalar, so drift checks a consumer
+    /// path only up to it.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub scalars: BTreeSet<String>,
+    /// For a consumer, the paths a declared type gives rather than a field read (spec #23):
+    /// drift on one of them is `exact` when the provider's shape is declared too.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub declared: BTreeSet<String>,
+}
+
+impl Shape {
+    /// A shape with no fields, read from `source`.
+    pub fn new(source: Source) -> Self {
+        Self {
+            source,
+            fields: BTreeSet::new(),
+            open: BTreeSet::new(),
+            scalars: BTreeSet::new(),
+            declared: BTreeSet::new(),
+        }
+    }
+
+    /// Adds the paths of `other`, read from the same side, to this shape.
+    pub fn merge(&mut self, other: &Shape) {
+        self.fields.extend(other.fields.iter().cloned());
+        self.open.extend(other.open.iter().cloned());
+        self.scalars.extend(other.scalars.iter().cloned());
+        self.declared.extend(other.declared.iter().cloned());
+    }
 }
 
 /// Where a shape was read from. A provider's sources, in the order the first that applies
@@ -43,9 +73,9 @@ impl Source {
         }
     }
 
-    /// Whether the shape is declared (a document, a schema, a type) rather than read from
-    /// what code does (field reads, object literals): drift between two declared shapes is
-    /// `exact`, any other `inferred`.
+    /// Whether a provider's shape is declared (a document, a schema) rather than read from what
+    /// code does (object literals): drift is `exact` only against a declared one, on a consumer
+    /// path a declared type gives (`Shape::declared`).
     fn declared(&self) -> bool {
         match self {
             Source::Document(_) => true,
@@ -59,15 +89,15 @@ pub fn shown(path: &str) -> &str {
     if path.is_empty() { "(root)" } else { path }
 }
 
-/// The field paths a consumer reads that the provider does not return (spec #23). It is the
-/// level of the report, not of the link.
+/// The field paths a consumer reads that the provider does not return (spec #23).
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct Drift {
-    pub level: Level,
     /// The consumer's paths the provider's shape does not contain, each the shallowest one
-    /// of its branch: nothing below a missing path is listed.
-    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
-    pub missing: BTreeSet<String>,
+    /// of its branch (nothing below a missing path is listed), with the level of that report:
+    /// `exact` when the provider's shape is declared and the path comes from a declared type,
+    /// else `inferred`. It is not the link's level.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub missing: BTreeMap<String, Level>,
     /// The consumer's paths below an open part of the provider's shape, each with that open
     /// path: not checked, and never drift.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -76,16 +106,24 @@ pub struct Drift {
 
 /// The drift of `consumer` against `provider`, compared from the root; `None` when every path
 /// the consumer reads is checked and present. A path is checked one step at a time: the first
-/// step below an open part is not checked, the first step the provider lacks is missing.
-/// `length` below a field the provider returns as an array is no field of it.
+/// step below an open part is not checked, the first step the provider lacks is missing, and
+/// nothing is checked past a step the provider knows to be a scalar (`name.length`), nor past
+/// `length` below a field the provider returns as an array, which is no field of it.
 pub fn drift(provider: &Shape, consumer: &Shape) -> Option<Drift> {
+    if provider.scalars.contains("") {
+        return None;
+    }
     let present = |q: &str| provider.fields.contains(q) || provider.open.contains(q);
     let below = |q: &str, open: &str| {
         open.is_empty()
             || q.strip_prefix(open)
                 .is_some_and(|r| r.starts_with(['.', '[']))
     };
-    let mut missing = BTreeSet::new();
+    let level = |q: &str| match provider.source.declared() && consumer.declared.contains(q) {
+        true => Level::Exact,
+        false => Level::Inferred,
+    };
+    let mut missing = BTreeMap::new();
     let mut unchecked = BTreeMap::new();
     for path in &consumer.fields {
         for q in prefixes(path) {
@@ -101,20 +139,15 @@ pub fn drift(provider: &Shape, consumer: &Shape) -> Option<Drift> {
                 break;
             }
             if !present(q) {
-                missing.insert(q.to_string());
+                missing.insert(q.to_string(), level(q));
+                break;
+            }
+            if provider.scalars.contains(q) {
                 break;
             }
         }
     }
-    let level = match provider.source.declared() && consumer.source.declared() {
-        true => Level::Exact,
-        false => Level::Inferred,
-    };
-    (!missing.is_empty() || !unchecked.is_empty()).then_some(Drift {
-        level,
-        missing,
-        unchecked,
-    })
+    (!missing.is_empty() || !unchecked.is_empty()).then_some(Drift { missing, unchecked })
 }
 
 /// Each path from the root down to `path`, shallowest first: `items`, `items[]`, `items[].id`.
@@ -130,22 +163,33 @@ mod tests {
     use super::{Shape, Source, drift};
     use crate::contract::Level;
 
-    fn shape(source: Source, fields: &[&str], open: &[&str]) -> Shape {
+    fn set(paths: &[&str]) -> std::collections::BTreeSet<String> {
+        paths.iter().map(|p| p.to_string()).collect()
+    }
+
+    fn document(fields: &[&str], open: &[&str], scalars: &[&str]) -> Shape {
         Shape {
-            source,
-            fields: fields.iter().map(|f| f.to_string()).collect(),
-            open: open.iter().map(|o| o.to_string()).collect(),
+            source: Source::Document("openapi.yaml".into()),
+            fields: set(fields),
+            open: set(open),
+            scalars: set(scalars),
+            declared: set(&[]),
         }
     }
 
     fn reads(paths: &[&str]) -> Shape {
-        shape(Source::Reads("src/a.ts".into()), paths, &[])
+        Shape {
+            source: Source::Reads("src/a.ts".into()),
+            fields: set(paths),
+            open: set(&[]),
+            scalars: set(&[]),
+            declared: set(&[]),
+        }
     }
 
     #[test]
     fn field_paths_compare_from_the_root() {
-        let orders = shape(
-            Source::Document("openapi.yaml".into()),
+        let orders = document(
             &[
                 "[]",
                 "[].id",
@@ -156,6 +200,7 @@ mod tests {
                 "meta",
             ],
             &["[].product"],
+            &["[].id", "[].items[].sku"],
         );
         // (consumer paths, missing, not checked as (path, open path))
         type Case<'c> = (&'c [&'c str], &'c [&'c str], &'c [(&'c str, &'c str)]);
@@ -191,6 +236,9 @@ mod tests {
             (&["[].items[].sku"], &[], &[]),
             (&["count"], &["count"], &[]),
             (&["[].total", "count"], &["[].total", "count"], &[]),
+            // A read below a scalar leaf is checked only up to the leaf.
+            (&["[]", "[].id", "[].id.length"], &[], &[]),
+            (&["[].items[].sku.x.y"], &[], &[]),
             // `length` of an array the provider returns is no field of it.
             (&["[]", "[].items", "[].items.length"], &[], &[]),
             (&["meta", "meta.length"], &["meta.length"], &[]),
@@ -199,7 +247,7 @@ mod tests {
         for &(consumer, missing, unchecked) in cases {
             let found = drift(&orders, &reads(consumer));
             let got: Vec<&str> = (found.iter())
-                .flat_map(|d| d.missing.iter().map(String::as_str))
+                .flat_map(|d| d.missing.keys().map(String::as_str))
                 .collect();
             assert_eq!(got, missing, "missing for {consumer:?}");
             let got: Vec<(&str, &str)> = (found.iter())
@@ -213,7 +261,7 @@ mod tests {
 
     #[test]
     fn an_open_root_checks_nothing() {
-        let open = shape(Source::Document("openapi.yaml".into()), &[], &[""]);
+        let open = document(&[], &[""], &[]);
         let found = drift(&open, &reads(&["id", "items", "items[]"])).unwrap();
         assert!(found.missing.is_empty());
         let unchecked: Vec<(&str, &str)> = (found.unchecked.iter())
@@ -223,9 +271,25 @@ mod tests {
     }
 
     #[test]
-    fn drift_from_field_reads_is_inferred() {
-        let document = shape(Source::Document("openapi.yaml".into()), &["id"], &[]);
-        let found = drift(&document, &reads(&["name"])).unwrap();
-        assert_eq!(found.level, Level::Inferred);
+    fn a_scalar_root_has_no_fields_to_miss() {
+        let scalar = document(&[], &[], &[""]);
+        assert_eq!(drift(&scalar, &reads(&["length", "x", "x.y"])), None);
+    }
+
+    #[test]
+    fn each_missing_path_has_its_own_level() {
+        let provider = document(&["id"], &[], &[]);
+        let mut consumer = reads(&["name", "total"]);
+        consumer.declared.insert("total".into());
+        let found = drift(&provider, &consumer).unwrap();
+        let levels: Vec<(&str, Level)> = (found.missing.iter())
+            .map(|(p, l)| (p.as_str(), *l))
+            .collect();
+        // A field read is inferred; a declared consumer path against a document is exact.
+        assert_eq!(levels, [("name", Level::Inferred), ("total", Level::Exact)]);
+        let mut read = document(&["id"], &[], &[]);
+        read.source = Source::Reads("src/b.ts".into());
+        let found = drift(&read, &consumer).unwrap();
+        assert_eq!(found.missing["total"], Level::Inferred);
     }
 }

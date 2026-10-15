@@ -25,8 +25,8 @@ modules updates it.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository (each row with its
-  `Found::shape` as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
+  `resolved` digest changed, re-extract contracts for the whole repository (one row per side, the
+  `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
   `Consumer::shape`). `refresh(db, root,
   identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart

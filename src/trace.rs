@@ -333,7 +333,7 @@ impl Row {
 
     /// A line reached through `link`.
     fn link(text: String, repo: usize, link: &Link) -> Self {
-        let missing = link.drift.iter().flat_map(|d| &d.missing);
+        let missing = link.drift.iter().flat_map(|d| d.missing.keys());
         let missing: Vec<&str> = missing.map(String::as_str).collect();
         Self {
             text,

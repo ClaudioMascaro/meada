@@ -39,3 +39,37 @@ export async function rebound() {
     return orders.message;
   }
 }
+
+// No drift: `id` is a string in the document, and a read below a scalar stops there.
+export async function idLength() {
+  const orders = await get("/api/orders");
+  return orders[0].id.length;
+}
+
+// One wrapper fetching two routes: the two consumers at its caller's call site each read only
+// what their own fetch returns (the orders, read by the caller; `carrier`, read here).
+async function load(orders: string, shipment: string) {
+  const list = await fetch(`${BASE}${orders}`);
+  const one = await fetch(`${BASE}${shipment}`);
+  console.log((await one.json()).carrier);
+  return list.json();
+}
+
+export async function page() {
+  const orders = await load("/api/orders", "/api/shipments/1");
+  return orders[0].id;
+}
+
+// Two calls of the wrapper in one wrapper reach the same consumer site: its shape holds the
+// reads of both (`total` here, `customer` at the caller).
+async function both(path: string) {
+  const first = await get(path);
+  const second = await get(path);
+  console.log(second[0].total);
+  return first;
+}
+
+export async function pair() {
+  const orders = await both("/api/orders");
+  return orders[0].customer;
+}

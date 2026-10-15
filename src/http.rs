@@ -150,9 +150,8 @@ fn response_reads<'a>(
     fields.remove("");
     let site = frames.last().map_or(call.0, |f| f.path);
     (!fields.is_empty()).then(|| Shape {
-        source: Source::Reads(site.to_string()),
         fields,
-        open: BTreeSet::new(),
+        ..Shape::new(Source::Reads(site.to_string()))
     })
 }
 
@@ -217,10 +216,17 @@ pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
 /// provider at the link's provider site serving the link's contract. Run on the links of the
 /// whole workspace once the decisions are replayed, so everything reading links sees it.
 pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
-    let consumers: HashMap<&str, &Shape> = (exports.iter())
-        .flat_map(|e| &e.consumers)
-        .filter_map(|c| Some((c.site.as_str(), c.shape.as_ref()?)))
-        .collect();
+    // A call site holds one consumer per contract it reaches (a wrapper fetching two routes);
+    // the same contract from several hosts (`via`) counts only when they read alike.
+    let mut consumers: HashMap<(&str, Option<&str>), Vec<Option<&Shape>>> = HashMap::new();
+    for c in exports.iter().flat_map(|e| &e.consumers) {
+        let key = (c.site.as_str(), c.contract.as_deref());
+        consumers.entry(key).or_default().push(c.shape.as_ref());
+    }
+    let read = |site, contract| match consumers.get(&(site, contract))?.as_slice() {
+        [first, rest @ ..] if rest.iter().all(|s| s == first) => *first,
+        _ => None,
+    };
     let mut providers: HashMap<&str, Vec<&Provider>> = HashMap::new();
     for p in exports.iter().flat_map(|e| &e.providers) {
         if p.shape.is_some() && route(&p.contract).is_some() {
@@ -231,7 +237,9 @@ pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
         if link.level == Level::Ambiguous || route(&link.contract).is_none() {
             continue;
         }
-        let Some(consumer) = consumers.get(link.consumer.as_str()) else {
+        // A decided link of an unresolved consumer carries the provider's contract.
+        let site = link.consumer.as_str();
+        let Some(consumer) = read(site, Some(&link.contract)).or_else(|| read(site, None)) else {
             continue;
         };
         let served = (providers.get(link.provider.as_str()).into_iter().flatten())

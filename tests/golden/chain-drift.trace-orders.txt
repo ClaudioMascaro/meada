@@ -1,9 +1,12 @@
 example.com/chain/gateway src/orders.ts:5 listOrders
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:29 customerEmail drift: missing [].customer
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:14 firstOrderId
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:45 idLength
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:7 orderTotal drift: missing [].total
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:59 page
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:73 pair drift: missing [].customer, [].total
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:21 productName
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/drift.ts:35 rebound
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:6 listOrders
     example.com/chain/web src/dashboard.ts:7 dashboard
-chain: inferred · 6 hops · 2 repos · 266 tokens
+chain: inferred · 9 hops · 2 repos · 379 tokens

@@ -76,9 +76,11 @@ impl<'t> Uses<'t> {
                     "subscript_expression" if is("object") => {
                         match parent.child_by_field_name("index") {
                             Some(i) if i.kind() == "number" => steps.push(Step::Element),
-                            Some(i) if i.kind() == "string" => {
-                                steps.push(Step::Field(unquote(i, self.src)))
-                            }
+                            // A key holding `.` or `[` has no spelling in a field path.
+                            Some(i) if i.kind() == "string" => match unquote(i, self.src) {
+                                key if key.contains(['.', '[']) => break,
+                                key => steps.push(Step::Field(key)),
+                            },
                             _ => break,
                         }
                     }
@@ -219,6 +221,23 @@ mod tests {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let fetch = facts.calls.iter().find(|c| c.callee == "fetch").unwrap();
         fetch.uses.clone()
+    }
+
+    #[test]
+    fn a_key_the_path_notation_cannot_write_ends_the_read() {
+        let read = |key: &str| {
+            uses(&format!(
+                "async function f() {{\n  const r = await fetch(u);\n  return (await r.json())[{key}].c;\n}}\n"
+            ))
+        };
+        let (json, field) = (Step::Call("json".into()), |f: &str| Step::Field(f.into()));
+        assert_eq!(
+            read("\"a\""),
+            [vec![json.clone(), field("a"), field("c"), Step::Return]]
+        );
+        for key in ["\"a.b\"", "\"a[0]\"", "'items[]'"] {
+            assert_eq!(read(key), [vec![json.clone()]], "{key}");
+        }
     }
 
     #[test]

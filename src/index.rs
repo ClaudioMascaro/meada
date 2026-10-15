@@ -438,7 +438,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
 
     tx.execute("DELETE FROM contracts", [])?;
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
-    let mut rows = BTreeSet::new();
+    // One row per side; the shapes of the Founds of one side (a site reached through several
+    // wrapper paths) merge into it.
+    let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -463,8 +465,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         };
         let role = f.role.name();
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
-        let shape = f.shape.as_ref().map(serde_json::to_string);
-        rows.insert((
+        let key = (
             role,
             site,
             &f.contract,
@@ -472,10 +473,16 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             path,
             &f.method,
             fragments.transpose()?,
-            shape.transpose()?,
-        ));
+        );
+        let shape = rows.entry(key).or_default();
+        match (shape.as_mut(), &f.shape) {
+            (Some(shape), Some(more)) => shape.merge(more),
+            (None, more) => *shape = more.clone(),
+            (_, None) => {}
+        }
     }
-    for (role, site, contract, via, path, method, fragments, shape) in rows {
+    for ((role, site, contract, via, path, method, fragments), shape) in rows {
+        let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
             "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![role, contract, site, via, path, method, fragments, shape],

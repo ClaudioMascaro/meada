@@ -71,13 +71,14 @@ one for the area a change touches.
   `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
-  `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
-  absent when empty) when a document gives its route or channel side one; a consumer has the same
+  `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
+  declared}`, each of the last three absent when empty) when a document gives its route or channel side one; a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
   response has `shape` `{"source": {"reads": "<file>"}, fields}` (spec #23). A link of an HTTP
-  route with a shape on both sides and a single provider has `drift` (`{level, missing,
-  unchecked}`, the last two absent when empty; `unchecked` maps each consumer path below an open
-  part to that open path) when some consumer path is missing or not checked. `documents` (absent when none was read) lists each
+  route with a shape on both sides and a single provider has `drift` (`{missing, unchecked}`,
+  each absent when empty: `missing` maps each missing path to its level, `unchecked` each
+  consumer path below an open part to that open path) when some consumer path is missing or
+  not checked. `documents` (absent when none was read) lists each
   document read, in path order, as `{path, format, version, contracts}` (route and channel
   contracts, sorted);
   ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
@@ -160,7 +161,10 @@ one for the area a change touches.
 - New **shape source** (spec #23 tickets after #60): a provider's (zod schemas, then returned
   literals, in that order after documents) or a consumer's (destructuring, iteration, declared
   types) is a `shape::Source` variant, never a new shape type, with an arm in `Source::at` and
-  `Source::declared` (declared on both sides makes drift `exact`). What a pack reads from code
+  `Source::declared`. A source that knows scalar leaves fills `Shape::scalars` (documents do,
+  from primitive `type`s); a consumer source that declares paths (a type) fills
+  `Shape::declared`, and a missing path is `exact` only when the provider's source is declared
+  and the path is in the consumer's `declared`. What a pack reads from code
   for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
   `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
   TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
@@ -207,7 +211,7 @@ one for the area a change touches.
   consumer reads from the parsed response, spec #23), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
-  payload shapes and the external references met, the
+  payload shapes (fields, open parts, scalar leaves) and the external references met, the
   hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
   document it could not read), and what spec #22 stores of the build and package files: the
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
@@ -262,7 +266,9 @@ one for the area a change touches.
   `src/drift.ts` holds consumers of the documented `GET /api/orders` reading a field the
   document lacks, a present one, one under its open `[].product`, one through the client
   wrapper `src/api/body.ts` (`get(path)`, which returns the parsed body), and one whose name a
-  `catch` rebinds (no reads). Later spec #23 tickets extend this overlay, so the `chain` and
+  `catch` rebinds (no reads), plus a read below a documented scalar (`[].id.length`), a wrapper
+  `load` fetching two routes whose two consumers share their caller's site, and a wrapper `both`
+  calling `get` twice, which reaches one consumer site by two paths. Later spec #23 tickets extend this overlay, so the `chain` and
   `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the

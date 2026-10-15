@@ -286,6 +286,10 @@ sample.openapi.yaml
         ],
         "open": [
           "extra"
+        ],
+        "scalars": [
+          "id",
+          "tags[]"
         ]
       }
     },
@@ -337,6 +341,9 @@ sample.asyncapi.yaml
         },
         "fields": [
           "id"
+        ],
+        "scalars": [
+          "id"
         ]
       }
     },
@@ -349,6 +356,9 @@ sample.asyncapi.yaml
           "document": "sample.asyncapi.yaml"
         },
         "fields": [
+          "id"
+        ],
+        "scalars": [
           "id"
         ]
       }

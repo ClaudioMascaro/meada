@@ -111,9 +111,9 @@ _Avoid_: schema, payload type, body
 A field path in a consumer's shape that the shape of the provider it links to does not contain:
 a field the consumer reads that the provider no longer returns. Paths are compared from the
 root; one that reaches an open part of the provider's shape is not checked and never drift.
-Drift carries its own level, `exact` when both shapes are declared (a document, a schema, a
-type) and `inferred` when either comes from what code does (field reads, returned literals),
-while the link keeps its level.
+Each drifting path carries its own level, `exact` when the provider's shape and the consumer's
+path are both declared (a document, a schema, a type) and `inferred` when either comes from
+what code does (field reads, returned literals), while the link keeps its level.
 _Avoid_: breaking change, mismatch, schema diff
 
 **Resource**:

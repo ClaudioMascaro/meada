@@ -80,23 +80,29 @@ modules updates it.
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
   included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
   document is unreadable). Readers only see `serde_json::Value`.
-- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open}`, the one form of what a
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
   caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
   for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
   node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
   (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
   anything below it may be present. Presence only: no types, formats, `required` or
-  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
+  `nullable`; `scalars` are the paths known to hold a string, number or boolean (nothing below
+  them), and `declared`, on a consumer, the paths a declared type gives rather than a field read
+  (empty until spec #23's declared types). `Shape::merge` adds another shape's paths (one side
+  reached by several Founds). `schema::read` marks a part scalar when its `type` is only
+  `string`, `number`, `integer` or `boolean` (with `null` or not) and no other structure keyword
+  is there, and drops the mark where another member gives the part fields or leaves it open. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
   `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
   file of its call site; spec #23) are the sources yet; later spec #23 tickets add the zod and
   literal provider sources and the declared-type consumer source as variants. `Source::at`
   names it in `context`; `Source::declared` tells a declared source (a document) from one read
-  from code. `drift(provider, consumer) -> Option<Drift {level, missing, unchecked}>` is the
+  from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the
   one drift comparison: each consumer path is checked from the root one step at a time
   (`prefixes`), the first step below an open path of the provider is not checked
   (`unchecked`, mapped to that open path), the first step the provider's fields and open paths
-  lack is `missing` (so only the shallowest missing path of a branch is listed), and
-  `<path>.length` below a provider array (`<path>[]` present) is no field. `level` is `exact`
-  when both sources are declared, else `inferred`; `None` when nothing is missing or
-  unchecked.
+  lack is `missing` (so only the shallowest missing path of a branch is listed), nothing past
+  a provider scalar is checked (`name.length`; a scalar root checks nothing), and
+  `<path>.length` below a provider array (`<path>[]` present) is no field. Each missing path
+  maps to its level: `exact` when the provider's source is declared and the path is in the
+  consumer's `declared`, else `inferred`; `None` when nothing is missing or unchecked.

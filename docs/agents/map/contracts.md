@@ -16,8 +16,9 @@ modules updates it.
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). `http::drift(links, exports)` sets `Link::drift` on every
-  HTTP link but an ambiguous one whose consumer (by site) and provider (by site, serving the
-  link's contract) both have a shape, through `shape::drift`. An Express route path or mount prefix with a part that cannot
+  HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site
+  alone for an unresolved one; several of one contract count only when their shapes agree) and
+  provider (by site, serving the link's contract) both have a shape, through `shape::drift`. An Express route path or mount prefix with a part that cannot
   be read (a template-literal hole, a parameter, an environment read) adds no route: a router
   mounted only under such a prefix is served under no prefix, never at the root; a literal `:id`
   stays a parameter. `declare` first adds the routes of the repository's
