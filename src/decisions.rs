@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::Result;
 use crate::config;
 use crate::contract::{Level, Link};
+use crate::http;
 use crate::index::Export;
 use crate::items::{Candidate, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -263,8 +264,8 @@ impl Evaluation {
 
 /// What a decision comes to against the current index.
 enum Fate {
-    /// Links the call to this provider.
-    Applies(String),
+    /// Links the call to this provider through this contract.
+    Applies(String, String),
     Stale(Cause),
     Waiting(String),
 }
@@ -309,27 +310,26 @@ fn evaluate(
     };
     // ponytail: a repository serving one contract from several sites links to the first by
     // site; the target names no site.
-    let provider = exports
+    let served: Vec<_> = exports
         .iter()
         .filter(|e| e.repository == identity)
         .flat_map(|e| &e.providers)
         .filter(|p| p.contract == contract)
-        .map(|p| &p.site)
-        .min();
-    let Some(provider) = provider else {
+        .collect();
+    let Some(provider) = served.iter().map(|p| &p.site).min() else {
         return Fate::Stale(Cause::TargetGone);
     };
     match d.kind {
-        Kind::DynamicUrl => Fate::Applies(provider.clone()),
-        Kind::AmbiguousLink => {
-            let prefix = format!("{identity}::");
-            core.iter()
-                .filter(at)
-                .find(|l| l.contract == contract && l.provider.starts_with(&prefix))
-                .map_or(Fate::Stale(Cause::NotCandidate), |l| {
-                    Fate::Applies(l.provider.clone())
-                })
-        }
+        Kind::DynamicUrl => Fate::Applies(provider.clone(), contract.into()),
+        // The ambiguous link to a provider of the target, by its code path or its gateway
+        // path; the decided link keeps the contract the call uses.
+        Kind::AmbiguousLink => core
+            .iter()
+            .filter(at)
+            .find(|l| (served.iter()).any(|p| p.site == l.provider && http::serves(p, &l.contract)))
+            .map_or(Fate::Stale(Cause::NotCandidate), |l| {
+                Fate::Applies(l.provider.clone(), l.contract.clone())
+            }),
     }
 }
 
@@ -355,7 +355,7 @@ pub(crate) fn replay(
             let fate = evaluate(d, export, exports, &links, &workspace.missing);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
-                Fate::Applies(provider) => applied.push((d, provider)),
+                Fate::Applies(provider, contract) => applied.push((d, provider, contract)),
                 Fate::Stale(cause) => evaluation.stale.push(Stale {
                     call,
                     target,
@@ -366,13 +366,9 @@ pub(crate) fn replay(
         }
         evaluations.push(evaluation);
     }
-    for (d, provider) in applied {
-        let (_, contract) = d
-            .target
-            .split_once("::")
-            .expect("an evaluated target has `::`");
+    for (d, provider, contract) in applied {
         links.retain(|l| !(l.consumer == d.call && l.level == Level::Ambiguous));
-        links.push(d.link(&provider, contract));
+        links.push(d.link(&provider, &contract));
     }
     links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
     (links, evaluations)
