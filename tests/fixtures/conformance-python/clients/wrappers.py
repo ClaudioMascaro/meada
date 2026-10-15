@@ -102,3 +102,15 @@ def explicit_instance():
 
 def class_method():
     return Pages.load_shared("/shared")
+
+
+# A method whose name no other method of the repository has, called on a receiver of unknown
+# class: the call matches by name only, so the client passed to it is no consumer.
+class Reports:
+    def pull(self, client):
+        return client.get("/reports")
+
+
+def unrelated(store):
+    http = httpx.Client(base_url=HOST)
+    return store.pull(http)

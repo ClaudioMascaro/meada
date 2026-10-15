@@ -47,8 +47,8 @@ enum Binding<'a> {
     Unknown,
 }
 
-/// A call site whose single target is a definition. `by_name` when only a name match of a
-/// member call (`data.get(...)`) found it: its receiver may be any object.
+/// A call site whose single target is a definition. `by_name` when only a name match found it
+/// (`data.get(...)`, or a bare name no import binds): it may reach any object or function.
 #[derive(Clone, Copy)]
 struct Caller<'a> {
     path: &'a str,
@@ -186,7 +186,7 @@ impl<'a> Resolver<'a> {
             for (index, call) in facts.calls.iter().enumerate() {
                 let (target, by_name) = match resolver.call(path, call) {
                     Resolution::Exact(t) => (t, false),
-                    Resolution::Inferred(t) => (t, call.callee.contains('.')),
+                    Resolution::Inferred(t) => (t, true),
                     _ => continue,
                 };
                 let caller = Caller {
@@ -839,7 +839,9 @@ impl<'a> Code<'a> {
                     // ponytail: a parameter of an outer function, captured by a closure, is
                     // not followed.
                     Some(_) => return,
+                    // A caller found only by a name match may pass any object: not climbed.
                     None => (self.resolver.callers.get(&function).into_iter().flatten())
+                        .filter(|c| !c.by_name)
                         .map(|c| (c.path, c.index))
                         .collect(),
                 };
@@ -986,9 +988,11 @@ impl<'a> Code<'a> {
         if frames.iter().any(|f| f.def == wrapper) {
             return;
         }
-        // A call that only matches the wrapper's name may be on any object: it is not climbed.
-        // ponytail: so a wrapper method called on a receiver whose class Meada cannot tell is
-        // read where it stands, its parameters unknown.
+        // A call that only matches the wrapper's name may be on any object, or reach another
+        // function: it is not climbed.
+        // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
+        // class Meada cannot tell, a bare name no import binds) is read where it stands, its
+        // parameters unknown.
         let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
             .filter(|c| !c.by_name)
             .copied()
