@@ -9,9 +9,11 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Binding, Consumer, Export, Provider, Publish};
+use crate::document;
+use crate::index::{self, Binding, Consumer, Export, Provider, Publish};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
+use crate::shape::Shape;
 use crate::workspace::Repository;
 
 pub struct Channel;
@@ -185,6 +187,56 @@ impl ContractKind for Channel {
             .collect()
     }
 
+    /// Adds the channel sides of the repository's AsyncAPI documents (spec #21). A document side
+    /// with the contract of a code side of the same direction merges into it: the code keeps the
+    /// handler or the producing call, and takes the document's payload shape. Any other is a side
+    /// of its own, without a handler, at `<repository>::<document>::<broker> send|receive
+    /// <name>`; a side an earlier document (by path) already lists adds nothing.
+    fn declare(&self, _repo: &Repository, export: &mut Export) {
+        for doc in &export.documents {
+            for side in &doc.summary.channels {
+                let contract = side.contract();
+                let merged = match side.role {
+                    document::Role::Producer => merge(
+                        (export.providers.iter_mut())
+                            .filter(|p| p.contract == contract)
+                            .map(|p| &mut p.shape),
+                        &side.shape,
+                    ),
+                    document::Role::Consumer => merge(
+                        (export.consumers.iter_mut())
+                            .filter(|c| c.contract.as_ref() == Some(&contract))
+                            .map(|c| &mut c.shape),
+                        &side.shape,
+                    ),
+                };
+                if merged {
+                    continue;
+                }
+                let site = format!("{}::{}::{}", export.repository, doc.path, side.label());
+                let shape = side.shape.clone();
+                match side.role {
+                    document::Role::Producer => export.providers.push(Provider {
+                        contract,
+                        site,
+                        shape,
+                        ..Provider::default()
+                    }),
+                    document::Role::Consumer => export.consumers.push(Consumer {
+                        contract: Some(contract),
+                        site,
+                        via: None,
+                        shape,
+                        method: None,
+                        fragments: Vec::new(),
+                    }),
+                }
+            }
+        }
+        index::sort_providers(&mut export.providers);
+        index::sort_consumers(&mut export.consumers);
+    }
+
     /// The consumer links to every producer that reaches its channel (`reaching`), in any
     /// repository. Several producers or consumers are fan-in or fan-out, never ambiguity.
     fn link(
@@ -210,6 +262,19 @@ impl ContractKind for Channel {
             })
             .collect()
     }
+}
+
+/// Gives each code side a document side merges into (`own`, their shapes) the document's
+/// `shape`, unless it has one; whether there was any.
+fn merge<'a>(own: impl Iterator<Item = &'a mut Option<Shape>>, shape: &Option<Shape>) -> bool {
+    let mut any = false;
+    for own in own {
+        any = true;
+        if own.is_none() {
+            own.clone_from(shape);
+        }
+    }
+    any
 }
 
 /// How a producer of the channel `produced` reaches a consumer of the channel `consumed`, the

@@ -76,11 +76,36 @@ A category of contract with its own matching rules, such as HTTP route, channel 
 _Avoid_: contract type, protocol
 
 **Gateway prefix**:
-The rewrite a gateway applies to the paths of a repository, declared in `[serve]`: `prefix` is
-added in front, `strip` is removed from the start. A route is also matched by its gateway path
-(the prefix followed by its code path without the stripped part); a link made that way is
+The rewrite a gateway applies to the paths of a repository: `prefix` is added in front, `strip`
+is removed from the start. It is declared in `[serve]`, and the **server path** of each root
+`servers` URL of a provider document (`/gw` in `https://api.example.com/gw`) is a prefix too,
+for that document's routes, with the `[serve]` strip. A route is also matched by its gateway
+path (the prefix followed by its code path without the stripped part); a link made that way is
 inferred and its reason names the rewrite. Within one repository a code path match wins.
 _Avoid_: base path, path rewrite
+
+**Provider document**:
+An OpenAPI or AsyncAPI file of a repository with a `[serve]` table, found by its name or listed
+in `[serve] documents`. Its routes and channel sides are provider contracts of the repository,
+each merged into the code side with the same contract when there is one; what it states of a
+payload is the side's shape.
+_Avoid_: spec file, schema file, contract file
+
+**Documented only**:
+A route or channel side that only a provider document lists, with no handler or producing call
+in the code. It shows as `<document> (documented only)` in search, context and trace, and a
+trace does not enter it.
+_Avoid_: virtual route, phantom side
+
+**Shape**:
+What a contract carries in its payload, recorded as a set of field paths: dotted, with array
+elements written `[]` (`items[].id`), and `[]` first for a payload that is itself an array
+(`[].id`). Only presence is recorded, never types. A part of a shape can be **open**, meaning
+Meada cannot list its fields, such as an object that allows any extra property or a schema
+behind an external reference; anything below an open part may be present. A shape names its
+source, such as the provider document it was read from, and has one form whatever that source
+is.
+_Avoid_: schema, payload type, body
 
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content

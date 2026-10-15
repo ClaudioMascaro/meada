@@ -134,7 +134,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                         let method = consumer.method.as_deref();
                         let fits = |c: &str| http::route_fits(c, method, &consumer.fragments);
                         let fitting = routes.iter().filter(|(_, p)| {
-                            fits(&p.contract) || http::gateway_contract(p).is_some_and(|g| fits(&g))
+                            fits(&p.contract) || http::gateway_contracts(p).any(|(g, _)| fits(&g))
                         });
                         (
                             ItemKind::Unresolved,

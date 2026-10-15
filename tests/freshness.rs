@@ -7,7 +7,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, chain, fixture_repo, set_mtime, worker};
+use common::{age, assert_golden, chain, documented_chain, fixture_repo, set_mtime, worker};
 use meada::engine::Engine;
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
@@ -392,5 +392,73 @@ fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     {
         assert_ne!(refreshed, before, "repository {n}");
         assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
+/// Moves the documented-only route of the gateway's OpenAPI document, adds a JSON document with
+/// a route of its own, and deletes the invalid one.
+fn edit_documents(gateway: &Path) {
+    let doc = fs::read_to_string(gateway.join("openapi.yaml")).unwrap();
+    let doc = doc.replace("/api/shipments/{id}", "/api/parcels/{id}");
+    fs::write(gateway.join("openapi.yaml"), doc).unwrap();
+    fs::write(
+        gateway.join("extra.openapi.json"),
+        r#"{"openapi": "3.0.3", "paths": {"/api/returns": {"post": {}}}}"#,
+    )
+    .unwrap();
+    fs::remove_file(gateway.join("broken.openapi.yaml")).unwrap();
+}
+
+/// Writes the listed path that did not exist, and takes the gitignored document and the
+/// oddly named one off the list.
+fn edit_listed_documents(gateway: &Path) {
+    fs::write(
+        gateway.join("docs/missing.yaml"),
+        "openapi: 3.0.3\npaths:\n  /api/returns:\n    post: {}\n",
+    )
+    .unwrap();
+    let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
+    let toml = toml.replace(
+        "\"generated/openapi.yaml\", \"docs/api-contract.yaml\", ",
+        "",
+    );
+    fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
+/// Drops the gateway's `[serve]` table: its documents stop counting.
+fn drop_serve(gateway: &Path) {
+    let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
+    let serve = ["[serve]", "hosts = ", "documents = "];
+    let kept = toml
+        .lines()
+        .filter(|l| !serve.iter().any(|k| l.starts_with(k)));
+    let toml = kept.map(|l| format!("{l}\n")).collect::<String>();
+    fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
+#[test]
+fn edited_documents_relink_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        repos
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    for (case, edit) in [
+        ("fresh_documents", edit_documents as fn(&Path)),
+        ("fresh_documents_listed", edit_listed_documents),
+        ("fresh_documents_serve", drop_serve),
+    ] {
+        let (web, gateway, _) = documented_chain(case);
+        age(gateway.parent().unwrap());
+        let before = exports([&gateway, &web]);
+        edit(&gateway);
+
+        let refreshed = exports([&gateway, &web]);
+
+        let (cold_web, cold, _) = documented_chain(&format!("{case}_cold"));
+        edit(&cold);
+        assert_ne!(refreshed[0], before[0], "{case}");
+        assert_eq!(refreshed, exports([&cold, &cold_web]), "{case}");
     }
 }

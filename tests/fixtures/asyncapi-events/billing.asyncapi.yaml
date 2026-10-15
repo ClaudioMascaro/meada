@@ -1,0 +1,52 @@
+asyncapi: 3.0.0
+info:
+  title: Billing queues
+  version: 1.0.0
+servers:
+  broker:
+    host: rabbit.example.com
+    protocol: amqp
+channels:
+  invoices:
+    address: invoices.issued
+    messages:
+      issued:
+        payload:
+          type: object
+          properties:
+            number: {type: string}
+      voided:
+        payload:
+          type: object
+          properties:
+            reason: {type: string}
+  shipments:
+    address: shipments.requested
+    messages:
+      requested:
+        payload:
+          type: object
+          properties:
+            parcel: {type: string}
+  cancellations:
+    address: shipments.cancelled
+    messages:
+      cancelled:
+        payload:
+          type: object
+          properties:
+            parcel: {type: string}
+            reason: {type: string}
+operations:
+  sendInvoice:
+    action: send
+    channel:
+      $ref: "#/channels/invoices"
+  receiveShipment:
+    action: receive
+    channel:
+      $ref: "#/channels/shipments"
+  receiveCancellation:
+    action: receive
+    channel:
+      $ref: "#/channels/cancellations"

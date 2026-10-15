@@ -1,0 +1,3 @@
+example.com/chain/web src/shipments.ts:4 shipment
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/gateway openapi.yaml GET /api/shipments/{} (documented only)
+chain: inferred · 1 hops · 2 repos · 68 tokens

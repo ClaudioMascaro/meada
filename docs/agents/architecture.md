@@ -37,9 +37,26 @@ give byte-identical output.
   `produces <channel>` (at the producing call), `publishes <exchange> <key>` followed by
   `produces <queue> [<level>: <reason>]` for each queue the bindings route it to, or `consumes
   <channel>` (the handler) to its `contracts:`. Which contracts `context` lists by side, and
-  the words for them, is `ContractKind::sides` (`writer`/`reader`, `producer`/`consumer`).
-  `status` also prints, under each
-  repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
+  the words for them, is `ContractKind::sides` (`writer`/`reader`, `producer`/`consumer`). After
+  a `provides <route>` line with a shape come `<repository> <document> response fields: <paths>`
+  and, when some are open, `<repository> <document> response open: <paths>`
+  (`shape_lines(identity, shape, what)`; a channel side in `contract_sides` gets the same two
+  lines with `payload` instead of `response`, indented under its side, and a side only a
+  document lists is `<repository> <role> <document> (documented only)`). `context` on an HTTP
+  route (`http::GET::/x`, as `search` prints it) goes through the same `contract_sides` with
+  the role `provider` and no consumer role: one `<repository> provider <path>:<line> <handler>`
+  or `<repository> provider <document> (documented only)` line per provider, each followed by
+  its `response` shape lines (which name the document); its consumers are calls, left to
+  `trace` and to the `contracts:` of their symbols. Only `ContractKind::sides` makes a start
+  point to `context` in `trace`, so a route stays a `trace` start. `status` also prints,
+  under each repository, the lines `Engine::status_report` gathers (resource lines,
+  then document lines from `document::report`; same indexed-only rule as
+  decisions). `search` shows a route only a document lists at `<document path> (documented
+  only)` (`Export::document_of`). `search` kind `document` (`search_documents`, an early branch
+  like the open-item kinds) lists the documents read across the workspace, matched by path and
+  `info.title` (exact, prefix, substring), as `<repository> <path> (<Summary::shown()>)
+  <title>`; `shown` is `openapi 3.1.0, routes: 3` or `asyncapi 3.0.0, channels: 2` (the count
+  follows the format, so OpenAPI lines never gain a `channels: 0`).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -123,11 +140,15 @@ give byte-identical output.
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config` parses
   `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`, normalized
-  by `gateway_key`) and `[[resource]]` (`kind` checked as a lowercase identifier, `id` not empty,
-  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`; keys later track A
-  specs add are listed in `LATER` so the error says "not in v0.1". `Serve::gateway_path(code path)
-  -> Option<(gateway path, reason)>` is the one gateway rule (spec #19), written for A4's document
-  routes to reuse. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
+  by `gateway_key`), `[serve] documents` (`repo_paths`: repository-relative, none absolute or
+  with a `..` segment, `./` and doubled `/` dropped; added to the documents discovery finds;
+  `Serve::declared` is set when the `[serve]` table is present, even empty or with only
+  `documents`, which makes the repository's documents provider sources) and `[[resource]]`
+  (`kind` checked as a lowercase identifier, `id` not empty,
+  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`. `config::gateway_path(prefix,
+  strip, path) -> Option<(gateway path, reason)>` is the one gateway rule (spec #19); `Serve::
+  gateway_path(path)` applies it with `[serve]` prefix and strip, `Http::declare` with a
+  document's server path as the prefix. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
   every error), also used for the decisions file; `Repository` carries both `config` and
   `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -156,7 +177,102 @@ give byte-identical output.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository.
+  `resolved` digest changed, re-extract contracts for the whole repository. `refresh(db, root,
+  identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
+  to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
+  from the code rows: a document edit re-extracts no code. Without `serve.declared` the
+  repository has no documents and stored rows are deleted. The walk yields every file the
+  ignore rules keep; `lang::pack_for` and `document::is_document` split it, and
+  `documents_found` adds each `[serve] documents` path that is a file, stat'ed outside the walk
+  so `.gitignore` does not hide it; a listed path that is not a file, or that has a symbolic
+  link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
+  `Export::documents` (`Document {path, summary}`, path order). `sort_providers` and
+  `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
+- `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
+  name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
+  `read(path, bytes) ->
+  Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
+  becomes a `Problem`, with the line clamped to the file's last line; the content decides,
+  since a listed document can have any name: a top-level `openapi` field goes to `openapi.rs`,
+  an `asyncapi` one to `asyncapi.rs`, and with neither the name only picks which format it is
+  reported as not being, `asyncapi.rs` for an `asyncapi` name, `openapi.rs` for any other),
+  `Summary {format: Option<Format>,
+  version, title, routes: Vec<Route {path, method, shape}>, servers: Vec<Server {host, path}>,
+  channels: Vec<Side {broker, name, role, shape}>, problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
+  /users/{}`; `servers` are the root `servers[].url` entries with variables replaced by their
+  defaults in one pass over the URL (a default naming a variable stays as written), a URL
+  still holding one dropped, a relative URL giving only its path, host lower
+  case, path normalized with no trailing `/`; `Side::contract`, `Side::label` = `kafka send
+  orders.created`, `Role::{Producer, Consumer}`; sorted by broker kind, name, role),
+  `Problem::Unreadable {line, error}`,
+  `Problem::Format {found}`, `Problem::AsyncFormat {found}`, `Problem::Protocol {protocol}`,
+  `Problem::Parameters {channel}`, `Problem::NoServers`, `Problem::NoProtocol {server}`,
+  `Problem::UnknownServer {channel, server}`, `Problem::ExternalRef {reference}` and
+  `Problem::ExternalPathItem {reference}` (structured, rendered through `Msg`), `Format::{Openapi,
+  Asyncapi}` (stored as `openapi` and `asyncapi`; `Msg::DocumentRead` takes it with the count),
+  `Summary::shown()` (what `search` prints of a document read), `Summary::count(format)`
+  (routes for OpenAPI, distinct channels of the sides for AsyncAPI) and
+  `report(repo, export)`: the status lines, per document in path order (`Msg::DocumentRead`
+  for one read, each problem of it, then each route a later document by path lists again:
+  `Msg::DuplicateRoute`), then `Msg::DocumentMissing` for each `[serve] documents` path with
+  no row. `openapi.rs`: `read(path,
+  value)`: a top-level `openapi` of `3.0` or `3.1` (any patch; a YAML number counts), else
+  `Problem::Format` naming the `openapi` or `swagger` field it found; every `paths` key starting
+  with `/` and every method of `get put post delete options head patch trace` is a route (a
+  path item that is a local `$ref`, such as `#/components/pathItems/...`, is read where it
+  points; an external one is a `Problem::ExternalPathItem` and its routes are not read), its
+  templates (`{id}`) written as `{}` before `http::normalize_path`, sorted and deduplicated (of
+  two templates of one route, the first key gives the shape). A route's `shape` is the
+  `application/json` schema of its lowest explicit 2xx response that has one, else of `2XX`
+  (a response may be a local `$ref`; `application/*+json` is not read); every external `$ref`
+  met, once, sorted, is a `Problem::ExternalRef`. `schema.rs`: `read(doc, schema, source) ->
+  (Shape, external refs)`, the schema-to-shape reader: `properties` give fields, `items` the
+  `[]` elements (an array with no `items` has open elements), `allOf`, `oneOf` and `anyOf` add
+  their members' fields (an `allOf` member with no structure keyword adds nothing; anywhere
+  else such a schema, or `true`, is open); `additionalProperties` `true` or a schema opens the
+  object, and an object type that lists no fields, no members and no `$ref` is open unless
+  `additionalProperties` is `false`. Local `$ref`s (JSON pointers into the document) resolve; a
+  reference already being read (a cycle), a missing target and an external reference leave
+  that part open. Reading one shape visits at most 10,000 schemas (`BUDGET`) and goes at most
+  `MAX_DEPTH` (128) levels deep, a property, element, member or reference being one level; all
+  the shapes of one document share one `schema::Work` (`WORK`, 64 MiB: 32 per schema visited
+  plus the bytes of every field path listed), which the reader of each document creates and
+  passes to every `read`. Past any of them, every part not read is open, so a document's shapes
+  have bounded memory and the recursion bounded depth. To read several schemas as one shape
+  (AsyncAPI messages), read `{"oneOf": [...]}` of them. `asyncapi.rs`: `read(path, value)`: a top-level `asyncapi` of `2.x`
+  or `3.0` (any patch), else `Problem::AsyncFormat` naming the `asyncapi`, `openapi` or `swagger`
+  field it found. 2.x: the key of a channel is its name, `subscribe` is a producer and `publish`
+  a consumer (the application's side, as the specification reads them), the payloads those of
+  `message` (or each member of its `oneOf`), a message a local `$ref`; the channel's `servers`
+  are server names. 3.0: the name is the channel's `address` (a channel with none is skipped),
+  `action: send` is a producer and `receive` a consumer, the payloads those of the operation's
+  `messages` when it lists them, else every message of its channel; the channel's `servers` are
+  `$ref`s to `#/servers/<name>`. A channel uses the servers it lists, else every server of the
+  document; the lower-cased `protocol` gives the broker kind (`kafka`, `kafka-secure` ->
+  `kafka`; `amqp`, `amqps` -> `amqp`; `nats`; `redis`; `sqs`), any other is a `Problem::Protocol`
+  once and its channels are ignored. A document with channels and no root `servers` is a
+  `Problem::NoServers` (every channel ignored), a server a channel uses without `protocol` a
+  `Problem::NoProtocol`, and a server name a channel lists that the document lacks a
+  `Problem::UnknownServer` (the channel is ignored on it). A name holding `{` or `}` is a `Problem::Parameters` and
+  ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
+  operations, several servers of one kind) are one, their payloads read together as one
+  `oneOf` shape. `yaml.rs`: `parse(text) -> Result<Value,
+  (line, reason)>` over `yaml-rust2`'s event parser, taken one event at a time with
+  `Parser::next_token` (never `YamlLoader`, nor `Parser::load`, which recurses per level of
+  nesting), the collections being read on an explicit stack, at most `MAX_NESTING` (128, as
+  `serde_json`) deep (deeper, the document is unreadable at that line): first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
+  quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
+  included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
+  document is unreadable). Readers only see `serde_json::Value`.
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open}`, the one form of what a
+  contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
+  caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
+  for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
+  node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
+  (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
+  anything below it may be present. Presence only: no types, formats, `required` or
+  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) is the only
+  source yet; spec #23 adds its code sources as variants. `Source::at` names it in `context`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
@@ -218,12 +334,27 @@ give byte-identical output.
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
-  `Provider::gateway`, `http::gateway_contract` turns it into a contract and
-  `http::serves(provider, contract)` is the one check of either path (also used by open items and
-  decision replay, so a gateway candidate carries the provider's own contract). That link is
-  `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
-  within one repository a code path match wins over gateway path matches. `resource.rs` (spec
+  `base_url_env`, unique provider). `declare` first adds the routes of the repository's
+  documents (spec #21): a document route whose contract a code provider already has merges
+  into it (one provider, the code's handler site); any other becomes a provider of its own at
+  `<repository>::<document path>::<METHOD> <path>` (no handler), and a route an earlier
+  document by path listed adds nothing. Each provider of a documented contract, merged or not,
+  takes `Provider::shape` from the first document by path that lists it (none when that
+  document's route has no shape). A document provider is a written contract: it lowers
+  no level (a host match is `exact`). A route also matches by its gateway paths: `declare`
+  fills `Provider::gateways` (`Gateway {path, reason}`, not exported; the `[serve]` form, which
+  is also the exported `Provider::gateway`, first, then the forms of each document listing the
+  route: one per server path of the document, with `[serve] strip`, or the `[serve]` form when
+  the document has no server path; a code route always has its `[serve]` form, a route only
+  documents list has it only through a document without server paths), `Provider::hosts` (not
+  exported: `[serve] hosts` plus the host of every `servers` URL of the repository's documents,
+  checked by `link` for a `host:` consumer). `shape`, `gateways` and `hosts` are set on HTTP
+  providers only; `http::gateway_contracts(provider)` yields each as
+  `(contract, reason)` and `http::serves(provider, contract)` is the one check of any path (also
+  used by open items and decision replay, so a gateway candidate carries the provider's own
+  contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
+  strip <s>` or both), read from the provider, not recomputed from the configuration; within
+  one repository a code path match wins over gateway path matches. `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -257,7 +388,19 @@ give byte-identical output.
   when the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
   <pattern>`. `reaching` adds those publishes to a queue's producers, and `Routes::reached`
   gives the queues one publish reaches; of several matches to one producer the strongest wins.
-  `ContractKind::link` takes the workspace's `Routes` beside its providers.
+  `ContractKind::link` takes the workspace's `Routes` beside its providers. `declare` adds the
+  channel sides of the repository's AsyncAPI documents (`Summary::channels`, in path order): a
+  document side whose contract equals a code side's of the same direction merges into it (every
+  such code provider or consumer keeps its site and takes the document's shape unless it has
+  one), any other is a side without a handler, a provider at `<repository>::<document>::<broker>
+  send <name>` or a consumer (`via` null) at `<repository>::<document>::<broker> receive
+  <name>`; a side an earlier document by path already added merges the same way, so adds
+  nothing. Both carry `shape` (`Consumer::shape` is new, exported when present). `link` is
+  unchanged by this: the documented sides are ordinary providers and consumers, so a documented
+  producer reaches the code consumers of other repositories at `exact`, and a code producer
+  reaches the documented consumer (an `amqp` side of a document is a queue name, never an
+  exchange, so it is never a publish). It sorts `providers` and `consumers` into the index's
+  order afterwards.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,
@@ -268,11 +411,16 @@ give byte-identical output.
   the walk one row for it under the producing call (down, and from a call start) or the handler symbol:
   `<repository> <path>:<line> produces|consumes channel::<broker> (unresolved)`, no level and no
   hop. A repository-level side (`Graph::is_repo`) prints as `<repository>
-  (repository-level)` and ends its branch: it is pushed as a row, never entered. Starts take
-  only HTTP routes, symbols and call sites; a start in a kind with `ContractKind::sides`
-  (`resource::...`, `channel::...`) gets an answer pointing to `context`.
+  (repository-level)`, and a route or channel side only a document lists (`Graph::documented`,
+  from `Export::document_of` over providers and consumers) as `<repository> <document> GET /x
+  (documented only)` or `<repository> <document> kafka send orders.created (documented only)`;
+  both end their branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its
+  row, pushes them and enters anything else. Starts take only HTTP routes, symbols and call
+  sites; a start in a kind with `ContractKind::sides` (`resource::...`, `channel::...`) gets an
+  answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, plus the markers
+  `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
 
@@ -288,12 +436,22 @@ give byte-identical output.
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
+  document lists, such as `example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}`
+  (`Export::document_of` recognises it). Document channel side: `<repository>::<document
+  path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
+  document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, publishes,
-  links}`; a provider has
-  `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
+  publishes, links}`; a provider has
+  `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
+  absent when empty) when a document gives its route or channel side one; a consumer has the same
+  `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
+  document read, in path order, as `{path, format, version, contracts}` (route and channel
+  contracts, sorted);
+  ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
   resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
   identity for a repository-level side (a consumer's `via` is null). A channel producer is a
@@ -340,6 +498,15 @@ give byte-identical output.
   `Engine::contract_sides`. A form whose site is a
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
+- New **document format or document data** (spec #21 tickets after #50): what is read from the
+  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` and
+  `asyncapi.rs` sees
+  only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
+  through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
+  (HTTP: `Http::declare`; channels: `Channel::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
+  new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
+  `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
+  type.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -351,7 +518,7 @@ give byte-identical output.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
   A pack is done when that suite passes.
-- New **config key**: add the field to `Config`, delete it from `LATER`. Parse errors name file,
+- New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
   (descriptions plus parameter schemas) must stay within 1,000 tokens.
@@ -365,7 +532,12 @@ give byte-identical output.
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
+  provider document states (`documents.summary`: format, version, title, normalized route paths
+  and methods, channel sides (broker kind, name, role), the field paths of their response and
+  payload shapes and the external references met, the
+  hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
+  document it could not read). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
@@ -395,7 +567,21 @@ give byte-identical output.
   catalog. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
-  has none.
+  has none. `documented_chain(case)` lays `tests/fixtures/chain-documents/{gateway,web}/` over
+  the chain (and copies `generated-openapi.yaml` to the gateway's gitignored
+  `generated/openapi.yaml`, which Meada's own git would ignore inside the overlay), then commits:
+  the gateway gains `openapi.yaml` (3.1: `GET /api/orders`, merged with the Express route and
+  given a response shape with an open part, and
+  the documented-only `GET /api/shipments/{id}`; a `servers` URL on `api.example.com` with base
+  path `/gw`), `orders.openapi.json` (3.0, the same shipments route again: a duplicate; servers
+  with variable defaults `https://{region}.example.com/{version}` and a relative `/relative/base`,
+  and one URL with a variable without default, which gives nothing), a Swagger 2.0 `legacy.openapi.yaml` and an invalid
+  `broken.openapi.yaml`, `docs/api-contract.yaml` (3.0, `GET /api/carriers`) and the
+  gitignored `generated/openapi.yaml` (`GET /api/generated`), both listed, with a path that does
+  not exist, in the gateway's `[serve] documents` (the helper writes that line); the web app gains `src/shipments.ts` (the shipments route through
+  `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
+  since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
+  goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
@@ -416,7 +602,33 @@ give byte-identical output.
   name and NATS wildcards at `inferred`, also in `context` on a subject and on a pattern),
   `channel_queries` (`search`, `context` and `trace` on channels over the first fixture),
   `channels_jobs` (the `channels-jobs-api` and `channels-jobs-worker` fixtures: BullMQ queues,
-  a `new Queue(name)` wrapper, and Redis streams in both client styles).
+  a `new Queue(name)` wrapper, and Redis streams in both client styles),
+  `documents` (provider documents over `documented_chain`: export, `trace` to "documented
+  only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
+  merged route with its documented fields, `context` on a route (documented only and merged);
+  inline repositories written by the test (`repo`, `client`, `openapi` helpers): each document
+  giving its own gateway forms under `[serve] prefix` and `strip`, a `[serve]` table with only
+  `documents` and an unlisted gitignored document left out, a listed path through a symbolic
+  link left unread; over
+  the `documents-shapes` fixture, a repository with no code whose OpenAPI 3.0 JSON document
+  has local `$ref`s into `components`, `allOf`, `oneOf`, an array response,
+  `additionalProperties: true`, a cycle and an external `$ref`, plus a later
+  `v2.openapi.json` listing one route again: the export with every shape and `status` with
+  the external reference; freshness of an edited document and of a dropped `[serve]` is in
+  `freshness`), `asyncapi` (AsyncAPI documents over `asyncapi-events`, a repository with a
+  `[serve]` table whose `asyncapi.yaml` (2.6, `kafka-secure`), `billing.asyncapi.yaml` (3.0,
+  `amqp`), `sensors.asyncapi.yml` (`mqtt`), `routing.asyncapi.yaml` (a server without
+  `protocol`, a channel naming a server the document lacks), `serverless.asyncapi.yaml` (no root
+  `servers`) and `legacy.asyncapi.json` (1.2) sit beside two
+  code sides that merge with a documented one, and `asyncapi-services`, which names it as a
+  peer and holds the code on the other side of each documented one: both exports with the
+  channel contracts, shapes and links, the merge of a documented and a code side, `status`
+  (protocol, parameterized channel, version), `trace` down to a documented consumer and up
+  from a handler to a documented producer, `context` on documented channels with their payload
+  fields, and `search` of channels and of documents). Table tests for discovery, format detection, routes, response selection, the
+  schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`,
+  with the hostile inputs each limit stops (server variables naming each other, 200,000 nested
+  block sequences, a 10,000-long reference chain, one wide schema read for many routes).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -466,6 +678,12 @@ Each is marked `ponytail:` at its site unless noted.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
+- `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
+  larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
+  `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
+  marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
+  `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
+  another one that is external is dropped without a status line (no marker).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by

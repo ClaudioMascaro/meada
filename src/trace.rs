@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
-use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
+use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 use crate::{channel, http, render};
@@ -46,6 +46,8 @@ pub(crate) struct Graph<'a> {
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
+    /// The sides only a document lists (spec #21), with the document's path.
+    documented: HashMap<&'a str, &'a str>,
     /// The channel sides whose name Meada could not evaluate, by site (the producing call or
     /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
     /// chain would not otherwise show them.
@@ -69,6 +71,7 @@ impl<'a> Graph<'a> {
             callers: HashMap::new(),
             consumers: HashMap::new(),
             providers: Vec::new(),
+            documented: HashMap::new(),
             unresolved_sides: HashMap::new(),
             out: HashMap::new(),
             into: HashMap::new(),
@@ -91,6 +94,13 @@ impl<'a> Graph<'a> {
             graph
                 .providers
                 .extend(provided.map(|p| (p.contract.as_str(), p.site.as_str())));
+            let sites = (export.providers.iter().map(|p| &p.site))
+                .chain(export.consumers.iter().map(|c| &c.site));
+            for site in sites {
+                if let Some(doc) = export.document_of(site) {
+                    graph.documented.insert(site, doc);
+                }
+            }
             let produced = export.providers.iter();
             let consumed = export.consumers.iter();
             let sides = produced
@@ -280,6 +290,12 @@ impl<'a> Graph<'a> {
     fn is_repo(&self, id: &str) -> bool {
         self.workspace.repos.iter().any(|m| m.identity == id)
     }
+
+    /// Whether the chain ends at `id`, reached through a link: a whole repository, or a side
+    /// only a document lists, since no code of it is indexed.
+    fn ends(&self, id: &str) -> bool {
+        self.is_repo(id) || self.documented.contains_key(id)
+    }
 }
 
 /// What a `from` names.
@@ -392,15 +408,10 @@ impl<'a> Walk<'_, 'a> {
                 // ends the branch.
                 for link in graph.into.get(id).into_iter().flatten() {
                     let reader = link.consumer.as_str();
-                    let whole = graph.is_repo(reader);
-                    if (whole || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
+                    let ends = graph.ends(reader);
+                    if (ends || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
                     {
-                        let (m, text) = self.node(reader);
-                        let text = format!("{} {text}", arrow(link));
-                        match whole {
-                            true => self.push(depth + 1, Row::link(text, m, link)),
-                            false => self.enter(reader, depth + 1, Row::link(text, m, link)),
-                        }
+                        self.reach(reader, depth + 1, link);
                     }
                 }
             }
@@ -441,12 +452,7 @@ impl<'a> Walk<'_, 'a> {
                         continue;
                     }
                     if shown.insert((writer, true)) {
-                        let (m, text) = self.node(writer);
-                        let text = format!("{} {text}", arrow(link));
-                        match graph.is_repo(writer) {
-                            true => self.push(depth + 1, Row::link(text, m, link)),
-                            false => self.enter(writer, depth + 1, Row::link(text, m, link)),
-                        }
+                        self.reach(writer, depth + 1, link);
                     }
                 }
             }
@@ -499,12 +505,9 @@ impl<'a> Walk<'_, 'a> {
                 self.push(depth, Row::call(text, n, None));
             }
             for link in links {
-                if !shown.insert((&link.provider, true)) {
-                    continue;
+                if shown.insert((&link.provider, true)) {
+                    self.reach(&link.provider, depth, link);
                 }
-                let (m, text) = self.node(&link.provider);
-                let text = format!("{} {text}", arrow(link));
-                self.enter(&link.provider, depth, Row::link(text, m, link));
             }
         }
         let place = self.site(call);
@@ -512,12 +515,20 @@ impl<'a> Walk<'_, 'a> {
         // A call that produces to a channel goes on to the handlers of its consumers.
         for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
             let handler = link.consumer.as_str();
-            if !shown.insert((handler, true)) {
-                continue;
+            if shown.insert((handler, true)) {
+                self.reach(handler, depth, link);
             }
-            let (m, text) = self.node(handler);
-            let text = format!("{} {text}", arrow(link));
-            self.enter(handler, depth, Row::link(text, m, link));
+        }
+    }
+
+    /// Writes the line `link` reaches `id` by, then follows `id`, unless the chain ends there
+    /// (`Graph::ends`): that line closes the branch.
+    fn reach(&mut self, id: &'a str, depth: usize, link: &Link) {
+        let (m, text) = self.node(id);
+        let row = Row::link(format!("{} {text}", arrow(link)), m, link);
+        match self.graph.ends(id) {
+            true => self.push(depth, row),
+            false => self.enter(id, depth, row),
         }
     }
 
@@ -538,18 +549,23 @@ impl<'a> Walk<'_, 'a> {
 
     /// `<repository> <path>:<line> <name>` at a symbol's definition; a file (the caller of
     /// top-level calls, or a route file serving with no function of its own) is
-    /// `<repository> <path> (top level)`.
+    /// `<repository> <path> (top level)`, and a route only a document lists
+    /// `<repository> <document> GET /users/{} (documented only)`.
     fn node(&mut self, id: &str) -> (usize, String) {
         let graph = self.graph;
         let n = graph.repo(id);
         let identity = &graph.workspace.repos[n].identity;
+        let document = graph.documented.get(id);
         let text = match graph.symbols.get(id) {
             Some((_, s)) => {
                 let at = self.files[n].at(&s.span.path, s.span.start);
                 format!("{identity} {at} {}", label(id))
             }
             None if graph.is_repo(id) => format!("{identity} {REPOSITORY_LEVEL}"),
-            None => format!("{identity} {} (top level)", label(id)),
+            None => match document {
+                Some(doc) => format!("{identity} {doc} {} {DOCUMENTED_ONLY}", label(id)),
+                None => format!("{identity} {} (top level)", label(id)),
+            },
         };
         (n, text)
     }

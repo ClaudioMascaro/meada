@@ -7,6 +7,7 @@ mod contract;
 pub mod decide;
 mod decider;
 mod decisions;
+mod document;
 pub mod engine;
 mod http;
 mod index;
@@ -18,6 +19,7 @@ mod render;
 pub mod repo;
 mod resolve;
 mod resource;
+mod shape;
 mod trace;
 mod workspace;
 

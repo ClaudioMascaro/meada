@@ -1,0 +1,40 @@
+openapi: 3.1.0
+info:
+  title: Chain gateway
+  version: "1.0"
+# The public URL in front of the gateway: a host of its own and a base path.
+servers:
+  - url: https://api.example.com/gw
+paths:
+  # Also an Express route in src/routes.ts: the two merge into one provider.
+  /api/orders:
+    get:
+      summary: List orders
+      responses:
+        "200":
+          description: The orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    product:
+                      type: object
+                      additionalProperties: true
+  # Only the document lists it: a provider without a handler.
+  /api/shipments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: One shipment
+      responses:
+        "200":
+          description: The shipment

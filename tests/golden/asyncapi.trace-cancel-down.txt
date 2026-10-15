@@ -1,0 +1,3 @@
+example.com/asyncapi/services src/queues.ts:19 cancel
+  →[exact: channel::amqp::shipments.cancelled] example.com/asyncapi/events src/emit.ts:20 onCancellation
+chain: exact · 1 hops · 2 repos · 52 tokens

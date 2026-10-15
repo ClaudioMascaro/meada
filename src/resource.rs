@@ -101,7 +101,7 @@ impl ContractKind for Resource {
                     export.providers.push(Provider {
                         contract: contract.clone(),
                         site: site.clone(),
-                        gateway: None,
+                        ..Provider::default()
                     });
                 }
                 if resource.role.reads() {
@@ -109,6 +109,7 @@ impl ContractKind for Resource {
                         contract: Some(contract.clone()),
                         site,
                         via: None,
+                        shape: None,
                         method: None,
                         fragments: Vec::new(),
                     });

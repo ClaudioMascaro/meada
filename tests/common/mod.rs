@@ -66,6 +66,39 @@ pub fn loose_chain(case: &str) -> PathBuf {
     gateway
 }
 
+/// The chain with the OpenAPI documents of spec #21 laid over it (`tests/fixtures/
+/// chain-documents/`): the gateway gains `openapi.yaml` (3.1, one route its code also serves,
+/// one only the document lists), a Swagger 2.0 file, an invalid YAML file and, under its
+/// gitignored `generated/`, a document never read; the web app gains a call to the
+/// documented-only route and a vendored `vendor/openapi.yaml`, ignored since it has no
+/// `[serve]`. Each overlaid repository gets a second commit. Returns (web, gateway, catalog).
+pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let (web, gateway, catalog) = chain(case);
+    let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-documents");
+    copy_dir(&overlay.join("gateway"), &gateway);
+    copy_dir(&overlay.join("web"), &web);
+    // The gateway lists the gitignored document, one with a name discovery does not know, and
+    // a path that does not exist.
+    let toml = gateway.join("meada.toml");
+    let hosts = "hosts = [\"gateway.example.com\"]\n";
+    let listed = "documents = [\"generated/openapi.yaml\", \"docs/api-contract.yaml\", \
+                  \"docs/missing.yaml\"]\n";
+    let src = fs::read_to_string(&toml).unwrap();
+    fs::write(&toml, src.replace(hosts, &format!("{hosts}{listed}"))).unwrap();
+    // The overlay cannot hold the gitignored document: Meada's own git would ignore it there.
+    fs::create_dir_all(gateway.join("generated")).unwrap();
+    fs::copy(
+        overlay.join("generated-openapi.yaml"),
+        gateway.join("generated/openapi.yaml"),
+    )
+    .unwrap();
+    for repo in [&web, &gateway] {
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "documents"]);
+    }
+    (web, gateway, catalog)
+}
+
 /// The chain's worker, next to any repository of the chain.
 pub fn worker(sibling: &Path) -> PathBuf {
     sibling.with_file_name("chain-worker")
