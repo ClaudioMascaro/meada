@@ -197,14 +197,14 @@ listed in `[serve] documents`: the routes and channels they describe become cont
 fields of each response or payload, and `meada status` says what it read and what it ignored.
 Each named `package.json` becomes the contract `package::npm::<name>`, and each dependency
 (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) that names a
-package of another repository in the workspace links to it, with the version range checked
+package of the workspace (from any repository, its own included) links to it, with the version range checked
 against the local version (`range mismatch` when it does not accept it, `range unchecked` when
 it cannot be checked). A call to a function imported from that package crosses into the
 provider's code, through the `exports`, `types`, `module` and `main` fields and through
 re-exports, also when the entry point points into the build folder (the `outDir` of
 `tsconfig.json`, mapped back to its `rootDir`). `search` with the kind `package` finds the
 package by name, with its repository, folder, version and number of consumers, and `context` on
-an exported function lists who calls it in other repositories. It reads no lockfile and queries
+an exported function lists who calls it, in any repository of the workspace. It reads no lockfile and queries
 no npm registry. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
 `decided`. Broker clusters are not modelled: two clusters that each have a topic with the same

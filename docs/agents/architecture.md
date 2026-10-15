@@ -70,7 +70,9 @@ give byte-identical output.
   whose contract starts with `package::`), from any repository, as `<repository> <path>:<line>
   <caller>` then ` [<level>, <flag>]` when the link is not `exact` or the dependency's range does
   not plainly accept the provider's version (`package::flag` on the entry's range and the version
-  of the manifest the hop went through; the reason is never parsed).
+  of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
+  plain: a consumer through one always shows `range unchecked`, even inside its own repository,
+  which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -732,7 +734,8 @@ give byte-identical output.
   `consumers:` of the kit's `greet`) and `pkg-shared.context-greet-flagged.txt` (the same after
   editing two ranges to `^3.0.0` and `latest`: `[range mismatch]`, `[range unchecked]`),
   `pkg.context-package-kit.txt` and `pkg.trace-package-kit.txt` (a package contract as a
-  `context` subject, and as a `trace` start).
+  `context` subject, and as a `trace` start), and `pkg-mono.context-add.txt` (the consumers of
+  `mono`'s `add`, both in its own repository).
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte

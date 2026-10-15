@@ -291,3 +291,17 @@ fn context_on_a_package_lists_its_manifest_and_dependents() {
     assert_golden("pkg.context-package-kit.txt", &found);
     assert_golden("pkg.trace-package-kit.txt", &traced);
 }
+
+#[test]
+fn consumers_in_the_same_repository_show_through_workspace_ranges() {
+    let p = packages("packages_context_mono");
+    let engine = Engine::open(&p.mono).unwrap();
+
+    let found = engine
+        .context("example.com/pkg/mono::packages/a/src/index.js::add", None)
+        .unwrap();
+
+    // `b` names `a` through `workspace:*` (`range unchecked`, exact); `c` names it with
+    // `^1.0.0`, which accepts 1.0.0, while `fork` also provides `@example/a` (`ambiguous`).
+    assert_golden("pkg-mono.context-add.txt", &found);
+}

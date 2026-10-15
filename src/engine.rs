@@ -452,10 +452,7 @@ impl Engine {
         }
         hits.sort();
         if hits.is_empty() {
-            return Ok(format!(
-                "no matches for `{query}`
-"
-            ));
+            return Ok(format!("no matches for `{query}`\n"));
         }
         let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
         Ok(render::budgeted(&lines, budget))

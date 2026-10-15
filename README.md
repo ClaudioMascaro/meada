@@ -196,15 +196,15 @@ no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus d
 e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o
 `meada status` diz o que leu e o que ignorou. Cada `package.json` com nome vira o contrato
 `package::npm::<nome>`, e cada dependência (`dependencies`, `devDependencies`,
-`peerDependencies`, `optionalDependencies`) que nomeia um pacote de outro repositório do
-workspace se liga a ele, com a faixa de versão conferida contra a versão local (`range
+`peerDependencies`, `optionalDependencies`) que nomeia um pacote do workspace (de
+qualquer repositório, o próprio inclusive) se liga a ele, com a faixa de versão conferida contra a versão local (`range
 mismatch` quando não a aceita, `range unchecked` quando não dá para conferir). Uma chamada a
 uma função importada desse pacote atravessa até o código do provedor, pelos campos `exports`,
 `types`, `module` e `main` e pelos re-exports, também quando o ponto de entrada aponta para a
 pasta de build (o `outDir` do `tsconfig.json`, mapeado de volta para o `rootDir`). O `search`
 com o tipo `package` acha o pacote pelo nome, com o repositório, a pasta, a versão e o número
-de consumidores, e o `context` de uma função exportada lista quem a chama em outros
-repositórios. Não lê lockfile nem consulta o registro npm. Cada ligação tem o nível `exact`,
+de consumidores, e o `context` de uma função exportada lista quem a chama, em qualquer
+repositório do workspace. Não lê lockfile nem consulta o registro npm. Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
 aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
 broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um

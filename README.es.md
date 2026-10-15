@@ -203,14 +203,14 @@ en `[serve] documents`: las rutas y los canales que describen se vuelven contrat
 campos de cada respuesta o payload, y `meada status` dice qué leyó y qué ignoró. Cada
 `package.json` con nombre se vuelve el contrato `package::npm::<nombre>`, y cada dependencia
 (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) que nombra un
-paquete de otro repositorio del workspace se enlaza a él, con el rango de versión comprobado
+paquete del workspace (de cualquier repositorio, el propio incluido) se enlaza a él, con el rango de versión comprobado
 contra la versión local (`range mismatch` cuando no la acepta, `range unchecked` cuando no se
 puede comprobar). Una llamada a una función importada de ese paquete atraviesa hasta el código
 del proveedor, por los campos `exports`, `types`, `module` y `main` y por los re-exports,
 también cuando el punto de entrada apunta a la carpeta de build (el `outDir` del
 `tsconfig.json`, mapeado de vuelta al `rootDir`). `search` con el tipo `package` encuentra el
 paquete por el nombre, con el repositorio, la carpeta, la versión y el número de consumidores,
-y `context` de una función exportada lista quién la llama en otros repositorios. No lee
+y `context` de una función exportada lista quién la llama, en cualquier repositorio del workspace. No lee
 lockfile ni consulta el registro npm. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
 se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
 `decided`. Los clústeres de broker no se modelan: dos clústeres que tienen un tópico con el
