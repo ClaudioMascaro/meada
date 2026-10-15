@@ -16,7 +16,14 @@ export class Store {
   }
 }
 
-export function serve(port = 8080) {
+export function serve(port = 8080, ...[first]: number[]) {
+  let tries = 0;
+  const { host, ...rest } = { host: "h" };
+  try {
+    for (const item of [tries]) helper(item, host, rest, first);
+  } catch (error) {
+    helper(error);
+  }
   app.get("/health", (_req, res) => res.send(helper()));
   return app.listen(port, () => path.join("a", "b"));
 }

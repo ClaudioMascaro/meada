@@ -1,0 +1,5 @@
+example.com/pkg/web src/text.ts:8 normalize
+  →[inferred: package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir] example.com/pkg/shared src/text.ts:4 normalize
+    example.com/pkg/shared src/utils/collapse.ts:1 collapse
+    example.com/pkg/shared src/utils/trim.ts:1 trim
+chain: inferred · 1 hops · 2 repos · 84 tokens

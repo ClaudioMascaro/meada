@@ -112,6 +112,15 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
+    /// Every other name a binding makes, qualified like `Const::name` by the definition whose
+    /// body or parameters hold it (a function that is no definition lends its names to the
+    /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
+    /// and `for ... of` bindings, and each parameter name `Def::params` does not hold (a nested,
+    /// array or rest pattern, or any parameter of a function that is no definition). Each hides
+    /// the same spelling in its whole scope (`Resolver::lexical`), whatever block it sits in: an
+    /// outer name, and a definition, constant or parameter of its own scope.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub locals: Vec<String>,
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from

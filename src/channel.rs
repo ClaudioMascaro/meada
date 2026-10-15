@@ -229,6 +229,7 @@ impl ContractKind for Channel {
                         shape,
                         method: None,
                         fragments: Vec::new(),
+                        hops: Vec::new(),
                     }),
                 }
             }

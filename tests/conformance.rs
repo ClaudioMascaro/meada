@@ -142,6 +142,17 @@ fn typescript_and_javascript() {
             "src/messages/queues.ts::work",
             "src/messages/queues.ts::work.amqp tasks",
             "src/messages/queues.ts::workReports",
+            "src/shadow.ts::again",
+            "src/shadow.ts::caught",
+            "src/shadow.ts::helper",
+            "src/shadow.ts::hoisted",
+            "src/shadow.ts::listed",
+            "src/shadow.ts::looped",
+            "src/shadow.ts::nested",
+            "src/shadow.ts::plain",
+            "src/shadow.ts::rebound",
+            "src/shadow.ts::twice",
+            "src/shadow.ts::unparenthesized",
             "src/shapes/circle.ts::Circle",
             "src/shapes/circle.ts::Circle.area",
             "src/shapes/circle.ts::Circle.constructor",
@@ -251,6 +262,59 @@ fn typescript_and_javascript() {
             ),
             // No definition has the name.
             ("src/util/log.js::default::console.log#0", None, &[]),
+            // Hidden names: a `catch`, `for ... of`, `let` or `var` binding, an arrow parameter
+            // without parentheses, a nested or array parameter pattern, and one spelled like a
+            // constant or a parameter of the same function hide the top-level `helper`.
+            (
+                "src/shadow.ts::plain::helper#0",
+                EXACT,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::caught::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::looped::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::rebound::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::hoisted::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::unparenthesized::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::nested::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::listed::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::twice::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
+            (
+                "src/shadow.ts::again::helper#0",
+                INFERRED,
+                &["src/shadow.ts::helper"],
+            ),
         ],
     );
 }

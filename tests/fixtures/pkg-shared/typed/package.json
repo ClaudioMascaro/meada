@@ -1,0 +1,6 @@
+{
+  "name": "@example/typed",
+  "version": "1.0.0",
+  "types": "./src/index.ts",
+  "main": "./dist/index.js"
+}

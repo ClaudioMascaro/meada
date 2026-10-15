@@ -112,6 +112,7 @@ impl ContractKind for Resource {
                         shape: None,
                         method: None,
                         fragments: Vec::new(),
+                        hops: Vec::new(),
                     });
                 }
             }

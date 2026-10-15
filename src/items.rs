@@ -8,6 +8,7 @@ use std::ops::Range;
 use crate::contract::{Level, Link};
 use crate::http;
 use crate::index::{Export, Provider};
+use crate::package;
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -101,6 +102,12 @@ impl OpenItem {
     }
 }
 
+/// Whether `link` is an ambiguous link a person can decide: several providers of a package
+/// fit a dependency entry, but no call is there to pick one for.
+fn decidable(link: &Link) -> bool {
+    link.level == Level::Ambiguous && !link.contract.starts_with(package::PREFIX)
+}
+
 /// The items of every repository as the core sees them, in id order: `links` are the links
 /// before any decision, so a decided call is listed too (the caller drops it to keep the open
 /// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
@@ -108,7 +115,7 @@ impl OpenItem {
 /// leave.
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
-    for link in links.iter().filter(|l| l.level == Level::Ambiguous) {
+    for link in links.iter().filter(|l| decidable(l)) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
     let routes: Vec<(&str, &Provider)> = exports
@@ -199,4 +206,32 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     }
     items.sort_by(|a, b| a.id.cmp(&b.id));
     items
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ambiguous(contract: &str) -> Link {
+        Link {
+            consumer: "r::src/a.ts::f::g#0".into(),
+            provider: "r::src/b.ts::h".into(),
+            contract: contract.into(),
+            level: Level::Ambiguous,
+            reason: String::new(),
+            by: None,
+            p: None,
+        }
+    }
+
+    #[test]
+    fn an_ambiguous_package_link_is_no_item_even_when_its_consumer_is_a_call() {
+        assert!(decidable(&ambiguous("http::GET::/users")));
+        assert!(!decidable(&ambiguous("package::npm::@example/a")));
+        let exact = Link {
+            level: Level::Exact,
+            ..ambiguous("http::GET::/users")
+        };
+        assert!(!decidable(&exact));
+    }
 }

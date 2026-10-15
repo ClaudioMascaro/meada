@@ -56,7 +56,23 @@ give byte-identical output.
   like the open-item kinds) lists the documents read across the workspace, matched by path and
   `info.title` (exact, prefix, substring), as `<repository> <path> (<Summary::shown()>)
   <title>`; `shown` is `openapi 3.1.0, routes: 3` or `asyncapi 3.0.0, channels: 2` (the count
-  follows the format, so OpenAPI lines never gain a `channels: 0`).
+  follows the format, so OpenAPI lines never gain a `channels: 0`). `search` kind `package`
+  (`search_packages`, an early branch too) lists the `packages` rows whose name matches, as
+  `<repository> <directory> <name>@<version> (consumers: <n>)` (no `@<version>` for a manifest
+  without one); the consumers are the links whose provider is the package's manifest
+  (`Package::site`), that is the dependency entries at any level, not the call hops, which link to
+  symbols. A dependency entry's site (`<repository>::<path>::<field>::<name>`) and a manifest's
+  print as `package.json dependencies` and `kit/package.json` in `search` and in `context` on
+  `package::npm::<name>` (`package::place`); that `context` goes through `contract_sides` with the
+  roles `package` and `dependent`, and `trace` on it points to `context`. `context` on a symbol
+  adds a `consumers:` section after `callees:`, only when non-empty: the calls that reach it
+  through a package import (`package::reached`, from the links whose provider is the symbol and
+  whose contract starts with `package::`), from any repository, as `<repository> <path>:<line>
+  <caller>` then ` [<level>, <flag>]` when the link is not `exact` or the dependency's range does
+  not plainly accept the provider's version (`package::flag` on the entry's range and the version
+  of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
+  plain: a consumer through one always shows `range unchecked`, even inside its own repository,
+  which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -67,6 +83,8 @@ give byte-identical output.
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
+  `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
+  package name are no call for a person to decide.
 - `decide.rs`: `meada decide`. `items(engine, only)` (`Engine::local_items`: the open items
   whose call lives in the repository where Meada runs, id order; with `--item`,
   `Engine::local_item`, which also takes a decided call, offered with every candidate so the
@@ -186,8 +204,100 @@ give byte-identical output.
   `documents_found` adds each `[serve] documents` path that is a file, stat'ed outside the walk
   so `.gitignore` does not hide it; a listed path that is not a file, or that has a symbolic
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
-  `Export::documents` (`Document {path, summary}`, path order). `sort_providers` and
+  `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
+  is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
+  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json` the walk
+  finds (`manifests_found`: any path with a `node_modules` segment is skipped, since the walk
+  yields it unless `.gitignore` lists it), a nameless one too, whatever `serve.declared` says;
+  `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
+  (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
+  rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
+  name with the `file` and `target` definition it names, `target` NULL for a whole file and
+  `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
+  row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
+  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
+- `package.rs` (spec #22): packages as contracts. `read(bytes)` turns a `package.json` into a
+  `Summary {name, version, dependencies: [Entry {field, name, range}], exports, types, module,
+  main}` (the four dependency fields, sorted by field then name; `exports` as written, `null`
+  counting as absent) and never fails: a file over `MAX_BYTES` (1 MiB), not a JSON
+  object or nested past `serde_json`'s depth limit reads as empty, a field of another type or an
+  empty string counts as absent, and a name that is empty, over `MAX_NAME` (214), or holds a
+  control character, whitespace or `:` is no name (a dependency entry with such a name is dropped).
+  The kind `Packages` (`package::npm::<name>`, sides `package` and `dependent`) `extract`s an
+  `Import` row (`Role::Import`, never exported) for each call whose callee's head names an import
+  of a bare specifier from outside the repository (`Code::imported`: specifier in `via`, the
+  chain spelled from the imported name in `method`); `declare` makes a provider at `<repository>::<manifest path>` (`Provider::version` for the
+  reason) and a `packages` row `{name, version, repository, directory}` (`.` at the root) for each
+  named manifest, private ones too. `consume(exports, providers)` is the workspace-wide step `Engine::exports`
+  runs after every repository's `declare` (one repository cannot see another's providers; the
+  `Providers` index of package names to their manifests is built once there and shared with
+  `import`, and `reaches` is the one place the `workspace:` rule lives): for
+  each dependency entry whose package some repository of the workspace provides (a `workspace:`
+  range needs one in its own repository), it adds a consumer at `<repository>::<manifest
+  path>::<field>::<name>` (the range travels in `Consumer::method`, which is `serde(skip)`) and a
+  `dependencies` row `{manifest, field, name, range}`. An entry on a package outside the workspace
+  appears nowhere. `link` gives one candidate `exact` and several `ambiguous` (one link per
+  candidate, `workspace:` keeping the consumer's repository), with the reason `<identifier>
+  <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous.
+  `reason()` is the one place it is built; it ends with `, range mismatch` or `, range
+  unchecked` when `flag(range, version) -> Option<Flag>` (public; `context` calls it too, and
+  nobody parses the reason back) says so. `flag` checks with `nodejs-semver` (npm syntax: `^ ~
+  x - ||`, prereleases as npm): `Mismatch` when the range does not accept the local version,
+  `Unchecked` for a missing range or version, a `workspace:`/`file:`/`link:`/`npm:` range, a git
+  or URL source, a tag such as `latest`, a range past `MAX_RANGE`, and any range with a token
+  that is not a comparator (the crate parses `foo 1.2.3` as `1.2.3`). The flag is computed at
+  query time and stores nothing. `import(exports, providers)` is the second workspace step, after
+  `consume`: for each import row whose package the importing file's nearest manifest
+  (`nearest`: the deepest directory holding it, named or not) depends on in any field, it
+  resolves the call in every provider of that package (a `workspace:` range: its own repository
+  only) through `Provided::resolve`: `ways` gives the ways in, each with the files it names and
+  its `How` (`exports` through `exported`, the table-tested lookup of spec #22: exact key, then
+  the `*` pattern with the longest prefix, the first of `types`, `import`, `default`, `require`
+  at each level, `null` blocking, a key or a target with two `*` not read, the only way in when
+  present; without `exports`, for the bare name one way for each of `types`, `module`, `main`
+  present, tried in that order (an empty or non-string `types`, `module` or `main` counts as
+  absent), or, with none of the three, `index.<ext>` for each pack extension, as Node's default
+  does (`path`, never `index` alone or `index/index.<ext>`); for any other subpath, the subpath
+  itself, as a path with the trunk's extension and `index` rules, `path`). A file must stay
+  inside the package directory (`inside`), be a source file the provider indexes, not a
+  `.d.ts`, and have this package's manifest as its nearest (`owned_source`: a file of a nested
+  package is not the outer package's); the first way that leads to one, directly or through the
+  mapping, wins, so a field that leads nowhere does not stop the search. One that is build output
+  maps back to source: `mapped` takes the `tsconfig.json` in the package directory; only when that
+  file is absent or invalid (stored as `null`, no `Config`) the repository root's, and a valid
+  one without a usable `outDir` maps nothing, with no fallback. `roots` turns its `outDir` and `rootDir` (relative to that config;
+  `rootDir` defaults to the package directory) into repository directories, and `sources`
+  (the pure, table-tested mapping) swaps the entry's `.d.ts`, `.js`, `.mjs`, `.cjs` or `.jsx` for
+  each pack extension in `EXTENSIONS` order under `rootDir`; the first the provider indexes wins,
+  `inferred` with `how` `outDir`. When no way finds a file, directly or through the mapping, the
+  import is `ambiguous` and `how` names the declared field or rule whose entry could not be
+  followed to a source file (the first way tried: `exports`, the first of `types`, `module`,
+  `main` present, or `path`): `candidates` gives the
+  symbol the chain names in every source file whose nearest manifest is this package's (not a
+  nested package's, not one under a `node_modules` segment, not a `.d.ts`) and that exports its
+  head (sorted, one hop each; none, nothing). The files by owning manifest are grouped once per
+  provider (`Provided::owned`), not once per call. `lookup` then reads the chain's
+  head from the `exports` rows (the file's own export of the name decides; else its `export *`
+  files, never for `default`, two that give it differently making it ambiguous and so not
+  exported, as in ES modules; `seen` cuts cycles) and each further name as a member of that
+  definition or a name of a whole file. A `tsconfig.json` has a row in `manifests` too, read
+  by `read_tsconfig` (`out_dir`, `root_dir`; `Export::tsconfigs`, `serde(skip)`; `extends` is not
+  followed, as the trunk follows none), so an edit relinks like a `package.json` one. `import` skips a specifier no repository provides before
+  reading anything else, and builds a provider's tables (`Provided`) the first time an import
+  reaches it; `index::export` reads the `import` rows only for a repository with a manifest and
+  the `exports` rows only for one with a named manifest. A call resolved in one provider at least
+  becomes a
+  consumer of the package at its call site (range in `Consumer::method`, where it resolves in
+  `Consumer::hops`, both `serde(skip)`), and each resolution an `imports` row `{site, specifier,
+  name, level, how, target}`. `link` then gives a call with hops, instead of the manifest, the
+  symbol in each provider whose package link it would have, at the weaker of the two levels,
+  with the reason `<package reason>; import <how>` (`How::name`: `exports`, `types`, `module`,
+  `main`, `path` or `outDir`; on an `ambiguous` link, the field or rule whose entry could not be
+  followed to a source file). The hop is derived at query time from stored facts and never stored; an import of a
+  package outside the workspace, or that resolves nowhere, appears in no export. A re-export of
+  another package inside the provider ends the lookup (no second hop). No lockfile is read and
+  no registry queried.
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
   `read(path, bytes) ->
@@ -276,7 +386,12 @@ give byte-identical output.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
-  the index. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
+  the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
+  `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
+  parameter pattern, any parameter of a function that is no definition), qualified by the
+  enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
+  name and a definition, constant or parameter of its own scope alike (`Binding::Unknown`: a
+  call falls to a name match, a value is not known), the hidden names probe. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
@@ -330,10 +445,13 @@ give byte-identical output.
   adds no name, a default import is `default`; `binding` is the constant the chain's head names
   (how a pack pairs calls on the same client). `Code::expand_constructed(binding, at, read)` is
   `expand` over the arguments of the `new` a binding holds, on behalf of the call `at` made on
-  it. `Code::pack()` is the pack of the files.
+  it. `Code::pack()` is the pack of the files. `Code::imported(path, scope, chain)` is the same
+  tracing without `const`s: the specifier and spelled chain when the chain's head is itself an
+  import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
+  what each file exports, as `export` reads it, for the `exports` table.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `sides`, `link`),
   `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
-  `Consumer`, `Binding` or `Publish`),
+  `Consumer`, `Binding`, `Publish` or `Import`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
@@ -424,7 +542,10 @@ give byte-identical output.
   both end their branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its
   row, pushes them and enters anything else. Starts take only HTTP routes, symbols and call
   sites; a start in a kind with `ContractKind::sides` (`resource::...`, `channel::...`) gets an
-  answer pointing to `context`.
+  answer pointing to `context`. A package hop is a call-site consumer linked to a symbol, like an
+  HTTP call: `call_down` crosses it from the call into the provider's function and on through its
+  callees, and `trace` up reaches the call through `into[symbol]`; a hop into another repository
+  counts in the footer's hops and repositories.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, plus the markers
   `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display only.
@@ -443,6 +564,11 @@ give byte-identical output.
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
+  `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
+  path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
+  A call through a package import that resolves is also a consumer of the package, at its call
+  site, linked to the provider's symbol (`<repository>::<path>::<name>`).
 - Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
   document lists, such as `example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}`
   (`Export::document_of` recognises it). Document channel side: `<repository>::<document
@@ -452,7 +578,14 @@ give byte-identical output.
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
-  publishes, links}`; a provider has
+  publishes, packages, dependencies, imports, links}`; `imports` (absent when empty) lists each
+  call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
+  target, where `level` is the import's own level (how certain the entry and the name were), not
+  the hop's: the link from that call carries the hop's level, the weaker of it and the package
+  link's. `how` is the field or rule that named the entry (`exports`, `types`, `module`,
+  `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
+  `ambiguous` import it names the declared field or rule whose entry could not be followed to a
+  source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
   absent when empty) when a document gives its route or channel side one; a consumer has the same
   `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
@@ -489,7 +622,28 @@ give byte-identical output.
   (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
   a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
   calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
-  whole workspace's providers. A kind's rules stay in its own file.
+  whole workspace's providers. A kind's rules stay in its own file. A kind whose consumers
+  need providers from other repositories (a package depends on one the workspace holds) adds a
+  workspace step: `Engine::exports` runs it after every `declare`, as `package::consume` (the
+  dependency entries) and `package::import` (the calls through an import) are, over a
+  `Providers` index built once, and `link` reads what the step left on the consumer. Such a
+  consumer is no open item when ambiguous: `items.rs` (`decidable`) skips the contracts of the
+  kind explicitly, since several providers of a name are no call for a person to decide. Its
+  sites show in `context` and `search` through hooks in `engine.rs`: `package::place` names where
+  a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
+  calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
+  of the contract itself, with the roles `sides` names.
+- New **package ecosystem** (spec #22 user story 26, track B packs): a pack for another manifest
+  format (`Cargo.toml`, `pyproject.toml`, `go.mod`) plugs in beside npm without a new kind of
+  contract. Discovery is a file name in `manifests_found` (`index.rs`), which stamps the file
+  into `manifests` like `package.json`; a reader per ecosystem, beside `package::read`, turns
+  its bytes into the same `Summary` (name, version, dependency entries, entry fields) and never
+  fails; the contract is `package::<ecosystem>::<name>` (`package::npm::<name>` is the first),
+  so `PREFIX` still routes it to the same `declare`, `consume`, `link`, `place` and `reached`;
+  and the reason grammar and `flag` stay the one function each, with the ecosystem's range
+  syntax checked there (a range it cannot check is `range unchecked`). Resolving an import
+  into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
+  stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
   its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
@@ -537,10 +691,10 @@ give byte-identical output.
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
-  a document's stored `summary`. A unit test in `index.rs` keeps all three in
+  a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
   `tests/golden/schema.v<version>.txt` (the facts of each pack's
-  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml` and
-  `sample.asyncapi.yaml` there) and never re-blesses it in place: a change
+  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml`,
+  `sample.asyncapi.yaml` and `sample.package.json` there) and never re-blesses it in place: a change
   fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
   An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
   so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
@@ -551,7 +705,11 @@ give byte-identical output.
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes and the external references met, the
   hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
-  document it could not read). `Call::args`,
+  document it could not read), and what spec #22 stores of the build and package files: the
+  `manifests` summaries of each `package.json` (name, version, the dependency ranges as
+  written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
+  (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
+  the definition or file they name). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
@@ -596,6 +754,56 @@ give byte-identical output.
   `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
   since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
   goldens never change.
+- `tests/packages.rs` (spec #22): the package fixtures `pkg-{shared,web,api,mono,fork}` as
+  siblings (`web`, `api` and `mono` name `shared` as a peer, `fork` names `mono`), through
+  `Engine::export`. `shared` holds `@example/shared` and an ignored-by-rule
+  `node_modules/left-pad/package.json`; `web` and `api` depend on it (`api`'s manifest has no
+  name and a non-string range; `web` accepts the `shared` version, `api` does not (goldens carry
+  `range mismatch` and `range unchecked`); `web` also names `express` and `left-pad`, outside the workspace);
+  `mono` has `packages/{a,b,c}` (`b` on `a` through `workspace:*`, `c` on `a` with `^1.0.0`) and a
+  `.gitignore`d `ignored/`, and `fork` holds another `@example/a`. Goldens `pkg-*.export.json`;
+  a freshness test edits manifests in three repositories (`shared`, `web`, `mono`), and renames
+  an export and an `exports` subpath of the kit, and compares the exports of all four with a cold
+  set; a test shows an ambiguous package link is no open item. Imports (spec #22): `shared` also
+  holds `kit/`, `@example/kit`, whose `exports` (conditions, a `./utils/*` pattern, a `null`
+  `./internal/*`) and `main` point straight to sources, with a re-export, an `export *` cycle, a
+  default and a class; `web/src/app.ts` calls it through a named, default, aliased, namespace,
+  pattern and member import, plus a blocked subpath, an unexported name, an unlisted subpath,
+  `express` and a name never imported (none cross), and the hidden names probe (a parameter, a
+  `catch` binding, a destructuring and a `let` named like the import: no hop); `api/src/report.js`
+  calls `greet` too; `mono`'s `a` has `main`, called from `b` (`workspace:*`, exact) and `c`
+  (ambiguous with `fork`). `shared` also holds `@example/typed` (`types` to a source) and
+  `@example/esm` (`module` to a `.mjs`, and subpaths read as paths, one through `index`), which
+  `web/src/entries.ts` calls; the root package `@example/shared` ships build output, with an `exports`
+  map into `dist` (conditions, a `./utils/*` pattern), a `tsconfig.json` (`outDir`, `rootDir`) and
+  `src/`, which `web/src/text.ts` and `api/src/label.js` call (`inferred`, `import outDir`), and
+  `@example/sealed` (`main` into `dist`, a `tsconfig.json` with no `rootDir`, two files exporting
+  `seal`) is `ambiguous` with both listed; `web/e2e/` declares the kit in `devDependencies` and crosses, and
+  `web/tools/`, whose own manifest does not declare the kit though the root one does, does not.
+  `shared` also holds `@example/dts` (`types` to a declaration file that is no source, `main` to
+  `index.js`: `exact`, `import main`), `@example/plain` (no entry field, an `index.ts`: `exact`,
+  `path`) and `@example/bare` (no entry field and no `index`, one file exporting the name:
+  `ambiguous`, `path`), called from `web/src/entries.ts`; `@example/prec` (`types` into `dist`,
+  mapped through its own `tsconfig.json`, and a later `main` that is a source: the first field
+  wins, `inferred`) and `@example/nest` (no entry field, with `index/` and `sub/` nested
+  packages: `index/index.ts` is not its default and a subpath into `sub/` does not cross),
+  called from `web/src/nest.ts`. The freshness test also asserts the calls through the renamed export and subpath no longer
+  cross. Hidden names in the trunk: `conformance-ts-js/src/shadow.ts` (`catch`, `for ... of`,
+  `let`, `var`, an arrow parameter without parentheses, nested and array parameter patterns, a
+  same-scope constant and parameter, each never `exact`) and two value-flow cases in
+  `http-fetch-param` (a `for ... of` hiding a constant URL, a `catch` hiding a parameter that
+  defaults to `fetch`). Goldens `pkg-web.trace-down.txt` (from the call into `greet` and on to
+  `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`). `search` and `context` (ticket
+  T5): `pkg.search-package*.txt` (kind `package`, all and by name), `pkg.search-contract-shared.txt`
+  (dependency entries placed at their manifest and field), `pkg-shared.context-greet.txt` (the
+  `consumers:` of the kit's `greet`) and `pkg-shared.context-greet-flagged.txt` (the same after
+  editing two ranges to `^3.0.0` and `latest`: `[range mismatch]`, `[range unchecked]`),
+  `pkg.context-package-kit.txt` and `pkg.trace-package-kit.txt` (a package contract as a
+  `context` subject, and as a `trace` start), and `pkg-mono.context-add.txt` (the consumers of
+  `mono`'s `add`, both in its own repository).
+  Ticket T4 adds `pkg-web.trace-down-outdir.txt` and `pkg-shared.trace-up-outdir.txt` (the calls
+  through `@example/shared`); an invalid, hostile or edited nested `tsconfig.json` is tested the
+  same way as a `package.json` (refreshed equals cold).
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
@@ -697,6 +905,37 @@ give byte-identical output.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
+- `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
+  (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
+  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
+  length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
+  calls a longer one `range unchecked`. Import resolution: `exported` follows at most
+  `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
+  levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
+  read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
+  like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
+  invalid (`None`, no config; an option of another type is absent in a valid one), and `roots` voids the mapping for an absolute `outDir` or `rootDir`, one with an empty or
+  `..` segment, or an `outDir` that is the config's own directory (a path read from a config stays
+  inside the repository; nothing is opened on disk, the mapped file must be one the walk indexed,
+  and the walk follows no symlink). `extends` is not followed (`ponytail:` in `Tsconfig`; the
+  trunk follows none for `paths` either): a base config's `outDir` counts as absent, so such an
+  entry is `ambiguous`; `declarationDir` is not read, and a package with no `rootDir` maps
+  `dist/index.js` to `index.ts` at its own directory. An entry with no output extension never
+  maps (`main: "./dist"`, `"dist/index"`, `types: "dist/index.d.mts"` or `.d.cts`): only `.d.ts`,
+  `.js`, `.mjs`, `.cjs` and `.jsx` are stripped (no marker). The ambiguous candidates of an
+  import have no cap: every file of the package exporting the name is listed, so a name exported
+  by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
+  client bound from it (`const c = new Client(); c.run()`) does not (no marker).
+- `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
+  definition, whatever block holds it, the definition's own definitions, constants and
+  parameters of that name included, and a function that is no definition (an object literal
+  method, `module.exports = (db) => ...`, an IIFE, an arrow kept in an object) lends its
+  parameters and locals to the definition around it; at the top level that is the whole file.
+  A call to the hidden name elsewhere in that scope loses its exact link or its value, never
+  gains a wrong one (no marker).
+- `index.rs` (`refresh_stamped`): a `package.json` or document that cannot be statted or read
+  (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
+  `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
   larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no

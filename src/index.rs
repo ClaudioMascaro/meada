@@ -16,12 +16,13 @@ use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
-use crate::resolve::{Code, Resolution, Resolver, Target};
+use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
+use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
-/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
-/// `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 14;
+/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
+/// manifest's stored `summary`: an index with another version is deleted and rebuilt.
+const SCHEMA_VERSION: i64 = 15;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -38,7 +39,16 @@ const SCHEMA_VERSION: i64 = 14;
 /// same stat and hash as `files`, and its `summary` (`document::Summary` as JSON: format,
 /// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
 /// derived from the bytes alone); a document that could not be read keeps its row, so its hash
-/// is cached too.
+/// is cached too. `manifests` holds each `package.json` (spec #22) the same way, its `summary`
+/// being `package::Summary` as JSON (name, version, dependency entries and the entry fields
+/// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
+/// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
+/// `package::Tsconfig` (`out_dir`, `root_dir`), or `null` when the file is invalid. An `import`
+/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
+/// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
+/// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
+/// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
+/// time to resolve imports of a package into another repository (spec #22).
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -63,6 +73,11 @@ CREATE TABLE documents (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE manifests (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -194,7 +209,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
-                 DELETE FROM documents;",
+                 DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports;",
             )?;
             None
         }
@@ -215,7 +230,23 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .collect::<rusqlite::Result<_>>()?;
 
     let all = walk(root);
-    refresh_documents(&tx, &documents_found(root, &all, serve), now)?;
+    refresh_stamped(
+        &tx,
+        "documents",
+        &documents_found(root, &all, serve),
+        now,
+        |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
+    )?;
+    refresh_stamped(
+        &tx,
+        "manifests",
+        &manifests_found(&all),
+        now,
+        |path, src| match package::is_tsconfig(path) {
+            true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
+            false => Ok(serde_json::to_string(&package::read(src))?),
+        },
+    )?;
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -446,6 +477,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             params![role, contract, site, via, path, method, fragments],
         )?;
     }
+    tx.execute("DELETE FROM exports", [])?;
+    for e in resolvers.values().flat_map(Resolver::exported) {
+        tx.execute(
+            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
+            params![e.path, e.name, e.file, e.target],
+        )?;
+    }
     tx.execute("DELETE FROM meta", [])?;
     tx.execute(
         "INSERT INTO meta VALUES (?1, ?2)",
@@ -507,12 +545,34 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// Brings the `documents` table up to date with `found`, the documents on disk (path and
-/// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
-/// stored document not found leaves the table.
-fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemTime) -> Result<()> {
+/// The `package.json` and `tsconfig.json` files of a repository (path and absolute path), but
+/// those under a `node_modules` directory, which the walk finds when `.gitignore` does not list
+/// it.
+fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
+    let is_manifest = |path: &str| {
+        let mut segments = path.split('/').rev();
+        matches!(segments.next(), Some("package.json" | "tsconfig.json"))
+            && !segments.any(|s| s == "node_modules")
+    };
+    (walked.iter())
+        .filter(|(path, _)| is_manifest(path))
+        .cloned()
+        .collect()
+}
+
+/// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
+/// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
+/// hash, then `summarize` only what changed. A stored row not found, or whose file cannot be
+/// statted or read, leaves the table.
+fn refresh_stamped(
+    tx: &Transaction,
+    table: &str,
+    found: &[(String, PathBuf)],
+    now: SystemTime,
+    summarize: impl Fn(&str, &[u8]) -> Result<String>,
+) -> Result<()> {
     let stored: HashMap<String, Stamp> = tx
-        .prepare("SELECT path, hash, mtime, size FROM documents")?
+        .prepare(&format!("SELECT path, hash, mtime, size FROM {table}"))?
         .query_map([], |r| {
             let (hash, mtime, size) = (r.get(1)?, r.get(2)?, r.get(3)?);
             Ok((r.get(0)?, Stamp { hash, mtime, size }))
@@ -520,30 +580,40 @@ fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemT
         .collect::<rusqlite::Result<_>>()?;
     let mut seen = HashSet::new();
     for (path, abs) in found {
+        // A file that vanished or cannot be read since the walk has no row, and a stored one
+        // leaves the table; it never fails the refresh.
+        let Ok((size, mtime, trusted)) = stat(abs, now) else {
+            continue;
+        };
         seen.insert(path.as_str());
-        let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
         if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
-        let src = fs::read(abs)?;
+        let Ok(src) = fs::read(abs) else {
+            seen.remove(path.as_str());
+            continue;
+        };
         let hash = blake3::hash(&src).to_hex().to_string();
         if known.is_some_and(|k| k.hash == hash) {
             tx.execute(
-                "UPDATE documents SET mtime = ?2, size = ?3 WHERE path = ?1",
+                &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
                 params![path, mtime, size],
             )?;
             continue;
         }
-        let summary = serde_json::to_string(&document::read(path, &src))?;
+        let summary = summarize(path, &src)?;
         tx.execute(
-            "INSERT OR REPLACE INTO documents VALUES (?1, ?2, ?3, ?4, ?5)",
+            &format!("INSERT OR REPLACE INTO {table} VALUES (?1, ?2, ?3, ?4, ?5)"),
             params![path, hash, mtime, size, summary],
         )?;
     }
     for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
-        tx.execute("DELETE FROM documents WHERE path = ?1", params![path])?;
+        tx.execute(
+            &format!("DELETE FROM {table} WHERE path = ?1"),
+            params![path],
+        )?;
     }
     Ok(())
 }
@@ -706,6 +776,32 @@ pub(crate) struct Export {
     /// bindings route them to.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) publishes: Vec<Publish>,
+    /// The `package.json` files read (spec #22), in path order. Not exported as such:
+    /// `Package::declare` turns the named ones into `packages` and providers, and
+    /// `package::consume` the dependency entries that name a package of the workspace into
+    /// `dependencies` and consumers.
+    #[serde(skip)]
+    pub(crate) manifests: Vec<Manifest>,
+    /// The `tsconfig.json` files read (spec #22), in path order: `package::import` maps a
+    /// package's build output back to source through them.
+    #[serde(skip)]
+    pub(crate) tsconfigs: Vec<Config>,
+    /// The packages the repository provides, by name, then directory.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) packages: Vec<Package>,
+    /// The dependency entries naming a package of the workspace, by manifest, field, name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) dependencies: Vec<Dependency>,
+    /// The calls through a binding imported from a bare specifier, by site. Not exported:
+    /// `package::import` resolves those that name a package of the workspace.
+    #[serde(skip)]
+    pub(crate) import_calls: Vec<ImportCall>,
+    /// What each file exports (the `exports` table), sorted, for `package::import`.
+    #[serde(skip)]
+    pub(crate) exported: Vec<Exported>,
+    /// The imports resolved into a package of the workspace, by call site, then target.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) imports: Vec<Import>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -828,6 +924,9 @@ pub(crate) struct Provider {
     /// against it.
     #[serde(skip)]
     pub(crate) hosts: Vec<String>,
+    /// The `version` of a package's manifest, for `package::link`.
+    #[serde(skip)]
+    pub(crate) version: Option<String>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.
@@ -877,6 +976,10 @@ pub(crate) struct Consumer {
     pub(crate) method: Option<String>,
     #[serde(skip)]
     pub(crate) fragments: Vec<String>,
+    /// For a call through a package import, where it resolves in each provider of the package
+    /// (`package::import`); `Packages::link` turns them into links.
+    #[serde(skip)]
+    pub(crate) hops: Vec<Hop>,
 }
 
 /// The index content of the repository attached as `schema`, every list sorted. Links are
@@ -964,6 +1067,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 fragments: fragments
                     .and_then(|f| serde_json::from_str(&f).ok())
                     .unwrap_or_default(),
+                hops: Vec::new(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -1008,6 +1112,62 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<(String, String)> = db
+        .prepare(&format!(
+            "SELECT path, summary FROM {schema}.manifests ORDER BY path"
+        ))?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
+    for (path, summary) in rows {
+        match package::is_tsconfig(&path) {
+            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
+            true => tsconfigs.extend(
+                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
+                    .map(|tsconfig| Config { path, tsconfig }),
+            ),
+            false => manifests.push(Manifest {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            }),
+        }
+    }
+    // Only a repository with a manifest can import a package, and only one with a named
+    // manifest provides one: the rows that resolve imports are read for those alone.
+    let import_calls = match manifests.is_empty() {
+        true => Vec::new(),
+        false => db
+            .prepare(&format!(
+                "SELECT site, path, via, method FROM {schema}.contracts \
+                 WHERE role = 'import' ORDER BY site, via, method"
+            ))?
+            .query_map([], |r| {
+                Ok(ImportCall {
+                    site: r.get(0)?,
+                    path: r.get(1)?,
+                    specifier: r.get(2)?,
+                    chain: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
+    let exported = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, name, file, target FROM {schema}.exports \
+                 ORDER BY path, name, file, target"
+            ))?
+            .query_map([], |r| {
+                Ok(Exported {
+                    path: r.get(0)?,
+                    name: r.get(1)?,
+                    file: r.get(2)?,
+                    target: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1017,6 +1177,13 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         consumers,
         bindings,
         publishes,
+        manifests,
+        tsconfigs,
+        packages: Vec::new(),
+        dependencies: Vec::new(),
+        import_calls,
+        exported,
+        imports: Vec::new(),
         links: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
@@ -1036,8 +1203,46 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION};
-    use crate::{document, lang};
+    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
+    use crate::{document, lang, package};
+
+    #[test]
+    fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {
+        let mut db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        db.execute(
+            "INSERT INTO manifests VALUES ('gone/package.json', 'h', 1, 1, '{}')",
+            [],
+        )
+        .unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let found = vec![
+            (
+                "gone/package.json".to_string(),
+                root.join("gone/package.json"),
+            ),
+            // A directory stats fine and cannot be read as a file.
+            ("src".to_string(), root.join("src")),
+            ("Cargo.toml".to_string(), root.join("Cargo.toml")),
+        ];
+        let tx = db.transaction().unwrap();
+
+        refresh_stamped(
+            &tx,
+            "manifests",
+            &found,
+            std::time::SystemTime::now(),
+            |_, _| Ok("{}".into()),
+        )
+        .unwrap();
+
+        let paths: Vec<String> = (tx.prepare("SELECT path FROM manifests").unwrap())
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(paths, ["Cargo.toml"]);
+    }
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
     /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never
@@ -1061,6 +1266,12 @@ mod tests {
             let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();
             actual += &format!("\n{name}\n{summary}\n");
         }
+        let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
+        let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
+        actual += &format!("\nsample.package.json\n{summary}\n");
+        let src = fs::read(tests.join("fixtures/schema/sample.tsconfig.json")).unwrap();
+        let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
+        actual += &format!("\nsample.tsconfig.json\n{summary}\n");
 
         let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
         let Ok(expected) = fs::read_to_string(&golden) else {
