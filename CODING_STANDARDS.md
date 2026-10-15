@@ -52,10 +52,19 @@ indexing carries on.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
 - Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
-  `docs/agents/architecture.md`, and a unit test feeds it an input past the limit.
+  `docs/agents/architecture.md` (`tests/docs.rs` checks the name is there), and a unit test
+  feeds it an input past the limit.
 
 ## Docs move with the capability
 
 A change users can see (a language, a framework, a contract kind, a command or MCP behavior)
 updates, in the same PR, the README "Estado" section (`README.md`, with `README.en.md` and
 `README.es.md` as `AGENTS.md` requires) and `CHANGELOG.md` under its unreleased version.
+
+A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
+in the same change:
+
+- A value the index now stores (a table, a column, a field of a stored summary) joins the list
+  of the invariant "The index holds no source text and no values, apart from ...".
+- A step a kind runs outside `ContractKind` (a workspace pass in `Engine::exports`, a rule in
+  `items.rs`, a rendering hook in `engine.rs`) is named under "Seams and what extends them".
