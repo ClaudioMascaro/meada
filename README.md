@@ -183,11 +183,14 @@ Constantes fixas:
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP (`fetch` no lado que consome,
-Next.js (app router) e Express no lado que serve, também atrás de um gateway) e pelos recursos
-declarados no `meada.toml`. Cada ligação tem o nível `exact`, `declared`, `inferred`, `decided`
-ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida e só vira
-ligação por uma decisão, no nível `decided`. Ainda não há: outras linguagens, outros clientes
-HTTP além do `fetch`, filas, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
+Next.js (app router) e Express no lado que serve, também atrás de um gateway), pelos recursos
+declarados no `meada.toml` e por canais: tópicos Kafka do `kafkajs`, com o produtor ligado ao
+handler de cada consumidor, inclusive no mesmo repositório. Cada ligação tem o nível `exact`,
+`declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
+aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
+broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um
+só. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, outros brokers além
+do Kafka, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).
 

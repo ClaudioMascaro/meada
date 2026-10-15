@@ -182,11 +182,14 @@ Fixed constants:
 
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) and links repositories through HTTP contracts (`fetch` on the consuming
-side, Next.js (app router) and Express on the serving side, also behind a gateway) and through
-the resources declared in `meada.toml`. Each link has the level `exact`, `declared`,
-`inferred`, `decided` or `ambiguous`; a call whose URL cannot be resolved shows up as
-unresolved and becomes a link only through a decision, at the level `decided`. Not there yet:
-other languages, HTTP clients other than `fetch`, queues, packages and the npm package. The scope and order of the work are in
+side, Next.js (app router) and Express on the serving side, also behind a gateway), through
+the resources declared in `meada.toml` and through channels: `kafkajs` Kafka topics, with the
+producer linked to the handler of each consumer, in the same repository too. Each link has the
+level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
+resolved shows up as unresolved and becomes a link only through a decision, at the level
+`decided`. Broker clusters are not modelled: two clusters that each have a topic with the same
+name link as if they were one. Not there yet: other languages, HTTP clients other than `fetch`,
+brokers other than Kafka, packages and the npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).
 

@@ -9,13 +9,14 @@ use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{http, render, resource};
+use crate::{channel, http, render, resource};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
-    /// From callers to callees, and from consumers to the providers they reach.
+    /// From callers to callees, from consumers to the providers they reach, and from writers
+    /// and producers to the readers and handlers of what they write or produce.
     Down,
-    /// From callees to callers, and from providers to the consumers that reach them.
+    /// The reverse of `Down`.
     Up,
 }
 
@@ -46,8 +47,9 @@ pub(crate) struct Graph<'a> {
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
-    /// consumer is a call site, or, for a resource, the symbol that reads it: data goes from
-    /// the provider (writer) to that consumer, so the chain crosses it the other way.
+    /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
+    /// handles it: data goes from the provider (a writer, or the call that produces) to that
+    /// consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
 }
@@ -141,10 +143,15 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        if from.starts_with(resource::PREFIX) {
+        let sides = match () {
+            _ if from.starts_with(resource::PREFIX) => Some(("resource", "writers and readers")),
+            _ if from.starts_with(channel::PREFIX) => Some(("channel", "producers and consumers")),
+            _ => None,
+        };
+        if let Some((kind, sides)) = sides {
             return Lookup::Answer(vec![format!(
-                "`{from}` is a resource, and a trace starts from a symbol, a route or a call \
-                 site: run `context` on it for its writers and readers, then trace from one"
+                "`{from}` is a {kind}, and a trace starts from a symbol, a route or a call \
+                 site: run `context` on it for its {sides}, then trace from one"
             )]);
         }
         let (contract, path) = if http::route(from).is_some() {
@@ -388,10 +395,23 @@ impl<'a> Walk<'_, 'a> {
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
                     self.enter(&c.caller, depth + 1, Row::link(text, n, link));
                 }
-                // A reader goes back to the writers of what it reads; a repository-level writer
-                // ends the branch.
+                // A reader goes back to the writers of what it reads, and a channel handler to
+                // the calls that produce what it handles, then to their callers; a
+                // repository-level writer ends the branch.
                 for link in graph.out.get(id).into_iter().flatten() {
                     let writer = link.provider.as_str();
+                    if let Some(&call @ (n, c)) = graph.calls.get(writer) {
+                        if shown.insert((c.caller.as_str(), true)) {
+                            let text = format!(
+                                "{} {} {}",
+                                arrow(link),
+                                self.site(call),
+                                self.caller(call)
+                            );
+                            self.enter(&c.caller, depth + 1, Row::link(text, n, link));
+                        }
+                        continue;
+                    }
                     if shown.insert((writer, true)) {
                         let (m, text) = self.node(writer);
                         let text = format!("{} {text}", arrow(link));
@@ -458,6 +478,16 @@ impl<'a> Walk<'_, 'a> {
                 let text = format!("{} {text}", arrow(link));
                 self.enter(&link.provider, depth, Row::link(text, m, link));
             }
+        }
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if !shown.insert((handler, true)) {
+                continue;
+            }
+            let (m, text) = self.node(handler);
+            let text = format!("{} {text}", arrow(link));
+            self.enter(handler, depth, Row::link(text, m, link));
         }
     }
 

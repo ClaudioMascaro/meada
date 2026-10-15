@@ -14,6 +14,26 @@
       "hash": "673e8154604d801ca80ebeb8abbe955d0c4f4dbf982ec42de7c4d48ab40e0ae9"
     },
     {
+      "path": "src/messages/consume.ts",
+      "hash": "81fe0162e5e032340bc2617b7cf538ab41cee7f69e96470efd28b128944a5770"
+    },
+    {
+      "path": "src/messages/handlers.ts",
+      "hash": "7df9c2bf5e63547bc93a3f74808d8cfb9d3d74a8d5e6b7f1e686be499fc908bc"
+    },
+    {
+      "path": "src/messages/kafka.ts",
+      "hash": "7e0a0d1488ee1fabd6d67953b00dafb41bb955d82ebbf3f5c829f4523a0c3c12"
+    },
+    {
+      "path": "src/messages/produce.ts",
+      "hash": "99b8351f01efc5d943a36fc7b3be58161c9ebb3f1e9f442e3740e05efa017beb"
+    },
+    {
+      "path": "src/messages/topics.ts",
+      "hash": "98db0d23d9c687597bb5767087188bf5035c4194f58d5e287f6c081b0de3ab95"
+    },
+    {
       "path": "src/shapes/circle.ts",
       "hash": "0d6a842df74ebec2b924f1aa6a06a82dde7147fe6dc3a686fa9165053f32883e"
     },
@@ -101,6 +121,134 @@
         "path": "src/math.ts",
         "start": 141,
         "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 239,
+        "end": 443
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 381,
+        "end": 434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 752,
+        "end": 1027
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 509,
+        "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 618,
+        "end": 673
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1132,
+        "end": 1210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1219,
+        "end": 1280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1282,
+        "end": 1333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "span": {
+        "path": "src/messages/handlers.ts",
+        "start": 7,
+        "end": 65
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 494,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 611,
+        "end": 674
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emitRefund",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 683,
+        "end": 734
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1294,
+        "end": 1405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 204,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 813,
+        "end": 987
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::retry",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 996,
+        "end": 1046
       }
     },
     {
@@ -389,6 +537,303 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::record#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 412,
+        "end": 427
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders::consumer.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 349,
+        "end": 440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders::consumer.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 280,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::kafka.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 884,
+        "end": 923
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::payments.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 984,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::payments.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 933,
+        "end": 974
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds::record#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 653,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds::auditor.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 600,
+        "end": 679
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds::auditor.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 551,
+        "end": 590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listen::retrier.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1179,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listenRetries::listen#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1260,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 216,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.consumer#1",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 278,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.producer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 174,
+        "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::other.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 471,
+        "end": 507
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::deliver::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 552,
+        "end": 599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emit::deliver#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 651,
+        "end": 671
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::emitRefund",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 716,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::fake.producer#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1269,
+        "end": 1284
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced::fakeProducer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1362,
+        "end": 1402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced::transport.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1321,
+        "end": 1358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 242,
+        "end": 292
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 302,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 359,
+        "end": 418
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 946,
+        "end": 984
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay::relay#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 905,
+        "end": 931
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::retry",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1024,
+        "end": 1043
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area::square#0",
       "caller": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
       "target": "example.com/acme/conformance::src/math.ts::square",
@@ -466,7 +911,90 @@
       }
     }
   ],
-  "providers": [],
-  "consumers": [],
-  "links": []
+  "providers": [
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1"
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2"
+    },
+    {
+      "contract": "channel::kafka::payments",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0"
+    },
+    {
+      "contract": "channel::kafka::refunds",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0"
+    },
+    {
+      "contract": "channel::kafka::retries",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::refunds",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::retries",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::payments",
+      "site": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0",
+      "contract": "channel::kafka::refunds",
+      "level": "exact",
+      "reason": "channel::kafka::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0",
+      "contract": "channel::kafka::retries",
+      "level": "exact",
+      "reason": "channel::kafka::retries"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0",
+      "contract": "channel::kafka::payments",
+      "level": "exact",
+      "reason": "channel::kafka::payments"
+    }
+  ]
 }

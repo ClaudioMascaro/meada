@@ -22,8 +22,8 @@ _Avoid_: snippet, line range
 
 **Language pack**:
 What Meada knows about one language: the file extensions it handles and the tree-sitter
-queries that read what one file defines, imports, exports and calls. It never touches the index
-or other files. A pack is done when it passes the conformance suite over its fixture.
+queries that read what one file defines, imports, exports and calls, and the producer and
+consumer calls of the message libraries it knows. It never touches the index. A pack is done when it passes the conformance suite over its fixture.
 _Avoid_: plugin, parser, grammar
 
 **Language adapter**:
@@ -60,18 +60,19 @@ search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
 
 **Client wrapper**:
-A function whose call to an HTTP client (`fetch` in v0.1) takes its URL or method from the
-function's own parameters. Each call site of the wrapper is a consumer, read with its
-arguments in place of the parameters, through any number of wrapper levels.
+A function whose call to an HTTP client (`fetch`) or a message client (a Kafka producer) takes
+its URL, method or channel name from the function's own parameters. Each call site of the
+wrapper is a consumer or producer, read with its arguments in place of the parameters, through
+any number of wrapper levels.
 _Avoid_: API client, helper, fetcher
 
 **Contract**:
-What one repository exposes and another depends on, such as an HTTP route, a queue, a package or
-a shared resource.
+What one repository exposes and another depends on, such as an HTTP route, a channel, a package
+or a shared resource.
 _Avoid_: interface, integration
 
 **Contract kind**:
-A category of contract with its own matching rules, such as HTTP route, queue or package.
+A category of contract with its own matching rules, such as HTTP route, channel or package.
 _Avoid_: contract type, protocol
 
 **Gateway prefix**:
@@ -90,6 +91,19 @@ _Avoid_: datastore
 The sides of a resource: what writes it (a provider of its contract) and what reads it (a
 consumer). Each is a `via` symbol of the entry, or the repository as a whole.
 _Avoid_: producer, subscriber
+
+**Channel**:
+A queue or topic of a broker, identified by its broker kind and its name as evaluated:
+`channel::kafka::orders.created`. The same name under two broker kinds is two channels; broker
+clusters are not modelled, so one name of one kind is one channel across the workspace. Every
+consumer of a channel links to every producer of it, in the same repository too.
+_Avoid_: queue (for the kind), topic (for the kind), stream
+
+**Producer**:
+The provider side of a channel: the call that sends to it, or the call site of a client wrapper
+that leads to one. Its consumer side is the handler of the messages, the function a subscription
+names. Messages go from producer to handler, so `trace` goes down that way.
+_Avoid_: publisher, sender, writer
 
 **Repository-level**:
 A resource side that is the repository as a whole, because its entry names no `via` symbol the

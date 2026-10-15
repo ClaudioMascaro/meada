@@ -155,6 +155,65 @@ fn a_resource_both_sides_read_and_write_closes_a_cycle() {
     );
 }
 
+/// The gateway's `createOrder` produces the Kafka topic `orders.created` through its
+/// `publish` wrapper; the worker's `onOrderCreated` handles it (spec #20).
+const PRODUCER: &str = "example.com/chain/gateway::src/checkout.ts::createOrder";
+const HANDLER: &str = "example.com/chain/worker::src/consumer.ts::onOrderCreated";
+
+#[test]
+fn trace_down_from_a_producer_crosses_the_channel_into_its_handler() {
+    let (web, _, _) = chain("trace_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From(PRODUCER), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.created] example.com/chain/worker \
+             src/consumer.ts:13 onOrderCreated"
+        ),
+        "{answer}"
+    );
+    assert_golden("chain.trace-channel-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_from_a_handler_crosses_the_channel_then_http_into_the_web_app() {
+    let (web, _, _) = chain("trace_channel_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From(HANDLER), Direction::Up, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.created] example.com/chain/gateway \
+             src/checkout.ts:11 createOrder"
+        ),
+        "{answer}"
+    );
+    assert_golden("chain.trace-channel-up.txt", &answer);
+}
+
+#[test]
+fn a_trace_from_a_channel_points_to_context() {
+    let (web, _, _) = chain("trace_channel_start");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("channel::kafka::orders.created"),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+
+    assert!(answer.contains("is a channel"), "{answer}");
+}
+
 #[test]
 fn trace_up_from_a_reader_crosses_the_resource_into_its_writer_and_upstream() {
     let (web, _, _) = chain("trace_resource_up");

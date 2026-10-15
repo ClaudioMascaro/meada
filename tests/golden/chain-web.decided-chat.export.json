@@ -15,7 +15,7 @@
     },
     {
       "path": "src/orders.ts",
-      "hash": "986abf5b87e61db849de0470c50cafd3d75a780216894b78240fceee40ff6db8"
+      "hash": "10cae4a1d0e91138874c148de586a3eac0bd91d1a584bf29b1d725619ac0fa93"
     },
     {
       "path": "src/status.ts",
@@ -53,6 +53,14 @@
         "path": "src/orders.ts",
         "start": 247,
         "end": 335
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 344,
+        "end": 429
       }
     },
     {
@@ -148,6 +156,17 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::createOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 388,
+        "end": 426
+      }
+    },
+    {
       "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
       "caller": "example.com/chain/web::src/orders.ts::listOrders",
       "target": "example.com/chain/web::src/api/client.ts::request",
@@ -189,6 +208,11 @@
       "via": "env:GATEWAY_URL"
     },
     {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/web::src/orders.ts::listOrders::request#0",
       "via": "env:GATEWAY_URL"
@@ -209,6 +233,13 @@
       "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
       "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
       "contract": "http::DELETE::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "contract": "http::PUT::/api/orders/{}",
       "level": "inferred",
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },

@@ -71,6 +71,22 @@ fn typescript_and_javascript() {
             "src/math.ts::scale",
             "src/math.ts::scale.times",
             "src/math.ts::square",
+            "src/messages/consume.ts::consumeOrders",
+            "src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+            "src/messages/consume.ts::consumePayments",
+            "src/messages/consume.ts::consumeRefunds",
+            "src/messages/consume.ts::consumeRefunds.kafka refunds",
+            "src/messages/consume.ts::listen",
+            "src/messages/consume.ts::listenRetries",
+            "src/messages/consume.ts::record",
+            "src/messages/handlers.ts::onPayment",
+            "src/messages/produce.ts::deliver",
+            "src/messages/produce.ts::emit",
+            "src/messages/produce.ts::emitRefund",
+            "src/messages/produce.ts::notProduced",
+            "src/messages/produce.ts::produceAll",
+            "src/messages/produce.ts::relay",
+            "src/messages/produce.ts::retry",
             "src/shapes/circle.ts::Circle",
             "src/shapes/circle.ts::Circle.area",
             "src/shapes/circle.ts::Circle.constructor",
@@ -182,4 +198,60 @@ fn typescript_and_javascript() {
             ("src/util/log.js::default::console.log#0", None, &[]),
         ],
     );
+}
+
+/// The kafkajs forms of the TS/JS pack (spec #20): every producer and consumer of the
+/// fixture, as `(consumer, producer, channel)`, all `exact`. `transport.send` and a client of
+/// another package produce nothing.
+#[test]
+fn typescript_and_javascript_kafkajs() {
+    let repo = fixture_repo("conformance_kafkajs", "conformance-ts-js", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
+
+    let links: Vec<(String, String, String, &str)> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            (
+                rel(l["consumer"].as_str().unwrap()),
+                rel(l["provider"].as_str().unwrap()),
+                l["reason"].as_str().unwrap().to_string(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+
+    let consume = "src/messages/consume.ts::";
+    let produce = "src/messages/produce.ts::";
+    let link = |consumer: &str, producer: &str, channel: &str| {
+        (
+            consumer.to_string(),
+            format!("{produce}{producer}"),
+            format!("channel::kafka::{channel}"),
+            "exact",
+        )
+    };
+    let orders = format!("{consume}consumeOrders.kafka orders.created orders.shipped");
+    let mut expected = vec![
+        link(&orders, "produceAll::producer.send#1", "orders.created"),
+        link(&orders, "produceAll::producer.send#2", "orders.shipped"),
+        link(
+            &format!("{consume}consumeRefunds.kafka refunds"),
+            "emitRefund::emit#0",
+            "refunds",
+        ),
+        link(
+            &format!("{consume}listenRetries"),
+            "retry::relay#0",
+            "retries",
+        ),
+        link(
+            "src/messages/handlers.ts::onPayment",
+            "produceAll::producer.send#0",
+            "payments",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(links, expected);
 }
