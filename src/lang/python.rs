@@ -6,7 +6,7 @@ use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, children,
+    Call, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, Star, children,
     named, text,
 };
 use crate::{Result, qualify};
@@ -98,7 +98,7 @@ impl LanguagePack for Python {
                 in_class: inner_class,
             }));
         }
-        facts.exports = module.exports();
+        (facts.exports, facts.star) = module.exports();
         Ok(facts)
     }
 
@@ -186,32 +186,27 @@ impl Module {
         }
     }
 
-    /// A module's public names: every one not starting with `_` (imports included, as that is
-    /// how a package re-exports) and its star imports' exports; a literal `__all__` replaces
-    /// them. A computed `__all__` is ignored.
-    fn exports(self) -> Vec<Export> {
-        let local = |name: String| Export::Local {
-            exported: name.clone(),
-            local: name,
-        };
-        if let Some(all) = self.all {
-            return all.into_iter().map(local).collect();
-        }
+    /// What an explicit import or an attribute access names: every module-level name (imports
+    /// included, as that is how a package re-exports) and its star imports' names. What
+    /// `import *` takes is a literal `__all__`, else the public names; a computed `__all__` is
+    /// ignored.
+    fn exports(self) -> (Vec<Export>, Star) {
         let mut seen = HashSet::new();
-        let public = self
-            .names
-            .into_iter()
-            .filter(|n| !n.starts_with('_') && seen.insert(n.clone()));
-        public
-            .map(local)
+        let exports = (self.names.into_iter())
+            .filter(|n| seen.insert(n.clone()))
+            .map(|name| Export::Local {
+                exported: name.clone(),
+                local: name,
+            })
             .chain(self.stars.into_iter().map(|source| Export::All { source }))
-            .collect()
+            .collect();
+        (exports, self.all.map_or(Star::Public, Star::Only))
     }
 }
 
 /// The repository-relative files that module `name`, a `/`-separated path, may be under
-/// `base`: `name.py`, or the `__init__.py` of the package `name` (`base` itself when `name`
-/// is empty).
+/// `base`: the `__init__.py` of the package `name` (`base` itself when `name` is empty), which
+/// Python prefers, or `name.py`.
 fn files(base: &str, name: &str) -> Vec<String> {
     let path = [base, name]
         .into_iter()
@@ -226,7 +221,7 @@ fn files(base: &str, name: &str) -> Vec<String> {
     if name.is_empty() {
         vec![init]
     } else {
-        vec![format!("{path}.py"), init]
+        vec![init, format!("{path}.py")]
     }
 }
 
@@ -238,18 +233,22 @@ fn source_roots(src: &[u8]) -> Result<Vec<String>> {
     let tool = config.get("tool");
     let setuptools = tool.and_then(|t| t.get("setuptools"));
     let mut roots: Vec<String> = Vec::new();
-    // `"" = "src"` roots every package in `src`; `"pkg" = "lib/pkg"` roots `pkg` in `lib`.
+    // `"" = "src"` roots every package in `src`; `"pkg" = "lib/pkg"` roots `pkg` in `lib`, and
+    // `"a.b" = "lib/a/b"` roots `a.b` in `lib`. A directory not named after its package says
+    // nothing about a root.
     let dirs = setuptools.and_then(|s| s.get("package-dir"));
     for (package, dir) in dirs.and_then(toml::Value::as_table).into_iter().flatten() {
-        let (Some(dir), Some(package)) = (dir.as_str().and_then(clean), clean(package)) else {
+        let (Some(dir), Some(package)) = (
+            dir.as_str().and_then(clean),
+            clean(&package.replace('.', "/")),
+        ) else {
             continue;
         };
-        roots.extend(if package.is_empty() {
-            Some(dir)
-        } else {
-            dir.strip_suffix(&package)
-                .and_then(|root| clean(root.trim_end_matches('/')))
-        });
+        if package.is_empty() {
+            roots.push(dir);
+        } else if let Some(root) = dir.strip_suffix(&format!("/{package}")) {
+            roots.push(root.to_string());
+        }
     }
     let find = setuptools.and_then(|s| s.get("packages")?.get("find"));
     let wheres = find.and_then(|f| f.get("where")?.as_array());
@@ -373,10 +372,11 @@ fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
             },
             _ => (text(item, src), text(item, src)),
         };
-        add(local, source, Imported::Name(name.to_string()));
-        // `from p import m` also names the submodule `m` of `p`, when `p` exports no `m`.
+        // `from p import m` also names the submodule `m` of `p`, when `p` exports no `m`. The
+        // resolver tries a name's imports last first, so the name of `p` comes after.
         let join = if source.ends_with('.') { "" } else { "." };
         add(local, &format!("{source}{join}{name}"), Imported::Namespace);
+        add(local, source, Imported::Name(name.to_string()));
     }
 }
 

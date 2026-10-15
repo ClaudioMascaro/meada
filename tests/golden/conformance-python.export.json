@@ -6,6 +6,38 @@
       "hash": "6e030b5535a854cae283df549ca1c4ab3601286c75333208733052370d8121e7"
     },
     {
+      "path": "explicit/__init__.py",
+      "hash": "30efbc2396b1ddedea17bf549f92d6ce339458cc1ebaa7fc09ee8fe5df1e2ec9"
+    },
+    {
+      "path": "explicit/core.py",
+      "hash": "f1f790813876f50313e253b475c8385f850e06365d998431d30cd6d36cdbf642"
+    },
+    {
+      "path": "explicit/first.py",
+      "hash": "61d4b84cce64e2625f17a7ea07f4c049d0388f201003045c356450e8eeb0f43d"
+    },
+    {
+      "path": "explicit/letters.py",
+      "hash": "527b1ac8ac9399ffb2f85afac63814393e93af8521655c79ae5b29fa56a41b6b"
+    },
+    {
+      "path": "explicit/mod.py",
+      "hash": "f22291b2cb6b4e0ef5052561e5852d4f673281883fa57028ef51767cfcb98126"
+    },
+    {
+      "path": "explicit/second.py",
+      "hash": "81f02370c25fbabc3cfdf0ecba9f339eaa003bdd502d0373446d04d9a29c317d"
+    },
+    {
+      "path": "explicit/use.py",
+      "hash": "2965052cfe7941db9814e408af40ad1f768217c35b782529b34c1f497fe132eb"
+    },
+    {
+      "path": "explicit/util.py",
+      "hash": "e183e05a365277f5d59dc6b8a528b983cb625e94dc949007b95f313babe4e066"
+    },
+    {
       "path": "geometry/__init__.py",
       "hash": "75ae69b68c41125e96d8110830a74d354f294f2ef138a5b623eab781da65e300"
     },
@@ -36,6 +68,14 @@
     {
       "path": "main.py",
       "hash": "e2515ba3bb1eb8331e862cee8cbb2900fcd19706dbcf1653446751723e731a5e"
+    },
+    {
+      "path": "shadow.py",
+      "hash": "45851e9a73e751e14e276f31f05dde43fbb638a459788a32922fe86a49c1a60b"
+    },
+    {
+      "path": "shadow/__init__.py",
+      "hash": "e53679ba99b9af5b3d0b1014dff1346a4b5308553792556003cc79483e3228bc"
     },
     {
       "path": "src/billing/__init__.py",
@@ -196,6 +236,86 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::explicit/core.py::default",
+      "span": {
+        "path": "explicit/core.py",
+        "start": 0,
+        "end": 27
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/first.py::pick",
+      "span": {
+        "path": "explicit/first.py",
+        "start": 0,
+        "end": 24
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/letters.py::alpha",
+      "span": {
+        "path": "explicit/letters.py",
+        "start": 0,
+        "end": 25
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/letters.py::beta",
+      "span": {
+        "path": "explicit/letters.py",
+        "start": 28,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/mod.py::_hidden",
+      "span": {
+        "path": "explicit/mod.py",
+        "start": 167,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/mod.py::outside",
+      "span": {
+        "path": "explicit/mod.py",
+        "start": 137,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/mod.py::public",
+      "span": {
+        "path": "explicit/mod.py",
+        "start": 108,
+        "end": 134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/second.py::pick",
+      "span": {
+        "path": "explicit/second.py",
+        "start": 0,
+        "end": 24
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 357,
+        "end": 646
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/util.py::get",
+      "span": {
+        "path": "explicit/util.py",
+        "start": 0,
+        "end": 23
+      }
+    },
+    {
       "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
       "span": {
         "path": "geometry/extra/measure.py",
@@ -313,6 +433,22 @@
         "path": "main.py",
         "start": 399,
         "end": 798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shadow.py::from_module",
+      "span": {
+        "path": "shadow.py",
+        "start": 65,
+        "end": 96
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shadow/__init__.py::from_package",
+      "span": {
+        "path": "shadow/__init__.py",
+        "start": 0,
+        "end": 32
       }
     },
     {
@@ -571,6 +707,116 @@
         "path": "defs.py",
         "start": 930,
         "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::_hidden#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/mod.py::_hidden",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 389,
+        "end": 398
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::beta#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/letters.py::beta",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 435,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::default#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/core.py::default",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 446,
+        "end": 455
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::from_package#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::shadow/__init__.py::from_package",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 606,
+        "end": 620
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::get#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "explicit/use.py",
+        "start": 596,
+        "end": 601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::m._hidden#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/mod.py::_hidden",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 419,
+        "end": 430
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::m.outside#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/mod.py::outside",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 403,
+        "end": 414
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::outside#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/mod.py::outside",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 375,
+        "end": 384
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::pick#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::explicit/second.py::pick",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 499,
+        "end": 505
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/use.py::report::shadow.from_package#0",
+      "caller": "example.com/acme/conformance::explicit/use.py::report",
+      "target": "example.com/acme/conformance::shadow/__init__.py::from_package",
+      "level": "exact",
+      "span": {
+        "path": "explicit/use.py",
+        "start": 625,
+        "end": 646
       }
     },
     {

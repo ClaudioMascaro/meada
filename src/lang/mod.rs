@@ -54,7 +54,10 @@ pub fn pack(index: usize) -> &'static dyn LanguagePack {
 pub struct Facts {
     pub defs: Vec<Def>,
     pub imports: Vec<Import>,
+    /// Everything an explicit import can name: `exports` lists every binding the file makes
+    /// available, and `star` narrows what a star import takes from them.
     pub exports: Vec<Export>,
+    pub star: Star,
     pub calls: Vec<Call>,
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
@@ -62,7 +65,7 @@ pub struct Facts {
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from
-/// 'source'`. Several imports may bind one `local`: the first that resolves wins. A `local`
+/// 'source'`. Several imports may bind one `local`: the last that resolves wins. A `local`
 /// may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its head.
 #[derive(Serialize, Deserialize)]
 pub struct Import {
@@ -77,7 +80,7 @@ pub enum Imported {
     Name(String),
     /// The whole module.
     Namespace,
-    /// Every name the module exports, as `from source import *` binds them (`local` is
+    /// Every name the module's `star` takes, as `from source import *` binds them (`local` is
     /// unused). A name no import binds is looked up here, the last such import first.
     All,
 }
@@ -92,8 +95,20 @@ pub enum Export {
         source: String,
         name: Imported,
     },
-    /// Every name `source` exports, except `default`.
+    /// Every name `source` exports that its `star` lets through.
     All { source: String },
+}
+
+/// Which of a file's exports a star import (`export * from`, `from m import *`) takes.
+#[derive(Default, Serialize, Deserialize)]
+pub enum Star {
+    /// Every one except `default`.
+    #[default]
+    ExceptDefault,
+    /// Those not starting with `_`.
+    Public,
+    /// Only these names: a literal `__all__`.
+    Only(Vec<String>),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

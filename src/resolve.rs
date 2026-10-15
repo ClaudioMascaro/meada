@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Value};
+use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Star, Value};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -213,29 +213,32 @@ impl<'a> Resolver<'a> {
         self.imported(path, name, seen)
     }
 
-    /// What the file's imports bind `name` to. Several imports may bind one name: the first
-    /// that resolves wins, else the first one's answer stands. A name none binds is looked
-    /// up in the modules of `import *`, the last first.
+    /// What the file's imports bind `name` to. Several imports may bind one name: the last
+    /// that resolves wins, else the last one's answer stands. A name no import binds is
+    /// looked up in the modules of `import *`, the last first.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         let imports = &self.files[path].imports;
-        let mut first = None;
-        for import in imports.iter().filter(|i| i.local == name) {
+        let mut last = None;
+        for import in imports.iter().rev().filter(|i| i.local == name) {
             let found = self.import(path, &import.source, &import.name, seen);
             if !matches!(found, Binding::Unknown | Binding::External) {
                 return found;
             }
-            first.get_or_insert(found);
+            last.get_or_insert(found);
+        }
+        if let Some(found) = last {
+            return found;
         }
         for import in imports.iter().rev() {
             if matches!(import.name, Imported::All)
                 && let Some(module) = self.module(path, &import.source)
                 && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                    self.export(module, name, seen)
+                    self.star(module, name, seen)
             {
                 return found;
             }
         }
-        first.unwrap_or(Binding::Unknown)
+        Binding::Unknown
     }
 
     /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
@@ -273,7 +276,21 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// What `path` exports as `name`.
+    /// What a star import of `path` takes as `name`.
+    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        let taken = match &self.files[path].star {
+            Star::ExceptDefault => name != "default",
+            Star::Public => !name.starts_with('_'),
+            Star::Only(names) => names.iter().any(|n| n == name),
+        };
+        if taken {
+            self.export(path, name, seen)
+        } else {
+            Binding::Unknown
+        }
+    }
+
+    /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         if !seen.insert((path, name)) {
             return Binding::Unknown;
@@ -292,15 +309,13 @@ impl<'a> Resolver<'a> {
                 _ => {}
             }
         }
-        if name != "default" {
-            for export in exports {
-                if let Export::All { source } = export
-                    && let Some(module) = self.module(path, source)
-                    && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                        self.export(module, name, seen)
-                {
-                    return found;
-                }
+        for export in exports {
+            if let Export::All { source } = export
+                && let Some(module) = self.module(path, source)
+                && let found @ (Binding::Def(_) | Binding::Module(_)) =
+                    self.star(module, name, seen)
+            {
+                return found;
             }
         }
         Binding::Unknown

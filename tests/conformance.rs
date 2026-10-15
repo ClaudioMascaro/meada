@@ -205,6 +205,16 @@ fn python() {
             "defs.py::register",
             "defs.py::register.wrapper",
             "defs.py::sorted_names",
+            "explicit/core.py::default",
+            "explicit/first.py::pick",
+            "explicit/letters.py::alpha",
+            "explicit/letters.py::beta",
+            "explicit/mod.py::_hidden",
+            "explicit/mod.py::outside",
+            "explicit/mod.py::public",
+            "explicit/second.py::pick",
+            "explicit/use.py::report",
+            "explicit/util.py::get",
             "geometry/extra/measure.py::perimeter",
             "geometry/shapes.py::Circle",
             "geometry/shapes.py::Circle.__init__",
@@ -220,6 +230,8 @@ fn python() {
             "helpers.py::format_name",
             "legacy.py::legacy",
             "main.py::main",
+            "shadow.py::from_module",
+            "shadow/__init__.py::from_package",
             "src/billing/invoice.py::total",
             "src/billing/tax.py::fee",
             "src/billing/tax.py::vat",
@@ -407,6 +419,58 @@ fn python() {
                 EXACT,
                 &["stars/computed.py::unnamed"],
             ),
+            // An explicit import or an attribute of a module sees every name, whatever
+            // `__all__` and the underscore prefix say, and a re-export `__all__` leaves out; a
+            // star import in a package is found by name too, `default` included.
+            (
+                "explicit/use.py::report::outside#0",
+                EXACT,
+                &["explicit/mod.py::outside"],
+            ),
+            (
+                "explicit/use.py::report::_hidden#0",
+                EXACT,
+                &["explicit/mod.py::_hidden"],
+            ),
+            (
+                "explicit/use.py::report::m.outside#0",
+                EXACT,
+                &["explicit/mod.py::outside"],
+            ),
+            (
+                "explicit/use.py::report::m._hidden#0",
+                EXACT,
+                &["explicit/mod.py::_hidden"],
+            ),
+            (
+                "explicit/use.py::report::beta#0",
+                EXACT,
+                &["explicit/letters.py::beta"],
+            ),
+            (
+                "explicit/use.py::report::default#0",
+                EXACT,
+                &["explicit/core.py::default"],
+            ),
+            // Of two imports of one name the later wins, and an explicit import of a package
+            // outside the repository is not overridden by a star import.
+            (
+                "explicit/use.py::report::pick#0",
+                EXACT,
+                &["explicit/second.py::pick"],
+            ),
+            ("explicit/use.py::report::get#0", None, &[]),
+            // A package comes before a module of the same name.
+            (
+                "explicit/use.py::report::from_package#0",
+                EXACT,
+                &["shadow/__init__.py::from_package"],
+            ),
+            (
+                "explicit/use.py::report::shadow.from_package#0",
+                EXACT,
+                &["shadow/__init__.py::from_package"],
+            ),
             // A package outside the repository stays unresolved.
             ("main.py::main::np.array#0", None, &[]),
             // Only a unique name match finds these: a function no import names, a method on
@@ -450,8 +514,21 @@ fn python_source_roots_come_from_pyproject() {
     let exact = Some("exact".to_string());
     // Nothing declared: `src` is a root, `lib` is not.
     assert_eq!(python_roots("python_roots_none", ""), [None, exact.clone()]);
-    // A declared root replaces `src`, in each of the three forms.
+    // A `package-dir` whose directory is not named after the package, even by its last
+    // letters, says nothing about a root.
+    assert_eq!(
+        python_roots(
+            "python_roots_package_dir_suffix",
+            "[tool.setuptools]\npackage-dir = { shop = \"libshop\" }\n",
+        ),
+        [None, exact.clone()]
+    );
+    // A declared root replaces `src`, in each of the forms.
     for (case, pyproject) in [
+        (
+            "python_roots_package_dir_dotted",
+            "[tool.setuptools.package-dir]\n\"shop.cart\" = \"lib/shop/cart\"\n",
+        ),
         (
             "python_roots_package_dir",
             "[tool.setuptools.package-dir]\n\"\" = \"lib\"\n",
