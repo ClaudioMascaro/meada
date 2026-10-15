@@ -143,17 +143,16 @@ give byte-identical output.
   every module-level name (imports included), as an explicit import or `m.x` sees them; what
   `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
   Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
-  and `a.b.c` (dotted `Import::local`s); `from p import m` binds `m` twice, as a name `p`
-  exports and as the submodule `p.m` (the last that resolves wins); `from p import *` is
-  `Imported::All`. `modules` resolves them against the repository root, then the roots
+  and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
+  `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
   `packages.from`), or `src` when none is declared; a package comes before a module of the
   same name.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
-  bound by several imports (the last that resolves wins), a callee may start with a dotted
-  import, and a name no import binds is looked up in what the `Facts::star` of each
-  `Imported::All` import takes, last first. `Code` folds constants and client wrapper arguments into values for contract kinds.
+  bound by several imports (the latest in source order decides, whatever it resolves to), a
+  callee may start with a dotted import, and an `Imported::All` import counts as one binding
+  of each name its module's `Facts::star` takes. `Code` folds constants and client wrapper arguments into values for contract kinds.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
   `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).

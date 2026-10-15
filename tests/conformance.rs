@@ -206,13 +206,18 @@ fn python() {
             "defs.py::register.wrapper",
             "defs.py::sorted_names",
             "explicit/core.py::default",
+            "explicit/early.py::kept",
+            "explicit/early.py::swept",
+            "explicit/early.py::taken",
             "explicit/first.py::pick",
             "explicit/letters.py::alpha",
             "explicit/letters.py::beta",
             "explicit/mod.py::_hidden",
             "explicit/mod.py::outside",
             "explicit/mod.py::public",
+            "explicit/order.py::order",
             "explicit/second.py::pick",
+            "explicit/sweeper.py::swept",
             "explicit/use.py::report",
             "explicit/util.py::get",
             "geometry/extra/measure.py::perimeter",
@@ -460,6 +465,20 @@ fn python() {
                 &["explicit/second.py::pick"],
             ),
             ("explicit/use.py::report::get#0", None, &[]),
+            // The latest import that binds a name decides: an external one after a resolving
+            // one leaves it unresolved, a star import after an explicit one takes the name
+            // over when it provides it, and only then.
+            ("explicit/order.py::order::taken#0", None, &[]),
+            (
+                "explicit/order.py::order::swept#0",
+                EXACT,
+                &["explicit/sweeper.py::swept"],
+            ),
+            (
+                "explicit/order.py::order::kept#0",
+                EXACT,
+                &["explicit/early.py::kept"],
+            ),
             // A package comes before a module of the same name.
             (
                 "explicit/use.py::report::from_package#0",

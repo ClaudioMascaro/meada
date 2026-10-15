@@ -65,8 +65,9 @@ pub struct Facts {
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from
-/// 'source'`. Several imports may bind one `local`: the last that resolves wins. A `local`
-/// may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its head.
+/// 'source'`. Several imports may bind one `local`: the latest in source order decides. A
+/// `local` may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its
+/// head.
 #[derive(Serialize, Deserialize)]
 pub struct Import {
     pub local: String,
@@ -78,10 +79,15 @@ pub struct Import {
 pub enum Imported {
     /// One exported name; a default import is the name `default`.
     Name(String),
+    /// A name the module exports or, when it exports none (or the module is not a file of
+    /// the repository), the module `module`: `from p import m` names `m` of `p` or the
+    /// submodule `p.m`. `module` is a specifier, as `Import::source` is.
+    Member { name: String, module: String },
     /// The whole module.
     Namespace,
     /// Every name the module's `star` takes, as `from source import *` binds them (`local` is
-    /// unused). A name no import binds is looked up here, the last such import first.
+    /// unused). It binds a name only when the module takes it, and then like an import of
+    /// that name written there.
     All,
 }
 

@@ -213,23 +213,14 @@ impl<'a> Resolver<'a> {
         self.imported(path, name, seen)
     }
 
-    /// What the file's imports bind `name` to. Several imports may bind one name: the last
-    /// that resolves wins, else the last one's answer stands. A name no import binds is
-    /// looked up in the modules of `import *`, the last first.
+    /// What the file's imports bind `name` to. Several imports may bind one name: the latest
+    /// in source order decides, whatever it resolves to. An import of every name binds
+    /// `name` only if the module takes it.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        let imports = &self.files[path].imports;
-        let mut last = None;
-        for import in imports.iter().rev().filter(|i| i.local == name) {
-            let found = self.import(path, &import.source, &import.name, seen);
-            if !matches!(found, Binding::Unknown | Binding::External) {
-                return found;
+        for import in self.files[path].imports.iter().rev() {
+            if import.local == name {
+                return self.import(path, &import.source, &import.name, seen);
             }
-            last.get_or_insert(found);
-        }
-        if let Some(found) = last {
-            return found;
-        }
-        for import in imports.iter().rev() {
             if matches!(import.name, Imported::All)
                 && let Some(module) = self.module(path, &import.source)
                 && let found @ (Binding::Def(_) | Binding::Module(_)) =
@@ -266,14 +257,21 @@ impl<'a> Resolver<'a> {
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
-        let Some(module) = self.module(path, source) else {
-            return Binding::External;
+        let found = match (name, self.module(path, source)) {
+            (_, None) => Binding::External,
+            (Imported::Namespace, Some(module)) => Binding::Module(module),
+            (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
+                self.export(module, name, seen)
+            }
+            (Imported::All, Some(_)) => Binding::Unknown,
         };
-        match name {
-            Imported::Namespace => Binding::Module(module),
-            Imported::Name(name) => self.export(module, name, seen),
-            Imported::All => Binding::Unknown,
+        if let Imported::Member { module, .. } = name
+            && matches!(found, Binding::Unknown | Binding::External)
+            && let Some(module) = self.module(path, module)
+        {
+            return Binding::Module(module);
         }
+        found
     }
 
     /// What a star import of `path` takes as `name`.
