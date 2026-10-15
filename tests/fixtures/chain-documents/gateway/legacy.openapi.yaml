@@ -1,0 +1,10 @@
+swagger: "2.0"
+info:
+  title: Legacy gateway
+  version: "0.9"
+paths:
+  /api/legacy:
+    get:
+      responses:
+        "200":
+          description: Gone

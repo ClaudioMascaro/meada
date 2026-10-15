@@ -96,7 +96,7 @@ impl ContractKind for Resource {
                     export.providers.push(Provider {
                         contract: contract.clone(),
                         site: site.clone(),
-                        gateway: None,
+                        ..Provider::default()
                     });
                 }
                 if resource.role.reads() {

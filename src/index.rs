@@ -8,17 +8,19 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::Result;
+use crate::config::Serve;
 use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
+use crate::document::{self, Summary};
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -28,7 +30,10 @@ const SCHEMA_VERSION: i64 = 9;
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach.
+/// none); they let `Engine::open_items` list the routes it may reach. `documents` holds each
+/// provider document (spec #21) with the same stat and hash as `files`, and its `summary`
+/// (`document::Summary` as JSON: format, version, title, routes and problems, derived from the
+/// bytes alone); a document that could not be read keeps its row, so its hash is cached too.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -49,6 +54,10 @@ CREATE TABLE contracts (
     method TEXT, fragments TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
+CREATE TABLE documents (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -153,7 +162,11 @@ struct Rows {
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
 /// repository, since constants and client wrappers reach across files. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files.
-pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
+///
+/// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
+/// a `[serve]` table the repository has none. They hold no code, so an edited document changes
+/// no code row: `Http::declare` reads them at query time.
+pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     let now = SystemTime::now();
     let tx = db.unchecked_transaction()?;
     let known = tx
@@ -167,7 +180,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         _ => {
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
-                 DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts;",
+                 DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
+                 DELETE FROM documents;",
             )?;
             None
         }
@@ -187,22 +201,21 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         })?
         .collect::<rusqlite::Result<_>>()?;
 
-    let walked = walk(root);
+    let all = walk(root);
+    let documents = (all.iter()).filter(|(path, _)| serve.declared && document::is_document(path));
+    refresh_documents(&tx, documents, now)?;
+    let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
+        .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
+        .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
     let mut changed = Vec::new();
-    for (path, abs, pack) in &walked {
-        let stat = fs::metadata(abs)?;
-        let size = stat.len() as i64;
-        let modified = stat.modified()?;
-        let mtime = modified
-            .duration_since(UNIX_EPOCH)
-            .ok()
-            .map(|d| d.as_nanos() as i64);
+    for &(path, abs, pack) in &walked {
+        let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
         if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
             continue;
         }
-        let mtime = mtime.filter(|_| modified + RACY < now);
+        let mtime = mtime.filter(|_| trusted);
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
         if known.is_some_and(|k| k.hash == hash) {
@@ -212,7 +225,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             )?;
             continue;
         }
-        let facts = lang::pack(*pack).parse(path, &src)?;
+        let facts = lang::pack(pack).parse(path, &src)?;
         changed.push(Parsed {
             path: path.clone(),
             hash,
@@ -432,20 +445,70 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// The files a language pack handles under `root`, sorted, with their pack.
-fn walk(root: &Path) -> Vec<(String, PathBuf, usize)> {
-    let mut files: Vec<(String, PathBuf, usize)> = WalkBuilder::new(root)
+/// Brings the `documents` table up to date with `found`, the documents on disk (path and
+/// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
+/// stored document not found leaves the table.
+fn refresh_documents<'a>(
+    tx: &Transaction,
+    found: impl Iterator<Item = &'a (String, PathBuf)>,
+    now: SystemTime,
+) -> Result<()> {
+    let stored: HashMap<String, (String, Option<i64>, i64)> = tx
+        .prepare("SELECT path, hash, mtime, size FROM documents")?
+        .query_map([], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?, r.get(3)?))))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut seen = HashSet::new();
+    for (path, abs) in found {
+        seen.insert(path.as_str());
+        let (size, mtime, trusted) = stat(abs, now)?;
+        let known = stored.get(path);
+        if known.is_some_and(|k| k.1.is_some() && k.1 == mtime && k.2 == size) {
+            continue;
+        }
+        let mtime = mtime.filter(|_| trusted);
+        let src = fs::read(abs)?;
+        let hash = blake3::hash(&src).to_hex().to_string();
+        if known.is_some_and(|k| k.0 == hash) {
+            tx.execute(
+                "UPDATE documents SET mtime = ?2, size = ?3 WHERE path = ?1",
+                params![path, mtime, size],
+            )?;
+            continue;
+        }
+        let summary = serde_json::to_string(&document::read(path, &src))?;
+        tx.execute(
+            "INSERT OR REPLACE INTO documents VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![path, hash, mtime, size, summary],
+        )?;
+    }
+    for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
+        tx.execute("DELETE FROM documents WHERE path = ?1", params![path])?;
+    }
+    Ok(())
+}
+
+/// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
+/// enough, by `RACY`, to be trusted on the next refresh.
+fn stat(abs: &Path, now: SystemTime) -> Result<(i64, Option<i64>, bool)> {
+    let stat = fs::metadata(abs)?;
+    let modified = stat.modified()?;
+    let mtime = modified
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_nanos() as i64);
+    Ok((stat.len() as i64, mtime, modified + RACY < now))
+}
+
+/// Every file under `root` but what `.gitignore` excludes, sorted.
+fn walk(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
         // The repository's own ignore files only, never those of directories above it.
         .parents(false)
         .build()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
-        .filter_map(|entry| {
-            let rel = relative(root, entry.path())?;
-            let pack = lang::pack_for(&rel)?;
-            Some((rel, entry.into_path(), pack))
-        })
+        .filter_map(|entry| Some((relative(root, entry.path())?, entry.into_path())))
         .collect();
     files.sort();
     files
@@ -571,10 +634,66 @@ pub(crate) struct Export {
     /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) bindings: Vec<Binding>,
+    /// The provider documents (spec #21), in path order; those read are exported, with
+    /// their contracts.
+    #[serde(
+        serialize_with = "documents_read",
+        skip_serializing_if = "no_document_read"
+    )]
+    pub(crate) documents: Vec<Document>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) stale_decisions: Vec<Stale>,
+}
+
+impl Export {
+    /// The document whose route `site` is, when `site` is a route only a document of this
+    /// repository lists: `<repository>::<document path>::<METHOD> <path>`.
+    pub(crate) fn document_of(&self, site: &str) -> Option<&str> {
+        let rest = site.strip_prefix(&self.repository)?.strip_prefix("::")?;
+        let (path, _) = rest.split_once("::")?;
+        let doc = self.documents.iter().find(|d| d.path == path)?;
+        Some(&doc.path)
+    }
+}
+
+/// A provider document of the repository and what was read from it.
+pub(crate) struct Document {
+    pub(crate) path: String,
+    pub(crate) summary: Summary,
+}
+
+/// A document read, as `meada export` shows it: path, format, version and its contracts,
+/// sorted.
+impl Serialize for Document {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        struct Shown<'a> {
+            path: &'a str,
+            format: &'a Option<String>,
+            version: &'a Option<String>,
+            contracts: BTreeSet<String>,
+        }
+        Shown {
+            path: &self.path,
+            format: &self.summary.format,
+            version: &self.summary.version,
+            contracts: self.summary.routes.iter().map(|r| r.contract()).collect(),
+        }
+        .serialize(s)
+    }
+}
+
+fn documents_read<S: Serializer>(
+    documents: &[Document],
+    s: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    s.collect_seq(documents.iter().filter(|d| d.summary.format.is_some()))
+}
+
+fn no_document_read(documents: &[Document]) -> bool {
+    documents.iter().all(|d| d.summary.format.is_none())
 }
 
 #[derive(Serialize)]
@@ -607,15 +726,27 @@ pub(crate) struct CallSite {
     pub(crate) span: Span,
 }
 
-/// The provider side of a contract: a symbol that serves it, a file, a repository, or the call
-/// that produces to a channel.
-#[derive(Serialize)]
+/// The provider side of a contract: a symbol that serves it, a file, a repository, the call
+/// that produces to a channel, or a route only a document lists
+/// (`<repository>::<document>::<METHOD> <path>`).
+#[derive(Serialize, Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
+    /// Every path a gateway serves the route at, with the reason for the rewrite: the
+    /// `[serve]` form first. `Http::declare` fills it; matching goes through
+    /// `http::gateway_contracts`.
+    #[serde(skip)]
+    pub(crate) gateways: Vec<Gateway>,
+}
+
+/// A path a gateway serves a route at, and why: `gateway prefix /shop`.
+pub(crate) struct Gateway {
+    pub(crate) path: String,
+    pub(crate) reason: String,
 }
 
 /// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
@@ -709,7 +840,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
-                gateway: None,
+                ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -746,6 +877,20 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<(String, String)> = db
+        .prepare(&format!(
+            "SELECT path, summary FROM {schema}.documents ORDER BY path"
+        ))?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let documents = (rows.into_iter())
+        .map(|(path, summary)| {
+            Ok(Document {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            })
+        })
+        .collect::<Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -755,6 +900,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         consumers,
         bindings,
         links: Vec::new(),
+        documents,
         stale_decisions: Vec::new(),
     })
 }
