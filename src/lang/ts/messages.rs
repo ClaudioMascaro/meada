@@ -14,6 +14,13 @@ const AWS_SQS: &str = "@aws-sdk/client-sqs";
 const SQS_CONSUMER: &str = "sqs-consumer";
 const NATS: &str = "nats";
 const NATS_CONNECTION: &str = "connect()";
+const BULLMQ: &str = "bullmq";
+const BULLMQ_QUEUE: &str = "new Queue()";
+const IOREDIS: &str = "ioredis";
+// A default import takes the name it is given; the client is also exported as `Redis`.
+const IOREDIS_CLIENT: [&str; 2] = ["new default()", "new Redis()"];
+const NODE_REDIS: &str = "redis";
+const NODE_REDIS_CLIENT: &str = "createClient()";
 
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
@@ -29,8 +36,15 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let (receiver, method) = (call.callee.rsplit_once('.')).unwrap_or(("", &call.callee));
             // A library form is a method of a client, or a class or function called itself.
             let chain = match method {
-                "send" | "subscribe" | "run" | "publish" if !receiver.is_empty() => receiver,
-                "SendMessageCommand" | "ReceiveMessageCommand" | "create" => &call.callee,
+                "send" | "subscribe" | "run" | "publish" | "add" | "xadd" | "xAdd"
+                | "xreadgroup" | "xReadGroup"
+                    if !receiver.is_empty() =>
+                {
+                    receiver
+                }
+                "SendMessageCommand" | "ReceiveMessageCommand" | "create" | "Worker" => {
+                    &call.callee
+                }
                 _ => continue,
             };
             let Some(origin) = code.origin(path, &call.scope, chain) else {
@@ -92,11 +106,41 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume("sqs", &|a| queue(a, "queueUrl"), handler));
                 }
                 (NATS, NATS_CONNECTION, "publish") => {
-                    out.extend(produce("nats", &|a| subject(a)));
+                    out.extend(produce("nats", &first));
                 }
                 (NATS, NATS_CONNECTION, "subscribe") => {
                     let handler = handler(code, path, n, 1, &["callback"]);
-                    out.extend(consume("nats", &|a| subject(a), handler));
+                    out.extend(consume("nats", &first, handler));
+                }
+                // The queue is named where the binding is made, not at the `add`.
+                (BULLMQ, BULLMQ_QUEUE, "add") => {
+                    let name = (origin.binding.and_then(|b| code.constructed(b)))
+                        .and_then(|args| name(args.first()?))
+                        .flatten();
+                    out.push(Message {
+                        broker: "bullmq",
+                        name,
+                        path: path.into(),
+                        call: n,
+                        role: Role::Producer,
+                    });
+                }
+                (BULLMQ, "Worker", _) => {
+                    let processor = (code.args(path, n).and_then(|a| a.get(1)))
+                        .and_then(|value| processor(code, path, &call.scope, value));
+                    out.extend(consume("bullmq", &first, processor));
+                }
+                (IOREDIS, expr, "xadd") if IOREDIS_CLIENT.contains(&expr) => {
+                    out.extend(produce("redis", &first));
+                }
+                (NODE_REDIS, NODE_REDIS_CLIENT, "xAdd") => {
+                    out.extend(produce("redis", &first));
+                }
+                (IOREDIS, expr, "xreadgroup") if IOREDIS_CLIENT.contains(&expr) => {
+                    out.extend(consume("redis", &after_streams, None));
+                }
+                (NODE_REDIS, NODE_REDIS_CLIENT, "xReadGroup") => {
+                    out.extend(consume("redis", &keys, None));
                 }
                 _ => {}
             }
@@ -145,7 +189,18 @@ fn handler<'a>(
     let handler = keys
         .iter()
         .find_map(|key| property(options, key).ok().flatten())?;
-    match handler {
+    processor(code, path, scope, handler)
+}
+
+/// The function `value`, written in `path` within `scope`, is: written in place or a
+/// definition of the repository.
+fn processor<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    value: &'a Value,
+) -> Option<Handler> {
+    match value {
         Value::Function(def) => Some(Handler::Inline {
             path: path.into(),
             def: def.clone(),
@@ -192,8 +247,9 @@ fn name(value: &Value) -> Option<Option<String>> {
     }
 }
 
-/// The subject a NATS `publish` or `subscribe` gives as its first argument.
-fn subject(args: &[Value]) -> Option<Vec<Option<String>>> {
+/// The channel name a call gives as its first argument: a NATS subject, the queue of a BullMQ
+/// `Worker`, the key of a Redis `xadd`.
+fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
     Some(vec![name(args.first().unwrap_or(&Value::Undefined))?])
 }
 
@@ -217,5 +273,36 @@ fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
         }
         _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
         _ => Some(vec![None]),
+    }
+}
+
+/// The streams an ioredis `xreadgroup` reads: the arguments after `STREAMS` that name them,
+/// the first half; the ids that close the list are the other half.
+fn after_streams(args: &[Value]) -> Option<Vec<Option<String>>> {
+    let keyword = |v: &Value| match v {
+        Value::Str(parts) => literal(parts).is_some_and(|s| s.eq_ignore_ascii_case("STREAMS")),
+        _ => false,
+    };
+    let Some(at) = args.iter().position(keyword) else {
+        return Some(vec![None]);
+    };
+    let rest = &args[at + 1..];
+    rest[..rest.len() / 2].iter().map(name).collect()
+}
+
+/// The streams a node-redis `xReadGroup` reads: the `key` of its third argument, an object or
+/// a list of them.
+fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
+    let key = |value: &Value| match value {
+        Value::Object(properties) => {
+            name(property(properties, "key").ok()?.unwrap_or(&Value::Unknown))
+        }
+        Value::Ref(_) => None,
+        _ => Some(None),
+    };
+    match args.get(2) {
+        Some(Value::List(items)) => items.iter().map(key).collect(),
+        Some(value) => Some(vec![key(value)?]),
+        None => Some(vec![None]),
     }
 }

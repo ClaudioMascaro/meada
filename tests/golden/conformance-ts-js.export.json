@@ -14,6 +14,10 @@
       "hash": "673e8154604d801ca80ebeb8abbe955d0c4f4dbf982ec42de7c4d48ab40e0ae9"
     },
     {
+      "path": "src/messages/bullmq.ts",
+      "hash": "4bf78146495d4c891ddee523d307d2aa2ce62ef67c2656e58a6d5bcb50f978da"
+    },
+    {
       "path": "src/messages/consume.ts",
       "hash": "81fe0162e5e032340bc2617b7cf538ab41cee7f69e96470efd28b128944a5770"
     },
@@ -32,6 +36,10 @@
     {
       "path": "src/messages/produce.ts",
       "hash": "99b8351f01efc5d943a36fc7b3be58161c9ebb3f1e9f442e3740e05efa017beb"
+    },
+    {
+      "path": "src/messages/redis.ts",
+      "hash": "6208c15ff0bc423434a921a7f9c978bd84af3f9ed3152599d2784b18509a3f34"
     },
     {
       "path": "src/messages/sqs.ts",
@@ -129,6 +137,86 @@
         "path": "src/math.ts",
         "start": 141,
         "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 755,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 513,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 827,
+        "end": 895
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1427,
+        "end": 1485
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::record",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1536,
+        "end": 1587
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1487,
+        "end": 1534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1280,
+        "end": 1360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 984,
+        "end": 1080
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1089,
+        "end": 1196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1155,
+        "end": 1192
       }
     },
     {
@@ -321,6 +409,102 @@
         "path": "src/messages/produce.ts",
         "start": 996,
         "end": 1046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 880,
+        "end": 962
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendBilling",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 971,
+        "end": 1020
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1100,
+        "end": 1192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 465,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 666,
+        "end": 803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2162,
+        "end": 2306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1942,
+        "end": 2046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2055,
+        "end": 2107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1294,
+        "end": 1461
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1752,
+        "end": 1897
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1470,
+        "end": 1580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1633,
+        "end": 1743
       }
     },
     {
@@ -702,6 +886,204 @@
         "path": "src/math.ts",
         "start": 332,
         "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::FakeQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 363,
+        "end": 384
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Queue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 200,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Queue#1",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 315,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Set#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 399,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::bull.Queue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 265,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 797,
+        "end": 815
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::dynamic.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 610,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::fake.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 643,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 551,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 580,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::seen.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 666,
+        "end": 681
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice::enqueue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 855,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice::enqueue#1",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 875,
+        "end": 892
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq::FakeWorker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1452,
+        "end": 1482
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic::Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1315,
+        "end": 1357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs::Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1016,
+        "end": 1077
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu::record#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1176,
+        "end": 1187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail::bull.Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startMail",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1121,
+        "end": 1193
       }
     },
     {
@@ -1200,6 +1582,226 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::IORedis#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 189,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::Redis#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 218,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::append::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 923,
+        "end": 959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendBilling",
+      "target": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1000,
+        "end": 1017
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1141,
+        "end": 1189
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 506,
+        "end": 544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 554,
+        "end": 599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 709,
+        "end": 751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 761,
+        "end": 800
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::createClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 263,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::fakeClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 332,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::noderedis.createClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 293,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis::fake.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2243,
+        "end": 2303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis::fake.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2198,
+        "end": 2233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::read::client.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1983,
+        "end": 2043
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readBilling::read#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "target": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2089,
+        "end": 2104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::ioredis.xreadgroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1334,
+        "end": 1458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readMany::other.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1789,
+        "end": 1894
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNamed::named.xreadgroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1508,
+        "end": 1577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis::client.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1675,
+        "end": 1740
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/sqs.ts::SQSClient#0",
       "caller": "example.com/acme/conformance::src/messages/sqs.ts",
       "target": null,
@@ -1499,6 +2101,22 @@
   ],
   "providers": [
     {
+      "contract": "channel::bullmq",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::dynamic.add#0"
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0"
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0"
+    },
+    {
+      "contract": "channel::bullmq::mail-eu",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0"
+    },
+    {
       "contract": "channel::kafka::orders.created",
       "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1"
     },
@@ -1531,6 +2149,30 @@
       "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1"
     },
     {
+      "contract": "channel::redis",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic::ioredis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0"
+    },
+    {
+      "contract": "channel::redis::events.audit",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0"
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::returns",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0"
+    },
+    {
+      "contract": "channel::redis::shipments",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0"
+    },
+    {
       "contract": "channel::sqs::audit",
       "site": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0"
     },
@@ -1548,6 +2190,21 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "channel::bullmq",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "via": null
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "via": null
+    },
+    {
+      "contract": "channel::bullmq::mail-eu",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "via": null
+    },
     {
       "contract": "channel::kafka::orders.created",
       "site": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
@@ -1599,6 +2256,41 @@
       "via": null
     },
     {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::events.audit",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::returns",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::shipments",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "via": null
+    },
+    {
       "contract": "channel::sqs::mail",
       "site": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
       "via": null
@@ -1620,6 +2312,27 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0",
+      "contract": "channel::bullmq::jobs",
+      "level": "exact",
+      "reason": "channel::bullmq::jobs"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0",
+      "contract": "channel::bullmq::jobs",
+      "level": "exact",
+      "reason": "channel::bullmq::jobs"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0",
+      "contract": "channel::bullmq::mail-eu",
+      "level": "exact",
+      "reason": "channel::bullmq::mail-eu"
+    },
     {
       "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
       "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1",
@@ -1710,6 +2423,55 @@
       "contract": "channel::nats::jobs.>",
       "level": "inferred",
       "reason": "channel::nats::jobs.audit.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "contract": "channel::redis::billing",
+      "level": "exact",
+      "reason": "channel::redis::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0",
+      "contract": "channel::redis::events.audit",
+      "level": "exact",
+      "reason": "channel::redis::events.audit"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0",
+      "contract": "channel::redis::returns",
+      "level": "exact",
+      "reason": "channel::redis::returns"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "contract": "channel::redis::billing",
+      "level": "exact",
+      "reason": "channel::redis::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0",
+      "contract": "channel::redis::shipments",
+      "level": "exact",
+      "reason": "channel::redis::shipments"
     },
     {
       "consumer": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
