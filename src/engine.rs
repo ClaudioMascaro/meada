@@ -15,7 +15,7 @@ use crate::msg::Msg;
 use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, unresolved};
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
-use crate::workspace::{Missing, Workspace};
+use crate::workspace::{Missing, Repository, Workspace};
 use crate::{
     Result, channel, decisions, document, http, index, items, package, render, repo, resource,
     trace,
@@ -267,7 +267,8 @@ impl Engine {
     /// substring, ties by identity. `kind` keeps only `symbol`, `contract`, `route` (HTTP
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
     /// by broker kind and name) matches; `document` lists the documents read, matched by path
-    /// or title (see `search_documents`); `ambiguous` and `unresolved` list the open items whose enclosing
+    /// or title (see `search_documents`); `package` lists the packages, matched by name (see
+    /// `search_packages`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -276,6 +277,9 @@ impl Engine {
         }
         if kind == Some("document") {
             return self.search_documents(query, budget);
+        }
+        if kind == Some("package") {
+            return self.search_packages(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
@@ -286,7 +290,7 @@ impl Engine {
             Some("resource") => (false, Some(resource::PREFIX)),
             Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
-                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, \
+                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
                              `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
@@ -362,11 +366,12 @@ impl Engine {
                     None => match export.document_of(site) {
                         // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
-                        // A route file that serves the contract with no function of its own.
-                        None => site
-                            .rsplit_once("::")
-                            .map_or(site.as_str(), |(_, p)| p)
-                            .to_string(),
+                        None => package::place(&repo.identity, site).unwrap_or_else(|| {
+                            // A route file that serves the contract with no function of its own.
+                            site.rsplit_once("::")
+                                .map_or(site.as_str(), |(_, p)| p)
+                                .to_string()
+                        }),
                     },
                 };
                 let line = format!("{} {location} {}", repo.identity, channel::shown(&contract));
@@ -407,6 +412,42 @@ impl Engine {
                 let title = title.map_or(String::new(), |t| format!(" {t}"));
                 let line = format!("{} {} ({shown}){title}", repo.identity, doc.path);
                 hits.push((r, format!("{} {}", repo.identity, doc.path), line));
+            }
+        }
+        hits.sort();
+        if hits.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+        Ok(render::budgeted(&lines, budget))
+    }
+
+    /// The packages (spec #22) whose name matches `query`, one line each, as `<repository>
+    /// <directory> <name>@<version> (consumers: <n>)`, the version left out when the manifest
+    /// has none. The consumers are the dependency entries linked to the package, at any level.
+    fn search_packages(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let mut entries: HashMap<&str, usize> = HashMap::new();
+        for link in &links {
+            *entries.entry(&link.provider).or_default() += 1;
+        }
+        let needle = query.to_lowercase();
+        // (rank, repository and directory to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in &exports {
+            for p in &export.packages {
+                let Some(r) = rank(&p.name.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let name = match &p.version {
+                    Some(version) => format!("{}@{version}", p.name),
+                    None => p.name.clone(),
+                };
+                let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
+                let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
+                hits.push((r, format!("{} {}", p.repository, p.directory), line));
             }
         }
         hits.sort();
@@ -523,6 +564,9 @@ impl Engine {
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
                     format!("{doc} {DOCUMENTED_ONLY}")
+                } else if let Some(place) = package::place(&repo.identity, site) {
+                    // A dependency entry of a manifest.
+                    place
                 } else {
                     format!("{} (top level)", label(site))
                 };
@@ -615,6 +659,7 @@ impl Engine {
         }));
         lines.extend(relations(identity, export, &mut files, &symbol_found.id));
         let links = self.links(&exports);
+        lines.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
         lines.extend(contracts(
@@ -815,6 +860,54 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     let mut lines = section("callers", callers);
     lines.extend(section("callees", callees));
     lines
+}
+
+/// `consumers:` with the calls that reach `symbol` through a package import (spec #22), from
+/// any repository of the workspace, as `<repository> <path>:<line> <caller>`, then ` [<level>,
+/// <range flag>]` when the link is not exact or the dependency's range does not plainly accept
+/// the package's version. Nothing when there are none.
+fn consumers(
+    exports: &[Export],
+    repos: &[Repository],
+    links: &[Link],
+    symbol: &str,
+) -> Vec<String> {
+    let mut reached = package::reached(exports, links, symbol);
+    reached.sort_by_key(|r| {
+        (
+            &repos[r.repository].identity,
+            &r.call.span.path,
+            r.call.span.start,
+        )
+    });
+    let lines: Vec<String> = reached
+        .iter()
+        .map(|r| {
+            let repo = &repos[r.repository];
+            let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
+            let caller = &r.call.caller;
+            let caller = match exports[r.repository]
+                .symbols
+                .iter()
+                .any(|s| s.id == *caller)
+            {
+                true => label(caller),
+                false => "(top level)",
+            };
+            let level = (r.level != Level::Exact).then(|| r.level.name());
+            let flag = r.flag.map(package::Flag::words);
+            let tags: Vec<&str> = level.into_iter().chain(flag).collect();
+            let tags = match tags.is_empty() {
+                true => String::new(),
+                false => format!(" [{}]", tags.join(", ")),
+            };
+            format!("{} {location} {caller}{tags}", repo.identity)
+        })
+        .collect();
+    match lines.is_empty() {
+        true => lines,
+        false => section("consumers", lines),
+    }
 }
 
 /// `<repository> <path>:<line> <name>` for a symbol's definition.

@@ -56,7 +56,23 @@ give byte-identical output.
   like the open-item kinds) lists the documents read across the workspace, matched by path and
   `info.title` (exact, prefix, substring), as `<repository> <path> (<Summary::shown()>)
   <title>`; `shown` is `openapi 3.1.0, routes: 3` or `asyncapi 3.0.0, channels: 2` (the count
-  follows the format, so OpenAPI lines never gain a `channels: 0`).
+  follows the format, so OpenAPI lines never gain a `channels: 0`). `search` kind `package`
+  (`search_packages`, an early branch too) lists the `packages` rows whose name matches, as
+  `<repository> <directory> <name>@<version> (consumers: <n>)` (no `@<version>` for a manifest
+  without one); the consumers are the links whose provider is the package's manifest
+  (`Package::site`), that is the dependency entries at any level, not the call hops, which link to
+  symbols. A dependency entry's site (`<repository>::<path>::<field>::<name>`) and a manifest's
+  print as `package.json dependencies` and `kit/package.json` in `search` and in `context` on
+  `package::npm::<name>` (`package::place`); that `context` goes through `contract_sides` with the
+  roles `package` and `dependent`, and `trace` on it points to `context`. `context` on a symbol
+  adds a `consumers:` section after `callees:`, only when non-empty: the calls that reach it
+  through a package import (`package::reached`, from the links whose provider is the symbol and
+  whose contract starts with `package::`), from any repository, as `<repository> <path>:<line>
+  <caller>` then ` [<level>, <flag>]` when the link is not `exact` or the dependency's range does
+  not plainly accept the provider's version (`package::flag` on the entry's range and the version
+  of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
+  plain: a consumer through one always shows `range unchecked`, even inside its own repository,
+  which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -712,7 +728,14 @@ give byte-identical output.
   same-scope constant and parameter, each never `exact`) and two value-flow cases in
   `http-fetch-param` (a `for ... of` hiding a constant URL, a `catch` hiding a parameter that
   defaults to `fetch`). Goldens `pkg-web.trace-down.txt` (from the call into `greet` and on to
-  `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`).
+  `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`). `search` and `context` (ticket
+  T5): `pkg.search-package*.txt` (kind `package`, all and by name), `pkg.search-contract-shared.txt`
+  (dependency entries placed at their manifest and field), `pkg-shared.context-greet.txt` (the
+  `consumers:` of the kit's `greet`) and `pkg-shared.context-greet-flagged.txt` (the same after
+  editing two ranges to `^3.0.0` and `latest`: `[range mismatch]`, `[range unchecked]`),
+  `pkg.context-package-kit.txt` and `pkg.trace-package-kit.txt` (a package contract as a
+  `context` subject, and as a `trace` start), and `pkg-mono.context-add.txt` (the consumers of
+  `mono`'s `add`, both in its own repository).
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
