@@ -18,7 +18,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -287,7 +287,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
                 .collect();
             let language = lang::pack(pack);
             let modules = language.modules(&found)?;
-            Ok((pack, Resolver::new(files, modules, language.receiver())))
+            Ok((pack, Resolver::new(files, modules, language)))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
 

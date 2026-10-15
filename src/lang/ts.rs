@@ -53,6 +53,7 @@ impl LanguagePack for TsJs {
                     kind,
                     range,
                     bases: Vec::new(),
+                    returns: Vec::new(),
                 });
             }
             match node.kind() {
@@ -67,6 +68,8 @@ impl LanguagePack for TsJs {
                                 .filter(|a| a.kind() == "arguments")
                                 .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
                                 .unwrap_or_default(),
+                            kwargs: Vec::new(),
+                            decorates: None,
                         });
                     }
                 }
@@ -106,6 +109,10 @@ impl LanguagePack for TsJs {
 
     fn receiver(&self) -> Option<&'static str> {
         Some("this")
+    }
+
+    fn globals(&self) -> &'static [&'static str] {
+        &["fetch"]
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
@@ -561,9 +568,7 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         }
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
-            None if kind == "call_expression" => node
-                .child_by_field_name("function")
-                .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
+            None if kind == "call_expression" => Value::Call(node.byte_range()),
             None => Value::Unknown,
         },
     }

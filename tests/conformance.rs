@@ -380,6 +380,21 @@ fn python() {
             "stars/literal.py::unlisted",
             "stars/underscore.py::_internal",
             "stars/underscore.py::visible",
+            "web/accounts.py::update",
+            "web/api.py::echo",
+            "web/api.py::health",
+            "web/api.py::ping",
+            "web/factory.py::build_admin",
+            "web/factory.py::build_admin.remove_user",
+            "web/factory.py::mount",
+            "web/factory.py::relay",
+            "web/items.py::create_item",
+            "web/items.py::read_item",
+            "web/pages.py::daily",
+            "web/pages.py::fetch",
+            "web/pages.py::index",
+            "web/pages.py::order",
+            "web/pages.py::shortcut",
         ],
         &[
             // In-file scope: a comprehension and a nested function, a nested function called
@@ -985,6 +1000,66 @@ fn python() {
             ),
         ],
     );
+}
+
+#[test]
+fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
+    let repo = fixture_repo("python_http_providers", "conformance-python", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let providers: Vec<(String, String)> = json["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| {
+            let site = p["site"].as_str().unwrap();
+            let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+            (p["contract"].as_str().unwrap().into(), site.into())
+        })
+        .collect();
+    let expected = [
+        // FastAPI: method decorators and `api_route` on the app.
+        ("http::GET::/health", "web/api.py::health"),
+        ("http::GET::/ping", "web/api.py::ping"),
+        ("http::POST::/ping", "web/api.py::ping"),
+        ("http::GET::/echo", "web/api.py::echo"),
+        // One router under three prefixes: nested in `v1` (its own prefix after the one given
+        // when including it), directly, and through a function that returns its argument.
+        (
+            "http::GET::/api/v1/items/catalog/{}",
+            "web/items.py::read_item",
+        ),
+        (
+            "http::POST::/api/v1/items/catalog",
+            "web/items.py::create_item",
+        ),
+        ("http::GET::/legacy/catalog/{}", "web/items.py::read_item"),
+        ("http::POST::/legacy/catalog", "web/items.py::create_item"),
+        ("http::GET::/relay/catalog/{}", "web/items.py::read_item"),
+        ("http::POST::/relay/catalog", "web/items.py::create_item"),
+        // A router returned by a function and included by another one, as arguments.
+        (
+            "http::DELETE::/internal/admin/users/{}",
+            "web/factory.py::build_admin.remove_user",
+        ),
+        // Flask: `route` without methods serves GET; a Blueprint's own prefix, and one replaced
+        // on registration. The `get` shortcut yields nothing.
+        ("http::GET::/", "web/pages.py::index"),
+        ("http::GET::/orders/{}", "web/pages.py::order"),
+        ("http::DELETE::/orders/{}", "web/pages.py::order"),
+        ("http::GET::/reports/daily/{}", "web/pages.py::daily"),
+        ("http::PUT::/members/{}", "web/accounts.py::update"),
+    ];
+    let mut expected: Vec<(String, String)> = expected
+        .iter()
+        .map(|(c, s)| (c.to_string(), s.to_string()))
+        .collect();
+    expected.sort();
+    let mut actual = providers;
+    actual.sort();
+    assert_eq!(actual, expected);
+    // A Python function named `fetch` is no HTTP consumer.
+    assert_eq!(json["consumers"], serde_json::json!([]));
 }
 
 /// The levels of `checkout`'s two calls in `python-roots` under a given `pyproject.toml`: the

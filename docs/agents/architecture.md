@@ -146,7 +146,8 @@ give byte-identical output.
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's instance,
-  `this` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
+  `this` for TS/JS, none for Python, and `globals`: names bound everywhere that contract kinds
+  read, `fetch` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
   (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
   .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
   `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
@@ -168,7 +169,11 @@ give byte-identical output.
   at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
   binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
   `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
-  and a parameter the body assigns. A target that is `self.x`, also inside unpacking, a `for`
+  and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
+  also a `Const` holding that value. Calls carry their positional `args` and keyword `kwargs`
+  as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
+  a `Value::Call` at its range), a decorator call names the definition it decorates
+  (`Call::decorates`), and a function lists the values it returns (`Def::returns`). A target that is `self.x`, also inside unpacking, a `for`
   or an `as`, and also written in a function nested in the method, binds the class's attribute
   `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
   and resolves through the file's imports. An annotation decides; other bindings that
@@ -198,16 +203,38 @@ give byte-identical output.
   without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
   keyword). `Code` folds constants and client wrapper arguments into values for contract kinds,
   a destructured object parameter reading its names (`Param::fields`) off the literal object the
-  caller passes.
+  caller passes. An argument binds a parameter by position or by the parameter's name among the
+  keyword arguments, and a method called on an instance (`x.m(a)`, whose first parameter is a
+  receiver local) passes nothing for the receiver. `Code::origins(path, scope, name)` (and
+  `value_origins` for a value as written) is the shared value flow: the call sites whose result
+  a name may hold, followed through constants, imports and module attributes, the arguments
+  every caller passes to a parameter, and the values a function of the repository returns (its
+  parameters then bound by that call only); a call that reaches no function of the repository
+  is the origin. A constant, parameter or function met again on one path (a cycle) adds
+  nothing. `Code::external(path, scope, callee)` names what an import from outside the
+  repository binds a callee to (`fastapi.APIRouter`, `express.default`): contract kinds
+  recognize framework constructors with it.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
   `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
+  `fetch`; only in a pack whose `globals` has it), Next.js app-router, Express, FastAPI and
+  Flask providers, `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
   `Provider::gateway`, `http::gateway_contract` turns it into a contract and
   `http::serves(provider, contract)` is the one check of either path (also used by open items and
   decision replay, so a gateway candidate carries the provider's own contract). That link is
   `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
-  within one repository a code path match wins over gateway path matches. `resource.rs` (spec
+  within one repository a code path match wins over gateway path matches. An app or router
+  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
+  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
+  on a receiver that traces back to its framework's constructor (`Code::external`; Express
+  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
+  route is served under every prefix (`prefixes`): the segment of each mount (`use`,
+  `include_router`, `register_blueprint`) under every prefix of the router it is mounted on,
+  or the router's own prefix (`APIRouter(prefix=)`, `Blueprint(url_prefix=)`) when nothing
+  mounts it; FastAPI's mount segment is the given prefix then the router's own, Flask's given
+  `url_prefix` replaces the own one. A prefix that cannot be read adds no route. FastAPI method
+  decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
+  is the decorated function, the methods `methods=[...]` or `GET`. `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -241,7 +268,7 @@ give byte-identical output.
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
-  parameter of any spelling is `{}`.
+  parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`) is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
   `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
@@ -287,7 +314,7 @@ give byte-identical output.
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
-  `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
+  `Call::kwargs`, `Def::returns`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
@@ -359,7 +386,8 @@ Each is marked `ponytail:` at its site unless noted.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
 - `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
-  a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
+  a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
+  more than once, or an attribute); a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
@@ -369,10 +397,10 @@ Each is marked `ponytail:` at its site unless noted.
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
-  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple, and call arguments
-  and parameter defaults are not read (no `Value`s, so no contracts).
-- `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
-  `require` are not followed.
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. Parameter
+  defaults are not read, nor `**k` splats; a `*a` splat is read as one positional argument.
+- `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
+  that depends on a parameter is not read through callers.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
