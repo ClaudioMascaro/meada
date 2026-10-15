@@ -16,6 +16,10 @@
     {
       "path": "src/server.ts",
       "hash": "3bac308f9c2edd1b2015535688e3b8a2fdc85b4f13c93951b2623b2f3b46bc2b"
+    },
+    {
+      "path": "src/unreadable.ts",
+      "hash": "9c683afa134facda04a75fd971745e5e082daf11a8f14148173c6aec8e2bfc7a"
     }
   ],
   "symbols": [
@@ -81,6 +85,38 @@
         "path": "src/server.ts",
         "start": 256,
         "end": 285
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 319,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::GET /v1/old",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 570,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountAt",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 160,
+        "end": 257
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 610,
+        "end": 692
       }
     }
   ],
@@ -326,6 +362,116 @@
         "start": 95,
         "end": 109
       }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}::res.send#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 334,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::GET /v1/old::res.send#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::GET /v1/old",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 585,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::Router#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 47,
+        "end": 55
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::Router#1",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 541,
+        "end": 549
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::app.get#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 296,
+        "end": 352
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::app.use#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 693,
+        "end": 715
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::legacy.get#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 551,
+        "end": 601
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountAt::app.get#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountAt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 195,
+        "end": 254
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountAt::res.send#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountAt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 236,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy::app.use#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 652,
+        "end": 689
+      }
     }
   ],
   "providers": [
@@ -348,6 +494,14 @@
     {
       "contract": "http::GET::/health",
       "site": "example.com/acme/backend::src/server.ts::GET /health"
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}"
+    },
+    {
+      "contract": "http::GET::/v1/old",
+      "site": "example.com/acme/backend::src/unreadable.ts::GET /v1/old"
     }
   ],
   "consumers": [],

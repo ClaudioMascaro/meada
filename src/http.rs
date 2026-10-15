@@ -427,14 +427,14 @@ fn express(code: &Code) -> Vec<Found> {
                 continue;
             };
             let (prefix, rest) = match args.first().map(|a| code.value(path, &call.scope, a)) {
-                Some(Value::Str(parts)) => (render(&parts), &args[1..]),
-                _ => (String::new(), args),
+                Some(Value::Str(parts)) => (literal(&parts), &args[1..]),
+                _ => (Some(String::new()), args),
             };
             for arg in rest {
                 let children = code.value_origins(path, &call.scope, arg).into_iter();
                 for child in children.filter(|&c| is_express(code, c)) {
                     let parents = mounts.entry(child).or_default();
-                    parents.extend(ats.iter().map(|&at| (at, Some(prefix.clone()))));
+                    parents.extend(ats.iter().map(|&at| (at, prefix.clone())));
                 }
             }
         }
@@ -449,7 +449,9 @@ fn express(code: &Code) -> Vec<Found> {
         let Value::Str(parts) = code.value(path, scope, first) else {
             continue;
         };
-        let route = render(&parts);
+        let Some(route) = literal(&parts) else {
+            continue;
+        };
         let root = |_: CallAt| Some(String::new());
         for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));

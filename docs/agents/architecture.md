@@ -266,8 +266,10 @@ give byte-identical output.
   `include_router(app.router)` and `mount`, not Flask's `register_blueprint`), may mount it;
   never an `APIRouter` or a `Blueprint`, which serves only where a mount Meada reads puts it,
   so a router mounted through an import that does not resolve is not guessed at the root. A
-  prefix or a path with a part that cannot be read (an f-string hole, a parameter) adds no
-  route; a path parameter written in the literal (`{id}`, `<int:id>`) stays one. FastAPI method
+  prefix or a path with a part that cannot be read (an f-string or template-literal hole, a
+  parameter) adds no route (Express included: `` `/${name}/items` `` is no provider, and a
+  router mounted only under such a prefix is served under no prefix); a path parameter written
+  in the literal (`{id}`, `<int:id>`, `:id`) stays one. FastAPI method
   decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
   is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
   `include()` argument names is an `Include`: a module of the repository (by dotted name or
