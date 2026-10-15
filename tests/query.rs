@@ -104,6 +104,32 @@ fn context_lists_every_candidate_of_an_ambiguous_call() {
 }
 
 #[test]
+fn python_functions_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_python",
+        "conformance-python",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    assert_golden(
+        "conformance-python.search-scale.txt",
+        &engine.search("scale", None, None).unwrap(),
+    );
+    // Callers through an alias, a dotted import and the same file; a callee through a
+    // relative import.
+    assert_golden(
+        "conformance-python.context-scale.txt",
+        &engine.context("scale", None).unwrap(),
+    );
+    // A method's callers through `self`, annotations and constructors, and by name alone.
+    assert_golden(
+        "conformance-python.context-render.txt",
+        &engine.context("Panel.render", None).unwrap(),
+    );
+}
+
+#[test]
 fn answers_over_budget_say_where_they_stopped() {
     // 30 tokens are 120 bytes: room for the cut note and one result line.
     let engine = web("budget_cut");

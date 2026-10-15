@@ -31,8 +31,8 @@ give byte-identical output.
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
-  reach come from `http::route_fits` (method and ordered literal fragments, see `Found::method`
-  / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
+  reach come from `http::route_fits` (method, or a route of every method, and ordered literal
+  fragments, see `Found::method` / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
   path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
@@ -145,21 +145,171 @@ give byte-identical output.
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`), and the `Facts`/`Value` types. `lang/ts.rs` is the only pack
-  (`.ts .tsx .js .jsx .mjs .cjs`). A pack sees one file at a time and never touches the index.
-- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
-  (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
-  folds constants and client wrapper arguments into values for contract kinds, a destructured
-  object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's instance,
+  `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose members
+  are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
+  `globals`: names bound everywhere that contract kinds read, `fetch` for TS/JS, none for
+  Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
+  (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
+  .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
+  `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
+  `python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
+  two definitions of one name, spans a decorated definition with its decorators, and exports
+  every module-level name (imports included), as an explicit import or `m.x` sees them; what
+  `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
+  Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
+  and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
+  `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
+  `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
+  `packages.from`), or `src` when none is declared; a package comes before a module of the
+  same name.
+  It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
+  written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::locals`, one
+  `Local {scope, name, class}` per name a scope binds: a method's first parameter unless
+  `@staticmethod` (`Class::Enclosing`), an annotated parameter or name, `x = C(...)`
+  (`Class::Named("C")`, whatever `C` turns out to be), `self.x: T` in a method (an attribute,
+  at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
+  binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
+  `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
+  and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
+  also a `Const` holding that value; so is the name of `with C(...) as x` (also
+  `Class::Named("C")`, as `x = C(...)` is) and a `self.x = C(...)` attribute (a `Const` of the
+  class, only for a call). `xs += ...` and `xs = xs + ...` on a name whose latest
+  value in that scope is a list literal do not bind it again: a list literal added joins the
+  `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
+  as `Value`s (strings, f-strings and `+` folded into parts, a name or a member chain in them,
+  `config.BASE`, a `Part::Ref`; `[...]`/`(...)` a `Value::List`, a call
+  a `Value::Call` at its range), a decorator call names the definition it decorates
+  (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
+  callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`).
+  A function's parameters carry their defaults as written (`Param::default`) and which
+  argument binds them (`Param::binds`, a `Binds`): `*args` and `**kwargs` are `Rest` (no single
+  argument), the parameters after them or after the bare `*` (which is no parameter) are
+  `Keyword`, a method's first one is `Instance` (`Class` for a `@classmethod`, neither for a
+  `@staticmethod`), any other `Any`. A target that is `self.x`, also inside unpacking, a `for`
+  or an `as`, and also written in a function nested in the method, binds the class's attribute
+  `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
+  and resolves through the file's imports. An annotation decides; other bindings that
+  disagree make the class unknown. `global x` sends the function's bindings of `x` to the
+  module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
+  skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
+  and `... | None`.
+- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
+  imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
+  bound by several imports (the latest in source order decides, whatever it resolves to), a
+  callee may start with a dotted import, and an `Imported::All` import counts as one binding
+  of each name its module's `Facts::star` takes. `lexical` skips a class's scope unless the
+  lookup starts in it (a class body's names are not in scope for its methods). A member of a
+  class, or of a parameter or local whose `Class` resolves to a class of the repository
+  (`Binding::Instance`), is looked up through the class's family: the class and the ancestors
+  its written bases give, in C3 order (Python's method resolution order), linearized once per
+  class in `Resolver::new`. A base that is not a class of the repository is an opaque
+  ancestor, named by what the file imports for it (`abc.ABC`) or as written (`object`), so
+  classes that share it give C3 one entry; a base that is no name (`mixin()`) is its own
+  entry: reaching it before a class that has the member leaves the member unknown, and so
+  does a hierarchy C3 rejects or bases in a cycle. The first class that defines the member, or
+  binds it as an attribute local, wins, `exact`. A receiver whose class (or whose value's
+  callee) is outside the repository is unresolved; any other member call falls back to the
+  name match. `Busy` guards locals and families that resolve through themselves. A single
+  module-level binding is read from functions as it is; a function that rebinds it through
+  `global` makes it unknown. A pack that writes `Def::bases` and `Facts::locals` gets this
+  without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
+  keyword). `Code` folds constants and client wrapper arguments into values for contract kinds,
+  a destructured object parameter reading its names (`Param::fields`) off the literal object the
+  caller passes. An argument binds a parameter as its `Param::binds` says: by position or by
+  the parameter's name among the keyword arguments, only by name, or not at all (`Rest`); a
+  method called on an instance (`x.m(a)`) passes nothing for an `Instance` receiver, one called
+  on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
+  `Code::expand(path, index, read)` hands
+  `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
+  with them; a member call found only by a name match (`data.get(...)` matched to a wrapper
+  method, `Caller::by_name`) is not climbed, since its receiver may be any object, so a
+  wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
+  `value_origins` for a value as written) is the shared value flow: the call sites whose result
+  a name may hold, followed through constants, imports and module attributes, the arguments
+  every caller passes to a parameter, the values a function of the repository returns (its
+  parameters then bound by that call only) and the items of a list or tuple; an attribute
+  assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
+  reaches no function of the repository is the origin. A constant, parameter or function met
+  again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
+  import from outside the repository binds a callee to (`fastapi.APIRouter`,
+  `express.default`): contract kinds recognize framework constructors with it.
+  `Code::definition` resolves a name or a member chain (`views.index`) to a definition,
+  `Code::module` a name to the file it binds as a whole module, and `Code::import_file` an
+  import specifier (`shop.orders.urls`) to its file.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
   `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
-  `Provider::gateway`, `http::gateway_contract` turns it into a contract and
-  `http::serves(provider, contract)` is the one check of either path (also used by open items and
-  decision replay, so a gateway candidate carries the provider's own contract). That link is
+  `fetch`; only in a pack whose `globals` has it), Python client consumers (`clients`, below),
+  Next.js app-router, Express, FastAPI, Flask and Django providers, `normalize_path`, and the link rules (host,
+  `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
+  (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
+  on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
+  (`POST /health`) take it the same way. A route also matches by its gateway path: `declare`
+  fills `Provider::gateway`, `http::gateway_contract` turns it into a contract and
+  `http::serves(provider, contract)` is the one check of either path, through `fits` (also used
+  by open items and decision replay, so a gateway candidate carries the provider's own
+  contract). That link is
   `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
-  within one repository a code path match wins over gateway path matches. `resource.rs` (spec
+  within one repository a code path match wins over gateway path matches. An app or router
+  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
+  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
+  on a receiver that traces back to its framework's constructor (`Code::external`; Express
+  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
+  route is served under every prefix (`prefixes`): the segment of each mount (`use`,
+  `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
+  prefix of the router it is mounted on; FastAPI's mount segment is the given prefix (or
+  `mount`'s path) then the router's own (`APIRouter(prefix=)`), Flask's given `url_prefix`
+  replaces the own one (`Blueprint(url_prefix=)`). What nothing mounts is served at its root
+  (`prefixes`' `root`): every Express app or router; a FastAPI or Flask app, unless a mount
+  whose child cannot be read (no origin of the child is an app or router of the framework),
+  called on another app or router of its framework and able to hold an app (FastAPI's
+  `include_router(app.router)` and `mount`, not Flask's `register_blueprint`), may mount it;
+  never an `APIRouter` or a `Blueprint`, which serves only where a mount Meada reads puts it,
+  so a router mounted through an import that does not resolve is not guessed at the root. A
+  prefix or a path with a part that cannot be read (an f-string hole, a parameter) adds no
+  route; a path parameter written in the literal (`{id}`, `<int:id>`) stays one. FastAPI method
+  decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
+  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
+  `include()` argument names is an `Include`: a module of the repository (by dotted name or
+  as a module), the entries of a list, either of them first in the tuple form `(module or
+  list, "app_name")`, a dotted name no module answers to from the source roots (an import
+  from outside the repository, or one that does not resolve: `Named`), or `Unknown` (anything
+  else, or a value whose origins are not all `path()`/`re_path()` entries). A root URLconf is
+  a file with a module-level `urlpatterns` that no `include()` may name: none resolves to it,
+  no `Named` is its dotted path or a suffix of it (`may_be`: `backend/shop/urls.py` may be
+  `shop.urls`), and no `include()` is `Unknown` (then there is no root). Its `path()` and
+  `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
+  view adding its route before the entries it holds, at any depth, an `include()` met again
+  on the walk (a cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
+  `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
+  (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
+  `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
+  `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
+  `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
+  the provider's site. Python clients (`clients`, from `LIBRARIES`: `requests`, `httpx`,
+  `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
+  library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
+  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
+  to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
+  `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
+  attribute, or a parameter the callers pass one to, or a value a function of the repository
+  returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
+  `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
+  a value counts (module constants, caller parameters, return values). A `get` on any other
+  object is nothing.
+  `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
+  front of a relative URL (an absolute one, or one starting with a hole, is left alone);
+  different constructors with different bases make the base a hole. URL and method fold like
+  any `Value` (`str.format` and `%` do not). `python.rs` folds an environment read into
+  `Part::Env`, as `ts.rs` does (`env_read`/`single_env`): `os.environ["X"]`,
+  `os.environ.get("X")`, `os.getenv("X")` and the bare `environ`/`getenv`, matched as written
+  (not through the file's imports), alone or in an f-string hole, through `or` fallbacks (the
+  read on the left, no other variable on the right), a default argument (ignored, unless it
+  reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
+  `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
+  reads the value. `Code::expand` follows a function whose URL
+  or method depends on its parameters, so each of its call sites is a consumer (an argument
+  it leaves out takes the parameter's default). `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -174,7 +324,10 @@ give byte-identical output.
   pushed as a row, never entered. Starts take only HTTP routes, symbols and call sites; a
   `resource::...` start gets an answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>: <reason>]`
+  after a call that is not exact, in `trace` and in `context`'s callers and callees; the reason
+  is derived when rendering, never stored: `one method named render`, `2 functions or classes
+  named render`). Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
 
@@ -190,7 +343,8 @@ give byte-identical output.
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
-  parameter of any spelling is `{}`.
+  parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`) is `{}`. A provider of
+  every method is `http::ANY::<path>`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
   `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
@@ -225,7 +379,13 @@ give byte-identical output.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
-  A pack is done when that suite passes.
+  A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
+  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
+  its family), `Facts::locals` (the class each binding gives a name), `Facts::star` (what a
+  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  writes none of them (TypeScript writes no bases or locals) gets name matches where those
+  would have resolved.
 - New **config key**: add the field to `Config`, delete it from `LATER`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
@@ -241,7 +401,7 @@ give byte-identical output.
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
-  `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
+  `Call::kwargs`, `Def::returns`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
@@ -274,9 +434,11 @@ give byte-identical output.
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
-- Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
+- Test files by subject: `conformance` (pack; for Python also its HTTP providers and consumers,
+  over `conformance-python`, `python-mounts` and `python-django`), `xlang` (a TypeScript and a
+  Python repository linked both ways: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
-  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `decisions`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
   `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
@@ -312,13 +474,35 @@ Each is marked `ponytail:` at its site unless noted.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
-  a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
+- `resolve.rs`: wrapper expansion walks every simple path up the callers, and does not climb a
+  member call found only by a name match, so a wrapper method called on a receiver whose class
+  Meada cannot tell is read where it stands; a parameter captured by
+  a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
+  more than once, or an attribute not assigned a call once in its class); a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
-- `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
-  `require` are not followed.
+- `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
+  root declarations. `src` is a source root when nothing is declared, whether or not it holds
+  packages (a pack sees no file list). An import binds its names for the whole file, wherever
+  it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
+  there for the whole scope (the safe side: a name match instead of `exact`). A write to an
+  attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. A `**k` splat
+  in a call is not read; a `*a` splat is read as one positional argument.
+- `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
+  that depends on a parameter is not read through callers (it yields no route). A FastAPI
+  mount whose child cannot be read hides every other app of its framework that nothing else
+  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; what
+  an extension of `urlpatterns` adds other than a list literal is left out (marked in
+  `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
+  yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
+  handler method a class-based view inherits and `as_view()` on a class outside the repository
+  yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
+  backslashes yields nothing. Python clients: a receiver that is the result of a call
+  (`Session().get(...)`, `make().get(...)`) or an attribute set from anything but a call
+  (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a client
+  takes the base of every caller that passes one, and several different bases make it a hole.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

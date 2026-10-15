@@ -4,7 +4,10 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Param, Part, Value};
+use crate::lang::{
+    Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
+    Star, Value,
+};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -26,6 +29,9 @@ pub enum Resolution<'a> {
 /// What a name or a member chain refers to.
 enum Binding<'a> {
     Def(Target<'a>),
+    /// What a receiver whose class the source writes holds: an instance of this class, or
+    /// the class itself (`cls`). Its members are looked up through the class's family.
+    Instance(Target<'a>),
     /// A whole file, through a namespace import or re-export.
     Module(&'a str),
     /// A `const` that holds no function: its file and qualified name.
@@ -33,22 +39,74 @@ enum Binding<'a> {
     /// The parameter at this position of a function, and the field of its object pattern
     /// when the name is one of those it destructures.
     Param(Target<'a>, usize, Option<usize>),
+    /// A name bound in a scope (`Facts::locals`): its file, scope and name.
+    Local(&'a str, &'a str, &'a str),
     /// Something an import brings from outside the repository.
     External,
     /// Neither scope nor import resolution knows it.
     Unknown,
 }
 
+/// A call site whose single target is a definition. `by_name` when only a name match of a
+/// member call (`data.get(...)`) found it: its receiver may be any object.
+#[derive(Clone, Copy)]
+struct Caller<'a> {
+    path: &'a str,
+    index: usize,
+    by_name: bool,
+}
+
 /// Seen `(file, exported name)` pairs: re-exports may form cycles.
 type Seen<'a> = HashSet<(&'a str, &'a str)>;
+
+/// A local whose class, or a class whose family, is being resolved: one met again while
+/// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
+/// nothing.
+#[derive(PartialEq)]
+enum Busy<'a> {
+    Local(&'a str, &'a str, &'a str),
+    Family(Target<'a>),
+}
+
+/// What resolving one name carries along: what is being resolved, and the families
+/// linearized so far (while `Resolver::new` linearizes them all).
+#[derive(Default)]
+struct Work<'a> {
+    busy: Vec<Busy<'a>>,
+    families: HashMap<Target<'a>, Family<'a>>,
+}
+
+/// One entry of a class family: a class of the repository, or a base that is not one
+/// (outside the repository, or not resolved), whose members are not known. An opaque base is
+/// named by what it imports (`abc.ABC`) or as written (`object`), so classes that share it
+/// share one entry; a base that is no name (`mixin()`) is named by where it is written.
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Ancestor<'a> {
+    Class(Target<'a>),
+    Opaque(String),
+}
+
+/// A class and its ancestors in method resolution order (C3), or `None` when they have none:
+/// C3 rejects the hierarchy, or the bases form a cycle.
+type Family<'a> = Option<Vec<Ancestor<'a>>>;
 
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// Each file's `Facts::locals`, by scope and name.
+    locals: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+    /// Every class's family, linearized once.
+    families: HashMap<Target<'a>, Family<'a>>,
+    /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
+    receiver: Option<&'static str>,
+    /// The pack's keyword for the base of the enclosing class (`LanguagePack::base_receiver`).
+    base_receiver: Option<&'static str>,
+    /// The pack's names bound everywhere (`LanguagePack::globals`).
+    globals: &'static [&'static str],
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
-    callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
+    callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
@@ -56,7 +114,11 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(files: &'a BTreeMap<&'a str, &'a Facts>, modules: Modules) -> Self {
+    pub fn new(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        language: &dyn LanguagePack,
+    ) -> Self {
         let defs = files
             .iter()
             .map(|(path, facts)| {
@@ -68,6 +130,15 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|(path, facts)| {
                 let names = facts.consts.iter().map(|c| c.name.as_str()).collect();
+                (*path, names)
+            })
+            .collect();
+        let locals = files
+            .iter()
+            .map(|(path, facts)| {
+                let names = (facts.locals.iter())
+                    .map(|l| ((l.scope.as_str(), l.name.as_str()), &l.class))
+                    .collect();
                 (*path, names)
             })
             .collect();
@@ -88,16 +159,42 @@ impl<'a> Resolver<'a> {
             files,
             defs,
             consts,
+            locals,
+            families: HashMap::new(),
+            receiver: language.receiver(),
+            base_receiver: language.base_receiver(),
+            globals: language.globals(),
             callers: HashMap::new(),
             by_name,
             modules,
         };
-        let mut callers: HashMap<Target, Vec<(&str, usize)>> = HashMap::new();
+        let mut work = Work::default();
         for (path, facts) in files {
-            for (n, call) in facts.calls.iter().enumerate() {
-                if let Resolution::Exact(t) | Resolution::Inferred(t) = resolver.call(path, call) {
-                    callers.entry(t).or_default().push((path, n));
-                }
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                resolver.family(
+                    Target {
+                        path,
+                        name: &def.name,
+                    },
+                    &mut work,
+                );
+            }
+        }
+        resolver.families = work.families;
+        let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
+        for (path, facts) in files {
+            for (index, call) in facts.calls.iter().enumerate() {
+                let (target, by_name) = match resolver.call(path, call) {
+                    Resolution::Exact(t) => (t, false),
+                    Resolution::Inferred(t) => (t, call.callee.contains('.')),
+                    _ => continue,
+                };
+                let caller = Caller {
+                    path,
+                    index,
+                    by_name,
+                };
+                callers.entry(target).or_default().push(caller);
             }
         }
         resolver.callers = callers;
@@ -105,28 +202,183 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        let mut segments = call.callee.split('.');
-        let head = segments.next().unwrap_or("");
-        let seen = &mut Seen::new();
-        let mut binding = match head {
-            "this" => self.class(path, &call.scope),
-            "super" => Binding::Unknown,
-            _ if head.starts_with('(') => Binding::Unknown,
-            _ => self.lexical(path, &call.scope, head, seen),
-        };
-        for member in segments {
-            binding = match binding {
+        match self.binding(path, &call.scope, &call.callee) {
+            Binding::Def(t) => Resolution::Exact(t),
+            Binding::External => Resolution::Unresolved,
+            Binding::Instance(_)
+            | Binding::Module(_)
+            | Binding::Const(..)
+            | Binding::Param(..)
+            | Binding::Local(..)
+            | Binding::Unknown => self.infer(&call.callee),
+        }
+    }
+
+    /// `resolve` of one name on its own, with nothing seen or being resolved yet.
+    fn binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
+        self.resolve(path, scope, callee, &mut Seen::new(), &mut Work::default())
+    }
+
+    /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
+    /// of a receiver whose class the source writes, is looked up through the class's family.
+    fn resolve(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
+        let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
+            let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
+            let binding = match head {
+                _ if Some(head) == self.receiver => self.class(path, scope),
+                _ if Some(head) == self.base_receiver => Binding::Unknown,
+                _ if head.starts_with('(') => Binding::Unknown,
+                _ => self.lexical(path, scope, head, seen),
+            };
+            (binding, members)
+        });
+        for member in members.split('.').filter(|m| !m.is_empty()) {
+            binding = match self.instance(binding, work) {
+                Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
+                    self.member(t, member, work)
+                }
                 Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
                 Binding::Module(m) => self.export(m, member, seen),
                 other => other,
             };
         }
-        match binding {
-            Binding::Def(t) => Resolution::Exact(t),
-            Binding::External => Resolution::Unresolved,
-            Binding::Module(_) | Binding::Const(..) | Binding::Param(..) | Binding::Unknown => {
-                self.infer(&call.callee)
+        binding
+    }
+
+    fn is_class(&self, t: Target) -> bool {
+        self.defs[t.path][t.name].kind == Kind::Class
+    }
+
+    /// What a parameter or a local holds, as far as the source writes its class: an instance
+    /// of a class of the repository, something from outside it, or unknown. Other bindings
+    /// stay as they are.
+    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
+        let (path, scope, name) = match binding {
+            Binding::Param(f, n, field) => {
+                let param = &self.defs[f.path][f.name].params[n];
+                let name = match field {
+                    Some(field) => param.fields[field].name.as_str(),
+                    None => param.name.as_str(),
+                };
+                (f.path, f.name, name)
             }
+            Binding::Local(path, scope, name) => (path, scope, name),
+            // A constant is a name its scope binds once.
+            Binding::Const(path, constant) => match constant.rsplit_once('.') {
+                Some((scope, name)) => (path, scope, name),
+                None => (path, "", constant),
+            },
+            other => return other,
+        };
+        let Some(class) = self.locals[path].get(&(scope, name)) else {
+            return Binding::Unknown;
+        };
+        if let Class::Imported = class {
+            return self.imported(path, name, &mut Seen::new());
+        }
+        let key = Busy::Local(path, scope, name);
+        if work.busy.contains(&key) {
+            return Binding::Unknown;
+        }
+        work.busy.push(key);
+        let found = match class {
+            Class::Enclosing => self.class(path, scope),
+            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Imported | Class::Unknown => Binding::Unknown,
+        };
+        work.busy.pop();
+        match found {
+            Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
+            Binding::External => Binding::External,
+            _ => Binding::Unknown,
+        }
+    }
+
+    /// `member` of `class`: the first class of its family that defines it, or binds it as an
+    /// attribute. A base whose members are not known, met first, leaves it unknown, and so
+    /// does a family C3 rejects.
+    fn member(&self, class: Target<'a>, member: &'a str, work: &mut Work<'a>) -> Binding<'a> {
+        let Some(family) = self.family(class, work) else {
+            return Binding::Unknown;
+        };
+        for ancestor in family {
+            let Ancestor::Class(c) = ancestor else {
+                return Binding::Unknown;
+            };
+            let qualified = format!("{}.{member}", c.name);
+            if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
+                return Binding::Def(Target { path: c.path, name });
+            }
+            if self.locals[c.path].contains_key(&(c.name, member)) {
+                return Binding::Local(c.path, c.name, member);
+            }
+        }
+        Binding::Unknown
+    }
+
+    /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
+    /// method resolution order. Without written bases (TypeScript) it is `class` alone.
+    fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
+        if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
+            return family.clone();
+        }
+        let key = Busy::Family(class);
+        if work.busy.contains(&key) {
+            return None;
+        }
+        work.busy.push(key);
+        let bases = self.bases(class, work);
+        let mut lists = Vec::new();
+        for base in &bases {
+            lists.push(match base {
+                Ancestor::Class(base) => self.family(*base, work),
+                Ancestor::Opaque(_) => Some(vec![base.clone()]),
+            });
+        }
+        lists.push(Some(bases));
+        let family = (lists.into_iter().collect::<Option<Vec<_>>>())
+            .and_then(merge)
+            .map(|rest| [Ancestor::Class(class)].into_iter().chain(rest).collect());
+        work.busy.pop();
+        work.families.insert(class, family.clone());
+        family
+    }
+
+    /// What each base `class` writes is, in order, resolved from the scope enclosing it.
+    fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
+        let scope = crate::parent(class.name);
+        let bases = self.defs[class.path][class.name].bases.iter().enumerate();
+        bases
+            .map(
+                |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
+                    Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
+                    _ if base.starts_with('(') => {
+                        Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
+                    }
+                    _ => Ancestor::Opaque(self.imported_name(class.path, base)),
+                },
+            )
+            .collect()
+    }
+
+    /// `name` as the file's imports spell it: the module and name its head imports, then the
+    /// rest (`ABC` imported from `abc` is `abc.ABC`); as written when no import binds it.
+    fn imported_name(&self, path: &str, name: &str) -> String {
+        let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
+        let imports = self.files[path].imports.iter().rev();
+        match imports.map(|i| (i, &i.name)).find(|(i, _)| i.local == head) {
+            Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
+            Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
+                format!("{}.{n}{rest}", i.source)
+            }
+            _ => name.to_string(),
         }
     }
 
@@ -166,24 +418,32 @@ impl<'a> Resolver<'a> {
             {
                 return Binding::Def(Target { path, name });
             }
-            scope = scope.rsplit_once('.').map_or("", |(parent, _)| parent);
+            scope = crate::parent(scope);
         }
         Binding::Unknown
     }
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (what it
-    /// defines, its constants, its parameters), then the top level, then the file's imports.
-    /// Methods are not lexical bindings.
+    /// defines, its constants, its parameters, its other locals), then the top level, then the
+    /// file's imports. Methods are not lexical bindings, and a class body's names are in scope
+    /// only for the statements written directly in it, not for its methods or nested classes.
     fn lexical(
         &self,
         path: &'a str,
-        scope: &str,
+        scope: &'a str,
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = Some(scope);
+        let mut first = true;
         while let Some(s) = scope {
+            scope = (!s.is_empty()).then(|| crate::parent(s));
+            let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
+            first = false;
+            if class_body {
+                continue;
+            }
             let candidate = if s.is_empty() {
                 name.to_string()
             } else {
@@ -212,12 +472,50 @@ impl<'a> Resolver<'a> {
                 };
                 return Binding::Param(function, n, field);
             }
-            scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+            match self.locals[path].get(&(s, name)) {
+                Some(Class::Imported) => return self.imported(path, name, seen),
+                Some(_) => return Binding::Local(path, s, name),
+                None => {}
+            }
         }
-        match self.files[path].imports.iter().find(|i| i.local == name) {
-            Some(import) => self.import(path, &import.source, &import.name, seen),
-            None => Binding::Unknown,
+        self.imported(path, name, seen)
+    }
+
+    /// What the file's imports bind `name` to. Several imports may bind one name: the latest
+    /// in source order decides, whatever it resolves to. An import of every name binds
+    /// `name` only if the module takes it.
+    fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        for import in self.files[path].imports.iter().rev() {
+            if import.local == name {
+                return self.import(path, &import.source, &import.name, seen);
+            }
+            if matches!(import.name, Imported::All)
+                && let Some(module) = self.module(path, &import.source)
+                && let found @ (Binding::Def(_) | Binding::Module(_)) =
+                    self.star(module, name, seen)
+            {
+                return found;
+            }
         }
+        Binding::Unknown
+    }
+
+    /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
+    /// the longest such name first, and the members left after it.
+    fn dotted(
+        &self,
+        path: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<(Binding<'a>, &'a str)> {
+        callee
+            .rmatch_indices('.')
+            .map(|(at, _)| at)
+            .filter(|&at| callee[..at].contains('.'))
+            .find_map(|at| match self.imported(path, &callee[..at], seen) {
+                Binding::Unknown => None,
+                found => Some((found, &callee[at + 1..])),
+            })
     }
 
     fn import(
@@ -227,16 +525,38 @@ impl<'a> Resolver<'a> {
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
-        let Some(module) = self.module(path, source) else {
-            return Binding::External;
+        let found = match (name, self.module(path, source)) {
+            (_, None) => Binding::External,
+            (Imported::Namespace, Some(module)) => Binding::Module(module),
+            (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
+                self.export(module, name, seen)
+            }
+            (Imported::All, Some(_)) => Binding::Unknown,
         };
-        match name {
-            Imported::Namespace => Binding::Module(module),
-            Imported::Name(name) => self.export(module, name, seen),
+        if let Imported::Member { module, .. } = name
+            && matches!(found, Binding::Unknown | Binding::External)
+            && let Some(module) = self.module(path, module)
+        {
+            return Binding::Module(module);
+        }
+        found
+    }
+
+    /// What a star import of `path` takes as `name`.
+    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        let taken = match &self.files[path].star {
+            Star::ExceptDefault => name != "default",
+            Star::Public => !name.starts_with('_'),
+            Star::Only(names) => names.iter().any(|n| n == name),
+        };
+        if taken {
+            self.export(path, name, seen)
+        } else {
+            Binding::Unknown
         }
     }
 
-    /// What `path` exports as `name`.
+    /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         if !seen.insert((path, name)) {
             return Binding::Unknown;
@@ -255,15 +575,13 @@ impl<'a> Resolver<'a> {
                 _ => {}
             }
         }
-        if name != "default" {
-            for export in exports {
-                if let Export::All { source } = export
-                    && let Some(module) = self.module(path, source)
-                    && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                        self.export(module, name, seen)
-                {
-                    return found;
-                }
+        for export in exports {
+            if let Export::All { source } = export
+                && let Some(module) = self.module(path, source)
+                && let found @ (Binding::Def(_) | Binding::Module(_)) =
+                    self.star(module, name, seen)
+            {
+                return found;
             }
         }
         Binding::Unknown
@@ -278,12 +596,54 @@ impl<'a> Resolver<'a> {
     }
 }
 
+/// The C3 merge of `lists`: repeatedly the first head that is in no list's tail. `None` when
+/// none is.
+fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
+    let mut merged = Vec::new();
+    loop {
+        lists.retain(|l| !l.is_empty());
+        if lists.is_empty() {
+            return Some(merged);
+        }
+        let head = (lists.iter().map(|l| &l[0]))
+            .find(|h| lists.iter().all(|l| !l[1..].contains(h)))?
+            .clone();
+        for list in &mut lists {
+            if list[0] == head {
+                list.remove(0);
+            }
+        }
+        merged.push(head);
+    }
+}
+
+/// The keyword arguments of a call, as `(name, value)`.
+pub type Keywords = [(String, Value)];
+
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
 #[derive(Clone, Copy)]
 struct Frame<'a> {
     def: Target<'a>,
     path: &'a str,
     index: usize,
+}
+
+/// What `Code::origins` follows: a constant, a parameter, a function's return values.
+#[derive(PartialEq)]
+enum Flow<'a> {
+    Const(&'a str, &'a str),
+    Param(Target<'a>, usize),
+    Returns(Target<'a>),
+}
+
+/// What `Code::origins` carries along: `frames` bind the parameters of the functions whose
+/// return values are being followed, innermost last; `busy` is what is being followed, met
+/// again only through a cycle; `out` holds the origins found.
+#[derive(Default)]
+struct Trail<'a> {
+    frames: Vec<Frame<'a>>,
+    busy: Vec<Flow<'a>>,
+    out: BTreeSet<(&'a str, usize)>,
 }
 
 /// Values evaluated across files for contract kinds: constants folded where they are
@@ -320,7 +680,187 @@ impl<'a> Code<'a> {
 
     /// The arguments of the call at `index` of `path`, as written.
     pub fn args(&self, path: &'a str, index: usize) -> Option<&'a [Value]> {
-        Some(self.full(path)?.calls.get(index)?.args.as_slice())
+        Some(self.call(path, index)?.args.as_slice())
+    }
+
+    /// The call at `index` of `path`, with its arguments.
+    pub fn call(&self, path: &'a str, index: usize) -> Option<&'a Call> {
+        self.full(path)?.calls.get(index)
+    }
+
+    /// Whether the pack binds `name` everywhere, as JavaScript does `fetch`.
+    pub fn is_global(&self, name: &str) -> bool {
+        self.resolver.globals.contains(&name)
+    }
+
+    /// What `callee`, written in `scope` of `path`, names outside the repository: the module
+    /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
+    /// the repository binds it.
+    pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
+        let binding = self.resolver.binding(path, scope, callee);
+        matches!(binding, Binding::External).then(|| self.resolver.imported_name(path, callee))
+    }
+
+    /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
+    /// position, or by the parameter's name among its keyword arguments. A method called on
+    /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
+    fn arg(
+        &self,
+        path: &'a str,
+        index: usize,
+        function: Target<'a>,
+        n: usize,
+    ) -> Option<&'a Value> {
+        let call = self.call(path, index)?;
+        let params = &self.resolver.defs[function.path][function.name].params;
+        let param = params.get(n)?;
+        // The call's receiver binds a class method's first parameter, and a method's when it
+        // is called on an instance rather than on the class.
+        let bound = match params.first().map(|p| p.binds) {
+            Some(Binds::Class) => true,
+            Some(Binds::Instance) => call.callee.rsplit_once('.').is_some_and(|(receiver, _)| {
+                let class = self.definition(path, &call.scope, receiver);
+                !class.is_some_and(|c| self.resolver.is_class(c))
+            }),
+            _ => false,
+        };
+        let position = match bound {
+            true => n.checked_sub(1),
+            false => Some(n),
+        };
+        match param.binds {
+            Binds::Rest => None,
+            Binds::Keyword => call.keyword(&param.name),
+            Binds::Any | Binds::Instance | Binds::Class => (position)
+                .and_then(|at| call.args.get(at))
+                .or_else(|| call.keyword(&param.name)),
+        }
+    }
+
+    /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
+    /// through constants and imports, the arguments callers pass to parameters, the values
+    /// functions of the repository return and the items of a list or tuple. A call that
+    /// reaches no such function is where the value comes from, such as a constructor
+    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
+    /// binding, an attribute) is left out.
+    pub fn origins(&self, path: &'a str, scope: &'a str, name: &'a str) -> Vec<(&'a str, usize)> {
+        let mut trail = Trail::default();
+        self.flow_name(path, scope, name, &mut trail);
+        trail.out.into_iter().collect()
+    }
+
+    /// `origins` of a value as written.
+    pub fn value_origins(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+    ) -> Vec<(&'a str, usize)> {
+        let mut trail = Trail::default();
+        self.flow(path, scope, value, &mut trail);
+        trail.out.into_iter().collect()
+    }
+
+    fn flow(&self, path: &'a str, scope: &'a str, value: &'a Value, trail: &mut Trail<'a>) {
+        match value {
+            Value::Ref(name) => self.flow_name(path, scope, name, trail),
+            Value::Call(range) => {
+                let calls = &self.resolver.files[path].calls;
+                let Some(index) = calls.iter().position(|c| c.range == *range) else {
+                    return;
+                };
+                let function = match self.resolver.call(path, &calls[index]) {
+                    Resolution::Exact(t) if !self.resolver.is_class(t) => t,
+                    _ => {
+                        trail.out.insert((path, index));
+                        return;
+                    }
+                };
+                let Some(def) = (self.full(function.path))
+                    .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
+                else {
+                    return;
+                };
+                if trail.busy.contains(&Flow::Returns(function)) {
+                    return;
+                }
+                trail.busy.push(Flow::Returns(function));
+                trail.frames.push(Frame {
+                    def: function,
+                    path,
+                    index,
+                });
+                for returned in &def.returns {
+                    self.flow(function.path, function.name, returned, trail);
+                }
+                trail.frames.pop();
+                trail.busy.pop();
+            }
+            Value::List(items) => {
+                for item in items {
+                    self.flow(path, scope, item, trail);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
+        let binding = self.resolver.binding(path, scope, name);
+        // An attribute assigned a call once in its class (`self.client = Client()`) is a
+        // constant of the class.
+        let binding = match binding {
+            Binding::Local(at, scope, name) => {
+                let constant = self.resolver.consts[at].get(crate::qualify(scope, name).as_str());
+                constant.map_or(binding, |&constant| Binding::Const(at, constant))
+            }
+            binding => binding,
+        };
+        match binding {
+            Binding::Const(at, constant) => {
+                let found = self
+                    .full(at)
+                    .and_then(|f| f.consts.iter().find(|c| c.name == constant));
+                let Some(found) = found else {
+                    return;
+                };
+                if trail.busy.contains(&Flow::Const(at, constant)) {
+                    return;
+                }
+                trail.busy.push(Flow::Const(at, constant));
+                self.flow(at, crate::parent(constant), &found.value, trail);
+                trail.busy.pop();
+            }
+            Binding::Param(function, n, None) => {
+                // Inside a function whose return value is followed, its call binds the
+                // parameter; else every call of it does.
+                let sites = match trail.frames.last() {
+                    Some(frame) if frame.def == function => vec![(frame.path, frame.index)],
+                    // ponytail: a parameter of an outer function, captured by a closure, is
+                    // not followed.
+                    Some(_) => return,
+                    None => (self.resolver.callers.get(&function).into_iter().flatten())
+                        .map(|c| (c.path, c.index))
+                        .collect(),
+                };
+                if trail.busy.contains(&Flow::Param(function, n)) {
+                    return;
+                }
+                trail.busy.push(Flow::Param(function, n));
+                let frame = trail.frames.pop();
+                for (caller, index) in sites {
+                    let scope = &self.resolver.files[caller].calls[index].scope;
+                    if let Some(arg) = self.arg(caller, index, function, n) {
+                        self.flow(caller, scope, arg, trail);
+                    }
+                }
+                trail.frames.extend(frame);
+                trail.busy.pop();
+            }
+            // ponytail: a name its scope binds more than once, and an attribute not assigned a
+            // call once in its class, hold no constant, so what they hold is not followed.
+            _ => {}
+        }
     }
 
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
@@ -347,24 +887,6 @@ impl<'a> Code<'a> {
         unbind(self.eval(path, scope, value, &[], 0, &mut Vec::new(), &mut None))
     }
 
-    /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
-    /// its value as written.
-    pub fn constant(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        name: &'a str,
-    ) -> Option<((&'a str, &'a str), &'a Value)> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
-            Binding::Const(at, constant) => {
-                let facts = self.full(at)?;
-                let value = &facts.consts.iter().find(|c| c.name == constant)?.value;
-                Some(((at, constant), value))
-            }
-            _ => None,
-        }
-    }
-
     /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object
     /// parameter destructures) whose default value is the identifier `default`.
     pub fn param_defaults_to(
@@ -387,27 +909,42 @@ impl<'a> Code<'a> {
         matches!(value, Some(Some(Value::Ref(r))) if r == default)
     }
 
-    /// The definition `name` refers to from `scope` in `path`.
+    /// The definition `name` (also a member chain, such as `views.index`) refers to from
+    /// `scope` in `path`.
     pub fn definition(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        match self.resolver.binding(path, scope, name) {
             Binding::Def(t) => Some(t),
             _ => None,
         }
     }
 
-    /// What `read` makes of the arguments of the call at `index` of `path`, at each call site
-    /// that determines them. `read` answers `None` when what it needs holds a `Ref`: a
-    /// parameter of the enclosing function, which makes that function a client wrapper. Each
-    /// call site of the wrapper is then read with its own arguments substituted, through any
-    /// number of wrapper levels. A wrapper reached again through its own callers (a cycle)
-    /// adds nothing; a wrapper nobody calls is read where it stands, its parameters unknown.
+    /// The file `name`, written in `scope` of `path`, refers to as a whole module.
+    pub fn module(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<&'a str> {
+        match self.resolver.binding(path, scope, name) {
+            Binding::Module(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// The file an import of `specifier` from `path` names, if the pack parses it.
+    pub fn import_file(&self, path: &str, specifier: &str) -> Option<&'a str> {
+        self.resolver.module(path, specifier)
+    }
+
+    /// What `read` makes of the positional and keyword arguments of the call at `index` of
+    /// `path`, at each call site that determines them. `read` answers `None` when what it
+    /// needs holds a `Ref`: a parameter of the enclosing function, which makes that function a
+    /// client wrapper. Each call site of the wrapper is then read with its own arguments
+    /// substituted, through any number of wrapper levels. A wrapper reached again through its
+    /// own callers (a cycle) adds nothing; a wrapper nobody calls is read where it stands, its
+    /// parameters unknown.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
         &self,
         path: &'a str,
         index: usize,
-        read: &dyn Fn(&[Value]) -> Option<R>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<(&'a str, usize, R)> {
         let mut out = Vec::new();
         self.walk(path, index, &mut Vec::new(), read, &mut out);
@@ -419,20 +956,27 @@ impl<'a> Code<'a> {
         path: &'a str,
         index: usize,
         frames: &mut Vec<Frame<'a>>,
-        read: &dyn Fn(&[Value]) -> Option<R>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<(&'a str, usize, R)>,
     ) {
-        let call = self.resolver.files[path].calls.get(index);
-        let (Some(call), Some(args)) = (call, self.args(path, index)) else {
+        // The full call: the resolver's files may be kept from the index, without values.
+        let Some(call) = self.call(path, index) else {
             return;
         };
         let mut wants = None;
-        let values: Vec<Value> = args
+        let values: Vec<Value> = call
+            .args
             .iter()
             .map(|a| self.eval(path, &call.scope, a, frames, 0, &mut Vec::new(), &mut wants))
             .collect();
+        let kwargs: Vec<(String, Value)> = (call.kwargs.iter())
+            .map(|(k, v)| {
+                let v = self.eval(path, &call.scope, v, frames, 0, &mut Vec::new(), &mut wants);
+                (k.clone(), v)
+            })
+            .collect();
         let (site, at) = frames.last().map_or((path, index), |f| (f.path, f.index));
-        if let Some(found) = read(&values) {
+        if let Some(found) = read(&values, &kwargs) {
             out.push((site, at, found));
             return;
         }
@@ -442,18 +986,25 @@ impl<'a> Code<'a> {
         if frames.iter().any(|f| f.def == wrapper) {
             return;
         }
-        let callers = self.resolver.callers.get(&wrapper);
-        let callers = callers.map_or(&[][..], Vec::as_slice);
+        // A call that only matches the wrapper's name may be on any object: it is not climbed.
+        // ponytail: so a wrapper method called on a receiver whose class Meada cannot tell is
+        // read where it stands, its parameters unknown.
+        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
+            .filter(|c| !c.by_name)
+            .copied()
+            .collect();
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
-            out.extend(read(&values).map(|found| (site, at, found)));
+            let kwargs: Vec<(String, Value)> =
+                kwargs.into_iter().map(|(k, v)| (k, unbind(v))).collect();
+            out.extend(read(&values, &kwargs).map(|found| (site, at, found)));
             return;
         }
-        for &(caller, n) in callers {
+        for caller in callers {
             frames.push(Frame {
                 def: wrapper,
-                path: caller,
-                index: n,
+                path: caller.path,
+                index: caller.index,
             });
             self.walk(path, index, frames, read, out);
             frames.pop();
@@ -499,6 +1050,11 @@ impl<'a> Code<'a> {
                     })
                     .collect(),
             ),
+            Value::List(items) => Value::List(
+                (items.iter())
+                    .map(|v| self.eval(path, scope, v, frames, depth, seen, wants))
+                    .collect(),
+            ),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, seen, wants),
             other => other.clone(),
         }
@@ -515,7 +1071,7 @@ impl<'a> Code<'a> {
         seen: &mut Vec<(&'a str, &'a str)>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        match self.resolver.binding(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if seen.contains(&(at, constant)) {
@@ -527,22 +1083,30 @@ impl<'a> Code<'a> {
                 let Some(found) = found else {
                     return Value::Unknown;
                 };
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                let within = crate::parent(constant);
                 seen.push((at, constant));
                 let folded = self.eval(at, within, &found.value, frames, depth, seen, wants);
                 seen.pop();
                 folded
+            }
+            // `*args` and `**kwargs` hold what no single argument gives.
+            Binding::Param(function, n, _)
+                if self.resolver.defs[function.path][function.name].params[n].binds
+                    == Binds::Rest =>
+            {
+                Value::Unknown
             }
             Binding::Param(function, n, field) => match frames.get(depth) {
                 Some(frame) if frame.def == function => {
                     let Some(call) = self.resolver.files[frame.path].calls.get(frame.index) else {
                         return Value::Unknown;
                     };
-                    let Some(args) = self.args(frame.path, frame.index) else {
+                    if self.args(frame.path, frame.index).is_none() {
                         return Value::Unknown;
-                    };
+                    }
+                    let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
-                    let bound = match (args.get(n), param.and_then(|p| p.default.as_ref())) {
+                    let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
                         (Some(arg), _) => {
                             self.eval(frame.path, &call.scope, arg, frames, depth + 1, seen, wants)
                         }
@@ -623,6 +1187,7 @@ fn unbind(value: Value) -> Value {
                 .map(|(k, v)| (k, unbind(v)))
                 .collect(),
         ),
+        Value::List(items) => Value::List(items.into_iter().map(unbind).collect()),
         other => other,
     }
 }

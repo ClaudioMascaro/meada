@@ -1,0 +1,128 @@
+{
+  "repository": "example.com/acme/client",
+  "files": [
+    {
+      "path": "src/client.ts",
+      "hash": "1365fa186f8a7539f261e4f0ef482f47c48745312e5b5d6ac92026e725837859"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/client::src/client.ts::archived",
+      "span": {
+        "path": "src/client.ts",
+        "start": 616,
+        "end": 698
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::cancel",
+      "span": {
+        "path": "src/client.ts",
+        "start": 251,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::ping",
+      "span": {
+        "path": "src/client.ts",
+        "start": 92,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::restock",
+      "span": {
+        "path": "src/client.ts",
+        "start": 415,
+        "end": 517
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/client::src/client.ts::archived::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::archived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 665,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::cancel::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::cancel",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 296,
+        "end": 345
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::ping::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 125,
+        "end": 161
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::restock::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 462,
+        "end": 514
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": null,
+      "site": "example.com/acme/client::src/client.ts::archived::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::DELETE::/shop/orders/{}",
+      "site": "example.com/acme/client::src/client.ts::cancel::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/health",
+      "site": "example.com/acme/client::src/client.ts::ping::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::PUT::/shop/items/{}/stock",
+      "site": "example.com/acme/client::src/client.ts::restock::fetch#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/client::src/client.ts::cancel::fetch#0",
+      "provider": "example.com/acme/conformance::shop/orders/views.py::order",
+      "contract": "http::DELETE::/shop/orders/{}",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::ping::fetch#0",
+      "provider": "example.com/acme/conformance::shop/views.py::health",
+      "contract": "http::POST::/health",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/conformance; any method"
+    }
+  ]
+}

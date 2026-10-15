@@ -1,0 +1,8 @@
+# The storefront (TypeScript) reaches the inventory service (Python) through a base URL
+# variable and through the inventory's declared host.
+[serve]
+hosts = ["storefront.example.com"]
+
+[[peer]]
+repo = "example.com/xlang/inventory"
+base_url_env = ["INVENTORY_URL"]

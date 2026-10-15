@@ -30,3 +30,8 @@ fn qualify(scope: &str, name: &str) -> String {
         format!("{scope}.{name}")
     }
 }
+
+/// The scope enclosing the dotted `scope`, empty at the top: `outer` for `outer.inner`.
+fn parent(scope: &str) -> &str {
+    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
+}

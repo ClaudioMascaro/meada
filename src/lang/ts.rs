@@ -5,8 +5,8 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules, Param,
-    Part, Value,
+    Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules,
+    Param, Part, Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -52,6 +52,9 @@ impl LanguagePack for TsJs {
                     name: inner.clone(),
                     kind,
                     range,
+                    bases: Vec::new(),
+                    decorators: Vec::new(),
+                    returns: Vec::new(),
                 });
             }
             match node.kind() {
@@ -66,6 +69,8 @@ impl LanguagePack for TsJs {
                                 .filter(|a| a.kind() == "arguments")
                                 .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
                                 .unwrap_or_default(),
+                            kwargs: Vec::new(),
+                            decorates: None,
                         });
                     }
                 }
@@ -101,6 +106,18 @@ impl LanguagePack for TsJs {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["tsconfig.json", "jsconfig.json"]
+    }
+
+    fn receiver(&self) -> Option<&'static str> {
+        Some("this")
+    }
+
+    fn base_receiver(&self) -> Option<&'static str> {
+        Some("super")
+    }
+
+    fn globals(&self) -> &'static [&'static str] {
+        &["fetch"]
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
@@ -319,6 +336,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
     if list.kind() == "identifier" {
         return vec![Param {
             name: text(list, src).to_string(),
+            binds: Binds::Any,
             default: None,
             fields: Vec::new(),
         }];
@@ -342,6 +360,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
                     .filter(|n| n.kind() == "identifier")
                     .map_or("", |n| text(n, src))
                     .to_string(),
+                binds: Binds::Any,
                 default: default.map(|d| value(d, src, scope)),
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
@@ -556,9 +575,7 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         }
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
-            None if kind == "call_expression" => node
-                .child_by_field_name("function")
-                .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
+            None if kind == "call_expression" => Value::Call(node.byte_range()),
             None => Value::Unknown,
         },
     }
@@ -662,18 +679,6 @@ fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
-        .collect::<Vec<_>>()
-        .into_iter()
-}
-
-fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
-}
-
 /// A string literal's content: `'./m'` is `./m`.
 fn unquote(node: Node, src: &[u8]) -> String {
     let quoted = text(node, src);
@@ -701,8 +706,4 @@ fn callee(node: Node, src: &[u8]) -> String {
         },
         kind => format!("({kind})"),
     }
-}
-
-fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
-    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
 }

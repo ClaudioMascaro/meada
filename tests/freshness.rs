@@ -54,6 +54,46 @@ fn refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
     );
 }
 
+/// Renames a function others import, adds a module whose function turns an inferred call
+/// into an ambiguous one, deletes a module star-imported elsewhere, and declares a source
+/// root, which drops the implicit `src` one.
+fn edit_python(repo: &Path) {
+    let units = fs::read_to_string(repo.join("geometry/units.py")).unwrap();
+    fs::write(
+        repo.join("geometry/units.py"),
+        units.replace("def to_cm", "def to_mm"),
+    )
+    .unwrap();
+    fs::write(repo.join("stars/extra.py"), "def legacy():\n    return 2\n").unwrap();
+    fs::remove_file(repo.join("helpers.py")).unwrap();
+    fs::write(
+        repo.join("pyproject.toml"),
+        "[tool.setuptools.packages.find]\nwhere = [\"lib\"]\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_python", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python
+        )
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.
@@ -314,6 +354,55 @@ fn edit_resources(gateway: &Path) {
         "role = \"read\"",
         "role = \"read-write\"",
     );
+}
+
+/// Edits, adds and deletes `.py` files of the inventory and deletes a route of the storefront:
+/// a route path changes, a module with a consumer on the declared host appears, the jobs
+/// module goes.
+fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
+    let main = inventory.join("inventory/main.py");
+    let src = fs::read_to_string(&main).unwrap();
+    assert!(src.contains("\"/stock/{sku}\""));
+    fs::write(
+        &main,
+        src.replace("\"/stock/{sku}\"", "\"/stock/{sku}/level\""),
+    )
+    .unwrap();
+    fs::write(
+        inventory.join("inventory/report.py"),
+        "import requests\n\n\ndef report():\n    return requests.post(\"https://storefront.example.com/api/audit\")\n",
+    )
+    .unwrap();
+    fs::remove_file(inventory.join("inventory/jobs.py")).unwrap();
+    fs::remove_file(storefront.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(storefront, inventory): &(PathBuf, PathBuf)| -> Vec<String> {
+        [storefront, inventory]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang("fresh_xlang");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang("fresh_xlang_cold");
+    edit_xlang(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
 }
 
 #[test]
