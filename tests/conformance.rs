@@ -86,6 +86,28 @@ fn typescript_and_javascript() {
             "src/messages/exchanges.ts::onAudit",
             "src/messages/exchanges.ts::onShipment",
             "src/messages/handlers.ts::onPayment",
+            "src/messages/bullmq.ts::enqueue",
+            "src/messages/bullmq.ts::enqueueAll",
+            "src/messages/bullmq.ts::enqueueTwice",
+            "src/messages/bullmq.ts::notBullmq",
+            "src/messages/bullmq.ts::record",
+            "src/messages/bullmq.ts::runJob",
+            "src/messages/bullmq.ts::startDynamic",
+            "src/messages/bullmq.ts::startJobs",
+            "src/messages/bullmq.ts::startMail",
+            "src/messages/bullmq.ts::startMail.bullmq mail-eu",
+            "src/messages/redis.ts::append",
+            "src/messages/redis.ts::appendBilling",
+            "src/messages/redis.ts::appendDynamic",
+            "src/messages/redis.ts::appendIoredis",
+            "src/messages/redis.ts::appendNodeRedis",
+            "src/messages/redis.ts::notRedis",
+            "src/messages/redis.ts::read",
+            "src/messages/redis.ts::readBilling",
+            "src/messages/redis.ts::readIoredis",
+            "src/messages/redis.ts::readMany",
+            "src/messages/redis.ts::readNamed",
+            "src/messages/redis.ts::readNodeRedis",
             "src/messages/nats.ts::notPublished",
             "src/messages/nats.ts::onAudit",
             "src/messages/nats.ts::publishAll",
@@ -403,6 +425,87 @@ fn typescript_and_javascript_sqs_and_nats() {
     ];
     expected.sort();
     assert_eq!(links, expected);
+}
+
+/// The BullMQ and Redis stream forms of the TS/JS pack (spec #20), as `(consumer, producer,
+/// reason)`, every link `exact`: `Queue.add` and `Worker`, ioredis `xadd`/`xreadgroup` and
+/// node-redis `xAdd`/`xReadGroup`, client wrappers included. A client of another package, a
+/// `Set.add` and a name Meada cannot evaluate produce no link.
+#[test]
+fn typescript_and_javascript_bullmq_and_redis() {
+    let repo = fixture_repo("conformance_jobs", "conformance-ts-js", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
+
+    let mut links: Vec<(String, String, String, &str)> = (json["links"].as_array().unwrap())
+        .iter()
+        .filter(|l| {
+            let reason = l["reason"].as_str().unwrap();
+            reason.starts_with("channel::bullmq::") || reason.starts_with("channel::redis::")
+        })
+        .map(|l| {
+            (
+                rel(l["consumer"].as_str().unwrap()),
+                rel(l["provider"].as_str().unwrap()),
+                l["reason"].as_str().unwrap().to_string(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    links.sort();
+
+    let bull = "src/messages/bullmq.ts::";
+    let redis = "src/messages/redis.ts::";
+    let job = |consumer: &str, producer: &str, name: &str| {
+        let (consumer, producer) = (format!("{bull}{consumer}"), format!("{bull}{producer}"));
+        (
+            consumer,
+            producer,
+            format!("channel::bullmq::{name}"),
+            "exact",
+        )
+    };
+    let stream = |consumer: &str, producer: &str, name: &str| {
+        let (consumer, producer) = (format!("{redis}{consumer}"), format!("{redis}{producer}"));
+        (
+            consumer,
+            producer,
+            format!("channel::redis::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        job("runJob", "enqueueAll::jobs.add#0", "jobs"),
+        // The queue is named by the binding, so a wrapper's `add` is the producer.
+        job("runJob", "enqueue::jobs.add#0", "jobs"),
+        job(
+            "startMail.bullmq mail-eu",
+            "enqueueAll::mail.add#0",
+            "mail-eu",
+        ),
+        stream("readIoredis", "appendIoredis::ioredis.xadd#0", "orders"),
+        stream("readMany", "appendIoredis::ioredis.xadd#0", "orders"),
+        stream("readIoredis", "appendIoredis::named.xadd#0", "events.audit"),
+        stream(
+            "readNodeRedis",
+            "appendNodeRedis::client.xAdd#0",
+            "shipments",
+        ),
+        stream("readMany", "appendNodeRedis::other.xAdd#0", "returns"),
+        stream("readNamed", "appendBilling::append#0", "billing"),
+        stream("readBilling", "appendBilling::append#0", "billing"),
+    ];
+    expected.sort();
+    assert_eq!(links, expected);
+    // The two names Meada cannot evaluate stay as unresolved sides of their broker kind.
+    let unresolved = |broker: &str| {
+        (json["providers"].as_array().unwrap())
+            .iter()
+            .filter(|p| p["contract"] == format!("channel::{broker}"))
+            .count()
+    };
+    assert_eq!((unresolved("bullmq"), unresolved("redis")), (1, 1));
 }
 
 /// The amqplib forms of the TS/JS pack (spec #20): `sendToQueue`, `consume`, `bindQueue` and
