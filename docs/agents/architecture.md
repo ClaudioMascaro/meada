@@ -178,7 +178,10 @@ give byte-identical output.
   as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
   a `Value::Call` at its range), a decorator call names the definition it decorates
   (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
-  callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`). A target that is `self.x`, also inside unpacking, a `for`
+  callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`).
+  A function's parameters carry their defaults as written (`Param::default`); `*args`,
+  `**kwargs` and the bare `*` keep their stars in `Param::name`, so no argument binds them and
+  the parameters after the first of them take an argument only by keyword. A target that is `self.x`, also inside unpacking, a `for`
   or an `as`, and also written in a function nested in the method, binds the class's attribute
   `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
   and resolves through the file's imports. An annotation decides; other bindings that
@@ -271,7 +274,8 @@ give byte-identical output.
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like
   any `Value` (`str.format` and `%` do not), and `Code::expand` follows a function whose URL
-  or method depends on its parameters, so each of its call sites is a consumer. `resource.rs` (spec
+  or method depends on its parameters, so each of its call sites is a consumer (an argument
+  it leaves out takes the parameter's default). `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -435,8 +439,8 @@ Each is marked `ponytail:` at its site unless noted.
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
-  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. Parameter
-  defaults are not read, nor `**k` splats; a `*a` splat is read as one positional argument.
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. A `**k` splat
+  in a call is not read; a `*a` splat is read as one positional argument.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers. Django: what an extension of
   `urlpatterns` adds other than a list literal is left out, and a single `urlpatterns = [...] +
@@ -447,8 +451,7 @@ Each is marked `ponytail:` at its site unless noted.
   backslashes yields nothing. Python clients: a receiver that is the result of a call
   (`Session().get(...)`, `make().get(...)`) or an attribute set from anything but a call
   (`self.http = http`) is not read; a parameter given a client takes the base of every caller
-  that passes one, and several different bases make it a hole; a parameter's default is not
-  read.
+  that passes one, and several different bases make it a hole.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

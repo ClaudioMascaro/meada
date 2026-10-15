@@ -189,6 +189,15 @@ fn python() {
     conform(
         "conformance-python",
         &[
+            "clients/defaults.py::call_keyword_only",
+            "clients/defaults.py::call_with_splats",
+            "clients/defaults.py::create_default",
+            "clients/defaults.py::keyword_only",
+            "clients/defaults.py::list_defaults",
+            "clients/defaults.py::other_base",
+            "clients/defaults.py::override_keyword_only",
+            "clients/defaults.py::request",
+            "clients/defaults.py::with_splats",
             "clients/dynamic.py::build_url",
             "clients/dynamic.py::computed",
             "clients/dynamic.py::formatted",
@@ -1465,6 +1474,53 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
 
     assert_eq!(
         python_clients("python_http_wrappers", "wrappers.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
+    let site = |function: &str, call: &str| format!("clients/defaults.py::{function}::{call}");
+    let expected = triples(&[
+        // Method and base both from the defaults.
+        (
+            "http::GET::/defaults",
+            "host:api.example.com",
+            &site("list_defaults", "request#0"),
+        ),
+        // The method by position; the base still from its default.
+        (
+            "http::POST::/defaults",
+            "host:api.example.com",
+            &site("create_default", "request#0"),
+        ),
+        // The base by keyword; the method from its default.
+        (
+            "http::GET::/other",
+            "host:other.example.com",
+            &site("other_base", "request#0"),
+        ),
+        // Keyword-only: the default when left out, the argument when given.
+        (
+            "http::PUT::/kw-default",
+            "host:api.example.com",
+            &site("call_keyword_only", "keyword_only#0"),
+        ),
+        (
+            "http::PATCH::/kw-override",
+            "host:api.example.com",
+            &site("override_keyword_only", "keyword_only#0"),
+        ),
+        // Positional arguments past the named ones go to `*extra`, never to `method`.
+        (
+            "http::HEAD::/splat",
+            "host:api.example.com",
+            &site("call_with_splats", "with_splats#0"),
+        ),
+    ]);
+
+    assert_eq!(
+        python_clients("python_http_defaults", "defaults.py"),
         expected
     );
 }

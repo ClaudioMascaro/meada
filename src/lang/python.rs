@@ -394,14 +394,32 @@ fn span(node: Node) -> Range<usize> {
     }
 }
 
-/// The parameters of a function `node` in order, `self` included. Defaults are not read yet.
+/// The parameters of a function `node` in order, `self` included, with their defaults. `*args`
+/// and `**kwargs` keep their stars in the name, and so does the bare `*`: such a parameter
+/// binds no argument, and the ones after it are keyword-only (`Param::name`).
 fn params(node: Node, src: &[u8]) -> Vec<Param> {
-    parameters(node)
-        .into_iter()
-        .map(|(name, _)| Param {
-            name: name.map_or("", |n| text(n, src)).to_string(),
-            default: None,
-            fields: Vec::new(),
+    let Some(list) = node.child_by_field_name("parameters") else {
+        return Vec::new();
+    };
+    named(list)
+        .filter_map(|p| {
+            let (name, default) = match p.kind() {
+                "default_parameter" | "typed_default_parameter" => (
+                    text(identifier(p.child_by_field_name("name")?)?, src).to_string(),
+                    p.child_by_field_name("value"),
+                ),
+                "identifier" | "typed_parameter" => (text(identifier(p)?, src).to_string(), None),
+                "list_splat_pattern" => (format!("*{}", text(identifier(p)?, src)), None),
+                "dictionary_splat_pattern" => (format!("**{}", text(identifier(p)?, src)), None),
+                "keyword_separator" => ("*".to_string(), None),
+                // The `/` separator binds nothing.
+                _ => return None,
+            };
+            Some(Param {
+                name,
+                default: default.map(|d| value(d, src)),
+                fields: Vec::new(),
+            })
         })
         .collect()
 }

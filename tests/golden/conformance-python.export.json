@@ -14,6 +14,10 @@
       "hash": "2cf146c786d51951dcfaec6195001ed378f9b864c468004e0bd0317c1c452362"
     },
     {
+      "path": "clients/defaults.py",
+      "hash": "332c804d7b4da39f15240567c125cfe3f2ed66dbcfc2775d04c8563b737e7499"
+    },
+    {
       "path": "clients/dynamic.py",
       "hash": "2acf9e3d447d386bf62f30308258b332c60b8924610143c2514380b78fa57cbd"
     },
@@ -569,6 +573,78 @@
         "path": "bindings.py",
         "start": 926,
         "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::call_keyword_only",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 662,
+        "end": 725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::call_with_splats",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 934,
+        "end": 1087
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::create_default",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 326,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::keyword_only",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 570,
+        "end": 659
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::list_defaults",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 234,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::other_base",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 439,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::override_keyword_only",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 728,
+        "end": 812
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::request",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 139,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::with_splats",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 815,
+        "end": 931
       }
     },
     {
@@ -2684,6 +2760,105 @@
         "path": "bindings.py",
         "start": 979,
         "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::call_keyword_only::keyword_only#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::call_keyword_only",
+      "target": "example.com/acme/conformance::clients/defaults.py::keyword_only",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 698,
+        "end": 725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::call_with_splats::with_splats#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::call_with_splats",
+      "target": "example.com/acme/conformance::clients/defaults.py::with_splats",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 1045,
+        "end": 1087
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::create_default::request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::create_default",
+      "target": "example.com/acme/conformance::clients/defaults.py::request",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 408,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::keyword_only::requests.request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::keyword_only",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 622,
+        "end": 659
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::list_defaults::request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::list_defaults",
+      "target": "example.com/acme/conformance::clients/defaults.py::request",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 303,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::other_base::request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::other_base",
+      "target": "example.com/acme/conformance::clients/defaults.py::request",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 516,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::override_keyword_only::keyword_only#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::override_keyword_only",
+      "target": "example.com/acme/conformance::clients/defaults.py::keyword_only",
+      "level": "exact",
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 768,
+        "end": 812
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::request::requests.request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::request",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 194,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/defaults.py::with_splats::requests.request#0",
+      "caller": "example.com/acme/conformance::clients/defaults.py::with_splats",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/defaults.py",
+        "start": 883,
+        "end": 931
       }
     },
     {
@@ -5383,6 +5558,36 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "http::PUT::/kw-default",
+      "site": "example.com/acme/conformance::clients/defaults.py::call_keyword_only::keyword_only#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::HEAD::/splat",
+      "site": "example.com/acme/conformance::clients/defaults.py::call_with_splats::with_splats#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::POST::/defaults",
+      "site": "example.com/acme/conformance::clients/defaults.py::create_default::request#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/defaults",
+      "site": "example.com/acme/conformance::clients/defaults.py::list_defaults::request#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/other",
+      "site": "example.com/acme/conformance::clients/defaults.py::other_base::request#0",
+      "via": "host:other.example.com"
+    },
+    {
+      "contract": "http::PATCH::/kw-override",
+      "site": "example.com/acme/conformance::clients/defaults.py::override_keyword_only::keyword_only#0",
+      "via": "host:api.example.com"
+    },
     {
       "contract": null,
       "site": "example.com/acme/conformance::clients/dynamic.py::computed::requests.post#0",

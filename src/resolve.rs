@@ -689,7 +689,10 @@ impl<'a> Code<'a> {
             true => n.checked_sub(1),
             false => Some(n),
         };
+        // A starred parameter (`*args`, `**kwargs`, the bare `*`) ends the positional ones.
+        let open = params.iter().take(n + 1).all(|p| !p.name.starts_with('*'));
         position
+            .filter(|_| open)
             .and_then(|at| call.args.get(at))
             .or_else(|| call.keyword(&params.get(n)?.name))
     }

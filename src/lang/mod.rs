@@ -194,6 +194,8 @@ pub struct Def {
 
 #[derive(Serialize, Deserialize)]
 pub struct Param {
+    /// A Python `*args`, `**kwargs` or the bare `*` keeps its stars: it binds no argument, and
+    /// the parameters after the first of them are keyword-only.
     pub name: String,
     /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(skip)]
