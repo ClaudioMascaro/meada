@@ -1,0 +1,58 @@
+{
+  "repository": "example.com/pkg/shared",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/shared::package.json"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "@example/shared",
+      "version": "1.2.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "."
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared 1.2.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared none (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::devDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared ~1.1.0 (local 1.2.0)"
+    }
+  ]
+}

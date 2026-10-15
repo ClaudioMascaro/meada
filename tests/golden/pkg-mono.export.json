@@ -1,0 +1,115 @@
+{
+  "repository": "example.com/pkg/mono",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::npm::@example/a",
+      "site": "example.com/pkg/mono::packages/a/package.json"
+    },
+    {
+      "contract": "package::npm::@example/b",
+      "site": "example.com/pkg/mono::packages/b/package.json"
+    },
+    {
+      "contract": "package::npm::@example/c",
+      "site": "example.com/pkg/mono::packages/c/package.json"
+    },
+    {
+      "contract": "package::npm::@example/mono",
+      "site": "example.com/pkg/mono::package.json"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::npm::@example/a",
+      "site": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/a",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/c",
+      "site": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/c",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/a",
+      "site": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "@example/a",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/mono",
+      "directory": "packages/a"
+    },
+    {
+      "name": "@example/b",
+      "version": "2.0.0",
+      "repository": "example.com/pkg/mono",
+      "directory": "packages/b"
+    },
+    {
+      "name": "@example/c",
+      "repository": "example.com/pkg/mono",
+      "directory": "packages/c"
+    },
+    {
+      "name": "@example/mono",
+      "repository": "example.com/pkg/mono",
+      "directory": "."
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "packages/b/package.json",
+      "field": "dependencies",
+      "name": "@example/a",
+      "range": "workspace:*"
+    },
+    {
+      "manifest": "packages/b/package.json",
+      "field": "dependencies",
+      "name": "@example/c",
+      "range": "workspace:*"
+    },
+    {
+      "manifest": "packages/c/package.json",
+      "field": "dependencies",
+      "name": "@example/a",
+      "range": "^1.0.0"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/a",
+      "provider": "example.com/pkg/mono::packages/a/package.json",
+      "contract": "package::npm::@example/a",
+      "level": "exact",
+      "reason": "package::npm::@example/a workspace:* (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/mono::packages/b/package.json::dependencies::@example/c",
+      "provider": "example.com/pkg/mono::packages/c/package.json",
+      "contract": "package::npm::@example/c",
+      "level": "exact",
+      "reason": "package::npm::@example/c workspace:* (local none)"
+    },
+    {
+      "consumer": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",
+      "provider": "example.com/pkg/fork::packages/a/package.json",
+      "contract": "package::npm::@example/a",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::npm::@example/a ^1.0.0 (local 3.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",
+      "provider": "example.com/pkg/mono::packages/a/package.json",
+      "contract": "package::npm::@example/a",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::npm::@example/a ^1.0.0 (local 1.0.0)"
+    }
+  ]
+}

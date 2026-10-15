@@ -15,6 +15,7 @@ mod items;
 mod lang;
 pub mod mcp;
 pub mod msg;
+mod package;
 mod render;
 pub mod repo;
 mod resolve;

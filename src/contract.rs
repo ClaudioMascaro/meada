@@ -1,7 +1,7 @@
 //! The contract-kind interface: each kind turns pack output, or what `meada.toml` declares,
 //! into provider and consumer contracts and matches them into links (ADR 0005). The kinds are
-//! HTTP (`http::`), resources (`resource::`, spec #19) and channels (`channel::`, spec #20);
-//! later kinds (`package::`) plug in behind the same trait.
+//! HTTP (`http::`), resources (`resource::`, spec #19), channels (`channel::`, spec #20) and
+//! packages (`package::`, spec #22); later kinds plug in behind the same trait.
 
 use std::collections::HashMap;
 
@@ -10,6 +10,7 @@ use serde::Serialize;
 use crate::channel::{Channel, Routes};
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
+use crate::package::Packages;
 use crate::resolve::Code;
 use crate::resource::Resource;
 use crate::workspace::Repository;
@@ -167,7 +168,7 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages];
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {

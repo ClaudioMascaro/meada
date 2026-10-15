@@ -17,7 +17,8 @@ use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
 use crate::{
-    Result, channel, decisions, document, http, index, items, render, repo, resource, trace,
+    Result, channel, decisions, document, http, index, items, package, render, repo, resource,
+    trace,
 };
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -100,7 +101,7 @@ impl Engine {
     /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
         let repos = self.workspace.repos.iter().enumerate();
-        repos
+        let mut exports = repos
             .map(|(n, m)| {
                 let mut export = index::export(&self.db, &schema(n), &m.identity)?;
                 for kind in contract::KINDS {
@@ -108,7 +109,10 @@ impl Engine {
                 }
                 Ok(export)
             })
-            .collect()
+            .collect::<Result<Vec<_>>>()?;
+        // Dependency entries need every repository's packages, so they come after all declares.
+        package::consume(&mut exports);
+        Ok(exports)
     }
 
     /// Every link of the workspace, sorted.
