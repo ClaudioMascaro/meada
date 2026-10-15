@@ -122,6 +122,11 @@ fn python_functions_are_found_by_name_and_list_callers_and_callees() {
         "conformance-python.context-scale.txt",
         &engine.context("scale", None).unwrap(),
     );
+    // A method's callers through `self`, annotations and constructors, and by name alone.
+    assert_golden(
+        "conformance-python.context-render.txt",
+        &engine.context("Panel.render", None).unwrap(),
+    );
 }
 
 #[test]

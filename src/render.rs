@@ -5,6 +5,16 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use crate::contract::Level;
+
+/// ` [<level>]` after a call that is not exact.
+pub fn mark(level: Option<Level>) -> String {
+    match level {
+        Some(Level::Exact) | None => String::new(),
+        Some(level) => format!(" [{}]", level.name()),
+    }
+}
+
 /// Tokens an answer may use unless the caller asks for another budget.
 pub const DEFAULT_BUDGET: usize = 2_000;
 

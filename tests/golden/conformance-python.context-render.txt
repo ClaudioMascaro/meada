@@ -1,0 +1,12 @@
+example.com/acme/conformance methods.py:50 Panel.render
+def render(self):
+        return 0
+callers:
+example.com/acme/conformance methods.py:40 Panel.draw
+example.com/acme/conformance methods.py:46 Panel.draw.later
+example.com/acme/conformance methods.py:91 use
+example.com/acme/conformance methods.py:92 use
+example.com/acme/conformance methods.py:96 use [inferred]
+example.com/acme/conformance methods.py:104 module_level
+example.com/acme/conformance methods.py:109 shadowed [inferred]
+callees: none

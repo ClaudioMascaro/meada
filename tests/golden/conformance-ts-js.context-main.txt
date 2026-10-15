@@ -17,15 +17,16 @@ function main(shape: Shape): void {
 }
 callers: none
 callees:
+example.com/acme/conformance src/shapes/shape.ts:2 Shape.unit [inferred]
 example.com/acme/conformance src/shapes/shape.ts:2 Shape.unit
 example.com/acme/conformance src/math.ts:5 double
-example.com/acme/conformance src/legacy.cjs:1 legacy
+example.com/acme/conformance src/legacy.cjs:1 legacy [inferred]
 example.com/acme/conformance src/util/log.js:1 default
 example.com/acme/conformance src/math.ts:1 add
 example.com/acme/conformance src/math.ts:7 square
 example.com/acme/conformance src/math.ts:1 add
 example.com/acme/conformance src/math.ts:11 scale
-example.com/acme/conformance src/shapes/shape.ts:10 Shape.describe
+example.com/acme/conformance src/shapes/shape.ts:10 Shape.describe [inferred]
 example.com/acme/conformance src/util/format.mjs:1 format
 example.com/acme/conformance src/view.tsx:3 render [ambiguous]
 example.com/acme/conformance src/widget.jsx:1 render [ambiguous]

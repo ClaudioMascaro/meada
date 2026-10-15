@@ -62,6 +62,30 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
+    /// Names bound in a scope whose class the syntax may tell, one per scope and name.
+    pub locals: Vec<Local>,
+}
+
+/// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
+/// its instances. The shared side follows a method call on it to the class it holds.
+#[derive(Serialize, Deserialize)]
+pub struct Local {
+    pub scope: String,
+    pub name: String,
+    pub class: Class,
+}
+
+/// What the syntax says a name holds. It is read as written: the shared side decides whether
+/// the name it gives is a class, and no type is inferred beyond that.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum Class {
+    /// An instance of the class whose body encloses the scope, or that class: `self`, `cls`.
+    Enclosing,
+    /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
+    /// an instance of: a constructor call or an annotation. A function's result is unknown.
+    Named(String),
+    /// Bound otherwise, so an outer binding of the name is hidden.
+    Unknown,
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from
@@ -138,6 +162,10 @@ pub struct Def {
     pub range: Range<usize>,
     /// A function's parameters in order; a destructured one has an empty name.
     pub params: Vec<Param>,
+    /// A class's bases as written, in order, as callee-like names resolved from the scope
+    /// enclosing the class.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bases: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]

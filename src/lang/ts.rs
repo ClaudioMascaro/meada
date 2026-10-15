@@ -52,6 +52,7 @@ impl LanguagePack for TsJs {
                     name: inner.clone(),
                     kind,
                     range,
+                    bases: Vec::new(),
                 });
             }
             match node.kind() {

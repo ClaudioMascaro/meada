@@ -148,17 +148,36 @@ give byte-identical output.
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
   `packages.from`), or `src` when none is declared; a package comes before a module of the
   same name.
+  It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
+  written, `B[T]` read as `B`) and `Facts::locals`, one `Local {scope, name, class}` per name a
+  scope binds: a method's first parameter unless `@staticmethod` (`Class::Enclosing`), an
+  annotated parameter or name, `x = C(...)` (`Class::Named("C")`, whatever `C` turns out to
+  be), `self.x: T` in a method (an attribute, at the class's scope), and any other assignment
+  or `for` target (`Class::Unknown`, which hides an outer binding). Annotations are read as
+  written: a name, a string holding one, `Optional[...]` and `... | None`.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
   callee may start with a dotted import, and an `Imported::All` import counts as one binding
-  of each name its module's `Facts::star` takes. `Code` folds constants and client wrapper arguments into values for contract kinds.
+  of each name its module's `Facts::star` takes. `lexical` skips a class's scope unless the
+  lookup starts in it (a class body's names are not in scope for its methods). A member of a
+  class, or of a parameter or local whose `Class` resolves to a class of the repository
+  (`Binding::Instance`), is looked up through the class's family: the class, then the bases
+  its definition writes, at any depth, depth first and left to right with each class at its
+  last place (Python's order for consistent hierarchies); the first class that defines it, or
+  binds it as an attribute local, wins, `exact`. A receiver whose class is outside the
+  repository is unresolved; any other member call falls back to the name match. `Busy` guards
+  locals and bases that resolve through themselves. A pack that writes `Def::bases` and
+  `Facts::locals` gets this without resolver changes (TypeScript writes none yet; `this` stays
+  a resolver keyword). `Code` folds constants and client wrapper arguments into values for contract kinds.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
   `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>]`
+  after a call that is not exact, in `trace` and in `context`'s callers and callees). Display
+  only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
 
@@ -288,8 +307,8 @@ Each is marked `ponytail:` at its site unless noted.
 - `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
   root declarations. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
-  it sits. `self`, `cls`, base classes and typed receivers are not resolved yet (a method call
-  resolves by name), `__all__` is read only as one literal list or tuple, and call arguments
+  it sits. `with`/`except ... as`, `:=`, comprehension targets and `global` neither type a
+  name nor hide an outer one, and a class family is ordered pre-C3 (`resolve.rs`). `__all__` is read only as one literal list or tuple, and call arguments
   and parameter defaults are not read (no `Value`s, so no contracts).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.

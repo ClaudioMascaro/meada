@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
-use crate::render::{Files, callee, label, line_of, unresolved};
+use crate::render::{Files, callee, label, line_of, mark, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 use crate::{http, render};
@@ -495,14 +495,6 @@ impl<'a> Walk<'_, 'a> {
                 t => tokens = t,
             }
         }
-    }
-}
-
-/// ` [<level>]` after a call that is not exact.
-fn mark(level: Option<Level>) -> String {
-    match level {
-        Some(Level::Exact) | None => String::new(),
-        Some(level) => format!(" [{}]", level.name()),
     }
 }
 

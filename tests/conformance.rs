@@ -235,6 +235,37 @@ fn python() {
             "helpers.py::format_name",
             "legacy.py::legacy",
             "main.py::main",
+            "methods.py::Base",
+            "methods.py::Base.ping",
+            "methods.py::Base.shared",
+            "methods.py::Dial",
+            "methods.py::Dial.spin",
+            "methods.py::Leaf",
+            "methods.py::Leaf.run",
+            "methods.py::Left",
+            "methods.py::Mixin",
+            "methods.py::Mixin.mixed",
+            "methods.py::Mixin.shared",
+            "methods.py::Panel",
+            "methods.py::Panel.__init__",
+            "methods.py::Panel.build",
+            "methods.py::Panel.check",
+            "methods.py::Panel.create",
+            "methods.py::Panel.draw",
+            "methods.py::Panel.draw.later",
+            "methods.py::Panel.render",
+            "methods.py::Right",
+            "methods.py::Right.hook",
+            "methods.py::Root",
+            "methods.py::Root.hook",
+            "methods.py::make",
+            "methods.py::module_level",
+            "methods.py::shadowed",
+            "methods.py::use",
+            "scopes.py::Helper",
+            "scopes.py::Outer",
+            "scopes.py::Outer.Helper",
+            "scopes.py::Outer.m",
             "shadow.py::from_module",
             "shadow/__init__.py::from_package",
             "src/billing/invoice.py::total",
@@ -492,13 +523,129 @@ fn python() {
             ),
             // A package outside the repository stays unresolved.
             ("main.py::main::np.array#0", None, &[]),
-            // Only a unique name match finds these: a function no import names, a method on
-            // a local.
+            // Only a unique name match finds a function no import names.
             ("main.py::main::legacy#0", INFERRED, &["legacy.py::legacy"]),
+            // A local assigned from a constructor call, here through an aliased import.
             (
                 "main.py::main::circle.describe#0",
-                INFERRED,
+                EXACT,
                 &["geometry/shapes.py::Circle.describe"],
+            ),
+            // `self` and `cls` reach the class, then its bases in the order written, in
+            // Python's method resolution order, also from a nested function.
+            (
+                "methods.py::Panel.draw::self.ping#0",
+                EXACT,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::Panel.draw::self.shared#0",
+                EXACT,
+                &["methods.py::Base.shared"],
+            ),
+            (
+                "methods.py::Panel.draw::self.mixed#0",
+                EXACT,
+                &["methods.py::Mixin.mixed"],
+            ),
+            (
+                "methods.py::Panel.draw::self.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::Panel.draw.later::self.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::Panel.build::cls.create#0",
+                EXACT,
+                &["methods.py::Panel.create"],
+            ),
+            (
+                "methods.py::Leaf.run::self.hook#0",
+                EXACT,
+                &["methods.py::Right.hook"],
+            ),
+            // Attribute annotations, in a method and in the class body.
+            (
+                "methods.py::Panel.draw::self.shape.area#0",
+                EXACT,
+                &["geometry/shapes.py::Shape.area"],
+            ),
+            (
+                "methods.py::Panel.draw::self.frame.describe#0",
+                EXACT,
+                &["geometry/shapes.py::Circle.describe"],
+            ),
+            // Parameter annotations: a name, `Optional[...]` and a string; a constructor
+            // call in the same scope, and at the module level.
+            (
+                "methods.py::use::panel.draw#0",
+                EXACT,
+                &["methods.py::Panel.draw"],
+            ),
+            (
+                "methods.py::use::maybe.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::ahead.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::built.ping#0",
+                EXACT,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::module_level::current.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            // By name: a method the class family lacks, a static method's parameter, what a
+            // function returns, and a local that shadows a typed module-level name.
+            (
+                "methods.py::Panel.draw::self.spin#0",
+                INFERRED,
+                &["methods.py::Dial.spin"],
+            ),
+            (
+                "methods.py::Panel.check::value.ping#0",
+                INFERRED,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::use::made.render#0",
+                INFERRED,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::shadowed::current.render#0",
+                INFERRED,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::made.area#0",
+                AMBIGUOUS,
+                &[
+                    "geometry/shapes.py::Circle.area",
+                    "geometry/shapes.py::Shape.area",
+                ],
+            ),
+            // A class body's names are in scope for its own statements, not for its methods.
+            (
+                "scopes.py::Outer::Helper#0",
+                EXACT,
+                &["scopes.py::Outer.Helper"],
+            ),
+            (
+                "scopes.py::Outer.m::Helper#0",
+                EXACT,
+                &["scopes.py::Helper"],
             ),
             // Several definitions fit: a method on a parameter.
             (
