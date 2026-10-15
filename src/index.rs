@@ -257,16 +257,23 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
 
     // The facts of every file: parsed now, or kept from the index.
     let changed_paths: HashSet<&str> = changed.iter().map(|p| p.path.as_str()).collect();
-    let mut kept: Vec<(String, Facts)> = Vec::new();
-    for row in tx
+    let rows = tx
         .prepare("SELECT path, facts FROM files")?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-    {
-        let (path, facts) = row?;
-        if !changed_paths.contains(path.as_str()) {
-            kept.push((path, serde_json::from_str(&facts)?));
-        }
-    }
+        .collect::<rusqlite::Result<Vec<(String, String)>>>()?;
+    let kept: Option<Vec<(String, Facts)>> = rows
+        .into_iter()
+        .filter(|(path, _)| !changed_paths.contains(path.as_str()))
+        .map(|(path, facts)| Some((path, serde_json::from_str(&facts).ok()?)))
+        .collect();
+    let Some(kept) = kept else {
+        // Facts this version cannot read, stored before a change that missed its version
+        // bump: rebuild, as for another version. Without the identity, the next pass starts
+        // over and keeps nothing.
+        drop(tx);
+        db.execute("DELETE FROM meta", [])?;
+        return refresh(db, root, identity);
+    };
     let all: BTreeMap<&str, &Facts> = changed
         .iter()
         .map(|p| (p.path.as_str(), &p.facts))

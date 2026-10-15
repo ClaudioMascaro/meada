@@ -242,7 +242,8 @@ give byte-identical output.
   pack's `tests/fixtures/schema/sample.<extension>`) and never re-blesses it in place: a change
   fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
   An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
-  so.
+  so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
+  a file changed), which `status` cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come

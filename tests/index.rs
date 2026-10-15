@@ -2,7 +2,7 @@ mod common;
 
 use std::fs;
 
-use common::{assert_golden, fixture_repo, git};
+use common::{age, assert_golden, fixture_repo, git};
 use meada::engine::Engine;
 
 #[test]
@@ -80,6 +80,28 @@ fn index_from_another_schema_version_is_rebuilt() {
     drop(old);
 
     let rebuilt = Engine::open(&stale).unwrap().export().unwrap();
+
+    assert_eq!(rebuilt, Engine::open(&fresh).unwrap().export().unwrap());
+}
+
+#[test]
+fn index_whose_stored_facts_do_not_parse_is_rebuilt() {
+    let origin = Some("https://example.com/acme/web.git");
+    let fresh = fixture_repo("facts_fresh", "ts-basic", origin);
+    let broken = fixture_repo("facts_broken", "ts-basic", origin);
+    Engine::open(&broken).unwrap().export().unwrap();
+    let db = rusqlite::Connection::open(broken.join(".meada/index.db")).unwrap();
+    db.execute("UPDATE files SET facts = '{'", []).unwrap();
+    drop(db);
+    // A changed file makes the refresh read the facts it keeps for the others.
+    for repo in [&fresh, &broken] {
+        age(repo);
+        let math = repo.join("src/math.ts");
+        let src = fs::read_to_string(&math).unwrap();
+        fs::write(&math, format!("{src}\nexport const ZERO = 0;\n")).unwrap();
+    }
+
+    let rebuilt = Engine::open(&broken).unwrap().export().unwrap();
 
     assert_eq!(rebuilt, Engine::open(&fresh).unwrap().export().unwrap());
 }
