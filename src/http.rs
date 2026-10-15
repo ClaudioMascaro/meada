@@ -248,10 +248,11 @@ fn join(prefix: &str, path: &str) -> String {
     }
 }
 
-/// Every prefix `router` is mounted under, sorted: the empty one when nothing mounts it.
+/// Every prefix `router` is mounted under, sorted: the empty one when nothing mounts it. A mount
+/// whose prefix cannot be read (`None`) adds none.
 fn prefixes<'a>(
     router: Router<'a>,
-    mounts: &BTreeMap<Router<'a>, Vec<(Router<'a>, String)>>,
+    mounts: &BTreeMap<Router<'a>, Vec<(Router<'a>, Option<String>)>>,
     seen: &mut Vec<Router<'a>>,
 ) -> Vec<String> {
     let Some(parents) = mounts.get(&router) else {
@@ -265,6 +266,9 @@ fn prefixes<'a>(
     let mut out: Vec<String> = parents
         .iter()
         .flat_map(|(parent, prefix)| {
+            let Some(prefix) = prefix else {
+                return Vec::new();
+            };
             prefixes(*parent, mounts, seen)
                 .into_iter()
                 .map(|above| join(&above, prefix))
@@ -287,7 +291,7 @@ fn express(code: &Code) -> Vec<Found> {
         let (at, value) = code.constant(path, scope, name)?;
         matches!(value, Value::Call(c) if ROUTERS.contains(&c.as_str())).then_some(at)
     };
-    let mut mounts: BTreeMap<Router, Vec<(Router, String)>> = BTreeMap::new();
+    let mut mounts: BTreeMap<Router, Vec<(Router, Option<String>)>> = BTreeMap::new();
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
@@ -309,8 +313,8 @@ fn express(code: &Code) -> Vec<Found> {
                 continue;
             };
             let (prefix, rest) = match args.first().map(|a| code.value(path, &call.scope, a)) {
-                Some(Value::Str(parts)) => (render(&parts), &args[1..]),
-                _ => (String::new(), args),
+                Some(Value::Str(parts)) => (literal(&parts), &args[1..]),
+                _ => (Some(String::new()), args),
             };
             for arg in rest {
                 if let Value::Ref(name) = arg
@@ -331,7 +335,9 @@ fn express(code: &Code) -> Vec<Found> {
         let Value::Str(parts) = code.value(path, scope, first) else {
             continue;
         };
-        let route = render(&parts);
+        let Some(route) = literal(&parts) else {
+            continue;
+        };
         for prefix in prefixes(at, &mounts, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
