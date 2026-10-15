@@ -312,9 +312,24 @@ fn express(code: &Code) -> Vec<Found> {
             let Some(args) = code.args(path, n) else {
                 continue;
             };
-            let (prefix, rest) = match args.first().map(|a| code.value(path, &call.scope, a)) {
-                Some(Value::Str(parts)) => (literal(&parts), &args[1..]),
-                _ => (Some(String::new()), args),
+            let first = args.first().map(|a| (a, code.value(path, &call.scope, a)));
+            let (prefix, rest) = match first {
+                Some((_, Value::Str(parts))) => (literal(&parts), &args[1..]),
+                // A router or a handler first: the mount has no path.
+                None | Some((_, Value::Call(_) | Value::Function(_) | Value::New(..))) => {
+                    (Some(String::new()), args)
+                }
+                Some((Value::Ref(name), _))
+                    if code.definition(path, &call.scope, name).is_some() =>
+                {
+                    (Some(String::new()), args)
+                }
+                // Anything else may be a path Meada cannot read (a parameter, a member of an
+                // imported object): what it mounts is served under no prefix.
+                // ponytail: so is a router mounted after a package's middleware passed uncalled
+                // (`app.use(requireAuth, router)`); tell package handlers from package strings
+                // through `Code::origin` if that loses routes that matter.
+                _ => (None, &args[1..]),
             };
             for arg in rest {
                 if let Value::Ref(name) = arg
