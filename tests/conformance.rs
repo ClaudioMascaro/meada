@@ -86,6 +86,26 @@ fn typescript_and_javascript() {
             "src/messages/exchanges.ts::onAudit",
             "src/messages/exchanges.ts::onShipment",
             "src/messages/handlers.ts::onPayment",
+            "src/messages/nats.ts::notPublished",
+            "src/messages/nats.ts::onAudit",
+            "src/messages/nats.ts::publishAll",
+            "src/messages/nats.ts::record",
+            "src/messages/nats.ts::subscribeMiddle",
+            "src/messages/nats.ts::subscribeOne",
+            "src/messages/nats.ts::subscribeRest",
+            "src/messages/nats.ts::subscribeRest.nats jobs.>",
+            "src/messages/sqs.ts::consumeAudit",
+            "src/messages/sqs.ts::consumeMail",
+            "src/messages/sqs.ts::consumeMail.sqs mail",
+            "src/messages/sqs.ts::enqueue",
+            "src/messages/sqs.ts::enqueueBilling",
+            "src/messages/sqs.ts::notQueued",
+            "src/messages/sqs.ts::onAudit",
+            "src/messages/sqs.ts::receiveBilling",
+            "src/messages/sqs.ts::receiveJobs",
+            "src/messages/sqs.ts::record",
+            "src/messages/sqs.ts::sendJob",
+            "src/messages/sqs.ts::sendThroughNamespace",
             "src/messages/produce.ts::deliver",
             "src/messages/produce.ts::emit",
             "src/messages/produce.ts::emitRefund",
@@ -225,6 +245,12 @@ fn typescript_and_javascript_kafkajs() {
 
     let links: Vec<(String, String, String, &str)> = (json["links"].as_array().unwrap())
         .iter()
+        .filter(|l| {
+            l["reason"]
+                .as_str()
+                .unwrap()
+                .starts_with("channel::kafka::")
+        })
         .map(|l| {
             (
                 rel(l["consumer"].as_str().unwrap()),
@@ -265,6 +291,115 @@ fn typescript_and_javascript_kafkajs() {
             "produceAll::producer.send#0",
             "payments",
         ),
+    ];
+    expected.sort();
+    assert_eq!(links, expected);
+}
+
+/// The SQS and NATS forms of the TS/JS pack (spec #20): the AWS SDK v3 commands, `sqs-consumer`
+/// and the `nats` connection, as `(consumer, producer, reason, level)`. A client of another
+/// package and `publish` on any object produce nothing; NATS wildcards link at `inferred`.
+#[test]
+fn typescript_and_javascript_sqs_and_nats() {
+    let repo = fixture_repo("conformance_sqs_nats", "conformance-ts-js", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
+
+    let mut links: Vec<(String, String, String, &str)> = (json["links"].as_array().unwrap())
+        .iter()
+        .filter(|l| {
+            let reason = l["reason"].as_str().unwrap();
+            reason.starts_with("channel::sqs::") || reason.starts_with("channel::nats::")
+        })
+        .map(|l| {
+            (
+                rel(l["consumer"].as_str().unwrap()),
+                rel(l["provider"].as_str().unwrap()),
+                l["reason"].as_str().unwrap().to_string(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    links.sort();
+
+    let sqs = "src/messages/sqs.ts::";
+    let nats = "src/messages/nats.ts::";
+    let queue = |consumer: &str, producer: &str, name: &str| {
+        let (consumer, producer) = (format!("{sqs}{consumer}"), format!("{sqs}{producer}"));
+        (consumer, producer, format!("channel::sqs::{name}"), "exact")
+    };
+    let subject = |consumer: &str, producer: &str, subject: &str, pattern: Option<&str>| {
+        let (consumer, producer) = (format!("{nats}{consumer}"), format!("{nats}{producer}"));
+        match pattern {
+            Some(pattern) => (
+                consumer,
+                producer,
+                format!("channel::nats::{subject} wildcard {pattern}"),
+                "inferred",
+            ),
+            None => (
+                consumer,
+                producer,
+                format!("channel::nats::{subject}"),
+                "exact",
+            ),
+        }
+    };
+    let created = "publishAll::nc.publish#0";
+    let created_eu = "publishAll::nc.publish#1";
+    let created_audit = "publishAll::other.publish#0";
+    let mut expected = vec![
+        queue("receiveJobs", "sendJob::SendMessageCommand#0", "jobs"),
+        queue(
+            "consumeMail.sqs mail",
+            "sendJob::SendMessageCommand#1",
+            "mail",
+        ),
+        queue(
+            "onAudit",
+            "sendThroughNamespace::aws.SendMessageCommand#0",
+            "audit",
+        ),
+        queue("receiveBilling", "enqueueBilling::enqueue#0", "billing"),
+        subject("subscribeOne", created, "jobs.created", Some("jobs.*")),
+        subject(
+            "subscribeRest.nats jobs.>",
+            created,
+            "jobs.created",
+            Some("jobs.>"),
+        ),
+        subject(
+            "subscribeRest.nats jobs.>",
+            created_eu,
+            "jobs.eu.created",
+            Some("jobs.>"),
+        ),
+        subject(
+            "subscribeRest.nats jobs.>",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.>"),
+        ),
+        subject(
+            "onAudit",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.audit.>"),
+        ),
+        subject(
+            "subscribeMiddle",
+            created_eu,
+            "jobs.eu.created",
+            Some("jobs.*.created"),
+        ),
+        subject(
+            "subscribeMiddle",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.*.created"),
+        ),
+        subject("subscribeMiddle", created, "jobs.created", None),
     ];
     expected.sort();
     assert_eq!(links, expected);

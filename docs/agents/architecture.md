@@ -170,12 +170,19 @@ give byte-identical output.
   forms live in `lang/ts/messages.rs`: kafkajs `send({topic})` on a `new Kafka().producer()`,
   `subscribe({topic})` or `({topics})` on a `new Kafka().consumer()`, with the handler of the
   first `run({eachMessage|eachBatch})` on the same consumer binding (else the function whose
-  call subscribes); amqplib on a channel that traces to `connect().createChannel()` or
-  `createConfirmChannel()` (default import, namespace or named `connect`): `sendToQueue(queue)`,
-  `consume(queue, handler)` (a function in place or a definition; else the function that
-  consumes), `publish(exchange, key)` and `bindQueue(queue, exchange, pattern)`, each name read
-  through `Code::expand` like a topic. `value` unwraps `await x` to `x`, so `const channel =
-  await conn.createChannel()` traces back.
+  call subscribes); AWS SDK v3 `SendMessageCommand` / `ReceiveMessageCommand` (the queue is the
+  last segment of the `QueueUrl`, so only that tail has to evaluate; the receive's handler is
+  its enclosing function); `sqs-consumer` `Consumer.create({queueUrl, handleMessage})`; NATS
+  `publish(subject)` / `subscribe(subject, {callback})` on a `connect()` connection (the
+  handler is the `callback`, else the enclosing function); and amqplib on a channel that
+  traces to `connect().createChannel()` or `createConfirmChannel()` (default import, namespace
+  or named `connect`): `sendToQueue(queue)`, `consume(queue, handler)` (a function in place or
+  a definition; else the enclosing function), `publish(exchange, key)` and `bindQueue(queue,
+  exchange, pattern)`, each name read through `Code::expand` like a topic. `new X(...)` is a
+  call fact like `X(...)` (the `new_expression` arm of `ts.rs`'s `calls`, callee `X`), so a
+  form can start at a constructor, and `value` reads through `await`, so `const nc = await
+  connect()` or `const channel = await conn.createChannel()` is a traced binding. Both are in
+  every export (`Kafka#0` and the like: unresolved calls, no target).
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
@@ -213,18 +220,21 @@ give byte-identical output.
   prints it with `(unresolved)`), which `link` skips: it is in the export and never
   linked, and since its contract is not `None` it is no open item (`search` kind `unresolved`
   and `meada decide` never see it). `link` joins every consumer to every producer of the same
-  contract at `exact`, reason the contract, in any repository including its own. RabbitMQ
+  contract at `exact`, reason the contract, in any repository including its own; a consumer whose
+  name is a wildcard pattern also joins the producers its pattern matches (`wildcard(broker,
+  pattern, name)`, the one place a broker's matching rules live: NATS `*` one token and `>` the
+  rest, table-tested), at `inferred`, reason `<producer contract> wildcard <pattern>`. RabbitMQ
   (`amqp`): a binding is a `Found` with role `Binding`, stored in `contracts` (`contract` the
   queue's channel, `via` the exchange, `method` the pattern, `site` the `bindQueue` call) and
   exported as `bindings` (absent when empty). A publish to a named exchange is a provider whose
   contract is `channel::amqp-exchange::<exchange>::<key>` (a publish to the empty exchange is
   the queue `key`'s own contract), so it never equals a queue's. `matched` is the one match
-  hook: for a queue consumer it takes the providers of the same contract (`exact`) and, for each
-  binding of that queue in any repository, the publishes to its exchange whose key
-  `pattern_matches` (topic-exchange rules whatever the exchange type): `exact` when the pattern
-  is the key, else `inferred`, reason `<queue contract> binding <exchange> <pattern>`; of
-  several matches to one producer the strongest wins. `ContractKind::link` takes the
-  workspace's bindings beside its providers.
+  hook `link` calls (the equal-name, wildcard and binding matches): for a queue consumer it
+  also takes, for each binding of that queue in any repository, the publishes to its exchange
+  whose key `pattern_matches` (topic-exchange rules whatever the exchange type): `exact` when
+  the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
+  <pattern>`; of several matches to one producer the strongest wins. `ContractKind::link`
+  takes the workspace's bindings beside its providers.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,
@@ -290,13 +300,15 @@ give byte-identical output.
   `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
   its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
-  and giving the handler. A wildcard or binding match (`inferred`, reason suffix `wildcard <p>`
-  or `binding <exchange> <p>`) belongs in `channel.rs`'s `matched`, which `link` calls with the
-  whole workspace's providers and bindings (RabbitMQ's pattern matcher is there). Something that
-  is neither side, like a binding, is a `Found` with its own `Role`, an export list of its own
-  (`Export::bindings`) and, to show in `context` on a channel, a line in `Engine::contract_sides`.
-  `new X(...)` is a value (`Value::New`) but not yet a call fact, so a form whose site is a
-  constructor call needs `new_expression` in the pack's calls first.
+  and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
+  <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `matched` calls
+  from `link`; a binding match (reason `<queue contract> binding <exchange> <p>`) is in
+  `matched` too, which `link` calls with the whole workspace's providers and bindings (the
+  AMQP pattern matcher is `pattern_matches`). Something that is neither side, like a binding,
+  is a `Found` with its own `Role`, an export list of its own (`Export::bindings`) and, to show
+  in `context` on a channel, a line in `Engine::contract_sides`. A form whose site is a
+  constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
+  `new`, with its arguments, like any other call.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -368,7 +380,8 @@ give byte-identical output.
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, and a Kafka topic
-  that shares a queue's name).
+  that shares a queue's name; the `channels-queues-api` and `channels-queues-worker` fixtures:
+  SQS by queue name and NATS wildcards at `inferred`).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -402,8 +415,8 @@ Each is marked `ponytail:` at its site unless noted.
   a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
-  `module.exports` are not imports, and `new X()` is not a call, only a value (no `ponytail:`
-  marker).
+  `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
+  and a `Value::New` carrying only the callee.
 - `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).

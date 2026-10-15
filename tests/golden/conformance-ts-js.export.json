@@ -30,6 +30,10 @@
       "hash": "7e0a0d1488ee1fabd6d67953b00dafb41bb955d82ebbf3f5c829f4523a0c3c12"
     },
     {
+      "path": "src/messages/nats.ts",
+      "hash": "d527f67791a7320ca1febc46312a710598f1a0594d689ff62e6ef865d455de38"
+    },
+    {
       "path": "src/messages/produce.ts",
       "hash": "99b8351f01efc5d943a36fc7b3be58161c9ebb3f1e9f442e3740e05efa017beb"
     },
@@ -40,6 +44,10 @@
     {
       "path": "src/messages/rabbit.ts",
       "hash": "b45fee15c400c3b715f35e6c7aeacaafb64dda50eaa80dfd0bc384d463233243"
+    },
+    {
+      "path": "src/messages/sqs.ts",
+      "hash": "7e0e05de55f344098ba3cedf30574b8b6623d268295fb5780879ef5731df85cd"
     },
     {
       "path": "src/messages/topics.ts",
@@ -256,6 +264,70 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1176,
+        "end": 1266
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1268,
+        "end": 1339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 347,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::record",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1341,
+        "end": 1392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 920,
+        "end": 1016
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 552,
+        "end": 605
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 678,
+        "end": 859
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 746,
+        "end": 795
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/produce.ts::deliver",
       "span": {
         "path": "src/messages/produce.ts",
@@ -365,6 +437,102 @@
         "path": "src/messages/queues.ts",
         "start": 863,
         "end": 969
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1826,
+        "end": 1940
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1652,
+        "end": 1817
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1759,
+        "end": 1808
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1046,
+        "end": 1173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1182,
+        "end": 1254
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2068,
+        "end": 2229
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1942,
+        "end": 1998
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1441,
+        "end": 1564
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1331,
+        "end": 1432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::record",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2231,
+        "end": 2282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 575,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 844,
+        "end": 971
       }
     },
     {
@@ -686,6 +854,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 803,
+        "end": 863
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::kafka.consumer#0",
       "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
       "target": null,
@@ -928,6 +1107,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 84,
+        "end": 147
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.consumer#0",
       "caller": "example.com/acme/conformance::src/messages/kafka.ts",
       "target": null,
@@ -961,6 +1151,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafkajs.Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 381,
+        "end": 446
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/kafka.ts::other.consumer#0",
       "caller": "example.com/acme/conformance::src/messages/kafka.ts",
       "target": null,
@@ -969,6 +1170,171 @@
         "path": "src/messages/kafka.ts",
         "start": 471,
         "end": 507
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::connect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 131,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::fakeConnect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 245,
+        "end": 260
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::nats.connect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 186,
+        "end": 224
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished::bus.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1236,
+        "end": 1263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished::fake.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1204,
+        "end": 1232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 373,
+        "end": 399
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 403,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 443,
+        "end": 478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 951,
+        "end": 981
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::nc.subscribe#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 985,
+        "end": 1013
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 580,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>::record#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "target": "example.com/acme/conformance::src/messages/nats.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 773,
+        "end": 788
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 707,
+        "end": 801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest::nc.subscribe#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 805,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::Fake#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1221,
+        "end": 1246
       }
     },
     {
@@ -1258,6 +1624,215 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::SQSClient#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 308,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit::Consumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1861,
+        "end": 1937
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail::record#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "target": "example.com/acme/conformance::src/messages/sqs.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1786,
+        "end": 1801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail::Consumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1686,
+        "end": 1814
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue::SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1104,
+        "end": 1169
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1092,
+        "end": 1170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling",
+      "target": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1219,
+        "end": 1251
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued::Fake#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2093,
+        "end": 2140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued::FakeConsumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2144,
+        "end": 2226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::ReceiveMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1496,
+        "end": 1560
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1484,
+        "end": 1561
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::ReceiveMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1383,
+        "end": 1428
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1371,
+        "end": 1429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 622,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 706,
+        "end": 783
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 610,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::client.send#1",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 694,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 904,
+        "end": 967
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 892,
+        "end": 968
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area::square#0",
       "caller": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
       "target": "example.com/acme/conformance::src/math.ts::square",
@@ -1288,6 +1863,17 @@
         "path": "src/shapes/shape.ts",
         "start": 155,
         "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit::Shape#0",
+      "caller": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+      "level": "exact",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 57,
+        "end": 68
       }
     },
     {
@@ -1383,6 +1969,34 @@
     {
       "contract": "channel::kafka::retries",
       "site": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0"
+    },
+    {
+      "contract": "channel::nats::jobs.audit.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0"
+    },
+    {
+      "contract": "channel::nats::jobs.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0"
+    },
+    {
+      "contract": "channel::nats::jobs.eu.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1"
+    },
+    {
+      "contract": "channel::sqs::audit",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::billing",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0"
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::mail",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1"
     }
   ],
   "consumers": [
@@ -1432,6 +2046,31 @@
       "via": null
     },
     {
+      "contract": "channel::nats::jobs.audit.>",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.*.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.*",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.>",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "via": null
+    },
+    {
       "contract": "channel::amqp::tasks",
       "site": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
       "via": null
@@ -1439,6 +2078,26 @@
     {
       "contract": "channel::amqp::reports",
       "site": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::mail",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::audit",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::billing",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
       "via": null
     }
   ],
@@ -1534,6 +2193,62 @@
       "reason": "channel::amqp::invoices"
     },
     {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.audit.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.audit.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.created",
+      "level": "exact",
+      "reason": "channel::nats::jobs.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "contract": "channel::nats::jobs.*.created",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.eu.created wildcard jobs.*.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.*.created",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.*.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.*",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.created wildcard jobs.*"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.eu.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.>"
+    },
+    {
       "consumer": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
       "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#2",
       "contract": "channel::amqp::tasks",
@@ -1553,6 +2268,34 @@
       "contract": "channel::amqp::reports",
       "level": "exact",
       "reason": "channel::amqp::reports"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1",
+      "contract": "channel::sqs::mail",
+      "level": "exact",
+      "reason": "channel::sqs::mail"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0",
+      "contract": "channel::sqs::audit",
+      "level": "exact",
+      "reason": "channel::sqs::audit"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0",
+      "contract": "channel::sqs::billing",
+      "level": "exact",
+      "reason": "channel::sqs::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0",
+      "contract": "channel::sqs::jobs",
+      "level": "exact",
+      "reason": "channel::sqs::jobs"
     }
   ]
 }

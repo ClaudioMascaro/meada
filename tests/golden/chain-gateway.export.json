@@ -171,6 +171,17 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/kafka.ts::Kafka#0",
+      "caller": "example.com/chain/gateway::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 48,
+        "end": 107
+      }
+    },
+    {
       "id": "example.com/chain/gateway::src/kafka.ts::kafka.producer#0",
       "caller": "example.com/chain/gateway::src/kafka.ts",
       "target": null,

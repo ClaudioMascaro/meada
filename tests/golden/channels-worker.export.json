@@ -98,6 +98,17 @@
   ],
   "calls": [
     {
+      "id": "example.com/channels/worker::src/consumer.ts::Kafka#0",
+      "caller": "example.com/channels/worker::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 48,
+        "end": 106
+      }
+    },
+    {
       "id": "example.com/channels/worker::src/consumer.ts::kafka.consumer#0",
       "caller": "example.com/channels/worker::src/consumer.ts",
       "target": null,
@@ -128,6 +139,17 @@
         "path": "src/consumer.ts",
         "start": 205,
         "end": 273
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::Kafka#0",
+      "caller": "example.com/channels/worker::src/pattern.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 48,
+        "end": 110
       }
     },
     {
