@@ -1,0 +1,91 @@
+# Provider documents and shapes
+
+Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
+seams, invariants and Known ceilings. The code wins over this file, and a change to these
+modules updates it.
+
+- `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
+  name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
+  `read(path, bytes) ->
+  Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
+  becomes a `Problem`, with the line clamped to the file's last line; the content decides,
+  since a listed document can have any name: a top-level `openapi` field goes to `openapi.rs`,
+  an `asyncapi` one to `asyncapi.rs`, and with neither the name only picks which format it is
+  reported as not being, `asyncapi.rs` for an `asyncapi` name, `openapi.rs` for any other),
+  `Summary {format: Option<Format>,
+  version, title, routes: Vec<Route {path, method, shape}>, servers: Vec<Server {host, path}>,
+  channels: Vec<Side {broker, name, role, shape}>, problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
+  /users/{}`; `servers` are the root `servers[].url` entries with variables replaced by their
+  defaults in one pass over the URL (a default naming a variable stays as written), a URL
+  still holding one dropped, a relative URL giving only its path, host lower
+  case, path normalized with no trailing `/`; `Side::contract`, `Side::label` = `kafka send
+  orders.created`, `Role::{Producer, Consumer}`; sorted by broker kind, name, role),
+  `Problem::Unreadable {line, error}`,
+  `Problem::Format {found}`, `Problem::AsyncFormat {found}`, `Problem::Protocol {protocol}`,
+  `Problem::Parameters {channel}`, `Problem::NoServers`, `Problem::NoProtocol {server}`,
+  `Problem::UnknownServer {channel, server}`, `Problem::ExternalRef {reference}` and
+  `Problem::ExternalPathItem {reference}` (structured, rendered through `Msg`), `Format::{Openapi,
+  Asyncapi}` (stored as `openapi` and `asyncapi`; `Msg::DocumentRead` takes it with the count),
+  `Summary::shown()` (what `search` prints of a document read), `Summary::count(format)`
+  (routes for OpenAPI, distinct channels of the sides for AsyncAPI) and
+  `report(repo, export)`: the status lines, per document in path order (`Msg::DocumentRead`
+  for one read, each problem of it, then each route a later document by path lists again:
+  `Msg::DuplicateRoute`), then `Msg::DocumentMissing` for each `[serve] documents` path with
+  no row. `openapi.rs`: `read(path,
+  value)`: a top-level `openapi` of `3.0` or `3.1` (any patch; a YAML number counts), else
+  `Problem::Format` naming the `openapi` or `swagger` field it found; every `paths` key starting
+  with `/` and every method of `get put post delete options head patch trace` is a route (a
+  path item that is a local `$ref`, such as `#/components/pathItems/...`, is read where it
+  points; an external one is a `Problem::ExternalPathItem` and its routes are not read), its
+  templates (`{id}`) written as `{}` before `http::normalize_path`, sorted and deduplicated (of
+  two templates of one route, the first key gives the shape). A route's `shape` is the
+  `application/json` schema of its lowest explicit 2xx response that has one, else of `2XX`
+  (a response may be a local `$ref`; `application/*+json` is not read); every external `$ref`
+  met, once, sorted, is a `Problem::ExternalRef`. `schema.rs`: `read(doc, schema, source) ->
+  (Shape, external refs)`, the schema-to-shape reader: `properties` give fields, `items` the
+  `[]` elements (an array with no `items` has open elements), `allOf`, `oneOf` and `anyOf` add
+  their members' fields (an `allOf` member with no structure keyword adds nothing; anywhere
+  else such a schema, or `true`, is open); `additionalProperties` `true` or a schema opens the
+  object, and an object type that lists no fields, no members and no `$ref` is open unless
+  `additionalProperties` is `false`. Local `$ref`s (JSON pointers into the document) resolve; a
+  reference already being read (a cycle), a missing target and an external reference leave
+  that part open. Reading one shape visits at most 10,000 schemas (`BUDGET`) and goes at most
+  `MAX_DEPTH` (128) levels deep, a property, element, member or reference being one level; all
+  the shapes of one document share one `schema::Work` (`WORK`, 64 MiB: 32 per schema visited
+  plus the bytes of every field path listed), which the reader of each document creates and
+  passes to every `read`. Past any of them, every part not read is open, so a document's shapes
+  have bounded memory and the recursion bounded depth. To read several schemas as one shape
+  (AsyncAPI messages), read `{"oneOf": [...]}` of them. `asyncapi.rs`: `read(path, value)`: a top-level `asyncapi` of `2.x`
+  or `3.0` (any patch), else `Problem::AsyncFormat` naming the `asyncapi`, `openapi` or `swagger`
+  field it found. 2.x: the key of a channel is its name, `subscribe` is a producer and `publish`
+  a consumer (the application's side, as the specification reads them), the payloads those of
+  `message` (or each member of its `oneOf`), a message a local `$ref`; the channel's `servers`
+  are server names. 3.0: the name is the channel's `address` (a channel with none is skipped),
+  `action: send` is a producer and `receive` a consumer, the payloads those of the operation's
+  `messages` when it lists them, else every message of its channel; the channel's `servers` are
+  `$ref`s to `#/servers/<name>`. A channel uses the servers it lists, else every server of the
+  document; the lower-cased `protocol` gives the broker kind (`kafka`, `kafka-secure` ->
+  `kafka`; `amqp`, `amqps` -> `amqp`; `nats`; `redis`; `sqs`), any other is a `Problem::Protocol`
+  once and its channels are ignored. A document with channels and no root `servers` is a
+  `Problem::NoServers` (every channel ignored), a server a channel uses without `protocol` a
+  `Problem::NoProtocol`, and a server name a channel lists that the document lacks a
+  `Problem::UnknownServer` (the channel is ignored on it). A name holding `{` or `}` is a `Problem::Parameters` and
+  ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
+  operations, several servers of one kind) are one, their payloads read together as one
+  `oneOf` shape. `yaml.rs`: `parse(text) -> Result<Value,
+  (line, reason)>` over `yaml-rust2`'s event parser, taken one event at a time with
+  `Parser::next_token` (never `YamlLoader`, nor `Parser::load`, which recurses per level of
+  nesting), the collections being read on an explicit stack, at most `MAX_NESTING` (128, as
+  `serde_json`) deep (deeper, the document is unreadable at that line): first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
+  quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
+  included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
+  document is unreadable). Readers only see `serde_json::Value`.
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open}`, the one form of what a
+  contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
+  caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
+  for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
+  node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
+  (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
+  anything below it may be present. Presence only: no types, formats, `required` or
+  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) is the only
+  source yet; spec #23 adds its code sources as variants. `Source::at` names it in `context`.
