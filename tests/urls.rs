@@ -172,6 +172,8 @@ fn a_route_of_every_method_links_a_consumer_of_any_method() {
     assert_eq!(
         candidates,
         [
+            "http::ANY::/about",
+            "http::ANY::/contact",
             "http::ANY::/health",
             "http::ANY::/vintage/{}",
             "http::PUT::/members/{}"

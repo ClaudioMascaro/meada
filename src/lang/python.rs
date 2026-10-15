@@ -510,6 +510,9 @@ impl Locals {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
+        if self.extend(node, left, scope, src) {
+            return;
+        }
         if let ("assignment", "identifier", Some(right)) =
             (node.kind(), left.kind(), node.child_by_field_name("right"))
         {
@@ -531,6 +534,49 @@ impl Locals {
         for target in targets(left) {
             self.target(target, scope, class.clone(), How::Assigned, src);
         }
+    }
+
+    /// `xs += ...` or `xs = xs + ...`, when the latest value `scope` assigned `xs` is a list
+    /// literal: a list literal added joins its items, anything else added is left out, and
+    /// `xs` is not bound again, so it stays a constant. `false` for any other assignment.
+    // ponytail: an addition that is not a list literal (`+= static(...)`) is left out of the
+    // list rather than making it unknown.
+    fn extend(&mut self, node: Node, left: Node, scope: &str, src: &[u8]) -> bool {
+        if left.kind() != "identifier" {
+            return false;
+        }
+        let name = text(left, src);
+        let operator = |n: Node| n.child_by_field_name("operator").map(|o| text(o, src));
+        let Some(right) = node.child_by_field_name("right") else {
+            return false;
+        };
+        let added = match node.kind() {
+            "augmented_assignment" if operator(node) == Some("+=") => right,
+            "assignment"
+                if right.kind() == "binary_operator"
+                    && operator(right) == Some("+")
+                    && (right.child_by_field_name("left"))
+                        .is_some_and(|l| l.kind() == "identifier" && text(l, src) == name) =>
+            {
+                match right.child_by_field_name("right") {
+                    Some(added) => added,
+                    None => return false,
+                }
+            }
+            _ => return false,
+        };
+        let Locals {
+            written, values, ..
+        } = self;
+        let latest = (values.iter_mut().rev())
+            .find(|(at, _)| written[*at].0 == scope && written[*at].1 == name);
+        let Some((_, Value::List(items))) = latest else {
+            return false;
+        };
+        if let Value::List(more) = value(added, src) {
+            items.extend(more);
+        }
+        true
     }
 
     /// The facts: one per scope and name, every binding but a plain parameter (its definition

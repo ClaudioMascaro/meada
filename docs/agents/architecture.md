@@ -170,7 +170,9 @@ give byte-identical output.
   binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
   `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
   and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
-  also a `Const` holding that value. Calls carry their positional `args` and keyword `kwargs`
+  also a `Const` holding that value. `xs += ...` and `xs = xs + ...` on a name whose latest
+  value in that scope is a list literal do not bind it again: a list literal added joins the
+  `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
   as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
   a `Value::Call` at its range), a decorator call names the definition it decorates
   (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
@@ -420,8 +422,9 @@ Each is marked `ponytail:` at its site unless noted.
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. Parameter
   defaults are not read, nor `**k` splats; a `*a` splat is read as one positional argument.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
-  that depends on a parameter is not read through callers. Django: `urlpatterns` bound more
-  than once (`urlpatterns += [...]`) is not read; `include((patterns, "app"))`,
+  that depends on a parameter is not read through callers. Django: what an extension of
+  `urlpatterns` adds other than a list literal is left out, and a single `urlpatterns = [...] +
+  other` (no list literal as a whole) yields no entry; `include((patterns, "app"))`,
   `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
   handler method a class-based view inherits and `as_view()` on a class outside the repository
   yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled

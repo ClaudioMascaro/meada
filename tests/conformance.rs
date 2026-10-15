@@ -378,7 +378,9 @@ fn python() {
             "shop/orders/views.py::OrderList.post",
             "shop/orders/views.py::OrderList.total",
             "shop/orders/views.py::order",
+            "shop/views.py::about",
             "shop/views.py::archive",
+            "shop/views.py::contact",
             "shop/views.py::health",
             "shop/views.py::vintage",
             "src/billing/invoice.py::total",
@@ -1090,6 +1092,10 @@ fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
     let expected = [
         // Unrestricted function views serve every method.
         ("http::ANY::/health", "shop/views.py::health"),
+        // `urlpatterns += [...]` and `urlpatterns = urlpatterns + [...]` extend the list; the
+        // `static(...)` added between them is left out and voids nothing.
+        ("http::ANY::/about", "shop/views.py::about"),
+        ("http::ANY::/contact", "shop/views.py::contact"),
         // A `re_path()` with a simple named group; the one beyond them yields nothing.
         ("http::ANY::/vintage/{}", "shop/views.py::vintage"),
         // `include()` by dotted name, two levels deep: `require_http_methods`, a class-based

@@ -11,3 +11,11 @@ def vintage(request, code):
 
 def archive(request, year):
     return year
+
+
+def about(request):
+    return "about"
+
+
+def contact(request):
+    return "contact"
