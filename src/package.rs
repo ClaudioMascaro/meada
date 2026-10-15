@@ -228,22 +228,23 @@ pub struct Config {
 
 /// Reads a `tsconfig.json` (JSON with comments and trailing commas) from its bytes. Hostile
 /// input, as for `read`: a file too large, not UTF-8, not JSON, nested past `serde_json`'s depth
-/// limit or not an object reads as empty, and an option that is not a string counts as absent.
-pub fn read_tsconfig(src: &[u8]) -> Tsconfig {
+/// limit or not an object is invalid, `None`, which counts as no config at all (the repository
+/// root's is tried instead); an option that is not a string counts as absent in a valid one.
+pub fn read_tsconfig(src: &[u8]) -> Option<Tsconfig> {
     let text = std::str::from_utf8(src)
         .ok()
         .filter(|_| src.len() <= MAX_BYTES);
     let Some(Ok(Value::Object(root))) = text.map(|t| serde_json::from_str(&strip_jsonc(t))) else {
-        return Tsconfig::default();
+        return None;
     };
     let option = |name: &str| match root.get("compilerOptions")?.get(name)? {
         Value::String(s) if !s.is_empty() => Some(s.clone()),
         _ => None,
     };
-    Tsconfig {
+    Some(Tsconfig {
         out_dir: option("outDir"),
         root_dir: option("rootDir"),
-    }
+    })
 }
 
 /// `outDir` and `rootDir` as repository-relative directories, for the config at `config`
@@ -443,6 +444,10 @@ struct Provided<'e> {
     exported: HashMap<&'e str, Vec<&'e Exported>>,
     manifests: &'e [Manifest],
     configs: &'e [Config],
+    /// The source files that export something, by the path of the manifest that is their
+    /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
+    /// asks (`candidates`), once for all.
+    owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
 
 /// What an import of a package resolved to in one provider: what named the entry (`outDir` when
@@ -462,6 +467,7 @@ impl<'e> Provided<'e> {
             exported,
             manifests: &export.manifests,
             configs: &export.tsconfigs,
+            owned: OnceCell::new(),
         }
     }
 
@@ -518,16 +524,31 @@ impl<'e> Provided<'e> {
     }
 
     /// The symbols `chain` names in the source files of the package at `manifest` (those whose
-    /// nearest manifest it is) that export its head, sorted, without repeats.
+    /// nearest manifest it is, `node_modules` ones left out) that export its head, sorted,
+    /// without repeats. Every one is listed: a package has as many as it has files exporting
+    /// the name.
     fn candidates(&self, repository: &str, manifest: &Manifest, chain: &str) -> Vec<String> {
         let head = chain.split('.').next();
-        let mut ids: Vec<String> = (self.exported.iter())
-            .filter(|(path, rows)| {
-                self.source(path)
-                    && nearest(self.manifests, path).is_some_and(|m| m.path == manifest.path)
-                    && rows.iter().any(|e| e.name.as_deref() == head)
+        let owned = self.owned.get_or_init(|| {
+            let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
+            for &path in self.exported.keys() {
+                if self.source(path)
+                    && !path.split('/').any(|s| s == "node_modules")
+                    && let Some(m) = nearest(self.manifests, path)
+                {
+                    owned.entry(&m.path).or_default().push(path);
+                }
+            }
+            owned
+        });
+        let files = owned.get(manifest.path.as_str()).into_iter().flatten();
+        let mut ids: Vec<String> = files
+            .filter(|path| {
+                self.exported[**path]
+                    .iter()
+                    .any(|e| e.name.as_deref() == head)
             })
-            .filter_map(|(path, _)| self.reach(repository, path, chain))
+            .filter_map(|path| self.reach(repository, path, chain))
             .collect();
         ids.sort();
         ids.dedup();
@@ -1318,7 +1339,7 @@ mod tests {
         }
     }
 
-    fn tsconfig(json: &str) -> Tsconfig {
+    fn tsconfig(json: &str) -> Option<Tsconfig> {
         read_tsconfig(json.as_bytes())
     }
 
@@ -1330,30 +1351,34 @@ mod tests {
                 "compilerOptions": { "outDir": "dist", /* x */ "rootDir": "src", },
                 "extends": "./base.json",
             }"#,
-        );
+        )
+        .unwrap();
         assert_eq!(
             (t.out_dir.as_deref(), t.root_dir.as_deref()),
             (Some("dist"), Some("src"))
         );
         // `extends` is not followed: what the base declares is not read.
-        let empty = Tsconfig::default();
-        for bad in [
-            "",
-            "[]",
-            "{ not json",
+        // A valid config without usable options is empty, not invalid.
+        let empty = Some(Tsconfig::default());
+        for valid in [
+            "{}",
             r#"{"compilerOptions": 3}"#,
             r#"{"compilerOptions": {"outDir": 1, "rootDir": ["src"]}}"#,
             r#"{"compilerOptions": {"outDir": "", "rootDir": ""}}"#,
         ] {
-            assert_eq!(tsconfig(bad), empty, "{bad}");
+            assert_eq!(tsconfig(valid), empty, "{valid}");
+        }
+        // Invalid input is no config.
+        for bad in ["", "[]", "{ not json", "3"] {
+            assert_eq!(tsconfig(bad), None, "{bad}");
         }
         let huge = format!(
             r#"{{"compilerOptions": {{"outDir": "{}"}}}}"#,
             "d".repeat(MAX_BYTES)
         );
-        assert_eq!(tsconfig(&huge), empty);
+        assert_eq!(tsconfig(&huge), None);
         let nested = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
-        assert_eq!(tsconfig(&nested), empty);
+        assert_eq!(tsconfig(&nested), None);
     }
 
     #[test]
@@ -1416,6 +1441,7 @@ mod tests {
             exported,
             manifests: &[],
             configs: &[],
+            owned: OnceCell::new(),
         }
     }
 
@@ -1495,6 +1521,75 @@ mod tests {
         assert!(lookup(&provided(&found), "0.ts", "f").is_some());
         let past = chain(MAX_REEXPORTS + 1);
         assert_eq!(lookup(&provided(&past), "0.ts", "f"), None);
+    }
+
+    #[test]
+    fn candidates_are_the_exporting_source_files_of_that_package_alone() {
+        let root = manifest("package.json", "{}");
+        let nested = manifest("sealed/package.json", "{}");
+        let manifests = [root, nested];
+        let paths = [
+            "src/a.ts",
+            "src/a.d.ts",
+            "sealed/src/b.ts",
+            "node_modules/x/c.ts",
+            "sealed/node_modules/y/d.ts",
+        ];
+        let rows: Vec<Exported> = (paths.iter())
+            .map(|p| row(p, Some("f"), Some(p), Some("f")))
+            .collect();
+        let mut p = provided(&rows);
+        p.files = paths.iter().copied().collect();
+        let ids: Vec<String> = paths.iter().map(|p| format!("r::{p}::f")).collect();
+        p.symbols = ids.iter().map(String::as_str).collect();
+        p.manifests = &manifests;
+
+        // The root package does not take the nested package's file (a directory-prefix test
+        // would), a declaration file, or one under `node_modules`; the nested one neither.
+        assert_eq!(p.candidates("r", &manifests[0], "f"), ["r::src/a.ts::f"]);
+        assert_eq!(
+            p.candidates("r", &manifests[1], "f"),
+            ["r::sealed/src/b.ts::f"]
+        );
+        assert!(p.candidates("r", &manifests[0], "g").is_empty());
+    }
+
+    #[test]
+    fn an_invalid_package_tsconfig_falls_back_to_the_root_one_and_a_valid_one_does_not() {
+        let manifests = [manifest("pkg/package.json", "{}")];
+        let rows = [];
+        let mut p = provided(&rows);
+        p.files = ["pkg/src/index.ts"].into_iter().collect();
+        p.manifests = &manifests;
+        let entries = ["pkg/dist/index.js".to_string()];
+        let config = |path: &str, out: Option<&str>, root: &str| Config {
+            path: path.into(),
+            tsconfig: Tsconfig {
+                out_dir: out.map(Into::into),
+                root_dir: Some(root.into()),
+            },
+        };
+        let root = config("tsconfig.json", Some("pkg/dist"), "pkg/src");
+        let found = Some("pkg/src/index.ts".to_string());
+
+        // An invalid `pkg/tsconfig.json` has no `Config` (see `read_tsconfig`): the root's maps.
+        let configs = [root];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), found);
+        // A valid one without `outDir` maps nothing, and the root's is not tried.
+        let configs = [
+            config("pkg/tsconfig.json", None, "src"),
+            config("tsconfig.json", Some("pkg/dist"), "pkg/src"),
+        ];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), None);
+        // With its own `outDir`, the package's config is the one used.
+        let configs = [
+            config("pkg/tsconfig.json", Some("dist"), "src"),
+            config("tsconfig.json", Some("elsewhere"), "pkg/src"),
+        ];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), found);
     }
 
     #[test]

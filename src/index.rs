@@ -43,8 +43,8 @@ const SCHEMA_VERSION: i64 = 15;
 /// being `package::Summary` as JSON (name, version, dependency entries and the entry fields
 /// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
 /// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
-/// `package::Tsconfig` (`out_dir`, `root_dir`). An `import` row of `contracts` is a call through a binding imported
-/// from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
+/// `package::Tsconfig` (`out_dir`, `root_dir`), or `null` when the file is invalid. An `import`
+/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
 /// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
@@ -1121,10 +1121,11 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
     for (path, summary) in rows {
         match package::is_tsconfig(&path) {
-            true => tsconfigs.push(Config {
-                path,
-                tsconfig: serde_json::from_str(&summary)?,
-            }),
+            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
+            true => tsconfigs.extend(
+                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
+                    .map(|tsconfig| Config { path, tsconfig }),
+            ),
             false => manifests.push(Manifest {
                 path,
                 summary: serde_json::from_str(&summary)?,

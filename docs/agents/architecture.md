@@ -240,15 +240,18 @@ give byte-identical output.
   `exports`, the first of `types`, `module`, `main` for the bare name, or the subpath with the
   trunk's extension and `index` rules, `path`), which must stay inside the package directory
   (`inside`) and be a source file the provider indexes, not a `.d.ts`. One that is build output
-  maps back to source: `mapped` takes the `tsconfig.json` in the package directory (else the
-  repository root's), `roots` turns its `outDir` and `rootDir` (relative to that config;
+  maps back to source: `mapped` takes the `tsconfig.json` in the package directory; only when that
+  file is absent or invalid (stored as `null`, no `Config`) the repository root's, and a valid
+  one without a usable `outDir` maps nothing, with no fallback. `roots` turns its `outDir` and `rootDir` (relative to that config;
   `rootDir` defaults to the package directory) into repository directories, and `sources`
   (the pure, table-tested mapping) swaps the entry's `.d.ts`, `.js`, `.mjs`, `.cjs` or `.jsx` for
   each pack extension in `EXTENSIONS` order under `rootDir`; the first the provider indexes wins,
   `inferred` with `how` `outDir`. When neither the field nor the mapping finds a file, the
   import is `ambiguous` with `how` the field that named the entry: `candidates` gives the
-  symbol the chain names in every source file whose nearest manifest is this package's and that
-  exports its head (sorted, one hop each; none, nothing). `lookup` then reads the chain's
+  symbol the chain names in every source file whose nearest manifest is this package's (not a
+  nested package's, not one under a `node_modules` segment, not a `.d.ts`) and that exports its
+  head (sorted, one hop each; none, nothing). The files by owning manifest are grouped once per
+  provider (`Provided::owned`), not once per call. `lookup` then reads the chain's
   head from the `exports` rows (the file's own export of the name decides; else its `export *`
   files, never for `default`, two that give it differently making it ambiguous and so not
   exported, as in ES modules; `seen` cuts cycles) and each further name as a member of that
@@ -841,13 +844,17 @@ give byte-identical output.
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
   like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
-  empty, and `roots` voids the mapping for an absolute `outDir` or `rootDir`, one with an empty or
+  invalid (`None`, no config; an option of another type is absent in a valid one), and `roots` voids the mapping for an absolute `outDir` or `rootDir`, one with an empty or
   `..` segment, or an `outDir` that is the config's own directory (a path read from a config stays
   inside the repository; nothing is opened on disk, the mapped file must be one the walk indexed,
   and the walk follows no symlink). `extends` is not followed (`ponytail:` in `Tsconfig`; the
   trunk follows none for `paths` either): a base config's `outDir` counts as absent, so such an
   entry is `ambiguous`; `declarationDir` is not read, and a package with no `rootDir` maps
-  `dist/index.js` to `index.ts` at its own directory. Only a call whose callee's head is the import crosses: a `const` alias or a
+  `dist/index.js` to `index.ts` at its own directory. An entry with no output extension never
+  maps (`main: "./dist"`, `"dist/index"`, `types: "dist/index.d.mts"` or `.d.cts`): only `.d.ts`,
+  `.js`, `.mjs`, `.cjs` and `.jsx` are stripped (no marker). The ambiguous candidates of an
+  import have no cap: every file of the package exporting the name is listed, so a name exported
+  by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and

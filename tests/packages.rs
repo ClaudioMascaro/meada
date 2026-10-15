@@ -325,5 +325,13 @@ fn editing_the_providers_tsconfig_relinks_like_a_cold_export() {
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, export(&cold.web));
     // `dist/index.d.ts` no longer maps to a file: the import lists what exports the name.
-    assert_eq!(imports_of(&warm.web, CLEAN)[0].0, "ambiguous");
+    // The nested `@example/sealed` exports a `normalize` too: it is not a candidate.
+    assert_eq!(
+        imports_of(&warm.web, CLEAN),
+        [(
+            "ambiguous".to_string(),
+            "exports".to_string(),
+            NORMALIZE.to_string()
+        )]
+    );
 }

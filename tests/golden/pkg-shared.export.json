@@ -43,7 +43,7 @@
     },
     {
       "path": "sealed/src/one.ts",
-      "hash": "2947100f5a92d83157ad32d03d605bc910491f671a4a05a5d3e9266adce5bb18"
+      "hash": "4168d8686775eec83309aaf2b50b2372b36ea6cd3fafd0782ef7d284b8217ff7"
     },
     {
       "path": "sealed/src/two.ts",
@@ -173,6 +173,14 @@
         "path": "kit/src/utils/slug.ts",
         "start": 7,
         "end": 78
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/one.ts::normalize",
+      "span": {
+        "path": "sealed/src/one.ts",
+        "start": 154,
+        "end": 211
       }
     },
     {
