@@ -1,0 +1,137 @@
+{
+  "repository": "example.com/channels/worker",
+  "files": [
+    {
+      "path": "src/consumer.ts",
+      "hash": "5e370ea5b8cda0c87f26d0b1b49d3238ecb47bffbc6e4bf99c79a5261397f6dd"
+    },
+    {
+      "path": "src/pattern.ts",
+      "hash": "42b85bb60cca655c085ccb9630f510e31ad3ec6c127d29ea18a6b1403c30cc8d"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 337,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 172,
+        "end": 328
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::seen",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 385,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 247,
+        "end": 376
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::kafka.consumer#0",
+      "caller": "example.com/channels/worker::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 125,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::consumer.run#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 283,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::consumer.subscribe#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 205,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::kafka.consumer#0",
+      "caller": "example.com/channels/worker::src/pattern.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 129,
+        "end": 170
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::consumer.run#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 338,
+        "end": 373
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::consumer.subscribe#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 286,
+        "end": 328
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/channels/worker::src/pattern.ts::seen",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "provider": "example.com/channels/api::src/orders.ts::createOrder::producer.send#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    }
+  ]
+}

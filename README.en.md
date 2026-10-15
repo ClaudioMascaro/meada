@@ -94,11 +94,14 @@ configuration (for example Claude Code's `.mcp.json`):
 There are three tools, always in English, and none of them writes:
 
 - `search` finds a symbol, a route or a contract by name; with the kind `resource`, a resource
-  by its kind or id; with the kind `ambiguous` or `unresolved`, it lists the open items (see
+  by its kind or id; with the kind `channel`, a channel (queue or topic) by broker or name;
+  with the kind `ambiguous` or `unresolved`, it lists the open items (see
   Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
   contracts it touches; on a resource (`resource::postgres::orders`), it lists who writes and
-  who reads it, with the symbol and line, or `(repository-level)` for the whole repository;
+  who reads it, with the symbol and line, or `(repository-level)` for the whole repository; on
+  a channel (`channel::kafka::orders.created`), it lists producers and consumers, and a side
+  whose name Meada cannot evaluate shows as `(unresolved)` and is never linked;
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
   with `changes: uncommitted`, it starts from the working-tree diff, which covers the impact
   analysis of what was just edited.

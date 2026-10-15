@@ -25,7 +25,13 @@ give byte-identical output.
   lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. `search`
   kind `resource` is the contracts under `resource::` (matched by kind and id), the same lines
   `contract` and no kind list; `context` on `resource::<kind>::<id>` lists the writers and
-  readers across the workspace (`resource_sides`). `status` also prints, under each
+  readers across the workspace (`contract_sides`, shared with channels). `search` kind
+  `channel` is the contracts under `channel::`, matched by broker kind and name (an unresolved
+  side by its broker kind, printed `channel::kafka (unresolved)`); `context` on
+  `channel::<broker>::<name>` (or `channel::<broker>`, the unresolved sides of that broker) lists
+  the producers (the symbol around the producing call) and consumers (the handler) across the
+  workspace, and `context` on a symbol adds `produces <channel>` (at the producing call) or
+  `consumes <channel>` (the handler) to its `contracts:`. `status` also prints, under each
   repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
@@ -196,7 +202,8 @@ give byte-identical output.
   `extract` calls `code.pack().messages(code)`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
-  `channel::<broker>` for an unresolved side, which `link` skips: it is in the export and never
+  `channel::<broker>` for an unresolved side (`channel::parse`, `is_unresolved`, and `shown`, which
+  prints it with `(unresolved)`), which `link` skips: it is in the export and never
   linked, and since its contract is not `None` it is no open item (`search` kind `unresolved`
   and `meada decide` never see it). `link` joins every consumer to every producer of the same
   contract at `exact`, reason the contract, in any repository including its own.
@@ -205,7 +212,10 @@ give byte-identical output.
   down and back going up; a call-site consumer the other way. A channel link (producer call,
   handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
   handler, and up from the handler (`out[handler]`, a provider that is a call) to the producing
-  call and its caller. A repository-level side (`Graph::is_repo`) prints as `<repository>
+  call and its caller. An unresolved channel side has no link, so `Graph::holes` (by site) gives
+  the walk one row for it under the producing call (down, and from a call start) or the handler symbol:
+  `<repository> <path>:<line> produces|consumes channel::<broker> (unresolved)`, no level and no
+  hop. A repository-level side (`Graph::is_repo`) prints as `<repository>
   (repository-level)` and ends its branch: it is pushed as a row, never entered. Starts take
   only HTTP routes, symbols and call sites; a `resource::...` or `channel::...` start gets an
   answer pointing to `context`.
@@ -261,7 +271,8 @@ give byte-identical output.
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard or binding match (`inferred`, reason suffix `wildcard <p>`
   or `binding <exchange> <p>`) belongs in `channel.rs`'s `link`, which receives the whole
-  workspace's providers; bindings that are neither side need a place in the export of their own.
+  workspace's providers; bindings that are neither side need a place in the export of their own
+  and, to show in `context` on a channel, a section in `Engine::contract_sides`.
   `new X(...)` is a value (`Value::New`) but not yet a call fact, so a form whose site is a
   constructor call needs `new_expression` in the pack's calls first.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item

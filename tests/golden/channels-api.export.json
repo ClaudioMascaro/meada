@@ -6,6 +6,10 @@
       "hash": "176705d9f96b1c86e6df0c5089874eec6a629746b496e5b035dffbbdaf2d2434"
     },
     {
+      "path": "src/dynamic.ts",
+      "hash": "e3333d6fa5f5c6e1e7794502c91661ae315854cc819f9a231a4f51eb8ba13a9e"
+    },
+    {
       "path": "src/kafka.ts",
       "hash": "680358af862be4b51354e3fb5f375ca694775d08b5e569fbf32aa13271e6e004"
     },
@@ -41,6 +45,30 @@
         "path": "src/audit.ts",
         "start": 232,
         "end": 281
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::announce",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 322,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::currentRegion",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 453,
+        "end": 496
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::replay",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 137,
+        "end": 261
       }
     },
     {
@@ -116,6 +144,39 @@
         "path": "src/audit.ts",
         "start": 80,
         "end": 122
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::announce::currentRegion#0",
+      "caller": "example.com/channels/api::src/dynamic.ts::announce",
+      "target": "example.com/channels/api::src/dynamic.ts::currentRegion",
+      "level": "exact",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 401,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::announce::producer.send#0",
+      "caller": "example.com/channels/api::src/dynamic.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 368,
+        "end": 448
+      }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::replay::producer.send#0",
+      "caller": "example.com/channels/api::src/dynamic.ts::replay",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 181,
+        "end": 258
       }
     },
     {
@@ -197,6 +258,14 @@
     }
   ],
   "providers": [
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/channels/api::src/dynamic.ts::announce::producer.send#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/channels/api::src/dynamic.ts::replay::producer.send#0"
+    },
     {
       "contract": "channel::kafka::audit.log",
       "site": "example.com/channels/api::src/orders.ts::audit::producer.send#0"
