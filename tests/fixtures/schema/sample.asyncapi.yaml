@@ -1,0 +1,32 @@
+# A sample of what an AsyncAPI document read stores (`documents.summary`), for the
+# SCHEMA_VERSION guard in src/index.rs.
+asyncapi: 3.0.0
+info:
+  title: Sample
+  version: "1.0"
+servers:
+  broker:
+    host: kafka.example.com:9092
+    protocol: kafka
+  bare:
+    host: edge.example.com
+channels:
+  created:
+    address: orders.created
+    messages:
+      created:
+        payload:
+          type: object
+          properties:
+            id: { type: string }
+  pings:
+    address: edge.pings
+    servers:
+      - $ref: "#/servers/bare"
+operations:
+  publish:
+    action: send
+    channel: { $ref: "#/channels/created" }
+  consume:
+    action: receive
+    channel: { $ref: "#/channels/created" }

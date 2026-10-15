@@ -232,3 +232,100 @@ sample.ts
     }
   ]
 }
+
+sample.openapi.yaml
+{
+  "format": "openapi",
+  "version": "3.1.0",
+  "title": "Sample",
+  "routes": [
+    {
+      "path": "/items/{}",
+      "method": "GET",
+      "shape": {
+        "source": {
+          "document": "sample.openapi.yaml"
+        },
+        "fields": [
+          "extra",
+          "id",
+          "tags",
+          "tags[]"
+        ],
+        "open": [
+          "extra"
+        ]
+      }
+    },
+    {
+      "path": "/linked",
+      "method": "POST",
+      "shape": {
+        "source": {
+          "document": "sample.openapi.yaml"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
+    }
+  ],
+  "servers": [
+    {
+      "host": "api.example.com",
+      "path": "/v1"
+    }
+  ],
+  "problems": [
+    {
+      "problem": "external-path-item",
+      "reference": "./other.yaml#/paths/remote"
+    },
+    {
+      "problem": "external-ref",
+      "reference": "./other.yaml#/Item"
+    }
+  ]
+}
+
+sample.asyncapi.yaml
+{
+  "format": "asyncapi",
+  "version": "3.0.0",
+  "title": "Sample",
+  "channels": [
+    {
+      "broker": "kafka",
+      "name": "orders.created",
+      "role": "producer",
+      "shape": {
+        "source": {
+          "document": "sample.asyncapi.yaml"
+        },
+        "fields": [
+          "id"
+        ]
+      }
+    },
+    {
+      "broker": "kafka",
+      "name": "orders.created",
+      "role": "consumer",
+      "shape": {
+        "source": {
+          "document": "sample.asyncapi.yaml"
+        },
+        "fields": [
+          "id"
+        ]
+      }
+    }
+  ],
+  "problems": [
+    {
+      "problem": "no-protocol",
+      "server": "bare"
+    }
+  ]
+}

@@ -529,9 +529,11 @@ give byte-identical output.
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
-- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. A
-  unit test in `index.rs` keeps both in `tests/golden/schema.v<version>.txt` (the facts of each
-  pack's `tests/fixtures/schema/sample.<extension>`) and never re-blesses it in place: a change
+- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
+  a document's stored `summary`. A unit test in `index.rs` keeps all three in
+  `tests/golden/schema.v<version>.txt` (the facts of each pack's
+  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml` and
+  `sample.asyncapi.yaml` there) and never re-blesses it in place: a change
   fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
   An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
   so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when

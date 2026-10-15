@@ -19,8 +19,8 @@ use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
-/// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
-/// version is deleted and rebuilt.
+/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
+/// `summary`: an index with another version is deleted and rebuilt.
 const SCHEMA_VERSION: i64 = 14;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
@@ -173,7 +173,8 @@ struct Rows {
 /// file's exports, re-export chains, name inference, config changes and inline route
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
 /// repository, since constants and client wrappers reach across files. Deleted files leave
-/// the index. The result equals a refresh of an empty index over the same files.
+/// the index. The result equals a refresh of an empty index over the same files. Stored facts
+/// that do not parse (a change that missed its `SCHEMA_VERSION` bump) rebuild the index.
 ///
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
@@ -1036,10 +1037,10 @@ mod tests {
     use std::path::Path;
 
     use super::{SCHEMA, SCHEMA_VERSION};
-    use crate::lang;
+    use crate::{document, lang};
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
-    /// sample in `tests/fixtures/schema/`. Its golden is keyed by `SCHEMA_VERSION` and never
+    /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never
     /// rewritten in place, so a change fails until the version is bumped; `MEADA_BLESS=1` then
     /// writes the new version's golden and removes the old one.
     #[test]
@@ -1054,6 +1055,11 @@ mod tests {
             let facts = pack.parse(&name, &src).unwrap();
             let facts = serde_json::to_string_pretty(&facts).unwrap();
             actual += &format!("\n{name}\n{facts}\n");
+        }
+        for name in ["sample.openapi.yaml", "sample.asyncapi.yaml"] {
+            let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
+            let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();
+            actual += &format!("\n{name}\n{summary}\n");
         }
 
         let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));

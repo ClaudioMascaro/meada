@@ -15,8 +15,9 @@ if [ $# -eq 0 ]; then
 fi
 command -v jq >/dev/null || { echo "scripts/edges: needs jq" >&2; exit 1; }
 
-manifest="$(cd "$(dirname "$0")/.." && pwd)/Cargo.toml"
+root="$(CDPATH= cd "$(dirname "$0")/.." && pwd)"
 tmp=$(mktemp -d)
+echo "kept in $tmp" >&2
 first=
 
 for arg in "$@"; do
@@ -24,7 +25,7 @@ for arg in "$@"; do
   origin=
   [ "$dir" = "$arg" ] || origin=${arg#*=}
   [ -d "$dir" ] || { echo "scripts/edges: not a directory: $dir" >&2; exit 1; }
-  repo="$tmp/$(basename "$(cd "$dir" && pwd)")"
+  repo="$tmp/$(basename "$(CDPATH= cd "$dir" && pwd)")"
   [ -e "$repo" ] && { echo "scripts/edges: two directories named $(basename "$repo")" >&2; exit 1; }
   cp -R "$dir" "$repo"
   rm -rf "$repo/.git" "$repo/.meada"
@@ -43,7 +44,10 @@ for arg in "$@"; do
   [ -n "$first" ] || first=$repo
 done
 
-(cd "$first" && cargo run --quiet --manifest-path "$manifest" -- export) > "$tmp/export.json"
+# Built from the repository root, where rust-toolchain.toml picks the toolchain.
+meada=$(cd "$root" && cargo build --quiet --bin meada --message-format=json |
+  jq -r 'select(.reason == "compiler-artifact" and .executable != null) | .executable')
+(cd "$first" && "$meada" export) > "$tmp/export.json"
 
 jq -r '
   "calls:",
@@ -56,4 +60,3 @@ jq -r '
   "links:",
   (.links[] | "  \(.consumer) -> \(.provider)  [\(.level): \(.reason)]")
 ' "$tmp/export.json"
-echo "kept in $tmp"
