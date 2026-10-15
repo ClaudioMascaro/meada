@@ -266,7 +266,8 @@ pub fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
 
 /// Whether every token of `range` looks like part of an npm range: `||` separates sets of at
 /// least one token, `-` joins a hyphen range, and a comparator is an optional operator then a
-/// version body that begins with a digit, `x`, `X` or `*` (so no `:` or `/` gets through).
+/// version body that begins with a digit, or is a wildcard (`x`, `X`, `*`) alone or followed by
+/// `.` (so no `:` or `/` gets through, nor `xyz`).
 fn comparators(range: &str) -> bool {
     range.split("||").all(|set| {
         let mut tokens = set.split_whitespace().peekable();
@@ -275,7 +276,9 @@ fn comparators(range: &str) -> bool {
                 let body = t.trim_start_matches(['^', '~', '<', '>', '=', 'v']);
                 t == "-"
                     || body.is_empty()
-                    || (body.starts_with(|c: char| c.is_ascii_digit() || "xX*".contains(c))
+                    || ((body.starts_with(|c: char| c.is_ascii_digit())
+                        || matches!(body, "x" | "X" | "*")
+                        || body.starts_with(['x', 'X', '*']) && body[1..].starts_with('.'))
                         && body
                             .chars()
                             .all(|c| c.is_ascii_alphanumeric() || ".+-*".contains(c)))
@@ -520,6 +523,8 @@ mod tests {
             "latest",
             "next",
             "foo 1.2.3",
+            "xyz 1.2.3",
+            "x-foo",
             "1.2.3 foo",
             "^1.0.0 || bar",
             "",
