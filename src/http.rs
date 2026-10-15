@@ -431,9 +431,12 @@ impl ContractKind for Http {
             .map(|p| p.contract.clone())
             .collect();
         let mut documented = Vec::new();
+        // The first document by path listing a route gives its shape, merged or not.
+        let mut shapes = BTreeMap::new();
         for doc in &export.documents {
             for route in &doc.summary.routes {
                 let contract = route.contract();
+                shapes.entry(contract.clone()).or_insert(&route.shape);
                 if listed.insert(contract.clone()) {
                     let site = format!("{}::{}::{}", repo.identity, doc.path, route.label());
                     documented.push(Provider {
@@ -449,6 +452,7 @@ impl ContractKind for Http {
         let providers = &mut export.providers;
         providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
         for p in &mut export.providers {
+            p.shape = shapes.get(&p.contract).and_then(|s| (*s).clone());
             let path = route(&p.contract).map(|(_, path)| path);
             let served = path.and_then(|path| repo.config.serve.gateway_path(path));
             p.gateway = served.as_ref().map(|(path, _)| path.clone());

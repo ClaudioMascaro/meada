@@ -1,0 +1,3 @@
+example.com/documents/shapes (.) indexed, 0 files
+  openapi.json: external reference https://schemas.example.com/customer.json not followed, its part of the shape is open
+  GET /orders/{} in v2.openapi.json is also in openapi.json: one route

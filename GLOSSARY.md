@@ -82,6 +82,16 @@ added in front, `strip` is removed from the start. A route is also matched by it
 inferred and its reason names the rewrite. Within one repository a code path match wins.
 _Avoid_: base path, path rewrite
 
+**Shape**:
+What a contract carries in its payload, recorded as a set of field paths: dotted, with array
+elements written `[]` (`items[].id`), and `[]` first for a payload that is itself an array
+(`[].id`). Only presence is recorded, never types. A part of a shape can be **open**, meaning
+Meada cannot list its fields, such as an object that allows any extra property or a schema
+behind an external reference; anything below an open part may be present. A shape names its
+source, such as the provider document it was read from, and has one form whatever that source
+is.
+_Avoid_: schema, payload type, body
+
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content
 dataset, declared in `meada.toml`.

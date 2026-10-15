@@ -1,0 +1,3 @@
+# A service Meada has no language pack for: its OpenAPI documents are its only provider source.
+[serve]
+hosts = ["shapes.example.com"]

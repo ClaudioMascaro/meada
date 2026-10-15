@@ -10,6 +10,18 @@ paths:
       responses:
         "200":
           description: The orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    product:
+                      type: object
+                      additionalProperties: true
   # Only the document lists it: a provider without a handler.
   /api/shipments/{id}:
     parameters:

@@ -19,6 +19,7 @@ mod render;
 pub mod repo;
 mod resolve;
 mod resource;
+mod shape;
 mod trace;
 mod workspace;
 
