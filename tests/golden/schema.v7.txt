@@ -1,0 +1,230 @@
+CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
+CREATE TABLE files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    facts TEXT NOT NULL, resolved TEXT NOT NULL
+);
+CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
+CREATE INDEX symbols_path ON symbols (path);
+CREATE TABLE calls (
+    id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
+);
+CREATE INDEX calls_path ON calls (path);
+CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
+CREATE INDEX candidates_call ON candidates (call);
+CREATE TABLE contracts (
+    role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
+    method TEXT, fragments TEXT
+);
+CREATE INDEX contracts_path ON contracts (path);
+
+sample.ts
+{
+  "defs": [
+    {
+      "name": "Store",
+      "kind": "Class",
+      "range": {
+        "start": 380,
+        "end": 531
+      },
+      "params": []
+    },
+    {
+      "name": "Store.find",
+      "kind": "Method",
+      "range": {
+        "start": 396,
+        "end": 529
+      },
+      "params": [
+        {
+          "name": "id"
+        },
+        {
+          "name": "",
+          "fields": [
+            {
+              "name": "limit",
+              "key": "limit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "serve",
+      "kind": "Function",
+      "range": {
+        "start": 540,
+        "end": 682
+      },
+      "params": [
+        {
+          "name": "port"
+        }
+      ]
+    },
+    {
+      "name": "serve.@591",
+      "kind": "Inline",
+      "range": {
+        "start": 591,
+        "end": 624
+      },
+      "params": [
+        {
+          "name": "_req"
+        },
+        {
+          "name": "res"
+        }
+      ]
+    },
+    {
+      "name": "serve.@653",
+      "kind": "Inline",
+      "range": {
+        "start": 653,
+        "end": 678
+      },
+      "params": []
+    }
+  ],
+  "imports": [
+    {
+      "local": "express",
+      "source": "express",
+      "name": {
+        "Name": "default"
+      }
+    },
+    {
+      "local": "Router",
+      "source": "express",
+      "name": {
+        "Name": "Router"
+      }
+    },
+    {
+      "local": "path",
+      "source": "node:path",
+      "name": "Namespace"
+    },
+    {
+      "local": "helper",
+      "source": "./helper",
+      "name": {
+        "Name": "helper"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "From": {
+        "exported": "reexported",
+        "source": "./helper",
+        "name": {
+          "Name": "helper"
+        }
+      }
+    },
+    {
+      "All": {
+        "source": "./shapes"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "serve",
+        "local": "serve"
+      }
+    },
+    {
+      "Local": {
+        "exported": "default",
+        "local": "default"
+      }
+    }
+  ],
+  "calls": [
+    {
+      "scope": "",
+      "callee": "express",
+      "range": {
+        "start": 361,
+        "end": 370
+      }
+    },
+    {
+      "scope": "Store.find",
+      "callee": "fetch",
+      "range": {
+        "start": 462,
+        "end": 524
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "app.get",
+      "range": {
+        "start": 572,
+        "end": 625
+      }
+    },
+    {
+      "scope": "serve.@591",
+      "callee": "res.send",
+      "range": {
+        "start": 606,
+        "end": 624
+      }
+    },
+    {
+      "scope": "serve.@591",
+      "callee": "helper",
+      "range": {
+        "start": 615,
+        "end": 623
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "app.listen",
+      "range": {
+        "start": 636,
+        "end": 679
+      }
+    },
+    {
+      "scope": "serve.@653",
+      "callee": "path.join",
+      "range": {
+        "start": 659,
+        "end": 678
+      }
+    },
+    {
+      "scope": "",
+      "callee": "Router",
+      "range": {
+        "start": 699,
+        "end": 707
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "BASE"
+    },
+    {
+      "name": "app"
+    }
+  ]
+}

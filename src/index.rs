@@ -732,3 +732,54 @@ fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {
         end: row.get(at + 2)?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::{SCHEMA, SCHEMA_VERSION};
+    use crate::lang;
+
+    /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
+    /// sample in `tests/fixtures/schema/`. Its golden is keyed by `SCHEMA_VERSION` and never
+    /// rewritten in place, so a change fails until the version is bumped; `MEADA_BLESS=1` then
+    /// writes the new version's golden and removes the old one.
+    #[test]
+    fn the_stored_format_changes_only_with_the_schema_version() {
+        let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+        let mut actual = SCHEMA.trim_start().to_string();
+        for pack in lang::packs() {
+            let name = format!("sample.{}", pack.extensions()[0]);
+            let src = fs::read(tests.join("fixtures/schema").join(&name)).unwrap_or_else(|_| {
+                panic!("add tests/fixtures/schema/{name}, a sample of the facts its pack stores")
+            });
+            let facts = pack.parse(&name, &src).unwrap();
+            let facts = serde_json::to_string_pretty(&facts).unwrap();
+            actual += &format!("\n{name}\n{facts}\n");
+        }
+
+        let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
+        let Ok(expected) = fs::read_to_string(&golden) else {
+            assert!(
+                std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1"),
+                "missing {}; run with MEADA_BLESS=1 to create it",
+                golden.display()
+            );
+            for old in fs::read_dir(tests.join("golden")).unwrap() {
+                let old = old.unwrap().file_name().into_string().unwrap();
+                if old.starts_with("schema.v") && old.ends_with(".txt") {
+                    fs::remove_file(tests.join("golden").join(old)).unwrap();
+                }
+            }
+            fs::write(&golden, actual).unwrap();
+            return;
+        };
+        assert!(
+            actual == expected,
+            "the stored format differs from {}: bump SCHEMA_VERSION, then rerun with \
+             MEADA_BLESS=1 to write the new version's golden\n--- actual ---\n{actual}",
+            golden.display()
+        );
+    }
+}
