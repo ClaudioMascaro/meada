@@ -19,7 +19,7 @@
     },
     {
       "path": "src/shipments.ts",
-      "hash": "99ab13610f5cdd50595544b25fc19ffc456a22bd001647ad1dcefe6604575e4c"
+      "hash": "1f462c453a41a02c3730287a7418c13cd96e6829d94eff553e7b55d413164432"
     },
     {
       "path": "src/status.ts",
@@ -76,6 +76,22 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 507,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 684,
+        "end": 784
+      }
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::publicShipment",
       "span": {
         "path": "src/shipments.ts",
@@ -84,11 +100,27 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 858,
+        "end": 953
+      }
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::shipment",
       "span": {
         "path": "src/shipments.ts",
         "start": 129,
         "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1028,
+        "end": 1131
       }
     },
     {
@@ -198,6 +230,28 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 552,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::euShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 727,
+        "end": 781
+      }
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
       "caller": "example.com/chain/web::src/shipments.ts::publicShipment",
       "target": null,
@@ -209,6 +263,17 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 907,
+        "end": 950
+      }
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
       "caller": "example.com/chain/web::src/shipments.ts::shipment",
       "target": null,
@@ -217,6 +282,17 @@
         "path": "src/shipments.ts",
         "start": 170,
         "end": 206
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1074,
+        "end": 1128
       }
     },
     {
@@ -260,14 +336,34 @@
       "via": "env:GATEWAY_URL"
     },
     {
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "via": "host:eu.example.com"
+    },
+    {
       "contract": "http::GET::/api/shipments/{}",
       "site": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
       "via": "host:gateway.example.com"
     },
     {
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/shipments/{}",
       "site": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
       "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/v9/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "via": "host:qa.example.com"
     },
     {
       "contract": "http::GET::/api/health",
@@ -303,11 +399,32 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /gw"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /v3"
+    },
+    {
       "consumer": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
       "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
       "contract": "http::GET::/api/shipments/{}",
       "level": "exact",
       "reason": "host gateway.example.com is served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /relative/base"
     },
     {
       "consumer": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",

@@ -20,7 +20,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -741,6 +741,11 @@ pub(crate) struct Provider {
     /// `http::gateway_contracts`.
     #[serde(skip)]
     pub(crate) gateways: Vec<Gateway>,
+    /// The hosts the repository serves on, lower case: `[serve] hosts` and the host of every
+    /// `servers` URL of its documents. `Http::declare` fills it; `link` matches a URL's host
+    /// against it.
+    #[serde(skip)]
+    pub(crate) hosts: Vec<String>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.

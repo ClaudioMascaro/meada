@@ -63,29 +63,39 @@ fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Er
 }
 
 impl Serve {
-    /// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
-    /// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
-    /// when no rewrite applies. Code routes use it; it is written for the document routes of
-    /// spec #21 (A4) to reuse.
+    /// The path a gateway serves a route at, with the reason (see `gateway_path`), for the
+    /// repository's `[serve]` prefix and strip.
     pub fn gateway_path(&self, code_path: &str) -> Option<(String, String)> {
-        let prefix = self.prefix.as_deref().filter(|p| !p.is_empty());
-        let strip = self.strip.as_deref().filter(|s| !s.is_empty());
-        let stripped = strip.and_then(|s| {
-            let rest = code_path.strip_prefix(s)?;
-            (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
-        });
-        let rest = stripped.map_or(code_path, |(_, rest)| rest);
-        let path = format!("{}{rest}", prefix.unwrap_or(""));
-        let path = if path.is_empty() { "/".into() } else { path };
-        let reasons: Vec<String> = [
-            prefix.map(|p| format!("gateway prefix {p}")),
-            stripped.map(|(s, _)| format!("gateway strip {s}")),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-        (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
+        gateway_path(self.prefix.as_deref(), self.strip.as_deref(), code_path)
     }
+}
+
+/// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
+/// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
+/// when no rewrite applies. Code routes use the `[serve]` pair; the routes of a document
+/// (spec #21) use the path of a `servers` URL as the prefix and the `[serve]` strip.
+pub fn gateway_path(
+    prefix: Option<&str>,
+    strip: Option<&str>,
+    code_path: &str,
+) -> Option<(String, String)> {
+    let prefix = prefix.filter(|p| !p.is_empty());
+    let strip = strip.filter(|s| !s.is_empty());
+    let stripped = strip.and_then(|s| {
+        let rest = code_path.strip_prefix(s)?;
+        (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
+    });
+    let rest = stripped.map_or(code_path, |(_, rest)| rest);
+    let path = format!("{}{rest}", prefix.unwrap_or(""));
+    let path = if path.is_empty() { "/".into() } else { path };
+    let reasons: Vec<String> = [
+        prefix.map(|p| format!("gateway prefix {p}")),
+        stripped.map(|(s, _)| format!("gateway strip {s}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
 }
 
 /// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
@@ -160,14 +170,6 @@ fn not_empty<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::
 }
 
 impl Config {
-    /// Whether this repository serves on `host`, case-insensitively.
-    pub fn serves(&self, host: &str) -> bool {
-        self.serve
-            .hosts
-            .iter()
-            .any(|h| h.eq_ignore_ascii_case(host))
-    }
-
     /// The peers whose base URL this repository reads from the variable `var`.
     pub fn peers_reading<'a>(&'a self, var: &'a str) -> impl Iterator<Item = &'a str> {
         let reads = move |p: &&Peer| p.base_url_env.iter().any(|v| v == var);

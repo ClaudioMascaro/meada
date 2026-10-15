@@ -478,11 +478,32 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /gw"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /v3"
+    },
+    {
       "consumer": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
       "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
       "contract": "http::GET::/api/shipments/{}",
       "level": "exact",
       "reason": "host gateway.example.com is served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /relative/base"
     },
     {
       "consumer": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
