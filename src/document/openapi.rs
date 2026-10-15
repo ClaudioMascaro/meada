@@ -1,18 +1,22 @@
-//! OpenAPI 3.0 and 3.1 (spec #21): every path and method of a document is a route.
+//! OpenAPI 3.0 and 3.1 (spec #21): every path and method of a document is a route, with the
+//! shape of its 2xx JSON response.
+
+use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-use super::{Problem, Route, Server, Summary};
+use super::{Problem, Route, Server, Summary, schema};
 use crate::http::{PARAM, normalize_path};
+use crate::shape::Source;
 
 /// The operations a path item may hold.
 const METHODS: &[&str] = &[
     "get", "put", "post", "delete", "options", "head", "patch", "trace",
 ];
 
-/// What `doc` gives: its routes when its `openapi` field is a 3.0 or 3.1 version, else the
-/// format it has instead.
-pub fn read(doc: &Value) -> Summary {
+/// What `doc`, the document at `path`, gives: its routes when its `openapi` field is a 3.0 or
+/// 3.1 version, else the format it has instead.
+pub fn read(path: &str, doc: &Value) -> Summary {
     let field = |name: &str| text(doc.get(name)?);
     let version = field("openapi");
     let Some(version) = version.filter(|v| supported(v)) else {
@@ -23,32 +27,82 @@ pub fn read(doc: &Value) -> Summary {
         };
         return Summary::problem(Problem::Format { found });
     };
-    let mut routes = Vec::new();
+    let mut operations = Vec::new();
     let paths = doc.get("paths").and_then(Value::as_object);
-    for (path, item) in paths.into_iter().flatten() {
-        if !path.starts_with('/') {
+    for (route, item) in paths.into_iter().flatten() {
+        if !route.starts_with('/') {
             continue;
         }
         for &method in METHODS {
-            if item.get(method).is_some_and(Value::is_object) {
-                routes.push(Route {
-                    method: method.to_uppercase(),
-                    path: normalize_path(&template(path)),
-                });
+            if let Some(operation) = item.get(method).filter(|o| o.is_object()) {
+                let route = normalize_path(&template(route));
+                operations.push((route, method.to_uppercase(), operation));
             }
         }
     }
-    routes.sort();
-    // `/users/{id}` and `/users/{name}` are one route.
-    routes.dedup();
+    // Stable: of `/users/{id}` and `/users/{name}`, one route, the first key gives the shape.
+    operations.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+    operations.dedup_by(|a, b| (&a.0, &a.1) == (&b.0, &b.1));
+    let mut external = BTreeSet::new();
+    let routes = (operations.into_iter())
+        .map(|(route, method, operation)| {
+            let shape = response(doc, operation).map(|response| {
+                let source = Source::Document(path.to_string());
+                let (shape, refs) = schema::read(doc, response, source);
+                external.extend(refs);
+                shape
+            });
+            Route {
+                path: route,
+                method,
+                shape,
+            }
+        })
+        .collect();
     Summary {
         format: Some("openapi".into()),
         version: Some(version),
         title: doc.pointer("/info/title").and_then(text),
         routes,
         servers: servers(doc),
-        problems: Vec::new(),
+        problems: (external.into_iter())
+            .map(|reference| Problem::ExternalRef { reference })
+            .collect(),
     }
+}
+
+/// The `application/json` schema of `operation`'s lowest explicit 2xx response that has one,
+/// else of its `2XX` response. `application/*+json` is not read.
+fn response<'a>(doc: &'a Value, operation: &'a Value) -> Option<&'a Value> {
+    let responses = operation.get("responses")?.as_object()?;
+    let schema = |response: &'a Value| {
+        let response = local(doc, response)?;
+        response
+            .get("content")?
+            .get("application/json")?
+            .get("schema")
+    };
+    let mut explicit: Vec<_> = (responses.iter())
+        .filter(|(code, _)| {
+            code.len() == 3 && code.starts_with('2') && code.bytes().all(|b| b.is_ascii_digit())
+        })
+        .collect();
+    explicit.sort_by_key(|&(code, _)| code);
+    (explicit.into_iter())
+        .find_map(|(_, response)| schema(response))
+        .or_else(|| schema(responses.get("2XX")?))
+}
+
+/// `value`, or the object its local `$ref` points to, through a few references; `None` for an
+/// external or missing one.
+fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Value> {
+    for _ in 0..8 {
+        let Some(reference) = value.get("$ref").and_then(Value::as_str) else {
+            return Some(value);
+        };
+        value = doc.pointer(reference.strip_prefix('#')?)?;
+    }
+    None
 }
 
 /// The root `servers` URLs of `doc`. Server variables take their default; a URL that still holds
@@ -151,7 +205,7 @@ mod tests {
             path: path.into(),
         };
         assert_eq!(
-            read(&doc).servers,
+            read("openapi.json", &doc).servers,
             vec![
                 server(None, "/relative/base"),
                 server(Some("api.example.com"), "/v2"),

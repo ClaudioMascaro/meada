@@ -1,6 +1,6 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,6 +12,7 @@ use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, unresolved};
+use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
 use crate::{Result, channel, decisions, document, index, items, render, repo, resource, trace};
@@ -585,12 +586,20 @@ fn contracts(
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
-    let mut lines: Vec<String> = export
-        .providers
-        .iter()
-        .filter(|p| p.site == symbol.id)
-        .map(|p| line(identity, files, symbol, &format!("provides {}", p.contract)))
-        .collect();
+    let mut lines = Vec::new();
+    for p in export.providers.iter().filter(|p| p.site == symbol.id) {
+        lines.push(line(
+            identity,
+            files,
+            symbol,
+            &format!("provides {}", p.contract),
+        ));
+        lines.extend(
+            p.shape
+                .as_ref()
+                .map_or_else(Vec::new, |s| shape_lines(identity, s)),
+        );
+    }
     // A channel producer is a call site: the symbol around it produces.
     for call in export.calls.iter().filter(|c| c.caller == symbol.id) {
         let produced = export
@@ -648,6 +657,27 @@ fn contracts(
         return lines;
     }
     section("contracts", lines)
+}
+
+/// What a route's response carries, after its `provides` line: the fields and the parts left
+/// open, each line naming where the shape comes from.
+fn shape_lines(identity: &str, shape: &Shape) -> Vec<String> {
+    let at = shape.source.at();
+    let list = |paths: &BTreeSet<String>| {
+        let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
+        paths.join(", ")
+    };
+    let mut lines = vec![format!(
+        "{identity} {at} response fields: {}",
+        list(&shape.fields)
+    )];
+    if !shape.open.is_empty() {
+        lines.push(format!(
+            "{identity} {at} response open: {}",
+            list(&shape.open)
+        ));
+    }
+    lines
 }
 
 /// The span's lines, or `None` when its file under `root` no longer has the indexed hash.

@@ -17,6 +17,7 @@ use crate::decisions::Stale;
 use crate::document::{self, Summary};
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
+use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
@@ -756,6 +757,9 @@ pub(crate) struct Provider {
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
+    /// What the route's response carries, from the first document by path that lists it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) shape: Option<Shape>,
     /// Every path a gateway serves the route at, with the reason for the rewrite: the
     /// `[serve]` form first. `Http::declare` fills it; matching goes through
     /// `http::gateway_contracts`.

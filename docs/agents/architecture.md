@@ -31,7 +31,9 @@ give byte-identical output.
   `channel::<broker>::<name>` (or `channel::<broker>`, the unresolved sides of that broker) lists
   the producers (the symbol around the producing call) and consumers (the handler) across the
   workspace, and `context` on a symbol adds `produces <channel>` (at the producing call) or
-  `consumes <channel>` (the handler) to its `contracts:`. `status` also prints, under each
+  `consumes <channel>` (the handler) to its `contracts:`; after a `provides <route>` line with
+  a shape come `<repository> <document> response fields: <paths>` and, when some are open,
+  `<repository> <document> response open: <paths>` (`shape_lines`). `status` also prints, under each
   repository, the lines `Engine::status_report` gathers (resource lines, then document lines
   from `document::report`; same indexed-only rule as decisions). `search` shows a route only a
   document lists at `<document path> (documented only)` (`Export::document_of`). `search` kind
@@ -172,25 +174,49 @@ give byte-identical output.
   name: `openapi.{yaml,yml,json}` and `*.openapi.{yaml,yml,json}`), `read(path, bytes) ->
   Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
   becomes a `Problem`, with the line clamped to the file's last line), `Summary {format,
-  version, title, routes: Vec<Route {path, method}>, servers: Vec<Server {host, path}>,
-  problems: Vec<Problem>}` (stored as JSON;
-  `Route::contract`, `Route::label` = `GET /users/{}`; `servers` are the root `servers[].url`
-  entries with variables replaced by their defaults, a URL still holding one dropped, a relative
-  URL giving only its path, host lower case, path normalized with no trailing `/`), `Problem::Unreadable {line, error}` and
-  `Problem::Format {found}` (structured, rendered through `Msg`), `Summary::shown()` (what
-  `search` prints of a document read) and `report(repo, export)`: the status lines, per
-  document in path order (`Msg::DocumentRead` for one read, each problem of one ignored, then
-  each route a later document by path lists again: `Msg::DuplicateRoute`), then
-  `Msg::DocumentMissing` for each `[serve] documents` path with no row. `openapi.rs`: `read(value)`: a top-level `openapi` of `3.0` or `3.1`
-  (any patch; a YAML number counts), else `Problem::Format` naming the `openapi` or `swagger`
-  field it found; every `paths` key starting with `/` and every method of `get put post delete
-  options head patch trace` is a route, its templates (`{id}`) written as `{}` before
-  `http::normalize_path`, sorted and deduplicated. `yaml.rs`: `parse(text) -> Result<Value,
+  version, title, routes: Vec<Route {path, method, shape}>, servers: Vec<Server {host, path}>,
+  problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
+  /users/{}`; `servers` are the root `servers[].url` entries with variables replaced by their
+  defaults, a URL still holding one dropped, a relative URL giving only its path, host lower
+  case, path normalized with no trailing `/`), `Problem::Unreadable {line, error}`,
+  `Problem::Format {found}` and `Problem::ExternalRef {reference}` (structured,
+  rendered through `Msg`), `Summary::shown()` (what `search` prints of a document read) and
+  `report(repo, export)`: the status lines, per document in path order (`Msg::DocumentRead`
+  for one read, each problem of it, then each route a later document by path lists again:
+  `Msg::DuplicateRoute`), then `Msg::DocumentMissing` for each `[serve] documents` path with
+  no row. `openapi.rs`: `read(path,
+  value)`: a top-level `openapi` of `3.0` or `3.1` (any patch; a YAML number counts), else
+  `Problem::Format` naming the `openapi` or `swagger` field it found; every `paths` key starting
+  with `/` and every method of `get put post delete options head patch trace` is a route, its
+  templates (`{id}`) written as `{}` before `http::normalize_path`, sorted and deduplicated (of
+  two templates of one route, the first key gives the shape). A route's `shape` is the
+  `application/json` schema of its lowest explicit 2xx response that has one, else of `2XX`
+  (a response may be a local `$ref`; `application/*+json` is not read); every external `$ref`
+  met, once, sorted, is a `Problem::ExternalRef`. `schema.rs`: `read(doc, schema, source) ->
+  (Shape, external refs)`, the schema-to-shape reader: `properties` give fields, `items` the
+  `[]` elements (an array with no `items` has open elements), `allOf`, `oneOf` and `anyOf` add
+  their members' fields (an `allOf` member with no structure keyword adds nothing; anywhere
+  else such a schema, or `true`, is open); `additionalProperties` `true` or a schema opens the
+  object, and an object type that lists no fields, no members and no `$ref` is open unless
+  `additionalProperties` is `false`. Local `$ref`s (JSON pointers into the document) resolve; a
+  reference already being read (a cycle), a missing target and an external reference leave
+  that part open. Reading one shape visits at most 10,000 schemas; past that, every part not
+  read is open. To read several schemas as one shape (AsyncAPI messages), read
+  `{"oneOf": [...]}` of them. `yaml.rs`: `parse(text) -> Result<Value,
   (line, reason)>` over `yaml-rust2`'s event parser (`MarkedEventReceiver`, never `YamlLoader`):
   first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
   included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
   document is unreadable). Readers only see `serde_json::Value`.
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open}`, the one form of what a
+  contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
+  caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
+  for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
+  node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
+  (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
+  anything below it may be present. Presence only: no types, formats, `required` or
+  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) is the only
+  source yet; spec #23 adds its code sources as variants. `Source::at` names it in `context`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
@@ -252,7 +278,9 @@ give byte-identical output.
   documents (spec #21): a document route whose contract a code provider already has merges
   into it (one provider, the code's handler site); any other becomes a provider of its own at
   `<repository>::<document path>::<METHOD> <path>` (no handler), and a route an earlier
-  document by path listed adds nothing. A document provider is a written contract: it lowers
+  document by path listed adds nothing. Each provider of a documented contract, merged or not,
+  takes `Provider::shape` from the first document by path that lists it (none when that
+  document's route has no shape). A document provider is a written contract: it lowers
   no level (a host match is `exact`). A route also matches by its gateway paths: `declare`
   fills `Provider::gateways` (`Gateway {path, reason}`, not exported; the `[serve]` form, which
   is also the exported `Provider::gateway`, followed by one form per server path of each
@@ -335,7 +363,8 @@ give byte-identical output.
   unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   links}`; a provider has
-  `gateway` when `[serve]` rewrites its path. `documents` (absent when none was read) lists each
+  `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
+  absent when empty) when a document gives its route one. `documents` (absent when none was read) lists each
   document read, in path order, as `{path, format, version, contracts}` (contracts sorted);
   ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
@@ -382,8 +411,10 @@ give byte-identical output.
   bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` sees
   only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
   through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
-  (HTTP: `Http::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a new host one more entry in
-  `Provider::hosts`.
+  (HTTP: `Http::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
+  new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
+  `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
+  type.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -411,7 +442,9 @@ give byte-identical output.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
-  and methods, the hosts and base paths of the root `servers` URLs, and the parser's reason and line for a document it could not read). `Call::args`,
+  and methods, the field paths of their response shapes and the external references met, the
+  hosts and base paths of the root `servers` URLs, and the parser's reason and line for a
+  document it could not read). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
@@ -444,7 +477,8 @@ give byte-identical output.
   has none. `documented_chain(case)` lays `tests/fixtures/chain-documents/{gateway,web}/` over
   the chain (and copies `generated-openapi.yaml` to the gateway's gitignored
   `generated/openapi.yaml`, which Meada's own git would ignore inside the overlay), then commits:
-  the gateway gains `openapi.yaml` (3.1: `GET /api/orders`, merged with the Express route, and
+  the gateway gains `openapi.yaml` (3.1: `GET /api/orders`, merged with the Express route and
+  given a response shape with an open part, and
   the documented-only `GET /api/shipments/{id}`; a `servers` URL on `api.example.com` with base
   path `/gw`), `orders.openapi.json` (3.0, the same shipments route again: a duplicate; servers
   with variable defaults `https://{region}.example.com/{version}` and a relative `/relative/base`,
@@ -474,9 +508,15 @@ give byte-identical output.
   SQS by queue name and NATS wildcards at `inferred`), `channels_jobs` (the `channels-jobs-api`
   and `channels-jobs-worker` fixtures: BullMQ queues and Redis streams in both client styles),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
-  only", `search` (routes and kind `document`), `status`, listed documents; freshness of an edited document and of a dropped `[serve]` is in
-  `freshness`). Table tests for discovery, format detection, routes and the YAML reader are unit
-  tests in `src/document/`.
+  only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
+  merged route with its documented fields; over
+  the `documents-shapes` fixture, a repository with no code whose OpenAPI 3.0 JSON document
+  has local `$ref`s into `components`, `allOf`, `oneOf`, an array response,
+  `additionalProperties: true`, a cycle and an external `$ref`, plus a later
+  `v2.openapi.json` listing one route again: the export with every shape and `status` with
+  the external reference; freshness of an edited document and of a dropped `[serve]` is in
+  `freshness`). Table tests for discovery, format detection, routes, response selection, the
+  schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`.
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

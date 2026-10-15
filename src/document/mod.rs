@@ -1,9 +1,11 @@
 //! Provider documents (spec #21): OpenAPI files a repository with a `[serve]` table keeps.
 //! `refresh` reads each one into a `Summary`, derived from its bytes alone and stored in the
 //! index; `Http::declare` turns the routes into provider contracts at query time, and `report`
-//! gives the status lines. Readers see the JSON value model whatever the syntax (`yaml.rs`).
+//! gives the status lines. Readers see the JSON value model whatever the syntax (`yaml.rs`);
+//! `schema.rs` reads a response schema into a shape.
 
 mod openapi;
+mod schema;
 mod yaml;
 
 use std::collections::BTreeMap;
@@ -14,6 +16,7 @@ use serde_json::Value;
 use crate::http;
 use crate::index::Export;
 use crate::msg::Msg;
+use crate::shape::Shape;
 use crate::workspace::Repository;
 
 /// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
@@ -75,11 +78,14 @@ pub struct Server {
 }
 
 /// One path and method of a document; `path` is normalized like a code path.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Route {
     pub path: String,
     /// Upper case: `GET`.
     pub method: String,
+    /// What its 2xx JSON response carries (`openapi.rs`), when the document says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<Shape>,
 }
 
 impl Route {
@@ -102,13 +108,16 @@ pub enum Problem {
     /// It parses, but is not OpenAPI 3.0 or 3.1; `found` is what it says it is, such as
     /// `swagger 2.0`.
     Format { found: Option<String> },
+    /// A `$ref` to another file or a URL in a response schema: not followed, so the part of
+    /// the shape behind it is open. Each reference once, sorted.
+    ExternalRef { reference: String },
 }
 
 /// The summary of the document at `path` (repository-relative) holding `src`. JSON by the
 /// extension, YAML otherwise. It never fails: what cannot be read is a problem.
 pub fn read(path: &str, src: &[u8]) -> Summary {
     match parse(path, src) {
-        Ok(doc) => openapi::read(&doc),
+        Ok(doc) => openapi::read(path, &doc),
         Err((line, error)) => Summary::problem(Problem::Unreadable { line, error }),
     }
 }
@@ -172,6 +181,7 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
                         path,
                         found: found.as_deref(),
                     },
+                    Problem::ExternalRef { reference } => Msg::ExternalRef { path, reference },
                 }
                 .text(),
             );
@@ -278,6 +288,93 @@ mod tests {
                 "http::TRACE::/users/{}"
             ]
         );
+    }
+
+    #[test]
+    fn a_route_shape_is_its_lowest_2xx_json_response() {
+        let json = |field: &str| {
+            format!(
+                r#"{{"content": {{"application/json": {{"schema": {{"properties": {{"{field}": {{"type": "string"}}}}}}}}}}}}"#
+            )
+        };
+        let plain = r#"{"description": "no body"}"#;
+        let fields = |responses: String| {
+            let src = format!(
+                r#"{{"openapi": "3.0.3", "paths": {{"/x": {{"get": {{"responses": {{{responses}}}}}}}}},
+                "components": {{"responses": {{"Ok": {}}}}}}}"#,
+                json("shared")
+            );
+            let summary = read("openapi.json", src.as_bytes());
+            assert_eq!(summary.problems, [], "{responses}");
+            let shape = summary.routes[0].shape.as_ref();
+            shape.map(|s| s.fields.iter().cloned().collect::<Vec<_>>())
+        };
+        let some = |field: &str| Some(vec![field.to_string()]);
+        for (responses, expected) in [
+            (format!(r#""206": {}, "200": {}"#, json("partial"), json("ok")), some("ok")),
+            (format!(r#""202": {plain}, "2XX": {}"#, json("range")), some("range")),
+            (format!(r#""201": {}, "2XX": {}"#, json("created"), json("range")), some("created")),
+            (
+                r#""200": {"content": {"application/vnd.api+json": {"schema": {"type": "object"}}}}"#
+                    .to_string(),
+                None,
+            ),
+            (format!(r#""200": {plain}"#), None),
+            (format!(r#""default": {}, "404": {}"#, json("d"), json("e")), None),
+            (
+                r##""200": {"$ref": "#/components/responses/Ok"}"##.to_string(),
+                some("shared"),
+            ),
+        ] {
+            assert_eq!(fields(responses.clone()), expected, "{responses}");
+        }
+        assert_eq!(
+            read(
+                "openapi.yaml",
+                b"openapi: 3.1.0\npaths:\n  /x:\n    get: {}\n"
+            )
+            .routes[0]
+                .shape,
+            None
+        );
+    }
+
+    #[test]
+    fn external_references_are_problems_of_the_document() {
+        let src = r#"
+openapi: 3.1.0
+paths:
+  /a:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  b: {$ref: "b.yaml#/B"}
+                  a: {$ref: "https://example.com/a.json"}
+  /b:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {$ref: "b.yaml#/B"}
+"#;
+        let summary = read("openapi.yaml", src.as_bytes());
+        assert_eq!(
+            summary.problems,
+            [
+                Problem::ExternalRef {
+                    reference: "b.yaml#/B".into()
+                },
+                Problem::ExternalRef {
+                    reference: "https://example.com/a.json".into()
+                }
+            ]
+        );
+        assert_eq!(summary.format.as_deref(), Some("openapi"));
     }
 
     #[test]

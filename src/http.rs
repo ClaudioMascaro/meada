@@ -440,6 +440,8 @@ impl ContractKind for Http {
             .collect();
         let mut documented = Vec::new();
         let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
+        // The first document by path listing a route gives its shape, merged or not.
+        let mut shapes = HashMap::new();
         for doc in &export.documents {
             let prefixes = (doc.summary.servers.iter())
                 .map(|s| s.path.as_str())
@@ -447,6 +449,7 @@ impl ContractKind for Http {
             let prefixes: Vec<&str> = prefixes.collect();
             for route in &doc.summary.routes {
                 let contract = route.contract();
+                shapes.entry(contract.clone()).or_insert(&route.shape);
                 let found = prefixes.iter().filter_map(|prefix| {
                     gateway_path(Some(prefix), serve.strip.as_deref(), &route.path)
                 });
@@ -482,6 +485,7 @@ impl ContractKind for Http {
         hosts.sort();
         hosts.dedup();
         for p in &mut export.providers {
+            p.shape = shapes.get(&p.contract).and_then(|s| (*s).clone());
             let path = route(&p.contract).map(|(_, path)| path);
             let from_document = forms.remove(&p.contract).unwrap_or_default();
             // The server path replaces `[serve] prefix` for what only a document lists.

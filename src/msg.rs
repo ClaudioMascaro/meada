@@ -67,6 +67,10 @@ pub enum Msg<'a> {
         path: &'a str,
         first: &'a str,
     },
+    ExternalRef {
+        path: &'a str,
+        reference: &'a str,
+    },
     KeyMissing(&'a str),
     NotInRepository(&'a str),
     KeyUnknown {
@@ -233,6 +237,10 @@ impl Msg<'_> {
             Msg::DuplicateRoute { route, path, first } => pick(
                 format!("{route} in {path} is also in {first}: one route"),
                 format!("{route} em {path} também está em {first}: uma rota só"),
+            ),
+            Msg::ExternalRef { path, reference } => pick(
+                format!("{path}: external reference {reference} not followed, its part of the shape is open"),
+                format!("{path}: referência externa {reference} não seguida, sua parte do shape fica aberta"),
             ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
             Msg::NotInRepository(path) => pick(
