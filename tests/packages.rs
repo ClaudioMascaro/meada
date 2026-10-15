@@ -206,3 +206,88 @@ fn each_entry_field_resolves_and_only_the_nearest_manifest_counts() {
     assert_eq!(how("tools/run.ts::run::greet#0"), None);
     assert!(!json["links"].to_string().contains(&at("tools/run.ts")));
 }
+
+#[test]
+fn search_finds_a_package_by_name_with_its_consumers() {
+    let p = packages("packages_search");
+    let engine = Engine::open(&p.web).unwrap();
+
+    let all = engine.search("@example", Some("package"), None).unwrap();
+    let kit = engine.search("KIT", Some("package"), None).unwrap();
+
+    assert_golden("pkg.search-package.txt", &all);
+    assert_golden("pkg.search-package-kit.txt", &kit);
+    assert_eq!(
+        engine
+            .search("nothing-like-it", Some("package"), None)
+            .unwrap(),
+        "no matches for `nothing-like-it`\n"
+    );
+}
+
+#[test]
+fn search_places_a_dependency_entry_at_its_manifest_and_field() {
+    let p = packages("packages_search_contract");
+    let engine = Engine::open(&p.web).unwrap();
+
+    let found = engine.search("shared", Some("contract"), None).unwrap();
+
+    assert_golden("pkg.search-contract-shared.txt", &found);
+}
+
+#[test]
+fn context_on_an_exported_function_lists_its_consumers_across_repositories() {
+    let p = packages("packages_context");
+    let engine = Engine::open(&p.shared).unwrap();
+
+    let found = engine.context(GREET, None).unwrap();
+
+    assert_golden("pkg-shared.context-greet.txt", &found);
+}
+
+#[test]
+fn a_consumer_carries_the_range_flag_of_its_dependency() {
+    let p = packages("packages_context_flags");
+    let replace = |repo: &Path, from: &str, to: &str| {
+        let file = repo.join("package.json");
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(text.contains(from), "{file:?} lacks {from}");
+        fs::write(&file, text.replace(from, to)).unwrap();
+    };
+    // `web` asks for a major `kit` that is not out; `api` names it by a tag.
+    replace(
+        &p.web,
+        "\"@example/kit\": \"^2.0.0\"",
+        "\"@example/kit\": \"^3.0.0\"",
+    );
+    replace(
+        &p.api,
+        "\"@example/kit\": \"2.x\"",
+        "\"@example/kit\": \"latest\"",
+    );
+
+    let found = Engine::open(&p.shared)
+        .unwrap()
+        .context(GREET, None)
+        .unwrap();
+
+    assert_golden("pkg-shared.context-greet-flagged.txt", &found);
+}
+
+#[test]
+fn context_on_a_package_lists_its_manifest_and_dependents() {
+    let p = packages("packages_context_package");
+    let engine = Engine::open(&p.web).unwrap();
+
+    let found = engine.context("package::npm::@example/kit", None).unwrap();
+    let traced = engine
+        .trace(
+            Start::From("package::npm::@example/kit"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("pkg.context-package-kit.txt", &found);
+    assert_golden("pkg.trace-package-kit.txt", &traced);
+}

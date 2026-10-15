@@ -195,12 +195,21 @@ to the handler of each consumer, in the same repository too. A repository with a
 also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
 listed in `[serve] documents`: the routes and channels they describe become contracts, with the
 fields of each response or payload, and `meada status` says what it read and what it ignored.
-Each link has the
-level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
+Each named `package.json` becomes the contract `package::npm::<name>`, and each dependency
+(`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) that names a
+package of another repository in the workspace links to it, with the version range checked
+against the local version (`range mismatch` when it does not accept it, `range unchecked` when
+it cannot be checked). A call to a function imported from that package crosses into the
+provider's code, through the `exports`, `types`, `module` and `main` fields and through
+re-exports, also when the entry point points into the build folder (the `outDir` of
+`tsconfig.json`, mapped back to its `rootDir`). `search` with the kind `package` finds the
+package by name, with its repository, folder, version and number of consumers, and `context` on
+an exported function lists who calls it in other repositories. It reads no lockfile and queries
+no npm registry. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
 `decided`. Broker clusters are not modelled: two clusters that each have a topic with the same
 name link as if they were one. Not there yet: other languages, HTTP clients other than `fetch`,
-messaging clients other than these, packages and the npm package. The scope and order of the work are in
+messaging clients other than these, or Meada's npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).
 

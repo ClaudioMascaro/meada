@@ -1,0 +1,1 @@
+`package::npm::@example/kit` is a package, and a trace starts from a symbol, a route or a call site: run `context` on it for its packages and dependents, then trace from one
