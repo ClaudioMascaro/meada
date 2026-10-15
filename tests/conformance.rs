@@ -79,6 +79,12 @@ fn typescript_and_javascript() {
             "src/messages/consume.ts::listen",
             "src/messages/consume.ts::listenRetries",
             "src/messages/consume.ts::record",
+            "src/messages/exchanges.ts::announce",
+            "src/messages/exchanges.ts::bind",
+            "src/messages/exchanges.ts::listen",
+            "src/messages/exchanges.ts::onAlert",
+            "src/messages/exchanges.ts::onAudit",
+            "src/messages/exchanges.ts::onShipment",
             "src/messages/handlers.ts::onPayment",
             "src/messages/bullmq.ts::enqueue",
             "src/messages/bullmq.ts::enqueueAll",
@@ -129,6 +135,13 @@ fn typescript_and_javascript() {
             "src/messages/produce.ts::produceAll",
             "src/messages/produce.ts::relay",
             "src/messages/produce.ts::retry",
+            "src/messages/queues.ts::enqueue",
+            "src/messages/queues.ts::enqueueReports",
+            "src/messages/queues.ts::queue",
+            "src/messages/queues.ts::record",
+            "src/messages/queues.ts::work",
+            "src/messages/queues.ts::work.amqp tasks",
+            "src/messages/queues.ts::workReports",
             "src/shapes/circle.ts::Circle",
             "src/shapes/circle.ts::Circle.area",
             "src/shapes/circle.ts::Circle.constructor",
@@ -268,6 +281,7 @@ fn typescript_and_javascript_kafkajs() {
                 l["level"].as_str().unwrap(),
             )
         })
+        .filter(|(_, _, reason, _)| reason.starts_with("channel::kafka::"))
         .collect();
 
     let consume = "src/messages/consume.ts::";
@@ -492,4 +506,78 @@ fn typescript_and_javascript_bullmq_and_redis() {
             .count()
     };
     assert_eq!((unresolved("bullmq"), unresolved("redis")), (1, 1));
+}
+
+/// The amqplib forms of the TS/JS pack (spec #20): `sendToQueue`, `consume`, `bindQueue` and
+/// `publish` on a channel that traces back to `amqplib` (a confirm channel too), as
+/// `(consumer, producer, reason, level)`.
+#[test]
+fn typescript_and_javascript_amqplib() {
+    let repo = fixture_repo("conformance_amqplib", "conformance-ts-js", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
+
+    let links: Vec<(String, String, String, &str)> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            (
+                rel(l["consumer"].as_str().unwrap()),
+                rel(l["provider"].as_str().unwrap()),
+                l["reason"].as_str().unwrap().to_string(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .filter(|(_, _, reason, _)| reason.starts_with("channel::amqp::"))
+        .collect();
+
+    let queues = "src/messages/queues.ts::";
+    let exchanges = "src/messages/exchanges.ts::";
+    let link = |consumer: &str, producer: &str, queue: &str| {
+        (
+            consumer.to_string(),
+            format!("{queues}{producer}"),
+            format!("channel::amqp::{queue}"),
+            "exact",
+        )
+    };
+    // A publish to the exchange `events` reaches the queues whose binding matches its key.
+    let published = |handler: &str, queue: &str, call: usize, binding: &str, level| {
+        (
+            format!("{exchanges}{handler}"),
+            format!("{exchanges}announce::channel.publish#{call}"),
+            format!("channel::amqp::{queue} binding events {binding}"),
+            level,
+        )
+    };
+    let mut expected = vec![
+        link(
+            &format!("{queues}work.amqp tasks"),
+            "enqueue::channel.sendToQueue#0",
+            "tasks",
+        ),
+        link(
+            "src/messages/handlers.ts::onPayment",
+            "enqueue::confirming.sendToQueue#0",
+            "invoices",
+        ),
+        link(
+            &format!("{queues}workReports"),
+            "enqueueReports::queue#0",
+            "reports",
+        ),
+        published("onAudit", "audit", 0, "order.created", "exact"),
+        published("onAlert", "alerts", 0, "order.#", "inferred"),
+        published("onAlert", "alerts", 1, "order.#", "inferred"),
+        published("onShipment", "shipments", 1, "*.shipped", "inferred"),
+        // The empty exchange is the queue `tasks`.
+        (
+            format!("{queues}work.amqp tasks"),
+            format!("{exchanges}announce::channel.publish#2"),
+            "channel::amqp::tasks".to_string(),
+            "exact",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(links, expected);
 }

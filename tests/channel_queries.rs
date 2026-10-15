@@ -115,3 +115,17 @@ fn the_export_keeps_the_unresolved_sides_and_links_none_of_them() {
         .unwrap();
     assert_golden("channels-worker.export.json", &export);
 }
+
+#[test]
+fn context_on_a_queue_lists_the_bindings_that_reach_it() {
+    let engine = channels("channel_bindings");
+
+    // The binding is declared in the worker, the publishes are in the api.
+    let bound = engine.context("channel::amqp::audit", None).unwrap();
+    assert_golden("channels.context-queue-bound.txt", &bound);
+    // A queue and a topic that share a name stay apart.
+    let queue = engine.context("channel::amqp::orders", None).unwrap();
+    assert_golden("channels.context-queue.txt", &queue);
+    let topic = engine.context("channel::kafka::orders", None).unwrap();
+    assert_golden("channels.context-topic-same-name.txt", &topic);
+}
