@@ -11,7 +11,11 @@
     },
     {
       "path": "src/entries.ts",
-      "hash": "e9b992b17b8e723b8f14f4e52f957366b76c382f666614e816f8eba734496569"
+      "hash": "51494bc5b450abca02f127f3a35ded8ea27f723f4a3b61d13803d6a72259f842"
+    },
+    {
+      "path": "src/nest.ts",
+      "hash": "7470a702c5abc82ebfb9f59e418af53b95801b2f4ee5c8fcfe2ec31f66365e3e"
     },
     {
       "path": "src/text.ts",
@@ -83,8 +87,16 @@
       "id": "example.com/pkg/web::src/entries.ts::entries",
       "span": {
         "path": "src/entries.ts",
-        "start": 317,
-        "end": 385
+        "start": 576,
+        "end": 675
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/nest.ts::nest",
+      "span": {
+        "path": "src/nest.ts",
+        "start": 352,
+        "end": 408
       }
     },
     {
@@ -309,14 +321,25 @@
       }
     },
     {
+      "id": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 645,
+        "end": 650
+      }
+    },
+    {
       "id": "example.com/pkg/web::src/entries.ts::entries::esm#0",
       "caller": "example.com/pkg/web::src/entries.ts::entries",
       "target": null,
       "level": null,
       "span": {
         "path": "src/entries.ts",
-        "start": 357,
-        "end": 362
+        "start": 616,
+        "end": 621
       }
     },
     {
@@ -326,8 +349,30 @@
       "level": null,
       "span": {
         "path": "src/entries.ts",
-        "start": 376,
-        "end": 382
+        "start": 635,
+        "end": 641
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 654,
+        "end": 661
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 665,
+        "end": 672
       }
     },
     {
@@ -337,8 +382,8 @@
       "level": null,
       "span": {
         "path": "src/entries.ts",
-        "start": 366,
-        "end": 372
+        "start": 625,
+        "end": 631
       }
     },
     {
@@ -348,8 +393,41 @@
       "level": null,
       "span": {
         "path": "src/entries.ts",
-        "start": 346,
-        "end": 353
+        "start": 605,
+        "end": 612
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/nest.ts::nest::deep#0",
+      "caller": "example.com/pkg/web::src/nest.ts::nest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nest.ts",
+        "start": 399,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/nest.ts::nest::inner#0",
+      "caller": "example.com/pkg/web::src/nest.ts::nest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nest.ts",
+        "start": 388,
+        "end": 395
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/nest.ts::nest::prec#0",
+      "caller": "example.com/pkg/web::src/nest.ts::nest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nest.ts",
+        "start": 378,
+        "end": 384
       }
     },
     {
@@ -415,6 +493,16 @@
       "via": null
     },
     {
+      "contract": "package::npm::@example/bare",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/bare",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/dts",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/dts",
+      "via": null
+    },
+    {
       "contract": "package::npm::@example/esm",
       "site": "example.com/pkg/web::package.json::dependencies::@example/esm",
       "via": null
@@ -422,6 +510,21 @@
     {
       "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/web::package.json::dependencies::@example/kit",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/nest",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/nest",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/plain",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/plain",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/prec",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/prec",
       "via": null
     },
     {
@@ -475,6 +578,11 @@
       "via": null
     },
     {
+      "contract": "package::npm::@example/dts",
+      "site": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "via": null
+    },
+    {
       "contract": "package::npm::@example/esm",
       "site": "example.com/pkg/web::src/entries.ts::entries::esm#0",
       "via": null
@@ -485,6 +593,16 @@
       "via": null
     },
     {
+      "contract": "package::npm::@example/plain",
+      "site": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/bare",
+      "site": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "via": null
+    },
+    {
       "contract": "package::npm::@example/esm",
       "site": "example.com/pkg/web::src/entries.ts::entries::tool#0",
       "via": null
@@ -492,6 +610,11 @@
     {
       "contract": "package::npm::@example/typed",
       "site": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/prec",
+      "site": "example.com/pkg/web::src/nest.ts::nest::prec#0",
       "via": null
     },
     {
@@ -528,6 +651,18 @@
     {
       "manifest": "package.json",
       "field": "dependencies",
+      "name": "@example/bare",
+      "range": "1.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/dts",
+      "range": "1.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
       "name": "@example/esm",
       "range": "~1.0.0"
     },
@@ -536,6 +671,24 @@
       "field": "dependencies",
       "name": "@example/kit",
       "range": "^2.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/nest",
+      "range": "1.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/plain",
+      "range": "1.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/prec",
+      "range": "1.0.0"
     },
     {
       "manifest": "package.json",
@@ -620,6 +773,14 @@
       "target": "example.com/pkg/shared::kit/src/greet.ts::greet"
     },
     {
+      "site": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "specifier": "@example/dts",
+      "name": "dts",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/pkg/shared::dts/index.js::dts"
+    },
+    {
       "site": "example.com/pkg/web::src/entries.ts::entries::esm#0",
       "specifier": "@example/esm",
       "name": "esm",
@@ -636,6 +797,22 @@
       "target": "example.com/pkg/shared::esm/lib/parts/index.ts::part"
     },
     {
+      "site": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "specifier": "@example/plain",
+      "name": "plain",
+      "level": "exact",
+      "how": "path",
+      "target": "example.com/pkg/shared::plain/index.ts::plain"
+    },
+    {
+      "site": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "specifier": "@example/bare",
+      "name": "thing",
+      "level": "ambiguous",
+      "how": "path",
+      "target": "example.com/pkg/shared::bare/src/thing.ts::thing"
+    },
+    {
       "site": "example.com/pkg/web::src/entries.ts::entries::tool#0",
       "specifier": "@example/esm/lib/tool",
       "name": "tool",
@@ -650,6 +827,14 @@
       "level": "exact",
       "how": "types",
       "target": "example.com/pkg/shared::typed/src/index.ts::typed"
+    },
+    {
+      "site": "example.com/pkg/web::src/nest.ts::nest::prec#0",
+      "specifier": "@example/prec",
+      "name": "prec",
+      "level": "inferred",
+      "how": "outDir",
+      "target": "example.com/pkg/shared::prec/index.ts::prec"
     },
     {
       "site": "example.com/pkg/web::src/text.ts::clean::normalize#0",
@@ -700,6 +885,20 @@
       "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
     },
     {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/bare",
+      "provider": "example.com/pkg/shared::bare/package.json",
+      "contract": "package::npm::@example/bare",
+      "level": "exact",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/dts",
+      "provider": "example.com/pkg/shared::dts/package.json",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0)"
+    },
+    {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/esm",
       "provider": "example.com/pkg/shared::esm/package.json",
       "contract": "package::npm::@example/esm",
@@ -712,6 +911,27 @@
       "contract": "package::npm::@example/kit",
       "level": "exact",
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/nest",
+      "provider": "example.com/pkg/shared::nest/package.json",
+      "contract": "package::npm::@example/nest",
+      "level": "exact",
+      "reason": "package::npm::@example/nest 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/plain",
+      "provider": "example.com/pkg/shared::plain/package.json",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/prec",
+      "provider": "example.com/pkg/shared::prec/package.json",
+      "contract": "package::npm::@example/prec",
+      "level": "exact",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
@@ -784,6 +1004,13 @@
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
     },
     {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "provider": "example.com/pkg/shared::dts/index.js::dts",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/pkg/web::src/entries.ts::entries::esm#0",
       "provider": "example.com/pkg/shared::esm/src/index.mjs::esm",
       "contract": "package::npm::@example/esm",
@@ -798,6 +1025,20 @@
       "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
     },
     {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "provider": "example.com/pkg/shared::plain/index.ts::plain",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "provider": "example.com/pkg/shared::bare/src/thing.ts::thing",
+      "contract": "package::npm::@example/bare",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0); import path"
+    },
+    {
       "consumer": "example.com/pkg/web::src/entries.ts::entries::tool#0",
       "provider": "example.com/pkg/shared::esm/lib/tool.ts::tool",
       "contract": "package::npm::@example/esm",
@@ -810,6 +1051,13 @@
       "contract": "package::npm::@example/typed",
       "level": "exact",
       "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/nest.ts::nest::prec#0",
+      "provider": "example.com/pkg/shared::prec/index.ts::prec",
+      "contract": "package::npm::@example/prec",
+      "level": "inferred",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0); import outDir"
     },
     {
       "consumer": "example.com/pkg/web::src/text.ts::clean::normalize#0",

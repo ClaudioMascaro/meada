@@ -15,6 +15,9 @@ tagging.
   `.cjs`) with tree-sitter: definitions, imports (relative paths, `index` resolution and
   `tsconfig.json` `paths` aliases) and calls, each with a level (`exact`, `inferred` or
   `ambiguous`).
+- A call through a local binding (`let`, `var`, `catch`, destructuring, `for...of`, nested
+  parameter patterns) never resolves `exact` to the definition, constant or parameter of the
+  same name that it hides.
 - HTTP contracts linked across repositories: `fetch` consumers (including client wrappers and
   base URLs read from environment variables) matched to Next.js app router and Express
   providers. Every link carries a level and a reason; calls whose URL cannot be resolved are

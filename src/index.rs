@@ -20,8 +20,8 @@ use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
-/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
-/// `summary`: an index with another version is deleted and rebuilt.
+/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
+/// manifest's stored `summary`: an index with another version is deleted and rebuilt.
 const SCHEMA_VERSION: i64 = 15;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
