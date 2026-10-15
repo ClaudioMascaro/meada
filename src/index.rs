@@ -285,10 +285,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
                 .iter()
                 .map(|(n, c)| (*n, c.as_slice()))
                 .collect();
-            Ok((
-                pack,
-                Resolver::new(files, lang::pack(pack).modules(&found)?),
-            ))
+            let language = lang::pack(pack);
+            let modules = language.modules(&found)?;
+            Ok((pack, Resolver::new(files, modules, language.receiver())))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
 

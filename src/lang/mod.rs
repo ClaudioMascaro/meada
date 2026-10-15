@@ -26,6 +26,12 @@ pub trait LanguagePack {
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order.
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
+
+    /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
+    /// language that names it as a parameter (`self`) writes it in `Facts::locals` instead.
+    fn receiver(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 /// The repository-relative paths an import of a specifier (second argument) from a file

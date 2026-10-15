@@ -46,14 +46,34 @@ enum Binding<'a> {
 /// Seen `(file, exported name)` pairs: re-exports may form cycles.
 type Seen<'a> = HashSet<(&'a str, &'a str)>;
 
-/// A local whose class, or a class whose bases, are being resolved: one met again while
-/// resolving itself (`a: b.C` and `b: a.D`, or two classes naming each other's members as
-/// bases) resolves to nothing.
+/// A local whose class, or a class whose family, is being resolved: one met again while
+/// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
+/// nothing.
 #[derive(PartialEq)]
 enum Busy<'a> {
     Local(&'a str, &'a str, &'a str),
-    Bases(Target<'a>),
+    Family(Target<'a>),
 }
+
+/// What resolving one name carries along: what is being resolved, and the families
+/// linearized so far (while `Resolver::new` linearizes them all).
+#[derive(Default)]
+struct Work<'a> {
+    busy: Vec<Busy<'a>>,
+    families: HashMap<Target<'a>, Family<'a>>,
+}
+
+/// One entry of a class family: a class of the repository, or the `n`th base a class writes
+/// that is not one (outside the repository, or not resolved), whose members are not known.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Ancestor<'a> {
+    Class(Target<'a>),
+    Opaque(Target<'a>, usize),
+}
+
+/// A class and its ancestors in method resolution order (C3), or `None` when they have none:
+/// C3 rejects the hierarchy, or the bases form a cycle.
+type Family<'a> = Option<Vec<Ancestor<'a>>>;
 
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
@@ -62,6 +82,10 @@ pub struct Resolver<'a> {
     consts: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::locals`, by scope and name.
     locals: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+    /// Every class's family, linearized once.
+    families: HashMap<Target<'a>, Family<'a>>,
+    /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
+    receiver: Option<&'static str>,
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
@@ -71,7 +95,11 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(files: &'a BTreeMap<&'a str, &'a Facts>, modules: Modules) -> Self {
+    pub fn new(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        receiver: Option<&'static str>,
+    ) -> Self {
         let defs = files
             .iter()
             .map(|(path, facts)| {
@@ -113,10 +141,25 @@ impl<'a> Resolver<'a> {
             defs,
             consts,
             locals,
+            families: HashMap::new(),
+            receiver,
             callers: HashMap::new(),
             by_name,
             modules,
         };
+        let mut work = Work::default();
+        for (path, facts) in files {
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                resolver.family(
+                    Target {
+                        path,
+                        name: &def.name,
+                    },
+                    &mut work,
+                );
+            }
+        }
+        resolver.families = work.families;
         let mut callers: HashMap<Target, Vec<(&str, usize)>> = HashMap::new();
         for (path, facts) in files {
             for (n, call) in facts.calls.iter().enumerate() {
@@ -130,8 +173,8 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        let (seen, busy) = (&mut Seen::new(), &mut Vec::new());
-        match self.resolve(path, &call.scope, &call.callee, seen, busy) {
+        let work = &mut Work::default();
+        match self.resolve(path, &call.scope, &call.callee, &mut Seen::new(), work) {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::External => Resolution::Unresolved,
             Binding::Instance(_)
@@ -151,12 +194,12 @@ impl<'a> Resolver<'a> {
         scope: &'a str,
         callee: &'a str,
         seen: &mut Seen<'a>,
-        busy: &mut Vec<Busy<'a>>,
+        work: &mut Work<'a>,
     ) -> Binding<'a> {
         let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
-                "this" => self.class(path, scope),
+                _ if Some(head) == self.receiver => self.class(path, scope),
                 "super" => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
                 _ => self.lexical(path, scope, head, seen),
@@ -164,9 +207,9 @@ impl<'a> Resolver<'a> {
             (binding, members)
         });
         for member in members.split('.').filter(|m| !m.is_empty()) {
-            binding = match self.instance(binding, busy) {
+            binding = match self.instance(binding, work) {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
-                    self.member(t, member, busy)
+                    self.member(t, member, work)
                 }
                 Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
                 Binding::Module(m) => self.export(m, member, seen),
@@ -183,7 +226,7 @@ impl<'a> Resolver<'a> {
     /// What a parameter or a local holds, as far as the source writes its class: an instance
     /// of a class of the repository, something from outside it, or unknown. Other bindings
     /// stay as they are.
-    fn instance(&self, binding: Binding<'a>, busy: &mut Vec<Busy<'a>>) -> Binding<'a> {
+    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
         let (path, scope, name) = match binding {
             Binding::Param(f, n) => {
                 let name = self.defs[f.path][f.name].params[n].name.as_str();
@@ -196,16 +239,16 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         };
         let key = Busy::Local(path, scope, name);
-        if busy.contains(&key) {
+        if work.busy.contains(&key) {
             return Binding::Unknown;
         }
-        busy.push(key);
+        work.busy.push(key);
         let found = match class {
             Class::Enclosing => self.class(path, scope),
-            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), busy),
+            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
             Class::Unknown => Binding::Unknown,
         };
-        busy.pop();
+        work.busy.pop();
         match found {
             Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
             Binding::External => Binding::External,
@@ -214,9 +257,16 @@ impl<'a> Resolver<'a> {
     }
 
     /// `member` of `class`: the first class of its family that defines it, or binds it as an
-    /// attribute.
-    fn member(&self, class: Target<'a>, member: &'a str, busy: &mut Vec<Busy<'a>>) -> Binding<'a> {
-        for c in self.family(class, busy) {
+    /// attribute. A base whose members are not known, met first, leaves it unknown, and so
+    /// does a family C3 rejects.
+    fn member(&self, class: Target<'a>, member: &'a str, work: &mut Work<'a>) -> Binding<'a> {
+        let Some(family) = self.family(class, work) else {
+            return Binding::Unknown;
+        };
+        for ancestor in family {
+            let Ancestor::Class(c) = ancestor else {
+                return Binding::Unknown;
+            };
             let qualified = format!("{}.{member}", c.name);
             if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
                 return Binding::Def(Target { path: c.path, name });
@@ -228,60 +278,46 @@ impl<'a> Resolver<'a> {
         Binding::Unknown
     }
 
-    /// `class`, then the classes of the repository its definition names as bases, at any
-    /// depth, in Python's method resolution order for consistent hierarchies: depth first, left
-    /// to right, each class kept at its last place, so a shared base comes after every class
-    /// that derives from it. Without written bases (TypeScript) it is `class` alone.
-    // ponytail: the pre-C3 order, which differs from C3 only for hierarchies C3 rejects or
-    // reorders; every path through a diamond is walked again.
-    fn family(&self, class: Target<'a>, busy: &mut Vec<Busy<'a>>) -> Vec<Target<'a>> {
-        let mut order = Vec::new();
-        self.linearize(class, &mut Vec::new(), &mut order, busy);
-        let mut kept = HashSet::new();
-        let mut family: Vec<Target> = (order.into_iter().rev())
-            .filter(|c| kept.insert(*c))
-            .collect();
-        family.reverse();
+    /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
+    /// method resolution order. Without written bases (TypeScript) it is `class` alone.
+    fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
+        if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
+            return family.clone();
+        }
+        let key = Busy::Family(class);
+        if work.busy.contains(&key) {
+            return None;
+        }
+        work.busy.push(key);
+        let bases = self.bases(class, work);
+        let mut lists = Vec::new();
+        for base in &bases {
+            lists.push(match base {
+                Ancestor::Class(base) => self.family(*base, work),
+                Ancestor::Opaque(..) => Some(vec![*base]),
+            });
+        }
+        lists.push(Some(bases));
+        let family = (lists.into_iter().collect::<Option<Vec<_>>>())
+            .and_then(merge)
+            .map(|rest| [Ancestor::Class(class)].into_iter().chain(rest).collect());
+        work.busy.pop();
+        work.families.insert(class, family.clone());
         family
     }
 
-    fn linearize(
-        &self,
-        class: Target<'a>,
-        below: &mut Vec<Target<'a>>,
-        order: &mut Vec<Target<'a>>,
-        busy: &mut Vec<Busy<'a>>,
-    ) {
-        if below.contains(&class) {
-            return;
-        }
-        order.push(class);
-        below.push(class);
-        for base in self.bases(class, busy) {
-            self.linearize(base, below, order, busy);
-        }
-        below.pop();
-    }
-
-    /// The classes of the repository that `class` names as bases, in the order written,
-    /// resolved from the scope enclosing it.
-    fn bases(&self, class: Target<'a>, busy: &mut Vec<Busy<'a>>) -> Vec<Target<'a>> {
-        let bases = &self.defs[class.path][class.name].bases;
-        let key = Busy::Bases(class);
-        if bases.is_empty() || busy.contains(&key) {
-            return Vec::new();
-        }
-        busy.push(key);
+    /// What each base `class` writes is, in order, resolved from the scope enclosing it.
+    fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
         let scope = class.name.rsplit_once('.').map_or("", |(scope, _)| scope);
-        let mut found = Vec::new();
-        for base in bases {
-            match self.resolve(class.path, scope, base, &mut Seen::new(), busy) {
-                Binding::Def(t) if self.is_class(t) => found.push(t),
-                _ => {}
-            }
-        }
-        busy.pop();
-        found
+        let bases = self.defs[class.path][class.name].bases.iter().enumerate();
+        bases
+            .map(
+                |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
+                    Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
+                    _ => Ancestor::Opaque(class, n),
+                },
+            )
+            .collect()
     }
 
     /// The definitions whose name matches the callee's last name anywhere in the repository:
@@ -487,6 +523,26 @@ impl<'a> Resolver<'a> {
             .iter()
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
+    }
+}
+
+/// The C3 merge of `lists`: repeatedly the first head that is in no list's tail. `None` when
+/// none is.
+fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
+    let mut merged = Vec::new();
+    loop {
+        lists.retain(|l| !l.is_empty());
+        if lists.is_empty() {
+            return Some(merged);
+        }
+        let head =
+            (lists.iter().map(|l| l[0])).find(|h| lists.iter().all(|l| !l[1..].contains(h)))?;
+        merged.push(head);
+        for list in &mut lists {
+            if list[0] == head {
+                list.remove(0);
+            }
+        }
     }
 }
 

@@ -99,10 +99,36 @@ impl LanguagePack for Python {
                     }
                     locals.assign(node, &scope, src);
                 }
-                "for_statement" => {
-                    let left = node.child_by_field_name("left");
-                    for target in left.map(targets).unwrap_or_default() {
+                // Other bindings say nothing of a class, but hide an outer binding of the name.
+                // ponytail: a comprehension's variables are bound in the enclosing scope, so
+                // they hide a name there for the whole scope.
+                "for_statement" | "for_in_clause" | "as_pattern" | "except_clause"
+                | "named_expression" => {
+                    let field = match node.kind() {
+                        "for_statement" | "for_in_clause" => "left",
+                        "named_expression" => "name",
+                        _ => "alias",
+                    };
+                    let target = node.child_by_field_name(field);
+                    for target in target.map(targets).unwrap_or_default() {
                         locals.bind(&scope, text(target, src), Class::Unknown, How::Assigned);
+                    }
+                }
+                // A lambda's calls belong to the enclosing scope, which its parameters bind.
+                "lambda" => {
+                    for (name, _) in parameters(node) {
+                        if let Some(name) = name {
+                            locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                        }
+                    }
+                }
+                "global_statement" | "nonlocal_statement" => {
+                    let target = match node.kind() {
+                        "global_statement" => "",
+                        _ => scope.rsplit_once('.').map_or("", |(parent, _)| parent),
+                    };
+                    for name in named(node).filter(|n| n.kind() == "identifier") {
+                        locals.redirect(&scope, text(name, src), target);
                     }
                 }
                 _ => {}
@@ -340,10 +366,11 @@ fn parameters(node: Node) -> Vec<(Option<Node>, Option<Node>)> {
         .collect()
 }
 
-/// How a name got its class; a stronger way decides over a weaker one.
+/// How a name got its class. An annotation decides over the other ways; two other bindings
+/// that disagree leave the class unknown.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum How {
-    /// A parameter without an annotation.
+    /// A parameter without an annotation: its argument is not known.
     Param,
     Assigned,
     /// An annotation, or the receiver of a method.
@@ -351,28 +378,38 @@ enum How {
 }
 
 /// The names each scope binds and what the syntax says of their class.
-// ponytail: `with ... as`, `except ... as`, `:=`, comprehension targets and `global` are not
-// read, so they neither give a name a class nor hide an outer binding of it.
 #[derive(Default)]
 struct Locals {
     bound: BTreeMap<(String, String), (Class, How)>,
     /// The receiver parameter (`self`, `cls`) of each method, by the method's scope.
     receivers: HashMap<String, String>,
+    /// The names `global` or `nonlocal` makes a scope bind in another, by scope and name.
+    elsewhere: HashMap<(String, String), String>,
 }
 
 impl Locals {
-    /// Records that `scope` binds `name` to `class`. Two bindings that disagree make the class
-    /// unknown, unless one is stronger.
+    /// Records that `scope` binds `name` to `class`, in the scope `global` or `nonlocal` sends
+    /// it to, if any.
     fn bind(&mut self, scope: &str, name: &str, class: Class, how: How) {
         let key = (scope.to_string(), name.to_string());
+        let scope = self.elsewhere.get(&key).cloned();
+        let key = (scope.unwrap_or(key.0), key.1);
+        let annotated = |how| how == How::Annotated;
         let merged = match self.bound.remove(&key) {
             None => (class, how),
-            Some(old) if old.1 > how => old,
-            Some(old) if how > old.1 => (class, how),
-            Some((old, _)) if old == class => (old, how),
-            Some(_) => (Class::Unknown, how),
+            Some(old) if annotated(old.1) && !annotated(how) => old,
+            Some(old) if annotated(how) && !annotated(old.1) => (class, how),
+            Some((old, old_how)) if old == class => (old, old_how.max(how)),
+            Some((_, old_how)) => (Class::Unknown, old_how.max(how)),
         };
         self.bound.insert(key, merged);
+    }
+
+    /// `global name` (`target` empty) or `nonlocal name` (`target` the enclosing scope) in
+    /// `scope`: its bindings there bind it in `target`.
+    fn redirect(&mut self, scope: &str, name: &str, target: &str) {
+        let key = (scope.to_string(), name.to_string());
+        self.elsewhere.insert(key, target.to_string());
     }
 
     /// The parameters of the function `node`, qualified `scope`: the first one of a method
@@ -395,28 +432,32 @@ impl Locals {
     }
 
     /// An assignment in `scope`: `x = C(...)` gives `x` what `C` names, `x: T` annotates `x`,
-    /// `self.x: T` in a method annotates the class's attribute `x`, and any other target is
-    /// bound to something unknown.
+    /// `self.x: T` in a method annotates the class's attribute `x` and `self.x = ...` binds it
+    /// to something unknown; any other target is bound to something unknown.
     fn assign(&mut self, node: Node, scope: &str, src: &[u8]) {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
-        if let Some(annotation) = node.child_by_field_name("type") {
-            let class = class(annotation, src);
-            match left.kind() {
-                "identifier" => self.bind(scope, text(left, src), class, How::Annotated),
-                "attribute" => {
-                    let object = left.child_by_field_name("object");
-                    let attribute = left.child_by_field_name("attribute");
-                    let receiver = self.receivers.get(scope).map(String::as_str);
-                    if let (Some(object), Some(attribute)) = (object, attribute)
-                        && Some(text(object, src)) == receiver
-                    {
-                        let owner = scope.rsplit_once('.').map_or("", |(owner, _)| owner);
-                        self.bind(owner, text(attribute, src), class, How::Annotated);
-                    }
-                }
-                _ => {}
+        let annotation = node.child_by_field_name("type").map(|a| class(a, src));
+        if left.kind() == "attribute" {
+            let object = left.child_by_field_name("object");
+            let attribute = left.child_by_field_name("attribute");
+            let receiver = self.receivers.get(scope).map(String::as_str);
+            if let (Some(object), Some(attribute)) = (object, attribute)
+                && Some(text(object, src)) == receiver
+            {
+                let owner = scope.rsplit_once('.').map_or("", |(owner, _)| owner);
+                let (class, how) = match annotation {
+                    Some(class) => (class, How::Annotated),
+                    None => (Class::Unknown, How::Assigned),
+                };
+                self.bind(owner, text(attribute, src), class, how);
+            }
+            return;
+        }
+        if let Some(class) = annotation {
+            if left.kind() == "identifier" {
+                self.bind(scope, text(left, src), class, How::Annotated);
             }
             return;
         }
@@ -443,13 +484,12 @@ impl Locals {
     }
 }
 
-/// The names an assignment or `for` target binds: `x`, and those in `a, (b, c)`.
+/// The names a binding target binds: `x`, and those in `a, (b, c)`.
 fn targets(node: Node) -> Vec<Node> {
     match node.kind() {
         "identifier" => vec![node],
-        "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list" => {
-            named(node).flat_map(targets).collect()
-        }
+        "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
+        | "as_pattern_target" => named(node).flat_map(targets).collect(),
         _ => Vec::new(),
     }
 }
@@ -514,21 +554,20 @@ fn dotted(name: &str) -> Class {
     }
 }
 
-/// The bases a class `node` lists, as callee-like names; a generic base `B[T]` is `B`.
-/// Keywords such as `metaclass=` are not bases.
+/// The bases a class `node` lists, as callee-like names; a generic base `B[T]` is `B`, and any
+/// other expression is `(<node kind>)`, a base whose members are not known. Keywords such as
+/// `metaclass=` are not bases.
 fn bases(node: Node, src: &[u8]) -> Vec<String> {
     let Some(list) = node.child_by_field_name("superclasses") else {
         return Vec::new();
     };
     named(list)
-        .filter_map(|base| {
-            let base = match base.kind() {
-                "subscript" => base.child_by_field_name("value")?,
-                _ => base,
-            };
-            matches!(base.kind(), "identifier" | "attribute").then(|| callee(base, src))
+        .filter(|base| !matches!(base.kind(), "keyword_argument" | "comment"))
+        .map(|base| match base.kind() {
+            "subscript" => base.child_by_field_name("value").unwrap_or(base),
+            _ => base,
         })
-        .filter(|name| !name.starts_with('('))
+        .map(|base| callee(base, src))
         .collect()
 }
 

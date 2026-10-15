@@ -189,6 +189,65 @@ fn python() {
     conform(
         "conformance-python",
         &[
+            "families.py::F",
+            "families.py::E",
+            "families.py::E.pick",
+            "families.py::D",
+            "families.py::D.pick",
+            "families.py::C",
+            "families.py::B",
+            "families.py::A",
+            "families.py::A.go",
+            "families.py::Tangled",
+            "families.py::Tangled.go",
+            "families.py::Stored",
+            "families.py::Stored.save",
+            "families.py::Model",
+            "families.py::Model.go",
+            "families.py::Client",
+            "families.py::Remote",
+            "families.py::Remote.go",
+            "families.py::Plain",
+            "families.py::Plain.keep",
+            "families.py::Plain.go",
+            "families.py::Lone",
+            "families.py::Lone.go",
+            "families.py::Lone.make",
+            "receivers.py::Engine",
+            "receivers.py::Engine.start",
+            "receivers.py::Untyped",
+            "receivers.py::Untyped.__init__",
+            "receivers.py::Untyped.run",
+            "receivers.py::Typed",
+            "receivers.py::Typed.__init__",
+            "receivers.py::Typed.run",
+            "receivers.py::Runner",
+            "receivers.py::Runner.stride",
+            "receivers.py::Runner.each",
+            "receivers.py::module_read",
+            "receivers.py::with_as",
+            "receivers.py::comprehension",
+            "receivers.py::walrus",
+            "receivers.py::except_as",
+            "receivers.py::lambdas",
+            "receivers.py::param_reassigned",
+            "receivers.py::swap",
+            "receivers.py::spare_read",
+            "receivers.py::fallback",
+            "receivers.py::lacking",
+            "receivers.py::optional",
+            "cycles.py::Ping",
+            "cycles.py::Ping.go",
+            "cycles.py::Pong",
+            "cycles.py::Pong.ring",
+            "cycles.py::Knot",
+            "cycles.py::Knot.go",
+            "cycles.py::Loop",
+            "cycles.py::Loop.Inner",
+            "cycles.py::Deep",
+            "cycles.py::Deep.go",
+            "cycles.py::crossed",
+            "cycle_b.py::use",
             "defs.py::Registry",
             "defs.py::Registry.Meta",
             "defs.py::Registry.Meta.label",
@@ -642,6 +701,155 @@ fn python() {
             ("methods.py::outside::session.render#0", None, &[]),
             ("methods.py::outside::client.render#0", None, &[]),
             ("methods.py::outside::log.render#0", None, &[]),
+            // Python's method resolution order (C3), a hierarchy it rejects, bases outside the
+            // repository that come before the class defining a method, and `object`.
+            (
+                "families.py::A.go::self.pick#0",
+                EXACT,
+                &["families.py::D.pick"],
+            ),
+            (
+                "families.py::Tangled.go::self.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            (
+                "families.py::Model.go::self.save#0",
+                INFERRED,
+                &["families.py::Stored.save"],
+            ),
+            (
+                "families.py::Remote.go::self.save#0",
+                INFERRED,
+                &["families.py::Stored.save"],
+            ),
+            (
+                "families.py::Plain.keep::self.go#0",
+                EXACT,
+                &["families.py::Plain.go"],
+            ),
+            // `self` and `cls` whose family lacks the method: a name match.
+            (
+                "families.py::Lone.go::self.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            (
+                "families.py::Lone.make::cls.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            // Bindings that hide an outer one: `self.x = ...` without an annotation, a loop
+            // variable named `this`, `with`, comprehensions, `:=`, `except`, lambdas, a
+            // reassigned parameter, `global` and an import's fallback; an annotation stays
+            // stronger, and a single module-level binding is read from a function.
+            (
+                "receivers.py::Untyped.run::self.engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::Typed.run::self.engine.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::Runner.each::this.stride#0",
+                INFERRED,
+                &["receivers.py::Runner.stride"],
+            ),
+            (
+                "receivers.py::module_read::engine.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::with_as::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::comprehension::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::walrus::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::except_as::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::lambdas::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::param_reassigned::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::spare_read::spare.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::fallback::Circle#0",
+                INFERRED,
+                &["geometry/shapes.py::Circle"],
+            ),
+            // An annotated receiver whose family lacks the method, and `X | None` both ways.
+            (
+                "receivers.py::lacking::engine.stride#0",
+                INFERRED,
+                &["receivers.py::Runner.stride"],
+            ),
+            (
+                "receivers.py::optional::first.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::optional::second.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            // Bases and annotations that resolve through themselves, in one module or two.
+            (
+                "cycles.py::Ping.go::self.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::Knot.go::self.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::Deep.go::self.x.y.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::crossed::a.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::crossed::b.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycle_b.py::use::other.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
             // A class body's names are in scope for its own statements, not for its methods.
             (
                 "scopes.py::Outer::Helper#0",
@@ -724,6 +932,40 @@ fn python_source_roots_come_from_pyproject() {
             "{case}"
         );
     }
+}
+
+#[test]
+fn python_class_families_are_linearized_once() {
+    // A ladder of diamonds: walking every path through it would take 2^24 steps.
+    let repo = fixture_repo("python_ladder", "python-roots", Some(ORIGIN));
+    let mut src =
+        String::from("class L0A:\n    def m(self):\n        return 0\n\n\nclass L0B:\n    pass\n");
+    for n in 1..=24 {
+        for side in ["A", "B"] {
+            let p = n - 1;
+            src += &format!("\n\nclass L{n}{side}(L{p}A, L{p}B):\n    pass\n");
+        }
+    }
+    src += "\n\nclass Top(L24A, L24B):\n    def go(self):\n        return self.m()\n";
+    std::fs::write(repo.join("ladder.py"), src).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+
+    let id = format!("{REPO}::ladder.py::Top.go::self.m#0");
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == id)
+        .unwrap();
+    assert_eq!(
+        (call["level"].as_str(), call["target"].as_str()),
+        (
+            Some("exact"),
+            Some(format!("{REPO}::ladder.py::L0A.m").as_str())
+        )
+    );
 }
 
 #[test]

@@ -104,6 +104,10 @@ impl LanguagePack for TsJs {
         &["tsconfig.json", "jsconfig.json"]
     }
 
+    fn receiver(&self) -> Option<&'static str> {
+        Some("this")
+    }
+
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
         let aliases = match configs.first() {
             Some((name, src)) => Aliases::parse(src).map_err(|e| format!("{name}: {e}"))?,
