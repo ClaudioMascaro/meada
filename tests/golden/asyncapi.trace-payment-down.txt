@@ -1,0 +1,3 @@
+example.com/asyncapi/services src/kafka.ts:18 requestPayment
+  →[exact: channel::kafka::payments.requested] example.com/asyncapi/events asyncapi.yaml kafka receive payments.requested (documented only)
+chain: exact · 1 hops · 2 repos · 63 tokens

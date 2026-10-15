@@ -1,0 +1,262 @@
+{
+  "repository": "example.com/asyncapi/events",
+  "files": [
+    {
+      "path": "src/emit.ts",
+      "hash": "47ed89bc389e1063659e18e8fbb9968388284b7fad371a0f2bae161daba0653f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::announceUpdate",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 261,
+        "end": 385
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 653,
+        "end": 716
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::work",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 562,
+        "end": 651
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::Kafka#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 76,
+        "end": 134
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::amqp.connect#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 412,
+        "end": 444
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::announceUpdate::producer.send#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts::announceUpdate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 313,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::connection.createChannel#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 468,
+        "end": 494
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::kafka.producer#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 153,
+        "end": 169
+      }
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::work::channel.consume#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/emit.ts",
+        "start": 594,
+        "end": 648
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::amqp::invoices.issued",
+      "site": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp send invoices.issued",
+      "shape": {
+        "source": {
+          "document": "billing.asyncapi.yaml"
+        },
+        "fields": [
+          "number",
+          "reason"
+        ]
+      }
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created",
+      "shape": {
+        "source": {
+          "document": "asyncapi.yaml"
+        },
+        "fields": [
+          "customer",
+          "customer.email",
+          "id",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "channel::kafka::orders.updated",
+      "site": "example.com/asyncapi/events::src/emit.ts::announceUpdate::producer.send#0",
+      "shape": {
+        "source": {
+          "document": "asyncapi.yaml"
+        },
+        "fields": [
+          "id",
+          "status"
+        ]
+      }
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::kafka::payments.requested",
+      "site": "example.com/asyncapi/events::asyncapi.yaml::kafka receive payments.requested",
+      "via": null,
+      "shape": {
+        "source": {
+          "document": "asyncapi.yaml"
+        },
+        "fields": [
+          "amount",
+          "currency",
+          "orderId"
+        ]
+      }
+    },
+    {
+      "contract": "channel::amqp::shipments.requested",
+      "site": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp receive shipments.requested",
+      "via": null,
+      "shape": {
+        "source": {
+          "document": "billing.asyncapi.yaml"
+        },
+        "fields": [
+          "parcel"
+        ]
+      }
+    },
+    {
+      "contract": "channel::amqp::shipments.cancelled",
+      "site": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+      "via": null,
+      "shape": {
+        "source": {
+          "document": "billing.asyncapi.yaml"
+        },
+        "fields": [
+          "parcel",
+          "reason"
+        ]
+      }
+    }
+  ],
+  "documents": [
+    {
+      "path": "asyncapi.yaml",
+      "format": "asyncapi",
+      "version": "2.6.0",
+      "contracts": [
+        "channel::kafka::orders.created",
+        "channel::kafka::orders.updated",
+        "channel::kafka::payments.requested"
+      ]
+    },
+    {
+      "path": "billing.asyncapi.yaml",
+      "format": "asyncapi",
+      "version": "3.0.0",
+      "contracts": [
+        "channel::amqp::invoices.issued",
+        "channel::amqp::shipments.cancelled",
+        "channel::amqp::shipments.requested"
+      ]
+    },
+    {
+      "path": "sensors.asyncapi.yml",
+      "format": "asyncapi",
+      "version": "2.6.0",
+      "contracts": []
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/asyncapi/events::asyncapi.yaml::kafka receive payments.requested",
+      "provider": "example.com/asyncapi/services::src/kafka.ts::requestPayment::producer.send#0",
+      "contract": "channel::kafka::payments.requested",
+      "level": "exact",
+      "reason": "channel::kafka::payments.requested"
+    },
+    {
+      "consumer": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp receive shipments.requested",
+      "provider": "example.com/asyncapi/services::src/queues.ts::ship::channel.sendToQueue#0",
+      "contract": "channel::amqp::shipments.requested",
+      "level": "exact",
+      "reason": "channel::amqp::shipments.requested"
+    },
+    {
+      "consumer": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+      "provider": "example.com/asyncapi/services::src/queues.ts::cancel::channel.sendToQueue#0",
+      "contract": "channel::amqp::shipments.cancelled",
+      "level": "exact",
+      "reason": "channel::amqp::shipments.cancelled"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "provider": "example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "provider": "example.com/asyncapi/events::src/emit.ts::announceUpdate::producer.send#0",
+      "contract": "channel::kafka::orders.updated",
+      "level": "exact",
+      "reason": "channel::kafka::orders.updated"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/queues.ts::onInvoice",
+      "provider": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp send invoices.issued",
+      "contract": "channel::amqp::invoices.issued",
+      "level": "exact",
+      "reason": "channel::amqp::invoices.issued"
+    }
+  ]
+}

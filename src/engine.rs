@@ -351,7 +351,7 @@ impl Engine {
                     Some(span) => files.at(&span.path, span.start),
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
-                        // A route only a document lists.
+                        // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
                         // A route file that serves the contract with no function of its own.
                         None => site
@@ -458,21 +458,29 @@ impl Engine {
         (provider, consumer): (&str, &str),
         what: &str,
     ) -> Vec<String> {
-        // Providers, then consumers, then the bindings that reach a queue.
-        let mut sides: Vec<(u8, String)> = Vec::new();
+        // Providers, then consumers, then the bindings that reach a queue; each with the lines
+        // of the payload shape a document gives it.
+        let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
-            // Each side: its contract, site, order and the words naming its role.
+            // Each side: its contract, site, order, the words naming its role and its shape.
             let provided = (export.providers.iter())
-                .map(|p| (&p.contract, &p.site, 0, String::from(provider)));
-            let consumed = (export.consumers.iter())
-                .filter_map(|c| Some((c.contract.as_ref()?, &c.site, 1, String::from(consumer))));
+                .map(|p| (&p.contract, &p.site, 0, String::from(provider), &p.shape));
+            let consumed = (export.consumers.iter()).filter_map(|c| {
+                Some((
+                    c.contract.as_ref()?,
+                    &c.site,
+                    1,
+                    String::from(consumer),
+                    &c.shape,
+                ))
+            });
             let bound = export.bindings.iter().map(|b| {
                 let role = format!("binding {} {}", b.exchange, b.pattern);
-                (&b.contract, &b.site, 2, role)
+                (&b.contract, &b.site, 2, role, &None)
             });
             let all = provided.chain(consumed).chain(bound);
-            for (_, site, order, role) in all.filter(|(c, ..)| *c == contract) {
+            for (_, site, order, role, shape) in all.filter(|(c, ..)| *c == contract) {
                 let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
@@ -482,10 +490,16 @@ impl Engine {
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
                 } else if *site == repo.identity {
                     REPOSITORY_LEVEL.into()
+                } else if let Some(doc) = export.document_of(site) {
+                    // A side only a document lists.
+                    format!("{doc} {DOCUMENTED_ONLY}")
                 } else {
                     format!("{} (top level)", label(site))
                 };
-                sides.push((order, format!("{} {role} {place}", repo.identity)));
+                let shape = shape.as_ref();
+                let shape =
+                    shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, "payload"));
+                sides.push((order, format!("{} {role} {place}", repo.identity), shape));
             }
         }
         if sides.is_empty() {
@@ -493,7 +507,10 @@ impl Engine {
         }
         sides.sort();
         let mut lines = vec![channel::shown(contract)];
-        lines.extend(sides.into_iter().map(|(_, line)| format!("  {line}")));
+        for (_, line, shape) in sides {
+            lines.push(format!("  {line}"));
+            lines.extend(shape.into_iter().map(|l| format!("    {l}")));
+        }
         lines
     }
 
@@ -597,7 +614,7 @@ fn contracts(
         lines.extend(
             p.shape
                 .as_ref()
-                .map_or_else(Vec::new, |s| shape_lines(identity, s)),
+                .map_or_else(Vec::new, |s| shape_lines(identity, s, "response")),
         );
     }
     // A channel producer is a call site: the symbol around it produces.
@@ -659,21 +676,21 @@ fn contracts(
     section("contracts", lines)
 }
 
-/// What a route's response carries, after its `provides` line: the fields and the parts left
-/// open, each line naming where the shape comes from.
-fn shape_lines(identity: &str, shape: &Shape) -> Vec<String> {
+/// What a route's response (or a channel's payload: `what`) carries, after its `provides` line:
+/// the fields and the parts left open, each line naming where the shape comes from.
+fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
     let at = shape.source.at();
     let list = |paths: &BTreeSet<String>| {
         let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
         paths.join(", ")
     };
     let mut lines = vec![format!(
-        "{identity} {at} response fields: {}",
+        "{identity} {at} {what} fields: {}",
         list(&shape.fields)
     )];
     if !shape.open.is_empty() {
         lines.push(format!(
-            "{identity} {at} response open: {}",
+            "{identity} {at} {what} open: {}",
             list(&shape.open)
         ));
     }

@@ -1,38 +1,47 @@
-//! Provider documents (spec #21): OpenAPI files a repository with a `[serve]` table keeps.
-//! `refresh` reads each one into a `Summary`, derived from its bytes alone and stored in the
-//! index; `Http::declare` turns the routes into provider contracts at query time, and `report`
-//! gives the status lines. Readers see the JSON value model whatever the syntax (`yaml.rs`);
+//! Provider documents (spec #21): OpenAPI and AsyncAPI files a repository with a `[serve]`
+//! table keeps. `refresh` reads each one into a `Summary`, derived from its bytes alone and
+//! stored in the index; `Http::declare` turns the routes into provider contracts at query time,
+//! `Channel::declare` the channel sides, and `report` gives the status lines. Readers see the JSON value model whatever the syntax (`yaml.rs`);
 //! `schema.rs` reads a response schema into a shape.
 
+mod asyncapi;
 mod openapi;
 mod schema;
 mod yaml;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::http;
 use crate::index::Export;
 use crate::msg::Msg;
 use crate::shape::Shape;
 use crate::workspace::Repository;
+use crate::{channel, http};
 
 /// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
-/// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions.
+/// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions;
+/// the same with `asyncapi`.
 pub fn is_document(path: &str) -> bool {
+    named(path, "openapi") || named(path, "asyncapi")
+}
+
+/// Whether the file name of `path` is `<format>.<ext>` or `<name>.<format>.<ext>`, with `ext`
+/// `yaml`, `yml` or `json`.
+fn named(path: &str, format: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     let Some((stem, ext)) = name.rsplit_once('.') else {
         return false;
     };
-    matches!(ext, "yaml" | "yml" | "json") && (stem == "openapi" || stem.ends_with(".openapi"))
+    matches!(ext, "yaml" | "yml" | "json")
+        && (stem == format || stem.strip_suffix(format).is_some_and(|s| s.ends_with('.')))
 }
 
 /// What Meada read from one document. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
-    /// `openapi` for a document read; `None` when it was ignored (see `problems`).
+    /// `openapi` or `asyncapi` for a document read; `None` when it was ignored (see `problems`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -46,16 +55,30 @@ pub struct Summary {
     /// The root `servers` URLs that name a host or a base path, sorted, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub servers: Vec<Server>,
+    /// The channel sides an AsyncAPI document lists, sorted by broker kind, name and role, each
+    /// once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub channels: Vec<Side>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<Problem>,
 }
 
 impl Summary {
-    /// What `search` shows of a document read: `openapi 3.1.0, routes: 3`. Nothing for one
-    /// ignored.
+    /// What `search` shows of a document read: `openapi 3.1.0, routes: 3`, or `asyncapi 3.0.0,
+    /// channels: 2`. Nothing for one ignored.
     pub fn shown(&self) -> Option<String> {
         let (format, version) = (self.format.as_ref()?, self.version.as_ref()?);
-        Some(format!("{format} {version}, routes: {}", self.routes.len()))
+        let count = match format.as_str() {
+            "asyncapi" => format!("channels: {}", self.channel_count()),
+            _ => format!("routes: {}", self.routes.len()),
+        };
+        Some(format!("{format} {version}, {count}"))
+    }
+
+    /// How many channels the sides are of: a channel both sent to and received from counts once.
+    pub fn channel_count(&self) -> usize {
+        let channels: BTreeSet<String> = self.channels.iter().map(Side::contract).collect();
+        channels.len()
     }
 
     fn problem(problem: Problem) -> Self {
@@ -75,6 +98,42 @@ pub struct Server {
     pub host: Option<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub path: String,
+}
+
+/// One side of a channel an AsyncAPI document lists: a producer or a consumer of the channel
+/// `name` of the broker kind `broker`.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Side {
+    pub broker: String,
+    pub name: String,
+    pub role: Role,
+    /// What its messages carry (`asyncapi.rs`), when the document says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<Shape>,
+}
+
+/// Which way the messages of a channel side go.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum Role {
+    Producer,
+    Consumer,
+}
+
+impl Side {
+    pub fn contract(&self) -> String {
+        channel::contract(&self.broker, Some(&self.name))
+    }
+
+    /// `kafka send orders.created`: the broker kind, the verb of the document's operation and
+    /// the channel. It ends the site of a side only a document lists.
+    pub fn label(&self) -> String {
+        let verb = match self.role {
+            Role::Producer => "send",
+            Role::Consumer => "receive",
+        };
+        format!("{} {verb} {}", self.broker, self.name)
+    }
 }
 
 /// One path and method of a document; `path` is normalized like a code path.
@@ -105,6 +164,14 @@ impl Route {
 pub enum Problem {
     /// The file does not parse as YAML or JSON (or is not UTF-8).
     Unreadable { line: usize, error: String },
+    /// It parses, but is not AsyncAPI 2.x or 3.0; `found` is what it says it is, such as
+    /// `asyncapi 1.2.0`.
+    AsyncFormat { found: Option<String> },
+    /// A channel on a server whose protocol Meada has no broker kind for: that channel is
+    /// ignored. Each protocol once, sorted.
+    Protocol { protocol: String },
+    /// A channel name with parameters, ignored. Each once, sorted.
+    Parameters { channel: String },
     /// It parses, but is not OpenAPI 3.0 or 3.1; `found` is what it says it is, such as
     /// `swagger 2.0`.
     Format { found: Option<String> },
@@ -117,6 +184,10 @@ pub enum Problem {
 /// extension, YAML otherwise. It never fails: what cannot be read is a problem.
 pub fn read(path: &str, src: &[u8]) -> Summary {
     match parse(path, src) {
+        // The content decides, since a listed document can have any name.
+        Ok(doc) if doc.get("asyncapi").is_some() || named(path, "asyncapi") => {
+            asyncapi::read(path, &doc)
+        }
         Ok(doc) => openapi::read(path, &doc),
         Err((line, error)) => Summary::problem(Problem::Unreadable { line, error }),
     }
@@ -165,6 +236,7 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
                     format,
                     version,
                     routes: doc.summary.routes.len(),
+                    channels: doc.summary.channel_count(),
                 }
                 .text(),
             );
@@ -181,6 +253,12 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
                         path,
                         found: found.as_deref(),
                     },
+                    Problem::AsyncFormat { found } => Msg::DocumentAsyncFormat {
+                        path,
+                        found: found.as_deref(),
+                    },
+                    Problem::Protocol { protocol } => Msg::DocumentProtocol { path, protocol },
+                    Problem::Parameters { channel } => Msg::DocumentParameters { path, channel },
                     Problem::ExternalRef { reference } => Msg::ExternalRef { path, reference },
                 }
                 .text(),
@@ -228,6 +306,14 @@ mod tests {
             ("myopenapi.yaml", false),
             ("openapi.yaml.bak", false),
             ("src/openapi.ts", false),
+            ("asyncapi.yaml", true),
+            ("asyncapi.yml", true),
+            ("docs/asyncapi.json", true),
+            ("orders.asyncapi.yaml", true),
+            ("orders.asyncapi.yml", true),
+            ("orders.asyncapi.json", true),
+            ("myasyncapi.yaml", false),
+            ("asyncapi.txt", false),
         ] {
             assert_eq!(is_document(path), expected, "{path}");
         }
@@ -263,7 +349,7 @@ mod tests {
                 "openapi: 3.2.0\n",
                 not(Some("openapi 3.2.0")),
             ),
-            ("openapi.yaml", "asyncapi: 3.0.0\n", not(None)),
+            ("openapi.yaml", "info: {}\n", not(None)),
             ("openapi.yaml", "- a list\n", not(None)),
         ] {
             assert_eq!(found(path, src), expected, "{src}");

@@ -104,6 +104,7 @@ impl ContractKind for Resource {
                         contract: Some(contract.clone()),
                         site,
                         via: None,
+                        shape: None,
                         method: None,
                         fragments: Vec::new(),
                     });
