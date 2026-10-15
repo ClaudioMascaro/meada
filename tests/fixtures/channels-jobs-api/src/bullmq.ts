@@ -18,3 +18,13 @@ export async function requestReport() {
 export function remember(id: string) {
   seen.add(id);
 }
+
+// A wrapper: the queue name is its parameter, so each call site produces.
+async function enqueue(name: string, data: unknown) {
+  const queue = new Queue(name);
+  await queue.add("job", data);
+}
+
+export async function sendInvoice() {
+  await enqueue("emails", {});
+}

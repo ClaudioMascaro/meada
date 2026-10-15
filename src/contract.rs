@@ -7,9 +7,9 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::channel::Channel;
+use crate::channel::{Channel, Routes};
 use crate::http::Http;
-use crate::index::{Binding, Consumer, Export, Provider};
+use crate::index::{Consumer, Export, Provider};
 use crate::resolve::Code;
 use crate::resource::Resource;
 use crate::workspace::Repository;
@@ -79,10 +79,10 @@ pub struct Found {
     /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`; for a
-    /// binding, the exchange.
+    /// binding or a publish, the exchange.
     pub via: Option<String>,
     /// For an unresolved consumer, the method it calls with when Meada could read it; for a
-    /// binding, the pattern.
+    /// binding, the pattern; for a publish, the routing key.
     pub method: Option<String>,
     /// For an unresolved consumer, the literal fragments of its URL path Meada could
     /// evaluate, in order.
@@ -97,6 +97,10 @@ pub enum Role {
     /// Neither side: a RabbitMQ binding of a queue (`contract`) to an exchange (`via`) by a
     /// pattern (`method`), which routes a publish to the queue (spec #20).
     Binding,
+    /// A RabbitMQ publish to the named exchange `via` with the routing key `method`, no
+    /// `contract`: it holds no channel of its own and produces to the queues the bindings
+    /// route it to (spec #20).
+    Publish,
 }
 
 impl Role {
@@ -106,6 +110,7 @@ impl Role {
             Role::Provider => "provider",
             Role::Consumer => "consumer",
             Role::Binding => "binding",
+            Role::Publish => "publish",
         }
     }
 }
@@ -142,15 +147,22 @@ pub trait ContractKind {
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
+    /// The words for a provider and a consumer of this kind when `context` lists a contract
+    /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
+    fn sides(&self) -> Option<(&'static str, &'static str)> {
+        None
+    }
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
-    /// workspace (each with the repository holding it). Several fitting providers are all
-    /// linked as ambiguous; none leaves the consumer unlinked.
+    /// workspace (each with the repository holding it) and, for a queue, the publishes the
+    /// workspace's `routes` send to it. Several fitting providers are all linked as ambiguous;
+    /// none leaves the consumer unlinked.
     fn link(
         &self,
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        bindings: &[&Binding],
+        routes: &Routes,
     ) -> Vec<Link>;
 }
 

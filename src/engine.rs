@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use crate::channel::Routes;
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
@@ -128,14 +129,14 @@ impl Engine {
             .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
-        let bindings: Vec<_> = exports.iter().flat_map(|e| &e.bindings).collect();
+        let routes = Routes::new(exports);
         let mut links = Vec::new();
         for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
-                links.extend(kind.link(consumer, from, &providers, &bindings));
+                links.extend(kind.link(consumer, from, &providers, &routes));
             }
         }
         links
@@ -450,7 +451,10 @@ impl Engine {
     /// is `writer` or `reader` (a resource, `<name>` its `via` symbol) or `producer` or
     /// `consumer` (a channel, `<name>` the symbol around the producing call, or the handler).
     /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
-    /// the top level of a file `<repository> <role> <path> (top level)`.
+    /// the top level of a file `<repository> <role> <path> (top level)`. A channel also lists
+    /// the sides linked to it through another name, each followed by `[<level>: <reason>]`:
+    /// the producers a consumer's wildcard pattern matches, the wildcard consumers that match
+    /// it, and the publishes its bindings route to it, then the bindings themselves.
     fn contract_sides(
         &self,
         exports: &[Export],
@@ -458,29 +462,38 @@ impl Engine {
         (provider, consumer): (&str, &str),
         what: &str,
     ) -> Vec<String> {
+        let routes = Routes::new(exports);
+        // How a side reaches `contract`: its own (no tag), a match through another name, or
+        // not at all.
+        let tag = |own: bool, matched: Option<(Level, String)>| match own {
+            true => Some(String::new()),
+            false => matched.map(|(level, reason)| format!(" [{}: {reason}]", level.name())),
+        };
         // Providers, then consumers, then the bindings that reach a queue; each with the lines
         // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
-            // Each side: its contract, site, order, the words naming its role and its shape.
-            let provided = (export.providers.iter())
-                .map(|p| (&p.contract, &p.site, 0, String::from(provider), &p.shape));
-            let consumed = (export.consumers.iter()).filter_map(|c| {
-                Some((
-                    c.contract.as_ref()?,
-                    &c.site,
-                    1,
-                    String::from(consumer),
-                    &c.shape,
-                ))
+            // Each side that reaches `contract`: its site, order, role words, tag and shape.
+            let provided = export.providers.iter().filter_map(|p| {
+                let tag = tag(p.contract == contract, channel::fits(&p.contract, contract))?;
+                Some((&p.site, 0, String::from(provider), tag, &p.shape))
             });
-            let bound = export.bindings.iter().map(|b| {
+            let published = export.publishes.iter().filter_map(|q| {
+                let tag = tag(false, routes.reached(q).remove(contract))?;
+                Some((&q.site, 0, String::from(provider), tag, &None))
+            });
+            let consumed = export.consumers.iter().filter_map(|c| {
+                let own = c.contract.as_ref()?;
+                let tag = tag(own == contract, channel::fits(contract, own))?;
+                Some((&c.site, 1, String::from(consumer), tag, &c.shape))
+            });
+            let bound = (export.bindings.iter().filter(|b| b.contract == contract)).map(|b| {
                 let role = format!("binding {} {}", b.exchange, b.pattern);
-                (&b.contract, &b.site, 2, role, &None)
+                (&b.site, 2, role, String::new(), &None)
             });
-            let all = provided.chain(consumed).chain(bound);
-            for (_, site, order, role, shape) in all.filter(|(c, ..)| *c == contract) {
+            let all = provided.chain(published).chain(consumed).chain(bound);
+            for (site, order, role, tag, shape) in all {
                 let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
@@ -499,7 +512,8 @@ impl Engine {
                 let shape = shape.as_ref();
                 let shape =
                     shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, "payload"));
-                sides.push((order, format!("{} {role} {place}", repo.identity), shape));
+                let line = format!("{} {role} {place}{tag}", repo.identity);
+                sides.push((order, line, shape));
             }
         }
         if sides.is_empty() {
@@ -526,15 +540,12 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
-        let sides = if symbol.starts_with(resource::PREFIX) {
-            Some((("writer", "reader"), "resource"))
-        } else if symbol.starts_with(channel::PREFIX) {
-            Some((("producer", "consumer"), "channel"))
-        } else {
-            None
-        };
-        if let Some((roles, what)) = sides {
-            let lines = self.contract_sides(&exports, symbol, roles, what);
+        // A contract listed by its sides, as `search` prints it.
+        let contract = channel::typed(symbol);
+        if let Some(kind) = contract::kind_of(contract)
+            && let Some(roles) = kind.sides()
+        {
+            let lines = self.contract_sides(&exports, contract, roles, kind.prefix());
             return Ok(render::budgeted(&lines, budget));
         }
         let suffix = format!("::{symbol}");
@@ -582,10 +593,12 @@ impl Engine {
         }));
         lines.extend(relations(identity, export, &mut files, &symbol_found.id));
         let links = self.links(&exports);
+        let routes = Routes::new(&exports);
+        let workspace = (links.as_slice(), &routes);
         lines.extend(contracts(
             identity,
             export,
-            &links,
+            workspace,
             &mut files,
             symbol_found,
         ));
@@ -593,13 +606,14 @@ impl Engine {
     }
 }
 
-/// `contracts:` with what `symbol` provides, the channels it produces to and the contracts its calls consume, unresolved
-/// ones included, each followed by its decided links (`links` are the workspace's); nothing
-/// when it has none.
+/// `contracts:` with what `symbol` provides, the channels it produces to (a publish to a named
+/// exchange, then each queue the bindings route it to) and the contracts its calls consume,
+/// unresolved ones included, each followed by its decided links; `links` and `routes` are the
+/// workspace's. Nothing when it has none.
 fn contracts(
     identity: &str,
     export: &Export,
-    links: &[Link],
+    (links, routes): (&[Link], &Routes),
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
@@ -623,10 +637,20 @@ fn contracts(
             .providers
             .iter()
             .filter(|p| p.site == call.id && p.contract.starts_with(channel::PREFIX));
+        let location = files.at(&call.span.path, call.span.start);
         for provider in produced {
-            let location = files.at(&call.span.path, call.span.start);
             let contract = channel::shown(&provider.contract);
             lines.push(format!("{identity} {location} produces {contract}"));
+        }
+        for publish in export.publishes.iter().filter(|q| q.site == call.id) {
+            let (exchange, key) = (&publish.exchange, &publish.key);
+            lines.push(format!("{identity} {location} publishes {exchange} {key}"));
+            for (queue, (level, reason)) in routes.reached(publish) {
+                let level = level.name();
+                lines.push(format!(
+                    "{identity} {location} produces {queue} [{level}: {reason}]"
+                ));
+            }
         }
     }
     // A resource reader or a channel handler is a symbol, not a call site.

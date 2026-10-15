@@ -100,7 +100,8 @@ São três ferramentas, sempre em inglês, e nenhuma escreve:
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
   chama e os contratos que ele toca; num recurso (`resource::postgres::orders`), lista quem
   escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
-  inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores, e um
+  inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores,
+  inclusive os que chegam a ele por um curinga ou por um binding, com o nível e o motivo, e um
   lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
   acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
@@ -186,13 +187,16 @@ Constantes fixas:
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP (`fetch` no lado que consome,
 Next.js (app router) e Express no lado que serve, também atrás de um gateway), pelos recursos
-declarados no `meada.toml` e por canais: tópicos Kafka do `kafkajs`, com o produtor ligado ao
-handler de cada consumidor, inclusive no mesmo repositório. Cada ligação tem o nível `exact`,
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs`), filas RabbitMQ (`amqplib`,
+com o `publish` numa exchange chegando às filas que os bindings ligam a ela), filas Amazon SQS
+(AWS SDK v3 e `sqs-consumer`), subjects NATS (com os curingas `*` e `>`), jobs BullMQ e streams
+Redis (`ioredis` e `node-redis`), com o produtor ligado ao handler de cada consumidor, inclusive
+no mesmo repositório. Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
 aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
 broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um
-só. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, outros brokers além
-do Kafka, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
+só. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, outros clientes de
+mensageria além desses, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).
 

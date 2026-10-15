@@ -11,7 +11,7 @@
     },
     {
       "path": "src/queues.ts",
-      "hash": "76a8145b62d0df45d6cfee9d7a2eebab0ac3e36e00159619f4157f83f931cf5a"
+      "hash": "256c40d97e288e62eaee2219c1e49b4b25862d6dedaa64001782db6d9d3dfb89"
     }
   ],
   "symbols": [
@@ -56,35 +56,43 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 744,
+        "end": 853
+      }
+    },
+    {
       "id": "example.com/channels/worker::src/queues.ts::onAudit",
       "span": {
         "path": "src/queues.ts",
-        "start": 697,
-        "end": 753
+        "start": 969,
+        "end": 1025
       }
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::onJob",
       "span": {
         "path": "src/queues.ts",
-        "start": 641,
-        "end": 695
+        "start": 913,
+        "end": 967
       }
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::onOrder",
       "span": {
         "path": "src/queues.ts",
-        "start": 583,
-        "end": 639
+        "start": 855,
+        "end": 911
       }
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::onShipment",
       "span": {
         "path": "src/queues.ts",
-        "start": 755,
-        "end": 814
+        "start": 1027,
+        "end": 1086
       }
     },
     {
@@ -230,6 +238,28 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/queues.ts::lookalikes::channel.consume#0",
+      "caller": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 782,
+        "end": 807
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::lookalikes::channel.consume#1",
+      "caller": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 817,
+        "end": 850
+      }
+    },
+    {
       "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#0",
       "caller": "example.com/channels/worker::src/queues.ts::work",
       "target": null,
@@ -284,6 +314,16 @@
     {
       "contract": "channel::kafka",
       "site": "example.com/channels/worker::src/pattern.ts::seen",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::events",
+      "site": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::order.refunded",
+      "site": "example.com/channels/worker::src/queues.ts::lookalikes",
       "via": null
     },
     {

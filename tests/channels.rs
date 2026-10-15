@@ -201,6 +201,20 @@ fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
     assert_golden("channels-queues-api.export.json", &export);
 }
 
+/// `context` on a subject lists the wildcard subscribers that match it, and on a pattern the
+/// producers it matches, each with the level and reason of the match.
+#[test]
+fn context_on_a_subject_lists_the_wildcard_sides_linked_to_it() {
+    let engine = Engine::open(&queues("channels_wildcard_context")).unwrap();
+
+    let subject = engine
+        .context("channel::nats::orders.created", None)
+        .unwrap();
+    assert_golden("channels-queues.context-subject.txt", &subject);
+    let pattern = engine.context("channel::nats::orders.>", None).unwrap();
+    assert_golden("channels-queues.context-pattern.txt", &pattern);
+}
+
 /// RabbitMQ (spec #20): `sendToQueue` links to `consume` by the queue name; a publish reaches
 /// the queues bound to its exchange, the binding declared in another repository, at `exact`
 /// when the pattern is the routing key and `inferred` for a wildcard; the empty exchange is
@@ -264,6 +278,38 @@ fn amqp_publishes_reach_the_queues_bound_to_their_exchange() {
         ),
     ];
     expected.sort();
-    // `order.refunded` matches no binding: its publish stays exported, with no link.
+    // `order.refunded` matches no binding: its publish stays exported, with no link, and
+    // neither it nor any other publish to `events` reaches the queues named `events` and
+    // `order.refunded`.
     assert_eq!(links, expected);
+    // A publish to a named exchange holds no channel of its own: it is listed apart, and
+    // every channel the export names is `channel::<broker>::<name>` of a v1 broker kind.
+    let publishes: Vec<String> = (json["publishes"].as_array().unwrap().iter())
+        .map(|p| {
+            format!(
+                "{} {} {}",
+                p["exchange"],
+                p["key"],
+                rel(p["site"].as_str().unwrap())
+            )
+        })
+        .collect();
+    let publish = |key: &str, n: u8| {
+        format!("\"events\" \"{key}\" src/amqp.ts::announce::channel.publish#{n}")
+    };
+    let expected = [
+        publish("order.created", 0),
+        publish("order.refunded", 2),
+        publish("order.shipped", 1),
+    ];
+    assert_eq!(publishes, expected);
+    let sides = ["providers", "consumers", "bindings", "links"].map(|k| &json[k]);
+    let channels = (sides.iter().filter_map(|s| s.as_array()).flatten())
+        .filter_map(|side| side["contract"].as_str())
+        .filter(|c| c.starts_with("channel::"));
+    for contract in channels {
+        let broker = contract.split("::").nth(1).unwrap();
+        let v1 = ["kafka", "amqp", "sqs", "nats", "bullmq", "redis"];
+        assert!(v1.contains(&broker), "{contract}");
+    }
 }
