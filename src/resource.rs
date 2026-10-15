@@ -16,11 +16,28 @@ use crate::workspace::Repository;
 
 pub struct Resource;
 
+/// The start of every resource contract identifier.
+pub const PREFIX: &str = "resource::";
+
+/// The contract identifier of `resource`: `resource::<kind>::<id>`.
+fn contract(resource: &config::Resource) -> String {
+    format!("{PREFIX}{}::{}", resource.kind, resource.id)
+}
+
+/// The site a `via` entry of `repo` names.
+fn site(repo: &Repository, via: &str) -> String {
+    format!("{}::{via}", repo.identity)
+}
+
 /// The `via` sites of `resource` that are symbols of the repository.
 fn matched(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
-    let site = |via: &String| format!("{}::{via}", repo.identity);
     let found = |site: &String| export.symbols.iter().any(|s| s.id == *site);
-    resource.via.iter().map(site).filter(found).collect()
+    resource
+        .via
+        .iter()
+        .map(|via| site(repo, via))
+        .filter(found)
+        .collect()
 }
 
 /// The sides of `resource`: its matched `via` symbols, else the repository as a whole.
@@ -38,10 +55,10 @@ pub fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String>
     let mut lines = Vec::new();
     let mut seen = HashSet::new();
     for resource in &repo.config.resources {
-        let contract = format!("resource::{}::{}", resource.kind, resource.id);
+        let contract = contract(resource);
         let found = matched(repo, export, resource);
         for via in &resource.via {
-            if !found.contains(&format!("{}::{via}", repo.identity)) {
+            if !found.contains(&site(repo, via)) {
                 let msg = Msg::ViaUnmatched {
                     contract: &contract,
                     via,
@@ -73,7 +90,7 @@ impl ContractKind for Resource {
     /// whole its side: the site is the repository identity.
     fn declare(&self, repo: &Repository, export: &mut Export) {
         for resource in &repo.config.resources {
-            let contract = format!("resource::{}::{}", resource.kind, resource.id);
+            let contract = contract(resource);
             for site in sites(repo, export, resource) {
                 if resource.role.writes() {
                     export.providers.push(Provider {
