@@ -1,0 +1,4 @@
+channel::nats::orders.created
+  example.com/queues/api producer src/nats.ts:7 orderCreated
+  example.com/queues/worker consumer src/nats.ts:29 onOrder [inferred: channel::nats::orders.created wildcard orders.>]
+  example.com/queues/worker consumer src/nats.ts:6 oneToken [inferred: channel::nats::orders.created wildcard orders.*]

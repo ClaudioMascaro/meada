@@ -7,6 +7,7 @@
 
 use std::collections::HashSet;
 
+use crate::channel::Routes;
 use crate::config;
 use crate::contract::{ContractKind, Found, Level, Link};
 use crate::index::{Consumer, Export, Provider};
@@ -81,6 +82,10 @@ impl ContractKind for Resource {
         "resource"
     }
 
+    fn sides(&self) -> Option<(&'static str, &'static str)> {
+        Some(("writer", "reader"))
+    }
+
     fn extract(&self, _code: &Code) -> Vec<Found> {
         Vec::new()
     }
@@ -96,7 +101,7 @@ impl ContractKind for Resource {
                     export.providers.push(Provider {
                         contract: contract.clone(),
                         site: site.clone(),
-                        gateway: None,
+                        ..Provider::default()
                     });
                 }
                 if resource.role.reads() {
@@ -104,6 +109,7 @@ impl ContractKind for Resource {
                         contract: Some(contract.clone()),
                         site,
                         via: None,
+                        shape: None,
                         method: None,
                         fragments: Vec::new(),
                     });
@@ -126,6 +132,7 @@ impl ContractKind for Resource {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
+        _routes: &Routes,
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();

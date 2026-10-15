@@ -1,0 +1,5 @@
+example.com/asyncapi/events asyncapi.yaml (asyncapi 2.6.0, channels: 3) Order events
+example.com/asyncapi/events billing.asyncapi.yaml (asyncapi 3.0.0, channels: 3) Billing queues
+example.com/asyncapi/events routing.asyncapi.yaml (asyncapi 2.6.0, channels: 0) Routing
+example.com/asyncapi/events sensors.asyncapi.yml (asyncapi 2.6.0, channels: 0) Sensors
+example.com/asyncapi/events serverless.asyncapi.yaml (asyncapi 3.0.0, channels: 0) Serverless

@@ -9,3 +9,7 @@ export function listOrders() {
 export function cancelOrder(id: string) {
   return request(`${ORDERS_PATH}/${id}`, "DELETE");
 }
+
+export function createOrder(id: string) {
+  return request(`${ORDERS_PATH}/${id}`, "PUT");
+}

@@ -94,12 +94,15 @@ seu agente (por exemplo o `.mcp.json` do Claude Code):
 São três ferramentas, sempre em inglês, e nenhuma escreve:
 
 - `search` acha um símbolo, uma rota ou um contrato pelo nome; com o tipo `resource`, um
-  recurso pelo tipo ou pelo id; com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
+  recurso pelo tipo ou pelo id; com o tipo `channel`, um canal (fila ou tópico) pelo broker ou
+  pelo nome; com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
   (veja Decisões);
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
   chama e os contratos que ele toca; num recurso (`resource::postgres::orders`), lista quem
   escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
-  inteiro;
+  inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores,
+  inclusive os que chegam a ele por um curinga ou por um binding, com o nível e o motivo, e um
+  lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
   acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
   analisar o impacto do que acabou de ser editado.
@@ -183,11 +186,20 @@ Constantes fixas:
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP (`fetch` no lado que consome,
-Next.js (app router) e Express no lado que serve, também atrás de um gateway) e pelos recursos
-declarados no `meada.toml`. Cada ligação tem o nível `exact`, `declared`, `inferred`, `decided`
-ou `ambiguous`; uma chamada cuja URL não dá para resolver aparece como não resolvida e só vira
-ligação por uma decisão, no nível `decided`. Ainda não há: outras linguagens, outros clientes
-HTTP além do `fetch`, filas, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
+Next.js (app router) e Express no lado que serve, também atrás de um gateway), pelos recursos
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs`), filas RabbitMQ (`amqplib`,
+com o `publish` numa exchange chegando às filas que os bindings ligam a ela), filas Amazon SQS
+(AWS SDK v3 e `sqs-consumer`), subjects NATS (com os curingas `*` e `>`), jobs BullMQ e streams
+Redis (`ioredis` e `node-redis`), com o produtor ligado ao handler de cada consumidor, inclusive
+no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus documentos OpenAPI
+(3.0 e 3.1) e AsyncAPI (2.x e 3.0), achados pelo nome ou listados em `[serve] documents`: as rotas
+e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o
+`meada status` diz o que leu e o que ignorou. Cada ligação tem o nível `exact`,
+`declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
+aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
+broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um
+só. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, outros clientes de
+mensageria além desses, pacotes nem o pacote npm. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).
 

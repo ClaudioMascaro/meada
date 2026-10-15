@@ -18,7 +18,7 @@ use crate::{Result, qualify};
 pub struct Config {
     #[serde(default, rename = "peer")]
     pub peers: Vec<Peer>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "declared")]
     pub serve: Serve,
     #[serde(default, rename = "resource")]
     pub resources: Vec<Resource>,
@@ -47,32 +47,79 @@ pub struct Serve {
     /// What a gateway removes from the start of every path this repository serves.
     #[serde(default, deserialize_with = "gateway_key")]
     pub strip: Option<String>,
+    /// Documents (spec #21) besides those found by file name, repository-relative. One that
+    /// `.gitignore` ignores is read all the same.
+    #[serde(default, deserialize_with = "repo_paths")]
+    pub documents: Vec<String>,
+    /// Whether `meada.toml` has a `[serve]` table, even an empty one: only then are the
+    /// repository's documents provider sources (spec #21).
+    #[serde(skip)]
+    pub declared: bool,
+}
+
+/// A `[serve]` table that is present: `declared` is set.
+fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
+    let serve = Serve::deserialize(d)?;
+    Ok(Serve {
+        declared: true,
+        ..serve
+    })
 }
 
 impl Serve {
-    /// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
-    /// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
-    /// when no rewrite applies. Code routes use it; it is written for the document routes of
-    /// spec #21 (A4) to reuse.
+    /// The path a gateway serves a route at, with the reason (see `gateway_path`), for the
+    /// repository's `[serve]` prefix and strip.
     pub fn gateway_path(&self, code_path: &str) -> Option<(String, String)> {
-        let prefix = self.prefix.as_deref().filter(|p| !p.is_empty());
-        let strip = self.strip.as_deref().filter(|s| !s.is_empty());
-        let stripped = strip.and_then(|s| {
-            let rest = code_path.strip_prefix(s)?;
-            (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
-        });
-        let rest = stripped.map_or(code_path, |(_, rest)| rest);
-        let path = format!("{}{rest}", prefix.unwrap_or(""));
-        let path = if path.is_empty() { "/".into() } else { path };
-        let reasons: Vec<String> = [
-            prefix.map(|p| format!("gateway prefix {p}")),
-            stripped.map(|(s, _)| format!("gateway strip {s}")),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-        (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
+        gateway_path(self.prefix.as_deref(), self.strip.as_deref(), code_path)
     }
+}
+
+/// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
+/// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
+/// when no rewrite applies. Code routes use the `[serve]` pair; the routes of a document
+/// (spec #21) use the path of a `servers` URL as the prefix and the `[serve]` strip.
+pub fn gateway_path(
+    prefix: Option<&str>,
+    strip: Option<&str>,
+    code_path: &str,
+) -> Option<(String, String)> {
+    let prefix = prefix.filter(|p| !p.is_empty());
+    let strip = strip.filter(|s| !s.is_empty());
+    let stripped = strip.and_then(|s| {
+        let rest = code_path.strip_prefix(s)?;
+        (rest.is_empty() || rest.starts_with('/')).then_some((s, rest))
+    });
+    let rest = stripped.map_or(code_path, |(_, rest)| rest);
+    let path = format!("{}{rest}", prefix.unwrap_or(""));
+    let path = if path.is_empty() { "/".into() } else { path };
+    let reasons: Vec<String> = [
+        prefix.map(|p| format!("gateway prefix {p}")),
+        stripped.map(|(s, _)| format!("gateway strip {s}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
+}
+
+/// Repository-relative paths: none may be absolute or climb out with `..`. `.` segments and
+/// doubled `/` are dropped.
+fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Vec<String>, D::Error> {
+    let mut paths = Vec::new();
+    for path in Vec::<String>::deserialize(d)? {
+        let segments: Vec<&str> = path.split('/').collect();
+        if path.starts_with('/') || segments.contains(&"..") {
+            return Err(D::Error::custom(Msg::NotInRepository(&path).text()));
+        }
+        paths.push(
+            segments
+                .into_iter()
+                .filter(|s| !matches!(*s, "" | "."))
+                .collect::<Vec<_>>()
+                .join("/"),
+        );
+    }
+    Ok(paths)
 }
 
 /// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
@@ -147,23 +194,12 @@ fn not_empty<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<String, D::
 }
 
 impl Config {
-    /// Whether this repository serves on `host`, case-insensitively.
-    pub fn serves(&self, host: &str) -> bool {
-        self.serve
-            .hosts
-            .iter()
-            .any(|h| h.eq_ignore_ascii_case(host))
-    }
-
     /// The peers whose base URL this repository reads from the variable `var`.
     pub fn peers_reading<'a>(&'a self, var: &'a str) -> impl Iterator<Item = &'a str> {
         let reads = move |p: &&Peer| p.base_url_env.iter().any(|v| v == var);
         self.peers.iter().filter(reads).map(|p| p.repo.as_str())
     }
 }
-
-/// Keys that track A adds after v0.1.
-const LATER: &[&str] = &["serve.documents"];
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
@@ -208,11 +244,6 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
         (Some(field), parent) if message.starts_with("missing field") => {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
-        (Some(_), Some(key)) if file == "meada.toml" && LATER.contains(&key) => Msg::KeyLater {
-            key,
-            release: &Msg::TrackA.text(),
-        }
-        .text(),
         (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
         (_, None) => message.to_string(),
@@ -246,8 +277,10 @@ mod tests {
     fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {
         Serve {
             hosts: Vec::new(),
+            documents: Vec::new(),
             prefix: prefix.map(Into::into),
             strip: strip.map(Into::into),
+            declared: true,
         }
     }
 

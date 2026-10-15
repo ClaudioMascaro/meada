@@ -1,11 +1,13 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::contract::{ContractKind, Found, Level, Link, Site};
-use crate::index::{Consumer, Export as IndexExport, Provider};
-use crate::lang::{Export, Part, Value};
+use crate::channel::Routes;
+use crate::config::gateway_path;
+use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
+use crate::lang::{Depends, Export, Part, Value, literal, property};
 use crate::resolve::Code;
 use crate::workspace::Repository;
 
@@ -60,9 +62,6 @@ fn next_route(path: &str) -> Option<String> {
         .collect();
     Some(format!("/{}", segments.join("/")))
 }
-
-/// What a reader needs depends on a parameter of the enclosing function: a client wrapper.
-struct Depends;
 
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
@@ -126,15 +125,16 @@ pub fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
-/// The contract `provider` serves at its gateway path, when `[serve]` rewrites its route.
-pub(crate) fn gateway_contract(provider: &Provider) -> Option<String> {
-    let (method, _) = route(&provider.contract)?;
-    Some(contract(method, provider.gateway.as_deref()?))
+/// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
+pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
+    let method = route(&provider.contract).map(|(method, _)| method);
+    (provider.gateways.iter())
+        .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
 }
 
-/// Whether `provider` serves `contract`, by its code path or by its gateway path.
+/// Whether `provider` serves `contract`, by its own path or by a gateway path.
 pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
-    provider.contract == contract || gateway_contract(provider).as_deref() == Some(contract)
+    provider.contract == contract || gateway_contracts(provider).any(|(g, _)| g == contract)
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -204,7 +204,7 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         return Ok(Some("GET".into()));
     };
     let value = match init {
-        Value::Object(properties) => match method_property(properties)? {
+        Value::Object(properties) => match property(properties, "method")? {
             Some(value) => value,
             None => return Ok(Some("GET".into())),
         },
@@ -217,38 +217,6 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         Value::Undefined => Ok(Some("GET".into())),
         _ => Ok(None),
     }
-}
-
-/// The value of the last `method` of an object, as in JavaScript, through spreads.
-fn method_property(properties: &[(String, Value)]) -> Result<Option<&Value>, Depends> {
-    static UNKNOWN: Value = Value::Unknown;
-    for (key, value) in properties.iter().rev() {
-        match (key.as_str(), value) {
-            ("method", value) => return Ok(Some(value)),
-            ("...", Value::Object(inner)) => {
-                if let Some(found) = method_property(inner)? {
-                    return Ok(Some(found));
-                }
-            }
-            ("...", Value::Undefined) => {}
-            ("...", Value::Ref(_)) => return Err(Depends),
-            // A spread of something unknown may hide a method.
-            ("...", _) => return Ok(Some(&UNKNOWN)),
-            _ => {}
-        }
-    }
-    Ok(None)
-}
-
-/// The text of `parts` when every part is literal.
-fn literal(parts: &[Part]) -> Option<String> {
-    parts
-        .iter()
-        .map(|p| match p {
-            Part::Text(t) => Some(t.as_str()),
-            _ => None,
-        })
-        .collect()
 }
 
 /// `parts` as a path, every non-literal part a parameter.
@@ -382,6 +350,7 @@ fn express(code: &Code) -> Vec<Found> {
                 _ => Site::File(path.into()),
             };
             found.push(Found {
+                role: Role::Provider,
                 site,
                 contract: Some(contract(&method, &full)),
                 via: None,
@@ -409,6 +378,7 @@ impl ContractKind for Http {
                 }
                 for (site, at, read) in code.expand(path, n, &fetch) {
                     found.push(Found {
+                        role: Role::Consumer,
                         site: Site::Call {
                             path: site.into(),
                             index: at,
@@ -440,6 +410,7 @@ impl ContractKind for Http {
                     Site::File(path.into())
                 };
                 found.push(Found {
+                    role: Role::Provider,
                     site,
                     contract: Some(contract(exported, &route)),
                     via: None,
@@ -452,12 +423,86 @@ impl ContractKind for Http {
         found
     }
 
+    /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
+    /// hosts. A document route with the contract of a code route merges into it: the code
+    /// keeps the handler. Any other is a provider of its own, without a handler, at
+    /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
+    /// already listed adds nothing of its own.
+    ///
+    /// Each document listing a route gives it its own gateway forms: one per `servers` path of
+    /// the document (the server path as the prefix, with the `[serve]` strip), or the `[serve]`
+    /// form when the document has no server path. A code route keeps its `[serve]` form and
+    /// adds those of the documents listing it. The hosts of every HTTP provider are the
+    /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        let serve = &repo.config.serve;
+        let code: HashSet<String> = (export.providers.iter())
+            .map(|p| p.contract.clone())
+            .collect();
+        let mut listed = code.clone();
+        let mut documented = Vec::new();
+        let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
+        // The first document by path listing a route gives its shape, merged or not.
+        let mut shapes = HashMap::new();
+        for doc in &export.documents {
+            let prefixes = (doc.summary.servers.iter())
+                .map(|s| s.path.as_str())
+                .filter(|p| !p.is_empty());
+            let prefixes: Vec<&str> = prefixes.collect();
+            for route in &doc.summary.routes {
+                let contract = route.contract();
+                shapes.entry(contract.clone()).or_insert(&route.shape);
+                let found: Vec<(String, String)> = match prefixes.is_empty() {
+                    true => serve.gateway_path(&route.path).into_iter().collect(),
+                    false => (prefixes.iter())
+                        .filter_map(|p| gateway_path(Some(p), serve.strip.as_deref(), &route.path))
+                        .collect(),
+                };
+                let own = forms.entry(contract.clone()).or_default();
+                for (path, reason) in found {
+                    let form = Gateway { path, reason };
+                    if !own.contains(&form) {
+                        own.push(form);
+                    }
+                }
+                if listed.insert(contract.clone()) {
+                    let site = format!("{}::{}::{}", repo.identity, doc.path, route.label());
+                    documented.push(Provider {
+                        contract,
+                        site,
+                        ..Provider::default()
+                    });
+                }
+            }
+        }
+        export.providers.extend(documented);
+        index::sort_providers(&mut export.providers);
+        let mut hosts: Vec<String> = serve.hosts.iter().map(|h| h.to_lowercase()).collect();
+        let servers = export.documents.iter().flat_map(|d| &d.summary.servers);
+        hosts.extend(servers.filter_map(|s| s.host.clone()));
+        hosts.sort();
+        hosts.dedup();
         for p in &mut export.providers {
-            let path = route(&p.contract).map(|(_, path)| path);
-            p.gateway = path
-                .and_then(|path| repo.config.serve.gateway_path(path))
-                .map(|g| g.0);
+            let Some((_, path)) = route(&p.contract) else {
+                continue;
+            };
+            p.shape = shapes.get(&p.contract).and_then(|s| (*s).clone());
+            let served = serve
+                .gateway_path(path)
+                .map(|(path, reason)| Gateway { path, reason });
+            let from_documents = forms.get(&p.contract).cloned().unwrap_or_default();
+            // The `[serve]` form first: a code route has it, a documented one when a document
+            // without server paths lists it.
+            let served =
+                served.filter(|s| code.contains(&p.contract) || from_documents.contains(s));
+            p.gateway = served.as_ref().map(|s| s.path.clone());
+            p.gateways = served.into_iter().collect();
+            for form in from_documents {
+                if !p.gateways.contains(&form) {
+                    p.gateways.push(form);
+                }
+            }
+            p.hosts = hosts.clone();
         }
     }
 
@@ -466,6 +511,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
+        _routes: &Routes,
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -479,11 +525,8 @@ impl ContractKind for Http {
                 if p.contract == *contract {
                     return Some((m, p, None));
                 }
-                if gateway_contract(p).as_deref() != Some(contract) {
-                    return None;
-                }
-                let (_, reason) = m.config.serve.gateway_path(route(&p.contract)?.1)?;
-                Some((m, p, Some(reason)))
+                let (_, reason) = gateway_contracts(p).find(|(g, _)| g == contract)?;
+                Some((m, p, Some(reason.to_string())))
             })
             .collect();
         let direct: Vec<&str> = (serving.iter())
@@ -499,7 +542,9 @@ impl ContractKind for Http {
             .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving.filter(|(m, ..)| m.config.serves(host)).collect();
+                let fits = serving
+                    .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+                    .collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving

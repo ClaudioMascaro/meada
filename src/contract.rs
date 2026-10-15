@@ -1,12 +1,13 @@
 //! The contract-kind interface: each kind turns pack output, or what `meada.toml` declares,
 //! into provider and consumer contracts and matches them into links (ADR 0005). The kinds are
-//! HTTP (`http::`) and resources (`resource::`, spec #19); later kinds (`channel::`,
-//! `package::`) plug in behind the same trait.
+//! HTTP (`http::`), resources (`resource::`, spec #19) and channels (`channel::`, spec #20);
+//! later kinds (`package::`) plug in behind the same trait.
 
 use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::channel::{Channel, Routes};
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
 use crate::resolve::Code;
@@ -53,7 +54,9 @@ impl Level {
     }
 }
 
-/// A consumer call site linked to a provider symbol through a contract.
+/// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a
+/// file or a whole repository, as its kind places it: an HTTP consumer is a call and its
+/// provider a symbol; a channel consumer is its handler and its producer a call.
 #[derive(Serialize)]
 pub struct Link {
     pub consumer: String,
@@ -71,32 +74,62 @@ pub struct Link {
 
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
+    pub role: Role,
     pub site: Site,
-    /// The contract identifier; `None` for a consumer Meada could not resolve.
+    /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
     pub contract: Option<String>,
-    /// How a consumer names the provider's repository, such as `host:api.example.com`.
+    /// How a consumer names the provider's repository, such as `host:api.example.com`; for a
+    /// binding or a publish, the exchange.
     pub via: Option<String>,
-    /// For an unresolved consumer, the method it calls with when Meada could read it.
+    /// For an unresolved consumer, the method it calls with when Meada could read it; for a
+    /// binding, the pattern; for a publish, the routing key.
     pub method: Option<String>,
     /// For an unresolved consumer, the literal fragments of its URL path Meada could
     /// evaluate, in order.
     pub fragments: Vec<String>,
 }
 
+/// Which side of a contract a site holds.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    Provider,
+    Consumer,
+    /// Neither side: a RabbitMQ binding of a queue (`contract`) to an exchange (`via`) by a
+    /// pattern (`method`), which routes a publish to the queue (spec #20).
+    Binding,
+    /// A RabbitMQ publish to the named exchange `via` with the routing key `method`, no
+    /// `contract`: it holds no channel of its own and produces to the queues the bindings
+    /// route it to (spec #20).
+    Publish,
+}
+
+impl Role {
+    /// The name the index stores.
+    pub fn name(self) -> &'static str {
+        match self {
+            Role::Provider => "provider",
+            Role::Consumer => "consumer",
+            Role::Binding => "binding",
+            Role::Publish => "publish",
+        }
+    }
+}
+
 /// Where a contract sits; every path is repository-relative.
 pub enum Site {
-    /// A provider: a definition, by qualified name.
+    /// A definition, by qualified name. Inline definitions no kind names fold away from it,
+    /// and a name that folds to nothing is the file's top level.
     Def { path: String, name: String },
-    /// A provider: the file itself.
+    /// The file itself.
     File(String),
-    /// A provider: an inline route handler, the `Kind::Inline` definition `def`, which takes
-    /// `name` (such as `GET /users/{}`) under its enclosing symbol.
+    /// An inline handler, the `Kind::Inline` definition `def`, which takes `name` (such as
+    /// `GET /users/{}` or `kafka orders.created`) under its enclosing symbol.
     Inline {
         path: String,
         def: String,
         name: String,
     },
-    /// A consumer: the call at this position of the file's `Facts::calls`.
+    /// The call at this position of the file's `Facts::calls`.
     Call { path: String, index: usize },
 }
 
@@ -114,19 +147,27 @@ pub trait ContractKind {
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
+    /// The words for a provider and a consumer of this kind when `context` lists a contract
+    /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
+    fn sides(&self) -> Option<(&'static str, &'static str)> {
+        None
+    }
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
-    /// workspace (each with the repository holding it). Several fitting providers are all
-    /// linked as ambiguous; none leaves the consumer unlinked.
+    /// workspace (each with the repository holding it) and, for a queue, the publishes the
+    /// workspace's `routes` send to it. Several fitting providers are all linked as ambiguous;
+    /// none leaves the consumer unlinked.
     fn link(
         &self,
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
+        routes: &Routes,
     ) -> Vec<Link>;
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel];
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {

@@ -1,0 +1,324 @@
+{
+  "repository": "example.com/jobs/api",
+  "files": [
+    {
+      "path": "src/bullmq.ts",
+      "hash": "00c6bf52f9865498b5178af163cd5f3ac65396ec36e325c4397c66c7829f3026"
+    },
+    {
+      "path": "src/ioredis.ts",
+      "hash": "f1f10ffc20b11dc6b27e1b92d861cc33bf7f21dd2dd969e103a62d863beac40e"
+    },
+    {
+      "path": "src/noderedis.ts",
+      "hash": "15ba238c95fa289d19ce40575c5ad6e7a013100084a2afbed8043d1c9d350408"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 575,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::remember",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 449,
+        "end": 498
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::requestReport",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 333,
+        "end": 403
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 704,
+        "end": 767
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendWelcome",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 243,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendOrder",
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 65,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendRefund",
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 161,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/noderedis.ts::appendShipment",
+      "span": {
+        "path": "src/noderedis.ts",
+        "start": 78,
+        "end": 170
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::Queue#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 72,
+        "end": 88
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::Queue#1",
+      "caller": "example.com/jobs/api::src/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 106,
+        "end": 126
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::Set#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 141,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue::Queue#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 645,
+        "end": 660
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::enqueue::queue.add#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 670,
+        "end": 692
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::remember::seen.add#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::remember",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 483,
+        "end": 495
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::requestReport::reports.add#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::requestReport",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 374,
+        "end": 400
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
+      "target": "example.com/jobs/api::src/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 743,
+        "end": 764
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::sendWelcome",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 292,
+        "end": 321
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::Redis#0",
+      "caller": "example.com/jobs/api::src/ioredis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 44,
+        "end": 55
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendOrder::redis.xadd#0",
+      "caller": "example.com/jobs/api::src/ioredis.ts::appendOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 114,
+        "end": 149
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendRefund::redis.xadd#0",
+      "caller": "example.com/jobs/api::src/ioredis.ts::appendRefund",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 211,
+        "end": 247
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/noderedis.ts::appendShipment::client.xAdd#0",
+      "caller": "example.com/jobs/api::src/noderedis.ts::appendShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/noderedis.ts",
+        "start": 130,
+        "end": 167
+      }
+    },
+    {
+      "id": "example.com/jobs/api::src/noderedis.ts::createClient#0",
+      "caller": "example.com/jobs/api::src/noderedis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/noderedis.ts",
+        "start": 54,
+        "end": 68
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::bullmq::emails",
+      "site": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0"
+    },
+    {
+      "contract": "channel::bullmq::emails",
+      "site": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0"
+    },
+    {
+      "contract": "channel::bullmq::reports",
+      "site": "example.com/jobs/api::src/bullmq.ts::requestReport::reports.add#0"
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/jobs/api::src/ioredis.ts::appendOrder::redis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::refunds",
+      "site": "example.com/jobs/api::src/ioredis.ts::appendRefund::redis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::shipments",
+      "site": "example.com/jobs/api::src/noderedis.ts::appendShipment::client.xAdd#0"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/jobs/worker::src/bullmq.ts::sendEmail",
+      "provider": "example.com/jobs/api::src/bullmq.ts::sendInvoice::enqueue#0",
+      "contract": "channel::bullmq::emails",
+      "level": "exact",
+      "reason": "channel::bullmq::emails"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/bullmq.ts::sendEmail",
+      "provider": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0",
+      "contract": "channel::bullmq::emails",
+      "level": "exact",
+      "reason": "channel::bullmq::emails"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/bullmq.ts::startReports.bullmq reports",
+      "provider": "example.com/jobs/api::src/bullmq.ts::requestReport::reports.add#0",
+      "contract": "channel::bullmq::reports",
+      "level": "exact",
+      "reason": "channel::bullmq::reports"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/ioredis.ts::readOrders",
+      "provider": "example.com/jobs/api::src/ioredis.ts::appendOrder::redis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/ioredis.ts::readOrders",
+      "provider": "example.com/jobs/api::src/ioredis.ts::appendRefund::redis.xadd#0",
+      "contract": "channel::redis::refunds",
+      "level": "exact",
+      "reason": "channel::redis::refunds"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/noderedis.ts::readBoth",
+      "provider": "example.com/jobs/api::src/ioredis.ts::appendOrder::redis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/noderedis.ts::readBoth",
+      "provider": "example.com/jobs/api::src/ioredis.ts::appendRefund::redis.xadd#0",
+      "contract": "channel::redis::refunds",
+      "level": "exact",
+      "reason": "channel::redis::refunds"
+    },
+    {
+      "consumer": "example.com/jobs/worker::src/noderedis.ts::readShipments",
+      "provider": "example.com/jobs/api::src/noderedis.ts::appendShipment::client.xAdd#0",
+      "contract": "channel::redis::shipments",
+      "level": "exact",
+      "reason": "channel::redis::shipments"
+    }
+  ]
+}

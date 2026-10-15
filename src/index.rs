@@ -8,17 +8,20 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::Result;
+use crate::config::Serve;
 use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
+use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
+use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 14;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -28,7 +31,14 @@ const SCHEMA_VERSION: i64 = 7;
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach.
+/// none); they let `Engine::open_items` list the routes it may reach. A RabbitMQ `binding` row
+/// keeps the queue's channel in `contract`, the exchange in `via` and the pattern in `method`;
+/// a `publish` row (a publish to a named exchange) has no `contract`, the exchange in `via` and
+/// the routing key in `method`. `documents` holds each provider document (spec #21) with the
+/// same stat and hash as `files`, and its `summary` (`document::Summary` as JSON: format,
+/// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
+/// derived from the bytes alone); a document that could not be read keeps its row, so its hash
+/// is cached too.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -49,6 +59,10 @@ CREATE TABLE contracts (
     method TEXT, fragments TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
+CREATE TABLE documents (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -116,6 +130,13 @@ struct Stored {
     resolved: String,
 }
 
+/// What the index knows of a document: its hash and the stat seen when it was hashed.
+struct Stamp {
+    hash: String,
+    mtime: Option<i64>,
+    size: i64,
+}
+
 /// A file whose content differs from the index, parsed again.
 struct Parsed {
     path: String,
@@ -153,7 +174,11 @@ struct Rows {
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
 /// repository, since constants and client wrappers reach across files. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files.
-pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
+///
+/// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
+/// a `[serve]` table the repository has none. They hold no code, so an edited document changes
+/// no code row: `Http::declare` reads them at query time.
+pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     let now = SystemTime::now();
     let tx = db.unchecked_transaction()?;
     let known = tx
@@ -167,7 +192,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         _ => {
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
-                 DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts;",
+                 DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
+                 DELETE FROM documents;",
             )?;
             None
         }
@@ -187,22 +213,20 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
         })?
         .collect::<rusqlite::Result<_>>()?;
 
-    let walked = walk(root);
+    let all = walk(root);
+    refresh_documents(&tx, &documents_found(root, &all, serve), now)?;
+    let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
+        .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
+        .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
     let mut changed = Vec::new();
-    for (path, abs, pack) in &walked {
-        let stat = fs::metadata(abs)?;
-        let size = stat.len() as i64;
-        let modified = stat.modified()?;
-        let mtime = modified
-            .duration_since(UNIX_EPOCH)
-            .ok()
-            .map(|d| d.as_nanos() as i64);
+    for &(path, abs, pack) in &walked {
+        let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
         if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
             continue;
         }
-        let mtime = mtime.filter(|_| modified + RACY < now);
+        let mtime = mtime.filter(|_| trusted);
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
         if known.is_some_and(|k| k.hash == hash) {
@@ -212,7 +236,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             )?;
             continue;
         }
-        let facts = lang::pack(*pack).parse(path, &src)?;
+        let facts = lang::pack(pack).parse(path, &src)?;
         changed.push(Parsed {
             path: path.clone(),
             hash,
@@ -312,8 +336,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             .collect();
         let mut found = Vec::new();
         let mut misses = Vec::new();
-        for resolver in resolvers.values() {
-            let code = Code::new(resolver, &full);
+        for (&pack, resolver) in &resolvers {
+            let code = Code::new(resolver, &full, lang::pack(pack));
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code));
             }
@@ -382,15 +406,17 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
     let mut rows = BTreeSet::new();
     for f in &found {
-        let (role, path, site) = match &f.site {
+        let (path, site) = match &f.site {
+            // An inline definition no kind names folds into the one enclosing it, or into the
+            // file at the top level.
             Site::Def { path, name }
             | Site::Inline {
                 path, def: name, ..
-            } => {
-                let name = names.def(path, name).unwrap_or_else(|| name.clone());
-                ("provider", path, format!("{identity}::{path}::{name}"))
-            }
-            Site::File(path) => ("provider", path, format!("{identity}::{path}")),
+            } => match names.scope(path, name) {
+                name if name.is_empty() => (path, format!("{identity}::{path}")),
+                name => (path, format!("{identity}::{path}::{name}")),
+            },
+            Site::File(path) => (path, format!("{identity}::{path}")),
             Site::Call { path, index } => {
                 let ids = calls
                     .entry(path)
@@ -398,9 +424,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
                 let Some((_, id)) = ids.get(*index) else {
                     continue;
                 };
-                ("consumer", path, id.clone())
+                (path, id.clone())
             }
         };
+        let role = f.role.name();
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         rows.insert((
             role,
@@ -436,20 +463,112 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// The files a language pack handles under `root`, sorted, with their pack.
-fn walk(root: &Path) -> Vec<(String, PathBuf, usize)> {
-    let mut files: Vec<(String, PathBuf, usize)> = WalkBuilder::new(root)
+/// The documents of a repository (path and absolute path): those `walk` found by file name,
+/// then each path `[serve] documents` lists that is a file, ignored by `.gitignore` or not. A
+/// listed path that is not a file, or that goes through a symbolic link, is no document;
+/// `document::report` says so. Without a `[serve]` table there are none.
+fn documents_found(
+    root: &Path,
+    walked: &[(String, PathBuf)],
+    serve: &Serve,
+) -> Vec<(String, PathBuf)> {
+    if !serve.declared {
+        return Vec::new();
+    }
+    let mut found: Vec<_> = (walked.iter())
+        .filter(|(path, _)| document::is_document(path))
+        .cloned()
+        .collect();
+    for path in &serve.documents {
+        if found.iter().any(|(p, _)| p == path) {
+            continue;
+        }
+        if let Some(abs) = plain_file(root, path) {
+            found.push((path.clone(), abs));
+        }
+    }
+    found
+}
+
+/// The file at `path` under `root`, when no segment of `path` is a symbolic link: like the
+/// walk, a listed path never leads out of the repository.
+fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
+    let mut abs = root.to_path_buf();
+    let mut file = false;
+    for segment in path.split('/') {
+        abs.push(segment);
+        let kind = fs::symlink_metadata(&abs).ok()?.file_type();
+        if kind.is_symlink() {
+            return None;
+        }
+        file = kind.is_file();
+    }
+    file.then_some(abs)
+}
+
+/// Brings the `documents` table up to date with `found`, the documents on disk (path and
+/// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
+/// stored document not found leaves the table.
+fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemTime) -> Result<()> {
+    let stored: HashMap<String, Stamp> = tx
+        .prepare("SELECT path, hash, mtime, size FROM documents")?
+        .query_map([], |r| {
+            let (hash, mtime, size) = (r.get(1)?, r.get(2)?, r.get(3)?);
+            Ok((r.get(0)?, Stamp { hash, mtime, size }))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut seen = HashSet::new();
+    for (path, abs) in found {
+        seen.insert(path.as_str());
+        let (size, mtime, trusted) = stat(abs, now)?;
+        let known = stored.get(path);
+        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
+            continue;
+        }
+        let mtime = mtime.filter(|_| trusted);
+        let src = fs::read(abs)?;
+        let hash = blake3::hash(&src).to_hex().to_string();
+        if known.is_some_and(|k| k.hash == hash) {
+            tx.execute(
+                "UPDATE documents SET mtime = ?2, size = ?3 WHERE path = ?1",
+                params![path, mtime, size],
+            )?;
+            continue;
+        }
+        let summary = serde_json::to_string(&document::read(path, &src))?;
+        tx.execute(
+            "INSERT OR REPLACE INTO documents VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![path, hash, mtime, size, summary],
+        )?;
+    }
+    for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
+        tx.execute("DELETE FROM documents WHERE path = ?1", params![path])?;
+    }
+    Ok(())
+}
+
+/// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
+/// enough, by `RACY`, to be trusted on the next refresh.
+fn stat(abs: &Path, now: SystemTime) -> Result<(i64, Option<i64>, bool)> {
+    let stat = fs::metadata(abs)?;
+    let modified = stat.modified()?;
+    let mtime = modified
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_nanos() as i64);
+    Ok((stat.len() as i64, mtime, modified + RACY < now))
+}
+
+/// Every file under `root` but what `.gitignore` excludes, sorted.
+fn walk(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
         // The repository's own ignore files only, never those of directories above it.
         .parents(false)
         .build()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
-        .filter_map(|entry| {
-            let rel = relative(root, entry.path())?;
-            let pack = lang::pack_for(&rel)?;
-            Some((rel, entry.into_path(), pack))
-        })
+        .filter_map(|entry| Some((relative(root, entry.path())?, entry.into_path())))
         .collect();
     files.sort();
     files
@@ -572,10 +691,87 @@ pub(crate) struct Export {
     pub(crate) calls: Vec<CallSite>,
     pub(crate) providers: Vec<Provider>,
     pub(crate) consumers: Vec<Consumer>,
+    /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) bindings: Vec<Binding>,
+    /// The provider documents (spec #21), in path order; those read are exported, with
+    /// their contracts.
+    #[serde(
+        serialize_with = "documents_read",
+        skip_serializing_if = "no_document_read"
+    )]
+    pub(crate) documents: Vec<Document>,
+    /// The RabbitMQ publishes to a named exchange (spec #20), producers of the queues the
+    /// bindings route them to.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) publishes: Vec<Publish>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) stale_decisions: Vec<Stale>,
+}
+
+/// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
+/// some.
+pub(crate) fn sort_providers(providers: &mut [Provider]) {
+    providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+}
+
+/// Puts `consumers` back in the order `export` reads them in, after a kind's `declare` added
+/// some.
+pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
+    consumers.sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+}
+
+impl Export {
+    /// The document whose route `site` is, when `site` is a route only a document of this
+    /// repository lists: `<repository>::<document path>::<METHOD> <path>`.
+    pub(crate) fn document_of(&self, site: &str) -> Option<&str> {
+        let rest = site.strip_prefix(&self.repository)?.strip_prefix("::")?;
+        let (path, _) = rest.split_once("::")?;
+        let doc = self.documents.iter().find(|d| d.path == path)?;
+        Some(&doc.path)
+    }
+}
+
+/// A provider document of the repository and what was read from it.
+pub(crate) struct Document {
+    pub(crate) path: String,
+    pub(crate) summary: Summary,
+}
+
+/// A document read, as `meada export` shows it: path, format, version and its contracts,
+/// sorted.
+impl Serialize for Document {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        struct Shown<'a> {
+            path: &'a str,
+            format: &'a Option<Format>,
+            version: &'a Option<String>,
+            contracts: BTreeSet<String>,
+        }
+        Shown {
+            path: &self.path,
+            format: &self.summary.format,
+            version: &self.summary.version,
+            contracts: (self.summary.routes.iter().map(|r| r.contract()))
+                .chain(self.summary.channels.iter().map(|s| s.contract()))
+                .collect(),
+        }
+        .serialize(s)
+    }
+}
+
+fn documents_read<S: Serializer>(
+    documents: &[Document],
+    s: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    s.collect_seq(documents.iter().filter(|d| d.summary.format.is_some()))
+}
+
+fn no_document_read(documents: &[Document]) -> bool {
+    documents.iter().all(|d| d.summary.format.is_none())
 }
 
 #[derive(Serialize)]
@@ -608,17 +804,62 @@ pub(crate) struct CallSite {
     pub(crate) span: Span,
 }
 
-/// A symbol that serves a contract.
-#[derive(Serialize)]
+/// The provider side of a contract: a symbol that serves it, a file, a repository, the call
+/// that produces to a channel, or a route or channel side only a document lists
+/// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
+#[derive(Serialize, Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
+    /// What the route's response or the channel's messages carry, from the first document by path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) shape: Option<Shape>,
+    /// Every path a gateway serves the route at, with the reason for the rewrite: the
+    /// `[serve]` form first. `Http::declare` fills it; matching goes through
+    /// `http::gateway_contracts`.
+    #[serde(skip)]
+    pub(crate) gateways: Vec<Gateway>,
+    /// The hosts the repository serves on, lower case: `[serve] hosts` and the host of every
+    /// `servers` URL of its documents. `Http::declare` fills it; `link` matches a URL's host
+    /// against it.
+    #[serde(skip)]
+    pub(crate) hosts: Vec<String>,
 }
 
-/// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
+/// A path a gateway serves a route at, and why: `gateway prefix /shop`.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Gateway {
+    pub(crate) path: String,
+    pub(crate) reason: String,
+}
+
+/// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
+/// queue channel `contract`. A publish to the exchange reaches the queue when the pattern
+/// matches its routing key.
+#[derive(Serialize)]
+pub(crate) struct Binding {
+    pub(crate) contract: String,
+    pub(crate) exchange: String,
+    pub(crate) pattern: String,
+    pub(crate) site: String,
+}
+
+/// A publish to the named exchange `exchange` with the routing key `key`, at the call `site`.
+/// It is no channel's side by itself: it produces to every queue a binding of `exchange`
+/// whose pattern matches `key` routes it to, and to no other (a publish to the empty exchange
+/// is a plain producer of the queue its key names).
+#[derive(Serialize)]
+pub(crate) struct Publish {
+    pub(crate) exchange: String,
+    pub(crate) key: String,
+    pub(crate) site: String,
+}
+
+/// The consumer side of a contract: a call site that uses it, or the symbol that reads a
+/// resource or handles a channel; `contract` is `None` while an HTTP call is unresolved. `via` says
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
 /// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
 /// that out.
@@ -627,6 +868,10 @@ pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,
     pub(crate) via: Option<String>,
+    /// What the messages a channel handler receives carry, from the first document by path
+    /// that lists the side (`Channel::declare`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) shape: Option<Shape>,
     #[serde(skip)]
     pub(crate) method: Option<String>,
     #[serde(skip)]
@@ -697,7 +942,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
-                gateway: None,
+                ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -712,11 +957,53 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
+                shape: None,
                 method: r.get(3)?,
                 // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
                 fragments: fragments
                     .and_then(|f| serde_json::from_str(&f).ok())
                     .unwrap_or_default(),
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let bindings = db
+        .prepare(&format!(
+            "SELECT contract, via, method, site FROM {schema}.contracts \
+             WHERE role = 'binding' ORDER BY contract, via, method, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Binding {
+                contract: r.get(0)?,
+                exchange: r.get(1)?,
+                pattern: r.get(2)?,
+                site: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<(String, String)> = db
+        .prepare(&format!(
+            "SELECT path, summary FROM {schema}.documents ORDER BY path"
+        ))?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let documents = (rows.into_iter())
+        .map(|(path, summary)| {
+            Ok(Document {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            })
+        })
+        .collect::<Result<_>>()?;
+    let publishes = db
+        .prepare(&format!(
+            "SELECT via, method, site FROM {schema}.contracts \
+             WHERE role = 'publish' ORDER BY via, method, site"
+        ))?
+        .query_map([], |r| {
+            Ok(Publish {
+                exchange: r.get(0)?,
+                key: r.get(1)?,
+                site: r.get(2)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -727,7 +1014,10 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         calls,
         providers,
         consumers,
+        bindings,
+        publishes,
         links: Vec::new(),
+        documents,
         stale_decisions: Vec::new(),
     })
 }

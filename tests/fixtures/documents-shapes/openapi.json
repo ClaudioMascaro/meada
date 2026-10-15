@@ -1,0 +1,137 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Shapes", "version": "1.0" },
+  "paths": {
+    "/orders": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Every order: an array response",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "responses": {
+          "200": { "$ref": "#/components/responses/Order" },
+          "404": {
+            "description": "Not a 2xx response: not read",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "error": { "type": "string" } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "responses": {
+          "202": { "description": "No body: the 2XX range gives the shape" },
+          "2XX": {
+            "description": "The payment",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } }
+            }
+          }
+        }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A category and its parents: a reference cycle",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Category" } }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Only application/*+json: no shape",
+            "content": {
+              "application/vnd.api+json": {
+                "schema": { "type": "object", "properties": { "data": { "type": "array" } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Order": {
+        "description": "One order",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Order" } }
+        }
+      }
+    },
+    "schemas": {
+      "Entity": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Order": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Entity" },
+          {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/LineItem" } },
+              "customer": { "$ref": "https://schemas.example.com/customer.json" },
+              "metadata": { "type": "object", "additionalProperties": true },
+              "total": { "type": "number", "nullable": true }
+            }
+          }
+        ]
+      },
+      "LineItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer" }
+        }
+      },
+      "Payment": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/Card" },
+          { "$ref": "#/components/schemas/Transfer" }
+        ]
+      },
+      "Card": {
+        "type": "object",
+        "properties": { "brand": { "type": "string" }, "last4": { "type": "string" } }
+      },
+      "Transfer": {
+        "type": "object",
+        "properties": { "iban": { "type": "string" } }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "parent": { "$ref": "#/components/schemas/Category" }
+        }
+      }
+    }
+  }
+}

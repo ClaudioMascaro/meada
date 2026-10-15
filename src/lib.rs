@@ -1,11 +1,13 @@
 //! Meada: an LLM-free code graph. The query engine (`engine`) is the seam the CLI, the MCP
 //! server and the tests share.
 
+mod channel;
 mod config;
 mod contract;
 pub mod decide;
 mod decider;
 mod decisions;
+mod document;
 pub mod engine;
 mod http;
 mod index;
@@ -17,6 +19,7 @@ mod render;
 pub mod repo;
 mod resolve;
 mod resource;
+mod shape;
 mod trace;
 mod workspace;
 

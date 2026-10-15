@@ -19,8 +19,9 @@ struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
     /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), `resource` (a
-    /// declared one, matched by kind and id), or `ambiguous` or `unresolved` (open items, with
-    /// the `meada decide` command for each).
+    /// declared one, matched by kind and id), `channel` (a queue or topic, by broker kind and
+    /// name), `document` (an OpenAPI or AsyncAPI file, by path or title), or `ambiguous` or
+    /// `unresolved` (open items, with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -28,7 +29,7 @@ struct SearchArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct ContextArgs {
-    /// Symbol name, `<path>::<name>` or full identity; or a resource, `resource::<kind>::<id>`.
+    /// Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; or a channel, `channel::<broker>::<name>`.
     symbol: String,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,

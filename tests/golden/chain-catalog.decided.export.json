@@ -70,6 +70,28 @@
   ],
   "calls": [
     {
+      "id": "example.com/chain/catalog::app/api/events/route.ts::POST::Response#0",
+      "caller": "example.com/chain/catalog::app/api/events/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/events/route.ts",
+        "start": 34,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/health/route.ts::GET::Response#0",
+      "caller": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/health/route.ts",
+        "start": 33,
+        "end": 51
+      }
+    },
+    {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::Response.json#0",
       "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "target": null,
@@ -147,6 +169,13 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
     {
       "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
