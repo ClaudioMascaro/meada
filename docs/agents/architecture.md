@@ -166,12 +166,16 @@ give byte-identical output.
   `@staticmethod` (`Class::Enclosing`), an annotated parameter or name, `x = C(...)`
   (`Class::Named("C")`, whatever `C` turns out to be), `self.x: T` in a method (an attribute,
   at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
-  binding: other assignments, `self.x = ...`, `for` and comprehension targets, `with` and
-  `except ... as`, `:=`, a lambda's parameters (in the enclosing scope, which owns its calls)
-  and a parameter the body assigns. An annotation decides; other bindings that disagree make
-  the class unknown. `global x` sends the function's bindings of `x` to the module, `nonlocal
-  x` to the enclosing scope. Annotations are read as written: a name, a string holding one,
-  `Optional[...]` and `... | None`.
+  binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
+  `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
+  and a parameter the body assigns. A target that is `self.x`, also inside unpacking, a `for`
+  or an `as`, and also written in a function nested in the method, binds the class's attribute
+  `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
+  and resolves through the file's imports. An annotation decides; other bindings that
+  disagree make the class unknown. `global x` sends the function's bindings of `x` to the
+  module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
+  skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
+  and `... | None`.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
@@ -182,7 +186,9 @@ give byte-identical output.
   (`Binding::Instance`), is looked up through the class's family: the class and the ancestors
   its written bases give, in C3 order (Python's method resolution order), linearized once per
   class in `Resolver::new`. A base that is not a class of the repository is an opaque
-  ancestor: reaching it before a class that has the member leaves the member unknown, and so
+  ancestor, named by what the file imports for it (`abc.ABC`) or as written (`object`), so
+  classes that share it give C3 one entry; a base that is no name (`mixin()`) is its own
+  entry: reaching it before a class that has the member leaves the member unknown, and so
   does a hierarchy C3 rejects or bases in a cycle. The first class that defines the member, or
   binds it as an attribute local, wins, `exact`. A receiver whose class (or whose value's
   callee) is outside the repository is unresolved; any other member call falls back to the
@@ -361,7 +367,9 @@ Each is marked `ponytail:` at its site unless noted.
   root declarations. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
-  there for the whole scope (the safe side: a name match instead of `exact`). `__all__` is read only as one literal list or tuple, and call arguments
+  there for the whole scope (the safe side: a name match instead of `exact`). A write to an
+  attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple, and call arguments
   and parameter defaults are not read (no `Value`s, so no contracts).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.

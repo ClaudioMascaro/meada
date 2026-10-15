@@ -66,12 +66,14 @@ struct Work<'a> {
     families: HashMap<Target<'a>, Family<'a>>,
 }
 
-/// One entry of a class family: a class of the repository, or the `n`th base a class writes
-/// that is not one (outside the repository, or not resolved), whose members are not known.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+/// One entry of a class family: a class of the repository, or a base that is not one
+/// (outside the repository, or not resolved), whose members are not known. An opaque base is
+/// named by what it imports (`abc.ABC`) or as written (`object`), so classes that share it
+/// share one entry; a base that is no name (`mixin()`) is named by where it is written.
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum Ancestor<'a> {
     Class(Target<'a>),
-    Opaque(Target<'a>, usize),
+    Opaque(String),
 }
 
 /// A class and its ancestors in method resolution order (C3), or `None` when they have none:
@@ -245,6 +247,9 @@ impl<'a> Resolver<'a> {
         let Some(class) = self.locals[path].get(&(scope, name)) else {
             return Binding::Unknown;
         };
+        if let Class::Imported = class {
+            return self.imported(path, name, &mut Seen::new());
+        }
         let key = Busy::Local(path, scope, name);
         if work.busy.contains(&key) {
             return Binding::Unknown;
@@ -253,7 +258,7 @@ impl<'a> Resolver<'a> {
         let found = match class {
             Class::Enclosing => self.class(path, scope),
             Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
-            Class::Unknown => Binding::Unknown,
+            Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
@@ -301,7 +306,7 @@ impl<'a> Resolver<'a> {
         for base in &bases {
             lists.push(match base {
                 Ancestor::Class(base) => self.family(*base, work),
-                Ancestor::Opaque(..) => Some(vec![*base]),
+                Ancestor::Opaque(_) => Some(vec![base.clone()]),
             });
         }
         lists.push(Some(bases));
@@ -321,10 +326,27 @@ impl<'a> Resolver<'a> {
             .map(
                 |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
-                    _ => Ancestor::Opaque(class, n),
+                    _ if base.starts_with('(') => {
+                        Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
+                    }
+                    _ => Ancestor::Opaque(self.imported_name(class.path, base)),
                 },
             )
             .collect()
+    }
+
+    /// `name` as the file's imports spell it: the module and name its head imports, then the
+    /// rest (`ABC` imported from `abc` is `abc.ABC`); as written when no import binds it.
+    fn imported_name(&self, path: &str, name: &str) -> String {
+        let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
+        let imports = self.files[path].imports.iter().rev();
+        match imports.map(|i| (i, &i.name)).find(|(i, _)| i.local == head) {
+            Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
+            Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
+                format!("{}.{n}{rest}", i.source)
+            }
+            _ => name.to_string(),
+        }
     }
 
     /// The definitions whose name matches the callee's last name anywhere in the repository:
@@ -417,8 +439,10 @@ impl<'a> Resolver<'a> {
                 };
                 return Binding::Param(function, n, field);
             }
-            if self.locals[path].contains_key(&(s, name)) {
-                return Binding::Local(path, s, name);
+            match self.locals[path].get(&(s, name)) {
+                Some(Class::Imported) => return self.imported(path, name, seen),
+                Some(_) => return Binding::Local(path, s, name),
+                None => {}
             }
         }
         self.imported(path, name, seen)
@@ -548,14 +572,15 @@ fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
         if lists.is_empty() {
             return Some(merged);
         }
-        let head =
-            (lists.iter().map(|l| l[0])).find(|h| lists.iter().all(|l| !l[1..].contains(h)))?;
-        merged.push(head);
+        let head = (lists.iter().map(|l| &l[0]))
+            .find(|h| lists.iter().all(|l| !l[1..].contains(h)))?
+            .clone();
         for list in &mut lists {
             if list[0] == head {
                 list.remove(0);
             }
         }
+        merged.push(head);
     }
 }
 
