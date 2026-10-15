@@ -187,12 +187,15 @@ Constantes fijas:
 ## Estado
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) y enlaza repositorios por contratos HTTP (`fetch` del lado que consume,
-Next.js (app router) y Express del lado que sirve, también detrás de un gateway) y por los
-recursos declarados en el `meada.toml`. Cada enlace tiene el nivel `exact`, `declared`,
-`inferred`, `decided` o `ambiguous`; una llamada cuya URL no se puede resolver aparece como no
-resuelta y solo se vuelve enlace por una decisión, en el nivel `decided`. Aún no hay: otros
-lenguajes, otros clientes HTTP además de `fetch`, colas, paquetes ni el paquete npm. El alcance y el orden del trabajo están
+`.jsx`, `.mjs`, `.cjs`) y Python (`.py`) y enlaza repositorios, también de un lenguaje al otro,
+por contratos HTTP y por los recursos declarados en el `meada.toml`. Del lado que consume,
+`fetch` y, en Python, `requests`, `httpx` y `aiohttp`; del lado que sirve, Next.js (app router)
+y Express y, en Python, FastAPI, Flask y Django, también detrás de un gateway. Cada enlace tiene
+el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no se
+puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
+`decided`, y una ruta que Meada no sabe dónde se sirve queda fuera del mapa en vez de ser
+adivinada. Aún no hay: otros lenguajes, colas, paquetes ni el paquete npm. El alcance y el
+orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
 

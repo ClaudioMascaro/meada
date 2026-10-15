@@ -4,6 +4,20 @@ All notable changes to Meada are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
+  *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
+  through `self`, annotations, constructor calls and Python's method resolution order.
+- Python HTTP providers (FastAPI, Flask and Django URLconfs, with their prefixes, mounts and
+  `include()`s, and the methods each view serves) and consumers (`requests`, `httpx` and
+  `aiohttp`, with a client's `base_url` and client wrappers read at each call site), linked
+  to TypeScript repositories both ways. A base URL read from the environment links through
+  `base_url_env`. A router or URLconf Meada cannot place, and a route with a part it cannot
+  read, stay out of the map rather than being guessed.
+
 ## [0.1.0] - Unreleased
 
 The first release: the trunk of the roadmap (ADR 0003). The maintainer sets the date when
@@ -59,4 +73,5 @@ and JavaScript files), median of three runs on a 16-thread Linux laptop:
 At today's 664 files: 1.3 s, 23.6 MB and 0.26 s. Tokens count 4 bytes each, as the answer budget
 does. These numbers gate 1.0, not this release.
 
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0
