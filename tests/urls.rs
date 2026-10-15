@@ -59,6 +59,29 @@ fn wrapper_call_sites_are_consumers_through_two_levels_and_a_cycle() {
 }
 
 #[test]
+fn wrapper_expansion_climbs_only_calls_that_resolved_exactly() {
+    let repo = fixture_repo(
+        "urls_wrappers_by_name",
+        "http-wrappers-by-name",
+        Some("https://example.com/acme/portal.git"),
+    );
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .filter_map(|c| c["contract"].as_str())
+        .collect();
+    consumers.sort();
+    // `this.get("/orders")` is exact; `store.get("/reports")` (receiver of unknown class),
+    // `api.get("/list")` (a `new Api()` constant, still a name match) and `fetchJson("/bare")`
+    // (no import binds it) are name matches, so none names a path (the wrappers read where they
+    // stand have no readable contract).
+    assert_eq!(consumers, ["http::GET::/orders"]);
+}
+
+#[test]
 fn express_routes_take_mount_prefixes_through_imports_at_two_depths() {
     let case = "urls_express";
     let backend = backend(case);
