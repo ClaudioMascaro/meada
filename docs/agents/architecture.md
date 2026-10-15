@@ -229,8 +229,10 @@ give byte-identical output.
   of a bare specifier from outside the repository (`Code::imported`: specifier in `via`, the
   chain spelled from the imported name in `method`); `declare` makes a provider at `<repository>::<manifest path>` (`Provider::version` for the
   reason) and a `packages` row `{name, version, repository, directory}` (`.` at the root) for each
-  named manifest, private ones too. `consume(exports)` is the workspace-wide step `Engine::exports`
-  runs after every repository's `declare` (one repository cannot see another's providers): for
+  named manifest, private ones too. `consume(exports, providers)` is the workspace-wide step `Engine::exports`
+  runs after every repository's `declare` (one repository cannot see another's providers; the
+  `Providers` index of package names to their manifests is built once there and shared with
+  `import`, and `reaches` is the one place the `workspace:` rule lives): for
   each dependency entry whose package some repository of the workspace provides (a `workspace:`
   range needs one in its own repository), it adds a consumer at `<repository>::<manifest
   path>::<field>::<name>` (the range travels in `Consumer::method`, which is `serde(skip)`) and a
@@ -245,25 +247,30 @@ give byte-identical output.
   `Unchecked` for a missing range or version, a `workspace:`/`file:`/`link:`/`npm:` range, a git
   or URL source, a tag such as `latest`, a range past `MAX_RANGE`, and any range with a token
   that is not a comparator (the crate parses `foo 1.2.3` as `1.2.3`). The flag is computed at
-  query time and stores nothing. `import(exports)` is the second workspace step, after
+  query time and stores nothing. `import(exports, providers)` is the second workspace step, after
   `consume`: for each import row whose package the importing file's nearest manifest
   (`nearest`: the deepest directory holding it, named or not) depends on in any field, it
   resolves the call in every provider of that package (a `workspace:` range: its own repository
-  only) through `Provided::resolve`: `entry` gives the file (`exports` through `exported`, the
-  table-tested lookup of spec #22: exact key, then the `*` pattern with the longest prefix, the
-  first of `types`, `import`, `default`, `require` at each level, `null` blocking, a key or a
-  target with two `*` not read; without
-  `exports`, the first of `types`, `module`, `main` for the bare name, or the subpath with the
-  trunk's extension and `index` rules, `path`), which must stay inside the package directory
-  (`inside`) and be a source file the provider indexes, not a `.d.ts`. One that is build output
+  only) through `Provided::resolve`: `ways` gives the ways in, each with the files it names and
+  its `How` (`exports` through `exported`, the table-tested lookup of spec #22: exact key, then
+  the `*` pattern with the longest prefix, the first of `types`, `import`, `default`, `require`
+  at each level, `null` blocking, a key or a target with two `*` not read, the only way in when
+  present; without `exports`, for the bare name one way for each of `types`, `module`, `main`
+  present, tried in that order, or, with none of the three, the subpath `./index` as a path;
+  for any other subpath, the subpath itself, as a path with the trunk's extension and `index`
+  rules, `path`). A file must stay inside the package directory (`inside`) and be a source file
+  the provider indexes, not a `.d.ts`; the first way that leads to one, directly or through the
+  mapping, wins, so a field that leads nowhere does not stop the search. One that is build output
   maps back to source: `mapped` takes the `tsconfig.json` in the package directory; only when that
   file is absent or invalid (stored as `null`, no `Config`) the repository root's, and a valid
   one without a usable `outDir` maps nothing, with no fallback. `roots` turns its `outDir` and `rootDir` (relative to that config;
   `rootDir` defaults to the package directory) into repository directories, and `sources`
   (the pure, table-tested mapping) swaps the entry's `.d.ts`, `.js`, `.mjs`, `.cjs` or `.jsx` for
   each pack extension in `EXTENSIONS` order under `rootDir`; the first the provider indexes wins,
-  `inferred` with `how` `outDir`. When neither the field nor the mapping finds a file, the
-  import is `ambiguous` with `how` the field that named the entry: `candidates` gives the
+  `inferred` with `how` `outDir`. When no way finds a file, directly or through the mapping, the
+  import is `ambiguous` and `how` names the declared field or rule whose entry could not be
+  followed to a source file (the first way tried: `exports`, the first of `types`, `module`,
+  `main` present, or `path`): `candidates` gives the
   symbol the chain names in every source file whose nearest manifest is this package's (not a
   nested package's, not one under a `node_modules` segment, not a `.d.ts`) and that exports its
   head (sorted, one hop each; none, nothing). The files by owning manifest are grouped once per
@@ -282,8 +289,9 @@ give byte-identical output.
   `Consumer::hops`, both `serde(skip)`), and each resolution an `imports` row `{site, specifier,
   name, level, how, target}`. `link` then gives a call with hops, instead of the manifest, the
   symbol in each provider whose package link it would have, at the weaker of the two levels,
-  with the reason `<package reason>; import <how>` (`exports`, `types`, `module`, `main`, `path` or
-  `outDir`). The hop is derived at query time from stored facts and never stored; an import of a
+  with the reason `<package reason>; import <how>` (`How::name`: `exports`, `types`, `module`,
+  `main`, `path` or `outDir`; on an `ambiguous` link, the field or rule whose entry could not be
+  followed to a source file). The hop is derived at query time from stored facts and never stored; an import of a
   package outside the workspace, or that resolves nowhere, appears in no export. A re-export of
   another package inside the provider ends the lookup (no second hop). No lockfile is read and
   no registry queried.
@@ -571,7 +579,10 @@ give byte-identical output.
   call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
   target, where `level` is the import's own level (how certain the entry and the name were), not
   the hop's: the link from that call carries the hop's level, the weaker of it and the package
-  link's; a provider has
+  link's. `how` is the field or rule that named the entry (`exports`, `types`, `module`,
+  `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
+  `ambiguous` import it names the declared field or rule whose entry could not be followed to a
+  source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
   absent when empty) when a document gives its route or channel side one; a consumer has the same
   `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
@@ -608,7 +619,28 @@ give byte-identical output.
   (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
   a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
   calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
-  whole workspace's providers. A kind's rules stay in its own file.
+  whole workspace's providers. A kind's rules stay in its own file. A kind whose consumers
+  need providers from other repositories (a package depends on one the workspace holds) adds a
+  workspace step: `Engine::exports` runs it after every `declare`, as `package::consume` (the
+  dependency entries) and `package::import` (the calls through an import) are, over a
+  `Providers` index built once, and `link` reads what the step left on the consumer. Such a
+  consumer is no open item when ambiguous: `items.rs` (`decidable`) skips the contracts of the
+  kind explicitly, since several providers of a name are no call for a person to decide. Its
+  sites show in `context` and `search` through hooks in `engine.rs`: `package::place` names where
+  a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
+  calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
+  of the contract itself, with the roles `sides` names.
+- New **package ecosystem** (spec #22 user story 26, track B packs): a pack for another manifest
+  format (`Cargo.toml`, `pyproject.toml`, `go.mod`) plugs in beside npm without a new kind of
+  contract. Discovery is a file name in `manifests_found` (`index.rs`), which stamps the file
+  into `manifests` like `package.json`; a reader per ecosystem, beside `package::read`, turns
+  its bytes into the same `Summary` (name, version, dependency entries, entry fields) and never
+  fails; the contract is `package::<ecosystem>::<name>` (`package::npm::<name>` is the first),
+  so `PREFIX` still routes it to the same `declare`, `consume`, `link`, `place` and `reached`;
+  and the reason grammar and `flag` stay the one function each, with the ecosystem's range
+  syntax checked there (a range it cannot check is `range unchecked`). Resolving an import
+  into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
+  stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
   its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
@@ -670,7 +702,11 @@ give byte-identical output.
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes and the external references met, the
   hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
-  document it could not read). `Call::args`,
+  document it could not read), and what spec #22 stores of the build and package files: the
+  `manifests` summaries of each `package.json` (name, version, the dependency ranges as
+  written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
+  (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
+  the definition or file they name). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
@@ -741,7 +777,10 @@ give byte-identical output.
   `@example/sealed` (`main` into `dist`, a `tsconfig.json` with no `rootDir`, two files exporting
   `seal`) is `ambiguous` with both listed; `web/e2e/` declares the kit in `devDependencies` and crosses, and
   `web/tools/`, whose own manifest does not declare the kit though the root one does, does not.
-  The freshness test also asserts the calls through the renamed export and subpath no longer
+  `shared` also holds `@example/dts` (`types` to a declaration file that is no source, `main` to
+  `index.js`: `exact`, `import main`), `@example/plain` (no entry field, an `index.ts`: `exact`,
+  `path`) and `@example/bare` (no entry field and no `index`, one file exporting the name:
+  `ambiguous`, `path`), called from `web/src/entries.ts`. The freshness test also asserts the calls through the renamed export and subpath no longer
   cross. Hidden names in the trunk: `conformance-ts-js/src/shadow.ts` (`catch`, `for ... of`,
   `let`, `var`, an arrow parameter without parentheses, nested and array parameter patterns, a
   same-scope constant and parameter, each never `exact`) and two value-flow cases in
