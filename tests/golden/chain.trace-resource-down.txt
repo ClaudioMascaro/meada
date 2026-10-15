@@ -1,0 +1,5 @@
+example.com/chain/gateway src/orders.ts:10 cancelOrder
+  →[declared: resource::postgres::orders] example.com/chain/catalog (repository-level)
+  →[declared: resource::postgres::orders] example.com/chain/worker src/jobs.ts:4 settleOrders
+    example.com/chain/worker src/notify.ts:1 notify
+chain: declared · 2 hops · 3 repos · 86 tokens

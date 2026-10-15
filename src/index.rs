@@ -18,7 +18,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -605,6 +605,9 @@ pub(crate) struct CallSite {
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) gateway: Option<String>,
 }
 
 /// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
@@ -686,6 +689,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
+                gateway: None,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

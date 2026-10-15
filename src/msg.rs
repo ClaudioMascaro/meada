@@ -35,6 +35,12 @@ pub enum Msg<'a> {
         found: usize,
         max: usize,
     },
+    ViaUnmatched {
+        contract: &'a str,
+        via: &'a str,
+    },
+    ViaFallback(&'a str),
+    UnlinkedResource(&'a str),
     KeyMissing(&'a str),
     KeyLater {
         key: &'a str,
@@ -45,6 +51,9 @@ pub enum Msg<'a> {
         file: &'a str,
     },
     TrackA,
+    NotLowercase(&'a str),
+    NoLeadingSlash(&'a str),
+    Empty,
     About,
     Index,
     Status,
@@ -160,6 +169,18 @@ impl Msg<'_> {
                 format!("the workspace has {found} repositories; v0.1 reads at most {max}"),
                 format!("o workspace tem {found} repositórios; a v0.1 lê no máximo {max}"),
             ),
+            Msg::ViaUnmatched { contract, via } => pick(
+                format!("{contract}: `via` {via} matches no symbol, ignored"),
+                format!("{contract}: `via` {via} não corresponde a nenhum símbolo, ignorado"),
+            ),
+            Msg::ViaFallback(contract) => pick(
+                format!("{contract}: no `via` matches a symbol, so the repository as a whole is the side"),
+                format!("{contract}: nenhum `via` corresponde a um símbolo, então o repositório inteiro é o lado"),
+            ),
+            Msg::UnlinkedResource(contract) => pick(
+                format!("{contract} is unlinked: no writer and reader in different repositories"),
+                format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
+            ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
             Msg::KeyLater { key, release } => pick(
                 format!("`{key}` is not in v0.1; {release}"),
@@ -170,9 +191,24 @@ impl Msg<'_> {
                 format!("`{key}` não é uma chave do {file}"),
             ),
             Msg::TrackA => pick(
-                "track A adds it (resources and gateway)".into(),
-                "a trilha A a adiciona (recursos e gateway)".into(),
+                "track A adds it (OpenAPI and AsyncAPI documents)".into(),
+                "a trilha A a adiciona (documentos OpenAPI e AsyncAPI)".into(),
             ),
+            Msg::NotLowercase(value) => pick(
+                format!(
+                    "`{value}` is not a lowercase identifier \
+                     (ASCII letters, digits and hyphens, starting with a letter)"
+                ),
+                format!(
+                    "`{value}` não é um identificador em minúsculas \
+                     (letras ASCII, dígitos e hífens, começando por uma letra)"
+                ),
+            ),
+            Msg::NoLeadingSlash(value) => pick(
+                format!("`{value}` must start with `/`"),
+                format!("`{value}` deve começar com `/`"),
+            ),
+            Msg::Empty => pick("is empty".into(), "está vazio".into()),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
                 "Grafo de código sem LLM para agentes e pessoas".into(),

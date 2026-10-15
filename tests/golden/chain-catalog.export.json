@@ -139,7 +139,13 @@
       "site": "example.com/chain/catalog::app/api/events/route.ts::POST"
     }
   ],
-  "consumers": [],
+  "consumers": [
+    {
+      "contract": "resource::postgres::orders",
+      "site": "example.com/chain/catalog",
+      "via": null
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",

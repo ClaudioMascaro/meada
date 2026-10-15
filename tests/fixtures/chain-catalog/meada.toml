@@ -1,3 +1,9 @@
 # C: the Next.js catalog.
 [serve]
 hosts = ["catalog.example.com"]
+
+# Reads the `orders` table too, without naming a symbol: a repository-level reader.
+[[resource]]
+kind = "postgres"
+id = "orders"
+role = "read"

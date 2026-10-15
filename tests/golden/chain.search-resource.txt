@@ -1,0 +1,3 @@
+example.com/chain/catalog (repository-level) resource::postgres::orders
+example.com/chain/gateway src/orders.ts:10 resource::postgres::orders
+example.com/chain/worker src/jobs.ts:4 resource::postgres::orders
