@@ -16,7 +16,7 @@ use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
-use crate::package::{self, Dependency, Hop, Import, ImportCall, Manifest, Package};
+use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
@@ -42,7 +42,8 @@ const SCHEMA_VERSION: i64 = 15;
 /// is cached too. `manifests` holds each `package.json` (spec #22) the same way, its `summary`
 /// being `package::Summary` as JSON (name, version, dependency entries and the entry fields
 /// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
-/// name keeps its row too. An `import` row of `contracts` is a call through a binding imported
+/// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
+/// `package::Tsconfig` (`out_dir`, `root_dir`). An `import` row of `contracts` is a call through a binding imported
 /// from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
 /// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
@@ -236,9 +237,16 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         now,
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
-    refresh_stamped(&tx, "manifests", &manifests_found(&all), now, |_, src| {
-        Ok(serde_json::to_string(&package::read(src))?)
-    })?;
+    refresh_stamped(
+        &tx,
+        "manifests",
+        &manifests_found(&all),
+        now,
+        |path, src| match package::is_tsconfig(path) {
+            true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
+            false => Ok(serde_json::to_string(&package::read(src))?),
+        },
+    )?;
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -537,12 +545,14 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The `package.json` files of a repository (path and absolute path), but those under a
-/// `node_modules` directory, which the walk finds when `.gitignore` does not list it.
+/// The `package.json` and `tsconfig.json` files of a repository (path and absolute path), but
+/// those under a `node_modules` directory, which the walk finds when `.gitignore` does not list
+/// it.
 fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
     let is_manifest = |path: &str| {
         let mut segments = path.split('/').rev();
-        segments.next() == Some("package.json") && !segments.any(|s| s == "node_modules")
+        matches!(segments.next(), Some("package.json" | "tsconfig.json"))
+            && !segments.any(|s| s == "node_modules")
     };
     (walked.iter())
         .filter(|(path, _)| is_manifest(path))
@@ -772,6 +782,10 @@ pub(crate) struct Export {
     /// `dependencies` and consumers.
     #[serde(skip)]
     pub(crate) manifests: Vec<Manifest>,
+    /// The `tsconfig.json` files read (spec #22), in path order: `package::import` maps a
+    /// package's build output back to source through them.
+    #[serde(skip)]
+    pub(crate) tsconfigs: Vec<Config>,
     /// The packages the repository provides, by name, then directory.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) packages: Vec<Package>,
@@ -1104,14 +1118,19 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let manifests: Vec<Manifest> = (rows.into_iter())
-        .map(|(path, summary)| {
-            Ok(Manifest {
+    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
+    for (path, summary) in rows {
+        match package::is_tsconfig(&path) {
+            true => tsconfigs.push(Config {
+                path,
+                tsconfig: serde_json::from_str(&summary)?,
+            }),
+            false => manifests.push(Manifest {
                 path,
                 summary: serde_json::from_str(&summary)?,
-            })
-        })
-        .collect::<Result<_>>()?;
+            }),
+        }
+    }
     // Only a repository with a manifest can import a package, and only one with a named
     // manifest provides one: the rows that resolve imports are read for those alone.
     let import_calls = match manifests.is_empty() {
@@ -1158,6 +1177,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         bindings,
         publishes,
         manifests,
+        tsconfigs,
         packages: Vec::new(),
         dependencies: Vec::new(),
         import_calls,
@@ -1248,6 +1268,9 @@ mod tests {
         let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
         let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
+        let src = fs::read(tests.join("fixtures/schema/sample.tsconfig.json")).unwrap();
+        let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
+        actual += &format!("\nsample.tsconfig.json\n{summary}\n");
 
         let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
         let Ok(expected) = fs::read_to_string(&golden) else {

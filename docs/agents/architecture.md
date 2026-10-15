@@ -193,7 +193,8 @@ give byte-identical output.
   hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json` the walk
   finds (`manifests_found`: any path with a `node_modules` segment is skipped, since the walk
   yields it unless `.gitignore` lists it), a nameless one too, whatever `serve.declared` says;
-  `export` loads them as `Export::manifests` (`serde(skip)`). With the contracts, `refresh`
+  `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
+  (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
   rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
   name with the `file` and `target` definition it names, `target` NULL for a whole file and
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
@@ -237,12 +238,23 @@ give byte-identical output.
   first of `types`, `import`, `default`, `require` at each level, `null` blocking, a key or a
   target with two `*` not read; without
   `exports`, the first of `types`, `module`, `main` for the bare name, or the subpath with the
-  trunk's extension and `index` rules, `path`), which must be a source file the provider indexes,
-  not a `.d.ts`, and stay inside the package directory (`inside`); `lookup` then reads the chain's
+  trunk's extension and `index` rules, `path`), which must stay inside the package directory
+  (`inside`) and be a source file the provider indexes, not a `.d.ts`. One that is build output
+  maps back to source: `mapped` takes the `tsconfig.json` in the package directory (else the
+  repository root's), `roots` turns its `outDir` and `rootDir` (relative to that config;
+  `rootDir` defaults to the package directory) into repository directories, and `sources`
+  (the pure, table-tested mapping) swaps the entry's `.d.ts`, `.js`, `.mjs`, `.cjs` or `.jsx` for
+  each pack extension in `EXTENSIONS` order under `rootDir`; the first the provider indexes wins,
+  `inferred` with `how` `outDir`. When neither the field nor the mapping finds a file, the
+  import is `ambiguous` with `how` the field that named the entry: `candidates` gives the
+  symbol the chain names in every source file whose nearest manifest is this package's and that
+  exports its head (sorted, one hop each; none, nothing). `lookup` then reads the chain's
   head from the `exports` rows (the file's own export of the name decides; else its `export *`
   files, never for `default`, two that give it differently making it ambiguous and so not
   exported, as in ES modules; `seen` cuts cycles) and each further name as a member of that
-  definition or a name of a whole file. `import` skips a specifier no repository provides before
+  definition or a name of a whole file. A `tsconfig.json` has a row in `manifests` too, read
+  by `read_tsconfig` (`out_dir`, `root_dir`; `Export::tsconfigs`, `serde(skip)`; `extends` is not
+  followed, as the trunk follows none), so an edit relinks like a `package.json` one. `import` skips a specifier no repository provides before
   reading anything else, and builds a provider's tables (`Provided`) the first time an import
   reaches it; `index::export` reads the `import` rows only for a repository with a manifest and
   the `exports` rows only for one with a named manifest. A call resolved in one provider at least
@@ -251,8 +263,8 @@ give byte-identical output.
   `Consumer::hops`, both `serde(skip)`), and each resolution an `imports` row `{site, specifier,
   name, level, how, target}`. `link` then gives a call with hops, instead of the manifest, the
   symbol in each provider whose package link it would have, at the weaker of the two levels,
-  with the reason `<package reason>; import <how>` (`exports`, `types`, `module`, `main` or
-  `path`). The hop is derived at query time from stored facts and never stored; an import of a
+  with the reason `<package reason>; import <how>` (`exports`, `types`, `module`, `main`, `path` or
+  `outDir`). The hop is derived at query time from stored facts and never stored; an import of a
   package outside the workspace, or that resolves nowhere, appears in no export. A re-export of
   another package inside the provider ends the lookup (no second hop). No lockfile is read and
   no registry queried.
@@ -704,7 +716,11 @@ give byte-identical output.
   calls `greet` too; `mono`'s `a` has `main`, called from `b` (`workspace:*`, exact) and `c`
   (ambiguous with `fork`). `shared` also holds `@example/typed` (`types` to a source) and
   `@example/esm` (`module` to a `.mjs`, and subpaths read as paths, one through `index`), which
-  `web/src/entries.ts` calls; `web/e2e/` declares the kit in `devDependencies` and crosses, and
+  `web/src/entries.ts` calls; the root package `@example/shared` ships build output, with an `exports`
+  map into `dist` (conditions, a `./utils/*` pattern), a `tsconfig.json` (`outDir`, `rootDir`) and
+  `src/`, which `web/src/text.ts` and `api/src/label.js` call (`inferred`, `import outDir`), and
+  `@example/sealed` (`main` into `dist`, a `tsconfig.json` with no `rootDir`, two files exporting
+  `seal`) is `ambiguous` with both listed; `web/e2e/` declares the kit in `devDependencies` and crosses, and
   `web/tools/`, whose own manifest does not declare the kit though the root one does, does not.
   The freshness test also asserts the calls through the renamed export and subpath no longer
   cross. Hidden names in the trunk: `conformance-ts-js/src/shadow.ts` (`catch`, `for ... of`,
@@ -712,7 +728,9 @@ give byte-identical output.
   same-scope constant and parameter, each never `exact`) and two value-flow cases in
   `http-fetch-param` (a `for ... of` hiding a constant URL, a `catch` hiding a parameter that
   defaults to `fetch`). Goldens `pkg-web.trace-down.txt` (from the call into `greet` and on to
-  `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`).
+  `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`), and `pkg-web.trace-down-outdir.txt`,
+  `pkg-shared.trace-up-outdir.txt` for the calls through `@example/shared`; an invalid, hostile or
+  edited nested `tsconfig.json` is tested the same way as a `package.json` (refreshed equals cold).
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
@@ -821,9 +839,15 @@ give byte-identical output.
   calls a longer one `range unchecked`. Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
-  read (one `*` in a target keeps every expansion the size of the subpath), and an entry that is
-  not a source file (a `.d.ts`, build output) resolves nothing yet
-  (no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
+  read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
+  like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
+  empty, and `roots` voids the mapping for an absolute `outDir` or `rootDir`, one with an empty or
+  `..` segment, or an `outDir` that is the config's own directory (a path read from a config stays
+  inside the repository; nothing is opened on disk, the mapped file must be one the walk indexed,
+  and the walk follows no symlink). `extends` is not followed (`ponytail:` in `Tsconfig`; the
+  trunk follows none for `paths` either): a base config's `outDir` counts as absent, so such an
+  entry is `ambiguous`; `declarationDir` is not read, and a package with no `rootDir` maps
+  `dist/index.js` to `index.ts` at its own directory. Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
