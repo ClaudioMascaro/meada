@@ -95,6 +95,12 @@ pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
 
+/// Every pack, in `PACKS` order.
+#[cfg(test)]
+pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
+    PACKS.iter().copied()
+}
+
 /// One file's facts, each list in source order. The index keeps them, so a refresh resolves
 /// unchanged files without parsing them again.
 #[derive(Default, Serialize, Deserialize)]

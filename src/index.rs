@@ -19,8 +19,8 @@ use crate::lang::{self, Facts};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
-/// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
-/// version is deleted and rebuilt.
+/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
+/// `summary`: an index with another version is deleted and rebuilt.
 const SCHEMA_VERSION: i64 = 14;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
@@ -173,7 +173,8 @@ struct Rows {
 /// file's exports, re-export chains, name inference, config changes and inline route
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
 /// repository, since constants and client wrappers reach across files. Deleted files leave
-/// the index. The result equals a refresh of an empty index over the same files.
+/// the index. The result equals a refresh of an empty index over the same files. Stored facts
+/// that do not parse (a change that missed its `SCHEMA_VERSION` bump) rebuild the index.
 ///
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
@@ -281,16 +282,23 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
 
     // The facts of every file: parsed now, or kept from the index.
     let changed_paths: HashSet<&str> = changed.iter().map(|p| p.path.as_str()).collect();
-    let mut kept: Vec<(String, Facts)> = Vec::new();
-    for row in tx
+    let rows = tx
         .prepare("SELECT path, facts FROM files")?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-    {
-        let (path, facts) = row?;
-        if !changed_paths.contains(path.as_str()) {
-            kept.push((path, serde_json::from_str(&facts)?));
-        }
-    }
+        .collect::<rusqlite::Result<Vec<(String, String)>>>()?;
+    let kept: Option<Vec<(String, Facts)>> = rows
+        .into_iter()
+        .filter(|(path, _)| !changed_paths.contains(path.as_str()))
+        .map(|(path, facts)| Some((path, serde_json::from_str(&facts).ok()?)))
+        .collect();
+    let Some(kept) = kept else {
+        // Facts this version cannot read, stored before a change that missed its version
+        // bump: rebuild, as for another version. Without the identity, the next pass starts
+        // over and keeps nothing.
+        drop(tx);
+        db.execute("DELETE FROM meta", [])?;
+        return refresh(db, root, identity, serve);
+    };
     let all: BTreeMap<&str, &Facts> = changed
         .iter()
         .map(|p| (p.path.as_str(), &p.facts))
@@ -1021,4 +1029,60 @@ fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {
         start: row.get(at + 1)?,
         end: row.get(at + 2)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::{SCHEMA, SCHEMA_VERSION};
+    use crate::{document, lang};
+
+    /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
+    /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never
+    /// rewritten in place, so a change fails until the version is bumped; `MEADA_BLESS=1` then
+    /// writes the new version's golden and removes the old one.
+    #[test]
+    fn the_stored_format_changes_only_with_the_schema_version() {
+        let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+        let mut actual = SCHEMA.trim_start().to_string();
+        for pack in lang::packs() {
+            let name = format!("sample.{}", pack.extensions()[0]);
+            let src = fs::read(tests.join("fixtures/schema").join(&name)).unwrap_or_else(|_| {
+                panic!("add tests/fixtures/schema/{name}, a sample of the facts its pack stores")
+            });
+            let facts = pack.parse(&name, &src).unwrap();
+            let facts = serde_json::to_string_pretty(&facts).unwrap();
+            actual += &format!("\n{name}\n{facts}\n");
+        }
+        for name in ["sample.openapi.yaml", "sample.asyncapi.yaml"] {
+            let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
+            let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();
+            actual += &format!("\n{name}\n{summary}\n");
+        }
+
+        let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
+        let Ok(expected) = fs::read_to_string(&golden) else {
+            assert!(
+                std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1"),
+                "missing {}; run with MEADA_BLESS=1 to create it",
+                golden.display()
+            );
+            for old in fs::read_dir(tests.join("golden")).unwrap() {
+                let old = old.unwrap().file_name().into_string().unwrap();
+                if old.starts_with("schema.v") && old.ends_with(".txt") {
+                    fs::remove_file(tests.join("golden").join(old)).unwrap();
+                }
+            }
+            fs::write(&golden, actual).unwrap();
+            return;
+        };
+        assert!(
+            actual == expected,
+            "the stored format differs from {}: bump SCHEMA_VERSION, then rerun with \
+             MEADA_BLESS=1 to write the new version's golden\n--- actual ---\n{actual}",
+            golden.display()
+        );
+    }
 }

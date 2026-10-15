@@ -529,8 +529,15 @@ give byte-identical output.
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
-- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
-  index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
+- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
+  a document's stored `summary`. A unit test in `index.rs` keeps all three in
+  `tests/golden/schema.v<version>.txt` (the facts of each pack's
+  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml` and
+  `sample.asyncapi.yaml` there) and never re-blesses it in place: a change
+  fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
+  An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
+  so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
+  a file changed), which `status` cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
@@ -642,10 +649,11 @@ give byte-identical output.
   second item written.
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
+- `scripts/edges <dir>[=<origin url>] [<peer dir>...]` is the repro harness for reviewing a
+  resolution or contract change: it copies the directories as sibling repositories, exports the
+  first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
-
-Each is marked `ponytail:` at its site unless noted.
 
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
