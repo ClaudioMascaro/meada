@@ -2,6 +2,14 @@
   "repository": "example.com/pkg/shared",
   "files": [
     {
+      "path": "bare/src/thing.ts",
+      "hash": "fb725627c93b6242e467c185daea658723d84fa2c3bd725f8bb5f07e9aa90574"
+    },
+    {
+      "path": "dts/index.js",
+      "hash": "f936b835c1860bca4f822ee8a9ceeb39ff61915c831dc165015446417c11b2ca"
+    },
+    {
       "path": "esm/lib/parts/index.ts",
       "hash": "f13869d7bbddb89e5feba9a21850ad9d2b9abf79c1ea4bdab535fdf009c1b392"
     },
@@ -42,6 +50,10 @@
       "hash": "f76b02cee77f96941152b79568cf54d41e6758a3f0708b3cb2bd8a008bdcaaf3"
     },
     {
+      "path": "plain/index.ts",
+      "hash": "016f1c092cff2ae70d39e0d4071eda485c70377fbf138a555df371e65ffb1802"
+    },
+    {
       "path": "sealed/src/one.ts",
       "hash": "4168d8686775eec83309aaf2b50b2372b36ea6cd3fafd0782ef7d284b8217ff7"
     },
@@ -71,6 +83,22 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/pkg/shared::bare/src/thing.ts::thing",
+      "span": {
+        "path": "bare/src/thing.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::dts/index.js::dts",
+      "span": {
+        "path": "dts/index.js",
+        "start": 7,
+        "end": 41
+      }
+    },
     {
       "id": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
       "span": {
@@ -173,6 +201,14 @@
         "path": "kit/src/utils/slug.ts",
         "start": 7,
         "end": 78
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::plain/index.ts::plain",
+      "span": {
+        "path": "plain/index.ts",
+        "start": 7,
+        "end": 53
       }
     },
     {
@@ -346,12 +382,24 @@
   ],
   "providers": [
     {
+      "contract": "package::npm::@example/bare",
+      "site": "example.com/pkg/shared::bare/package.json"
+    },
+    {
+      "contract": "package::npm::@example/dts",
+      "site": "example.com/pkg/shared::dts/package.json"
+    },
+    {
       "contract": "package::npm::@example/esm",
       "site": "example.com/pkg/shared::esm/package.json"
     },
     {
       "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/shared::kit/package.json"
+    },
+    {
+      "contract": "package::npm::@example/plain",
+      "site": "example.com/pkg/shared::plain/package.json"
     },
     {
       "contract": "package::npm::@example/sealed",
@@ -369,6 +417,18 @@
   "consumers": [],
   "packages": [
     {
+      "name": "@example/bare",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "bare"
+    },
+    {
+      "name": "@example/dts",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "dts"
+    },
+    {
       "name": "@example/esm",
       "version": "1.0.0",
       "repository": "example.com/pkg/shared",
@@ -379,6 +439,12 @@
       "version": "2.1.0",
       "repository": "example.com/pkg/shared",
       "directory": "kit"
+    },
+    {
+      "name": "@example/plain",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "plain"
     },
     {
       "name": "@example/sealed",
@@ -457,6 +523,20 @@
       "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
     },
     {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/bare",
+      "provider": "example.com/pkg/shared::bare/package.json",
+      "contract": "package::npm::@example/bare",
+      "level": "exact",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/dts",
+      "provider": "example.com/pkg/shared::dts/package.json",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0)"
+    },
+    {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/esm",
       "provider": "example.com/pkg/shared::esm/package.json",
       "contract": "package::npm::@example/esm",
@@ -469,6 +549,13 @@
       "contract": "package::npm::@example/kit",
       "level": "exact",
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/plain",
+      "provider": "example.com/pkg/shared::plain/package.json",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
@@ -541,6 +628,13 @@
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
     },
     {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "provider": "example.com/pkg/shared::dts/index.js::dts",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/pkg/web::src/entries.ts::entries::esm#0",
       "provider": "example.com/pkg/shared::esm/src/index.mjs::esm",
       "contract": "package::npm::@example/esm",
@@ -553,6 +647,20 @@
       "contract": "package::npm::@example/esm",
       "level": "exact",
       "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "provider": "example.com/pkg/shared::plain/index.ts::plain",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "provider": "example.com/pkg/shared::bare/src/thing.ts::thing",
+      "contract": "package::npm::@example/bare",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0); import path"
     },
     {
       "consumer": "example.com/pkg/web::src/entries.ts::entries::tool#0",

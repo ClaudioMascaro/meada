@@ -52,6 +52,12 @@ const FIELDS: [&str; 4] = [
 /// The prefix of a range that keeps a dependency inside its own repository.
 const WORKSPACE: &str = "workspace:";
 
+/// Whether a dependency `range` may reach a provider: a `workspace:` range keeps only the
+/// dependent's own repository (`own`), any other reaches every repository of the workspace.
+fn reaches(range: Option<&str>, own: bool) -> bool {
+    own || !range.is_some_and(|r| r.starts_with(WORKSPACE))
+}
+
 /// The conditions of an `exports` target Meada reads, in order: at each level the first one
 /// present is taken, and no other is followed.
 const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
@@ -181,15 +187,40 @@ pub struct ImportCall {
     pub chain: String,
 }
 
+/// What resolved an import in a provider: the declared field or rule that named the entry, or
+/// `OutDir` when the output-to-source mapping found the file. For an `ambiguous` import, the
+/// field or rule whose entry could not be followed to a source file.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum How {
+    Exports,
+    Types,
+    Module,
+    Main,
+    Path,
+    OutDir,
+}
+
+impl How {
+    pub fn name(self) -> &'static str {
+        match self {
+            How::Exports => "exports",
+            How::Types => "types",
+            How::Module => "module",
+            How::Main => "main",
+            How::Path => "path",
+            How::OutDir => "outDir",
+        }
+    }
+}
+
 /// Where a call through a package import resolves in one provider of the package.
 pub struct Hop {
     /// The provider's site: its manifest.
     pub manifest: String,
     /// The symbol reached.
     pub target: String,
-    /// What resolved the import: `exports`, `types`, `module`, `main`, `path`, or `outDir` when
-    /// the output-to-source mapping found the file.
-    pub how: &'static str,
+    pub how: How,
     /// The import's level.
     pub level: Level,
 }
@@ -203,7 +234,7 @@ pub struct Import {
     /// What the call names of the import.
     pub name: String,
     pub level: Level,
-    pub how: &'static str,
+    pub how: How,
     pub target: String,
 }
 
@@ -377,34 +408,43 @@ fn nearest<'m>(manifests: &'m [Manifest], path: &str) -> Option<&'m Manifest> {
         .max_by_key(|m| m.path.len())
 }
 
-/// The files an import of `subpath` of the package at `manifest` may name, most likely first,
-/// and what named them: `exports` when the manifest has it; else, for the bare name, the first
-/// of `types`, `module` and `main` present; else the subpath as a path inside the package, with
-/// the trunk's extension and `index` rules (`path`). Every file stays inside the package
-/// directory.
-fn entry(manifest: &Manifest, subpath: &str) -> Option<(&'static str, Vec<String>)> {
+/// The ways an import of `subpath` of the package at `manifest` may be followed, in the order to
+/// try them, each with the files it may name (most likely first) and what named them: `exports`
+/// when the manifest has it, the only way in; else, for the bare name, one for each of `types`,
+/// `module` and `main` present; else the subpath as a path inside the package, with the trunk's
+/// extension and `index` rules (`path`), the bare name being `./index`. Every file stays inside
+/// the package directory.
+fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
     let dir = directory(&manifest.path);
     let s = &manifest.summary;
+    let path = |subpath: &str| {
+        let files = with_extensions(&inside(dir, subpath.strip_prefix("./")?)?);
+        Some((How::Path, files))
+    };
     if let Some(exports) = &s.exports {
-        let target = exported(exports, subpath)?;
-        return Some(("exports", vec![inside(dir, target.strip_prefix("./")?)?]));
+        let followed = || {
+            let target = exported(exports, subpath)?;
+            Some((How::Exports, vec![inside(dir, target.strip_prefix("./")?)?]))
+        };
+        return followed().into_iter().collect();
     }
-    if subpath == "." {
-        let fields = [
-            ("types", &s.types),
-            ("module", &s.module),
-            ("main", &s.main),
-        ];
-        let (how, target) = fields
-            .into_iter()
-            .find_map(|(how, t)| Some((how, t.as_deref()?)))?;
-        let target = target.strip_prefix("./").unwrap_or(target);
-        return Some((how, vec![inside(dir, target)?]));
+    if subpath != "." {
+        return path(subpath).into_iter().collect();
     }
-    Some((
-        "path",
-        with_extensions(&inside(dir, subpath.strip_prefix("./")?)?),
-    ))
+    let fields = [
+        (How::Types, &s.types),
+        (How::Module, &s.module),
+        (How::Main, &s.main),
+    ];
+    if fields.iter().all(|(_, t)| t.is_none()) {
+        return path("./index").into_iter().collect();
+    }
+    (fields.into_iter())
+        .filter_map(|(how, t)| {
+            let t = t.as_deref()?;
+            Some((how, vec![inside(dir, t.strip_prefix("./").unwrap_or(t))?]))
+        })
+        .collect()
 }
 
 /// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
@@ -460,10 +500,13 @@ struct Provided<'e> {
     owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
 
-/// What an import of a package resolved to in one provider: what named the entry (`outDir` when
-/// the output-to-source mapping found the file), the import's level, and the symbols reached,
-/// more than one only when ambiguous.
-type Resolved = (&'static str, Level, Vec<String>);
+/// What an import of a package resolved to in one provider: what named the entry, the import's
+/// level, and the symbols reached, more than one only when ambiguous.
+struct Resolved {
+    how: How,
+    level: Level,
+    targets: Vec<String>,
+}
 
 impl<'e> Provided<'e> {
     fn new(export: &'e Export) -> Self {
@@ -488,11 +531,13 @@ impl<'e> Provided<'e> {
 
     /// The symbol an import of `subpath` of the package at `manifest` of `repository` names as
     /// `chain`. The entry must be a source file the provider indexes: found by the declared
-    /// field it names, the import is `exact`; found through the package's `outDir` and
-    /// `rootDir` (`sources`), `inferred`. When neither leads to a file, the import is
-    /// `ambiguous` and every source file of the package that exports the chain's head gives a
-    /// symbol (`candidates`). The chain's head is what the file exports, and each further name
-    /// a member of that definition or a name the whole file exports.
+    /// field or rule that names it, the import is `exact`; found through the package's `outDir`
+    /// and `rootDir` (`sources`), `inferred`. Of the ways in (`ways`), the first that leads
+    /// to a file wins; a present field that leads nowhere does not stop the search. When none
+    /// does, the import is `ambiguous`, named by the first way, and every source file of the
+    /// package that exports the chain's head gives a symbol (`candidates`). The chain's head is
+    /// what the file exports, and each further name a member of that definition or a name the
+    /// whole file exports.
     fn resolve(
         &self,
         repository: &str,
@@ -500,19 +545,28 @@ impl<'e> Provided<'e> {
         subpath: &str,
         chain: &str,
     ) -> Option<Resolved> {
-        let (how, entries) = entry(manifest, subpath)?;
-        let (file, how, level) = match entries.iter().find(|c| self.source(c)) {
-            Some(file) => (file.clone(), how, Level::Exact),
-            None => match self.mapped(manifest, &entries) {
-                Some(file) => (file, "outDir", Level::Inferred),
-                None => {
-                    let ids = self.candidates(repository, manifest, chain);
-                    return (!ids.is_empty()).then_some((how, Level::Ambiguous, ids));
-                }
-            },
+        let tried = ways(manifest, subpath);
+        let first = tried.first()?.0;
+        let followed = tried.iter().find_map(|(how, files)| {
+            if let Some(file) = files.iter().find(|f| self.source(f)) {
+                return Some((file.clone(), *how, Level::Exact));
+            }
+            Some((self.mapped(manifest, files)?, How::OutDir, Level::Inferred))
+        });
+        let Some((file, how, level)) = followed else {
+            let targets = self.candidates(repository, manifest, chain);
+            return (!targets.is_empty()).then_some(Resolved {
+                how: first,
+                level: Level::Ambiguous,
+                targets,
+            });
         };
         let id = self.reach(repository, &file, chain)?;
-        Some((how, level, vec![id]))
+        Some(Resolved {
+            how,
+            level,
+            targets: vec![id],
+        })
     }
 
     /// The first source file the provider indexes that one of `entries`, build output inside
@@ -621,6 +675,29 @@ impl<'e> Provided<'e> {
     }
 }
 
+/// The providers of each package name of the workspace, as positions: the repository in
+/// `exports`, then its manifest in `Export::manifests`. Built once for the workspace steps
+/// (`consume`, `import`), both of which only add to the exports and never move a manifest.
+pub struct Providers(HashMap<String, Vec<(usize, usize)>>);
+
+impl Providers {
+    pub fn new(exports: &[Export]) -> Self {
+        let mut providers: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+        for (n, export) in exports.iter().enumerate() {
+            for (i, m) in export.manifests.iter().enumerate() {
+                if let Some(name) = &m.summary.name {
+                    providers.entry(name.clone()).or_default().push((n, i));
+                }
+            }
+        }
+        Self(providers)
+    }
+
+    fn of(&self, name: &str) -> &[(usize, usize)] {
+        self.0.get(name).map_or(&[], Vec::as_slice)
+    }
+}
+
 /// The workspace step after `consume`: each call through a package import, whose package the
 /// importing file's nearest manifest depends on (in any of the four fields) and some repository
 /// of the workspace provides (a `workspace:` range: its own), resolves in each such provider
@@ -628,15 +705,7 @@ impl<'e> Provided<'e> {
 /// at its site, the range of the entry in `Consumer::method` and where it resolves in
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider. Any other, an import of a package outside the workspace included, adds nothing.
-pub fn import(exports: &mut [Export]) {
-    let mut providers: HashMap<&str, Vec<(usize, &Manifest)>> = HashMap::new();
-    for (n, export) in exports.iter().enumerate() {
-        for m in &export.manifests {
-            if let Some(name) = &m.summary.name {
-                providers.entry(name).or_default().push((n, m));
-            }
-        }
-    }
+pub fn import(exports: &mut [Export], providers: &Providers) {
     // Built for a provider the first time an import reaches it.
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let mut found = Vec::new();
@@ -647,27 +716,24 @@ pub fn import(exports: &mut [Export]) {
             let Some((name, subpath)) = split(&call.specifier) else {
                 continue;
             };
-            let Some(candidates) = providers.get(name) else {
-                continue;
-            };
             let Some(entry) = nearest(&export.manifests, &call.path)
                 .and_then(|m| m.summary.dependencies.iter().find(|e| e.name == name))
             else {
                 continue;
             };
-            let local = entry
-                .range
-                .as_deref()
-                .is_some_and(|r| r.starts_with(WORKSPACE));
             let mut hops = Vec::new();
-            for &(m, manifest) in candidates {
-                if local && m != n {
+            for &(m, i) in providers.of(name) {
+                if !reaches(entry.range.as_deref(), m == n) {
                     continue;
                 }
                 let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
                 let repository = &exports[m].repository;
-                let Some((how, level, targets)) =
-                    at.resolve(repository, manifest, &subpath, &call.chain)
+                let manifest = &exports[m].manifests[i];
+                let Some(Resolved {
+                    how,
+                    level,
+                    targets,
+                }) = at.resolve(repository, manifest, &subpath, &call.chain)
                 else {
                     continue;
                 };
@@ -714,54 +780,41 @@ pub fn import(exports: &mut [Export]) {
 /// that names a package some repository of the workspace provides, a consumer and a
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
-pub fn consume(exports: &mut [Export]) {
-    let mut providers: HashMap<String, Vec<String>> = HashMap::new();
-    for export in exports.iter() {
-        for p in export
-            .providers
-            .iter()
-            .filter(|p| p.contract.starts_with(PREFIX))
-        {
-            providers
-                .entry(p.contract.clone())
-                .or_default()
-                .push(export.repository.clone());
-        }
-    }
-    for export in exports.iter_mut() {
-        let mut consumers = Vec::new();
-        let mut dependencies = Vec::new();
-        for manifest in &export.manifests {
-            for e in &manifest.summary.dependencies {
-                let contract = contract(&e.name);
-                let local = e.range.as_deref().is_some_and(|r| r.starts_with(WORKSPACE));
-                let fits = |repo: &&String| !local || **repo == export.repository;
-                if !providers
-                    .get(&contract)
-                    .is_some_and(|r| r.iter().any(|r| fits(&r)))
-                {
-                    continue;
+pub fn consume(exports: &mut [Export], providers: &Providers) {
+    let found: Vec<_> = (exports.iter().enumerate())
+        .map(|(n, export)| {
+            let mut consumers = Vec::new();
+            let mut dependencies = Vec::new();
+            for manifest in &export.manifests {
+                for e in &manifest.summary.dependencies {
+                    let range = e.range.as_deref();
+                    if !(providers.of(&e.name).iter()).any(|&(m, _)| reaches(range, m == n)) {
+                        continue;
+                    }
+                    consumers.push(Consumer {
+                        contract: Some(contract(&e.name)),
+                        site: format!(
+                            "{}::{}::{}::{}",
+                            export.repository, manifest.path, e.field, e.name
+                        ),
+                        via: None,
+                        shape: None,
+                        method: e.range.clone(),
+                        fragments: Vec::new(),
+                        hops: Vec::new(),
+                    });
+                    dependencies.push(Dependency {
+                        manifest: manifest.path.clone(),
+                        field: e.field.clone(),
+                        name: e.name.clone(),
+                        range: e.range.clone(),
+                    });
                 }
-                consumers.push(Consumer {
-                    contract: Some(contract),
-                    site: format!(
-                        "{}::{}::{}::{}",
-                        export.repository, manifest.path, e.field, e.name
-                    ),
-                    via: None,
-                    shape: None,
-                    method: e.range.clone(),
-                    fragments: Vec::new(),
-                    hops: Vec::new(),
-                });
-                dependencies.push(Dependency {
-                    manifest: manifest.path.clone(),
-                    field: e.field.clone(),
-                    name: e.name.clone(),
-                    range: e.range.clone(),
-                });
             }
-        }
+            (consumers, dependencies)
+        })
+        .collect();
+    for (export, (consumers, mut dependencies)) in exports.iter_mut().zip(found) {
         export.consumers.extend(consumers);
         index::sort_consumers(&mut export.consumers);
         dependencies.sort_by(|a, b| {
@@ -996,10 +1049,9 @@ impl ContractKind for Packages {
             return Vec::new();
         };
         let range = consumer.method.as_deref();
-        let local = range.is_some_and(|r| r.starts_with(WORKSPACE));
         let fits: Vec<_> = (providers.iter())
             .filter(|(repo, p)| {
-                p.contract == *contract && (!local || repo.identity == from.identity)
+                p.contract == *contract && reaches(range, repo.identity == from.identity)
             })
             .collect();
         let (level, n) = match fits.len() {
@@ -1032,7 +1084,7 @@ impl ContractKind for Packages {
                         provider: h.target.clone(),
                         contract: link.contract.clone(),
                         level: link.level.max(h.level),
-                        reason: format!("{}; import {}", link.reason, h.how),
+                        reason: format!("{}; import {}", link.reason, h.how.name()),
                         by: None,
                         p: None,
                     })
@@ -1332,20 +1384,31 @@ mod tests {
     }
 
     #[test]
-    fn without_exports_the_bare_name_takes_types_then_module_then_main() {
-        let at = |json: &str, subpath: &str| entry(&manifest("lib/package.json", json), subpath);
+    fn without_exports_the_bare_name_tries_types_then_module_then_main() {
+        let at = |json: &str, subpath: &str| ways(&manifest("lib/package.json", json), subpath);
         let all = r#"{"types": "./t.ts", "module": "m.ts", "main": "./main.ts"}"#;
-        assert_eq!(at(all, "."), Some(("types", vec!["lib/t.ts".into()])));
-        let two = r#"{"module": "m.ts", "main": "./main.ts"}"#;
-        assert_eq!(at(two, "."), Some(("module", vec!["lib/m.ts".into()])));
         assert_eq!(
-            at(r#"{"main": "src/index.js"}"#, "."),
-            Some(("main", vec!["lib/src/index.js".into()]))
+            at(all, "."),
+            [
+                (How::Types, vec!["lib/t.ts".into()]),
+                (How::Module, vec!["lib/m.ts".into()]),
+                (How::Main, vec!["lib/main.ts".into()]),
+            ]
         );
-        assert_eq!(at("{}", "."), None);
+        // A field that is absent, or cannot be followed, is skipped, not a stop.
+        let two = r#"{"types": "../t.ts", "main": "src/index.js"}"#;
+        assert_eq!(at(two, "."), [(How::Main, vec!["lib/src/index.js".into()])]);
+        // None of the fields: Node's default, `./index` as a path.
+        let [(how, files)] = &at("{}", ".")[..] else {
+            panic!("one way")
+        };
+        assert_eq!(*how, How::Path);
+        assert_eq!(&files[..2], ["lib/index", "lib/index.ts"]);
         // A subpath is a path inside the package, with the trunk's extension and index rules.
-        let (how, files) = at(all, "./util/x").unwrap();
-        assert_eq!(how, "path");
+        let [(how, files)] = &at(all, "./util/x")[..] else {
+            panic!("one way")
+        };
+        assert_eq!(*how, How::Path);
         assert_eq!(
             &files[..3],
             ["lib/util/x", "lib/util/x.ts", "lib/util/x.tsx"]
@@ -1353,24 +1416,24 @@ mod tests {
         assert!(files.contains(&"lib/util/x/index.ts".to_string()));
         // `exports`, when present, is the only way in, and its targets start with `./`.
         let both = r#"{"main": "./main.ts", "exports": {".": "./e.ts", "./bare": "e.ts"}}"#;
-        assert_eq!(at(both, "."), Some(("exports", vec!["lib/e.ts".into()])));
-        assert_eq!(at(both, "./util/x"), None);
-        assert_eq!(at(both, "./bare"), None);
+        assert_eq!(at(both, "."), [(How::Exports, vec!["lib/e.ts".into()])]);
+        assert!(at(both, "./util/x").is_empty());
+        assert!(at(both, "./bare").is_empty());
     }
 
     #[test]
     fn an_entry_never_leaves_the_package_directory() {
-        let at = |json: &str, subpath: &str| entry(&manifest("lib/package.json", json), subpath);
-        for main in ["../x.ts", "/x.ts", "./a/../../x.ts", "a//x.ts", "./", ""] {
+        let at = |json: &str, subpath: &str| ways(&manifest("lib/package.json", json), subpath);
+        for main in ["../x.ts", "/x.ts", "./a/../../x.ts", "a//x.ts", "./"] {
             let json = format!(r#"{{"main": {}}}"#, serde_json::to_string(main).unwrap());
-            assert_eq!(at(&json, "."), None, "{main}");
+            assert!(at(&json, ".").is_empty(), "{main}");
         }
         let star = r#"{"exports": {"./*": "./src/*.ts"}}"#;
-        assert_eq!(at(star, "./../../x"), None);
-        assert_eq!(at("{}", "./../x"), None);
+        assert!(at(star, "./../../x").is_empty());
+        assert!(at("{}", "./../x").is_empty());
         // At the repository root the package directory is the root.
         let root = manifest("package.json", r#"{"main": "./index.ts"}"#);
-        assert_eq!(entry(&root, "."), Some(("main", vec!["index.ts".into()])));
+        assert_eq!(ways(&root, "."), [(How::Main, vec!["index.ts".into()])]);
     }
 
     #[test]

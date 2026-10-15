@@ -208,6 +208,32 @@ fn each_entry_field_resolves_and_only_the_nearest_manifest_counts() {
     assert!(!json["links"].to_string().contains(&at("tools/run.ts")));
 }
 
+#[test]
+fn a_field_that_leads_to_no_source_does_not_stop_the_search_and_no_field_reads_as_index() {
+    let p = packages("packages_entry_fallback");
+    let at = |callee: &str| format!("example.com/pkg/web::src/entries.ts::entries::{callee}#0");
+    let shared = |file: &str, name: &str| format!("example.com/pkg/shared::{file}::{name}");
+    let imports = |callee: &str| imports_of(&p.web, &at(callee));
+    let row =
+        |level: &str, how: &str, target: String| vec![(level.to_string(), how.to_string(), target)];
+
+    // `types` names a declaration file that is no source: `main` is tried next.
+    assert_eq!(
+        imports("dts"),
+        row("exact", "main", shared("dts/index.js", "dts"))
+    );
+    // None of `exports`, `types`, `module` and `main`: Node's default, `./index`.
+    assert_eq!(
+        imports("plain"),
+        row("exact", "path", shared("plain/index.ts", "plain"))
+    );
+    // No `index` file either: the files of the package exporting the name are listed.
+    assert_eq!(
+        imports("thing"),
+        row("ambiguous", "path", shared("bare/src/thing.ts", "thing"))
+    );
+}
+
 const CLEAN: &str = "example.com/pkg/web::src/text.ts::clean::normalize#0";
 const NORMALIZE: &str = "example.com/pkg/shared::src/text.ts::normalize";
 
