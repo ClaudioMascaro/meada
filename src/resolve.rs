@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Call, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Value,
+    Call, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Step, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -364,11 +364,16 @@ pub struct Exported {
 
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
 #[derive(Clone, Copy)]
-struct Frame<'a> {
-    def: Target<'a>,
-    path: &'a str,
-    index: usize,
+pub struct Frame<'a> {
+    pub def: Target<'a>,
+    pub path: &'a str,
+    pub index: usize,
 }
+
+/// What `Code::expand_frames` finds at one site: the site's file and call position, the
+/// wrapper calls climbed to reach it (innermost first; the last is the site), and what the
+/// reader made of the arguments there.
+pub type Expanded<'a, R> = (&'a str, usize, Vec<Frame<'a>>, R);
 
 /// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
 struct Written<'a> {
@@ -531,6 +536,12 @@ impl<'a> Code<'a> {
         Some(self.full(path)?.calls.get(index)?.args.as_slice())
     }
 
+    /// What the function making the call at `index` of `path` does with its result
+    /// (`Call::uses`).
+    pub fn uses(&self, path: &'a str, index: usize) -> Option<&'a [Vec<Step>]> {
+        Some(self.full(path)?.calls.get(index)?.uses.as_slice())
+    }
+
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
         let found = self.full.get(path).copied();
         if found.is_none() {
@@ -625,6 +636,18 @@ impl<'a> Code<'a> {
         index: usize,
         read: &dyn Fn(&[Value]) -> Option<R>,
     ) -> Vec<(&'a str, usize, R)> {
+        (self.expand_frames(path, index, read).into_iter())
+            .map(|(site, at, _, found)| (site, at, found))
+            .collect()
+    }
+
+    /// `expand`, with the wrapper calls climbed from the call to each site.
+    pub fn expand_frames<R>(
+        &self,
+        path: &'a str,
+        index: usize,
+        read: &dyn Fn(&[Value]) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
         let call = self.resolver.files[path].calls.get(index);
         let (Some(call), Some(args)) = (call, self.args(path, index)) else {
             return Vec::new();
@@ -661,7 +684,9 @@ impl<'a> Code<'a> {
             at,
         };
         self.walk(&written, &mut Vec::new(), read, &mut out);
-        out
+        (out.into_iter())
+            .map(|(site, at, _, found)| (site, at, found))
+            .collect()
     }
 
     fn walk<R>(
@@ -669,7 +694,7 @@ impl<'a> Code<'a> {
         written: &Written<'a>,
         frames: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value]) -> Option<R>,
-        out: &mut Vec<(&'a str, usize, R)>,
+        out: &mut Vec<Expanded<'a, R>>,
     ) {
         let &Written {
             path, scope, args, ..
@@ -681,7 +706,7 @@ impl<'a> Code<'a> {
             .collect();
         let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if let Some(found) = read(&values) {
-            out.push((site, at, found));
+            out.push((site, at, frames.clone(), found));
             return;
         }
         let Some(wrapper) = wants else {
@@ -701,7 +726,7 @@ impl<'a> Code<'a> {
             .collect();
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
-            out.extend(read(&values).map(|found| (site, at, found)));
+            out.extend(read(&values).map(|found| (site, at, frames.clone(), found)));
             return;
         }
         for caller in callers {

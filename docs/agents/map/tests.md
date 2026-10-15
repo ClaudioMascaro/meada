@@ -21,6 +21,10 @@ modules updates it.
   `channel_queries` (`search`, `context` and `trace` on channels over the first fixture),
   `channels_jobs` (the `channels-jobs-api` and `channels-jobs-worker` fixtures: BullMQ queues,
   a `new Queue(name)` wrapper, and Redis streams in both client styles),
+  `drift` (shape drift over `drift_chain`: the web export with every consumer shape and
+  link drift, and `trace` up from `GET /api/orders` with `drift: missing` on the drifting
+  consumers' lines only; an edited client wrapper changing its callers' drift like a cold
+  chain is in `freshness`),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

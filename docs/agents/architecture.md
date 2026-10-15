@@ -73,7 +73,11 @@ one for the area a change touches.
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
   absent when empty) when a document gives its route or channel side one; a consumer has the same
-  `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
+  `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
+  response has `shape` `{"source": {"reads": "<file>"}, fields}` (spec #23). A link of an HTTP
+  route with a shape on both sides and a single provider has `drift` (`{level, missing,
+  unchecked}`, the last two absent when empty; `unchecked` maps each consumer path below an open
+  part to that open path) when some consumer path is missing or not checked. `documents` (absent when none was read) lists each
   document read, in path order, as `{path, format, version, contracts}` (route and channel
   contracts, sorted);
   ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
@@ -153,6 +157,19 @@ one for the area a change touches.
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
+- New **shape source** (spec #23 tickets after #60): a provider's (zod schemas, then returned
+  literals, in that order after documents) or a consumer's (destructuring, iteration, declared
+  types) is a `shape::Source` variant, never a new shape type, with an arm in `Source::at` and
+  `Source::declared` (declared on both sides makes drift `exact`). What a pack reads from code
+  for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
+  `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
+  TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
+  applies to a call's result). The kind turns them into a `Found::shape`, stored as
+  `contracts.shape` and exported on the side; `Http::declare` keeps a code shape unless a
+  document gives the route one. Drift is one pure function, `shape::drift(provider,
+  consumer)`, which `http::drift` runs over the workspace's links in
+  `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
+  (`Row::link`), the export and every other reader of links see the same value.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -185,7 +202,9 @@ one for the area a change touches.
   so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
   a file changed), which `status` cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
+  of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
+  consumer reads from the parsed response, spec #23), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes and the external references met, the
@@ -195,7 +214,7 @@ one for the area a change touches.
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition or file they name). `Call::args`,
-  `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
+  `Call::uses`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
   back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
@@ -238,7 +257,13 @@ one for the area a change touches.
   not exist, in the gateway's `[serve] documents` (the helper writes that line); the web app gains `src/shipments.ts` (the shipments route through
   `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
   since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
-  goldens never change.
+  goldens never change. `drift_chain(case)`
+  (spec #23) lays `tests/fixtures/chain-drift/web/` over the documented chain and commits:
+  `src/drift.ts` holds consumers of the documented `GET /api/orders` reading a field the
+  document lacks, a present one, one under its open `[].product`, one through the client
+  wrapper `src/api/body.ts` (`get(path)`, which returns the parsed body), and one whose name a
+  `catch` rebinds (no reads). Later spec #23 tickets extend this overlay, so the `chain` and
+  `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
@@ -308,6 +333,14 @@ one for the area a change touches.
   import have no cap: every file of the package exporting the name is listed, so a name exported
   by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
+- `lang/ts/uses.rs`: following call results (`Call::uses`) charges every node it visits and
+  every step it copies into a `const`'s uses to `USES_BUDGET` (2^20 per file); past it, the
+  file's remaining calls have no uses, so their consumers read nothing and give no drift. A
+  value is followed only in the function making the call, through `const` bindings of a plain
+  name that nothing else in that function binds; a `let`, a destructuring, `.then(...)` and a
+  value passed to a function end it (no marker). A wrapper's caller is read only when the
+  wrapper returns one thing (the response, the body or one path below it) from the function
+  holding its call; whether the body was awaited is not checked (no marker).
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (an object literal

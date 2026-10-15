@@ -221,6 +221,7 @@ mod tests {
             reason: String::new(),
             by: None,
             p: None,
+            drift: None,
         }
     }
 

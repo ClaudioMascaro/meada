@@ -194,6 +194,7 @@ impl Decision {
             reason: self.reason(),
             by: Some(self.by.clone()),
             p: self.p,
+            drift: None,
         }
     }
 }

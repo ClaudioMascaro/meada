@@ -13,6 +13,7 @@ use crate::index::{Consumer, Export, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
 use crate::resource::Resource;
+use crate::shape::{Drift, Shape};
 use crate::workspace::Repository;
 
 /// How well a link is established. The order is the strength, strongest first: exact >
@@ -71,6 +72,9 @@ pub struct Link {
     /// The probability a model stated for a `decided` link.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p: Option<f64>,
+    /// The drift of an HTTP link with a shape on both sides (spec #23, `http::drift`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drift: Option<Drift>,
 }
 
 /// A contract the repository holds, before the index gives its site an identity.
@@ -88,6 +92,9 @@ pub struct Found {
     /// For an unresolved consumer, the literal fragments of its URL path Meada could
     /// evaluate, in order.
     pub fragments: Vec<String>,
+    /// The shape the code gives the side (spec #23): for an HTTP consumer, the fields it reads
+    /// from the parsed response.
+    pub shape: Option<Shape>,
 }
 
 /// Which side of a contract a site holds.

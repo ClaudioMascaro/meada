@@ -25,7 +25,9 @@ modules updates it.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository. `refresh(db, root,
+  `resolved` digest changed, re-extract contracts for the whole repository (each row with its
+  `Found::shape` as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
+  `Consumer::shape`). `refresh(db, root,
   identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
   from the code rows: a document edit re-extracts no code. Without `serve.declared` the
@@ -55,7 +57,12 @@ modules updates it.
   parameter pattern, any parameter of a function that is no definition), qualified by the
   enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
   name and a definition, constant or parameter of its own scope alike (`Binding::Unknown`: a
-  call falls to a name match, a value is not known), the hidden names probe. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
+  call falls to a name match, a value is not known), the hidden names probe. `Call::uses` (spec #23, `serde(skip)`) is the pack's optional shape
+  facts: each chain of `Step`s (`Field`, `Element`, `Call(method)`, `Return`) the function
+  making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
+  `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
+  of a `const` of a plain name that nothing else in the function binds; `Return` only from the
+  call's own function), within `USES_BUDGET` per file. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
@@ -97,6 +104,9 @@ modules updates it.
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  `Code::expand_frames` is `expand` that also returns, for each site, the wrapper calls it
+  climbed (`Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
+  `Call::uses` like `args` (a file without full facts is a miss).
   `Code::expand` climbs only callers that resolved exact: a call found only by a name match
   (`Caller::by_name`: `data.get(...)` matched to a wrapper method, or a bare name no import
   binds) may be on any object or reach another function, so a wrapper with no exact caller is

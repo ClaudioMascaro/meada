@@ -14,7 +14,7 @@ CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT
+    method TEXT, fragments TEXT, shape TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (

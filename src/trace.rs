@@ -314,6 +314,9 @@ struct Row {
     /// The level of the call or link that reached it.
     level: Option<Level>,
     link: bool,
+    /// What ends the line once it is complete: ` drift: missing <paths>` after a link whose
+    /// consumer reads fields its provider lacks (spec #23).
+    end: String,
 }
 
 impl Row {
@@ -324,16 +327,23 @@ impl Row {
             repo,
             level,
             link: false,
+            end: String::new(),
         }
     }
 
     /// A line reached through `link`.
     fn link(text: String, repo: usize, link: &Link) -> Self {
+        let missing = link.drift.iter().flat_map(|d| &d.missing);
+        let missing: Vec<&str> = missing.map(String::as_str).collect();
         Self {
             text,
             repo,
             level: Some(link.level),
             link: true,
+            end: match missing.is_empty() {
+                true => String::new(),
+                false => format!(" drift: missing {}", missing.join(", ")),
+            },
         }
     }
 }
@@ -544,6 +554,7 @@ impl<'a> Walk<'_, 'a> {
     /// Writes `row`, indented `depth` levels.
     fn push(&mut self, depth: usize, mut row: Row) {
         row.text.insert_str(0, &"  ".repeat(depth));
+        row.text += &std::mem::take(&mut row.end);
         self.rows.push(row);
     }
 

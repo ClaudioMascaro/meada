@@ -87,5 +87,16 @@ modules updates it.
   node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
   (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
   anything below it may be present. Presence only: no types, formats, `required` or
-  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) is the only
-  source yet; spec #23 adds its code sources as variants. `Source::at` names it in `context`.
+  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
+  `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
+  file of its call site; spec #23) are the sources yet; later spec #23 tickets add the zod and
+  literal provider sources and the declared-type consumer source as variants. `Source::at`
+  names it in `context`; `Source::declared` tells a declared source (a document) from one read
+  from code. `drift(provider, consumer) -> Option<Drift {level, missing, unchecked}>` is the
+  one drift comparison: each consumer path is checked from the root one step at a time
+  (`prefixes`), the first step below an open path of the provider is not checked
+  (`unchecked`, mapped to that open path), the first step the provider's fields and open paths
+  lack is `missing` (so only the shallowest missing path of a branch is listed), and
+  `<path>.length` below a provider array (`<path>[]` present) is no field. `level` is `exact`
+  when both sources are declared, else `inferred`; `None` when nothing is missing or
+  unchecked.

@@ -99,6 +99,21 @@ pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     (web, gateway, catalog)
 }
 
+/// The documented chain with the shape drift cases of spec #23 laid over it
+/// (`tests/fixtures/chain-drift/`): the web app gains consumers of the gateway's documented
+/// `GET /api/orders` reading a field the document lacks, a present field, a field under its
+/// open part, a field through a client wrapper that returns the parsed body, and a name the
+/// function rebinds. Each overlaid repository gets a third commit. Returns (web, gateway,
+/// catalog).
+pub fn drift_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let (web, gateway, catalog) = documented_chain(case);
+    let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-drift");
+    copy_dir(&overlay.join("web"), &web);
+    git(&web, &["add", "-A"]);
+    git(&web, &["commit", "-q", "-m", "drift"]);
+    (web, gateway, catalog)
+}
+
 /// The chain's worker, next to any repository of the chain.
 pub fn worker(sibling: &Path) -> PathBuf {
     sibling.with_file_name("chain-worker")

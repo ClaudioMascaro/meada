@@ -7,7 +7,9 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, chain, documented_chain, fixture_repo, set_mtime, worker};
+use common::{
+    age, assert_golden, chain, documented_chain, drift_chain, fixture_repo, set_mtime, worker,
+};
 use meada::engine::Engine;
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
@@ -434,6 +436,30 @@ fn drop_serve(gateway: &Path) {
         .filter(|l| !serve.iter().any(|k| l.starts_with(k)));
     let toml = kept.map(|l| format!("{l}\n")).collect::<String>();
     fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
+/// The web's client wrapper returns the response instead of its parsed body: its caller, in an
+/// unchanged file, reads no field any more.
+fn return_the_response(web: &Path) {
+    let path = web.join("src/api/body.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    fs::write(&path, src.replace("return res.json();", "return res;")).unwrap();
+}
+
+#[test]
+fn an_edited_client_wrapper_changes_its_callers_drift_like_a_cold_chain() {
+    let (web, _, _) = drift_chain("fresh_drift");
+    age(web.parent().unwrap());
+    let before = Engine::open(&web).unwrap().export().unwrap();
+    return_the_response(&web);
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_drift_cold");
+    return_the_response(&cold);
+    assert!(before.contains("\"[].customer\""));
+    assert!(!refreshed.contains("\"[].customer\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
 #[test]

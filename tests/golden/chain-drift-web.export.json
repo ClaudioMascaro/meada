@@ -1,0 +1,755 @@
+{
+  "repository": "example.com/chain/web",
+  "files": [
+    {
+      "path": "src/api/body.ts",
+      "hash": "1c1654807580e3a4de4188878f548a7d811444dec2d5fc4efbf1edcfb6579efc"
+    },
+    {
+      "path": "src/api/client.ts",
+      "hash": "59ac1e664f20160e491431efbc9923888aebb2744958e6704b0f67c6ba868562"
+    },
+    {
+      "path": "src/api/paths.ts",
+      "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
+    },
+    {
+      "path": "src/dashboard.ts",
+      "hash": "74f647de1ae0c993b4dcd83051b9d7c95034032101df53d1a017c4765287400f"
+    },
+    {
+      "path": "src/drift.ts",
+      "hash": "7b44319c2744a0b09416bc227b95c79d9fefdf0f811c1dc40af4d3a97faa7aae"
+    },
+    {
+      "path": "src/orders.ts",
+      "hash": "10cae4a1d0e91138874c148de586a3eac0bd91d1a584bf29b1d725619ac0fa93"
+    },
+    {
+      "path": "src/shipments.ts",
+      "hash": "1f462c453a41a02c3730287a7418c13cd96e6829d94eff553e7b55d413164432"
+    },
+    {
+      "path": "src/status.ts",
+      "hash": "d61eae8aa32a8e362600e4a936827570905950aa0e42340010ebfe6aa64c6d75"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get",
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 137,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 127,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 221,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 102,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::customerEmail",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 880,
+        "end": 992
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 372,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 154,
+        "end": 295
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 614,
+        "end": 790
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::rebound",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1079,
+        "end": 1235
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 247,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 344,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 182,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 507,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 684,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::publicShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 310,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 858,
+        "end": 953
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::shipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 129,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1028,
+        "end": 1131
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::health",
+      "span": {
+        "path": "src/status.ts",
+        "start": 90,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::track",
+      "span": {
+        "path": "src/status.ts",
+        "start": 201,
+        "end": 290
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::Error#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 244,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::fetch#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 192,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::res.json#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 284,
+        "end": 294
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request::fetch#0",
+      "caller": "example.com/chain/web::src/api/client.ts::request",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 185,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::cancel",
+      "target": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 260,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::health#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/status.ts::health",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 139,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::listOrders#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/orders.ts::listOrders",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 197,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::track#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/status.ts::track",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 157,
+        "end": 186
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::customerEmail",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 936,
+        "end": 954
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::(subscript_expression).id.toUpperCase#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 497,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 424,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 476,
+        "end": 486
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::orderTotal",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 204,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::orderTotal",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 256,
+        "end": 266
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::productName",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 665,
+        "end": 692
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::productName",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 712,
+        "end": 722
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::rebound",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1129,
+        "end": 1147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 291,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::createOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 388,
+        "end": 426
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::listOrders",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 215,
+        "end": 235
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 552,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::euShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 727,
+        "end": 781
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::publicShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 357,
+        "end": 413
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 907,
+        "end": 950
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::shipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 170,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1074,
+        "end": 1128
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "caller": "example.com/chain/web::src/status.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/status.ts",
+        "start": 119,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "caller": "example.com/chain/web::src/status.ts::track",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/status.ts",
+        "start": 251,
+        "end": 287
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::DELETE::/api/orders/{}",
+      "site": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].customer",
+          "[].customer.email"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].product",
+          "[].product.name"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "via": "host:eu.example.com"
+    },
+    {
+      "contract": "http::GET::/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "via": "host:gateway.example.com"
+    },
+    {
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/v9/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "via": "host:qa.example.com"
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "http::DELETE::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "level": "inferred",
+        "missing": [
+          "[].customer"
+        ]
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "level": "inferred",
+        "missing": [
+          "[].total"
+        ]
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "level": "inferred",
+        "unchecked": {
+          "[].product.name": "[].product"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "contract": "http::PUT::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /gw"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /v3"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/api/shipments/{}",
+      "level": "exact",
+      "reason": "host gateway.example.com is served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /relative/base"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/api/shipments/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/gateway::src/server.ts::GET /api/health",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    }
+  ]
+}

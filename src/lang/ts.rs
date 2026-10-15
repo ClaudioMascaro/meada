@@ -12,6 +12,7 @@ use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod messages;
+mod uses;
 
 pub struct TsJs;
 
@@ -34,6 +35,7 @@ impl LanguagePack for TsJs {
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
         let mut facts = Facts::default();
+        let mut uses = uses::Uses::new(src);
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -76,6 +78,7 @@ impl LanguagePack for TsJs {
                                 .filter(|a| a.kind() == "arguments")
                                 .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
                                 .unwrap_or_default(),
+                            uses: uses.of(node),
                         });
                     }
                 }
@@ -356,14 +359,19 @@ const BODIES: &[&str] = &[
 /// The names a binding pattern binds: an identifier, or each name an object, array, rest or
 /// default pattern (or a parameter list) holds, never a key or a default value.
 fn bound(pattern: Node, src: &[u8]) -> Vec<String> {
+    (bound_nodes(pattern).into_iter())
+        .map(|n| text(n, src).to_string())
+        .collect()
+}
+
+/// The identifier nodes `bound` reads the names of.
+fn bound_nodes(pattern: Node) -> Vec<Node> {
     let mut out = Vec::new();
     // Explicit stack: a pattern can nest deeper than the call stack.
     let mut stack = vec![pattern];
     while let Some(node) = stack.pop() {
         match node.kind() {
-            "identifier" | "shorthand_property_identifier_pattern" => {
-                out.push(text(node, src).to_string())
-            }
+            "identifier" | "shorthand_property_identifier_pattern" => out.push(node),
             "pair_pattern" => stack.extend(node.child_by_field_name("value")),
             "assignment_pattern" | "object_assignment_pattern" => {
                 stack.extend(node.child_by_field_name("left"))

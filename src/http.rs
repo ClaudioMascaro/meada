@@ -1,14 +1,15 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::channel::Routes;
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
-use crate::lang::{Depends, Export, Part, Value, literal, property};
-use crate::resolve::Code;
+use crate::lang::{Depends, Export, Part, Step, Value, literal, property};
+use crate::resolve::{Code, Frame};
+use crate::shape::{self, Shape, Source};
 use crate::workspace::Repository;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
@@ -94,6 +95,80 @@ fn fetch(args: &[Value]) -> Option<Read> {
     })
 }
 
+/// The consumer shape of the `fetch` at `call` (spec #23): the field paths read from the
+/// parsed body of its response, by the function making the call and by each client wrapper
+/// `frames` climbs from it to the consumer's site, which reads what the one below returns.
+/// The body is the result of `.json()` on the response; a wrapper returns the response, the
+/// body or a part of the body. `None` when nothing is read.
+fn response_reads<'a>(
+    code: &Code<'a>,
+    call: (&'a str, usize),
+    frames: &[Frame<'a>],
+) -> Option<Shape> {
+    /// What a value is: the response, or the body below a path (`Body(vec![])`: all of it).
+    #[derive(Clone, PartialEq)]
+    enum Got<'s> {
+        Response,
+        Body(Vec<&'s Step>),
+    }
+    let mut fields = BTreeSet::new();
+    let (mut got, mut at) = (Got::Response, call);
+    for level in 0..=frames.len() {
+        let mut returned = Vec::new();
+        for steps in code.uses(at.0, at.1)? {
+            let (mut path, rest) = match (&got, steps.first()) {
+                (Got::Response, Some(Step::Return)) if steps.len() == 1 => {
+                    returned.push(Got::Response);
+                    continue;
+                }
+                (Got::Response, Some(Step::Call(m))) if m == "json" => (Vec::new(), &steps[1..]),
+                (Got::Response, _) => continue,
+                (Got::Body(path), _) => (path.clone(), &steps[..]),
+            };
+            // A read stops at a method call: `name.toUpperCase()` reads `name`.
+            let read = (rest.iter())
+                .take_while(|s| matches!(s, Step::Field(_) | Step::Element))
+                .count();
+            path.extend(&rest[..read]);
+            fields.extend(shape::prefixes(&written(&path)).map(String::from));
+            if rest.get(read) == Some(&Step::Return) {
+                returned.push(Got::Body(path));
+            }
+        }
+        let Some(frame) = frames.get(level) else {
+            break;
+        };
+        // The frame calls the function making the call `at`, which returns one thing.
+        let scope = code.files()[at.0].calls.get(at.1).map(|c| c.scope.as_str());
+        returned.dedup();
+        match <[Got; 1]>::try_from(returned) {
+            Ok([one]) if frame.def.path == at.0 && Some(frame.def.name) == scope => got = one,
+            _ => break,
+        }
+        at = (frame.path, frame.index);
+    }
+    fields.remove("");
+    let site = frames.last().map_or(call.0, |f| f.path);
+    (!fields.is_empty()).then(|| Shape {
+        source: Source::Reads(site.to_string()),
+        fields,
+        open: BTreeSet::new(),
+    })
+}
+
+/// The field path `steps` (fields and elements) read: `items[].id`.
+fn written(steps: &[&Step]) -> String {
+    let mut out = String::new();
+    for step in steps {
+        match step {
+            Step::Field(name) if out.is_empty() => out += name,
+            Step::Field(name) => out += &format!(".{name}"),
+            _ => out += "[]",
+        }
+    }
+    out
+}
+
 /// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
 /// and host and its query are dropped, split at every part that is not literal.
 fn fragments(parts: &[Part]) -> Vec<String> {
@@ -135,6 +210,36 @@ pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (St
 /// Whether `provider` serves `contract`, by its own path or by a gateway path.
 pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
     provider.contract == contract || gateway_contracts(provider).any(|(g, _)| g == contract)
+}
+
+/// Sets the drift (spec #23) of every HTTP link of `links` with a single provider (any level
+/// but `ambiguous`) and a shape on both sides: the consumer's at its call site, and that of the
+/// provider at the link's provider site serving the link's contract. Run on the links of the
+/// whole workspace once the decisions are replayed, so everything reading links sees it.
+pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
+    let consumers: HashMap<&str, &Shape> = (exports.iter())
+        .flat_map(|e| &e.consumers)
+        .filter_map(|c| Some((c.site.as_str(), c.shape.as_ref()?)))
+        .collect();
+    let mut providers: HashMap<&str, Vec<&Provider>> = HashMap::new();
+    for p in exports.iter().flat_map(|e| &e.providers) {
+        if p.shape.is_some() && route(&p.contract).is_some() {
+            providers.entry(p.site.as_str()).or_default().push(p);
+        }
+    }
+    for link in links {
+        if link.level == Level::Ambiguous || route(&link.contract).is_none() {
+            continue;
+        }
+        let Some(consumer) = consumers.get(link.consumer.as_str()) else {
+            continue;
+        };
+        let served = (providers.get(link.provider.as_str()).into_iter().flatten())
+            .find(|p| serves(p, &link.contract));
+        if let Some(provider) = served.and_then(|p| p.shape.as_ref()) {
+            link.drift = shape::drift(provider, consumer);
+        }
+    }
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -377,6 +482,7 @@ fn express(code: &Code) -> Vec<Found> {
                 via: None,
                 method: None,
                 fragments: Vec::new(),
+                shape: None,
             });
         }
     }
@@ -397,8 +503,9 @@ impl ContractKind for Http {
                 if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
-                for (site, at, read) in code.expand(path, n, &fetch) {
+                for (site, at, frames, read) in code.expand_frames(path, n, &fetch) {
                     found.push(Found {
+                        shape: response_reads(code, (path, n), &frames),
                         role: Role::Consumer,
                         site: Site::Call {
                             path: site.into(),
@@ -437,6 +544,7 @@ impl ContractKind for Http {
                     via: None,
                     method: None,
                     fragments: Vec::new(),
+                    shape: None,
                 });
             }
         }
@@ -507,7 +615,10 @@ impl ContractKind for Http {
             let Some((_, path)) = route(&p.contract) else {
                 continue;
             };
-            p.shape = shapes.get(&p.contract).and_then(|s| (*s).clone());
+            // A document's shape wins over the one the code gives.
+            if let Some(Some(shape)) = shapes.get(&p.contract) {
+                p.shape = Some(shape.clone());
+            }
             let served = serve
                 .gateway_path(path)
                 .map(|(path, reason)| Gateway { path, reason });
@@ -617,6 +728,7 @@ impl ContractKind for Http {
                     reason,
                     by: None,
                     p: None,
+                    drift: None,
                 }
             })
             .collect()
