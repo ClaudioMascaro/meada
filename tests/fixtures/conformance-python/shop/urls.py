@@ -1,5 +1,6 @@
 """The root URLconf: no other one includes it."""
 
+from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path, re_path
 
@@ -15,6 +16,8 @@ urlpatterns = [
     re_path(r"^vintage/(?P<code>\d+)/$", views.vintage),
     # An unnamed group and a quantifier: no route.
     re_path(r"^archive/(\d{4})/$", views.archive),
+    # A route with a part that cannot be read: no route.
+    path(f"{settings.LEGAL_PREFIX}legal/", views.legal),
 ]
 
 # Extensions join the list; an addition that is not a list literal is left out.

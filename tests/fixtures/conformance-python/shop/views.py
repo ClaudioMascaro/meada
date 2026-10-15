@@ -19,3 +19,7 @@ def about(request):
 
 def contact(request):
     return "contact"
+
+
+def legal(request):
+    return "legal"

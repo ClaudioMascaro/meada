@@ -964,8 +964,8 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
                 .filter_map(|part| match part.kind() {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
-                        Some(e) if e.kind() == "identifier" => Part::Ref(text(e, src).into()),
-                        Some(e) => parts(e, src).and_then(single_env).unwrap_or(Part::Hole),
+                        Some(e) => (name(e, src).or_else(|| parts(e, src).and_then(single_env)))
+                            .unwrap_or(Part::Hole),
                         None => Part::Hole,
                     }),
                     _ => None,
@@ -991,9 +991,19 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
             Some(vec![if more { Part::Hole } else { env }])
         }
-        "identifier" => Some(vec![Part::Ref(text(node, src).to_string())]),
+        "identifier" | "attribute" => name(node, src).map(|name| vec![name]),
         "parenthesized_expression" => parts(named(node).next()?, src),
         "subscript" | "call" => env_read(node, src).map(|env| vec![env]),
+        _ => None,
+    }
+}
+
+/// A name or a member chain (`config.BASE`) inside a string, folded like `Value::Ref`.
+fn name(node: Node, src: &[u8]) -> Option<Part> {
+    match node.kind() {
+        "identifier" | "attribute" => Some(callee(node, src))
+            .filter(|name| !name.starts_with('('))
+            .map(Part::Ref),
         _ => None,
     }
 }

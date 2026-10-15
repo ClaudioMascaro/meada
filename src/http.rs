@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::contract::{ContractKind, Found, Level, Link, Site};
 use crate::index::{Consumer, Export as IndexExport, Provider};
-use crate::lang::{Export, Part, Value};
+use crate::lang::{Call, Export, Part, Value};
 use crate::resolve::{Code, Target};
 use crate::workspace::Repository;
 
@@ -266,6 +266,45 @@ fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
+/// The methods a list of literal strings names (`methods=["GET", "post"]`), upper-cased; none
+/// for anything but a list.
+fn methods(list: Value) -> Vec<String> {
+    let Value::List(items) = list else {
+        return Vec::new();
+    };
+    (items.into_iter())
+        .filter_map(|m| match m {
+            Value::Str(parts) => literal(&parts).map(|m| m.to_uppercase()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A provider of `contract` at `site`.
+fn provider(site: Site, contract: String) -> Found {
+    Found {
+        site,
+        contract: Some(contract),
+        via: None,
+        method: None,
+        fragments: Vec::new(),
+    }
+}
+
+/// The consumer at the call `index` of `path`, as `read` reads it.
+fn consumer(path: &str, index: usize, read: Read) -> Found {
+    Found {
+        site: Site::Call {
+            path: path.into(),
+            index,
+        },
+        contract: read.contract,
+        via: read.via,
+        method: read.method,
+        fragments: read.fragments,
+    }
+}
+
 /// `parts` as a path, every non-literal part a parameter.
 fn render(parts: &[Part]) -> String {
     parts
@@ -282,7 +321,7 @@ const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
 
 /// The HTTP methods as lower-case names: Express and FastAPI register routes with them, and
 /// Python clients send requests with them.
-const EXPRESS_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
+const HTTP_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
 
 /// An app or router: the file and index of the call that creates it.
 type Router<'a> = (&'a str, usize);
@@ -301,16 +340,16 @@ fn join(prefix: &str, path: &str) -> String {
 }
 
 /// Every prefix the routes of `router` take, sorted: the segment of each mount under every
-/// prefix of the router it is mounted on, or `own` prefix when nothing mounts it. A prefix
-/// that cannot be read adds none.
+/// prefix of the router it is mounted on, or its `root` prefix when nothing mounts it (`None`
+/// when such a router is not served). A prefix that cannot be read adds none.
 fn prefixes<'a>(
     router: Router<'a>,
     mounts: &Mounts<'a>,
-    own: &dyn Fn(Router<'a>) -> Option<String>,
+    root: &dyn Fn(Router<'a>) -> Option<String>,
     seen: &mut Vec<Router<'a>>,
 ) -> Vec<String> {
     let Some(parents) = mounts.get(&router) else {
-        return own(router).into_iter().collect();
+        return root(router).into_iter().collect();
     };
     // A router mounted inside itself, through any depth, adds nothing.
     if seen.contains(&router) {
@@ -321,7 +360,7 @@ fn prefixes<'a>(
         .iter()
         .filter_map(|(parent, segment)| Some((*parent, segment.as_deref()?)))
         .flat_map(|(parent, segment)| {
-            prefixes(parent, mounts, own, seen)
+            prefixes(parent, mounts, root, seen)
                 .into_iter()
                 .map(|above| join(&above, segment))
                 .collect::<Vec<_>>()
@@ -333,10 +372,11 @@ fn prefixes<'a>(
     out
 }
 
-/// A prefix or path as written: `None` when it is not a string.
+/// A provider's prefix or path as written: `None` when it is not a string, or when a part of it
+/// cannot be read. A path parameter written in the literal (`{id}`, `<int:id>`) stays one.
 fn text(value: Value) -> Option<String> {
     match value {
-        Value::Str(parts) => Some(render(&parts)),
+        Value::Str(parts) => literal(&parts),
         _ => None,
     }
 }
@@ -366,7 +406,7 @@ fn express(code: &Code) -> Vec<Found> {
             let Some((receiver, member)) = call.callee.rsplit_once('.') else {
                 continue;
             };
-            let registers = EXPRESS_METHODS.contains(&member);
+            let registers = HTTP_METHODS.contains(&member);
             if !(registers || member == "use") || receiver.starts_with('(') {
                 continue;
             }
@@ -408,8 +448,8 @@ fn express(code: &Code) -> Vec<Found> {
             continue;
         };
         let route = render(&parts);
-        let own = |_: Router| Some(String::new());
-        for prefix in prefixes(at, &mounts, &own, &mut Vec::new()) {
+        let root = |_: Router| Some(String::new());
+        for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
                 Value::Function(def) => Site::Inline {
@@ -426,27 +466,39 @@ fn express(code: &Code) -> Vec<Found> {
                 },
                 _ => Site::File(path.into()),
             };
-            found.push(Found {
-                site,
-                contract: Some(contract(&method, &full)),
-                via: None,
-                method: None,
-                fragments: Vec::new(),
-            });
+            found.push(provider(site, contract(&method, &full)));
         }
     }
     found
 }
 
+/// A method mounting an app or a router (the child) on the one it is called on.
+struct Mount {
+    method: &'static str,
+    /// The child's position, and its keyword.
+    child: (usize, &'static str),
+    /// The prefix given: its position when it may be positional, and its keyword.
+    prefix: (Option<usize>, &'static str),
+    /// Whether the child may be an app (FastAPI's `include_router(app.router)` and `mount`), so
+    /// a child that cannot be read may be any app.
+    takes_apps: bool,
+}
+
+/// The argument of `call` at `position`, or else its keyword argument `keyword`.
+fn argument<'c>(call: &'c Call, (position, keyword): (Option<usize>, &str)) -> Option<&'c Value> {
+    (position.and_then(|n| call.args.get(n))).or_else(|| call.keyword(keyword))
+}
+
 /// A Python web framework whose routes are decorators on an app or a router.
 struct Framework {
-    /// What creates its apps and routers, as named outside the repository.
-    constructors: &'static [&'static str],
+    /// What creates its apps, as named outside the repository: an app nothing mounts is served
+    /// at its root.
+    apps: &'static [&'static str],
+    /// What creates its routers: a router is served only where a mount Meada reads puts it.
+    routers: &'static [&'static str],
     /// The constructor's keyword giving a router's own prefix.
     prefix: &'static str,
-    /// The method mounting a router on another one, and its prefix keyword.
-    mount: &'static str,
-    mount_prefix: &'static str,
+    mounts: &'static [Mount],
     /// Whether a prefix given when mounting replaces the router's own (Flask) or goes before
     /// it (FastAPI).
     replaces: bool,
@@ -458,19 +510,37 @@ struct Framework {
 
 const FRAMEWORKS: &[Framework] = &[
     Framework {
-        constructors: &["fastapi.FastAPI", "fastapi.APIRouter"],
+        apps: &["fastapi.FastAPI"],
+        routers: &["fastapi.APIRouter"],
         prefix: "prefix",
-        mount: "include_router",
-        mount_prefix: "prefix",
+        mounts: &[
+            Mount {
+                method: "include_router",
+                child: (0, "router"),
+                prefix: (None, "prefix"),
+                takes_apps: true,
+            },
+            Mount {
+                method: "mount",
+                child: (1, "app"),
+                prefix: (Some(0), "path"),
+                takes_apps: true,
+            },
+        ],
         replaces: false,
         route: "api_route",
         shortcuts: true,
     },
     Framework {
-        constructors: &["flask.Flask", "flask.Blueprint"],
+        apps: &["flask.Flask"],
+        routers: &["flask.Blueprint"],
         prefix: "url_prefix",
-        mount: "register_blueprint",
-        mount_prefix: "url_prefix",
+        mounts: &[Mount {
+            method: "register_blueprint",
+            child: (0, "blueprint"),
+            prefix: (None, "url_prefix"),
+            takes_apps: false,
+        }],
         replaces: true,
         route: "route",
         shortcuts: false,
@@ -480,35 +550,42 @@ const FRAMEWORKS: &[Framework] = &[
 /// FastAPI and Flask providers: a decorator registering the function it decorates on an app
 /// or a router, under the router's own prefix and every prefix it is mounted under, at any
 /// depth. The app or router is followed through constants, imports, arguments and return
-/// values; a decorator counts only on one its framework's constructor creates.
+/// values; a decorator counts only on one its framework's constructor creates. A router is
+/// served only under the mounts Meada reads; an app nothing mounts is served at its root,
+/// unless a mount whose child cannot be read, called on another app or router of its
+/// framework, may put it there instead.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
-    let framework = |(path, n): Router<'a>| -> Option<&Framework> {
+    // The framework that creates an app or router, and whether it is an app.
+    let framework = |(path, n): Router<'a>| -> Option<(&Framework, bool)> {
         let call = &code.files()[path].calls[n];
         let name = code.external(path, &call.scope, &call.callee)?;
-        FRAMEWORKS
-            .iter()
-            .find(|f| f.constructors.contains(&name.as_str()))
+        FRAMEWORKS.iter().find_map(|f| {
+            let app = f.apps.contains(&name.as_str());
+            (app || f.routers.contains(&name.as_str())).then_some((f, app))
+        })
     };
     let routers = |path, scope, name| -> Vec<(Router, &Framework)> {
         let origins = code.origins(path, scope, name).into_iter();
-        origins.filter_map(|r| Some((r, framework(r)?))).collect()
+        origins.filter_map(|r| Some((r, framework(r)?.0))).collect()
     };
     // The prefix a router's constructor gives it: none when absent.
     let own = |router @ (path, n): Router<'a>| -> Option<String> {
         let call = code.call(path, n)?;
-        match call.keyword(framework(router)?.prefix) {
+        match call.keyword(framework(router)?.0.prefix) {
             None => Some(String::new()),
             Some(prefix) => text(code.value(path, &call.scope, prefix)),
         }
     };
     let mut mounts = Mounts::new();
+    // The apps and routers holding a mount that takes apps and whose child cannot be read.
+    let mut unread: Vec<(Router, &Framework)> = Vec::new();
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
             let Some((receiver, member)) = call.callee.rsplit_once('.') else {
                 continue;
             };
-            let mounting = FRAMEWORKS.iter().any(|f| f.mount == member);
+            let mounting = (FRAMEWORKS.iter()).any(|f| f.mounts.iter().any(|m| m.method == member));
             if !(call.decorates.is_some() || mounting) || receiver.starts_with('(') {
                 continue;
             }
@@ -517,19 +594,27 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                     routes.push((path, n, at, kind, member, def));
                     continue;
                 }
-                let Some(mount) = code.call(path, n).filter(|_| member == kind.mount) else {
+                let Some(how) = kind.mounts.iter().find(|m| m.method == member) else {
                     continue;
                 };
-                let Some(child) = mount.args.first() else {
+                let Some(mount) = code.call(path, n) else {
                     continue;
                 };
-                let given = (mount.keyword(kind.mount_prefix))
+                let (position, keyword) = how.child;
+                let Some(child) = argument(mount, (Some(position), keyword)) else {
+                    continue;
+                };
+                let given = argument(mount, how.prefix)
                     .map(|p| code.value(path, &call.scope, p))
                     .filter(|p| !matches!(p, Value::Undefined));
-                let children = code.value_origins(path, &call.scope, child).into_iter();
-                for child in
-                    children.filter(|&c| framework(c).is_some_and(|f| f.mount == kind.mount))
-                {
+                let children: Vec<Router> = (code.value_origins(path, &call.scope, child))
+                    .into_iter()
+                    .filter(|&c| framework(c).is_some_and(|(f, _)| std::ptr::eq(f, kind)))
+                    .collect();
+                if children.is_empty() && how.takes_apps {
+                    unread.push((at, kind));
+                }
+                for child in children {
                     let segment = match given.clone() {
                         None => own(child),
                         Some(given) if kind.replaces => text(given),
@@ -540,6 +625,13 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
             }
         }
     }
+    // Where a router nothing mounts is served: an app at its root, unless a mount that cannot
+    // be read may hold it.
+    let root = |router: Router<'a>| -> Option<String> {
+        let (kind, app) = framework(router)?;
+        let elsewhere = (unread.iter()).any(|&(at, f)| at != router && std::ptr::eq(f, kind));
+        (app && !elsewhere).then(|| own(router)).flatten()
+    };
     let mut found = Vec::new();
     for (path, n, at, kind, member, def) in routes {
         let Some(call) = code.call(path, n) else {
@@ -549,7 +641,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         else {
             continue;
         };
-        let methods: Vec<String> = if kind.shortcuts && EXPRESS_METHODS.contains(&member) {
+        let methods: Vec<String> = if kind.shortcuts && HTTP_METHODS.contains(&member) {
             vec![member.to_uppercase()]
         } else if member == kind.route {
             match call
@@ -557,30 +649,19 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                 .map(|m| code.value(path, &call.scope, m))
             {
                 None | Some(Value::Undefined) => vec!["GET".into()],
-                Some(Value::List(items)) => (items.into_iter())
-                    .filter_map(|m| match m {
-                        Value::Str(parts) => literal(&parts).map(|m| m.to_uppercase()),
-                        _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
+                Some(listed) => methods(listed),
             }
         } else {
             Vec::new()
         };
-        for prefix in prefixes(at, &mounts, &own, &mut Vec::new()) {
+        for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             for method in &methods {
-                found.push(Found {
-                    site: Site::Def {
-                        path: path.into(),
-                        name: def.clone(),
-                    },
-                    contract: Some(contract(method, &full)),
-                    via: None,
-                    method: None,
-                    fragments: Vec::new(),
-                });
+                let site = Site::Def {
+                    path: path.into(),
+                    name: def.clone(),
+                };
+                found.push(provider(site, contract(method, &full)));
             }
         }
     }
@@ -641,7 +722,7 @@ fn based(base: Option<&[Part]>, url: &Value) -> Value {
 
 /// Whether `member` sends a request: one of the methods, or `request(method, url)`.
 fn sends(member: &str) -> bool {
-    EXPRESS_METHODS.contains(&member) || member == "request"
+    HTTP_METHODS.contains(&member) || member == "request"
 }
 
 /// The base URL the clients that may be the `receiver` of the call at `path` were built
@@ -733,16 +814,7 @@ fn clients(code: &Code) -> Vec<Found> {
                 fetch(&[url, method.unwrap_or(Value::Unknown)])
             };
             for (site, at, read) in code.expand(path, n, &read) {
-                found.push(Found {
-                    site: Site::Call {
-                        path: site.into(),
-                        index: at,
-                    },
-                    contract: read.contract,
-                    via: read.via,
-                    method: read.method,
-                    fragments: read.fragments,
-                });
+                found.push(consumer(site, at, read));
             }
         }
     }
@@ -843,16 +915,7 @@ fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
         }
         let list = (code.args(view.path, n).and_then(<[_]>::first))
             .map(|m| code.value(view.path, &call.scope, m));
-        let methods = match list {
-            Some(Value::List(items)) => (items.into_iter())
-                .filter_map(|m| match m {
-                    Value::Str(parts) => literal(&parts).map(|m| m.to_uppercase()),
-                    _ => None,
-                })
-                .collect(),
-            _ => Vec::new(),
-        };
-        restrict(methods);
+        restrict(list.map(methods).unwrap_or_default());
     }
     allowed
 }
@@ -942,10 +1005,10 @@ fn urlconf<'a>(
         let Some(call) = code.call(path, n) else {
             continue;
         };
-        let route = match call.args.first().map(|r| code.value(path, &call.scope, r)) {
-            Some(Value::Str(parts)) if regex => literal(&parts).and_then(|p| regex_route(&p)),
-            Some(Value::Str(parts)) => Some(render(&parts)),
-            _ => None,
+        let route = (call.args.first()).and_then(|r| text(code.value(path, &call.scope, r)));
+        let route = match regex {
+            true => route.and_then(|p| regex_route(&p)),
+            false => route,
         };
         let Some(route) = route.map(|r| format!("{prefix}{r}")) else {
             continue;
@@ -954,15 +1017,12 @@ fn urlconf<'a>(
             continue;
         };
         let full = normalize_path(&route);
-        let serve = |path: &str, name: &str, method: &str| Found {
-            site: Site::Def {
+        let serve = |path: &str, name: &str, method: &str| {
+            let site = Site::Def {
                 path: path.into(),
                 name: name.into(),
-            },
-            contract: Some(contract(method, &full)),
-            via: None,
-            method: None,
-            fragments: Vec::new(),
+            };
+            provider(site, contract(method, &full))
         };
         if let Value::Ref(name) = view
             && let Some(def) = code.definition(path, &call.scope, name)
@@ -974,7 +1034,9 @@ fn urlconf<'a>(
             continue;
         }
         for origin @ (at, i) in code.value_origins(path, &call.scope, view) {
-            let callee = &code.files()[at].calls[i].callee;
+            let Some(origin_call) = code.call(at, i) else {
+                continue;
+            };
             if is(origin, DJANGO_INCLUDE) {
                 if stack.contains(&origin) {
                     continue;
@@ -982,8 +1044,8 @@ fn urlconf<'a>(
                 stack.push(origin);
                 urlconf(code, is, included(code, at, i), &route, stack, found);
                 stack.pop();
-            } else if let Some(class) = callee.strip_suffix(".as_view")
-                && let Some(class) = code.definition(at, &code.files()[at].calls[i].scope, class)
+            } else if let Some(class) = origin_call.callee.strip_suffix(".as_view")
+                && let Some(class) = code.definition(at, &origin_call.scope, class)
             {
                 for method in VIEW_METHODS {
                     let handler = format!("{}.{method}", class.name);
@@ -1018,16 +1080,7 @@ impl ContractKind for Http {
                     continue;
                 }
                 for (site, at, read) in code.expand(path, n, &|args, _| fetch(args)) {
-                    found.push(Found {
-                        site: Site::Call {
-                            path: site.into(),
-                            index: at,
-                        },
-                        contract: read.contract,
-                        via: read.via,
-                        method: read.method,
-                        fragments: read.fragments,
-                    });
+                    found.push(consumer(site, at, read));
                 }
             }
             let Some(route) = next_route(path) else {
@@ -1049,13 +1102,7 @@ impl ContractKind for Http {
                 } else {
                     Site::File(path.into())
                 };
-                found.push(Found {
-                    site,
-                    contract: Some(contract(exported, &route)),
-                    via: None,
-                    method: None,
-                    fragments: Vec::new(),
-                });
+                found.push(provider(site, contract(exported, &route)));
             }
         }
         found.extend(clients(code));

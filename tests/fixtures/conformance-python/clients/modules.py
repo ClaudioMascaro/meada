@@ -4,6 +4,7 @@ import httpx
 import requests
 from requests import get as fetch_page
 
+from . import config
 from .config import HOST, USERS
 
 
@@ -37,3 +38,13 @@ def lookup(options, cache):
     # `get` on any other object is not a consumer.
     cache.get("key")
     return options.get("retries", 3)
+
+
+def list_orders():
+    # A module's attribute joined with `+`.
+    return requests.get(config.HOST + "/orders")
+
+
+def read_order(order_id):
+    # A module's attribute inside an f-string.
+    return requests.get(f"{config.HOST}/orders/{order_id}")
