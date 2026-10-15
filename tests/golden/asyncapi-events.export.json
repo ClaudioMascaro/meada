@@ -111,6 +111,10 @@
         "fields": [
           "number",
           "reason"
+        ],
+        "scalars": [
+          "number",
+          "reason"
         ]
       }
     },
@@ -126,6 +130,11 @@
           "customer.email",
           "id",
           "total"
+        ],
+        "scalars": [
+          "customer.email",
+          "id",
+          "total"
         ]
       }
     },
@@ -137,6 +146,10 @@
           "document": "asyncapi.yaml"
         },
         "fields": [
+          "id",
+          "status"
+        ],
+        "scalars": [
           "id",
           "status"
         ]
@@ -156,6 +169,11 @@
           "amount",
           "currency",
           "orderId"
+        ],
+        "scalars": [
+          "amount",
+          "currency",
+          "orderId"
         ]
       }
     },
@@ -169,6 +187,9 @@
         },
         "fields": [
           "parcel"
+        ],
+        "scalars": [
+          "parcel"
         ]
       }
     },
@@ -181,6 +202,10 @@
           "document": "billing.asyncapi.yaml"
         },
         "fields": [
+          "parcel",
+          "reason"
+        ],
+        "scalars": [
           "parcel",
           "reason"
         ]

@@ -404,6 +404,9 @@
         ],
         "open": [
           "[].product"
+        ],
+        "scalars": [
+          "[].id"
         ]
       }
     },

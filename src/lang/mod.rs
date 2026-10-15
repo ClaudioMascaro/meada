@@ -226,6 +226,27 @@ pub struct Call {
     /// parses a file again when a contract needs them.
     #[serde(skip)]
     pub args: Vec<Value>,
+    /// Shape facts (spec #23), an optional part of a pack's output: what the function making
+    /// the call does with its result, one chain of steps per use, such as `res.json()` then
+    /// `.items`, `[0]` and `.id`. A pack that leaves it empty gives its consumers no shape.
+    /// Not kept in the index, like `args`.
+    #[serde(skip)]
+    pub uses: Vec<Vec<Step>>,
+}
+
+/// One step of what code does with a value (spec #23): the value read through a chain of
+/// member and element accesses and method calls, then maybe returned. A chain ends where the
+/// pack cannot follow the value (passed to a function, stored, rebound).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// `.name`, `?.name` or `["name"]`.
+    Field(String),
+    /// An element: `[0]`, an index with a literal number.
+    Element,
+    /// A call of the method `name` on the value: `.json()`.
+    Call(String),
+    /// The value is returned by the function making the call.
+    Return,
 }
 
 /// An expression as written. The pack does not follow names: the shared side folds

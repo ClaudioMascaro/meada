@@ -123,10 +123,14 @@ impl Engine {
         self.links_and_decisions(exports).0
     }
 
-    /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
-    /// each repository that did not apply, in workspace order.
+    /// Every link of the workspace, sorted, with the decisions replayed and the drift of each
+    /// HTTP link (`http::drift`), and the decisions of each repository that did not apply, in
+    /// workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
-        decisions::replay(self.core_links(exports), &self.workspace, exports)
+        let (mut links, evaluations) =
+            decisions::replay(self.core_links(exports), &self.workspace, exports);
+        http::drift(&mut links, exports);
+        (links, evaluations)
     }
 
     /// Every link of the workspace as the core derives it from the stored contracts, before

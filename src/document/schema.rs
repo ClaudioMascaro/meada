@@ -2,6 +2,7 @@
 //! with local `$ref`s resolved and the parts Meada cannot list left open.
 
 use std::collections::BTreeSet;
+use std::ops::Bound;
 
 use serde_json::Value;
 
@@ -66,6 +67,22 @@ const STRUCTURE: &[&str] = &[
     "$ref",
 ];
 
+/// Whether `schema` types its part as a scalar alone: a `type` of `string`, `number`,
+/// `integer` or `boolean` (with `null` or not), and no keyword that gives it structure.
+fn scalar(schema: &serde_json::Map<String, Value>) -> bool {
+    const SCALARS: &[&str] = &["string", "number", "integer", "boolean"];
+    let types: Vec<&str> = match schema.get("type") {
+        Some(Value::String(t)) => vec![t.as_str()],
+        Some(Value::Array(types)) => types.iter().filter_map(Value::as_str).collect(),
+        _ => return false,
+    };
+    types.iter().all(|t| SCALARS.contains(t) || *t == "null")
+        && types.iter().any(|t| SCALARS.contains(t))
+        && !STRUCTURE
+            .iter()
+            .any(|&k| k != "type" && schema.contains_key(k))
+}
+
 /// The shape `schema`, a schema of the document `doc`, gives, with `source` as its source, and
 /// every external `$ref` met, whose part is open. Reading takes from `work`, what is left of
 /// the document's budget.
@@ -88,13 +105,31 @@ pub fn read(
         work,
         fields: BTreeSet::new(),
         open: BTreeSet::new(),
+        scalars: BTreeSet::new(),
         external: BTreeSet::new(),
     };
     reader.schema(schema, "", false, 0);
+    let (fields, open) = (&reader.fields, &reader.open);
+    // A part some member reads as a scalar and another gives fields, or leaves open, is none.
+    let below = |set: &BTreeSet<String>, path: &str| {
+        [".", "["].iter().any(|step| {
+            let start = format!("{path}{step}");
+            let next = set.range::<str, _>((Bound::Included(start.as_str()), Bound::Unbounded));
+            next.into_iter()
+                .next()
+                .is_some_and(|p| p.starts_with(&start))
+        })
+    };
+    let scalars = (reader.scalars.iter())
+        .filter(|p| !open.contains(*p) && !below(fields, p) && !below(open, p))
+        .filter(|p| !p.is_empty() || (fields.is_empty() && open.is_empty()))
+        .cloned()
+        .collect();
     let shape = Shape {
-        source,
+        scalars,
         fields: reader.fields,
         open: reader.open,
+        ..Shape::new(source)
     };
     (shape, reader.external)
 }
@@ -107,6 +142,8 @@ struct Reader<'a, 'w> {
     work: &'w mut Work,
     fields: BTreeSet<String>,
     open: BTreeSet<String>,
+    /// The parts some schema types as a string, a number, an integer or a boolean.
+    scalars: BTreeSet<String>,
     external: BTreeSet<String>,
 }
 
@@ -130,6 +167,9 @@ impl<'a> Reader<'a, '_> {
                 self.open(path);
             }
             return;
+        }
+        if scalar(schema) && self.work.take(path.len()) {
+            self.scalars.insert(path.to_string());
         }
         if let Some(reference) = schema.get("$ref") {
             self.reference(reference, path, depth);
@@ -248,6 +288,41 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn primitive_types_are_scalar_leaves() {
+        let schema = json!({"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "string"},
+            "count": {"type": ["integer", "null"]},
+            "paid": {"type": "boolean"},
+            "tags": {"type": "array", "items": {"type": "number"}},
+            // A member that is an object with fields makes the part no scalar.
+            "either": {"oneOf": [
+                {"type": "string"},
+                {"type": "object", "properties": {"code": {"type": "string"}}}
+            ]},
+            "any": {},
+            "nothing": {"type": "null"}
+        }}});
+        let (shape, _) = read(&json!({}), &schema, Source::Document("o".into()));
+        let scalars: Vec<&str> = shape.scalars.iter().map(String::as_str).collect();
+        assert_eq!(
+            scalars,
+            [
+                "[].count",
+                "[].either.code",
+                "[].id",
+                "[].paid",
+                "[].tags[]"
+            ]
+        );
+        let (root, _) = read(
+            &json!({}),
+            &json!({"type": "string"}),
+            Source::Document("o".into()),
+        );
+        assert_eq!(root.scalars.iter().collect::<Vec<_>>(), [""]);
     }
 
     #[test]

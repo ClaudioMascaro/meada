@@ -1016,6 +1016,7 @@ impl ContractKind for Packages {
                     via: Some(specifier.to_string()),
                     method: Some(chain),
                     fragments: Vec::new(),
+                    shape: None,
                 });
             }
         }
@@ -1087,6 +1088,7 @@ impl ContractKind for Packages {
                     },
                     by: None,
                     p: None,
+                    drift: None,
                 };
                 if consumer.hops.is_empty() {
                     return vec![link];
@@ -1101,6 +1103,7 @@ impl ContractKind for Packages {
                         reason: format!("{}; import {}", link.reason, h.how.name()),
                         by: None,
                         p: None,
+                        drift: None,
                     })
                     .collect()
             })

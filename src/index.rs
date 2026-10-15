@@ -22,7 +22,7 @@ use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 15;
+const SCHEMA_VERSION: i64 = 16;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -32,7 +32,9 @@ const SCHEMA_VERSION: i64 = 15;
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach. A RabbitMQ `binding` row
+/// none); they let `Engine::open_items` list the routes it may reach. `contracts.shape` is the
+/// shape the code gives a side (`shape::Shape` as JSON: its source and field paths, spec #23),
+/// such as the fields an HTTP consumer reads from the parsed response; NULL when none. A RabbitMQ `binding` row
 /// keeps the queue's channel in `contract`, the exchange in `via` and the pattern in `method`;
 /// a `publish` row (a publish to a named exchange) has no `contract`, the exchange in `via` and
 /// the routing key in `method`. `documents` holds each provider document (spec #21) with the
@@ -66,7 +68,7 @@ CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT
+    method TEXT, fragments TEXT, shape TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -436,7 +438,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
 
     tx.execute("DELETE FROM contracts", [])?;
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
-    let mut rows = BTreeSet::new();
+    // One row per side; the shapes of the Founds of one side (a site reached through several
+    // wrapper paths) merge into it.
+    let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -461,7 +465,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         };
         let role = f.role.name();
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
-        rows.insert((
+        let key = (
             role,
             site,
             &f.contract,
@@ -469,12 +473,19 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             path,
             &f.method,
             fragments.transpose()?,
-        ));
+        );
+        let shape = rows.entry(key).or_default();
+        match (shape.as_mut(), &f.shape) {
+            (Some(shape), Some(more)) => shape.merge(more),
+            (None, more) => *shape = more.clone(),
+            (_, None) => {}
+        }
     }
-    for (role, site, contract, via, path, method, fragments) in rows {
+    for ((role, site, contract, via, path, method, fragments), shape) in rows {
+        let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![role, contract, site, via, path, method, fragments],
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![role, contract, site, via, path, method, fragments, shape],
         )?;
     }
     tx.execute("DELETE FROM exports", [])?;
@@ -911,7 +922,8 @@ pub(crate) struct Provider {
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
-    /// What the route's response or the channel's messages carry, from the first document by path.
+    /// What the route's response or the channel's messages carry: from the first document by
+    /// path that gives one, else from the code (`contracts.shape`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     /// Every path a gateway serves the route at, with the reason for the rewrite: the
@@ -969,7 +981,8 @@ pub(crate) struct Consumer {
     pub(crate) site: String,
     pub(crate) via: Option<String>,
     /// What the messages a channel handler receives carry, from the first document by path
-    /// that lists the side (`Channel::declare`).
+    /// that lists the side (`Channel::declare`); for an HTTP call, the fields it reads from
+    /// the parsed response (`contracts.shape`, spec #23).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     #[serde(skip)]
@@ -980,6 +993,12 @@ pub(crate) struct Consumer {
     /// (`package::import`); `Packages::link` turns them into links.
     #[serde(skip)]
     pub(crate) hops: Vec<Hop>,
+}
+
+/// A `contracts.shape` value; one that does not parse reads as no shape.
+fn stored_shape(json: Option<String>) -> Option<Shape> {
+    // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
+    serde_json::from_str(&json?).ok()
 }
 
 /// The index content of the repository attached as `schema`, every list sorted. Links are
@@ -1039,20 +1058,21 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let providers = db
         .prepare(&format!(
-            "SELECT contract, site FROM {schema}.contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape FROM {schema}.contracts WHERE role = 'provider' \
              ORDER BY contract, site"
         ))?
         .query_map([], |r| {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
+                shape: stored_shape(r.get(2)?),
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(&format!(
-            "SELECT contract, site, via, method, fragments FROM {schema}.contracts \
+            "SELECT contract, site, via, method, fragments, shape FROM {schema}.contracts \
              WHERE role = 'consumer' ORDER BY site, contract, via"
         ))?
         .query_map([], |r| {
@@ -1061,7 +1081,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
-                shape: None,
+                shape: stored_shape(r.get(5)?),
                 method: r.get(3)?,
                 // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
                 fragments: fragments

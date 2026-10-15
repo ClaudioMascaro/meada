@@ -87,7 +87,9 @@ modules updates it.
   from `Export::document_of` over providers and consumers) as `<repository> <document> GET /x
   (documented only)` or `<repository> <document> kafka send orders.created (documented only)`;
   both end their branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its
-  row, pushes them and enters anything else. Starts take only HTTP routes, symbols and call
+  row, pushes them and enters anything else. A line reached through a link with drift ends
+  with ` drift: missing <paths>` (comma-separated, after any `(cycle)` or `(see above)`):
+  `Row::link` reads `Link::drift` and `Walk::push` appends it. Starts take only HTTP routes, symbols and call
   sites; a start in a kind with `ContractKind::sides` (`resource::...`, `channel::...`) gets an
   answer pointing to `context`. A package hop is a call-site consumer linked to a symbol, like an
   HTTP call: `call_down` crosses it from the call into the provider's function and on through its

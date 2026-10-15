@@ -42,6 +42,14 @@ tagging.
   `package` (repository, directory, version and consumers), and `context` on an exported
   function lists its consumers, from any repository of the workspace, with the range flag of
   each.
+- Shape drift (spec #23), first part: the fields a TypeScript or JavaScript `fetch` consumer
+  reads from the parsed response (`await res.json()`, member access, optional chaining, a
+  literal index as an element, a read stopping at a method call), also through a client
+  wrapper that returns the parsed body, are compared with the shape of the provider document's
+  route; a read below a documented scalar is checked up to it. `trace` ends a link line with
+  `drift: missing <path>`, and `meada export` carries each consumer's shape and each link's
+  drift: each missing path with its level, and the reads not checked under an open part of the
+  provider's shape.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

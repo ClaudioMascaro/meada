@@ -182,6 +182,7 @@ impl ContractKind for Channel {
                     via,
                     method,
                     fragments: Vec::new(),
+                    shape: None,
                 }
             })
             .collect()
@@ -260,6 +261,7 @@ impl ContractKind for Channel {
                 reason,
                 by: None,
                 p: None,
+                drift: None,
             })
             .collect()
     }
