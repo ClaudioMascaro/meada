@@ -180,6 +180,17 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/kafka.ts::Kafka#0",
+      "caller": "example.com/channels/api::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 48,
+        "end": 103
+      }
+    },
+    {
       "id": "example.com/channels/api::src/kafka.ts::kafka.consumer#0",
       "caller": "example.com/channels/api::src/kafka.ts",
       "target": null,

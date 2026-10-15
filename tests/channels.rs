@@ -98,3 +98,102 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     );
     assert_golden("channels-api.export.json", &export);
 }
+
+/// The queue and subject fixtures as siblings in one case directory; returns the producer side.
+fn queues(case: &str) -> PathBuf {
+    fixture_repo(
+        case,
+        "channels-queues-worker",
+        Some("https://example.com/queues/worker.git"),
+    );
+    fixture_repo(
+        case,
+        "channels-queues-api",
+        Some("https://example.com/queues/api.git"),
+    )
+}
+
+/// SQS queues link by the queue name at the end of the URL, whatever its prefix, with the AWS
+/// SDK v3 and `sqs-consumer`; NATS subjects link exactly, and through `*` and `>` at
+/// `inferred`, with the pattern in the reason.
+#[test]
+fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
+    let api = queues("channels_queues");
+
+    let export = Engine::open(&api).unwrap().export().unwrap();
+
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let links: Vec<(String, String, String, String)> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            let text = |k: &str| {
+                let id = l[k].as_str().unwrap();
+                let id = id.strip_prefix("example.com/queues/").unwrap_or(id);
+                id.to_string()
+            };
+            (
+                text("consumer"),
+                text("provider"),
+                text("level"),
+                text("reason"),
+            )
+        })
+        .collect();
+    let link = |consumer: &str, provider: &str, level: &str, reason: &str| {
+        let (consumer, provider) = (consumer.to_string(), provider.to_string());
+        (consumer, provider, level.to_string(), reason.to_string())
+    };
+    let nats_api = "api::src/nats.ts::";
+    let nats_worker = "worker::src/nats.ts::";
+    let created = format!("{nats_api}orderCreated::nc.publish#0");
+    let created_eu = format!("{nats_api}orderCreated::nc.publish#1");
+    let mut expected = vec![
+        // The queue name is the last segment of a URL whose prefix is dynamic.
+        link(
+            "worker::src/sqs.ts::drain",
+            "api::src/sqs.ts::enqueueOrder::SendMessageCommand#0",
+            "exact",
+            "channel::sqs::orders",
+        ),
+        // `sqs-consumer`'s `handleMessage`, a producer reached through a client wrapper.
+        link(
+            "worker::src/sqs.ts::handleRefund",
+            "api::src/sqs.ts::enqueueRefund::enqueue#0",
+            "exact",
+            "channel::sqs::refunds",
+        ),
+        link(
+            &format!("{nats_worker}oneToken"),
+            &created,
+            "inferred",
+            "channel::nats::orders.created wildcard orders.*",
+        ),
+        link(
+            &format!("{nats_worker}onOrder"),
+            &created,
+            "inferred",
+            "channel::nats::orders.created wildcard orders.>",
+        ),
+        link(
+            &format!("{nats_worker}onOrder"),
+            &created_eu,
+            "inferred",
+            "channel::nats::orders.eu.created wildcard orders.>",
+        ),
+        link(
+            &format!("{nats_worker}middle.nats orders.*.created"),
+            &created_eu,
+            "inferred",
+            "channel::nats::orders.eu.created wildcard orders.*.created",
+        ),
+        link(
+            &format!("{nats_worker}literal"),
+            &format!("{nats_api}invoicePaid::nc.publish#0"),
+            "exact",
+            "channel::nats::billing.invoice.paid",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(links, expected);
+    assert_golden("channels-queues-api.export.json", &export);
+}

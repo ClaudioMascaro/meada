@@ -58,8 +58,13 @@ impl LanguagePack for TsJs {
                 });
             }
             match node.kind() {
-                "call_expression" => {
-                    if let Some(function) = node.child_by_field_name("function") {
+                "call_expression" | "new_expression" => {
+                    // `new X(...)` is a call of `X`: constructors are how some libraries are
+                    // used (`new SendMessageCommand(...)`, `new Worker(...)`).
+                    let function = node
+                        .child_by_field_name("function")
+                        .or_else(|| node.child_by_field_name("constructor"));
+                    if let Some(function) = function {
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
@@ -584,6 +589,9 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             Value::Object(properties.collect())
         }
         "array" => Value::List(named(node).map(|item| value(item, src, scope)).collect()),
+        "await_expression" => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| value(n, src, scope)),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node) => {

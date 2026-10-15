@@ -1,0 +1,241 @@
+{
+  "repository": "example.com/queues/api",
+  "files": [
+    {
+      "path": "src/nats.ts",
+      "hash": "80853508a3aac2fa8529213c082ec27d323a573f199152f77f826c368db479e0"
+    },
+    {
+      "path": "src/sqs.ts",
+      "hash": "2c16f17f7cb7a48a5efce4db4bca40e36d511ff51f4ed50f6c331f0909cda159"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/queues/api::src/nats.ts::invoicePaid",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 224,
+        "end": 288
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::orderCreated",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 114,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueue",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 449,
+        "end": 590
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 230,
+        "end": 380
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueRefund",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 599,
+        "end": 711
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/queues/api::src/nats.ts::connect#0",
+      "caller": "example.com/queues/api::src/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nats.ts",
+        "start": 50,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::invoicePaid::nc.publish#0",
+      "caller": "example.com/queues/api::src/nats.ts::invoicePaid",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nats.ts",
+        "start": 251,
+        "end": 285
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#0",
+      "caller": "example.com/queues/api::src/nats.ts::orderCreated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nats.ts",
+        "start": 142,
+        "end": 170
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#1",
+      "caller": "example.com/queues/api::src/nats.ts::orderCreated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/nats.ts",
+        "start": 174,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::SQSClient#0",
+      "caller": "example.com/queues/api::src/sqs.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 85,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueue::SendMessageCommand#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 521,
+        "end": 586
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueue::client.send#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 509,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueOrder::SendMessageCommand#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 299,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueOrder::client.send#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 282,
+        "end": 377
+      }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueRefund::enqueue#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueueRefund",
+      "target": "example.com/queues/api::src/sqs.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 635,
+        "end": 708
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::nats::billing.invoice.paid",
+      "site": "example.com/queues/api::src/nats.ts::invoicePaid::nc.publish#0"
+    },
+    {
+      "contract": "channel::nats::orders.created",
+      "site": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#0"
+    },
+    {
+      "contract": "channel::nats::orders.eu.created",
+      "site": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#1"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/queues/api::src/sqs.ts::enqueueOrder::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "site": "example.com/queues/api::src/sqs.ts::enqueueRefund::enqueue#0"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/queues/worker::src/nats.ts::literal",
+      "provider": "example.com/queues/api::src/nats.ts::invoicePaid::nc.publish#0",
+      "contract": "channel::nats::billing.invoice.paid",
+      "level": "exact",
+      "reason": "channel::nats::billing.invoice.paid"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/nats.ts::middle.nats orders.*.created",
+      "provider": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#1",
+      "contract": "channel::nats::orders.*.created",
+      "level": "inferred",
+      "reason": "channel::nats::orders.eu.created wildcard orders.*.created"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/nats.ts::onOrder",
+      "provider": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#0",
+      "contract": "channel::nats::orders.>",
+      "level": "inferred",
+      "reason": "channel::nats::orders.created wildcard orders.>"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/nats.ts::onOrder",
+      "provider": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#1",
+      "contract": "channel::nats::orders.>",
+      "level": "inferred",
+      "reason": "channel::nats::orders.eu.created wildcard orders.>"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/nats.ts::oneToken",
+      "provider": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#0",
+      "contract": "channel::nats::orders.*",
+      "level": "inferred",
+      "reason": "channel::nats::orders.created wildcard orders.*"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/sqs.ts::drain",
+      "provider": "example.com/queues/api::src/sqs.ts::enqueueOrder::SendMessageCommand#0",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "consumer": "example.com/queues/worker::src/sqs.ts::handleRefund",
+      "provider": "example.com/queues/api::src/sqs.ts::enqueueRefund::enqueue#0",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    }
+  ]
+}
