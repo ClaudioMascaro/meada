@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "src/client.ts",
-      "hash": "2afde460290d1b30c6ef68930ee2e3d3ecfe5f7c1a76bf7674e946ade330e725"
+      "hash": "987100ddc0b9e6d9872d210116a80480de761a0c7898160f86a955b96160365f"
     }
   ],
   "symbols": [
@@ -40,6 +40,14 @@
       }
     },
     {
+      "id": "example.com/acme/portal::src/client.ts::mirrors",
+      "span": {
+        "path": "src/client.ts",
+        "start": 928,
+        "end": 1040
+      }
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::other",
       "span": {
         "path": "src/client.ts",
@@ -53,6 +61,14 @@
         "path": "src/client.ts",
         "start": 156,
         "end": 284
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::retry",
+      "span": {
+        "path": "src/client.ts",
+        "start": 1049,
+        "end": 1187
       }
     }
   ],
@@ -102,6 +118,17 @@
       }
     },
     {
+      "id": "example.com/acme/portal::src/client.ts::mirrors::fetch#0",
+      "caller": "example.com/acme/portal::src/client.ts::mirrors",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1027,
+        "end": 1037
+      }
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::other::client#0",
       "caller": "example.com/acme/portal::src/client.ts::other",
       "target": null,
@@ -122,6 +149,28 @@
         "start": 227,
         "end": 281
       }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::retry::Error#0",
+      "caller": "example.com/acme/portal::src/client.ts::retry",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1107,
+        "end": 1121
+      }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::retry::request#0",
+      "caller": "example.com/acme/portal::src/client.ts::retry",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1156,
+        "end": 1180
+      }
     }
   ],
   "providers": [],
@@ -135,6 +184,11 @@
       "contract": "http::GET::/reports",
       "site": "example.com/acme/portal::src/client.ts::listReports::request#0",
       "via": "env:SERVICE_URL"
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/portal::src/client.ts::mirrors::fetch#0",
+      "via": null
     },
     {
       "contract": "http::POST::/reports",

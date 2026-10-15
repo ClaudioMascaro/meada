@@ -198,9 +198,9 @@ impl<'a> Resolver<'a> {
         Binding::Unknown
     }
 
-    /// What `name` refers to from `scope`: the innermost enclosing definition first (what it
-    /// defines, its constants, its parameters, then its other bindings, which hide the name),
-    /// then the top level, then the file's imports. Methods are not lexical bindings.
+    /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
+    /// binding, which hides the name; else what it defines, its constants, its parameters), then
+    /// the top level, then the file's imports. Methods are not lexical bindings.
     fn lexical(
         &self,
         path: &'a str,
@@ -216,6 +216,12 @@ impl<'a> Resolver<'a> {
             } else {
                 format!("{s}.{name}")
             };
+            // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
+            // it hides every name it spells, outer ones and those of its own definition (a
+            // definition, constant or parameter it may shadow in a block alike).
+            if self.locals[path].contains(candidate.as_str()) {
+                return Binding::Unknown;
+            }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
             {
@@ -238,11 +244,6 @@ impl<'a> Resolver<'a> {
                     name: function,
                 };
                 return Binding::Param(function, n, field);
-            }
-            // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
-            // it hides every outer name it spells.
-            if self.locals[path].contains(candidate.as_str()) {
-                return Binding::Unknown;
             }
             scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
         }

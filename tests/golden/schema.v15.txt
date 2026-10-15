@@ -256,17 +256,12 @@ sample.ts
     }
   ],
   "locals": [
-    "Store.find.limit",
-    "Store.find.id",
     "serve.first",
-    "serve.port",
     "serve.tries",
     "serve.rest",
     "serve.host",
     "serve.item",
-    "serve.error",
-    "serve.@789.res",
-    "serve.@789._req"
+    "serve.error"
   ]
 }
 

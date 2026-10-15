@@ -1,5 +1,6 @@
 example.com/pkg/shared kit/src/greet.ts:1 greet
   →[exact: package::npm::@example/kit 2.x (local 2.1.0); import exports] example.com/pkg/api src/report.js:4 report
+  →[exact: package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports] example.com/pkg/web e2e/smoke.ts:5 smoke
   →[exact: package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports] example.com/pkg/web src/app.ts:10 welcome
     example.com/pkg/web src/app.ts:35 caught
-chain: exact · 2 hops · 3 repos · 95 tokens
+chain: exact · 3 hops · 3 repos · 125 tokens

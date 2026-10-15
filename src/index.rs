@@ -1104,7 +1104,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let manifests = (rows.into_iter())
+    let manifests: Vec<Manifest> = (rows.into_iter())
         .map(|(path, summary)| {
             Ok(Manifest {
                 path,
@@ -1112,33 +1112,42 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })
         .collect::<Result<_>>()?;
-    let import_calls = db
-        .prepare(&format!(
-            "SELECT site, path, via, method FROM {schema}.contracts \
-             WHERE role = 'import' ORDER BY site, via, method"
-        ))?
-        .query_map([], |r| {
-            Ok(ImportCall {
-                site: r.get(0)?,
-                path: r.get(1)?,
-                specifier: r.get(2)?,
-                chain: r.get(3)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
-    let exported = db
-        .prepare(&format!(
-            "SELECT path, name, file, target FROM {schema}.exports ORDER BY path, name, file, target"
-        ))?
-        .query_map([], |r| {
-            Ok(Exported {
-                path: r.get(0)?,
-                name: r.get(1)?,
-                file: r.get(2)?,
-                target: r.get(3)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
+    // Only a repository with a manifest can import a package, and only one with a named
+    // manifest provides one: the rows that resolve imports are read for those alone.
+    let import_calls = match manifests.is_empty() {
+        true => Vec::new(),
+        false => db
+            .prepare(&format!(
+                "SELECT site, path, via, method FROM {schema}.contracts \
+                 WHERE role = 'import' ORDER BY site, via, method"
+            ))?
+            .query_map([], |r| {
+                Ok(ImportCall {
+                    site: r.get(0)?,
+                    path: r.get(1)?,
+                    specifier: r.get(2)?,
+                    chain: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
+    let exported = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, name, file, target FROM {schema}.exports \
+                 ORDER BY path, name, file, target"
+            ))?
+            .query_map([], |r| {
+                Ok(Exported {
+                    path: r.get(0)?,
+                    name: r.get(1)?,
+                    file: r.get(2)?,
+                    target: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
     Ok(Export {
         repository: identity.to_string(),
         files,

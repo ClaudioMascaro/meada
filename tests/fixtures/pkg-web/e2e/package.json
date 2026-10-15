@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@example/kit": "^2.1.0"
+  }
+}

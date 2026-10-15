@@ -62,6 +62,10 @@
       "hash": "98db0d23d9c687597bb5767087188bf5035c4194f58d5e287f6c081b0de3ab95"
     },
     {
+      "path": "src/shadow.ts",
+      "hash": "4189eb78482f9feafe4bb8732c1e27b66e88e17a37a136347ff1673fe29c828e"
+    },
+    {
       "path": "src/shapes/circle.ts",
       "hash": "0d6a842df74ebec2b924f1aa6a06a82dde7147fe6dc3a686fa9165053f32883e"
     },
@@ -717,6 +721,94 @@
         "path": "src/messages/sqs.ts",
         "start": 844,
         "end": 971
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1066,
+        "end": 1183
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 257,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::helper",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 151,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::hoisted",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 539,
+        "end": 603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::listed",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 808,
+        "end": 874
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::looped",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 366,
+        "end": 457
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::nested",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 712,
+        "end": 799
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::plain",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 201,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::rebound",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 466,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::twice",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 956,
+        "end": 1057
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 612,
+        "end": 703
       }
     },
     {
@@ -2432,6 +2524,138 @@
         "path": "src/messages/sqs.ts",
         "start": 892,
         "end": 968
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again::Error#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::again",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1127,
+        "end": 1141
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::again",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1168,
+        "end": 1176
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught::Error#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 301,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::caught",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 342,
+        "end": 350
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::hoisted::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::hoisted",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 592,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::listed::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::listed",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 863,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::looped::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::looped",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 446,
+        "end": 454
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::nested::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::nested",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 788,
+        "end": 796
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::plain::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::plain",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "exact",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 237,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::rebound::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::rebound",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 519,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::twice::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::twice",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1046,
+        "end": 1054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::unparenthesized::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 678,
+        "end": 686
       }
     },
     {

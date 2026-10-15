@@ -48,7 +48,9 @@ impl LanguagePack for TsJs {
         }) = stack.pop()
         {
             let mut inner = scope.clone();
-            if let Some((name, kind, range)) = definition(node, binding, src) {
+            let defined = definition(node, binding, src);
+            let is_def = defined.is_some();
+            if let Some((name, kind, range)) = defined {
                 inner = qualify(&scope, &name);
                 facts.defs.push(Def {
                     params: params(node, src, &inner),
@@ -83,12 +85,9 @@ impl LanguagePack for TsJs {
             }
             let named = binds(node, src);
             let pattern = match node.kind() {
-                "formal_parameters"
-                    if node.parent().is_some_and(|p| BODIES.contains(&p.kind())) =>
-                {
-                    Some(node)
-                }
-                "arrow_function" => node.child_by_field_name("parameter"),
+                kind if BODIES.contains(&kind) => node
+                    .child_by_field_name("parameters")
+                    .or_else(|| node.child_by_field_name("parameter")),
                 "catch_clause" => node.child_by_field_name("parameter"),
                 "for_in_statement" => node
                     .child_by_field_name("kind")
@@ -97,8 +96,18 @@ impl LanguagePack for TsJs {
                 "variable_declarator" if named.is_none() => node.child_by_field_name("name"),
                 _ => None,
             };
+            // A definition's parameters are `Def::params`; only the names they leave out (a
+            // nested, array or rest pattern) are locals.
+            let params = (facts.defs.last())
+                .filter(|_| is_def)
+                .map_or(&[][..], |d| d.params.as_slice());
+            let kept = |name: &str| {
+                (params.iter()).any(|p| p.name == name || p.fields.iter().any(|f| f.name == name))
+            };
             for name in pattern.map(|p| bound(p, src)).unwrap_or_default() {
-                facts.locals.push(qualify(&inner, &name));
+                if !(BODIES.contains(&node.kind()) && kept(&name)) {
+                    facts.locals.push(qualify(&inner, &name));
+                }
             }
             if node.kind() == "variable_declarator"
                 && let Some((value_node, name, _)) = &named

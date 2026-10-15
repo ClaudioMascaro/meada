@@ -11,6 +11,7 @@
 //! workspace provides into the provider's symbol, through its entry fields and what its files
 //! export (`resolve::Exported`). Nothing of it is stored as a link: `link` derives the hop.
 
+use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
@@ -67,8 +68,8 @@ const MAX_CONDITIONS: usize = 32;
 /// The target the `exports` field of a manifest gives `subpath` (`.` for the bare name, else
 /// `./<rest>`), as written, `*` replaced: exact keys first, then the pattern with one `*` whose
 /// prefix is the longest. A string, or an object without subpath keys, is the target of `.`. A
-/// `null` target, an array of fallbacks, keys that mix subpaths and conditions, or none of
-/// `CONDITIONS` present give no target.
+/// `null` target, an array of fallbacks, a key or a target with two `*`, keys that mix subpaths
+/// and conditions, or none of `CONDITIONS` present give no target.
 fn exported(exports: &Value, subpath: &str) -> Option<String> {
     let map = match exports {
         Value::Object(map) if map.keys().any(|k| k.starts_with('.')) => map,
@@ -97,7 +98,10 @@ fn exported(exports: &Value, subpath: &str) -> Option<String> {
 /// The path a target of `exports` names, through its conditions (see `exported`).
 fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
     match value {
-        Value::String(t) => Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s))),
+        // One `*` at most, as in a key: the expansion stays the size of the subpath.
+        Value::String(t) if t.matches('*').nth(1).is_none() => {
+            Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s)))
+        }
         Value::Object(conditions) if depth < MAX_CONDITIONS => {
             let taken = CONDITIONS.iter().find_map(|c| conditions.get(*c))?;
             target(taken, star, depth + 1)
@@ -387,8 +391,9 @@ impl<'e> Provided<'e> {
 
     /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
     /// `None` for the whole file. The file's own export of `name` decides; without one, the
-    /// files it re-exports with `export *` are looked into in order, for any name but
-    /// `default`, at most `MAX_REEXPORTS` deep. `seen` cuts cycles.
+    /// files it re-exports with `export *` are looked into, for any name but `default`, at most
+    /// `MAX_REEXPORTS` deep: two that give it differently make it ambiguous, so not exported, as
+    /// in ES modules. `seen` cuts cycles.
     fn lookup(
         &self,
         file: &str,
@@ -406,9 +411,19 @@ impl<'e> Provided<'e> {
         if name == "default" {
             return None;
         }
-        (rows.iter())
-            .filter(|e| e.name.is_none())
-            .find_map(|all| self.lookup(all.file.as_deref()?, name, depth + 1, seen))
+        let mut found = None;
+        for all in rows.iter().filter(|e| e.name.is_none()) {
+            let Some(hit) =
+                (all.file.as_deref()).and_then(|f| self.lookup(f, name, depth + 1, seen))
+            else {
+                continue;
+            };
+            if found.as_ref().is_some_and(|f| *f != hit) {
+                return None;
+            }
+            found = Some(hit);
+        }
+        found
     }
 }
 
@@ -428,15 +443,17 @@ pub fn import(exports: &mut [Export]) {
             }
         }
     }
-    let provided: Vec<Option<Provided>> = (exports.iter())
-        .map(|e| (e.manifests.iter().any(|m| m.summary.name.is_some())).then(|| Provided::new(e)))
-        .collect();
+    // Built for a provider the first time an import reaches it.
+    let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let mut found = Vec::new();
     for (n, export) in exports.iter().enumerate() {
         let mut consumers = Vec::new();
         let mut imports = Vec::new();
         for call in &export.import_calls {
             let Some((name, subpath)) = split(&call.specifier) else {
+                continue;
+            };
+            let Some(candidates) = providers.get(name) else {
                 continue;
             };
             let Some(entry) = nearest(&export.manifests, &call.path)
@@ -449,10 +466,11 @@ pub fn import(exports: &mut [Export]) {
                 .as_deref()
                 .is_some_and(|r| r.starts_with(WORKSPACE));
             let mut hops = Vec::new();
-            for &(m, manifest) in providers.get(name).into_iter().flatten() {
-                let (true, Some(at)) = (!local || m == n, &provided[m]) else {
+            for &(m, manifest) in candidates {
+                if local && m != n {
                     continue;
-                };
+                }
+                let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
                 let repository = &exports[m].repository;
                 let Some((how, target)) = at.resolve(repository, manifest, &subpath, &call.chain)
                 else {
@@ -958,8 +976,9 @@ mod tests {
             "./typed": {"types": null, "default": "./typed.ts"},
             "./fallbacks": ["./a.ts", "./b.ts"],
             "./many/*/x/*": "./many.ts",
+            "./two/*": "./src/*/*.ts",
         });
-        let cases: [(&str, Option<&str>); 17] = [
+        let cases: [(&str, Option<&str>); 18] = [
             // The first of `types`, `import`, `default`, `require` present is taken.
             (".", Some("./src/index.ts")),
             ("./format", Some("./src/format.ts")),
@@ -980,6 +999,8 @@ mod tests {
             // Fallback arrays and keys with two `*` are not read.
             ("./fallbacks", None),
             ("./many/a/x/b", None),
+            // A target with two `*` is not read either.
+            ("./two/x", None),
             ("./missing", None),
             ("./format/more", None),
         ];
@@ -995,6 +1016,14 @@ mod tests {
         assert_eq!(exported(&conditions, ".").as_deref(), Some("./i.ts"));
         let mixed = serde_json::json!({".": "./a.ts", "import": "./b.ts"});
         assert_eq!(exported(&mixed, "."), None);
+    }
+
+    #[test]
+    fn a_target_of_many_stars_is_not_expanded() {
+        let stars = format!("./{}.ts", "*".repeat(1 << 20));
+        let map = serde_json::json!({ "./h/*": stars, ".": stars });
+        assert_eq!(exported(&map, &format!("./h/{}", "x".repeat(64))), None);
+        assert_eq!(exported(&map, "."), None);
     }
 
     #[test]
@@ -1136,6 +1165,24 @@ mod tests {
         // `export *` carries no `default`, and a cycle ends the lookup.
         assert_eq!(lookup(&p, "i.ts", "default"), None);
         assert_eq!(lookup(&p, "i.ts", "missing"), None);
+    }
+
+    #[test]
+    fn a_name_two_export_stars_give_differently_is_not_exported() {
+        let rows = [
+            row("i.ts", None, Some("a.ts"), None),
+            row("i.ts", None, Some("b.ts"), None),
+            row("i.ts", None, Some("c.ts"), None),
+            row("a.ts", Some("dup"), Some("a.ts"), Some("dup")),
+            row("b.ts", Some("dup"), Some("b.ts"), Some("dup")),
+            row("a.ts", Some("same"), Some("a.ts"), Some("same")),
+            row("c.ts", None, Some("a.ts"), None),
+        ];
+        let p = provided(&rows);
+        assert_eq!(lookup(&p, "i.ts", "dup"), None);
+        // Two ways to one definition are one export.
+        let same = Some(("a.ts".to_string(), Some("same".to_string())));
+        assert_eq!(lookup(&p, "i.ts", "same"), same);
     }
 
     #[test]

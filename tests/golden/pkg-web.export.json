@@ -2,11 +2,31 @@
   "repository": "example.com/pkg/web",
   "files": [
     {
+      "path": "e2e/smoke.ts",
+      "hash": "86b2b4c0009efb693574d8b9947e867674db47a344c622a0c4e7bb67dc73ef19"
+    },
+    {
       "path": "src/app.ts",
       "hash": "73675b0b22eb78cd82d41432a833bdf6f389250952fda393ec5e0b000ebaa03f"
+    },
+    {
+      "path": "src/entries.ts",
+      "hash": "e9b992b17b8e723b8f14f4e52f957366b76c382f666614e816f8eba734496569"
+    },
+    {
+      "path": "tools/run.ts",
+      "hash": "b96f0ec3011835f3d06319a0b7553dfbe157241ab1556ab8acdeabdb6ccd892b"
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/pkg/web::e2e/smoke.ts::smoke",
+      "span": {
+        "path": "e2e/smoke.ts",
+        "start": 105,
+        "end": 156
+      }
+    },
     {
       "id": "example.com/pkg/web::src/app.ts::caught",
       "span": {
@@ -54,9 +74,36 @@
         "start": 369,
         "end": 433
       }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries",
+      "span": {
+        "path": "src/entries.ts",
+        "start": 317,
+        "end": 385
+      }
+    },
+    {
+      "id": "example.com/pkg/web::tools/run.ts::run",
+      "span": {
+        "path": "tools/run.ts",
+        "start": 136,
+        "end": 187
+      }
     }
   ],
   "calls": [
+    {
+      "id": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "caller": "example.com/pkg/web::e2e/smoke.ts::smoke",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "e2e/smoke.ts",
+        "start": 141,
+        "end": 153
+      }
+    },
     {
       "id": "example.com/pkg/web::src/app.ts::caught::farewell#0",
       "caller": "example.com/pkg/web::src/app.ts::caught",
@@ -232,6 +279,61 @@
         "start": 419,
         "end": 430
       }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 357,
+        "end": 362
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 376,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 366,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "caller": "example.com/pkg/web::src/entries.ts::entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/entries.ts",
+        "start": 346,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/pkg/web::tools/run.ts::run::greet#0",
+      "caller": "example.com/pkg/web::tools/run.ts::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "tools/run.ts",
+        "start": 170,
+        "end": 184
+      }
     }
   ],
   "providers": [
@@ -243,12 +345,32 @@
   "consumers": [
     {
       "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/web::e2e/package.json::devDependencies::@example/kit",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/esm",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/web::package.json::dependencies::@example/kit",
       "via": null
     },
     {
       "contract": "package::npm::@example/shared",
       "site": "example.com/pkg/web::package.json::dependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/typed",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/typed",
       "via": null
     },
     {
@@ -285,6 +407,26 @@
       "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/web::src/app.ts::welcome::greet#0",
       "via": null
+    },
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/typed",
+      "site": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "via": null
     }
   ],
   "packages": [
@@ -296,6 +438,18 @@
     }
   ],
   "dependencies": [
+    {
+      "manifest": "e2e/package.json",
+      "field": "devDependencies",
+      "name": "@example/kit",
+      "range": "^2.1.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/esm",
+      "range": "~1.0.0"
+    },
     {
       "manifest": "package.json",
       "field": "dependencies",
@@ -310,12 +464,26 @@
     },
     {
       "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/typed",
+      "range": "1.x"
+    },
+    {
+      "manifest": "package.json",
       "field": "devDependencies",
       "name": "@example/shared",
       "range": "~1.2.0"
     }
   ],
   "imports": [
+    {
+      "site": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "specifier": "@example/kit",
+      "name": "greet",
+      "level": "exact",
+      "how": "exports",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::greet"
+    },
     {
       "site": "example.com/pkg/web::src/app.ts::main::Client.create#0",
       "specifier": "@example/kit",
@@ -363,9 +531,62 @@
       "level": "exact",
       "how": "exports",
       "target": "example.com/pkg/shared::kit/src/greet.ts::greet"
+    },
+    {
+      "site": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "specifier": "@example/esm",
+      "name": "esm",
+      "level": "exact",
+      "how": "module",
+      "target": "example.com/pkg/shared::esm/src/index.mjs::esm"
+    },
+    {
+      "site": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "specifier": "@example/esm/lib/parts",
+      "name": "part",
+      "level": "exact",
+      "how": "path",
+      "target": "example.com/pkg/shared::esm/lib/parts/index.ts::part"
+    },
+    {
+      "site": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "specifier": "@example/esm/lib/tool",
+      "name": "tool",
+      "level": "exact",
+      "how": "path",
+      "target": "example.com/pkg/shared::esm/lib/tool.ts::tool"
+    },
+    {
+      "site": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "specifier": "@example/typed",
+      "name": "typed",
+      "level": "exact",
+      "how": "types",
+      "target": "example.com/pkg/shared::typed/src/index.ts::typed"
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/pkg/web::e2e/package.json::devDependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/esm",
+      "provider": "example.com/pkg/shared::esm/package.json",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0)"
+    },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/kit",
       "provider": "example.com/pkg/shared::kit/package.json",
@@ -379,6 +600,13 @@
       "contract": "package::npm::@example/shared",
       "level": "exact",
       "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/typed",
+      "provider": "example.com/pkg/shared::typed/package.json",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::devDependencies::@example/shared",
@@ -428,6 +656,34 @@
       "contract": "package::npm::@example/kit",
       "level": "exact",
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "provider": "example.com/pkg/shared::esm/src/index.mjs::esm",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import module"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "provider": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "provider": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "provider": "example.com/pkg/shared::typed/src/index.ts::typed",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
     }
   ]
 }

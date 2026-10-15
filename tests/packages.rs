@@ -113,6 +113,18 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     // `^2.0.0` flips the other: both entries now say `range mismatch`.
     assert!(!before[0].contains("range mismatch"));
     assert_eq!(refreshed[0].matches("range mismatch").count(), 2);
+    // The calls through the renamed export and subpath no longer cross: no consumer, link or
+    // import names them.
+    let fixed = "example.com/pkg/web::src/app.ts::main::fixed#0";
+    for (export, crossing) in [(&before[0], true), (&refreshed[0], false)] {
+        let json: serde_json::Value = serde_json::from_str(export).unwrap();
+        for site in [WELCOME_GREET, fixed] {
+            let named = ["consumers", "links", "imports"]
+                .iter()
+                .any(|list| json[list].to_string().contains(&format!("\"{site}\"")));
+            assert_eq!(named, crossing, "{site}");
+        }
+    }
 }
 
 const WELCOME_GREET: &str = "example.com/pkg/web::src/app.ts::welcome::greet#0";
@@ -168,4 +180,29 @@ fn a_local_binding_of_the_imported_name_does_not_cross() {
     for list in ["consumers", "links", "imports", "dependencies"] {
         assert!(!json[list].to_string().contains("express"), "{list}");
     }
+}
+
+#[test]
+fn each_entry_field_resolves_and_only_the_nearest_manifest_counts() {
+    let p = packages("packages_entries");
+    let json: serde_json::Value = serde_json::from_str(&export(&p.web)).unwrap();
+    let imports: Vec<(&str, &str)> = (json["imports"].as_array().unwrap().iter())
+        .map(|i| (i["site"].as_str().unwrap(), i["how"].as_str().unwrap()))
+        .collect();
+    let at = |site: &str| format!("example.com/pkg/web::{site}");
+    let how = |site: &str| {
+        (imports.iter())
+            .find(|(s, _)| *s == at(site))
+            .map(|(_, h)| *h)
+    };
+
+    assert_eq!(how("src/entries.ts::entries::typed#0"), Some("types"));
+    assert_eq!(how("src/entries.ts::entries::esm#0"), Some("module"));
+    assert_eq!(how("src/entries.ts::entries::tool#0"), Some("path"));
+    assert_eq!(how("src/entries.ts::entries::part#0"), Some("path"));
+    // `e2e/package.json` declares the kit in `devDependencies`; `tools/package.json`, the
+    // nearest manifest of `tools/run.ts`, does not declare it, though the root one does.
+    assert_eq!(how("e2e/smoke.ts::smoke::greet#0"), Some("exports"));
+    assert_eq!(how("tools/run.ts::run::greet#0"), None);
+    assert!(!json["links"].to_string().contains(&at("tools/run.ts")));
 }

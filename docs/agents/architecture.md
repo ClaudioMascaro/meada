@@ -234,13 +234,19 @@ give byte-identical output.
   resolves the call in every provider of that package (a `workspace:` range: its own repository
   only) through `Provided::resolve`: `entry` gives the file (`exports` through `exported`, the
   table-tested lookup of spec #22: exact key, then the `*` pattern with the longest prefix, the
-  first of `types`, `import`, `default`, `require` at each level, `null` blocking; without
+  first of `types`, `import`, `default`, `require` at each level, `null` blocking, a key or a
+  target with two `*` not read; without
   `exports`, the first of `types`, `module`, `main` for the bare name, or the subpath with the
   trunk's extension and `index` rules, `path`), which must be a source file the provider indexes,
   not a `.d.ts`, and stay inside the package directory (`inside`); `lookup` then reads the chain's
   head from the `exports` rows (the file's own export of the name decides; else its `export *`
-  files in order, never for `default`; `seen` cuts cycles) and each further name as a member of
-  that definition or a name of a whole file. A call resolved in one provider at least becomes a
+  files, never for `default`, two that give it differently making it ambiguous and so not
+  exported, as in ES modules; `seen` cuts cycles) and each further name as a member of that
+  definition or a name of a whole file. `import` skips a specifier no repository provides before
+  reading anything else, and builds a provider's tables (`Provided`) the first time an import
+  reaches it; `index::export` reads the `import` rows only for a repository with a manifest and
+  the `exports` rows only for one with a named manifest. A call resolved in one provider at least
+  becomes a
   consumer of the package at its call site (range in `Consumer::method`, where it resolves in
   `Consumer::hops`, both `serde(skip)`), and each resolution an `imports` row `{site, specifier,
   name, level, how, target}`. `link` then gives a call with hops, instead of the manifest, the
@@ -338,11 +344,12 @@ give byte-identical output.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
-  the index. `Facts::locals` holds every name a binding makes besides definitions and `const`s
-  (`let`, `var`, destructuring, `catch`, `for ... of`, each name of a parameter pattern of a
-  function with a body), qualified by the enclosing definition; `Resolver::lexical` lets it hide
-  an outer name of its scope (`Binding::Unknown`, so the call falls to a name match), the hidden
-  names probe. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
+  the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
+  `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
+  parameter pattern, any parameter of a function that is no definition), qualified by the
+  enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
+  name and a definition, constant or parameter of its own scope alike (`Binding::Unknown`: a
+  call falls to a name match, a value is not known), the hidden names probe. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
@@ -531,7 +538,9 @@ give byte-identical output.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   publishes, packages, dependencies, imports, links}`; `imports` (absent when empty) lists each
   call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
-  target; a provider has
+  target, where `level` is the import's own level (how certain the entry and the name were), not
+  the hop's: the link from that call carries the hop's level, the weaker of it and the package
+  link's; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
   absent when empty) when a document gives its route or channel side one; a consumer has the same
   `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
@@ -693,7 +702,16 @@ give byte-identical output.
   `express` and a name never imported (none cross), and the hidden names probe (a parameter, a
   `catch` binding, a destructuring and a `let` named like the import: no hop); `api/src/report.js`
   calls `greet` too; `mono`'s `a` has `main`, called from `b` (`workspace:*`, exact) and `c`
-  (ambiguous with `fork`). Goldens `pkg-web.trace-down.txt` (from the call into `greet` and on to
+  (ambiguous with `fork`). `shared` also holds `@example/typed` (`types` to a source) and
+  `@example/esm` (`module` to a `.mjs`, and subpaths read as paths, one through `index`), which
+  `web/src/entries.ts` calls; `web/e2e/` declares the kit in `devDependencies` and crosses, and
+  `web/tools/`, whose own manifest does not declare the kit though the root one does, does not.
+  The freshness test also asserts the calls through the renamed export and subpath no longer
+  cross. Hidden names in the trunk: `conformance-ts-js/src/shadow.ts` (`catch`, `for ... of`,
+  `let`, `var`, an arrow parameter without parentheses, nested and array parameter patterns, a
+  same-scope constant and parameter, each never `exact`) and two value-flow cases in
+  `http-fetch-param` (a `for ... of` hiding a constant URL, a `catch` hiding a parameter that
+  defaults to `fetch`). Goldens `pkg-web.trace-down.txt` (from the call into `greet` and on to
   `shout`) and `pkg-shared.trace-up.txt` (to `web` and `api`).
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
@@ -803,13 +821,17 @@ give byte-identical output.
   calls a longer one `range unchecked`. Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
-  read, and an entry that is not a source file (a `.d.ts`, build output) resolves nothing yet
+  read (one `*` in a target keeps every expansion the size of the subpath), and an entry that is
+  not a source file (a `.d.ts`, build output) resolves nothing yet
   (no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
-  definition, whatever block holds it, and a function that is no definition (an object literal
-  method) lends its parameters to the definition around it: a call to the outer name elsewhere
-  in that scope loses its exact link, never gains a wrong one (no marker).
+  definition, whatever block holds it, the definition's own definitions, constants and
+  parameters of that name included, and a function that is no definition (an object literal
+  method, `module.exports = (db) => ...`, an IIFE, an arrow kept in an object) lends its
+  parameters and locals to the definition around it; at the top level that is the whole file.
+  A call to the hidden name elsewhere in that scope loses its exact link or its value, never
+  gains a wrong one (no marker).
 - `index.rs` (`refresh_stamped`): a `package.json` or document that cannot be statted or read
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.

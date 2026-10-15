@@ -1,0 +1,6 @@
+{
+  "name": "@example/esm",
+  "version": "1.0.0",
+  "module": "src/index.mjs",
+  "main": "./dist/index.cjs"
+}
