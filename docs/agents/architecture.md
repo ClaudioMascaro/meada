@@ -299,8 +299,6 @@ give byte-identical output.
 
 ## Known ceilings
 
-Each is marked `ponytail:` at its site unless noted.
-
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
