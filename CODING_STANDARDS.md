@@ -1,7 +1,8 @@
 # Coding standards
 
-Judgement rules for writing and reviewing Meada code: what `cargo fmt`, `clippy` and the tests
-cannot check. Terms are `GLOSSARY.md`'s; the module map is `docs/agents/architecture.md`.
+Judgement rules for writing and reviewing Meada code: what `cargo fmt`, `clippy`, the tests and
+the hooks cannot check. The `code-review` skill and every per-ticket reviewer apply them to a
+diff. Terms are `GLOSSARY.md`'s; the module map is `docs/agents/architecture.md`.
 
 ## Certain or absent
 
@@ -37,6 +38,21 @@ a review finding.
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
+
+## Hostile input
+
+A reader of a file the repository holds (a provider document, a config, a source file) treats
+its bytes as **hostile**: a crafted file ends as a `meada status` line or an open part, and
+indexing carries on.
+
+- Recursion over nested input stops at a depth limit; deeper parts are open, or the file is
+  unreadable at that line.
+- Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
+  substitution runs once over the original text.
+- A path read from a file or a config stays inside the repository root: relative, without `..`,
+  and through no symlink.
+- Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
+  `docs/agents/architecture.md`, and a unit test feeds it an input past the limit.
 
 ## Docs move with the capability
 
