@@ -34,6 +34,8 @@ impl LanguagePack for Python {
         let mut functions: HashMap<String, usize> = HashMap::new();
         // The decorator calls not yet met, by node, and the definition each one decorates.
         let mut decorators: HashMap<usize, String> = HashMap::new();
+        // The bare-name decorators of each definition not yet met.
+        let mut bare: HashMap<String, Vec<String>> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -73,6 +75,7 @@ impl LanguagePack for Python {
                                 range: span(node),
                                 params: params(node, src),
                                 bases: bases(node, src),
+                                decorators: bare.remove(&inner).unwrap_or_default(),
                                 returns: Vec::new(),
                             });
                         }
@@ -89,9 +92,17 @@ impl LanguagePack for Python {
                     let name = (node.child_by_field_name("definition"))
                         .and_then(|d| d.child_by_field_name("name"));
                     if let Some(name) = name {
+                        let def = qualify(&scope, text(name, src));
                         for decorator in named(node).filter(|n| n.kind() == "decorator") {
-                            if let Some(call) = named(decorator).find(|n| n.kind() == "call") {
-                                decorators.insert(call.id(), qualify(&scope, text(name, src)));
+                            match named(decorator).next() {
+                                Some(call) if call.kind() == "call" => {
+                                    decorators.insert(call.id(), def.clone());
+                                }
+                                Some(e) if matches!(e.kind(), "identifier" | "attribute") => {
+                                    let names = bare.entry(def.clone()).or_default();
+                                    names.push(callee(e, src));
+                                }
+                                _ => {}
                             }
                         }
                     }

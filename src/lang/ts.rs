@@ -53,6 +53,7 @@ impl LanguagePack for TsJs {
                     kind,
                     range,
                     bases: Vec::new(),
+                    decorators: Vec::new(),
                     returns: Vec::new(),
                 });
             }

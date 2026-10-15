@@ -160,7 +160,8 @@ impl<'a> Graph<'a> {
             (None, None)
         };
         let route = |c: &str| {
-            contract.as_deref() == Some(c) || path.as_deref().is_some_and(|p| c.ends_with(p))
+            contract.as_deref().is_some_and(|w| http::fits(c, w))
+                || path.as_deref().is_some_and(|p| c.ends_with(p))
         };
         let mut sites: Vec<&str> = (self.providers.iter())
             .filter(|(c, _)| route(c))

@@ -370,6 +370,17 @@ fn python() {
             "scopes.py::Outer.m",
             "shadow.py::from_module",
             "shadow/__init__.py::from_package",
+            "shop/catalog/urls.py::products",
+            "shop/catalog/urls.py::upload",
+            "shop/orders/items.py::stock",
+            "shop/orders/views.py::OrderList",
+            "shop/orders/views.py::OrderList.get",
+            "shop/orders/views.py::OrderList.post",
+            "shop/orders/views.py::OrderList.total",
+            "shop/orders/views.py::order",
+            "shop/views.py::archive",
+            "shop/views.py::health",
+            "shop/views.py::vintage",
             "src/billing/invoice.py::total",
             "src/billing/tax.py::fee",
             "src/billing/tax.py::vat",
@@ -1002,12 +1013,13 @@ fn python() {
     );
 }
 
-#[test]
-fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
-    let repo = fixture_repo("python_http_providers", "conformance-python", Some(ORIGIN));
+/// The Python conformance fixture's export, and its providers (contract, site) whose site is
+/// under `dir`, sorted.
+fn python_providers(case: &str, dir: &str) -> (Value, Vec<(String, String)>) {
+    let repo = fixture_repo(case, "conformance-python", Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    let providers: Vec<(String, String)> = json["providers"]
+    let mut providers: Vec<(String, String)> = json["providers"]
         .as_array()
         .unwrap()
         .iter()
@@ -1016,7 +1028,24 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
             let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
             (p["contract"].as_str().unwrap().into(), site.into())
         })
+        .filter(|(_, site): &(String, String)| site.starts_with(dir))
         .collect();
+    providers.sort();
+    (json, providers)
+}
+
+/// `(contract, site)` pairs as owned strings, sorted.
+fn pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = (pairs.iter())
+        .map(|(c, s)| (c.to_string(), s.to_string()))
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
+    let (json, actual) = python_providers("python_http_providers", "web/");
     let expected = [
         // FastAPI: method decorators and `api_route` on the app.
         ("http::GET::/health", "web/api.py::health"),
@@ -1050,16 +1079,53 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
         ("http::GET::/reports/daily/{}", "web/pages.py::daily"),
         ("http::PUT::/members/{}", "web/accounts.py::update"),
     ];
-    let mut expected: Vec<(String, String)> = expected
-        .iter()
-        .map(|(c, s)| (c.to_string(), s.to_string()))
-        .collect();
-    expected.sort();
-    let mut actual = providers;
-    actual.sort();
-    assert_eq!(actual, expected);
+    assert_eq!(actual, pairs(&expected));
     // A Python function named `fetch` is no HTTP consumer.
     assert_eq!(json["consumers"], serde_json::json!([]));
+}
+
+#[test]
+fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
+    let (_, actual) = python_providers("python_django_providers", "shop/");
+    let expected = [
+        // Unrestricted function views serve every method.
+        ("http::ANY::/health", "shop/views.py::health"),
+        // A `re_path()` with a simple named group; the one beyond them yields nothing.
+        ("http::ANY::/vintage/{}", "shop/views.py::vintage"),
+        // `include()` by dotted name, two levels deep: `require_http_methods`, a class-based
+        // view's own handler methods, and `require_safe` reached through its module.
+        ("http::GET::/shop/orders/{}", "shop/orders/views.py::order"),
+        (
+            "http::DELETE::/shop/orders/{}",
+            "shop/orders/views.py::order",
+        ),
+        (
+            "http::GET::/shop/orders",
+            "shop/orders/views.py::OrderList.get",
+        ),
+        (
+            "http::POST::/shop/orders",
+            "shop/orders/views.py::OrderList.post",
+        ),
+        (
+            "http::GET::/shop/items/{}/stock",
+            "shop/orders/items.py::stock",
+        ),
+        (
+            "http::HEAD::/shop/items/{}/stock",
+            "shop/orders/items.py::stock",
+        ),
+        // `include()` of an imported module: `require_GET` and `require_POST`.
+        (
+            "http::GET::/catalog/products",
+            "shop/catalog/urls.py::products",
+        ),
+        (
+            "http::POST::/catalog/upload",
+            "shop/catalog/urls.py::upload",
+        ),
+    ];
+    assert_eq!(actual, pairs(&expected));
 }
 
 /// The levels of `checkout`'s two calls in `python-roots` under a given `pyproject.toml`: the

@@ -122,6 +122,42 @@
       "hash": "e53679ba99b9af5b3d0b1014dff1346a4b5308553792556003cc79483e3228bc"
     },
     {
+      "path": "shop/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "shop/catalog/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "shop/catalog/urls.py",
+      "hash": "2dde10140d4069cf73168e0ae84fbc501cd7c568adb358239912647f4e72eccf"
+    },
+    {
+      "path": "shop/orders/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "shop/orders/items.py",
+      "hash": "ef139e5380a961bb31ec6e275d9e2ef815caa8e56b98dbb267c7859efb7056b3"
+    },
+    {
+      "path": "shop/orders/urls.py",
+      "hash": "08ade8abc39febd6a5075866a70976d0d701abaf06c0a88e32a2863f1cca6ed0"
+    },
+    {
+      "path": "shop/orders/views.py",
+      "hash": "2e4b83b3e5a0844e7ae716b812c792daea36d7dba6cbc43c08c744f29ee86a9d"
+    },
+    {
+      "path": "shop/urls.py",
+      "hash": "b8298edb14f6b2a5debedd56edf4ade529b47eeb26321b1af77af036ef37946b"
+    },
+    {
+      "path": "shop/views.py",
+      "hash": "504761ec7358c6dc8121d76550b1b5de9a2f723f1d5adba8d9a775fe9494a9fd"
+    },
+    {
       "path": "src/billing/__init__.py",
       "hash": "87b3735bfe77674bc3457658da641991b179e4857b3e6d66e812975498270c06"
     },
@@ -1621,6 +1657,94 @@
         "path": "shadow/__init__.py",
         "start": 0,
         "end": 32
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/catalog/urls.py::products",
+      "span": {
+        "path": "shop/catalog/urls.py",
+        "start": 98,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/catalog/urls.py::upload",
+      "span": {
+        "path": "shop/catalog/urls.py",
+        "start": 150,
+        "end": 200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/items.py::stock",
+      "span": {
+        "path": "shop/orders/items.py",
+        "start": 120,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::OrderList",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 180,
+        "end": 406
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.get",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 268,
+        "end": 309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.post",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 315,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.total",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 373,
+        "end": 406
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::order",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 94,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/views.py::archive",
+      "span": {
+        "path": "shop/views.py",
+        "start": 161,
+        "end": 204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/views.py::health",
+      "span": {
+        "path": "shop/views.py",
+        "start": 76,
+        "end": 112
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/views.py::vintage",
+      "span": {
+        "path": "shop/views.py",
+        "start": 115,
+        "end": 158
       }
     },
     {
@@ -3595,6 +3719,204 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::shop/catalog/urls.py::path#0",
+      "caller": "example.com/acme/conformance::shop/catalog/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/catalog/urls.py",
+        "start": 223,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/catalog/urls.py::path#1",
+      "caller": "example.com/acme/conformance::shop/catalog/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/catalog/urls.py",
+        "start": 256,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/items.py::path#0",
+      "caller": "example.com/acme/conformance::shop/orders/items.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/items.py",
+        "start": 201,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/urls.py::include#0",
+      "caller": "example.com/acme/conformance::shop/orders/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/urls.py",
+        "start": 186,
+        "end": 214
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/urls.py::path#0",
+      "caller": "example.com/acme/conformance::shop/orders/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/urls.py",
+        "start": 80,
+        "end": 117
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/urls.py::path#1",
+      "caller": "example.com/acme/conformance::shop/orders/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/urls.py",
+        "start": 123,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/urls.py::path#2",
+      "caller": "example.com/acme/conformance::shop/orders/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/urls.py",
+        "start": 171,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/urls.py::views.OrderList.as_view#0",
+      "caller": "example.com/acme/conformance::shop/orders/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/urls.py",
+        "start": 139,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.post::self.total#0",
+      "caller": "example.com/acme/conformance::shop/orders/views.py::OrderList.post",
+      "target": "example.com/acme/conformance::shop/orders/views.py::OrderList.total",
+      "level": "exact",
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 355,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::order::str#0",
+      "caller": "example.com/acme/conformance::shop/orders/views.py::order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 170,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/orders/views.py::require_http_methods#0",
+      "caller": "example.com/acme/conformance::shop/orders/views.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/orders/views.py",
+        "start": 95,
+        "end": 134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::include#0",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 270,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::include#1",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 350,
+        "end": 371
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::path#0",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 182,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::path#1",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 256,
+        "end": 298
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::path#2",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 333,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::re_path#0",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 378,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::re_path#1",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 486,
+        "end": 531
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/billing/invoice.py::total::tax.fee#0",
       "caller": "example.com/acme/conformance::src/billing/invoice.py::total",
       "target": "example.com/acme/conformance::src/billing/tax.py::fee",
@@ -3960,6 +4282,14 @@
   ],
   "providers": [
     {
+      "contract": "http::ANY::/health",
+      "site": "example.com/acme/conformance::shop/views.py::health"
+    },
+    {
+      "contract": "http::ANY::/vintage/{}",
+      "site": "example.com/acme/conformance::shop/views.py::vintage"
+    },
+    {
       "contract": "http::DELETE::/internal/admin/users/{}",
       "site": "example.com/acme/conformance::web/factory.py::build_admin.remove_user"
     },
@@ -3968,12 +4298,20 @@
       "site": "example.com/acme/conformance::web/pages.py::order"
     },
     {
+      "contract": "http::DELETE::/shop/orders/{}",
+      "site": "example.com/acme/conformance::shop/orders/views.py::order"
+    },
+    {
       "contract": "http::GET::/",
       "site": "example.com/acme/conformance::web/pages.py::index"
     },
     {
       "contract": "http::GET::/api/v1/items/catalog/{}",
       "site": "example.com/acme/conformance::web/items.py::read_item"
+    },
+    {
+      "contract": "http::GET::/catalog/products",
+      "site": "example.com/acme/conformance::shop/catalog/urls.py::products"
     },
     {
       "contract": "http::GET::/echo",
@@ -4004,8 +4342,28 @@
       "site": "example.com/acme/conformance::web/pages.py::daily"
     },
     {
+      "contract": "http::GET::/shop/items/{}/stock",
+      "site": "example.com/acme/conformance::shop/orders/items.py::stock"
+    },
+    {
+      "contract": "http::GET::/shop/orders",
+      "site": "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+    },
+    {
+      "contract": "http::GET::/shop/orders/{}",
+      "site": "example.com/acme/conformance::shop/orders/views.py::order"
+    },
+    {
+      "contract": "http::HEAD::/shop/items/{}/stock",
+      "site": "example.com/acme/conformance::shop/orders/items.py::stock"
+    },
+    {
       "contract": "http::POST::/api/v1/items/catalog",
       "site": "example.com/acme/conformance::web/items.py::create_item"
+    },
+    {
+      "contract": "http::POST::/catalog/upload",
+      "site": "example.com/acme/conformance::shop/catalog/urls.py::upload"
     },
     {
       "contract": "http::POST::/legacy/catalog",
@@ -4018,6 +4376,10 @@
     {
       "contract": "http::POST::/relay/catalog",
       "site": "example.com/acme/conformance::web/items.py::create_item"
+    },
+    {
+      "contract": "http::POST::/shop/orders",
+      "site": "example.com/acme/conformance::shop/orders/views.py::OrderList.post"
     },
     {
       "contract": "http::PUT::/members/{}",

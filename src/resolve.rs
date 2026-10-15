@@ -692,8 +692,8 @@ impl<'a> Code<'a> {
     }
 
     /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
-    /// through constants and imports, the arguments callers pass to parameters and the values
-    /// functions of the repository return. A call that reaches no such function is where the
+    /// through constants and imports, the arguments callers pass to parameters, the values
+    /// functions of the repository return and the items of a list or tuple. A call that reaches no such function is where the
     /// value comes from, such as a constructor (`APIRouter()`); whatever else the name may
     /// hold (an assignment that is not its only binding, an attribute) is left out.
     pub fn origins(&self, path: &'a str, scope: &'a str, name: &'a str) -> Vec<(&'a str, usize)> {
@@ -772,6 +772,11 @@ impl<'a> Code<'a> {
                 }
                 frames.pop();
                 busy.pop();
+            }
+            Value::List(items) => {
+                for item in items {
+                    self.flow(path, scope, item, frames, busy, out);
+                }
             }
             _ => {}
         }
@@ -885,12 +890,34 @@ impl<'a> Code<'a> {
         matches!(value, Some(Some(Value::Ref(r))) if r == default)
     }
 
-    /// The definition `name` refers to from `scope` in `path`.
+    /// The definition `name` (also a member chain, such as `views.index`) refers to from
+    /// `scope` in `path`.
     pub fn definition(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        let work = &mut Work::default();
+        match self
+            .resolver
+            .resolve(path, scope, name, &mut Seen::new(), work)
+        {
             Binding::Def(t) => Some(t),
             _ => None,
         }
+    }
+
+    /// The file `name`, written in `scope` of `path`, refers to as a whole module.
+    pub fn module(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<&'a str> {
+        let work = &mut Work::default();
+        match self
+            .resolver
+            .resolve(path, scope, name, &mut Seen::new(), work)
+        {
+            Binding::Module(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// The file an import of `specifier` from `path` names, if the pack parses it.
+    pub fn import_file(&self, path: &str, specifier: &str) -> Option<&'a str> {
+        self.resolver.module(path, specifier)
     }
 
     /// What `read` makes of the arguments of the call at `index` of `path`, at each call site

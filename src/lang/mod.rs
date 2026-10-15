@@ -181,6 +181,11 @@ pub struct Def {
     /// enclosing the class.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bases: Vec<String>,
+    /// The decorators written as a bare name (`@require_GET`, `@http.require_safe`), as
+    /// callee-like names resolved from the scope enclosing the definition. A decorator call
+    /// is a `Call` that names the definition in `Call::decorates`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<String>,
     /// What a function returns, one value per `return`. Not kept in the index (see
     /// `Call::args`).
     #[serde(skip)]

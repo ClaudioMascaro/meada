@@ -6,11 +6,14 @@ use std::collections::BTreeMap;
 use crate::contract::{ContractKind, Found, Level, Link, Site};
 use crate::index::{Consumer, Export as IndexExport, Provider};
 use crate::lang::{Export, Part, Value};
-use crate::resolve::Code;
+use crate::resolve::{Code, Target};
 use crate::workspace::Repository;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
+
+/// The method of a provider that serves every method: `http::ANY::<path>`.
+pub const ANY: &str = "ANY";
 
 pub struct Http;
 
@@ -135,18 +138,27 @@ pub(crate) fn gateway_contract(provider: &Provider) -> Option<String> {
     Some(contract(method, provider.gateway.as_deref()?))
 }
 
+/// Whether a provider of the route `provided` serves the route `wanted`: the same route, or
+/// the same path when the provider serves every method (`ANY`).
+pub(crate) fn fits(provided: &str, wanted: &str) -> bool {
+    provided == wanted
+        || matches!((route(provided), route(wanted)), (Some((ANY, p)), Some((_, w))) if p == w)
+}
+
 /// Whether `provider` serves `contract`, by its code path or by its gateway path.
 pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
-    provider.contract == contract || gateway_contract(provider).as_deref() == Some(contract)
+    fits(&provider.contract, contract)
+        || gateway_contract(provider).is_some_and(|g| fits(&g, contract))
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
-/// `method` when that is known, and its path holds every literal fragment, in order.
+/// `method` when that is known (or of every method), and its path holds every literal
+/// fragment, in order.
 pub fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
     let Some((route_method, mut path)) = route(contract) else {
         return false;
     };
-    if method.is_some_and(|m| m != route_method) {
+    if method.is_some_and(|m| m != route_method && route_method != ANY) {
         return false;
     }
     for fragment in fragments {
@@ -574,6 +586,257 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
+/// The methods a Django class-based view serves by defining them.
+const VIEW_METHODS: &[&str] = &[
+    "get", "post", "put", "patch", "delete", "head", "options", "trace",
+];
+
+/// What a Django URLconf entry or a view decorator is, by its name outside the repository.
+const DJANGO_PATH: &str = "django.urls.path";
+const DJANGO_RE_PATH: &str = "django.urls.re_path";
+const DJANGO_INCLUDE: &str = "django.urls.include";
+const DJANGO_HTTP: &str = "django.views.decorators.http.";
+
+/// A `re_path()` pattern as a route: literal text and simple named groups (`(?P<name>...)`),
+/// each group a parameter; `None` for any other pattern. A leading `^` and a trailing `$`
+/// anchor it.
+fn regex_route(pattern: &str) -> Option<String> {
+    let pattern = pattern.strip_prefix('^').unwrap_or(pattern);
+    let pattern = pattern.strip_suffix('$').unwrap_or(pattern);
+    let mut out = String::new();
+    let mut rest = pattern;
+    while let Some(c) = rest.chars().next() {
+        rest = &rest[c.len_utf8()..];
+        match c {
+            // An escaped punctuation character is itself; `\d` and the like are classes.
+            '\\' => {
+                let escaped = rest.chars().next().filter(|e| !e.is_ascii_alphanumeric())?;
+                rest = &rest[escaped.len_utf8()..];
+                out.push(escaped);
+            }
+            '(' => {
+                let group = rest.strip_prefix("?P<")?;
+                let (name, body) = group.split_once('>')?;
+                if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                    return None;
+                }
+                // A group holding no other group: it ends at the first `)` not escaped.
+                let mut chars = body.char_indices();
+                let end = loop {
+                    match chars.next()? {
+                        (_, '\\') => _ = chars.next()?,
+                        (_, '(') => return None,
+                        (at, ')') => break at,
+                        _ => {}
+                    }
+                };
+                rest = &body[end + 1..];
+                out.push_str(PARAM);
+            }
+            '.' | '*' | '+' | '?' | '[' | ']' | '{' | '}' | '|' | ')' | '^' | '$' => return None,
+            c => out.push(c),
+        }
+    }
+    Some(out)
+}
+
+/// The methods the Django function view `view` serves, from its decorators: those of
+/// `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` (`GET`
+/// and `HEAD`), all of them when several restrict it; `None` when nothing restricts it.
+fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
+    let facts = code.files()[view.path];
+    let scope = view.name.rsplit_once('.').map_or("", |(s, _)| s);
+    let def = facts.defs.iter().find(|d| d.name == view.name)?;
+    let mut allowed: Option<Vec<String>> = None;
+    let mut restrict = |methods: Vec<String>| {
+        allowed = Some(match allowed.take() {
+            None => methods,
+            Some(before) => before.into_iter().filter(|m| methods.contains(m)).collect(),
+        });
+    };
+    let named = |name: &str| -> Option<&[&str]> {
+        match name.strip_prefix(DJANGO_HTTP)? {
+            "require_GET" => Some(&["GET"][..]),
+            "require_POST" => Some(&["POST"]),
+            "require_safe" => Some(&["GET", "HEAD"]),
+            _ => None,
+        }
+    };
+    for name in &def.decorators {
+        if let Some(methods) = code
+            .external(view.path, scope, name)
+            .as_deref()
+            .and_then(named)
+        {
+            restrict(methods.iter().map(|m| m.to_string()).collect());
+        }
+    }
+    for (n, call) in facts.calls.iter().enumerate() {
+        if call.decorates.as_deref() != Some(view.name)
+            || (code.external(view.path, &call.scope, &call.callee))
+                .is_none_or(|e| e != format!("{DJANGO_HTTP}require_http_methods"))
+        {
+            continue;
+        }
+        let list = (code.args(view.path, n).and_then(<[_]>::first))
+            .map(|m| code.value(view.path, &call.scope, m));
+        let methods = match list {
+            Some(Value::List(items)) => (items.into_iter())
+                .filter_map(|m| match m {
+                    Value::Str(parts) => literal(&parts).map(|m| m.to_uppercase()),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        restrict(methods);
+    }
+    allowed
+}
+
+/// The URLconf entries an `include()` call at `index` of `path` holds: the `urlpatterns` of
+/// the module it names (by dotted name or as a module), or the entries of the list it is given.
+fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Router<'a>> {
+    let Some(call) = code.call(path, index) else {
+        return Vec::new();
+    };
+    let Some(arg) = call.args.first() else {
+        return Vec::new();
+    };
+    match conf(code, path, &call.scope, arg) {
+        Some(module) => code.origins(module, "", "urlpatterns"),
+        None => code.value_origins(path, &call.scope, arg),
+    }
+}
+
+/// The URLconf module an `include()` argument names, by dotted name or as a module.
+fn conf<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -> Option<&'a str> {
+    match arg {
+        Value::Ref(name) => code.module(path, scope, name),
+        Value::Str(_) => {
+            let Value::Str(parts) = code.value(path, scope, arg) else {
+                return None;
+            };
+            code.import_file(path, &literal(&parts)?)
+        }
+        _ => None,
+    }
+}
+
+/// Django providers: the `path()` and `re_path()` entries of every root URLconf's
+/// `urlpatterns` (a module no `include()` names), each `include()` followed at any depth with
+/// the route before it. A function view serves the methods its decorators allow, or every
+/// method (`ANY`); a class-based view (`View.as_view()`) the handler methods it defines.
+fn django<'a>(code: &Code<'a>) -> Vec<Found> {
+    let is = |(path, n): Router<'a>, name: &str| {
+        let call = &code.files()[path].calls[n];
+        code.external(path, &call.scope, &call.callee).as_deref() == Some(name)
+    };
+    let mut confs: Vec<&str> = (code.files().iter())
+        .filter(|(_, f)| f.consts.iter().any(|c| c.name == "urlpatterns"))
+        .map(|(&path, _)| path)
+        .collect();
+    if confs.is_empty() {
+        return Vec::new();
+    }
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            // The name check first: `is` resolves the callee.
+            let named = call.callee.rsplit('.').next() == Some("include");
+            if named
+                && is((path, n), DJANGO_INCLUDE)
+                && let Some(arg) = code.args(path, n).and_then(<[_]>::first)
+                && let Some(module) = conf(code, path, &call.scope, arg)
+            {
+                confs.retain(|&c| c != module);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    for root in confs {
+        let entries = code.origins(root, "", "urlpatterns");
+        urlconf(code, &is, entries, "", &mut Vec::new(), &mut found);
+    }
+    found
+}
+
+/// The providers of URLconf `entries` under `prefix`; `stack` holds the `include()` calls
+/// being followed, so one met again (a cycle) adds nothing.
+fn urlconf<'a>(
+    code: &Code<'a>,
+    is: &dyn Fn(Router<'a>, &str) -> bool,
+    entries: Vec<Router<'a>>,
+    prefix: &str,
+    stack: &mut Vec<Router<'a>>,
+    found: &mut Vec<Found>,
+) {
+    for entry @ (path, n) in entries {
+        let regex = match (is(entry, DJANGO_PATH), is(entry, DJANGO_RE_PATH)) {
+            (true, _) => false,
+            (_, true) => true,
+            _ => continue,
+        };
+        let Some(call) = code.call(path, n) else {
+            continue;
+        };
+        let route = match call.args.first().map(|r| code.value(path, &call.scope, r)) {
+            Some(Value::Str(parts)) if regex => literal(&parts).and_then(|p| regex_route(&p)),
+            Some(Value::Str(parts)) => Some(render(&parts)),
+            _ => None,
+        };
+        let Some(route) = route.map(|r| format!("{prefix}{r}")) else {
+            continue;
+        };
+        let Some(view) = call.args.get(1).or_else(|| call.keyword("view")) else {
+            continue;
+        };
+        let full = normalize_path(&route);
+        let serve = |path: &str, name: &str, method: &str| Found {
+            site: Site::Def {
+                path: path.into(),
+                name: name.into(),
+            },
+            contract: Some(contract(method, &full)),
+            via: None,
+            method: None,
+            fragments: Vec::new(),
+        };
+        if let Value::Ref(name) = view
+            && let Some(def) = code.definition(path, &call.scope, name)
+        {
+            let methods = view_methods(code, def).unwrap_or_else(|| vec![ANY.into()]);
+            for method in methods {
+                found.push(serve(def.path, def.name, &method));
+            }
+            continue;
+        }
+        for origin @ (at, i) in code.value_origins(path, &call.scope, view) {
+            let callee = &code.files()[at].calls[i].callee;
+            if is(origin, DJANGO_INCLUDE) {
+                if stack.contains(&origin) {
+                    continue;
+                }
+                stack.push(origin);
+                urlconf(code, is, included(code, at, i), &route, stack, found);
+                stack.pop();
+            } else if let Some(class) = callee.strip_suffix(".as_view")
+                && let Some(class) = code.definition(at, &code.files()[at].calls[i].scope, class)
+            {
+                for method in VIEW_METHODS {
+                    let handler = format!("{}.{method}", class.name);
+                    if code.files()[class.path]
+                        .defs
+                        .iter()
+                        .any(|d| d.name == handler)
+                    {
+                        found.push(serve(class.path, &handler, method));
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl ContractKind for Http {
     fn prefix(&self) -> &'static str {
         "http"
@@ -634,6 +897,7 @@ impl ContractKind for Http {
         }
         found.extend(express(code));
         found.extend(decorated(code));
+        found.extend(django(code));
         found
     }
 
@@ -661,10 +925,10 @@ impl ContractKind for Http {
         // matches; across repositories both are candidates.
         let mut serving: Vec<_> = (providers.iter())
             .filter_map(|&(m, p)| {
-                if p.contract == *contract {
+                if fits(&p.contract, contract) {
                     return Some((m, p, None));
                 }
-                if gateway_contract(p).as_deref() != Some(contract) {
+                if !gateway_contract(p).is_some_and(|g| fits(&g, contract)) {
                     return None;
                 }
                 let (_, reason) = m.config.serve.gateway_path(route(&p.contract)?.1)?;
@@ -718,12 +982,15 @@ impl ContractKind for Http {
                 let n = fits.len();
                 // Through a gateway the link is inferred, whatever the consumer side gave, and
                 // its reason is the rewrite.
-                let reason = match (gateway, ambiguous) {
+                let mut reason = match (gateway, ambiguous) {
                     (Some(rewrite), true) => format!("{n} providers fit; {rewrite}"),
                     (Some(rewrite), false) => rewrite.clone(),
                     (None, true) => format!("{n} providers fit; {reason} {}", repo.identity),
                     (None, false) => format!("{reason} {}", repo.identity),
                 };
+                if route(&provider.contract).is_some_and(|(method, _)| method == ANY) {
+                    reason.push_str("; any method");
+                }
                 Link {
                     consumer: consumer.site.clone(),
                     provider: provider.site.clone(),
@@ -744,7 +1011,24 @@ impl ContractKind for Http {
 
 #[cfg(test)]
 mod tests {
-    use super::{fragments, normalize_path, route_fits};
+    use super::{fragments, normalize_path, regex_route, route_fits};
+
+    #[test]
+    fn a_regex_route_reads_literal_text_and_simple_named_groups_only() {
+        for (pattern, route) in [
+            ("^users/$", Some("users/")),
+            ("^api/", Some("api/")),
+            ("users/(?P<pk>[0-9]+)/$", Some("users/{}/")),
+            (r"^v1\.0/(?P<slug>[-\w]+)/(?P<n>\d+)$", Some("v1.0/{}/{}")),
+            (r"^(?P<code>[^\)]+)/$", Some("{}/")),
+            (r"^archive/(\d{4})/$", None),
+            ("^(?P<a>(x|y))/$", None),
+            ("^users/.*$", None),
+            ("^(?:users)/$", None),
+        ] {
+            assert_eq!(regex_route(pattern).as_deref(), route, "{pattern}");
+        }
+    }
 
     #[test]
     fn paths_normalize_alike_on_both_sides() {
@@ -785,6 +1069,8 @@ mod tests {
             // The method filters when known.
             ("http::GET::/api/users", Some("GET"), &[][..], true),
             ("http::POST::/api/users", Some("GET"), &[][..], false),
+            // A route of every method fits any method.
+            ("http::ANY::/api/users", Some("DELETE"), &[][..], true),
             // Every fragment must be in the path, in order, without overlapping.
             ("http::GET::/api/users/{}", None, &["/api/"][..], true),
             (
