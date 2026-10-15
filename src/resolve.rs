@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Value};
+use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Param, Part, Value};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -331,6 +331,16 @@ impl<'a> Code<'a> {
         found
     }
 
+    /// The parameter at position `n` of `function`.
+    fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
+        let file = self.full(function.path)?;
+        file.defs
+            .iter()
+            .find(|d| d.name == function.name)?
+            .params
+            .get(n)
+    }
+
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
@@ -369,10 +379,7 @@ impl<'a> Code<'a> {
         else {
             return false;
         };
-        let param = self
-            .full(function.path)
-            .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-            .and_then(|d| d.params.get(n));
+        let param = self.param(function, n);
         let value = match field {
             Some(f) => param.and_then(|p| p.fields.get(f)).map(|f| &f.default),
             None => param.map(|p| &p.default),
@@ -534,10 +541,7 @@ impl<'a> Code<'a> {
                     let Some(args) = self.args(frame.path, frame.index) else {
                         return Value::Unknown;
                     };
-                    let param = self
-                        .full(function.path)
-                        .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-                        .and_then(|d| d.params.get(n));
+                    let param = self.param(function, n);
                     let bound = match (args.get(n), param.and_then(|p| p.default.as_ref())) {
                         (Some(arg), _) => {
                             self.eval(frame.path, &call.scope, arg, frames, depth + 1, seen, wants)
@@ -558,9 +562,10 @@ impl<'a> Code<'a> {
                     let Some(field) = field.and_then(|f| param?.fields.get(f)) else {
                         return bound;
                     };
-                    // A destructured name reads one property of the object passed. A
-                    // spread may override what came before it; anything but a literal
-                    // object is unknown.
+                    // A destructured name reads one property of the object passed; anything
+                    // but a literal object is unknown. ponytail: a spread makes the name
+                    // unknown until a later key sets it, even a spread of an object whose
+                    // properties are known; read into the spread object if wrappers need it.
                     let Value::Object(properties) = bound else {
                         return Value::Unknown;
                     };

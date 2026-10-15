@@ -52,6 +52,7 @@ pub enum Msg<'a> {
     },
     TrackA,
     NotLowercase(&'a str),
+    NoLeadingSlash(&'a str),
     Empty,
     About,
     Index,
@@ -190,8 +191,8 @@ impl Msg<'_> {
                 format!("`{key}` não é uma chave do {file}"),
             ),
             Msg::TrackA => pick(
-                "the documents release of track A adds it (spec #21)".into(),
-                "a versão de documentos da trilha A a adiciona (spec #21)".into(),
+                "track A adds it (OpenAPI and AsyncAPI documents)".into(),
+                "a trilha A a adiciona (documentos OpenAPI e AsyncAPI)".into(),
             ),
             Msg::NotLowercase(value) => pick(
                 format!(
@@ -202,6 +203,10 @@ impl Msg<'_> {
                     "`{value}` não é um identificador em minúsculas \
                      (letras ASCII, dígitos e hífens, começando por uma letra)"
                 ),
+            ),
+            Msg::NoLeadingSlash(value) => pick(
+                format!("`{value}` must start with `/`"),
+                format!("`{value}` deve começar com `/`"),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into()),
             Msg::About => pick(

@@ -3,3 +3,6 @@ repo = "example.com/acme/orders"
 
 [[peer]]
 repo = "example.com/acme/billing"
+
+[[peer]]
+repo = "example.com/acme/ledger"

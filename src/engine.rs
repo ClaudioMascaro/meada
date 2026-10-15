@@ -144,17 +144,19 @@ impl Engine {
         Ok(self.links_and_decisions(&self.exports()?).1)
     }
 
-    /// For each repository of the workspace, in workspace order, the status lines about its
-    /// resources: a `via` that names no symbol, and a resource no link reaches.
-    pub fn resource_report(&self) -> Result<Vec<Vec<String>>> {
+    /// `decision_report`, with, for each repository of the workspace, in workspace order, the
+    /// status lines about its resources: a `via` that names no symbol, and a resource no link
+    /// reaches.
+    pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
         self.refresh()?;
         let exports = self.exports()?;
-        let links = self.links(&exports);
+        let (links, evaluations) = self.links_and_decisions(&exports);
         let repos = self.workspace.repos.iter();
-        Ok(repos
+        let resources = repos
             .zip(&exports)
             .map(|(repo, export)| resource::report(repo, export, &links))
-            .collect())
+            .collect();
+        Ok((evaluations, resources))
     }
 
     /// The decisions of the repository where Meada runs that are stale or waiting.
@@ -259,7 +261,7 @@ impl Engine {
             Some("symbol") => (true, None),
             Some("contract") => (false, Some("")),
             Some("route") => (false, Some("http::")),
-            Some("resource") => (false, Some("resource::")),
+            Some("resource") => (false, Some(resource::PREFIX)),
             Some(other) => {
                 let valid =
                     "`symbol`, `contract`, `route`, `resource`, `ambiguous` or `unresolved`";
@@ -308,7 +310,7 @@ impl Engine {
                 // A route path ranks against the path part: `/users` is exact for
                 // `http::GET::/users`. A resource ranks against its kind and its id.
                 let lower = contract.to_lowercase();
-                let (kind, id) = match lower.strip_prefix("resource::") {
+                let (kind, id) = match lower.strip_prefix(resource::PREFIX) {
                     Some(rest) => rest.split_once("::").unzip(),
                     None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
                 };
@@ -433,7 +435,7 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
-        if symbol.starts_with("resource::") {
+        if symbol.starts_with(resource::PREFIX) {
             return Ok(render::budgeted(
                 &self.resource_sides(&exports, symbol),
                 budget,
@@ -656,17 +658,14 @@ pub fn status(dir: &Path) -> Result<String> {
     let here = &workspace.repos[0].root;
     let indexed =
         |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
-    // A failure to open or refresh drops the decision lines, not the whole status.
+    // A failure to open or refresh drops the decision and resource lines, not the whole status.
     let engine = workspace
         .repos
         .iter()
         .all(indexed)
         .then(|| Engine::open(dir));
     let (evaluations, resources) = match engine {
-        Some(Ok(engine)) => (
-            engine.decision_report().unwrap_or_default(),
-            engine.resource_report().unwrap_or_default(),
-        ),
+        Some(Ok(engine)) => engine.status_report().unwrap_or_default(),
         _ => Default::default(),
     };
     let mut lines = Vec::new();

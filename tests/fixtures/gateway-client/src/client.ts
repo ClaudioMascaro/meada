@@ -19,3 +19,13 @@ export const staleVersion = () => fetch("/billing/v1/invoices");
 
 // The host rule picks the repository; through the gateway the link is still inferred.
 export const hosted = () => fetch("https://billing.example.com/billing/invoices");
+
+// The ledger serves this code path, and /v1/ledger, whose gateway path it also is: within one
+// repository the code path wins.
+export const ledger = () => fetch("/ledger");
+
+// A dynamic URL whose literal path only the gateway path of an orders route holds.
+declare function tenant(): string;
+export function order(id: string) {
+  return fetch(`https://${tenant()}.example.com/shop/orders/${id}`);
+}

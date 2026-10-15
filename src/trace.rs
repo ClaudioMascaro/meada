@@ -9,7 +9,7 @@ use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{http, render};
+use crate::{http, render, resource};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -141,7 +141,7 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        if from.starts_with("resource::") {
+        if from.starts_with(resource::PREFIX) {
             return Lookup::Answer(vec![format!(
                 "`{from}` is a resource, and a trace starts from a symbol, a route or a call \
                  site: run `context` on it for its writers and readers, then trace from one"

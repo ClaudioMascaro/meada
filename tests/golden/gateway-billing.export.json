@@ -99,28 +99,28 @@
       "provider": "example.com/acme/billing::app/audit/route.ts::GET",
       "contract": "http::GET::/billing/audit",
       "level": "ambiguous",
-      "reason": "2 providers fit; host unresolved; served by example.com/acme/billing (gateway prefix /billing)"
+      "reason": "2 providers fit; gateway prefix /billing"
     },
     {
       "consumer": "example.com/acme/client::src/client.ts::hosted::fetch#0",
       "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
       "contract": "http::GET::/billing/invoices",
       "level": "inferred",
-      "reason": "host billing.example.com is served by example.com/acme/billing (gateway prefix /billing, gateway strip /v1)"
+      "reason": "gateway prefix /billing, gateway strip /v1"
     },
     {
       "consumer": "example.com/acme/client::src/client.ts::invoices::fetch#0",
       "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
       "contract": "http::GET::/billing/invoices",
       "level": "inferred",
-      "reason": "host unresolved; the only repository serving it is example.com/acme/billing (gateway prefix /billing, gateway strip /v1)"
+      "reason": "gateway prefix /billing, gateway strip /v1"
     },
     {
       "consumer": "example.com/acme/client::src/client.ts::status::fetch#0",
       "provider": "example.com/acme/billing::app/status/route.ts::GET",
       "contract": "http::GET::/billing/status",
       "level": "inferred",
-      "reason": "host unresolved; the only repository serving it is example.com/acme/billing (gateway prefix /billing)"
+      "reason": "gateway prefix /billing"
     },
     {
       "consumer": "example.com/acme/client::src/client.ts::versioned::fetch#0",
