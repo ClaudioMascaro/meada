@@ -1,0 +1,59 @@
+#!/bin/sh
+# Lists what Meada makes of a directory, for reviewing a resolution or contract change: each
+# call with its level and target, then providers, consumers and links.
+# Usage: scripts/edges <dir>[=<origin url>] [<peer dir>[=<origin url>]...]
+# Each directory is copied as a sibling into a fresh temporary directory and made a git
+# repository, with <origin url> as its origin (for fixtures whose meada.toml names peers by
+# identity). Meada runs in the first: the calls, providers and consumers are the first one's,
+# the links every link that touches it; a peer joins when the first one's meada.toml names it.
+# The temporary directory is printed and kept, to edit and rerun there.
+set -eu
+
+if [ $# -eq 0 ]; then
+  echo "usage: scripts/edges <dir>[=<origin url>] [<peer dir>[=<origin url>]...]" >&2
+  exit 2
+fi
+command -v jq >/dev/null || { echo "scripts/edges: needs jq" >&2; exit 1; }
+
+manifest="$(cd "$(dirname "$0")/.." && pwd)/Cargo.toml"
+tmp=$(mktemp -d)
+first=
+
+for arg in "$@"; do
+  dir=${arg%%=*}
+  origin=
+  [ "$dir" = "$arg" ] || origin=${arg#*=}
+  [ -d "$dir" ] || { echo "scripts/edges: not a directory: $dir" >&2; exit 1; }
+  repo="$tmp/$(basename "$(cd "$dir" && pwd)")"
+  [ -e "$repo" ] && { echo "scripts/edges: two directories named $(basename "$repo")" >&2; exit 1; }
+  cp -R "$dir" "$repo"
+  rm -rf "$repo/.git" "$repo/.meada"
+  # Pinned like tests/common/mod.rs, so ids and hashes match across machines.
+  (
+    cd "$repo"
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    export GIT_AUTHOR_NAME=Meada GIT_AUTHOR_EMAIL=fixtures@example.com
+    export GIT_COMMITTER_NAME=Meada GIT_COMMITTER_EMAIL=fixtures@example.com
+    export GIT_AUTHOR_DATE=2026-01-01T00:00:00Z GIT_COMMITTER_DATE=2026-01-01T00:00:00Z
+    git init -q
+    [ -z "$origin" ] || git remote add origin "$origin"
+    git add -A
+    git commit -qm fixture
+  )
+  [ -n "$first" ] || first=$repo
+done
+
+(cd "$first" && cargo run --quiet --manifest-path "$manifest" -- export) > "$tmp/export.json"
+
+jq -r '
+  "calls:",
+  (.calls[] | [.id, .level // "unresolved", .target // ((.candidates // []) | join(" | "))]
+    | map(select(. != "")) | "  " + join("  ")),
+  "providers:",
+  (.providers[] | "  \(.contract)  \(.site)\(if .gateway then "  gateway \(.gateway)" else "" end)"),
+  "consumers:",
+  (.consumers[] | "  \(.contract // "unresolved")  \(.site)\(if .via then "  via \(.via)" else "" end)"),
+  "links:",
+  (.links[] | "  \(.consumer) -> \(.provider)  [\(.level): \(.reason)]")
+' "$tmp/export.json"
+echo "kept in $tmp"

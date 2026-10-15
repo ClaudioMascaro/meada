@@ -296,6 +296,9 @@ give byte-identical output.
   second item written.
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
+- `scripts/edges <dir>[=<origin url>] [<peer dir>...]` is the repro harness for reviewing a
+  resolution or contract change: it copies the directories as sibling repositories, exports the
+  first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
 
