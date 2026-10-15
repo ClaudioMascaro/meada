@@ -112,6 +112,8 @@ impl Engine {
             .collect::<Result<Vec<_>>>()?;
         // Dependency entries need every repository's packages, so they come after all declares.
         package::consume(&mut exports);
+        // Imports of a package resolve into its provider, wherever it lives.
+        package::import(&mut exports);
         Ok(exports)
     }
 

@@ -82,6 +82,24 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src);
+            let pattern = match node.kind() {
+                "formal_parameters"
+                    if node.parent().is_some_and(|p| BODIES.contains(&p.kind())) =>
+                {
+                    Some(node)
+                }
+                "arrow_function" => node.child_by_field_name("parameter"),
+                "catch_clause" => node.child_by_field_name("parameter"),
+                "for_in_statement" => node
+                    .child_by_field_name("kind")
+                    .and(node.child_by_field_name("left")),
+                // A `const` holding one name is a constant or a definition.
+                "variable_declarator" if named.is_none() => node.child_by_field_name("name"),
+                _ => None,
+            };
+            for name in pattern.map(|p| bound(p, src)).unwrap_or_default() {
+                facts.locals.push(qualify(&inner, &name));
+            }
             if node.kind() == "variable_declarator"
                 && let Some((value_node, name, _)) = &named
                 && !FUNCTIONS.contains(&value_node.kind())
@@ -236,7 +254,7 @@ const EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
 /// The files a module path may name: itself, its `.ts` source when it names `.js` output,
 /// itself with each extension, and its `index` file.
-fn with_extensions(base: &str) -> Vec<String> {
+pub(crate) fn with_extensions(base: &str) -> Vec<String> {
     let mut out = vec![base.to_string()];
     if let Some(stem) = base.strip_suffix(".js") {
         out.extend([format!("{stem}.ts"), format!("{stem}.tsx")]);
@@ -314,6 +332,44 @@ const FUNCTIONS: &[&str] = &[
     "function",
     "generator_function",
 ];
+
+/// The kinds of functions with a body, whose parameters bind names; a signature's do not.
+const BODIES: &[&str] = &[
+    "function_declaration",
+    "generator_function_declaration",
+    "method_definition",
+    "arrow_function",
+    "function_expression",
+    "function",
+    "generator_function",
+];
+
+/// The names a binding pattern binds: an identifier, or each name an object, array, rest or
+/// default pattern (or a parameter list) holds, never a key or a default value.
+fn bound(pattern: Node, src: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
+    // Explicit stack: a pattern can nest deeper than the call stack.
+    let mut stack = vec![pattern];
+    while let Some(node) = stack.pop() {
+        match node.kind() {
+            "identifier" | "shorthand_property_identifier_pattern" => {
+                out.push(text(node, src).to_string())
+            }
+            "pair_pattern" => stack.extend(node.child_by_field_name("value")),
+            "assignment_pattern" | "object_assignment_pattern" => {
+                stack.extend(node.child_by_field_name("left"))
+            }
+            "required_parameter" | "optional_parameter" => {
+                stack.extend(node.child_by_field_name("pattern"))
+            }
+            "formal_parameters" | "object_pattern" | "array_pattern" | "rest_pattern" => {
+                stack.extend(named(node))
+            }
+            _ => {}
+        }
+    }
+    out
+}
 
 /// Whether the anonymous function `node` is written in place as an argument, or as a property
 /// of an options object given as one: `run({ eachMessage: async () => {} })`.

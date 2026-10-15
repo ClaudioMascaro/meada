@@ -59,6 +59,8 @@ pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// The other names bindings make (`Facts::locals`): each hides an outer name.
+    locals: HashMap<&'a str, HashSet<&'a str>>,
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
@@ -83,6 +85,10 @@ impl<'a> Resolver<'a> {
                 (*path, names)
             })
             .collect();
+        let locals = files
+            .iter()
+            .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
+            .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
             for def in &facts.defs {
@@ -100,6 +106,7 @@ impl<'a> Resolver<'a> {
             files,
             defs,
             consts,
+            locals,
             callers: HashMap::new(),
             by_name,
             modules,
@@ -192,8 +199,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (what it
-    /// defines, its constants, its parameters), then the top level, then the file's imports.
-    /// Methods are not lexical bindings.
+    /// defines, its constants, its parameters, then its other bindings, which hide the name),
+    /// then the top level, then the file's imports. Methods are not lexical bindings.
     fn lexical(
         &self,
         path: &'a str,
@@ -231,6 +238,11 @@ impl<'a> Resolver<'a> {
                     name: function,
                 };
                 return Binding::Param(function, n, field);
+            }
+            // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
+            // it hides every outer name it spells.
+            if self.locals[path].contains(candidate.as_str()) {
+                return Binding::Unknown;
             }
             scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
         }
@@ -289,6 +301,43 @@ impl<'a> Resolver<'a> {
         Binding::Unknown
     }
 
+    /// What each file exports, for an import of the repository as a package (spec #22), as
+    /// `export` reads it: for each name a file exports, the definition or the whole file it
+    /// names, or nothing when that is outside the repository or not known (an import from
+    /// another package stops there); for each `export * from` a file of the repository, that
+    /// file. Sorted.
+    pub fn exported(&self) -> Vec<Exported> {
+        let mut rows = BTreeSet::new();
+        for (&path, facts) in self.files {
+            for export in &facts.exports {
+                let row = match export {
+                    Export::Local { exported, .. } | Export::From { exported, .. } => {
+                        match self.export(path, exported, &mut Seen::new()) {
+                            Binding::Def(t) => {
+                                (Some(exported.as_str()), Some(t.path), Some(t.name))
+                            }
+                            Binding::Module(m) => (Some(exported.as_str()), Some(m), None),
+                            _ => (Some(exported.as_str()), None, None),
+                        }
+                    }
+                    Export::All { source } => match self.module(path, source) {
+                        Some(m) => (None, Some(m), None),
+                        None => continue,
+                    },
+                };
+                rows.insert((path, row));
+            }
+        }
+        (rows.into_iter())
+            .map(|(path, (name, file, target))| Exported {
+                path: path.to_string(),
+                name: name.map(String::from),
+                file: file.map(String::from),
+                target: target.map(String::from),
+            })
+            .collect()
+    }
+
     /// The file an import of `specifier` from `path` names, if the pack parses it.
     fn module(&self, path: &str, specifier: &str) -> Option<&'a str> {
         (self.modules)(path, specifier)
@@ -296,6 +345,20 @@ impl<'a> Resolver<'a> {
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
     }
+}
+
+/// One name a file of the repository exports (`Resolver::exported`), or one of its `export *`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Exported {
+    /// The exporting file.
+    pub path: String,
+    /// The exported name; `None` for an `export * from` the file `file`.
+    pub name: Option<String>,
+    /// The file holding what `name` names; `None` when that is not in the repository or not
+    /// known, which ends the lookup of `name` in `path`.
+    pub file: Option<String>,
+    /// The qualified name of the definition in `file`; `None` when `name` is the whole file.
+    pub target: Option<String>,
 }
 
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
@@ -419,6 +482,37 @@ impl<'a> Code<'a> {
             origin.expr += member;
         }
         Some(origin)
+    }
+
+    /// The import the head of `chain`, a callee written in `path` within `scope`, names when
+    /// that import is of something outside the repository: the specifier, and the chain spelled
+    /// from the imported name (`greet`, `default`, `Client.create`; a namespace import adds no
+    /// name). A binding of the same name in scope hides the import, as for any call.
+    pub fn imported(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        chain: &'a str,
+    ) -> Option<(&'a str, String)> {
+        let (head, members) = chain
+            .split_once('.')
+            .map_or((chain, None), |(h, m)| (h, Some(m)));
+        let Binding::External(specifier, name) =
+            self.resolver.lexical(path, scope, head, &mut Seen::new())
+        else {
+            return None;
+        };
+        let mut spelled = match name {
+            Imported::Namespace => String::new(),
+            Imported::Name(name) => name.clone(),
+        };
+        if let Some(members) = members {
+            if !spelled.is_empty() {
+                spelled.push('.');
+            }
+            spelled += members;
+        }
+        Some((specifier, spelled))
     }
 
     /// The files looked into that `full` lacks, sorted.

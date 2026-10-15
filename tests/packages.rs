@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use common::{age, assert_golden, fixture_repo};
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 
 /// The package fixtures as siblings in one case directory. `web`, `api` and `mono` name
 /// `shared` as their peer, `fork` names `mono`, so a query from any of them sees all five.
@@ -68,8 +68,8 @@ fn ambiguous_package_links_are_not_open_items() {
     );
 }
 
-/// Bumps the shared version, narrows a range, and adds a manifest that takes a second
-/// provider of `@example/a` into the monorepo.
+/// Bumps the shared version, narrows a range, renames what the kit exports, and adds a manifest
+/// that takes a second provider of `@example/a` into the monorepo.
 fn edit(p: &Packages) {
     let replace = |repo: &Path, file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -78,6 +78,15 @@ fn edit(p: &Packages) {
     };
     replace(&p.shared, "package.json", "1.2.0", "1.3.0");
     replace(&p.web, "package.json", "^1.0.0", "^2.0.0");
+    // The kit renames an export and a subpath: the calls through them stop crossing.
+    let renamed = "export { greet as hello } from './greet';";
+    replace(
+        &p.shared,
+        "kit/src/index.ts",
+        "export { greet } from './greet';",
+        renamed,
+    );
+    replace(&p.shared, "kit/package.json", "\"./format\"", "\"./fmt\"");
     fs::create_dir_all(p.mono.join("packages/d")).unwrap();
     fs::write(
         p.mono.join("packages/d/package.json"),
@@ -104,4 +113,59 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     // `^2.0.0` flips the other: both entries now say `range mismatch`.
     assert!(!before[0].contains("range mismatch"));
     assert_eq!(refreshed[0].matches("range mismatch").count(), 2);
+}
+
+const WELCOME_GREET: &str = "example.com/pkg/web::src/app.ts::welcome::greet#0";
+const GREET: &str = "example.com/pkg/shared::kit/src/greet.ts::greet";
+
+#[test]
+fn trace_down_from_a_call_crosses_into_the_package_function_and_onward() {
+    let p = packages("packages_trace_down");
+    let engine = Engine::open(&p.web).unwrap();
+
+    let down = engine
+        .trace(Start::From(WELCOME_GREET), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("pkg-web.trace-down.txt", &down);
+}
+
+#[test]
+fn trace_up_from_a_package_function_reaches_its_callers_in_other_repositories() {
+    let p = packages("packages_trace_up");
+    let engine = Engine::open(&p.shared).unwrap();
+
+    let up = engine
+        .trace(Start::From(GREET), Direction::Up, None)
+        .unwrap();
+
+    assert_golden("pkg-shared.trace-up.txt", &up);
+}
+
+#[test]
+fn a_local_binding_of_the_imported_name_does_not_cross() {
+    let p = packages("packages_hidden");
+    let json: serde_json::Value = serde_json::from_str(&export(&p.web)).unwrap();
+
+    let sites = |list: &str, field: &str| -> Vec<String> {
+        (json[list].as_array().into_iter().flatten())
+            .map(|v| v[field].as_str().unwrap().to_string())
+            .collect()
+    };
+    let mut crossing = [sites("links", "consumer"), sites("imports", "site")].concat();
+    crossing.retain(|c| c.contains("::src/app.ts::"));
+    // `welcome` crosses, through the link and its import resolution.
+    let welcome = crossing.iter().filter(|c| *c == WELCOME_GREET).count();
+    assert_eq!(welcome, 2, "{crossing:?}");
+    for hidden in ["hidden", "caught", "destructured", "shadowed"] {
+        let site = format!("example.com/pkg/web::src/app.ts::{hidden}::");
+        assert!(
+            !crossing.iter().any(|c| c.starts_with(&site)),
+            "{hidden}: {crossing:?}"
+        );
+    }
+    // A package outside the workspace has no consumer, link, import or dependency entry.
+    for list in ["consumers", "links", "imports", "dependencies"] {
+        assert!(!json[list].to_string().contains("express"), "{list}");
+    }
 }

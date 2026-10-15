@@ -25,6 +25,7 @@ CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 
 sample.ts
 {
@@ -65,20 +66,23 @@ sample.ts
       "kind": "Function",
       "range": {
         "start": 540,
-        "end": 682
+        "end": 880
       },
       "params": [
         {
           "name": "port"
+        },
+        {
+          "name": ""
         }
       ]
     },
     {
-      "name": "serve.@591",
+      "name": "serve.@789",
       "kind": "Inline",
       "range": {
-        "start": 591,
-        "end": 624
+        "start": 789,
+        "end": 822
       },
       "params": [
         {
@@ -90,11 +94,11 @@ sample.ts
       ]
     },
     {
-      "name": "serve.@653",
+      "name": "serve.@851",
       "kind": "Inline",
       "range": {
-        "start": 653,
-        "end": 678
+        "start": 851,
+        "end": 876
       },
       "params": []
     }
@@ -180,50 +184,66 @@ sample.ts
     },
     {
       "scope": "serve",
-      "callee": "app.get",
-      "range": {
-        "start": 572,
-        "end": 625
-      }
-    },
-    {
-      "scope": "serve.@591",
-      "callee": "res.send",
-      "range": {
-        "start": 606,
-        "end": 624
-      }
-    },
-    {
-      "scope": "serve.@591",
       "callee": "helper",
       "range": {
-        "start": 615,
-        "end": 623
+        "start": 692,
+        "end": 723
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "helper",
+      "range": {
+        "start": 749,
+        "end": 762
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "app.get",
+      "range": {
+        "start": 770,
+        "end": 823
+      }
+    },
+    {
+      "scope": "serve.@789",
+      "callee": "res.send",
+      "range": {
+        "start": 804,
+        "end": 822
+      }
+    },
+    {
+      "scope": "serve.@789",
+      "callee": "helper",
+      "range": {
+        "start": 813,
+        "end": 821
       }
     },
     {
       "scope": "serve",
       "callee": "app.listen",
       "range": {
-        "start": 636,
-        "end": 679
+        "start": 834,
+        "end": 877
       }
     },
     {
-      "scope": "serve.@653",
+      "scope": "serve.@851",
       "callee": "path.join",
       "range": {
-        "start": 659,
-        "end": 678
+        "start": 857,
+        "end": 876
       }
     },
     {
       "scope": "",
       "callee": "Router",
       "range": {
-        "start": 699,
-        "end": 707
+        "start": 897,
+        "end": 905
       }
     }
   ],
@@ -234,6 +254,19 @@ sample.ts
     {
       "name": "app"
     }
+  ],
+  "locals": [
+    "Store.find.limit",
+    "Store.find.id",
+    "serve.first",
+    "serve.port",
+    "serve.tries",
+    "serve.rest",
+    "serve.host",
+    "serve.item",
+    "serve.error",
+    "serve.@789.res",
+    "serve.@789._req"
   ]
 }
 
@@ -359,5 +392,16 @@ sample.package.json
       "name": "react",
       "range": ">=18"
     }
-  ]
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./internal/*": null,
+    "./utils/*": "./src/utils/*.ts"
+  },
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.mjs",
+  "main": "./dist/index.cjs"
 }
