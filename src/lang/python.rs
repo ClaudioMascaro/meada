@@ -149,6 +149,9 @@ impl LanguagePack for Python {
                     }
                     locals.assign(node, &scope, src);
                 }
+                "as_pattern" if node.parent().is_some_and(|p| p.kind() == "with_item") => {
+                    locals.with_item(node, &scope, src);
+                }
                 // Other bindings say nothing of a class, but hide an outer binding of the name.
                 // ponytail: a comprehension's variables are bound in the enclosing scope, so
                 // they hide a name there for the whole scope.
@@ -391,14 +394,32 @@ fn span(node: Node) -> Range<usize> {
     }
 }
 
-/// The parameters of a function `node` in order, `self` included. Defaults are not read yet.
+/// The parameters of a function `node` in order, `self` included, with their defaults. `*args`
+/// and `**kwargs` keep their stars in the name, and so does the bare `*`: such a parameter
+/// binds no argument, and the ones after it are keyword-only (`Param::name`).
 fn params(node: Node, src: &[u8]) -> Vec<Param> {
-    parameters(node)
-        .into_iter()
-        .map(|(name, _)| Param {
-            name: name.map_or("", |n| text(n, src)).to_string(),
-            default: None,
-            fields: Vec::new(),
+    let Some(list) = node.child_by_field_name("parameters") else {
+        return Vec::new();
+    };
+    named(list)
+        .filter_map(|p| {
+            let (name, default) = match p.kind() {
+                "default_parameter" | "typed_default_parameter" => (
+                    text(identifier(p.child_by_field_name("name")?)?, src).to_string(),
+                    p.child_by_field_name("value"),
+                ),
+                "identifier" | "typed_parameter" => (text(identifier(p)?, src).to_string(), None),
+                "list_splat_pattern" => (format!("*{}", text(identifier(p)?, src)), None),
+                "dictionary_splat_pattern" => (format!("**{}", text(identifier(p)?, src)), None),
+                "keyword_separator" => ("*".to_string(), None),
+                // The `/` separator binds nothing.
+                _ => return None,
+            };
+            Some(Param {
+                name,
+                default: default.map(|d| value(d, src)),
+                fields: Vec::new(),
+            })
         })
         .collect()
 }
@@ -513,26 +534,56 @@ impl Locals {
         if self.extend(node, left, scope, src) {
             return;
         }
-        if let ("assignment", "identifier", Some(right)) =
-            (node.kind(), left.kind(), node.child_by_field_name("right"))
-        {
-            self.values.push((self.written.len(), value(right, src)));
-        }
+        let at = self.written.len();
+        let right = node.child_by_field_name("right");
         if let Some(annotation) = node.child_by_field_name("type") {
             self.target(left, scope, class(annotation, src), How::Annotated, src);
-            return;
+        } else {
+            let constructed = match (node.kind(), left.kind(), right) {
+                ("assignment", "identifier", Some(right)) if right.kind() == "call" => {
+                    constructor(right, src)
+                }
+                _ => None,
+            };
+            let class = constructed.map_or(Class::Unknown, Class::Named);
+            for target in targets(left) {
+                self.target(target, scope, class.clone(), How::Assigned, src);
+            }
         }
-        let right = node.child_by_field_name("right");
-        let constructed = match (node.kind(), left.kind(), right) {
-            ("assignment", "identifier", Some(right)) if right.kind() == "call" => right
-                .child_by_field_name("function")
-                .map(|f| callee(f, src))
-                .filter(|f| !f.starts_with('(')),
-            _ => None,
+        // A name bound by `name = value` holds that value. So does a `self` attribute, but
+        // only a call: the attribute's constant is the class's, and a name in the value would
+        // be read from the class, not from the method that writes it.
+        // ponytail: an attribute assigned something else (`self.client = client`) holds no
+        // value, so its origins are not followed.
+        if let (true, Some(right), true) =
+            (node.kind() == "assignment", right, self.written.len() > at)
+            && matches!(left.kind(), "identifier" | "attribute")
+        {
+            let value = value(right, src);
+            if left.kind() == "identifier" || matches!(value, Value::Call(_)) {
+                self.values.push((at, value));
+            }
+        }
+    }
+
+    /// `with C(...) as x`: `x` holds what `C(...)` gives, as `x = C(...)` does.
+    fn with_item(&mut self, node: Node, scope: &str, src: &[u8]) {
+        let Some(alias) = node.child_by_field_name("alias") else {
+            return;
         };
-        let class = constructed.map_or(Class::Unknown, Class::Named);
-        for target in targets(left) {
-            self.target(target, scope, class.clone(), How::Assigned, src);
+        let call = named(node).next().filter(|n| n.kind() == "call");
+        let name = named(alias).next().filter(|n| n.kind() == "identifier");
+        match (call, name) {
+            (Some(call), Some(name)) => {
+                let class = constructor(call, src).map_or(Class::Unknown, Class::Named);
+                self.values.push((self.written.len(), value(call, src)));
+                self.bind(scope, text(name, src), class, How::Assigned);
+            }
+            _ => {
+                for target in targets(alias) {
+                    self.target(target, scope, Class::Unknown, How::Assigned, src);
+                }
+            }
         }
     }
 
@@ -638,6 +689,12 @@ impl Locals {
             .collect();
         (locals, consts)
     }
+}
+
+/// What a `call` node constructs, as a callee-like name; `None` when its callee is no name.
+fn constructor(call: Node, src: &[u8]) -> Option<String> {
+    let function = call.child_by_field_name("function")?;
+    Some(callee(function, src)).filter(|f| !f.starts_with('('))
 }
 
 /// The scope enclosing `scope`, empty at the top level.

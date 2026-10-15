@@ -60,8 +60,8 @@ search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
 
 **Client wrapper**:
-A function whose call to an HTTP client (`fetch` in v0.1) takes its URL or method from the
-function's own parameters. Each call site of the wrapper is a consumer, read with its
+A function whose call to an HTTP client (`fetch`, or `requests`, `httpx` or `aiohttp` in
+Python) takes its URL or method from the function's own parameters. Each call site of the wrapper is a consumer, read with its
 arguments in place of the parameters, through any number of wrapper levels.
 _Avoid_: API client, helper, fetcher
 

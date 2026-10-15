@@ -189,6 +189,54 @@ fn python() {
     conform(
         "conformance-python",
         &[
+            "clients/defaults.py::call_keyword_only",
+            "clients/defaults.py::call_with_splats",
+            "clients/defaults.py::create_default",
+            "clients/defaults.py::keyword_only",
+            "clients/defaults.py::list_defaults",
+            "clients/defaults.py::other_base",
+            "clients/defaults.py::override_keyword_only",
+            "clients/defaults.py::request",
+            "clients/defaults.py::with_splats",
+            "clients/dynamic.py::build_url",
+            "clients/dynamic.py::computed",
+            "clients/dynamic.py::formatted",
+            "clients/dynamic.py::from_environment",
+            "clients/dynamic.py::percent",
+            "clients/dynamic.py::unknown_method",
+            "clients/modules.py::create_user",
+            "clients/modules.py::list_users",
+            "clients/modules.py::lookup",
+            "clients/modules.py::purge",
+            "clients/modules.py::rename_user",
+            "clients/modules.py::status",
+            "clients/sessions.py::Cache",
+            "clients/sessions.py::Cache.get",
+            "clients/sessions.py::Gateway",
+            "clients/sessions.py::Gateway.__init__",
+            "clients/sessions.py::Gateway.health",
+            "clients/sessions.py::annotated",
+            "clients/sessions.py::bound_by_async_with",
+            "clients/sessions.py::bound_by_with",
+            "clients/sessions.py::from_module",
+            "clients/sessions.py::from_scope",
+            "clients/sessions.py::hand_over",
+            "clients/sessions.py::no_base",
+            "clients/sessions.py::passed",
+            "clients/sessions.py::with_base",
+            "clients/wrappers.py::Api",
+            "clients/wrappers.py::Api.__init__",
+            "clients/wrappers.py::Api.profile",
+            "clients/wrappers.py::Api.user",
+            "clients/wrappers.py::backoff",
+            "clients/wrappers.py::drop_order",
+            "clients/wrappers.py::get",
+            "clients/wrappers.py::list_by_keyword",
+            "clients/wrappers.py::list_orders",
+            "clients/wrappers.py::list_patiently",
+            "clients/wrappers.py::remove",
+            "clients/wrappers.py::retry",
+            "clients/wrappers.py::send",
             "families.py::F",
             "families.py::E",
             "families.py::E.pick",
@@ -1045,6 +1093,40 @@ fn pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
     out
 }
 
+/// A consumer of the export: its contract (`unresolved` for none), how it names the provider's
+/// repository (empty for none) and its site.
+type Consumer = (String, String, String);
+
+/// The consumers of `json` whose site is under `dir`, sorted, with repository-relative sites.
+fn consumers(json: &Value, dir: &str) -> Vec<Consumer> {
+    let mut found: Vec<Consumer> = json["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let site = c["site"].as_str().unwrap();
+            let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+            (
+                c["contract"].as_str().unwrap_or("unresolved").into(),
+                c["via"].as_str().unwrap_or("").into(),
+                site.into(),
+            )
+        })
+        .filter(|(.., site): &Consumer| site.starts_with(dir))
+        .collect();
+    found.sort();
+    found
+}
+
+/// `(contract, via, site)` as owned strings, sorted.
+fn triples(items: &[(&str, &str, &str)]) -> Vec<Consumer> {
+    let mut out: Vec<Consumer> = (items.iter())
+        .map(|(c, v, s)| (c.to_string(), v.to_string(), s.to_string()))
+        .collect();
+    out.sort();
+    out
+}
+
 #[test]
 fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
     let (json, actual) = python_providers("python_http_providers", "web/");
@@ -1083,7 +1165,7 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
     ];
     assert_eq!(actual, pairs(&expected));
     // A Python function named `fetch` is no HTTP consumer.
-    assert_eq!(json["consumers"], serde_json::json!([]));
+    assert_eq!(consumers(&json, "web/"), []);
 }
 
 #[test]
@@ -1236,4 +1318,237 @@ fn python_pyproject_that_does_not_parse_names_the_file() {
     let error = Engine::open(&repo).and_then(|e| e.export()).unwrap_err();
 
     assert!(error.to_string().contains("pyproject.toml"), "{error}");
+}
+
+/// The consumers of the Python conformance fixture's export in `file` of `clients/`.
+fn python_clients(case: &str, file: &str) -> Vec<Consumer> {
+    let repo = fixture_repo(case, "conformance-python", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    consumers(&json, &format!("clients/{file}"))
+}
+
+#[test]
+fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path() {
+    let host = "host:api.example.com";
+    let site = |function: &str, call: &str| format!("clients/modules.py::{function}::{call}");
+    let expected = triples(&[
+        // A literal and an imported constant joined with `+`.
+        (
+            "http::GET::/users",
+            host,
+            &site("list_users", "requests.get#0"),
+        ),
+        // An f-string holding an imported constant; a keyword argument it does not read.
+        (
+            "http::POST::/users",
+            host,
+            &site("create_user", "httpx.post#0"),
+        ),
+        // An f-string hole that does not fold is a parameter marker.
+        (
+            "http::PUT::/users/{}/name",
+            host,
+            &site("rename_user", "requests.put#0"),
+        ),
+        // A function imported under another name.
+        ("http::GET::/status", host, &site("status", "fetch_page#0")),
+        // `request(method, url)`, positionally and by keyword.
+        (
+            "http::DELETE::/cache",
+            host,
+            &site("purge", "requests.request#0"),
+        ),
+        (
+            "http::PATCH::/cache/flags",
+            host,
+            &site("purge", "httpx.request#0"),
+        ),
+    ]);
+
+    // `get` on a parameter or on another object (`lookup`) is no consumer.
+    assert_eq!(
+        python_clients("python_http_modules", "modules.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
+    let host = "host:api.example.com";
+    let site = |function: &str, call: &str| format!("clients/sessions.py::{function}::{call}");
+    let expected = triples(&[
+        // A session in the module scope, and one assigned in the same scope.
+        (
+            "http::GET::/session",
+            host,
+            &site("from_module", "session.get#0"),
+        ),
+        ("http::POST::/orders", host, &site("from_scope", "s.post#0")),
+        // `base_url=` joins in front of a relative path; an absolute URL ignores it.
+        (
+            "http::GET::/v2/items",
+            host,
+            &site("with_base", "client.get#0"),
+        ),
+        (
+            "http::OPTIONS::/probe",
+            "host:other.example.com",
+            &site("with_base", "client.options#0"),
+        ),
+        // Without one the host stays unresolved.
+        ("http::HEAD::/ping", "", &site("no_base", "client.head#0")),
+        // Bound by `with` and `async with`, a trailing `/` of the base or none leading the path.
+        (
+            "http::DELETE::/items/7",
+            host,
+            &site("bound_by_with", "client.delete#0"),
+        ),
+        (
+            "http::PATCH::/items/9",
+            host,
+            &site("bound_by_async_with", "client.patch#0"),
+        ),
+        (
+            "http::HEAD::/aio/head",
+            host,
+            &site("bound_by_async_with", "http.request#0"),
+        ),
+        (
+            "http::GET::/aio",
+            host,
+            &site("bound_by_async_with", "http.get#0"),
+        ),
+        // Assigned to a `self` attribute in the class.
+        (
+            "http::GET::/gateway/health",
+            host,
+            &site("Gateway.health", "self.http.get#0"),
+        ),
+        // A parameter counts through the client a caller passes it.
+        (
+            "http::PUT::/handed/passed",
+            host,
+            &site("passed", "client.put#0"),
+        ),
+    ]);
+
+    // The annotated parameter, `Cache.get` and the response's `get` are no consumers.
+    assert_eq!(
+        python_clients("python_http_sessions", "sessions.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cycle() {
+    let host = "host:api.example.com";
+    let site = |function: &str, call: &str| format!("clients/wrappers.py::{function}::{call}");
+    let expected = triples(&[
+        // Two wrapper levels down, the path by position and by keyword.
+        ("http::GET::/orders", host, &site("list_orders", "get#0")),
+        (
+            "http::GET::/orders/kw",
+            host,
+            &site("list_by_keyword", "get#0"),
+        ),
+        // The method comes from the wrapper and a hole in the path stays a parameter marker.
+        (
+            "http::DELETE::/orders/{}",
+            host,
+            &site("drop_order", "remove#0"),
+        ),
+        // Through the cycle: `retry` reaches `get` without looping.
+        (
+            "http::GET::/orders/slow",
+            host,
+            &site("list_patiently", "retry#0"),
+        ),
+        // A method wrapper over a client with a base URL.
+        (
+            "http::GET::/api/users/me",
+            host,
+            &site("Api.profile", "self.user#0"),
+        ),
+    ]);
+
+    assert_eq!(
+        python_clients("python_http_wrappers", "wrappers.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
+    let site = |function: &str, call: &str| format!("clients/defaults.py::{function}::{call}");
+    let expected = triples(&[
+        // Method and base both from the defaults.
+        (
+            "http::GET::/defaults",
+            "host:api.example.com",
+            &site("list_defaults", "request#0"),
+        ),
+        // The method by position; the base still from its default.
+        (
+            "http::POST::/defaults",
+            "host:api.example.com",
+            &site("create_default", "request#0"),
+        ),
+        // The base by keyword; the method from its default.
+        (
+            "http::GET::/other",
+            "host:other.example.com",
+            &site("other_base", "request#0"),
+        ),
+        // Keyword-only: the default when left out, the argument when given.
+        (
+            "http::PUT::/kw-default",
+            "host:api.example.com",
+            &site("call_keyword_only", "keyword_only#0"),
+        ),
+        (
+            "http::PATCH::/kw-override",
+            "host:api.example.com",
+            &site("override_keyword_only", "keyword_only#0"),
+        ),
+        // Positional arguments past the named ones go to `*extra`, never to `method`.
+        (
+            "http::HEAD::/splat",
+            "host:api.example.com",
+            &site("call_with_splats", "with_splats#0"),
+        ),
+    ]);
+
+    assert_eq!(
+        python_clients("python_http_defaults", "defaults.py"),
+        expected
+    );
+}
+
+#[test]
+fn python_calls_whose_path_cannot_be_evaluated_are_unresolved_consumers() {
+    let site = |function: &str, call: &str| format!("clients/dynamic.py::{function}::{call}");
+    let expected = triples(&[
+        // `str.format`, `%` and a function's result are not folded.
+        ("unresolved", "", &site("formatted", "requests.get#0")),
+        ("unresolved", "", &site("percent", "requests.delete#0")),
+        ("unresolved", "", &site("computed", "requests.post#0")),
+        // A method no caller gives: the host is still known.
+        (
+            "unresolved",
+            "host:api.example.com",
+            &site("unknown_method", "requests.request#0"),
+        ),
+        // An environment read is a hole in the base: the path is still read.
+        (
+            "http::GET::/orders",
+            "",
+            &site("from_environment", "requests.get#0"),
+        ),
+    ]);
+
+    assert_eq!(
+        python_clients("python_http_dynamic", "dynamic.py"),
+        expected
+    );
 }

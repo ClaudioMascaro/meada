@@ -1,0 +1,59 @@
+"""Client wrappers: a function whose URL or method comes from its parameters."""
+
+import httpx
+import requests
+
+from .config import HOST
+
+
+def send(method, path):
+    return requests.request(method, HOST + path)
+
+
+# A second level of wrappers.
+def get(path):
+    return send("GET", path)
+
+
+def remove(path):
+    return send("DELETE", path)
+
+
+def list_orders():
+    return get("/orders")
+
+
+def list_by_keyword():
+    return get(path="/orders/kw")
+
+
+def drop_order(order_id):
+    return remove(f"/orders/{order_id}")
+
+
+# A cycle: retry and backoff call each other before handing over to `get`.
+def retry(path, attempts):
+    if attempts > 0:
+        return backoff(path, attempts)
+    return get(path)
+
+
+def backoff(path, attempts):
+    return retry(path, attempts - 1)
+
+
+def list_patiently():
+    return retry("/orders/slow", 3)
+
+
+class Api:
+    """A wrapper that is a method, over a client with a base URL."""
+
+    def __init__(self):
+        self.http = httpx.Client(base_url=HOST + "/api")
+
+    def user(self, user_id):
+        return self.http.get(f"/users/{user_id}")
+
+    def profile(self):
+        return self.user("me")
