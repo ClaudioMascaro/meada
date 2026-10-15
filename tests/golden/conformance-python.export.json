@@ -2,6 +2,18 @@
   "repository": "example.com/acme/conformance",
   "files": [
     {
+      "path": "cycle_a.py",
+      "hash": "6c698efa7e620bfe7c305f84d0803ba08212ba37dd176657389c622d18456d16"
+    },
+    {
+      "path": "cycle_b.py",
+      "hash": "45be53ce305baf0f8baaadaa81276526d0770324dc270c341fe98cac657edaa2"
+    },
+    {
+      "path": "cycles.py",
+      "hash": "9020787c91e62f3c632cc6817d34b8a4637b83fce7101eec6862a10c5b130375"
+    },
+    {
       "path": "defs.py",
       "hash": "6e030b5535a854cae283df549ca1c4ab3601286c75333208733052370d8121e7"
     },
@@ -50,6 +62,10 @@
       "hash": "e183e05a365277f5d59dc6b8a528b983cb625e94dc949007b95f313babe4e066"
     },
     {
+      "path": "families.py",
+      "hash": "5ec60cbd407ea380ea28ba29253ce74fd1dc29ee158c77b9f8bc551978bf894c"
+    },
+    {
       "path": "geometry/__init__.py",
       "hash": "75ae69b68c41125e96d8110830a74d354f294f2ef138a5b623eab781da65e300"
     },
@@ -80,6 +96,18 @@
     {
       "path": "main.py",
       "hash": "e2515ba3bb1eb8331e862cee8cbb2900fcd19706dbcf1653446751723e731a5e"
+    },
+    {
+      "path": "methods.py",
+      "hash": "9d69dae48911f404a295f730f4d22162e26c1eba4f64866e1bd5a0e4e36a65d8"
+    },
+    {
+      "path": "receivers.py",
+      "hash": "ad2d648db091953e151f12cf0ce07ceec12ae6835d5e1652e72aa19b41aba44a"
+    },
+    {
+      "path": "scopes.py",
+      "hash": "88d128b598a291ade1ba9d2355900fded5bc0811436e6d0dbaeb0b038039bfd7"
     },
     {
       "path": "shadow.py",
@@ -119,6 +147,102 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/acme/conformance::cycle_b.py::use",
+      "span": {
+        "path": "cycle_b.py",
+        "start": 55,
+        "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Deep",
+      "span": {
+        "path": "cycles.py",
+        "start": 332,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Deep.go",
+      "span": {
+        "path": "cycles.py",
+        "start": 367,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Knot",
+      "span": {
+        "path": "cycles.py",
+        "start": 199,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Knot.go",
+      "span": {
+        "path": "cycles.py",
+        "start": 227,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Loop",
+      "span": {
+        "path": "cycles.py",
+        "start": 270,
+        "end": 329
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Loop.Inner",
+      "span": {
+        "path": "cycles.py",
+        "start": 298,
+        "end": 329
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Ping",
+      "span": {
+        "path": "cycles.py",
+        "start": 77,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Ping.go",
+      "span": {
+        "path": "cycles.py",
+        "start": 99,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Pong",
+      "span": {
+        "path": "cycles.py",
+        "start": 142,
+        "end": 196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "span": {
+        "path": "cycles.py",
+        "start": 164,
+        "end": 196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::crossed",
+      "span": {
+        "path": "cycles.py",
+        "start": 414,
+        "end": 472
+      }
+    },
     {
       "id": "example.com/acme/conformance::defs.py::Registry",
       "span": {
@@ -368,6 +492,198 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::families.py::A",
+      "span": {
+        "path": "families.py",
+        "start": 310,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::A.go",
+      "span": {
+        "path": "families.py",
+        "start": 329,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::B",
+      "span": {
+        "path": "families.py",
+        "start": 284,
+        "end": 307
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::C",
+      "span": {
+        "path": "families.py",
+        "start": 258,
+        "end": 281
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Client",
+      "span": {
+        "path": "families.py",
+        "start": 570,
+        "end": 606
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::D",
+      "span": {
+        "path": "families.py",
+        "start": 208,
+        "end": 255
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::D.pick",
+      "span": {
+        "path": "families.py",
+        "start": 221,
+        "end": 255
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::E",
+      "span": {
+        "path": "families.py",
+        "start": 158,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::E.pick",
+      "span": {
+        "path": "families.py",
+        "start": 171,
+        "end": 205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::F",
+      "span": {
+        "path": "families.py",
+        "start": 138,
+        "end": 155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Lone",
+      "span": {
+        "path": "families.py",
+        "start": 790,
+        "end": 909
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Lone.go",
+      "span": {
+        "path": "families.py",
+        "start": 806,
+        "end": 846
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Lone.make",
+      "span": {
+        "path": "families.py",
+        "start": 852,
+        "end": 909
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Model",
+      "span": {
+        "path": "families.py",
+        "start": 493,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Model.go",
+      "span": {
+        "path": "families.py",
+        "start": 527,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Plain",
+      "span": {
+        "path": "families.py",
+        "start": 686,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Plain.go",
+      "span": {
+        "path": "families.py",
+        "start": 757,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Plain.keep",
+      "span": {
+        "path": "families.py",
+        "start": 711,
+        "end": 751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Remote",
+      "span": {
+        "path": "families.py",
+        "start": 609,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Remote.go",
+      "span": {
+        "path": "families.py",
+        "start": 643,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Stored",
+      "span": {
+        "path": "families.py",
+        "start": 440,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Stored.save",
+      "span": {
+        "path": "families.py",
+        "start": 458,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Tangled",
+      "span": {
+        "path": "families.py",
+        "start": 372,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Tangled.go",
+      "span": {
+        "path": "families.py",
+        "start": 397,
+        "end": 437
+      }
+    },
+    {
       "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
       "span": {
         "path": "geometry/extra/measure.py",
@@ -488,6 +804,446 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods.py::Base",
+      "span": {
+        "path": "methods.py",
+        "start": 215,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Base.ping",
+      "span": {
+        "path": "methods.py",
+        "start": 231,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Base.shared",
+      "span": {
+        "path": "methods.py",
+        "start": 269,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Dial",
+      "span": {
+        "path": "methods.py",
+        "start": 399,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Dial.spin",
+      "span": {
+        "path": "methods.py",
+        "start": 415,
+        "end": 447
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Leaf",
+      "span": {
+        "path": "methods.py",
+        "start": 1207,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Leaf.run",
+      "span": {
+        "path": "methods.py",
+        "start": 1236,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Left",
+      "span": {
+        "path": "methods.py",
+        "start": 1120,
+        "end": 1146
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Mixin",
+      "span": {
+        "path": "methods.py",
+        "start": 306,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Mixin.mixed",
+      "span": {
+        "path": "methods.py",
+        "start": 363,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Mixin.shared",
+      "span": {
+        "path": "methods.py",
+        "start": 323,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel",
+      "span": {
+        "path": "methods.py",
+        "start": 450,
+        "end": 1066
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.__init__",
+      "span": {
+        "path": "methods.py",
+        "start": 499,
+        "end": 566
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.build",
+      "span": {
+        "path": "methods.py",
+        "start": 873,
+        "end": 933
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.check",
+      "span": {
+        "path": "methods.py",
+        "start": 1003,
+        "end": 1066
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.create",
+      "span": {
+        "path": "methods.py",
+        "start": 939,
+        "end": 997
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw",
+      "span": {
+        "path": "methods.py",
+        "start": 572,
+        "end": 827
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw.later",
+      "span": {
+        "path": "methods.py",
+        "start": 758,
+        "end": 803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.render",
+      "span": {
+        "path": "methods.py",
+        "start": 833,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Right",
+      "span": {
+        "path": "methods.py",
+        "start": 1149,
+        "end": 1204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Right.hook",
+      "span": {
+        "path": "methods.py",
+        "start": 1172,
+        "end": 1204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Root",
+      "span": {
+        "path": "methods.py",
+        "start": 1069,
+        "end": 1117
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Root.hook",
+      "span": {
+        "path": "methods.py",
+        "start": 1085,
+        "end": 1117
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::make",
+      "span": {
+        "path": "methods.py",
+        "start": 1280,
+        "end": 1314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::module_level",
+      "span": {
+        "path": "methods.py",
+        "start": 1554,
+        "end": 1601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside",
+      "span": {
+        "path": "methods.py",
+        "start": 1716,
+        "end": 1837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::shadowed",
+      "span": {
+        "path": "methods.py",
+        "start": 1604,
+        "end": 1677
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use",
+      "span": {
+        "path": "methods.py",
+        "start": 1317,
+        "end": 1527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Engine",
+      "span": {
+        "path": "receivers.py",
+        "start": 172,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Engine.start",
+      "span": {
+        "path": "receivers.py",
+        "start": 190,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Runner",
+      "span": {
+        "path": "receivers.py",
+        "start": 533,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Runner.each",
+      "span": {
+        "path": "receivers.py",
+        "start": 591,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Runner.stride",
+      "span": {
+        "path": "receivers.py",
+        "start": 551,
+        "end": 585
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Typed",
+      "span": {
+        "path": "receivers.py",
+        "start": 382,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Typed.__init__",
+      "span": {
+        "path": "receivers.py",
+        "start": 419,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Typed.run",
+      "span": {
+        "path": "receivers.py",
+        "start": 481,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Untyped",
+      "span": {
+        "path": "receivers.py",
+        "start": 226,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Untyped.__init__",
+      "span": {
+        "path": "receivers.py",
+        "start": 268,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Untyped.run",
+      "span": {
+        "path": "receivers.py",
+        "start": 330,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::comprehension",
+      "span": {
+        "path": "receivers.py",
+        "start": 838,
+        "end": 911
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::except_as",
+      "span": {
+        "path": "receivers.py",
+        "start": 985,
+        "end": 1078
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::fallback",
+      "span": {
+        "path": "receivers.py",
+        "start": 1337,
+        "end": 1373
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::lacking",
+      "span": {
+        "path": "receivers.py",
+        "start": 1376,
+        "end": 1431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::lambdas",
+      "span": {
+        "path": "receivers.py",
+        "start": 1081,
+        "end": 1136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::module_read",
+      "span": {
+        "path": "receivers.py",
+        "start": 706,
+        "end": 750
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::optional",
+      "span": {
+        "path": "receivers.py",
+        "start": 1434,
+        "end": 1529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::param_reassigned",
+      "span": {
+        "path": "receivers.py",
+        "start": 1139,
+        "end": 1241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::spare_read",
+      "span": {
+        "path": "receivers.py",
+        "start": 1292,
+        "end": 1334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::swap",
+      "span": {
+        "path": "receivers.py",
+        "start": 1244,
+        "end": 1289
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::walrus",
+      "span": {
+        "path": "receivers.py",
+        "start": 914,
+        "end": 982
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::with_as",
+      "span": {
+        "path": "receivers.py",
+        "start": 753,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Helper",
+      "span": {
+        "path": "scopes.py",
+        "start": 87,
+        "end": 113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Outer",
+      "span": {
+        "path": "scopes.py",
+        "start": 116,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Outer.Helper",
+      "span": {
+        "path": "scopes.py",
+        "start": 133,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Outer.m",
+      "span": {
+        "path": "scopes.py",
+        "start": 186,
+        "end": 222
+      }
+    },
+    {
       "id": "example.com/acme/conformance::shadow.py::from_module",
       "span": {
         "path": "shadow.py",
@@ -585,6 +1341,72 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/acme/conformance::cycle_b.py::use::other.ring#0",
+      "caller": "example.com/acme/conformance::cycle_b.py::use",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycle_b.py",
+        "start": 77,
+        "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Deep.go::self.x.y.ring#0",
+      "caller": "example.com/acme/conformance::cycles.py::Deep.go",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycles.py",
+        "start": 396,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Knot.go::self.ring#0",
+      "caller": "example.com/acme/conformance::cycles.py::Knot.go",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycles.py",
+        "start": 256,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::Ping.go::self.ring#0",
+      "caller": "example.com/acme/conformance::cycles.py::Ping.go",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycles.py",
+        "start": 128,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::crossed::a.ring#0",
+      "caller": "example.com/acme/conformance::cycles.py::crossed",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycles.py",
+        "start": 451,
+        "end": 459
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::cycles.py::crossed::b.ring#0",
+      "caller": "example.com/acme/conformance::cycles.py::crossed",
+      "target": "example.com/acme/conformance::cycles.py::Pong.ring",
+      "level": "inferred",
+      "span": {
+        "path": "cycles.py",
+        "start": 464,
+        "end": 472
+      }
+    },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.Meta.label::plain#0",
       "caller": "example.com/acme/conformance::defs.py::Registry.Meta.label",
@@ -905,6 +1727,95 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::families.py::A.go::self.pick#0",
+      "caller": "example.com/acme/conformance::families.py::A.go",
+      "target": "example.com/acme/conformance::families.py::D.pick",
+      "level": "exact",
+      "span": {
+        "path": "families.py",
+        "start": 358,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Lone.go::self.pick#0",
+      "caller": "example.com/acme/conformance::families.py::Lone.go",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::families.py::D.pick",
+        "example.com/acme/conformance::families.py::E.pick"
+      ],
+      "span": {
+        "path": "families.py",
+        "start": 835,
+        "end": 846
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Lone.make::cls.pick#0",
+      "caller": "example.com/acme/conformance::families.py::Lone.make",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::families.py::D.pick",
+        "example.com/acme/conformance::families.py::E.pick"
+      ],
+      "span": {
+        "path": "families.py",
+        "start": 899,
+        "end": 909
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Model.go::self.save#0",
+      "caller": "example.com/acme/conformance::families.py::Model.go",
+      "target": "example.com/acme/conformance::families.py::Stored.save",
+      "level": "inferred",
+      "span": {
+        "path": "families.py",
+        "start": 556,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Plain.keep::self.go#0",
+      "caller": "example.com/acme/conformance::families.py::Plain.keep",
+      "target": "example.com/acme/conformance::families.py::Plain.go",
+      "level": "exact",
+      "span": {
+        "path": "families.py",
+        "start": 742,
+        "end": 751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Remote.go::self.save#0",
+      "caller": "example.com/acme/conformance::families.py::Remote.go",
+      "target": "example.com/acme/conformance::families.py::Stored.save",
+      "level": "inferred",
+      "span": {
+        "path": "families.py",
+        "start": 672,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::families.py::Tangled.go::self.pick#0",
+      "caller": "example.com/acme/conformance::families.py::Tangled.go",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::families.py::D.pick",
+        "example.com/acme/conformance::families.py::E.pick"
+      ],
+      "span": {
+        "path": "families.py",
+        "start": 426,
+        "end": 437
+      }
+    },
+    {
       "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter::area_of#0",
       "caller": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
       "target": "example.com/acme/conformance::geometry/shapes.py::area_of",
@@ -1055,7 +1966,7 @@
       "id": "example.com/acme/conformance::main.py::main::circle.describe#0",
       "caller": "example.com/acme/conformance::main.py::main",
       "target": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "main.py",
         "start": 781,
@@ -1236,6 +2147,582 @@
         "path": "main.py",
         "start": 694,
         "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Leaf.run::self.hook#0",
+      "caller": "example.com/acme/conformance::methods.py::Leaf.run",
+      "target": "example.com/acme/conformance::methods.py::Right.hook",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1266,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel#0",
+      "caller": "example.com/acme/conformance::methods.py",
+      "target": "example.com/acme/conformance::methods.py::Panel",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1540,
+        "end": 1551
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.build::cls.create#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.build",
+      "target": "example.com/acme/conformance::methods.py::Panel.create",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 921,
+        "end": 933
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.check::value.ping#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.check",
+      "target": "example.com/acme/conformance::methods.py::Base.ping",
+      "level": "inferred",
+      "span": {
+        "path": "methods.py",
+        "start": 1054,
+        "end": 1066
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.create::cls#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.create",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 988,
+        "end": 997
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw.later::self.render#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw.later",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 790,
+        "end": 803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::later#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Panel.draw.later",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 820,
+        "end": 827
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.frame.describe#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 707,
+        "end": 728
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.mixed#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Mixin.mixed",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 638,
+        "end": 650
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.ping#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Base.ping",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 596,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.render#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 659,
+        "end": 672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.shape.area#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::geometry/shapes.py::Shape.area",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 681,
+        "end": 698
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.shared#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Base.shared",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 616,
+        "end": 629
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::Panel.draw::self.spin#0",
+      "caller": "example.com/acme/conformance::methods.py::Panel.draw",
+      "target": "example.com/acme/conformance::methods.py::Dial.spin",
+      "level": "inferred",
+      "span": {
+        "path": "methods.py",
+        "start": 737,
+        "end": 748
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::logging.getLogger#0",
+      "caller": "example.com/acme/conformance::methods.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1686,
+        "end": 1713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::make::Panel#0",
+      "caller": "example.com/acme/conformance::methods.py::make",
+      "target": "example.com/acme/conformance::methods.py::Panel",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1303,
+        "end": 1314
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::module_level::current.render#0",
+      "caller": "example.com/acme/conformance::methods.py::module_level",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1585,
+        "end": 1601
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::client.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1805,
+        "end": 1820
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::httpx.Client#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1765,
+        "end": 1779
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::log.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1825,
+        "end": 1837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::outside::session.render#0",
+      "caller": "example.com/acme/conformance::methods.py::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "methods.py",
+        "start": 1784,
+        "end": 1800
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::shadowed::current.render#0",
+      "caller": "example.com/acme/conformance::methods.py::shadowed",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "inferred",
+      "span": {
+        "path": "methods.py",
+        "start": 1661,
+        "end": 1677
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::Panel#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Panel",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1447,
+        "end": 1458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::ahead.render#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1420,
+        "end": 1434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::built.ping#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Base.ping",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1463,
+        "end": 1475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::made.area#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+        "example.com/acme/conformance::geometry/shapes.py::Shape.area"
+      ],
+      "span": {
+        "path": "methods.py",
+        "start": 1516,
+        "end": 1527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::made.render#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "inferred",
+      "span": {
+        "path": "methods.py",
+        "start": 1498,
+        "end": 1511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::make#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::make",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1487,
+        "end": 1493
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::maybe.render#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Panel.render",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1401,
+        "end": 1415
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods.py::use::panel.draw#0",
+      "caller": "example.com/acme/conformance::methods.py::use",
+      "target": "example.com/acme/conformance::methods.py::Panel.draw",
+      "level": "exact",
+      "span": {
+        "path": "methods.py",
+        "start": 1384,
+        "end": 1396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Engine#0",
+      "caller": "example.com/acme/conformance::receivers.py",
+      "target": "example.com/acme/conformance::receivers.py::Engine",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 678,
+        "end": 686
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Engine#1",
+      "caller": "example.com/acme/conformance::receivers.py",
+      "target": "example.com/acme/conformance::receivers.py::Engine",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 695,
+        "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Runner.each::this.stride#0",
+      "caller": "example.com/acme/conformance::receivers.py::Runner.each",
+      "target": "example.com/acme/conformance::receivers.py::Runner.stride",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 653,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Typed.run::self.engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::Typed.run",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 511,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Untyped.run::self.engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::Untyped.run",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 360,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::Untyped::Engine#0",
+      "caller": "example.com/acme/conformance::receivers.py::Untyped",
+      "target": "example.com/acme/conformance::receivers.py::Engine",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 254,
+        "end": 262
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::comprehension::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::comprehension",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 876,
+        "end": 890
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::except_as::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::except_as",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1064,
+        "end": 1078
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::fallback::Circle#0",
+      "caller": "example.com/acme/conformance::receivers.py::fallback",
+      "target": "example.com/acme/conformance::geometry/shapes.py::Circle",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1364,
+        "end": 1373
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::lacking::engine.stride#0",
+      "caller": "example.com/acme/conformance::receivers.py::lacking",
+      "target": "example.com/acme/conformance::receivers.py::Runner.stride",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1416,
+        "end": 1431
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::lambdas::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::lambdas",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1122,
+        "end": 1136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::module_read::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::module_read",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 736,
+        "end": 750
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::optional::first.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::optional",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 1497,
+        "end": 1510
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::optional::second.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::optional",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 1515,
+        "end": 1529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::param_reassigned::Engine#0",
+      "caller": "example.com/acme/conformance::receivers.py::param_reassigned",
+      "target": "example.com/acme/conformance::receivers.py::Engine",
+      "level": "exact",
+      "span": {
+        "path": "receivers.py",
+        "start": 1233,
+        "end": 1241
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::param_reassigned::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::param_reassigned",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1178,
+        "end": 1192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::spare_read::spare.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::spare_read",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 1321,
+        "end": 1334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::walrus::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::walrus",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 968,
+        "end": 982
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::with_as::engine.start#0",
+      "caller": "example.com/acme/conformance::receivers.py::with_as",
+      "target": "example.com/acme/conformance::receivers.py::Engine.start",
+      "level": "inferred",
+      "span": {
+        "path": "receivers.py",
+        "start": 821,
+        "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::receivers.py::with_as::open_engine#0",
+      "caller": "example.com/acme/conformance::receivers.py::with_as",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "receivers.py",
+        "start": 788,
+        "end": 801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Outer.m::Helper#0",
+      "caller": "example.com/acme/conformance::scopes.py::Outer.m",
+      "target": "example.com/acme/conformance::scopes.py::Helper",
+      "level": "exact",
+      "span": {
+        "path": "scopes.py",
+        "start": 214,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes.py::Outer::Helper#0",
+      "caller": "example.com/acme/conformance::scopes.py::Outer",
+      "target": "example.com/acme/conformance::scopes.py::Outer.Helper",
+      "level": "exact",
+      "span": {
+        "path": "scopes.py",
+        "start": 172,
+        "end": 180
       }
     },
     {

@@ -17,18 +17,19 @@ function main(shape: Shape): void {
 }
 callers: none
 callees:
+example.com/acme/conformance src/shapes/shape.ts:2 Shape.unit [inferred: one method named unit]
 example.com/acme/conformance src/shapes/shape.ts:2 Shape.unit
 example.com/acme/conformance src/math.ts:5 double
-example.com/acme/conformance src/legacy.cjs:1 legacy
+example.com/acme/conformance src/legacy.cjs:1 legacy [inferred: one function or class named legacy]
 example.com/acme/conformance src/util/log.js:1 default
 example.com/acme/conformance src/math.ts:1 add
 example.com/acme/conformance src/math.ts:7 square
 example.com/acme/conformance src/math.ts:1 add
 example.com/acme/conformance src/math.ts:11 scale
-example.com/acme/conformance src/shapes/shape.ts:10 Shape.describe
+example.com/acme/conformance src/shapes/shape.ts:10 Shape.describe [inferred: one method named describe]
 example.com/acme/conformance src/util/format.mjs:1 format
-example.com/acme/conformance src/view.tsx:3 render [ambiguous]
-example.com/acme/conformance src/widget.jsx:1 render [ambiguous]
-example.com/acme/conformance src/shapes/circle.ts:9 Circle.area [ambiguous]
-example.com/acme/conformance src/shapes/shape.ts:6 Shape.area [ambiguous]
+example.com/acme/conformance src/view.tsx:3 render [ambiguous: 2 functions or classes named render]
+example.com/acme/conformance src/widget.jsx:1 render [ambiguous: 2 functions or classes named render]
+example.com/acme/conformance src/shapes/circle.ts:9 Circle.area [ambiguous: 2 methods named area]
+example.com/acme/conformance src/shapes/shape.ts:6 Shape.area [ambiguous: 2 methods named area]
 example.com/acme/conformance src/app.ts:22 (unresolved) useState

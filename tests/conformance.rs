@@ -189,6 +189,65 @@ fn python() {
     conform(
         "conformance-python",
         &[
+            "families.py::F",
+            "families.py::E",
+            "families.py::E.pick",
+            "families.py::D",
+            "families.py::D.pick",
+            "families.py::C",
+            "families.py::B",
+            "families.py::A",
+            "families.py::A.go",
+            "families.py::Tangled",
+            "families.py::Tangled.go",
+            "families.py::Stored",
+            "families.py::Stored.save",
+            "families.py::Model",
+            "families.py::Model.go",
+            "families.py::Client",
+            "families.py::Remote",
+            "families.py::Remote.go",
+            "families.py::Plain",
+            "families.py::Plain.keep",
+            "families.py::Plain.go",
+            "families.py::Lone",
+            "families.py::Lone.go",
+            "families.py::Lone.make",
+            "receivers.py::Engine",
+            "receivers.py::Engine.start",
+            "receivers.py::Untyped",
+            "receivers.py::Untyped.__init__",
+            "receivers.py::Untyped.run",
+            "receivers.py::Typed",
+            "receivers.py::Typed.__init__",
+            "receivers.py::Typed.run",
+            "receivers.py::Runner",
+            "receivers.py::Runner.stride",
+            "receivers.py::Runner.each",
+            "receivers.py::module_read",
+            "receivers.py::with_as",
+            "receivers.py::comprehension",
+            "receivers.py::walrus",
+            "receivers.py::except_as",
+            "receivers.py::lambdas",
+            "receivers.py::param_reassigned",
+            "receivers.py::swap",
+            "receivers.py::spare_read",
+            "receivers.py::fallback",
+            "receivers.py::lacking",
+            "receivers.py::optional",
+            "cycles.py::Ping",
+            "cycles.py::Ping.go",
+            "cycles.py::Pong",
+            "cycles.py::Pong.ring",
+            "cycles.py::Knot",
+            "cycles.py::Knot.go",
+            "cycles.py::Loop",
+            "cycles.py::Loop.Inner",
+            "cycles.py::Deep",
+            "cycles.py::Deep.go",
+            "cycles.py::crossed",
+            "cycle_b.py::use",
             "defs.py::Registry",
             "defs.py::Registry.Meta",
             "defs.py::Registry.Meta.label",
@@ -235,6 +294,38 @@ fn python() {
             "helpers.py::format_name",
             "legacy.py::legacy",
             "main.py::main",
+            "methods.py::Base",
+            "methods.py::Base.ping",
+            "methods.py::Base.shared",
+            "methods.py::Dial",
+            "methods.py::Dial.spin",
+            "methods.py::Leaf",
+            "methods.py::Leaf.run",
+            "methods.py::Left",
+            "methods.py::Mixin",
+            "methods.py::Mixin.mixed",
+            "methods.py::Mixin.shared",
+            "methods.py::Panel",
+            "methods.py::Panel.__init__",
+            "methods.py::Panel.build",
+            "methods.py::Panel.check",
+            "methods.py::Panel.create",
+            "methods.py::Panel.draw",
+            "methods.py::Panel.draw.later",
+            "methods.py::Panel.render",
+            "methods.py::Right",
+            "methods.py::Right.hook",
+            "methods.py::Root",
+            "methods.py::Root.hook",
+            "methods.py::make",
+            "methods.py::module_level",
+            "methods.py::outside",
+            "methods.py::shadowed",
+            "methods.py::use",
+            "scopes.py::Helper",
+            "scopes.py::Outer",
+            "scopes.py::Outer.Helper",
+            "scopes.py::Outer.m",
             "shadow.py::from_module",
             "shadow/__init__.py::from_package",
             "src/billing/invoice.py::total",
@@ -492,13 +583,283 @@ fn python() {
             ),
             // A package outside the repository stays unresolved.
             ("main.py::main::np.array#0", None, &[]),
-            // Only a unique name match finds these: a function no import names, a method on
-            // a local.
+            // Only a unique name match finds a function no import names.
             ("main.py::main::legacy#0", INFERRED, &["legacy.py::legacy"]),
+            // A local assigned from a constructor call, here through an aliased import.
             (
                 "main.py::main::circle.describe#0",
-                INFERRED,
+                EXACT,
                 &["geometry/shapes.py::Circle.describe"],
+            ),
+            // `self` and `cls` reach the class, then its bases in the order written, in
+            // Python's method resolution order, also from a nested function.
+            (
+                "methods.py::Panel.draw::self.ping#0",
+                EXACT,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::Panel.draw::self.shared#0",
+                EXACT,
+                &["methods.py::Base.shared"],
+            ),
+            (
+                "methods.py::Panel.draw::self.mixed#0",
+                EXACT,
+                &["methods.py::Mixin.mixed"],
+            ),
+            (
+                "methods.py::Panel.draw::self.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::Panel.draw.later::self.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::Panel.build::cls.create#0",
+                EXACT,
+                &["methods.py::Panel.create"],
+            ),
+            (
+                "methods.py::Leaf.run::self.hook#0",
+                EXACT,
+                &["methods.py::Right.hook"],
+            ),
+            // Attribute annotations, in a method and in the class body.
+            (
+                "methods.py::Panel.draw::self.shape.area#0",
+                EXACT,
+                &["geometry/shapes.py::Shape.area"],
+            ),
+            (
+                "methods.py::Panel.draw::self.frame.describe#0",
+                EXACT,
+                &["geometry/shapes.py::Circle.describe"],
+            ),
+            // Parameter annotations: a name, `Optional[...]` and a string; a constructor
+            // call in the same scope, and at the module level.
+            (
+                "methods.py::use::panel.draw#0",
+                EXACT,
+                &["methods.py::Panel.draw"],
+            ),
+            (
+                "methods.py::use::maybe.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::ahead.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::built.ping#0",
+                EXACT,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::module_level::current.render#0",
+                EXACT,
+                &["methods.py::Panel.render"],
+            ),
+            // By name: a method the class family lacks, a static method's parameter, what a
+            // function returns, and a local that shadows a typed module-level name.
+            (
+                "methods.py::Panel.draw::self.spin#0",
+                INFERRED,
+                &["methods.py::Dial.spin"],
+            ),
+            (
+                "methods.py::Panel.check::value.ping#0",
+                INFERRED,
+                &["methods.py::Base.ping"],
+            ),
+            (
+                "methods.py::use::made.render#0",
+                INFERRED,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::shadowed::current.render#0",
+                INFERRED,
+                &["methods.py::Panel.render"],
+            ),
+            (
+                "methods.py::use::made.area#0",
+                AMBIGUOUS,
+                &[
+                    "geometry/shapes.py::Circle.area",
+                    "geometry/shapes.py::Shape.area",
+                ],
+            ),
+            // A receiver whose class, or whose value's callee, is outside the repository:
+            // what its methods are is not known, and no name match is tried.
+            ("methods.py::outside::session.render#0", None, &[]),
+            ("methods.py::outside::client.render#0", None, &[]),
+            ("methods.py::outside::log.render#0", None, &[]),
+            // Python's method resolution order (C3), a hierarchy it rejects, bases outside the
+            // repository that come before the class defining a method, and `object`.
+            (
+                "families.py::A.go::self.pick#0",
+                EXACT,
+                &["families.py::D.pick"],
+            ),
+            (
+                "families.py::Tangled.go::self.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            (
+                "families.py::Model.go::self.save#0",
+                INFERRED,
+                &["families.py::Stored.save"],
+            ),
+            (
+                "families.py::Remote.go::self.save#0",
+                INFERRED,
+                &["families.py::Stored.save"],
+            ),
+            (
+                "families.py::Plain.keep::self.go#0",
+                EXACT,
+                &["families.py::Plain.go"],
+            ),
+            // `self` and `cls` whose family lacks the method: a name match.
+            (
+                "families.py::Lone.go::self.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            (
+                "families.py::Lone.make::cls.pick#0",
+                AMBIGUOUS,
+                &["families.py::D.pick", "families.py::E.pick"],
+            ),
+            // Bindings that hide an outer one: `self.x = ...` without an annotation, a loop
+            // variable named `this`, `with`, comprehensions, `:=`, `except`, lambdas, a
+            // reassigned parameter, `global` and an import's fallback; an annotation stays
+            // stronger, and a single module-level binding is read from a function.
+            (
+                "receivers.py::Untyped.run::self.engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::Typed.run::self.engine.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::Runner.each::this.stride#0",
+                INFERRED,
+                &["receivers.py::Runner.stride"],
+            ),
+            (
+                "receivers.py::module_read::engine.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::with_as::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::comprehension::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::walrus::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::except_as::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::lambdas::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::param_reassigned::engine.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::spare_read::spare.start#0",
+                INFERRED,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::fallback::Circle#0",
+                INFERRED,
+                &["geometry/shapes.py::Circle"],
+            ),
+            // An annotated receiver whose family lacks the method, and `X | None` both ways.
+            (
+                "receivers.py::lacking::engine.stride#0",
+                INFERRED,
+                &["receivers.py::Runner.stride"],
+            ),
+            (
+                "receivers.py::optional::first.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            (
+                "receivers.py::optional::second.start#0",
+                EXACT,
+                &["receivers.py::Engine.start"],
+            ),
+            // Bases and annotations that resolve through themselves, in one module or two.
+            (
+                "cycles.py::Ping.go::self.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::Knot.go::self.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::Deep.go::self.x.y.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::crossed::a.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycles.py::crossed::b.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            (
+                "cycle_b.py::use::other.ring#0",
+                INFERRED,
+                &["cycles.py::Pong.ring"],
+            ),
+            // A class body's names are in scope for its own statements, not for its methods.
+            (
+                "scopes.py::Outer::Helper#0",
+                EXACT,
+                &["scopes.py::Outer.Helper"],
+            ),
+            (
+                "scopes.py::Outer.m::Helper#0",
+                EXACT,
+                &["scopes.py::Helper"],
             ),
             // Several definitions fit: a method on a parameter.
             (
@@ -571,6 +932,40 @@ fn python_source_roots_come_from_pyproject() {
             "{case}"
         );
     }
+}
+
+#[test]
+fn python_class_families_are_linearized_once() {
+    // A ladder of diamonds: walking every path through it would take 2^24 steps.
+    let repo = fixture_repo("python_ladder", "python-roots", Some(ORIGIN));
+    let mut src =
+        String::from("class L0A:\n    def m(self):\n        return 0\n\n\nclass L0B:\n    pass\n");
+    for n in 1..=24 {
+        for side in ["A", "B"] {
+            let p = n - 1;
+            src += &format!("\n\nclass L{n}{side}(L{p}A, L{p}B):\n    pass\n");
+        }
+    }
+    src += "\n\nclass Top(L24A, L24B):\n    def go(self):\n        return self.m()\n";
+    std::fs::write(repo.join("ladder.py"), src).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+
+    let id = format!("{REPO}::ladder.py::Top.go::self.m#0");
+    let call = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == id)
+        .unwrap();
+    assert_eq!(
+        (call["level"].as_str(), call["target"].as_str()),
+        (
+            Some("exact"),
+            Some(format!("{REPO}::ladder.py::L0A.m").as_str())
+        )
+    );
 }
 
 #[test]

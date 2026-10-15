@@ -134,7 +134,8 @@ give byte-identical output.
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`), and the `Facts`/`Value` types, plus the tree-sitter helpers
+  `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's instance,
+  `this` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
   (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
   .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
   `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
@@ -148,17 +149,46 @@ give byte-identical output.
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
   `packages.from`), or `src` when none is declared; a package comes before a module of the
   same name.
+  It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
+  written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::locals`, one
+  `Local {scope, name, class}` per name a scope binds: a method's first parameter unless
+  `@staticmethod` (`Class::Enclosing`), an annotated parameter or name, `x = C(...)`
+  (`Class::Named("C")`, whatever `C` turns out to be), `self.x: T` in a method (an attribute,
+  at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
+  binding: other assignments, `self.x = ...`, `for` and comprehension targets, `with` and
+  `except ... as`, `:=`, a lambda's parameters (in the enclosing scope, which owns its calls)
+  and a parameter the body assigns. An annotation decides; other bindings that disagree make
+  the class unknown. `global x` sends the function's bindings of `x` to the module, `nonlocal
+  x` to the enclosing scope. Annotations are read as written: a name, a string holding one,
+  `Optional[...]` and `... | None`.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
   imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
   callee may start with a dotted import, and an `Imported::All` import counts as one binding
-  of each name its module's `Facts::star` takes. `Code` folds constants and client wrapper arguments into values for contract kinds.
+  of each name its module's `Facts::star` takes. `lexical` skips a class's scope unless the
+  lookup starts in it (a class body's names are not in scope for its methods). A member of a
+  class, or of a parameter or local whose `Class` resolves to a class of the repository
+  (`Binding::Instance`), is looked up through the class's family: the class and the ancestors
+  its written bases give, in C3 order (Python's method resolution order), linearized once per
+  class in `Resolver::new`. A base that is not a class of the repository is an opaque
+  ancestor: reaching it before a class that has the member leaves the member unknown, and so
+  does a hierarchy C3 rejects or bases in a cycle. The first class that defines the member, or
+  binds it as an attribute local, wins, `exact`. A receiver whose class (or whose value's
+  callee) is outside the repository is unresolved; any other member call falls back to the
+  name match. `Busy` guards locals and families that resolve through themselves. A single
+  module-level binding is read from functions as it is; a function that rebinds it through
+  `global` makes it unknown. A pack that writes `Def::bases` and `Facts::locals` gets this
+  without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
+  keyword). `Code` folds constants and client wrapper arguments into values for contract kinds.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
   `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
   providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>: <reason>]`
+  after a call that is not exact, in `trace` and in `context`'s callers and callees; the reason
+  is derived when rendering, never stored: `one method named render`, `2 functions or classes
+  named render`). Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
 
@@ -288,8 +318,8 @@ Each is marked `ponytail:` at its site unless noted.
 - `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
   root declarations. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
-  it sits. `self`, `cls`, base classes and typed receivers are not resolved yet (a method call
-  resolves by name), `__all__` is read only as one literal list or tuple, and call arguments
+  it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
+  there for the whole scope (the safe side: a name match instead of `exact`). `__all__` is read only as one literal list or tuple, and call arguments
   and parameter defaults are not read (no `Value`s, so no contracts).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.

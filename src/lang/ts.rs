@@ -52,6 +52,7 @@ impl LanguagePack for TsJs {
                     name: inner.clone(),
                     kind,
                     range,
+                    bases: Vec::new(),
                 });
             }
             match node.kind() {
@@ -101,6 +102,10 @@ impl LanguagePack for TsJs {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["tsconfig.json", "jsconfig.json"]
+    }
+
+    fn receiver(&self) -> Option<&'static str> {
+        Some("this")
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
-use crate::render::{Files, callee, label, line_of, unresolved};
+use crate::render::{Files, callee, label, line_of, mark, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 use crate::{http, render};
@@ -344,8 +344,7 @@ impl<'a> Walk<'_, 'a> {
                     if !shown.insert((c.caller.as_str(), false)) {
                         continue;
                     }
-                    let text =
-                        format!("{} {}{}", self.site(call), self.caller(call), mark(c.level));
+                    let text = format!("{} {}{}", self.site(call), self.caller(call), mark(c));
                     self.enter(&c.caller, depth + 1, Row::call(text, n, c.level));
                 }
                 for link in graph.into.get(id).into_iter().flatten() {
@@ -381,7 +380,7 @@ impl<'a> Walk<'_, 'a> {
             if !shown.insert((&s.id, false)) {
                 continue;
             }
-            let text = self.node(&s.id).1 + &mark(c.level);
+            let text = self.node(&s.id).1 + &mark(c);
             self.enter(&s.id, depth, Row::call(text, m, c.level));
         }
         let consumers = graph.consumers.get(c.id.as_str());
@@ -495,14 +494,6 @@ impl<'a> Walk<'_, 'a> {
                 t => tokens = t,
             }
         }
-    }
-}
-
-/// ` [<level>]` after a call that is not exact.
-fn mark(level: Option<Level>) -> String {
-    match level {
-        Some(Level::Exact) | None => String::new(),
-        Some(level) => format!(" [{}]", level.name()),
     }
 }
 

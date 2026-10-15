@@ -8,10 +8,10 @@ use rusqlite::Connection;
 
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{CallSite, Export, State, Symbol};
+use crate::index::{Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
-use crate::render::{Files, callee, label, unresolved};
+use crate::render::{Files, callee, label, mark, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
 use crate::{Result, decisions, index, items, render, repo, trace};
@@ -522,7 +522,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             format!(
                 "{identity} {location} {}{}",
                 name.unwrap_or("(top level)"),
-                ambiguous(c)
+                mark(c)
             )
         })
         .collect();
@@ -545,7 +545,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             }
             targets
                 .iter()
-                .map(|t| line(identity, files, t, label(&t.id)) + &ambiguous(c))
+                .map(|t| line(identity, files, t, label(&t.id)) + &mark(c))
                 .collect()
         })
         .collect();
@@ -559,14 +559,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
 fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> String {
     let location = files.at(&symbol.span.path, symbol.span.start);
     format!("{identity} {location} {name}")
-}
-
-/// ` [ambiguous]` for an ambiguous call, empty otherwise.
-fn ambiguous(call: &CallSite) -> String {
-    match call.level {
-        Some(level @ Level::Ambiguous) => format!(" [{}]", level.name()),
-        _ => String::new(),
-    }
 }
 
 /// The workspace of the repository containing `dir`: each repository with where it is,

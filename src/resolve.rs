@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Part, Star, Value};
+use crate::lang::{Call, Class, Def, Export, Facts, Imported, Kind, Modules, Part, Star, Value};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -26,12 +26,17 @@ pub enum Resolution<'a> {
 /// What a name or a member chain refers to.
 enum Binding<'a> {
     Def(Target<'a>),
+    /// What a receiver whose class the source writes holds: an instance of this class, or
+    /// the class itself (`cls`). Its members are looked up through the class's family.
+    Instance(Target<'a>),
     /// A whole file, through a namespace import or re-export.
     Module(&'a str),
     /// A `const` that holds no function: its file and qualified name.
     Const(&'a str, &'a str),
     /// The parameter at this position of a function.
     Param(Target<'a>, usize),
+    /// A name bound in a scope (`Facts::locals`): its file, scope and name.
+    Local(&'a str, &'a str, &'a str),
     /// Something an import brings from outside the repository.
     External,
     /// Neither scope nor import resolution knows it.
@@ -41,11 +46,46 @@ enum Binding<'a> {
 /// Seen `(file, exported name)` pairs: re-exports may form cycles.
 type Seen<'a> = HashSet<(&'a str, &'a str)>;
 
+/// A local whose class, or a class whose family, is being resolved: one met again while
+/// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
+/// nothing.
+#[derive(PartialEq)]
+enum Busy<'a> {
+    Local(&'a str, &'a str, &'a str),
+    Family(Target<'a>),
+}
+
+/// What resolving one name carries along: what is being resolved, and the families
+/// linearized so far (while `Resolver::new` linearizes them all).
+#[derive(Default)]
+struct Work<'a> {
+    busy: Vec<Busy<'a>>,
+    families: HashMap<Target<'a>, Family<'a>>,
+}
+
+/// One entry of a class family: a class of the repository, or the `n`th base a class writes
+/// that is not one (outside the repository, or not resolved), whose members are not known.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Ancestor<'a> {
+    Class(Target<'a>),
+    Opaque(Target<'a>, usize),
+}
+
+/// A class and its ancestors in method resolution order (C3), or `None` when they have none:
+/// C3 rejects the hierarchy, or the bases form a cycle.
+type Family<'a> = Option<Vec<Ancestor<'a>>>;
+
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// Each file's `Facts::locals`, by scope and name.
+    locals: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+    /// Every class's family, linearized once.
+    families: HashMap<Target<'a>, Family<'a>>,
+    /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
+    receiver: Option<&'static str>,
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
@@ -55,7 +95,11 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(files: &'a BTreeMap<&'a str, &'a Facts>, modules: Modules) -> Self {
+    pub fn new(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        receiver: Option<&'static str>,
+    ) -> Self {
         let defs = files
             .iter()
             .map(|(path, facts)| {
@@ -67,6 +111,15 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|(path, facts)| {
                 let names = facts.consts.iter().map(|c| c.name.as_str()).collect();
+                (*path, names)
+            })
+            .collect();
+        let locals = files
+            .iter()
+            .map(|(path, facts)| {
+                let names = (facts.locals.iter())
+                    .map(|l| ((l.scope.as_str(), l.name.as_str()), &l.class))
+                    .collect();
                 (*path, names)
             })
             .collect();
@@ -87,10 +140,26 @@ impl<'a> Resolver<'a> {
             files,
             defs,
             consts,
+            locals,
+            families: HashMap::new(),
+            receiver,
             callers: HashMap::new(),
             by_name,
             modules,
         };
+        let mut work = Work::default();
+        for (path, facts) in files {
+            for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
+                resolver.family(
+                    Target {
+                        path,
+                        name: &def.name,
+                    },
+                    &mut work,
+                );
+            }
+        }
+        resolver.families = work.families;
         let mut callers: HashMap<Target, Vec<(&str, usize)>> = HashMap::new();
         for (path, facts) in files {
             for (n, call) in facts.calls.iter().enumerate() {
@@ -104,32 +173,151 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        let callee = call.callee.as_str();
-        let seen = &mut Seen::new();
+        let work = &mut Work::default();
+        match self.resolve(path, &call.scope, &call.callee, &mut Seen::new(), work) {
+            Binding::Def(t) => Resolution::Exact(t),
+            Binding::External => Resolution::Unresolved,
+            Binding::Instance(_)
+            | Binding::Module(_)
+            | Binding::Const(..)
+            | Binding::Param(..)
+            | Binding::Local(..)
+            | Binding::Unknown => self.infer(&call.callee),
+        }
+    }
+
+    /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
+    /// of a receiver whose class the source writes, is looked up through the class's family.
+    fn resolve(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
         let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
-                "this" => self.class(path, &call.scope),
+                _ if Some(head) == self.receiver => self.class(path, scope),
                 "super" => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
-                _ => self.lexical(path, &call.scope, head, seen),
+                _ => self.lexical(path, scope, head, seen),
             };
             (binding, members)
         });
         for member in members.split('.').filter(|m| !m.is_empty()) {
-            binding = match binding {
+            binding = match self.instance(binding, work) {
+                Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
+                    self.member(t, member, work)
+                }
                 Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
                 Binding::Module(m) => self.export(m, member, seen),
                 other => other,
             };
         }
-        match binding {
-            Binding::Def(t) => Resolution::Exact(t),
-            Binding::External => Resolution::Unresolved,
-            Binding::Module(_) | Binding::Const(..) | Binding::Param(..) | Binding::Unknown => {
-                self.infer(&call.callee)
+        binding
+    }
+
+    fn is_class(&self, t: Target) -> bool {
+        self.defs[t.path][t.name].kind == Kind::Class
+    }
+
+    /// What a parameter or a local holds, as far as the source writes its class: an instance
+    /// of a class of the repository, something from outside it, or unknown. Other bindings
+    /// stay as they are.
+    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
+        let (path, scope, name) = match binding {
+            Binding::Param(f, n) => {
+                let name = self.defs[f.path][f.name].params[n].name.as_str();
+                (f.path, f.name, name)
+            }
+            Binding::Local(path, scope, name) => (path, scope, name),
+            other => return other,
+        };
+        let Some(class) = self.locals[path].get(&(scope, name)) else {
+            return Binding::Unknown;
+        };
+        let key = Busy::Local(path, scope, name);
+        if work.busy.contains(&key) {
+            return Binding::Unknown;
+        }
+        work.busy.push(key);
+        let found = match class {
+            Class::Enclosing => self.class(path, scope),
+            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Unknown => Binding::Unknown,
+        };
+        work.busy.pop();
+        match found {
+            Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
+            Binding::External => Binding::External,
+            _ => Binding::Unknown,
+        }
+    }
+
+    /// `member` of `class`: the first class of its family that defines it, or binds it as an
+    /// attribute. A base whose members are not known, met first, leaves it unknown, and so
+    /// does a family C3 rejects.
+    fn member(&self, class: Target<'a>, member: &'a str, work: &mut Work<'a>) -> Binding<'a> {
+        let Some(family) = self.family(class, work) else {
+            return Binding::Unknown;
+        };
+        for ancestor in family {
+            let Ancestor::Class(c) = ancestor else {
+                return Binding::Unknown;
+            };
+            let qualified = format!("{}.{member}", c.name);
+            if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
+                return Binding::Def(Target { path: c.path, name });
+            }
+            if self.locals[c.path].contains_key(&(c.name, member)) {
+                return Binding::Local(c.path, c.name, member);
             }
         }
+        Binding::Unknown
+    }
+
+    /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
+    /// method resolution order. Without written bases (TypeScript) it is `class` alone.
+    fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
+        if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
+            return family.clone();
+        }
+        let key = Busy::Family(class);
+        if work.busy.contains(&key) {
+            return None;
+        }
+        work.busy.push(key);
+        let bases = self.bases(class, work);
+        let mut lists = Vec::new();
+        for base in &bases {
+            lists.push(match base {
+                Ancestor::Class(base) => self.family(*base, work),
+                Ancestor::Opaque(..) => Some(vec![*base]),
+            });
+        }
+        lists.push(Some(bases));
+        let family = (lists.into_iter().collect::<Option<Vec<_>>>())
+            .and_then(merge)
+            .map(|rest| [Ancestor::Class(class)].into_iter().chain(rest).collect());
+        work.busy.pop();
+        work.families.insert(class, family.clone());
+        family
+    }
+
+    /// What each base `class` writes is, in order, resolved from the scope enclosing it.
+    fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
+        let scope = class.name.rsplit_once('.').map_or("", |(scope, _)| scope);
+        let bases = self.defs[class.path][class.name].bases.iter().enumerate();
+        bases
+            .map(
+                |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
+                    Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
+                    _ => Ancestor::Opaque(class, n),
+                },
+            )
+            .collect()
     }
 
     /// The definitions whose name matches the callee's last name anywhere in the repository:
@@ -174,18 +362,26 @@ impl<'a> Resolver<'a> {
     }
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (what it
-    /// defines, its constants, its parameters), then the top level, then the file's imports.
-    /// Methods are not lexical bindings.
+    /// defines, its constants, its parameters, its other locals), then the top level, then the
+    /// file's imports. Methods are not lexical bindings, and a class body's names are in scope
+    /// only for the statements written directly in it, not for its methods or nested classes.
     fn lexical(
         &self,
         path: &'a str,
-        scope: &str,
+        scope: &'a str,
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = Some(scope);
+        let mut first = true;
         while let Some(s) = scope {
+            scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+            let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
+            first = false;
+            if class_body {
+                continue;
+            }
             let candidate = if s.is_empty() {
                 name.to_string()
             } else {
@@ -208,7 +404,9 @@ impl<'a> Resolver<'a> {
                 };
                 return Binding::Param(function, n);
             }
-            scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+            if self.locals[path].contains_key(&(s, name)) {
+                return Binding::Local(path, s, name);
+            }
         }
         self.imported(path, name, seen)
     }
@@ -325,6 +523,26 @@ impl<'a> Resolver<'a> {
             .iter()
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
+    }
+}
+
+/// The C3 merge of `lists`: repeatedly the first head that is in no list's tail. `None` when
+/// none is.
+fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
+    let mut merged = Vec::new();
+    loop {
+        lists.retain(|l| !l.is_empty());
+        if lists.is_empty() {
+            return Some(merged);
+        }
+        let head =
+            (lists.iter().map(|l| l[0])).find(|h| lists.iter().all(|l| !l[1..].contains(h)))?;
+        merged.push(head);
+        for list in &mut lists {
+            if list[0] == head {
+                list.remove(0);
+            }
+        }
     }
 }
 
