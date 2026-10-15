@@ -212,8 +212,15 @@ give byte-identical output.
   `dependencies` row `{manifest, field, name, range}`. An entry on a package outside the workspace
   appears nowhere. `link` gives one candidate `exact` and several `ambiguous` (one link per
   candidate, `workspace:` keeping the consumer's repository), with the reason `<identifier>
-  <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous. No
-  lockfile is read and no registry queried.
+  <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous.
+  `reason()` is the one place it is built; it ends with `, range mismatch` or `, range
+  unchecked` when `flag(range, version) -> Option<Flag>` (public; `context` calls it too, and
+  nobody parses the reason back) says so. `flag` checks with `nodejs-semver` (npm syntax: `^ ~
+  x - ||`, prereleases as npm): `Mismatch` when the range does not accept the local version,
+  `Unchecked` for a missing range or version, a `workspace:`/`file:`/`link:`/`npm:` range, a git
+  or URL source, a tag such as `latest`, a range past `MAX_RANGE`, and any range with a token
+  that is not a comparator (the crate parses `foo 1.2.3` as `1.2.3`). The flag is computed at
+  query time and stores nothing. No lockfile is read and no registry queried.
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
   `read(path, bytes) ->
@@ -629,7 +636,8 @@ give byte-identical output.
   siblings (`web`, `api` and `mono` name `shared` as a peer, `fork` names `mono`), through
   `Engine::export`. `shared` holds `@example/shared` and an ignored-by-rule
   `node_modules/left-pad/package.json`; `web` and `api` depend on it (`api`'s manifest has no
-  name and a non-string range; `web` also names `express` and `left-pad`, outside the workspace);
+  name and a non-string range; `web` accepts the `shared` version, `api` does not (goldens carry
+  `range mismatch` and `range unchecked`); `web` also names `express` and `left-pad`, outside the workspace);
   `mono` has `packages/{a,b,c}` (`b` on `a` through `workspace:*`, `c` on `a` with `^1.0.0`) and a
   `.gitignore`d `ignored/`, and `fork` holds another `@example/a`. Goldens `pkg-*.export.json`;
   a freshness test edits manifests in three repositories (`shared`, `web`, `mono`) and compares the exports of all four with a cold set; a test
@@ -737,8 +745,9 @@ give byte-identical output.
   topic-exchange rules.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
   (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
-  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written and has no
-  length limit of its own beyond `MAX_BYTES`.
+  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
+  length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
+  calls a longer one `range unchecked`.
 - `index.rs` (`refresh_stamped`): a `package.json` or document that cannot be statted or read
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.

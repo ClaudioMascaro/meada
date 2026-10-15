@@ -40,7 +40,7 @@
       "manifest": "package.json",
       "field": "devDependencies",
       "name": "@example/shared",
-      "range": "~1.1.0"
+      "range": "~1.2.0"
     }
   ],
   "links": [
@@ -56,7 +56,7 @@
       "provider": "example.com/pkg/shared::package.json",
       "contract": "package::npm::@example/shared",
       "level": "exact",
-      "reason": "package::npm::@example/shared ~1.1.0 (local 1.2.0)"
+      "reason": "package::npm::@example/shared ~1.2.0 (local 1.2.0)"
     }
   ]
 }

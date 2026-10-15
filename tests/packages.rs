@@ -100,4 +100,8 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     edit(&cold);
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, repos(&cold));
+    // Bumping `shared` to 1.3.0 flips `web`'s `~1.2.0`, and the edit narrowing `^1.0.0` to
+    // `^2.0.0` flips the other: both entries now say `range mismatch`.
+    assert!(!before[0].contains("range mismatch"));
+    assert_eq!(refreshed[0].matches("range mismatch").count(), 2);
 }

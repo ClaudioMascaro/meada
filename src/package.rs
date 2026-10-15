@@ -218,6 +218,89 @@ pub fn consume(exports: &mut [Export]) {
     }
 }
 
+/// The longest range checked, in bytes; a longer one is `range unchecked`. The crate sets no
+/// limit of its own on a range, and a real one is a few dozen bytes.
+// ponytail: a flat 256 (the crate's own limit for versions); a measured need lifts it.
+const MAX_RANGE: usize = 256;
+
+/// What checking a dependency range against the provider's version found, when it is not a
+/// plain accept.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Flag {
+    /// The range is npm semver and does not accept the local version.
+    Mismatch,
+    /// The range cannot be checked: not a semver range, or no version to check it against.
+    Unchecked,
+}
+
+impl Flag {
+    /// The words a link reason ends with.
+    pub fn words(self) -> &'static str {
+        match self {
+            Flag::Mismatch => "range mismatch",
+            Flag::Unchecked => "range unchecked",
+        }
+    }
+}
+
+/// Whether the dependency `range` accepts the provider's `version`, by npm's semantics: `None`
+/// when it does, else the `Flag`. A missing range or version, a `workspace:`, `file:`, `link:`
+/// or `npm:` range, a git or URL source (anything holding `:` or `/`), a tag such as `latest`
+/// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
+/// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
+/// comparator.
+pub fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
+    let (Some(range), Some(version)) = (range, version) else {
+        return Some(Flag::Unchecked);
+    };
+    let parsed = (range.len() <= MAX_RANGE && comparators(range))
+        .then(|| nodejs_semver::Range::parse(range).ok())
+        .flatten()
+        .zip(nodejs_semver::Version::parse(version).ok());
+    match parsed {
+        None => Some(Flag::Unchecked),
+        Some((range, version)) if range.satisfies(&version) => None,
+        Some(_) => Some(Flag::Mismatch),
+    }
+}
+
+/// Whether every token of `range` looks like part of an npm range: `||` separates sets of at
+/// least one token, `-` joins a hyphen range, and a comparator is an optional operator then a
+/// version body that begins with a digit, or is a wildcard (`x`, `X`, `*`) alone or followed by
+/// `.` (so no `:` or `/` gets through, nor `xyz`).
+fn comparators(range: &str) -> bool {
+    range.split("||").all(|set| {
+        let mut tokens = set.split_whitespace().peekable();
+        tokens.peek().is_some()
+            && tokens.all(|t| {
+                let body = t.trim_start_matches(['^', '~', '<', '>', '=', 'v']);
+                t == "-"
+                    || body.is_empty()
+                    || ((body.starts_with(|c: char| c.is_ascii_digit())
+                        || matches!(body, "x" | "X" | "*")
+                        || body.starts_with(['x', 'X', '*']) && body[1..].starts_with('.'))
+                        && body
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || ".+-*".contains(c)))
+            })
+    })
+}
+
+/// The reason of a package link: `<identifier> <range|none> (local <version|none>)`, then
+/// `, range mismatch` or `, range unchecked` when `flag` says so. The one place the package
+/// reason is built; a path that extends it (an import hop) builds on this.
+pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> String {
+    let said = format!(
+        "{contract} {} (local {})",
+        range.unwrap_or("none"),
+        version.unwrap_or("none")
+    );
+    match flag(range, version) {
+        Some(f) => format!("{said}, {}", f.words()),
+        None => said,
+    }
+}
+
 impl ContractKind for Packages {
     fn prefix(&self) -> &'static str {
         "package"
@@ -259,8 +342,7 @@ impl ContractKind for Packages {
 
     /// The dependency entry links to the providers of its package: one candidate is `exact`,
     /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
-    /// repository. The reason is `<identifier> <range> (local <version>)`, `none` for a
-    /// missing one.
+    /// repository. The reason is `reason()`'s, flag included.
     fn link(
         &self,
         consumer: &Consumer,
@@ -285,11 +367,7 @@ impl ContractKind for Packages {
         };
         fits.into_iter()
             .map(|(_, p)| {
-                let said = format!(
-                    "{contract} {} (local {})",
-                    range.unwrap_or("none"),
-                    p.version.as_deref().unwrap_or("none")
-                );
+                let said = reason(contract, range, p.version.as_deref());
                 Link {
                     consumer: consumer.site.clone(),
                     provider: p.site.clone(),
@@ -391,6 +469,97 @@ mod tests {
             "]".repeat(n)
         );
         assert_eq!(read(src.as_bytes()), Summary::default());
+    }
+
+    const MISMATCH: Option<Flag> = Some(Flag::Mismatch);
+    const UNCHECKED: Option<Flag> = Some(Flag::Unchecked);
+
+    #[test]
+    fn npm_ranges_are_checked_against_the_local_version() {
+        let table = [
+            ("^1.0.0", "1.2.0", None),
+            ("^1.0.0", "2.0.0", MISMATCH),
+            ("^0.2.3", "0.2.9", None),
+            ("^0.2.3", "0.3.0", MISMATCH),
+            ("~1.1.0", "1.1.9", None),
+            ("~1.1.0", "1.2.0", MISMATCH),
+            ("1.x", "1.9.0", None),
+            ("1.x", "2.0.0", MISMATCH),
+            ("*", "7.0.0", None),
+            ("1.2.0 - 1.4.0", "1.3.0", None),
+            ("1.2.0 - 1.4.0", "1.5.0", MISMATCH),
+            ("^1.0.0 || ^3.0.0", "3.1.0", None),
+            ("^1.0.0 || ^3.0.0", "2.0.0", MISMATCH),
+            (">=1.0.0 <2.0.0", "1.5.0", None),
+            (">=1.0.0 <2.0.0", "2.0.0", MISMATCH),
+            ("1.2.0", "1.2.0", None),
+            ("1.2.0", "1.2.1", MISMATCH),
+            // A prerelease matches only a comparator on the same major.minor.patch.
+            ("^1.0.0", "1.2.0-beta.1", MISMATCH),
+            ("^1.2.0-beta.0", "1.2.0-beta.1", None),
+            ("^1.2.0-beta.0", "1.3.0-beta.1", MISMATCH),
+        ];
+        for (range, version, want) in table {
+            assert_eq!(
+                flag(Some(range), Some(version)),
+                want,
+                "{range} / {version}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_range_that_cannot_be_checked_is_unchecked() {
+        let ranges = [
+            "workspace:*",
+            "workspace:^1.0.0",
+            "file:../shared",
+            "link:../shared",
+            "npm:other@^1.0.0",
+            "git+https://example.com/a.git",
+            "github:user/repo",
+            "user/repo",
+            "https://example.com/a.tgz",
+            "latest",
+            "next",
+            "foo 1.2.3",
+            "xyz 1.2.3",
+            "x-foo",
+            "1.2.3 foo",
+            "^1.0.0 || bar",
+            "",
+        ];
+        for range in ranges {
+            assert_eq!(flag(Some(range), Some("1.2.0")), UNCHECKED, "{range:?}");
+        }
+        assert_eq!(flag(None, Some("1.2.0")), UNCHECKED);
+        assert_eq!(flag(Some("^1.0.0"), None), UNCHECKED);
+        // A local version that is not a version cannot be compared either.
+        assert_eq!(flag(Some("^1.0.0"), Some("not-a-version")), UNCHECKED);
+        let long = "^1.0.0 || ".repeat(MAX_RANGE);
+        assert!(long.len() > MAX_RANGE);
+        assert_eq!(flag(Some(&long), Some("1.2.0")), UNCHECKED);
+    }
+
+    #[test]
+    fn the_reason_ends_with_the_flag() {
+        let said = |range, version| reason("package::npm::a", range, version);
+        assert_eq!(
+            said(Some("^2.0.0"), Some("1.0.0")),
+            "package::npm::a ^2.0.0 (local 1.0.0), range mismatch"
+        );
+        assert_eq!(
+            said(Some("latest"), Some("1.0.0")),
+            "package::npm::a latest (local 1.0.0), range unchecked"
+        );
+        assert_eq!(
+            said(Some("^1.0.0"), Some("1.0.0")),
+            "package::npm::a ^1.0.0 (local 1.0.0)"
+        );
+        assert_eq!(
+            said(None, None),
+            "package::npm::a none (local none), range unchecked"
+        );
     }
 
     #[test]
