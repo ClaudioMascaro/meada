@@ -148,6 +148,13 @@
   ],
   "links": [
     {
+      "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
       "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "contract": "http::GET::/api/products/{}",

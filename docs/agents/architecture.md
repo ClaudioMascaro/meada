@@ -145,14 +145,40 @@ give byte-identical output.
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`), and the `Facts`/`Value` types. `lang/ts.rs` is the only pack
-  (`.ts .tsx .js .jsx .mjs .cjs`). A pack sees one file at a time and never touches the index.
+  `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
+  pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
+  the index. `Value` has `New(callee)` (`new X(...)` as a value) and `List` (an array literal);
+  `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
+  parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
+  written as a property of an options object passed as an argument (`run({ eachMessage: () =>
+  {} })`, or an object method there) is a `Kind::Inline` definition and a `Value::Function`,
+  like a function argument. `messages(code) -> Vec<Message>` (default: none) is the **producer
+  and consumer output** (spec #20): `Message {broker, name: Option<String>, path, call, role}`,
+  `role` `Producer` or `Consumer(Handler)`, `Handler::Def {path, name}` (a definition; a name
+  that folds to nothing is the top level, so a pack passes a call's `scope` for "the enclosing
+  function") or `Handler::Inline {path, def}`. `name` is `None` when it cannot be evaluated
+  (an unresolved side). The pack reads facts through `Code` (values, `Code::origin`,
+  `Code::expand`) and reports; the channel kind turns the output into contracts. TS/JS library
+  forms live in `lang/ts/messages.rs`: kafkajs `send({topic})` on a `new Kafka().producer()`,
+  `subscribe({topic})` or `({topics})` on a `new Kafka().consumer()`, with the handler of the
+  first `run({eachMessage|eachBatch})` on the same consumer binding (else the function whose
+  call subscribes).
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  `Code::origin(path, scope, chain) -> Option<Origin {package, expr, binding}>` is the
+  **receiver tracing** every message library form relies on: it follows a name or member chain
+  through `const` bindings (same file and imported) down to an import whose module is outside
+  the repository (`Binding::External` keeps the specifier and imported name), and spells what
+  the code did with it from that name: `new Kafka().producer()` for `kafkajs`. A namespace import
+  adds no name, a default import is `default`; `binding` is the constant the chain's head names
+  (how a pack pairs calls on the same client). `Code::pack()` is the pack of the files.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
-  `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
+  `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider` or `Consumer`), stored in
+  `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
+  consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
+  in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
   `Provider::gateway`, `http::gateway_contract` turns it into a contract and
@@ -166,13 +192,23 @@ give byte-identical output.
   names no symbol is dropped. An entry without `via`, or with none matched, makes the repository
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
-  level, and a resource with no link in the workspace (unlinked).
+  level, and a resource with no link in the workspace (unlinked). `channel.rs` (spec #20):
+  `extract` calls `code.pack().messages(code)`; a producer is a provider at its call site, a
+  consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
+  such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
+  `channel::<broker>` for an unresolved side, which `link` skips: it is in the export and never
+  linked, and since its contract is not `None` it is no open item (`search` kind `unresolved`
+  and `meada decide` never see it). `link` joins every consumer to every producer of the same
+  contract at `exact`, reason the contract, in any repository including its own.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
-  down and back going up; a call-site consumer the other way. A repository-level side
-  (`Graph::is_repo`) prints as `<repository> (repository-level)` and ends its branch: it is
-  pushed as a row, never entered. Starts take only HTTP routes, symbols and call sites; a
-  `resource::...` start gets an answer pointing to `context`.
+  down and back going up; a call-site consumer the other way. A channel link (producer call,
+  handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
+  handler, and up from the handler (`out[handler]`, a provider that is a call) to the producing
+  call and its caller. A repository-level side (`Graph::is_repo`) prints as `<repository>
+  (repository-level)` and ends its branch: it is pushed as a row, never entered. Starts take
+  only HTTP routes, symbols and call sites; a `resource::...` or `channel::...` start gets an
+  answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
@@ -186,16 +222,20 @@ give byte-identical output.
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
   other expression becomes `(<node kind>)`.
-- Inline route handlers: a pack emits anonymous function arguments as `Kind::Inline` named
-  `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
-  the second equal name) and folds the rest into the enclosing symbol.
-- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
-  parameter of any spelling is `{}`.
+- Inline handlers: a pack emits anonymous function arguments (and functions written in an
+  options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
+  kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
+  handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
+  `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
+  unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
   `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
   resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
-  identity for a repository-level side (a consumer's `via` is null). A call has `level` (`exact`,
+  identity for a repository-level side (a consumer's `via` is null). A channel producer is a
+  provider whose `site` is a call site; a channel consumer is a consumer whose `site` is its
+  handler symbol (or file, at the top level), `via` null. A call has `level` (`exact`,
   `inferred`, `ambiguous` or null) and `target`; an ambiguous call has `target: null` and a sorted
   `candidates`. `export` keeps only the links that touch the repository where Meada runs. A
   repository with stale decisions also has `stale_decisions: [{call, target, cause}]`
@@ -215,6 +255,15 @@ give byte-identical output.
   a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
   calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
   whole workspace's providers. A kind's rules stay in its own file.
+- New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
+  `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
+  its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
+  answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
+  and giving the handler. A wildcard or binding match (`inferred`, reason suffix `wildcard <p>`
+  or `binding <exchange> <p>`) belongs in `channel.rs`'s `link`, which receives the whole
+  workspace's providers; bindings that are neither side need a place in the export of their own.
+  `new X(...)` is a value (`Value::New`) but not yet a call fact, so a form whose site is a
+  constructor call needs `new_expression` in the pack's calls first.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -265,7 +314,8 @@ give byte-identical output.
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
   the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
   the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
-  level). `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
+  level) and handles the Kafka topic `orders.created` the gateway's `createOrder` (`PUT
+  /api/orders/:id`, which the web's `createOrder` calls) produces through its `publish` wrapper. `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
   catalog. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
@@ -282,7 +332,8 @@ give byte-identical output.
   `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
   (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
-  over the chain).
+  over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
+  fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -316,7 +367,13 @@ Each is marked `ponytail:` at its site unless noted.
   a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
-  `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
+  `module.exports` are not imports, and `new X()` is not a call, only a value (no `ponytail:`
+  marker).
+- `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
+  held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
+  binding (`new Kafka().producer().send`), is not recognized (no marker).
+- `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
+  (the function that subscribes handles); only the first `run` on a consumer binding counts.
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by

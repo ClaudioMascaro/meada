@@ -18,7 +18,7 @@ use crate::resolve::{Code, Resolution, Resolver, Target};
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -305,8 +305,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
             .collect();
         let mut found = Vec::new();
         let mut misses = Vec::new();
-        for resolver in resolvers.values() {
-            let code = Code::new(resolver, &full);
+        for (&pack, resolver) in &resolvers {
+            let code = Code::new(resolver, &full, lang::pack(pack));
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code));
             }
@@ -375,15 +375,17 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
     let mut rows = BTreeSet::new();
     for f in &found {
-        let (role, path, site) = match &f.site {
+        let (path, site) = match &f.site {
+            // An inline definition no kind names folds into the one enclosing it, or into the
+            // file at the top level.
             Site::Def { path, name }
             | Site::Inline {
                 path, def: name, ..
-            } => {
-                let name = names.def(path, name).unwrap_or_else(|| name.clone());
-                ("provider", path, format!("{identity}::{path}::{name}"))
-            }
-            Site::File(path) => ("provider", path, format!("{identity}::{path}")),
+            } => match names.scope(path, name) {
+                name if name.is_empty() => (path, format!("{identity}::{path}")),
+                name => (path, format!("{identity}::{path}::{name}")),
+            },
+            Site::File(path) => (path, format!("{identity}::{path}")),
             Site::Call { path, index } => {
                 let ids = calls
                     .entry(path)
@@ -391,9 +393,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str) -> Result<()> {
                 let Some((_, id)) = ids.get(*index) else {
                     continue;
                 };
-                ("consumer", path, id.clone())
+                (path, id.clone())
             }
         };
+        let role = f.role.name();
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         rows.insert((
             role,
@@ -601,7 +604,8 @@ pub(crate) struct CallSite {
     pub(crate) span: Span,
 }
 
-/// A symbol that serves a contract.
+/// The provider side of a contract: a symbol that serves it, a file, a repository, or the call
+/// that produces to a channel.
 #[derive(Serialize)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
@@ -611,7 +615,8 @@ pub(crate) struct Provider {
     pub(crate) gateway: Option<String>,
 }
 
-/// A call site that uses a contract; `contract` is `None` while it is unresolved. `via` says
+/// The consumer side of a contract: a call site that uses it, or the symbol that reads a
+/// resource or handles a channel; `contract` is `None` while an HTTP call is unresolved. `via` says
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
 /// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
 /// that out.

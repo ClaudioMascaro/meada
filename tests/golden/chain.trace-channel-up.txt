@@ -1,0 +1,4 @@
+example.com/chain/worker src/consumer.ts:13 onOrderCreated
+  →[exact: channel::kafka::orders.created] example.com/chain/gateway src/checkout.ts:11 createOrder
+    →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:14 createOrder
+chain: inferred · 2 hops · 3 repos · 90 tokens

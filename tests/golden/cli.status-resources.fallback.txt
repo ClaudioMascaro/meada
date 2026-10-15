@@ -1,7 +1,7 @@
-example.com/chain/gateway (.) indexed, 4 files
+example.com/chain/gateway (.) indexed, 8 files
 example.com/chain/catalog (../chain-catalog) indexed, 4 files
   resource::s3-bucket::invoices is unlinked: no writer and reader in different repositories
   resource::postgres::orders: `via` lib/gone.ts::sync matches no symbol, ignored
   resource::postgres::orders: no `via` matches a symbol, so the repository as a whole is the side
 example.com/chain/web (../chain-web) indexed, 5 files
-example.com/chain/worker (../chain-worker) indexed, 2 files
+example.com/chain/worker (../chain-worker) indexed, 3 files

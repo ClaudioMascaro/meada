@@ -4,7 +4,9 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Def, Export, Facts, Imported, Kind, Modules, Param, Part, Value};
+use crate::lang::{
+    Call, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Value,
+};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -33,8 +35,9 @@ enum Binding<'a> {
     /// The parameter at this position of a function, and the field of its object pattern
     /// when the name is one of those it destructures.
     Param(Target<'a>, usize, Option<usize>),
-    /// Something an import brings from outside the repository.
-    External,
+    /// Something an import brings from outside the repository: the specifier imported from
+    /// and what it names there.
+    External(&'a str, &'a Imported),
     /// Neither scope nor import resolution knows it.
     Unknown,
 }
@@ -123,7 +126,7 @@ impl<'a> Resolver<'a> {
         }
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
-            Binding::External => Resolution::Unresolved,
+            Binding::External(..) => Resolution::Unresolved,
             Binding::Module(_) | Binding::Const(..) | Binding::Param(..) | Binding::Unknown => {
                 self.infer(&call.callee)
             }
@@ -223,12 +226,12 @@ impl<'a> Resolver<'a> {
     fn import(
         &self,
         path: &'a str,
-        source: &str,
+        source: &'a str,
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let Some(module) = self.module(path, source) else {
-            return Binding::External;
+            return Binding::External(source, name);
         };
         match name {
             Imported::Namespace => Binding::Module(module),
@@ -297,15 +300,106 @@ pub struct Code<'a> {
     resolver: &'a Resolver<'a>,
     full: &'a BTreeMap<&'a str, &'a Facts>,
     misses: RefCell<BTreeSet<&'a str>>,
+    pack: &'static dyn LanguagePack,
+}
+
+/// Where a value comes from when a package outside the repository made it: the specifier
+/// imported, and what the code did with what it imports, written as JavaScript would write
+/// it from that name. `const kafka = new Kafka(...)` with `Kafka` imported from `kafkajs`,
+/// then `const producer = kafka.producer()`, makes `producer` the origin `kafkajs`,
+/// `new Kafka().producer()`. A namespace import adds no name; a default import is `default`.
+pub struct Origin<'a> {
+    pub package: &'a str,
+    pub expr: String,
+    /// The constant the traced name refers to, as its file and qualified name; `None` when
+    /// the name is the import itself.
+    pub binding: Option<(&'a str, &'a str)>,
 }
 
 impl<'a> Code<'a> {
-    pub fn new(resolver: &'a Resolver<'a>, full: &'a BTreeMap<&'a str, &'a Facts>) -> Self {
+    pub fn new(
+        resolver: &'a Resolver<'a>,
+        full: &'a BTreeMap<&'a str, &'a Facts>,
+        pack: &'static dyn LanguagePack,
+    ) -> Self {
         Self {
             resolver,
             full,
             misses: RefCell::new(BTreeSet::new()),
+            pack,
         }
+    }
+
+    /// The language pack whose files these are.
+    pub fn pack(&self) -> &'static dyn LanguagePack {
+        self.pack
+    }
+
+    /// The origin of `chain`, a name or member chain (`a.b`) written in `path` within
+    /// `scope`, through constants in the same file and imported ones: `None` unless it comes
+    /// from an import of something outside the repository. Only `const` bindings are
+    /// followed; a parameter has no origin.
+    pub fn origin(&self, path: &'a str, scope: &'a str, chain: &'a str) -> Option<Origin<'a>> {
+        self.trace(path, scope, chain, &mut Vec::new())
+    }
+
+    fn trace(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        chain: &'a str,
+        seen: &mut Vec<(&'a str, &'a str)>,
+    ) -> Option<Origin<'a>> {
+        let mut members = chain.split('.');
+        let head = members.next()?;
+        let mut origin = match self.resolver.lexical(path, scope, head, &mut Seen::new()) {
+            Binding::External(package, name) => Origin {
+                package,
+                expr: match name {
+                    Imported::Namespace => String::new(),
+                    Imported::Name(name) => name.clone(),
+                },
+                binding: None,
+            },
+            Binding::Const(at, constant) => {
+                // `const a = b; const b = a;` comes from nowhere.
+                if seen.contains(&(at, constant)) {
+                    return None;
+                }
+                seen.push((at, constant));
+                let value = &self
+                    .full(at)?
+                    .consts
+                    .iter()
+                    .find(|c| c.name == constant)?
+                    .value;
+                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                let mut origin = match value {
+                    Value::Ref(name) => self.trace(at, within, name, seen)?,
+                    Value::Call(callee) => {
+                        let mut origin = self.trace(at, within, callee, seen)?;
+                        origin.expr += "()";
+                        origin
+                    }
+                    Value::New(callee) => {
+                        let mut origin = self.trace(at, within, callee, seen)?;
+                        origin.expr = format!("new {}()", origin.expr);
+                        origin
+                    }
+                    _ => return None,
+                };
+                origin.binding = Some((at, constant));
+                origin
+            }
+            _ => return None,
+        };
+        for member in members {
+            if !origin.expr.is_empty() {
+                origin.expr.push('.');
+            }
+            origin.expr += member;
+        }
+        Some(origin)
     }
 
     /// The files looked into that `full` lacks, sorted.
@@ -499,6 +593,12 @@ impl<'a> Code<'a> {
                     })
                     .collect(),
             ),
+            Value::List(items) => Value::List(
+                items
+                    .iter()
+                    .map(|v| self.eval(path, scope, v, frames, depth, seen, wants))
+                    .collect(),
+            ),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, seen, wants),
             other => other.clone(),
         }
@@ -623,6 +723,7 @@ fn unbind(value: Value) -> Value {
                 .map(|(k, v)| (k, unbind(v)))
                 .collect(),
         ),
+        Value::List(items) => Value::List(items.into_iter().map(unbind).collect()),
         other => other,
     }
 }

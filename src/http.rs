@@ -3,9 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::contract::{ContractKind, Found, Level, Link, Site};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{Consumer, Export as IndexExport, Provider};
-use crate::lang::{Export, Part, Value};
+use crate::lang::{Depends, Export, Part, Value, literal, property};
 use crate::resolve::Code;
 use crate::workspace::Repository;
 
@@ -60,9 +60,6 @@ fn next_route(path: &str) -> Option<String> {
         .collect();
     Some(format!("/{}", segments.join("/")))
 }
-
-/// What a reader needs depends on a parameter of the enclosing function: a client wrapper.
-struct Depends;
 
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
@@ -204,7 +201,7 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         return Ok(Some("GET".into()));
     };
     let value = match init {
-        Value::Object(properties) => match method_property(properties)? {
+        Value::Object(properties) => match property(properties, "method")? {
             Some(value) => value,
             None => return Ok(Some("GET".into())),
         },
@@ -217,38 +214,6 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         Value::Undefined => Ok(Some("GET".into())),
         _ => Ok(None),
     }
-}
-
-/// The value of the last `method` of an object, as in JavaScript, through spreads.
-fn method_property(properties: &[(String, Value)]) -> Result<Option<&Value>, Depends> {
-    static UNKNOWN: Value = Value::Unknown;
-    for (key, value) in properties.iter().rev() {
-        match (key.as_str(), value) {
-            ("method", value) => return Ok(Some(value)),
-            ("...", Value::Object(inner)) => {
-                if let Some(found) = method_property(inner)? {
-                    return Ok(Some(found));
-                }
-            }
-            ("...", Value::Undefined) => {}
-            ("...", Value::Ref(_)) => return Err(Depends),
-            // A spread of something unknown may hide a method.
-            ("...", _) => return Ok(Some(&UNKNOWN)),
-            _ => {}
-        }
-    }
-    Ok(None)
-}
-
-/// The text of `parts` when every part is literal.
-fn literal(parts: &[Part]) -> Option<String> {
-    parts
-        .iter()
-        .map(|p| match p {
-            Part::Text(t) => Some(t.as_str()),
-            _ => None,
-        })
-        .collect()
 }
 
 /// `parts` as a path, every non-literal part a parameter.
@@ -382,6 +347,7 @@ fn express(code: &Code) -> Vec<Found> {
                 _ => Site::File(path.into()),
             };
             found.push(Found {
+                role: Role::Provider,
                 site,
                 contract: Some(contract(&method, &full)),
                 via: None,
@@ -409,6 +375,7 @@ impl ContractKind for Http {
                 }
                 for (site, at, read) in code.expand(path, n, &fetch) {
                     found.push(Found {
+                        role: Role::Consumer,
                         site: Site::Call {
                             path: site.into(),
                             index: at,
@@ -440,6 +407,7 @@ impl ContractKind for Http {
                     Site::File(path.into())
                 };
                 found.push(Found {
+                    role: Role::Provider,
                     site,
                     contract: Some(contract(exported, &route)),
                     via: None,

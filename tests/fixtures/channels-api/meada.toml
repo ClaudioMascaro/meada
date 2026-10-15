@@ -1,0 +1,2 @@
+# The producer side. Channels need no key: the worker and the billing service join the
+# workspace by naming this repository as their peer.

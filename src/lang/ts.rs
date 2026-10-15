@@ -5,10 +5,13 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules, Param,
-    Part, Value,
+    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Message, Modules,
+    Param, Part, Value,
 };
+use crate::resolve::Code;
 use crate::{Result, qualify};
+
+mod messages;
 
 pub struct TsJs;
 
@@ -101,6 +104,10 @@ impl LanguagePack for TsJs {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["tsconfig.json", "jsconfig.json"]
+    }
+
+    fn messages(&self, code: &Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
@@ -278,13 +285,15 @@ fn definition(
     let (kind, (name, range)) = match node.kind() {
         "function_declaration" | "generator_function_declaration" => (Kind::Function, own()?),
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
-        // Methods of object literals are not definitions: only those of a class body.
+        // Methods of object literals are not definitions: only those of a class body, and
+        // those of an options object, which are written in place like an argument.
         "method_definition" if node.parent()?.kind() == "class_body" => (Kind::Method, own()?),
+        "method_definition" if in_options(node) => {
+            (Kind::Inline, (inline(node), node.byte_range()))
+        }
         kind if FUNCTIONS.contains(&kind) => match binding {
             Some(binding) => (Kind::Function, binding),
-            None if node.parent()?.kind() == "arguments" => {
-                (Kind::Inline, (inline(node), node.byte_range()))
-            }
+            None if written_in_place(node) => (Kind::Inline, (inline(node), node.byte_range())),
             None => return None,
         },
         "class" => (Kind::Class, binding?),
@@ -300,6 +309,29 @@ const FUNCTIONS: &[&str] = &[
     "function",
     "generator_function",
 ];
+
+/// Whether the anonymous function `node` is written in place as an argument, or as a property
+/// of an options object given as one: `run({ eachMessage: async () => {} })`.
+fn written_in_place(node: Node) -> bool {
+    match node.parent() {
+        Some(p) if p.kind() == "arguments" => true,
+        Some(p) if p.kind() == "pair" => {
+            p.child_by_field_name("value")
+                .is_some_and(|v| v.id() == node.id())
+                && in_options(p)
+        }
+        _ => false,
+    }
+}
+
+/// Whether `property` (a pair or a method) belongs to an object literal given as an argument.
+fn in_options(property: Node) -> bool {
+    property
+        .parent()
+        .filter(|o| o.kind() == "object")
+        .and_then(|o| o.parent())
+        .is_some_and(|a| a.kind() == "arguments")
+}
 
 /// The last name segment of the `Kind::Inline` definition an anonymous function argument
 /// makes.
@@ -543,15 +575,18 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                     let spread = named(property).next()?;
                     Some(("...".into(), value(spread, src, scope)))
                 }
+                "method_definition" if in_options(property) => {
+                    let key = text(property.child_by_field_name("name")?, src).to_string();
+                    Some((key, Value::Function(qualify(scope, &inline(property)))))
+                }
                 _ => None,
             });
             Value::Object(properties.collect())
         }
+        "array" => Value::List(named(node).map(|item| value(item, src, scope)).collect()),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
-        kind if FUNCTIONS.contains(&kind)
-            && node.parent().is_some_and(|p| p.kind() == "arguments") =>
-        {
+        kind if FUNCTIONS.contains(&kind) && written_in_place(node) => {
             Value::Function(qualify(scope, &inline(node)))
         }
         kind => match parts(node, src) {
@@ -559,6 +594,9 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             None if kind == "call_expression" => node
                 .child_by_field_name("function")
                 .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
+            None if kind == "new_expression" => node
+                .child_by_field_name("constructor")
+                .map_or(Value::Unknown, |f| Value::New(callee(f, src))),
             None => Value::Unknown,
         },
     }

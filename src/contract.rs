@@ -1,12 +1,13 @@
 //! The contract-kind interface: each kind turns pack output, or what `meada.toml` declares,
 //! into provider and consumer contracts and matches them into links (ADR 0005). The kinds are
-//! HTTP (`http::`) and resources (`resource::`, spec #19); later kinds (`channel::`,
-//! `package::`) plug in behind the same trait.
+//! HTTP (`http::`), resources (`resource::`, spec #19) and channels (`channel::`, spec #20);
+//! later kinds (`package::`) plug in behind the same trait.
 
 use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::channel::Channel;
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
 use crate::resolve::Code;
@@ -53,7 +54,9 @@ impl Level {
     }
 }
 
-/// A consumer call site linked to a provider symbol through a contract.
+/// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a
+/// file or a whole repository, as its kind places it: an HTTP consumer is a call and its
+/// provider a symbol; a channel consumer is its handler and its producer a call.
 #[derive(Serialize)]
 pub struct Link {
     pub consumer: String,
@@ -71,8 +74,9 @@ pub struct Link {
 
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
+    pub role: Role,
     pub site: Site,
-    /// The contract identifier; `None` for a consumer Meada could not resolve.
+    /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`.
     pub via: Option<String>,
@@ -83,20 +87,38 @@ pub struct Found {
     pub fragments: Vec<String>,
 }
 
+/// Which side of a contract a site holds.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    Provider,
+    Consumer,
+}
+
+impl Role {
+    /// The name the index stores.
+    pub fn name(self) -> &'static str {
+        match self {
+            Role::Provider => "provider",
+            Role::Consumer => "consumer",
+        }
+    }
+}
+
 /// Where a contract sits; every path is repository-relative.
 pub enum Site {
-    /// A provider: a definition, by qualified name.
+    /// A definition, by qualified name. Inline definitions no kind names fold away from it,
+    /// and a name that folds to nothing is the file's top level.
     Def { path: String, name: String },
-    /// A provider: the file itself.
+    /// The file itself.
     File(String),
-    /// A provider: an inline route handler, the `Kind::Inline` definition `def`, which takes
-    /// `name` (such as `GET /users/{}`) under its enclosing symbol.
+    /// An inline handler, the `Kind::Inline` definition `def`, which takes `name` (such as
+    /// `GET /users/{}` or `kafka orders.created`) under its enclosing symbol.
     Inline {
         path: String,
         def: String,
         name: String,
     },
-    /// A consumer: the call at this position of the file's `Facts::calls`.
+    /// The call at this position of the file's `Facts::calls`.
     Call { path: String, index: usize },
 }
 
@@ -126,7 +148,7 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel];
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
