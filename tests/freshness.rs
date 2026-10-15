@@ -241,6 +241,58 @@ fn contracts_follow_values_edited_in_other_files() {
     }
 }
 
+/// Renames the topic the gateway produces through its wrapper, in the imported constant, and
+/// the topics the conformance fixture builds from a constant (spec #20).
+fn edit_topics(gateway: &Path, conformance: &Path) {
+    let replace = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    replace(
+        gateway.join("src/topics.ts"),
+        "orders.created",
+        "orders.placed",
+    );
+    replace(
+        conformance.join("src/messages/topics.ts"),
+        "\"orders\"",
+        "\"sales\"",
+    );
+}
+
+#[test]
+fn channels_follow_an_edited_topic_constant() {
+    let topics = |case: &str| {
+        let (_, gateway, _) = chain(case);
+        let conformance = fixture_repo(&format!("{case}_conformance"), "conformance-ts-js", ORIGIN);
+        [gateway.clone(), worker(&gateway), conformance]
+    };
+    let exports = |repos: &[PathBuf; 3]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = topics("fresh_topics");
+    repos.iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_topics(&repos[0], &repos[2]);
+
+    let refreshed = exports(&repos);
+
+    let cold = topics("fresh_topics_cold");
+    edit_topics(&cold[0], &cold[2]);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
 type Chain = (PathBuf, PathBuf, PathBuf);
 
 /// Edits, adds and deletes files in each repository of the chain: the web adds a consumer and

@@ -1,0 +1,2 @@
+# The producer side of the BullMQ and Redis stream channels; the worker names this repository
+# as its peer.

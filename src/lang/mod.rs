@@ -7,6 +7,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::resolve::Code;
 
 pub mod ts;
 
@@ -24,6 +25,54 @@ pub trait LanguagePack {
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order.
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
+
+    /// The producer and consumer calls of the message libraries the pack knows (spec #20),
+    /// read from its files' facts through `code`: a call counts only when its receiver traces
+    /// back to the library's package (`Code::origin`), and its channel name is evaluated like
+    /// a URL, client wrappers included (`Code::expand`). The channel contract kind turns them
+    /// into contracts; a pack never touches the index.
+    fn messages(&self, _code: &Code) -> Vec<Message> {
+        Vec::new()
+    }
+}
+
+/// A call that produces to or consumes from a channel: a queue or topic of one broker kind.
+pub struct Message {
+    /// `kafka`, `amqp`, `sqs`, `nats`, `bullmq` or `redis`.
+    pub broker: &'static str,
+    /// The channel name as evaluated, kept as it is; `None` when it cannot be evaluated (an
+    /// unresolved side, never linked).
+    pub name: Option<String>,
+    /// The call site: the producing or subscribing call, or the call of a client wrapper that
+    /// leads to it, as its file and position in `Facts::calls`.
+    pub path: String,
+    pub call: usize,
+    pub role: Role,
+}
+
+pub enum Role {
+    /// The provider side of the channel.
+    Producer,
+    /// A publish to a named exchange (`name` is its routing key): the message reaches the
+    /// queues bound to the exchange whose pattern matches, wherever the binding is declared.
+    Publish { exchange: String },
+    /// A binding of the queue `name` to an exchange by a pattern. It is neither side of a
+    /// channel; the channel kind keeps it for the links.
+    Binding { exchange: String, pattern: String },
+    /// The consumer side, with the function that handles what it receives.
+    Consumer(Handler),
+}
+
+/// Where a consumer's messages are handled.
+#[derive(Clone)]
+pub enum Handler {
+    /// A definition by qualified name; an empty name is the file's top level. A name whose
+    /// last segments are inline definitions no kind names stands for the definition that
+    /// encloses them.
+    Def { path: String, name: String },
+    /// An anonymous function written in place: the `Kind::Inline` definition `def` of `path`,
+    /// which the channel kind names after the channels it handles.
+    Inline { path: String, def: String },
 }
 
 /// The repository-relative paths an import of a specifier (second argument) from a file
@@ -179,11 +228,55 @@ pub enum Value {
     Undefined,
     /// The result of calling the normalized callee, such as `express.Router`.
     Call(String),
+    /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
+    /// the arguments.
+    New(String, Vec<Value>),
+    /// An array literal's elements.
+    List(Vec<Value>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
     /// Anything else.
     Unknown,
+}
+
+/// What a reader of evaluated values needs depends on a parameter of the enclosing function:
+/// the function is a client wrapper (see `Code::expand`).
+pub struct Depends;
+
+/// The value of the last property `key` of an object, as JavaScript reads it, through spreads:
+/// `None` when no property sets it, `Unknown` when a spread of something unknown may.
+pub fn property<'v>(
+    properties: &'v [(String, Value)],
+    key: &str,
+) -> std::result::Result<Option<&'v Value>, Depends> {
+    static UNKNOWN: Value = Value::Unknown;
+    for (k, value) in properties.iter().rev() {
+        match (k.as_str(), value) {
+            (k, value) if k == key => return Ok(Some(value)),
+            ("...", Value::Object(inner)) => {
+                if let Some(found) = property(inner, key)? {
+                    return Ok(Some(found));
+                }
+            }
+            ("...", Value::Undefined) => {}
+            ("...", Value::Ref(_)) => return Err(Depends),
+            ("...", _) => return Ok(Some(&UNKNOWN)),
+            _ => {}
+        }
+    }
+    Ok(None)
+}
+
+/// The text of `parts` when every part is literal.
+pub fn literal(parts: &[Part]) -> Option<String> {
+    parts
+        .iter()
+        .map(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[derive(Clone)]

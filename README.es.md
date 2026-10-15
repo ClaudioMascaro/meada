@@ -100,11 +100,15 @@ tu agente (por ejemplo el `.mcp.json` de Claude Code):
 Son tres herramientas, siempre en inglés, y ninguna escribe:
 
 - `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
-  un recurso por su tipo o su id; con el tipo `ambiguous` o `unresolved`, lista los ítems
+  un recurso por su tipo o su id; con el tipo `channel`, un canal (cola o tópico) por el broker
+  o el nombre; con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
   contratos que toca; en un recurso (`resource::postgres::orders`), lista quién lo escribe y
-  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero;
+  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero; en
+  un canal (`channel::kafka::orders.created`), lista productores y consumidores, también los
+  que llegan a él por un comodín o por un binding, con el nivel y el motivo, y un lado cuyo
+  nombre Meada no puede evaluar aparece como `(unresolved)` y nunca se enlaza;
 - `trace` sigue una cadena de llamadas por varios repositorios, río abajo (`down`) o río arriba
   (`up`); con `changes: uncommitted`, parte del diff del árbol de trabajo y sirve para analizar
   el impacto de lo que se acaba de editar.
@@ -188,11 +192,17 @@ Constantes fijas:
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) y enlaza repositorios por contratos HTTP (`fetch` del lado que consume,
-Next.js (app router) y Express del lado que sirve, también detrás de un gateway) y por los
-recursos declarados en el `meada.toml`. Cada enlace tiene el nivel `exact`, `declared`,
-`inferred`, `decided` o `ambiguous`; una llamada cuya URL no se puede resolver aparece como no
-resuelta y solo se vuelve enlace por una decisión, en el nivel `decided`. Aún no hay: otros
-lenguajes, otros clientes HTTP además de `fetch`, colas, paquetes ni el paquete npm. El alcance y el orden del trabajo están
+Next.js (app router) y Express del lado que sirve, también detrás de un gateway), por los
+recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs`), colas RabbitMQ
+(`amqplib`, con el `publish` a un exchange llegando a las colas que los bindings le atan), colas
+Amazon SQS (AWS SDK v3 y `sqs-consumer`), subjects NATS (con los comodines `*` y `>`), jobs
+BullMQ y streams Redis (`ioredis` y `node-redis`), con el productor enlazado al handler de cada
+consumidor, también en el mismo repositorio. Cada enlace
+tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
+se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
+`decided`. Los clústeres de broker no se modelan: dos clústeres que tienen un tópico con el
+mismo nombre se enlazan como si fueran uno solo. Aún no hay: otros lenguajes, otros clientes HTTP
+además de `fetch`, otros clientes de mensajería además de estos, paquetes ni el paquete npm. El alcance y el orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
 

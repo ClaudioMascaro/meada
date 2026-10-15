@@ -2,7 +2,7 @@ example.com/chain/web (.) indexed, 5 files
   stale decision: example.com/chain/web::src/status.ts::gone::fetch#0 -> example.com/chain/catalog::http::POST::/api/events (call site gone)
   decision waiting on missing peer example.com/chain/billing: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/billing::http::GET::/api/health
   decision waiting on missing peer example.com/chain/billing: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/billing::http::POST::/api/events
-example.com/chain/gateway (../chain-gateway) indexed, 4 files
+example.com/chain/gateway (../chain-gateway) indexed, 8 files
 example.com/chain/catalog (../chain-catalog) indexed, 4 files
-example.com/chain/worker (../chain-worker) indexed, 2 files
+example.com/chain/worker (../chain-worker) indexed, 3 files
 missing peer: example.com/chain/billing, named by example.com/chain/web

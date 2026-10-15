@@ -4,18 +4,19 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::contract::{Level, Link};
+use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{http, render, resource};
+use crate::{channel, http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
-    /// From callers to callees, and from consumers to the providers they reach.
+    /// From callers to callees, from consumers to the providers they reach, and from writers
+    /// and producers to the readers and handlers of what they write or produce.
     Down,
-    /// From callees to callers, and from providers to the consumers that reach them.
+    /// The reverse of `Down`.
     Up,
 }
 
@@ -45,9 +46,14 @@ pub(crate) struct Graph<'a> {
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
+    /// The channel sides whose name Meada could not evaluate, by site (the producing call or
+    /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
+    /// chain would not otherwise show them.
+    unresolved_sides: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
-    /// consumer is a call site, or, for a resource, the symbol that reads it: data goes from
-    /// the provider (writer) to that consumer, so the chain crosses it the other way.
+    /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
+    /// handles it: data goes from the provider (a writer, or the call that produces) to that
+    /// consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
 }
@@ -63,6 +69,7 @@ impl<'a> Graph<'a> {
             callers: HashMap::new(),
             consumers: HashMap::new(),
             providers: Vec::new(),
+            unresolved_sides: HashMap::new(),
             out: HashMap::new(),
             into: HashMap::new(),
         };
@@ -84,6 +91,20 @@ impl<'a> Graph<'a> {
             graph
                 .providers
                 .extend(provided.map(|p| (p.contract.as_str(), p.site.as_str())));
+            let produced = export.providers.iter();
+            let consumed = export.consumers.iter();
+            let sides = produced
+                .map(|p| ("produces", Some(&p.contract), &p.site))
+                .chain(consumed.map(|c| ("consumes", c.contract.as_ref(), &c.site)));
+            for (verb, contract, site) in sides {
+                if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
+                    graph
+                        .unresolved_sides
+                        .entry(site)
+                        .or_default()
+                        .push((verb, contract));
+                }
+            }
         }
         let order = |(n, c): &Call| (*n, c.span.path.clone(), c.span.start, c.id.clone());
         for calls in graph.callees.values_mut().chain(graph.callers.values_mut()) {
@@ -141,10 +162,14 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        if from.starts_with(resource::PREFIX) {
+        if let Some(kind) = contract::kind_of(from)
+            && let Some((provider, consumer)) = kind.sides()
+        {
             return Lookup::Answer(vec![format!(
-                "`{from}` is a resource, and a trace starts from a symbol, a route or a call \
-                 site: run `context` on it for its writers and readers, then trace from one"
+                "`{from}` is a {}, and a trace starts from a symbol, a route or a call \
+                 site: run `context` on it for its {provider}s and {consumer}s, then trace \
+                 from one",
+                kind.prefix()
             )]);
         }
         let (contract, path) = if http::route(from).is_some() {
@@ -324,7 +349,9 @@ impl<'a> Walk<'_, 'a> {
         match self.direction {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
             Direction::Up => {
-                let text = format!("{} {}", self.site(call), self.caller(call));
+                let site = self.site(call);
+                self.unresolved_sides(&call.1.id, 1, call.0, &site);
+                let text = format!("{site} {}", self.caller(call));
                 self.enter(&call.1.caller, 1, Row::call(text, call.0, None));
             }
         }
@@ -346,6 +373,14 @@ impl<'a> Walk<'_, 'a> {
         self.expanded.insert(id);
         self.ancestors.push(id);
         let graph = self.graph;
+        if let Some(&(n, s)) = graph.symbols.get(id) {
+            let place = format!(
+                "{} {}",
+                graph.workspace.repos[n].identity,
+                self.files[n].at(&s.span.path, s.span.start)
+            );
+            self.unresolved_sides(id, depth + 1, n, &place);
+        }
         // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
         match self.direction {
@@ -388,10 +423,23 @@ impl<'a> Walk<'_, 'a> {
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
                     self.enter(&c.caller, depth + 1, Row::link(text, n, link));
                 }
-                // A reader goes back to the writers of what it reads; a repository-level writer
-                // ends the branch.
+                // A reader goes back to the writers of what it reads, and a channel handler to
+                // the calls that produce what it handles, then to their callers; a
+                // repository-level writer ends the branch.
                 for link in graph.out.get(id).into_iter().flatten() {
                     let writer = link.provider.as_str();
+                    if let Some(&call @ (n, c)) = graph.calls.get(writer) {
+                        if shown.insert((c.caller.as_str(), true)) {
+                            let text = format!(
+                                "{} {} {}",
+                                arrow(link),
+                                self.site(call),
+                                self.caller(call)
+                            );
+                            self.enter(&c.caller, depth + 1, Row::link(text, n, link));
+                        }
+                        continue;
+                    }
                     if shown.insert((writer, true)) {
                         let (m, text) = self.node(writer);
                         let text = format!("{} {text}", arrow(link));
@@ -458,6 +506,27 @@ impl<'a> Walk<'_, 'a> {
                 let text = format!("{} {text}", arrow(link));
                 self.enter(&link.provider, depth, Row::link(text, m, link));
             }
+        }
+        let place = self.site(call);
+        self.unresolved_sides(&c.id, depth, n, &place);
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if !shown.insert((handler, true)) {
+                continue;
+            }
+            let (m, text) = self.node(handler);
+            let text = format!("{} {text}", arrow(link));
+            self.enter(handler, depth, Row::link(text, m, link));
+        }
+    }
+
+    /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
+    fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
+        let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
+        for &(verb, contract) in sides {
+            let text = format!("{place} {verb} {}", channel::shown(contract));
+            self.push(depth, Row::call(text, repo, None));
         }
     }
 
