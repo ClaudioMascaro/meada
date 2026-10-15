@@ -1,8 +1,9 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{Binding, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Value, literal, property};
@@ -421,19 +422,44 @@ impl ContractKind for Http {
         found
     }
 
-    /// Adds the routes of the repository's documents (spec #21), then the gateway paths of
-    /// every route. A document route with the contract of a code route merges into it: the
-    /// code keeps the handler. Any other is a provider of its own, without a handler, at
+    /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
+    /// hosts. A document route with the contract of a code route merges into it: the code
+    /// keeps the handler. Any other is a provider of its own, without a handler, at
     /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
-    /// already listed adds nothing.
+    /// already listed adds nothing of its own.
+    ///
+    /// Every `servers` path of a document is a gateway prefix for its routes (with the
+    /// `[serve]` strip), so a merged route serves its code path, its `[serve]` form and the
+    /// forms of every document listing it. A route only documents has no `[serve]` prefix when
+    /// a document gives it a server path: the server path replaces it. The hosts are the
+    /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        let serve = &repo.config.serve;
         let mut listed: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
             .collect();
         let mut documented = Vec::new();
+        let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
         for doc in &export.documents {
+            let prefixes = (doc.summary.servers.iter())
+                .map(|s| s.path.as_str())
+                .filter(|p| !p.is_empty());
+            let prefixes: Vec<&str> = prefixes.collect();
             for route in &doc.summary.routes {
                 let contract = route.contract();
+                let found = prefixes.iter().filter_map(|prefix| {
+                    gateway_path(Some(prefix), serve.strip.as_deref(), &route.path)
+                });
+                let found = found.map(|(path, reason)| Gateway { path, reason });
+                let own = forms.entry(contract.clone()).or_default();
+                for form in found {
+                    if !own
+                        .iter()
+                        .any(|g| g.path == form.path && g.reason == form.reason)
+                    {
+                        own.push(form);
+                    }
+                }
                 if listed.insert(contract.clone()) {
                     let site = format!("{}::{}::{}", repo.identity, doc.path, route.label());
                     documented.push(Provider {
@@ -444,17 +470,30 @@ impl ContractKind for Http {
                 }
             }
         }
+        let documented_only: HashSet<String> =
+            documented.iter().map(|p| p.contract.clone()).collect();
         // The index's order.
         export.providers.extend(documented);
         let providers = &mut export.providers;
         providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+        let mut hosts: Vec<String> = serve.hosts.iter().map(|h| h.to_lowercase()).collect();
+        let servers = export.documents.iter().flat_map(|d| &d.summary.servers);
+        hosts.extend(servers.filter_map(|s| s.host.clone()));
+        hosts.sort();
+        hosts.dedup();
         for p in &mut export.providers {
             let path = route(&p.contract).map(|(_, path)| path);
-            let served = path.and_then(|path| repo.config.serve.gateway_path(path));
-            p.gateway = served.as_ref().map(|(path, _)| path.clone());
-            p.gateways = (served.into_iter())
+            let from_document = forms.remove(&p.contract).unwrap_or_default();
+            // The server path replaces `[serve] prefix` for what only a document lists.
+            let replaced = documented_only.contains(&p.contract) && !from_document.is_empty();
+            let served = path.and_then(|path| serve.gateway_path(path));
+            let own = served.filter(|_| !replaced);
+            p.gateway = own.as_ref().map(|(path, _)| path.clone());
+            p.gateways = (own.into_iter())
                 .map(|(path, reason)| Gateway { path, reason })
+                .chain(from_document)
                 .collect();
+            p.hosts = hosts.clone();
         }
     }
 
@@ -494,7 +533,9 @@ impl ContractKind for Http {
             .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving.filter(|(m, ..)| m.config.serves(host)).collect();
+                let fits = serving
+                    .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+                    .collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving

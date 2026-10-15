@@ -51,3 +51,38 @@ fn status_reports_the_documents_it_ignored() {
         &engine::status(&gateway).unwrap(),
     );
 }
+
+/// The `(level, reason)` of the link from the web call in `function`, or `None` when it has
+/// none.
+fn link_of(web: &std::path::Path, function: &str) -> Option<(String, String)> {
+    let export = Engine::open(web).unwrap().export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let links = export["links"].as_array().unwrap();
+    let link = links.iter().find(|l| {
+        let consumer = l["consumer"].as_str().unwrap();
+        consumer.contains(&format!("::{function}::"))
+    })?;
+    Some((
+        link["level"].as_str().unwrap().into(),
+        link["reason"].as_str().unwrap().into(),
+    ))
+}
+
+#[test]
+fn servers_urls_add_hosts_and_base_paths() {
+    let (web, _, _) = documented_chain("documents_servers");
+    let link = |function| link_of(&web, function);
+    let inferred = |reason: &str| Some(("inferred".to_string(), reason.to_string()));
+
+    // The public URL of the document: its host and its base path.
+    assert_eq!(link("edgeShipment"), inferred("gateway prefix /gw"));
+    // A server variable takes its default.
+    assert_eq!(link("euShipment"), inferred("gateway prefix /v3"));
+    // A relative URL gives only its path, whatever the host.
+    assert_eq!(
+        link("relativeShipment"),
+        inferred("gateway prefix /relative/base")
+    );
+    // A variable without a default contributes nothing, not even its path.
+    assert_eq!(link("unsetShipment"), None);
+}
