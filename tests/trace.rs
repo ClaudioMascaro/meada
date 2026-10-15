@@ -129,6 +129,33 @@ fn trace_down_from_a_writer_crosses_the_resource_into_its_reader() {
 }
 
 #[test]
+fn a_resource_both_sides_read_and_write_closes_a_cycle() {
+    let (web, gateway, _) = chain("trace_resource_cycle");
+    let append = |repo: &Path, via: &str| {
+        let path = repo.join("meada.toml");
+        let entry = format!(
+            "\n[[resource]]\nkind = \"redis\"\nid = \"locks\"\nrole = \"read-write\"\nvia = [\"{via}\"]\n"
+        );
+        fs::write(&path, fs::read_to_string(&path).unwrap() + &entry).unwrap();
+    };
+    append(&gateway, "src/orders.ts::cancelOrder");
+    append(&worker(&gateway), "src/jobs.ts::settleOrders");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From(WRITER), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[declared: resource::redis::locks] example.com/chain/gateway src/orders.ts:10 \
+             cancelOrder (cycle)"
+        ),
+        "{answer}"
+    );
+}
+
+#[test]
 fn trace_up_from_a_reader_crosses_the_resource_into_its_writer_and_upstream() {
     let (web, _, _) = chain("trace_resource_up");
 
