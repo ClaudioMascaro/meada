@@ -280,7 +280,8 @@ fn render(parts: &[Part]) -> String {
 /// What `express()`, `Router()` and `express.Router()` return: an app or a router.
 const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
 
-/// The route-registering methods of an Express app or router, and of a FastAPI one.
+/// The HTTP methods as lower-case names: Express and FastAPI register routes with them, and
+/// Python clients send requests with them.
 const EXPRESS_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
 
 /// An app or router: the file and index of the call that creates it.
@@ -586,6 +587,168 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
+/// A Python HTTP client library, by what it names outside the repository.
+struct Library {
+    /// The module whose functions send a request (`requests.get`).
+    module: Option<&'static str>,
+    /// What constructs a client, an object whose methods send requests.
+    clients: &'static [&'static str],
+}
+
+const LIBRARIES: &[Library] = &[
+    Library {
+        module: Some("requests"),
+        clients: &["requests.Session"],
+    },
+    Library {
+        module: Some("httpx"),
+        clients: &["httpx.Client", "httpx.AsyncClient"],
+    },
+    Library {
+        module: None,
+        clients: &["aiohttp.ClientSession"],
+    },
+];
+
+/// `url` with the client's `base` URL joined in front, when `url` is a path relative to it: it
+/// starts with literal text that is not a scheme. An absolute URL, and one whose start is not
+/// known, are left as they are.
+fn based(base: Option<&[Part]>, url: &Value) -> Value {
+    let (Some(base), Value::Str(parts)) = (base, url) else {
+        return url.clone();
+    };
+    let lead: String = (parts.iter())
+        .map_while(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect();
+    if !parts.is_empty() && (lead.is_empty() || lead.contains("://")) {
+        return url.clone();
+    }
+    let mut out = base.to_vec();
+    if let Some(Part::Text(t)) = out.last_mut() {
+        *t = t.trim_end_matches('/').to_string();
+    }
+    out.push(Part::Text("/".into()));
+    let mut path = parts.clone();
+    if let Some(Part::Text(t)) = path.first_mut() {
+        *t = t.trim_start_matches('/').to_string();
+    }
+    out.extend(path);
+    Value::Str(out)
+}
+
+/// Whether `member` sends a request: one of the methods, or `request(method, url)`.
+fn sends(member: &str) -> bool {
+    EXPRESS_METHODS.contains(&member) || member == "request"
+}
+
+/// The base URL the clients that may be the `receiver` of the call at `path` were built
+/// with, `None` when it is not a client: `Some(None)` when it has no base URL, an unknown one
+/// when the clients differ. A client is the call of a library's constructor that the receiver
+/// traces back to, by assignment, `with`, a `self` attribute or an argument.
+fn client_base<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    receiver: &'a str,
+) -> Option<Option<Vec<Part>>> {
+    let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
+    for (at, i) in code.origins(path, scope, receiver) {
+        let Some(ctor) = code.call(at, i) else {
+            continue;
+        };
+        let name = code.external(at, &ctor.scope, &ctor.callee);
+        if !name.is_some_and(|n| LIBRARIES.iter().any(|l| l.clients.contains(&n.as_str()))) {
+            continue;
+        }
+        let base = match ctor.keyword("base_url") {
+            None => None,
+            Some(url) => match code.value(at, &ctor.scope, url) {
+                Value::Undefined => None,
+                Value::Str(parts) => Some(parts),
+                _ => Some(vec![Part::Hole]),
+            },
+        };
+        if !bases.contains(&base) {
+            bases.push(base);
+        }
+    }
+    match bases.len() {
+        0 => None,
+        1 => bases.pop(),
+        _ => Some(Some(vec![Part::Hole])),
+    }
+}
+
+/// Python HTTP consumers: a function of a library's module (`requests.get(url)`) or a method
+/// of a client it constructs (`session.get(url)`), whose HTTP method is its name or, for
+/// `request(method, url)`, its first argument. A wrapper around one is read at each of its call
+/// sites, as `fetch` wrappers are.
+fn clients(code: &Code) -> Vec<Found> {
+    let mut found = Vec::new();
+    for (&path, facts) in code.files() {
+        let imports = (facts.imports.iter()).any(|i| {
+            LIBRARIES
+                .iter()
+                .any(|l| l.module == Some(i.source.as_str()))
+        });
+        for (n, call) in facts.calls.iter().enumerate() {
+            let function = imports
+                .then(|| code.external(path, &call.scope, &call.callee))
+                .flatten()
+                .and_then(|name| {
+                    let (module, function) = name.rsplit_once('.')?;
+                    let library = LIBRARIES.iter().any(|l| l.module == Some(module));
+                    (library && sends(function)).then(|| (function.to_string(), None))
+                });
+            let method = call
+                .callee
+                .rsplit_once('.')
+                .filter(|(r, m)| function.is_none() && sends(m) && !r.starts_with('('));
+            let (member, base) = match (function, method) {
+                (Some(function), _) => function,
+                (None, Some((receiver, member))) => {
+                    match client_base(code, path, &call.scope, receiver) {
+                        Some(base) => (member.to_string(), base),
+                        None => continue,
+                    }
+                }
+                _ => continue,
+            };
+            let read = |args: &[Value], kwargs: &[(String, Value)]| {
+                let arg = |n: usize, key: &str| {
+                    let named = kwargs.iter().find(|(k, _)| k == key).map(|(_, v)| v);
+                    args.get(n).or(named)
+                };
+                let (method, url) = match member.as_str() {
+                    "request" => (arg(0, "method").cloned(), arg(1, "url")?),
+                    name => (
+                        Some(Value::Str(vec![Part::Text(name.to_uppercase())])),
+                        arg(0, "url")?,
+                    ),
+                };
+                let url = based(base.as_deref(), url);
+                fetch(&[url, method.unwrap_or(Value::Unknown)])
+            };
+            for (site, at, read) in code.expand(path, n, &read) {
+                found.push(Found {
+                    site: Site::Call {
+                        path: site.into(),
+                        index: at,
+                    },
+                    contract: read.contract,
+                    via: read.via,
+                    method: read.method,
+                    fragments: read.fragments,
+                });
+            }
+        }
+    }
+    found
+}
+
 /// The methods a Django class-based view serves by defining them.
 const VIEW_METHODS: &[&str] = &[
     "get", "post", "put", "patch", "delete", "head", "options", "trace",
@@ -854,7 +1017,7 @@ impl ContractKind for Http {
                 if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
-                for (site, at, read) in code.expand(path, n, &fetch) {
+                for (site, at, read) in code.expand(path, n, &|args, _| fetch(args)) {
                     found.push(Found {
                         site: Site::Call {
                             path: site.into(),
@@ -895,6 +1058,7 @@ impl ContractKind for Http {
                 });
             }
         }
+        found.extend(clients(code));
         found.extend(express(code));
         found.extend(decorated(code));
         found.extend(django(code));

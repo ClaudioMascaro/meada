@@ -593,6 +593,9 @@ fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
     }
 }
 
+/// The keyword arguments of a call, as `(name, value)`.
+pub type Keywords = [(String, Value)];
+
 /// A call whose arguments bind the parameters of `def`, the function it reaches.
 #[derive(Clone, Copy)]
 struct Frame<'a> {
@@ -792,10 +795,19 @@ impl<'a> Code<'a> {
         out: &mut BTreeSet<(&'a str, usize)>,
     ) {
         let work = &mut Work::default();
-        match self
+        let binding = self
             .resolver
-            .resolve(path, scope, name, &mut Seen::new(), work)
-        {
+            .resolve(path, scope, name, &mut Seen::new(), work);
+        // An attribute assigned a call once in its class (`self.client = Client()`) is a
+        // constant of the class.
+        let binding = match binding {
+            Binding::Local(at, scope, name) => {
+                let constant = self.resolver.consts[at].get(crate::qualify(scope, name).as_str());
+                constant.map_or(binding, |&constant| Binding::Const(at, constant))
+            }
+            binding => binding,
+        };
+        match binding {
             Binding::Const(at, constant) => {
                 let found = self
                     .full(at)
@@ -920,19 +932,20 @@ impl<'a> Code<'a> {
         self.resolver.module(path, specifier)
     }
 
-    /// What `read` makes of the arguments of the call at `index` of `path`, at each call site
-    /// that determines them. `read` answers `None` when what it needs holds a `Ref`: a
-    /// parameter of the enclosing function, which makes that function a client wrapper. Each
-    /// call site of the wrapper is then read with its own arguments substituted, through any
-    /// number of wrapper levels. A wrapper reached again through its own callers (a cycle)
-    /// adds nothing; a wrapper nobody calls is read where it stands, its parameters unknown.
+    /// What `read` makes of the positional and keyword arguments of the call at `index` of
+    /// `path`, at each call site that determines them. `read` answers `None` when what it
+    /// needs holds a `Ref`: a parameter of the enclosing function, which makes that function a
+    /// client wrapper. Each call site of the wrapper is then read with its own arguments
+    /// substituted, through any number of wrapper levels. A wrapper reached again through its
+    /// own callers (a cycle) adds nothing; a wrapper nobody calls is read where it stands, its
+    /// parameters unknown.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
         &self,
         path: &'a str,
         index: usize,
-        read: &dyn Fn(&[Value]) -> Option<R>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<(&'a str, usize, R)> {
         let mut out = Vec::new();
         self.walk(path, index, &mut Vec::new(), read, &mut out);
@@ -944,20 +957,27 @@ impl<'a> Code<'a> {
         path: &'a str,
         index: usize,
         frames: &mut Vec<Frame<'a>>,
-        read: &dyn Fn(&[Value]) -> Option<R>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<(&'a str, usize, R)>,
     ) {
-        let call = self.resolver.files[path].calls.get(index);
-        let (Some(call), Some(args)) = (call, self.args(path, index)) else {
+        // The full call: the resolver's files may be kept from the index, without values.
+        let Some(call) = self.call(path, index) else {
             return;
         };
         let mut wants = None;
-        let values: Vec<Value> = args
+        let values: Vec<Value> = call
+            .args
             .iter()
             .map(|a| self.eval(path, &call.scope, a, frames, 0, &mut Vec::new(), &mut wants))
             .collect();
+        let kwargs: Vec<(String, Value)> = (call.kwargs.iter())
+            .map(|(k, v)| {
+                let v = self.eval(path, &call.scope, v, frames, 0, &mut Vec::new(), &mut wants);
+                (k.clone(), v)
+            })
+            .collect();
         let (site, at) = frames.last().map_or((path, index), |f| (f.path, f.index));
-        if let Some(found) = read(&values) {
+        if let Some(found) = read(&values, &kwargs) {
             out.push((site, at, found));
             return;
         }
@@ -971,7 +991,9 @@ impl<'a> Code<'a> {
         let callers = callers.map_or(&[][..], Vec::as_slice);
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
-            out.extend(read(&values).map(|found| (site, at, found)));
+            let kwargs: Vec<(String, Value)> =
+                kwargs.into_iter().map(|(k, v)| (k, unbind(v))).collect();
+            out.extend(read(&values, &kwargs).map(|found| (site, at, found)));
             return;
         }
         for &(caller, n) in callers {

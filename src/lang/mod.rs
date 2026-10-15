@@ -280,7 +280,7 @@ pub enum Value {
     Unknown,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Part {
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.

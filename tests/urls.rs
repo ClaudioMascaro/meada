@@ -166,9 +166,13 @@ fn a_route_of_every_method_links_a_consumer_of_any_method() {
     let up = engine.trace(Start::From("POST /health"), Direction::Up, None);
     assert_golden("http-any-client.trace-up.txt", &up.unwrap());
     let items = engine.open_items().unwrap();
-    let candidates: Vec<&str> = (items.iter().flat_map(|i| &i.candidates))
-        .map(|c| c.contract.as_str())
-        .collect();
+    // The peer's own unresolved calls are items too: only the client's are read here.
+    let candidates: Vec<&str> = (items
+        .iter()
+        .filter(|i| i.repository == "example.com/acme/client"))
+    .flat_map(|i| &i.candidates)
+    .map(|c| c.contract.as_str())
+    .collect();
     assert_eq!(
         candidates,
         [

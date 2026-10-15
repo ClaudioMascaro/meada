@@ -170,7 +170,9 @@ give byte-identical output.
   binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
   `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
   and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
-  also a `Const` holding that value. `xs += ...` and `xs = xs + ...` on a name whose latest
+  also a `Const` holding that value; so is the name of `with C(...) as x` (also
+  `Class::Named("C")`, as `x = C(...)` is) and a `self.x = C(...)` attribute (a `Const` of the
+  class, only for a call). `xs += ...` and `xs = xs + ...` on a name whose latest
   value in that scope is a list literal do not bind it again: a list literal added joins the
   `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
   as `Value`s (strings and f-strings folded into parts, `[...]`/`(...)` a `Value::List`, a call
@@ -208,11 +210,14 @@ give byte-identical output.
   a destructured object parameter reading its names (`Param::fields`) off the literal object the
   caller passes. An argument binds a parameter by position or by the parameter's name among the
   keyword arguments, and a method called on an instance (`x.m(a)`, whose first parameter is a
-  receiver local) passes nothing for the receiver. `Code::origins(path, scope, name)` (and
+  receiver local) passes nothing for the receiver. `Code::expand(path, index, read)` hands
+  `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
+  with them. `Code::origins(path, scope, name)` (and
   `value_origins` for a value as written) is the shared value flow: the call sites whose result
   a name may hold, followed through constants, imports and module attributes, the arguments
   every caller passes to a parameter, the values a function of the repository returns (its
-  parameters then bound by that call only) and the items of a list or tuple; a call that
+  parameters then bound by that call only) and the items of a list or tuple; an attribute
+  assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
   reaches no function of the repository is the origin. A constant, parameter or function met
   again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
   import from outside the repository binds a callee to (`fastapi.APIRouter`,
@@ -222,8 +227,8 @@ give byte-identical output.
   import specifier (`shop.orders.urls`) to its file.
 - `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
   `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`; only in a pack whose `globals` has it), Next.js app-router, Express, FastAPI, Flask
-  and Django providers, `normalize_path`, and the link rules (host,
+  `fetch`; only in a pack whose `globals` has it), Python client consumers (`clients`, below),
+  Next.js app-router, Express, FastAPI, Flask and Django providers, `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
   (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
   on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
@@ -255,7 +260,18 @@ give byte-identical output.
   `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
   `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
   `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
-  the provider's site. `resource.rs` (spec
+  the provider's site. Python clients (`clients`, from `LIBRARIES`: `requests`, `httpx`,
+  `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
+  library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
+  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
+  to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
+  `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
+  attribute, or a parameter the callers pass one to. A `get` on any other object is nothing.
+  `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
+  front of a relative URL (an absolute one, or one starting with a hole, is left alone);
+  different constructors with different bases make the base a hole. URL and method fold like
+  any `Value` (`str.format` and `%` do not), and `Code::expand` follows a function whose URL
+  or method depends on its parameters, so each of its call sites is a consumer. `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -409,7 +425,7 @@ Each is marked `ponytail:` at its site unless noted.
   assumed.
 - `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
   a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
-  more than once, or an attribute); a nested or rest pattern in a destructured parameter binds nothing, and a
+  more than once, or an attribute not assigned a call once in its class); a nested or rest pattern in a destructured parameter binds nothing, and a
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
@@ -428,7 +444,11 @@ Each is marked `ponytail:` at its site unless noted.
   `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
   handler method a class-based view inherits and `as_view()` on a class outside the repository
   yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
-  backslashes yields nothing.
+  backslashes yields nothing. Python clients: a receiver that is the result of a call
+  (`Session().get(...)`, `make().get(...)`) or an attribute set from anything but a call
+  (`self.http = http`) is not read; a parameter given a client takes the base of every caller
+  that passes one, and several different bases make it a hole; a parameter's default is not
+  read.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
