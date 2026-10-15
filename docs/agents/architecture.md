@@ -334,7 +334,10 @@ give byte-identical output.
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). `declare` first adds the routes of the repository's
+  `base_url_env`, unique provider). An Express route path or mount prefix with a part that cannot
+  be read (a template-literal hole, a parameter, an environment read) adds no route: a router
+  mounted only under such a prefix is served under no prefix, never at the root; a literal `:id`
+  stays a parameter. `declare` first adds the routes of the repository's
   documents (spec #21): a document route whose contract a code provider already has merges
   into it (one provider, the code's handler site); any other becomes a provider of its own at
   `<repository>::<document path>::<METHOD> <path>` (no handler), and a route an earlier
