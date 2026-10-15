@@ -46,6 +46,17 @@ pub enum Msg<'a> {
         line: usize,
         error: &'a str,
     },
+    /// A document that counts: its format and version, and how many routes it lists.
+    DocumentRead {
+        path: &'a str,
+        format: &'a str,
+        version: &'a str,
+        routes: usize,
+    },
+    /// A path `[serve] documents` lists that is not a file.
+    DocumentMissing {
+        path: &'a str,
+    },
     /// `found` is the format field and version the document has, such as `swagger 2.0`.
     DocumentFormat {
         path: &'a str,
@@ -57,15 +68,11 @@ pub enum Msg<'a> {
         first: &'a str,
     },
     KeyMissing(&'a str),
-    KeyLater {
-        key: &'a str,
-        release: &'a str,
-    },
+    NotInRepository(&'a str),
     KeyUnknown {
         key: &'a str,
         file: &'a str,
     },
-    TrackA,
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
@@ -200,6 +207,19 @@ impl Msg<'_> {
                 format!("{path}:{line}: unreadable document ({error}), ignored"),
                 format!("{path}:{line}: documento ilegível ({error}), ignorado"),
             ),
+            Msg::DocumentRead {
+                path,
+                format,
+                version,
+                routes,
+            } => pick(
+                format!("{path}: {format} {version}, routes: {routes}"),
+                format!("{path}: {format} {version}, rotas: {routes}"),
+            ),
+            Msg::DocumentMissing { path } => pick(
+                format!("{path}: listed in `serve.documents`, not found"),
+                format!("{path}: listado em `serve.documents`, não encontrado"),
+            ),
             Msg::DocumentFormat { path, found } => pick(
                 format!(
                     "{path}: not OpenAPI 3.0 or 3.1 ({}), ignored",
@@ -215,17 +235,13 @@ impl Msg<'_> {
                 format!("{route} em {path} também está em {first}: uma rota só"),
             ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
-            Msg::KeyLater { key, release } => pick(
-                format!("`{key}` is not in v0.1; {release}"),
-                format!("`{key}` não existe na v0.1; {release}"),
+            Msg::NotInRepository(path) => pick(
+                format!("`{path}` is not a path inside the repository"),
+                format!("`{path}` não é um caminho dentro do repositório"),
             ),
             Msg::KeyUnknown { key, file } => pick(
                 format!("`{key}` is not a {file} key"),
                 format!("`{key}` não é uma chave do {file}"),
-            ),
-            Msg::TrackA => pick(
-                "track A adds it (OpenAPI and AsyncAPI documents)".into(),
-                "a trilha A a adiciona (documentos OpenAPI e AsyncAPI)".into(),
             ),
             Msg::NotLowercase(value) => pick(
                 format!(

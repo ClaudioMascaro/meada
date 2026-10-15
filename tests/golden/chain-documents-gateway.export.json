@@ -379,6 +379,14 @@
       "site": "example.com/chain/gateway::src/orders.ts::cancelOrder"
     },
     {
+      "contract": "http::GET::/api/carriers",
+      "site": "example.com/chain/gateway::docs/api-contract.yaml::GET /api/carriers"
+    },
+    {
+      "contract": "http::GET::/api/generated",
+      "site": "example.com/chain/gateway::generated/openapi.yaml::GET /api/generated"
+    },
+    {
       "contract": "http::GET::/api/health",
       "site": "example.com/chain/gateway::src/server.ts::GET /api/health"
     },
@@ -416,6 +424,22 @@
     }
   ],
   "documents": [
+    {
+      "path": "docs/api-contract.yaml",
+      "format": "openapi",
+      "version": "3.0.3",
+      "contracts": [
+        "http::GET::/api/carriers"
+      ]
+    },
+    {
+      "path": "generated/openapi.yaml",
+      "format": "openapi",
+      "version": "3.1.0",
+      "contracts": [
+        "http::GET::/api/generated"
+      ]
+    },
     {
       "path": "openapi.yaml",
       "format": "openapi",

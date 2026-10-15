@@ -409,10 +409,30 @@ fn edit_documents(gateway: &Path) {
     fs::remove_file(gateway.join("broken.openapi.yaml")).unwrap();
 }
 
+/// Writes the listed path that did not exist, and takes the gitignored document and the
+/// oddly named one off the list.
+fn edit_listed_documents(gateway: &Path) {
+    fs::write(
+        gateway.join("docs/missing.yaml"),
+        "openapi: 3.0.3\npaths:\n  /api/returns:\n    post: {}\n",
+    )
+    .unwrap();
+    let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
+    let toml = toml.replace(
+        "\"generated/openapi.yaml\", \"docs/api-contract.yaml\", ",
+        "",
+    );
+    fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
 /// Drops the gateway's `[serve]` table: its documents stop counting.
 fn drop_serve(gateway: &Path) {
     let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
-    let toml = toml.replace("[serve]\nhosts = [\"gateway.example.com\"]\n", "");
+    let serve = ["[serve]", "hosts = ", "documents = "];
+    let kept = toml
+        .lines()
+        .filter(|l| !serve.iter().any(|k| l.starts_with(k)));
+    let toml = kept.map(|l| format!("{l}\n")).collect::<String>();
     fs::write(gateway.join("meada.toml"), toml).unwrap();
 }
 
@@ -426,6 +446,7 @@ fn edited_documents_relink_like_a_cold_chain() {
     };
     for (case, edit) in [
         ("fresh_documents", edit_documents as fn(&Path)),
+        ("fresh_documents_listed", edit_listed_documents),
         ("fresh_documents_serve", drop_serve),
     ] {
         let (web, gateway, _) = documented_chain(case);
