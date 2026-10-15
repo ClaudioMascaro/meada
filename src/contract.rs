@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::channel::Channel;
 use crate::http::Http;
-use crate::index::{Consumer, Export, Provider};
+use crate::index::{Binding, Consumer, Export, Provider};
 use crate::resolve::Code;
 use crate::resource::Resource;
 use crate::workspace::Repository;
@@ -78,9 +78,11 @@ pub struct Found {
     pub site: Site,
     /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
     pub contract: Option<String>,
-    /// How a consumer names the provider's repository, such as `host:api.example.com`.
+    /// How a consumer names the provider's repository, such as `host:api.example.com`; for a
+    /// binding, the exchange.
     pub via: Option<String>,
-    /// For an unresolved consumer, the method it calls with when Meada could read it.
+    /// For an unresolved consumer, the method it calls with when Meada could read it; for a
+    /// binding, the pattern.
     pub method: Option<String>,
     /// For an unresolved consumer, the literal fragments of its URL path Meada could
     /// evaluate, in order.
@@ -92,6 +94,9 @@ pub struct Found {
 pub enum Role {
     Provider,
     Consumer,
+    /// Neither side: a RabbitMQ binding of a queue (`contract`) to an exchange (`via`) by a
+    /// pattern (`method`), which routes a publish to the queue (spec #20).
+    Binding,
 }
 
 impl Role {
@@ -100,6 +105,7 @@ impl Role {
         match self {
             Role::Provider => "provider",
             Role::Consumer => "consumer",
+            Role::Binding => "binding",
         }
     }
 }
@@ -144,6 +150,7 @@ pub trait ContractKind {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
+        bindings: &[&Binding],
     ) -> Vec<Link>;
 }
 

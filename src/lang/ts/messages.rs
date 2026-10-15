@@ -14,6 +14,14 @@ const AWS_SQS: &str = "@aws-sdk/client-sqs";
 const SQS_CONSUMER: &str = "sqs-consumer";
 const NATS: &str = "nats";
 const NATS_CONNECTION: &str = "connect()";
+const AMQPLIB: &str = "amqplib";
+/// What a channel of amqplib is, from the default import, a namespace or a named `connect`.
+const AMQP_CHANNELS: [&str; 4] = [
+    "default.connect().createChannel()",
+    "default.connect().createConfirmChannel()",
+    "connect().createChannel()",
+    "connect().createConfirmChannel()",
+];
 
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
@@ -29,7 +37,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let (receiver, method) = (call.callee.rsplit_once('.')).unwrap_or(("", &call.callee));
             // A library form is a method of a client, or a class or function called itself.
             let chain = match method {
-                "send" | "subscribe" | "run" | "publish" if !receiver.is_empty() => receiver,
+                "send" | "subscribe" | "run" | "publish" | "sendToQueue" | "consume"
+                | "bindQueue"
+                    if !receiver.is_empty() =>
+                {
+                    receiver
+                }
                 "SendMessageCommand" | "ReceiveMessageCommand" | "create" => &call.callee,
                 _ => continue,
             };
@@ -98,6 +111,49 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     let handler = handler(code, path, n, 1, &["callback"]);
                     out.extend(consume("nats", &|a| subject(a), handler));
                 }
+                (AMQPLIB, expr, "sendToQueue") if AMQP_CHANNELS.contains(&expr) => {
+                    out.extend(produce("amqp", &|a| Some(vec![arg_name(a, 0)?])));
+                }
+                (AMQPLIB, expr, "consume") if AMQP_CHANNELS.contains(&expr) => {
+                    let handler = function_arg(code, path, n, 1);
+                    out.extend(consume("amqp", &|a| Some(vec![arg_name(a, 0)?]), handler));
+                }
+                (AMQPLIB, expr, "publish") if AMQP_CHANNELS.contains(&expr) => {
+                    let read = |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?));
+                    for (site, at, (exchange, key)) in code.expand(path, n, &read) {
+                        // The empty exchange is the queue named by the key; one that cannot
+                        // be evaluated leaves the producer unresolved.
+                        let (name, role) = match exchange {
+                            Some(e) if e.is_empty() => (key, Role::Producer),
+                            Some(exchange) => (key, Role::Publish { exchange }),
+                            None => (None, Role::Producer),
+                        };
+                        let (path, call) = (site.into(), at);
+                        out.push(Message {
+                            broker: "amqp",
+                            name,
+                            path,
+                            call,
+                            role,
+                        });
+                    }
+                }
+                (AMQPLIB, expr, "bindQueue") if AMQP_CHANNELS.contains(&expr) => {
+                    let read =
+                        |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?, arg_name(a, 2)?));
+                    for (site, at, bound) in code.expand(path, n, &read) {
+                        // A binding that cannot be fully evaluated is dropped.
+                        if let (Some(queue), Some(exchange), Some(pattern)) = bound {
+                            out.push(Message {
+                                broker: "amqp",
+                                name: Some(queue),
+                                path: site.into(),
+                                call: at,
+                                role: Role::Binding { exchange, pattern },
+                            });
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -145,7 +201,23 @@ fn handler<'a>(
     let handler = keys
         .iter()
         .find_map(|key| property(options, key).ok().flatten())?;
-    match handler {
+    function(code, path, scope, handler)
+}
+
+/// The handler argument `arg` of the call is: a function written in place or a definition of
+/// the repository.
+fn function_arg<'a>(code: &Code<'a>, path: &'a str, n: usize, arg: usize) -> Option<Handler> {
+    let scope = &code.files()[path].calls[n].scope;
+    function(code, path, scope, code.args(path, n)?.get(arg)?)
+}
+
+fn function<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    value: &'a Value,
+) -> Option<Handler> {
+    match value {
         Value::Function(def) => Some(Handler::Inline {
             path: path.into(),
             def: def.clone(),
@@ -218,4 +290,10 @@ fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
         _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
         _ => Some(vec![None]),
     }
+}
+
+/// The queue, exchange, routing key or pattern argument `at` of an amqplib call: `None` when it
+/// depends on a parameter, `Some(None)` when it is not a literal string.
+fn arg_name(args: &[Value], at: usize) -> Option<Option<String>> {
+    args.get(at).map_or(Some(None), name)
 }

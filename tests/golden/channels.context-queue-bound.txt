@@ -1,0 +1,3 @@
+channel::amqp::audit
+  example.com/channels/worker consumer src/queues.ts:27 onAudit
+  example.com/channels/worker binding events order.created src/queues.ts:8 bind

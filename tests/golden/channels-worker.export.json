@@ -8,6 +8,10 @@
     {
       "path": "src/pattern.ts",
       "hash": "42b85bb60cca655c085ccb9630f510e31ad3ec6c127d29ea18a6b1403c30cc8d"
+    },
+    {
+      "path": "src/queues.ts",
+      "hash": "76a8145b62d0df45d6cfee9d7a2eebab0ac3e36e00159619f4157f83f931cf5a"
     }
   ],
   "symbols": [
@@ -41,6 +45,54 @@
         "path": "src/pattern.ts",
         "start": 247,
         "end": 376
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::bind",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 219,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::onAudit",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 697,
+        "end": 753
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::onJob",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 641,
+        "end": 695
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::onOrder",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 583,
+        "end": 639
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::onShipment",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 755,
+        "end": 814
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 379,
+        "end": 581
       }
     }
   ],
@@ -132,6 +184,94 @@
         "start": 286,
         "end": 328
       }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::amqp.connect#0",
+      "caller": "example.com/channels/worker::src/queues.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 54,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#0",
+      "caller": "example.com/channels/worker::src/queues.ts::bind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 251,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#1",
+      "caller": "example.com/channels/worker::src/queues.ts::bind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 314,
+        "end": 367
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::connection.createChannel#0",
+      "caller": "example.com/channels/worker::src/queues.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 110,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 411,
+        "end": 445
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#1",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 455,
+        "end": 485
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#2",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 495,
+        "end": 528
+      }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#3",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 538,
+        "end": 578
+      }
     }
   ],
   "providers": [],
@@ -145,6 +285,40 @@
       "contract": "channel::kafka",
       "site": "example.com/channels/worker::src/pattern.ts::seen",
       "via": null
+    },
+    {
+      "contract": "channel::amqp::audit",
+      "site": "example.com/channels/worker::src/queues.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::jobs",
+      "site": "example.com/channels/worker::src/queues.ts::onJob",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::orders",
+      "site": "example.com/channels/worker::src/queues.ts::onOrder",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::shipments",
+      "site": "example.com/channels/worker::src/queues.ts::onShipment",
+      "via": null
+    }
+  ],
+  "bindings": [
+    {
+      "contract": "channel::amqp::audit",
+      "exchange": "events",
+      "pattern": "order.created",
+      "site": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#0"
+    },
+    {
+      "contract": "channel::amqp::shipments",
+      "exchange": "events",
+      "pattern": "*.shipped",
+      "site": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#1"
     }
   ],
   "links": [
@@ -154,6 +328,34 @@
       "contract": "channel::kafka::orders.created",
       "level": "exact",
       "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onAudit",
+      "provider": "example.com/channels/api::src/amqp.ts::announce::channel.publish#0",
+      "contract": "channel::amqp::audit",
+      "level": "exact",
+      "reason": "channel::amqp::audit binding events order.created"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onJob",
+      "provider": "example.com/channels/api::src/amqp.ts::dispatch::channel.publish#0",
+      "contract": "channel::amqp::jobs",
+      "level": "exact",
+      "reason": "channel::amqp::jobs"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onOrder",
+      "provider": "example.com/channels/api::src/amqp.ts::queueOrder::channel.sendToQueue#0",
+      "contract": "channel::amqp::orders",
+      "level": "exact",
+      "reason": "channel::amqp::orders"
+    },
+    {
+      "consumer": "example.com/channels/worker::src/queues.ts::onShipment",
+      "provider": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1",
+      "contract": "channel::amqp::shipments",
+      "level": "inferred",
+      "reason": "channel::amqp::shipments binding events *.shipped"
     }
   ]
 }
