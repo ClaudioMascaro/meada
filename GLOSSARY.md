@@ -78,7 +78,7 @@ _Avoid_: contract type, protocol
 The rewrite a gateway applies to the paths of a repository, declared in `[serve]`: `prefix` is
 added in front, `strip` is removed from the start. A route is also matched by its gateway path
 (the prefix followed by its code path without the stripped part); a link made that way is
-inferred and its reason names the rewrite.
+inferred and its reason names the rewrite. Within one repository a code path match wins.
 _Avoid_: base path, path rewrite
 
 **Resource**:
@@ -86,13 +86,23 @@ A shared thing that repositories read or write, such as a database, a bucket or 
 dataset, declared in `meada.toml`.
 _Avoid_: datastore
 
+**Writer** and **reader**:
+The sides of a resource: what writes it (a provider of its contract) and what reads it (a
+consumer). Each is a `via` symbol of the entry, or the repository as a whole.
+_Avoid_: producer, subscriber
+
+**Repository-level**:
+A resource side that is the repository as a whole, because its entry names no `via` symbol the
+repository has. It shows as `(repository-level)` and a trace does not enter it.
+_Avoid_: global, whole-repo
+
 **Link**:
 A connection Meada makes between a consumer and a provider through a contract. It carries a
 level and a reason.
 _Avoid_: edge, bridge, connection
 
 **Level**:
-How well a link is established: exact, inferred, declared, decided or ambiguous. It is a name,
+How well a link is established: exact, declared, inferred, decided or ambiguous. It is a name,
 not a score.
 _Avoid_: confidence, score, weight
 

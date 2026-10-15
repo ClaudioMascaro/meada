@@ -52,7 +52,8 @@ pub struct Serve {
 impl Serve {
     /// The path a gateway serves a route at, with the reason: `prefix` followed by the route's
     /// `code_path` without `strip` (only when it starts with `strip`, whole segments). `None`
-    /// when no rewrite applies. Routes of code and of documents (spec #21) both use this rule.
+    /// when no rewrite applies. Code routes use it; it is written for the document routes of
+    /// spec #21 (A4) to reuse.
     pub fn gateway_path(&self, code_path: &str) -> Option<(String, String)> {
         let prefix = self.prefix.as_deref().filter(|p| !p.is_empty());
         let strip = self.strip.as_deref().filter(|s| !s.is_empty());
