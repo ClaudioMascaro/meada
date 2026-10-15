@@ -21,7 +21,7 @@ use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA` or to the facts a pack stores: an index with another
 /// version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -700,7 +700,9 @@ impl Serialize for Document {
             path: &self.path,
             format: &self.summary.format,
             version: &self.summary.version,
-            contracts: self.summary.routes.iter().map(|r| r.contract()).collect(),
+            contracts: (self.summary.routes.iter().map(|r| r.contract()))
+                .chain(self.summary.channels.iter().map(|s| s.contract()))
+                .collect(),
         }
         .serialize(s)
     }
@@ -748,8 +750,8 @@ pub(crate) struct CallSite {
 }
 
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
-/// that produces to a channel, or a route only a document lists
-/// (`<repository>::<document>::<METHOD> <path>`).
+/// that produces to a channel, or a route or channel side only a document lists
+/// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
 #[derive(Serialize, Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
@@ -757,7 +759,7 @@ pub(crate) struct Provider {
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
-    /// What the route's response carries, from the first document by path that lists it.
+    /// What the route's response or the channel's messages carry, from the first document by path.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     /// Every path a gateway serves the route at, with the reason for the rewrite: the
@@ -799,6 +801,10 @@ pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,
     pub(crate) via: Option<String>,
+    /// What the messages a channel handler receives carry, from the first document by path
+    /// that lists the side (`Channel::declare`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) shape: Option<Shape>,
     #[serde(skip)]
     pub(crate) method: Option<String>,
     #[serde(skip)]
@@ -884,6 +890,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
+                shape: None,
                 method: r.get(3)?,
                 // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
                 fragments: fragments

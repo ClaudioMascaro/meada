@@ -65,6 +65,7 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         title: doc.pointer("/info/title").and_then(text),
         routes,
         servers: servers(doc),
+        channels: Vec::new(),
         problems: (external.into_iter())
             .map(|reference| Problem::ExternalRef { reference })
             .collect(),
@@ -95,7 +96,7 @@ fn response<'a>(doc: &'a Value, operation: &'a Value) -> Option<&'a Value> {
 
 /// `value`, or the object its local `$ref` points to, through a few references; `None` for an
 /// external or missing one.
-fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Value> {
+pub(super) fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Value> {
     for _ in 0..8 {
         let Some(reference) = value.get("$ref").and_then(Value::as_str) else {
             return Some(value);
@@ -149,7 +150,7 @@ fn servers(doc: &Value) -> Vec<Server> {
 }
 
 /// A string, or a number as written in JSON (`openapi: 3.0` in YAML is a number).
-fn text(value: &Value) -> Option<String> {
+pub(super) fn text(value: &Value) -> Option<String> {
     match value {
         Value::String(s) => Some(s.clone()),
         Value::Number(n) => Some(n.to_string()),

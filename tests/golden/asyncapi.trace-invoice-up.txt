@@ -1,0 +1,3 @@
+example.com/asyncapi/services src/queues.ts:11 onInvoice
+  →[exact: channel::amqp::invoices.issued] example.com/asyncapi/events billing.asyncapi.yaml amqp send invoices.issued (documented only)
+chain: exact · 1 hops · 2 repos · 61 tokens

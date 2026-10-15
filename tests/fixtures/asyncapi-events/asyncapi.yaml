@@ -1,0 +1,55 @@
+asyncapi: 2.6.0
+info:
+  title: Order events
+  version: 1.0.0
+servers:
+  production:
+    url: kafka.example.com:9092
+    protocol: kafka-secure
+channels:
+  # `subscribe`: the service sends these messages. No code of this repository does.
+  orders.created:
+    subscribe:
+      message:
+        payload:
+          type: object
+          properties:
+            id: {type: string}
+            total: {type: number}
+            customer:
+              type: object
+              properties:
+                email: {type: string}
+  # The service sends these from code too (`src/emit.ts`): the two sides are one.
+  orders.updated:
+    subscribe:
+      message:
+        $ref: "#/components/messages/OrderUpdated"
+  # `publish`: the service receives these messages. No code of this repository does.
+  payments.requested:
+    publish:
+      message:
+        oneOf:
+          - payload:
+              type: object
+              properties:
+                orderId: {type: string}
+                amount: {type: number}
+          - payload:
+              type: object
+              properties:
+                orderId: {type: string}
+                currency: {type: string}
+  # Parameters are not read.
+  "orders.{region}.created":
+    subscribe:
+      message:
+        payload: {type: object}
+components:
+  messages:
+    OrderUpdated:
+      payload:
+        type: object
+        properties:
+          id: {type: string}
+          status: {type: string}

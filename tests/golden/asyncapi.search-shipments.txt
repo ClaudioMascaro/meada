@@ -1,0 +1,4 @@
+example.com/asyncapi/events src/emit.ts:20 channel::amqp::shipments.cancelled
+example.com/asyncapi/services src/queues.ts:20 channel::amqp::shipments.cancelled
+example.com/asyncapi/events billing.asyncapi.yaml (documented only) channel::amqp::shipments.requested
+example.com/asyncapi/services src/queues.ts:16 channel::amqp::shipments.requested

@@ -9,7 +9,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Binding, Consumer, Provider};
+use crate::document;
+use crate::index::{Binding, Consumer, Export, Provider};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -150,6 +151,62 @@ impl ContractKind for Channel {
                 }
             })
             .collect()
+    }
+
+    /// Adds the channel sides of the repository's AsyncAPI documents (spec #21). A document side
+    /// with the contract of a code side of the same direction merges into it: the code keeps the
+    /// handler or the producing call, and takes the document's payload shape. Any other is a side
+    /// of its own, without a handler, at `<repository>::<document>::<broker> send|receive
+    /// <name>`; a side an earlier document (by path) already lists adds nothing. It runs after
+    /// `Http::declare`, which sets every provider's shape to what its route documents.
+    fn declare(&self, _repo: &Repository, export: &mut Export) {
+        for doc in &export.documents {
+            for side in &doc.summary.channels {
+                let contract = side.contract();
+                let site = format!("{}::{}::{}", export.repository, doc.path, side.label());
+                match side.role {
+                    document::Role::Producer => {
+                        let same = |p: &&mut Provider| p.contract == contract;
+                        let mut found = false;
+                        for p in export.providers.iter_mut().filter(same) {
+                            found = true;
+                            p.shape = p.shape.take().or_else(|| side.shape.clone());
+                        }
+                        if !found {
+                            export.providers.push(Provider {
+                                contract,
+                                site,
+                                shape: side.shape.clone(),
+                                ..Provider::default()
+                            });
+                        }
+                    }
+                    document::Role::Consumer => {
+                        let same = |c: &&mut Consumer| c.contract.as_ref() == Some(&contract);
+                        let mut found = false;
+                        for c in export.consumers.iter_mut().filter(same) {
+                            found = true;
+                            c.shape = c.shape.take().or_else(|| side.shape.clone());
+                        }
+                        if !found {
+                            export.consumers.push(Consumer {
+                                contract: Some(contract),
+                                site,
+                                via: None,
+                                shape: side.shape.clone(),
+                                method: None,
+                                fragments: Vec::new(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        // The index's orders.
+        let providers = &mut export.providers;
+        providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+        let key = |c: &Consumer| (c.site.clone(), c.contract.clone(), c.via.clone());
+        export.consumers.sort_by_key(key);
     }
 
     /// The consumer links to every producer of its channel, in any repository: at `exact` when

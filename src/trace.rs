@@ -94,9 +94,11 @@ impl<'a> Graph<'a> {
             graph
                 .providers
                 .extend(provided.map(|p| (p.contract.as_str(), p.site.as_str())));
-            for p in &export.providers {
-                if let Some(doc) = export.document_of(&p.site) {
-                    graph.documented.insert(&p.site, doc);
+            let sites = (export.providers.iter().map(|p| &p.site))
+                .chain(export.consumers.iter().map(|c| &c.site));
+            for site in sites {
+                if let Some(doc) = export.document_of(site) {
+                    graph.documented.insert(site, doc);
                 }
             }
             let produced = export.providers.iter();

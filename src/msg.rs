@@ -46,12 +46,14 @@ pub enum Msg<'a> {
         line: usize,
         error: &'a str,
     },
-    /// A document that counts: its format and version, and how many routes it lists.
+    /// A document that counts: its format and version, and how many routes (OpenAPI) or
+    /// channel sides (AsyncAPI) it lists.
     DocumentRead {
         path: &'a str,
         format: &'a str,
         version: &'a str,
         routes: usize,
+        channels: usize,
     },
     /// A path `[serve] documents` lists that is not a file.
     DocumentMissing {
@@ -61,6 +63,21 @@ pub enum Msg<'a> {
     DocumentFormat {
         path: &'a str,
         found: Option<&'a str>,
+    },
+    /// `found` is the format field and version the document has, such as `asyncapi 1.2.0`.
+    DocumentAsyncFormat {
+        path: &'a str,
+        found: Option<&'a str>,
+    },
+    /// A channel on a server with this protocol, which has no broker kind: ignored.
+    DocumentProtocol {
+        path: &'a str,
+        protocol: &'a str,
+    },
+    /// A channel name with parameters: ignored.
+    DocumentParameters {
+        path: &'a str,
+        channel: &'a str,
     },
     DuplicateRoute {
         route: &'a str,
@@ -216,10 +233,17 @@ impl Msg<'_> {
                 format,
                 version,
                 routes,
-            } => pick(
-                format!("{path}: {format} {version}, routes: {routes}"),
-                format!("{path}: {format} {version}, rotas: {routes}"),
-            ),
+                channels,
+            } => match *format {
+                "asyncapi" => pick(
+                    format!("{path}: {format} {version}, channels: {channels}"),
+                    format!("{path}: {format} {version}, canais: {channels}"),
+                ),
+                _ => pick(
+                    format!("{path}: {format} {version}, routes: {routes}"),
+                    format!("{path}: {format} {version}, rotas: {routes}"),
+                ),
+            },
             Msg::DocumentMissing { path } => pick(
                 format!("{path}: listed in `serve.documents`, not found"),
                 format!("{path}: listado em `serve.documents`, não encontrado"),
@@ -233,6 +257,24 @@ impl Msg<'_> {
                     "{path}: não é OpenAPI 3.0 nem 3.1 ({}), ignorado",
                     found.unwrap_or("sem o campo `openapi`")
                 ),
+            ),
+            Msg::DocumentAsyncFormat { path, found } => pick(
+                format!(
+                    "{path}: not AsyncAPI 2.x or 3.0 ({}), ignored",
+                    found.unwrap_or("no `asyncapi` field")
+                ),
+                format!(
+                    "{path}: não é AsyncAPI 2.x nem 3.0 ({}), ignorado",
+                    found.unwrap_or("sem o campo `asyncapi`")
+                ),
+            ),
+            Msg::DocumentProtocol { path, protocol } => pick(
+                format!("{path}: server protocol `{protocol}` has no broker kind, its channels are ignored"),
+                format!("{path}: o protocolo `{protocol}` do servidor não tem tipo de broker, seus canais são ignorados"),
+            ),
+            Msg::DocumentParameters { path, channel } => pick(
+                format!("{path}: channel `{channel}` has parameters, ignored"),
+                format!("{path}: o canal `{channel}` tem parâmetros, ignorado"),
             ),
             Msg::DuplicateRoute { route, path, first } => pick(
                 format!("{route} in {path} is also in {first}: one route"),

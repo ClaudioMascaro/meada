@@ -33,14 +33,18 @@ give byte-identical output.
   workspace, and `context` on a symbol adds `produces <channel>` (at the producing call) or
   `consumes <channel>` (the handler) to its `contracts:`; after a `provides <route>` line with
   a shape come `<repository> <document> response fields: <paths>` and, when some are open,
-  `<repository> <document> response open: <paths>` (`shape_lines`). `status` also prints, under each
+  `<repository> <document> response open: <paths>` (`shape_lines(identity, shape, what)`; a
+  channel side in `contract_sides` gets the same two lines with `payload` instead of `response`,
+  indented under its side, and a side only a document lists is
+  `<repository> <role> <document> (documented only)`). `status` also prints, under each
   repository, the lines `Engine::status_report` gathers (resource lines, then document lines
   from `document::report`; same indexed-only rule as decisions). `search` shows a route only a
   document lists at `<document path> (documented only)` (`Export::document_of`). `search` kind
   `document` (`search_documents`, an early branch like the open-item kinds) lists the documents
   read across the workspace, matched by path and `info.title` (exact, prefix, substring), as
-  `<repository> <path> (<Summary::shown()>) <title>`; `shown` is `openapi 3.1.0, routes: 3`, the
-  one place that gains the channel count.
+  `<repository> <path> (<Summary::shown()>) <title>`; `shown` is `openapi 3.1.0, routes: 3` or
+  `asyncapi 3.0.0, channels: 2` (the count follows the format, so OpenAPI lines never gain a
+  `channels: 0`).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -171,16 +175,23 @@ give byte-identical output.
   so `.gitignore` does not hide it; a listed path that is not a file has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order).
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
-  name: `openapi.{yaml,yml,json}` and `*.openapi.{yaml,yml,json}`), `read(path, bytes) ->
+  name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
+  `read(path, bytes) ->
   Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
-  becomes a `Problem`, with the line clamped to the file's last line), `Summary {format,
+  becomes a `Problem`, with the line clamped to the file's last line; a document with a top-level
+  `asyncapi` field, or named `asyncapi`, goes to `asyncapi.rs`, any other to `openapi.rs`: the
+  content decides, since a listed document can have any name), `Summary {format,
   version, title, routes: Vec<Route {path, method, shape}>, servers: Vec<Server {host, path}>,
-  problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
+  channels: Vec<Side {broker, name, role, shape}>, problems: Vec<Problem>}` (stored as JSON; `Route::contract`, `Route::label` = `GET
   /users/{}`; `servers` are the root `servers[].url` entries with variables replaced by their
   defaults, a URL still holding one dropped, a relative URL giving only its path, host lower
-  case, path normalized with no trailing `/`), `Problem::Unreadable {line, error}`,
-  `Problem::Format {found}` and `Problem::ExternalRef {reference}` (structured,
-  rendered through `Msg`), `Summary::shown()` (what `search` prints of a document read) and
+  case, path normalized with no trailing `/`; `Side::contract`, `Side::label` = `kafka send
+  orders.created`, `Role::{Producer, Consumer}`; sorted by broker kind, name, role),
+  `Problem::Unreadable {line, error}`,
+  `Problem::Format {found}`, `Problem::AsyncFormat {found}`, `Problem::Protocol {protocol}`,
+  `Problem::Parameters {channel}` and `Problem::ExternalRef {reference}` (structured,
+  rendered through `Msg`), `Summary::shown()` (what `search` prints of a document read),
+  `Summary::channel_count()` (distinct channels of the sides) and
   `report(repo, export)`: the status lines, per document in path order (`Msg::DocumentRead`
   for one read, each problem of it, then each route a later document by path lists again:
   `Msg::DuplicateRoute`), then `Msg::DocumentMissing` for each `[serve] documents` path with
@@ -202,7 +213,21 @@ give byte-identical output.
   reference already being read (a cycle), a missing target and an external reference leave
   that part open. Reading one shape visits at most 10,000 schemas; past that, every part not
   read is open. To read several schemas as one shape (AsyncAPI messages), read
-  `{"oneOf": [...]}` of them. `yaml.rs`: `parse(text) -> Result<Value,
+  `{"oneOf": [...]}` of them. `asyncapi.rs`: `read(path, value)`: a top-level `asyncapi` of `2.x`
+  or `3.0` (any patch), else `Problem::AsyncFormat` naming the `asyncapi`, `openapi` or `swagger`
+  field it found. 2.x: the key of a channel is its name, `subscribe` is a producer and `publish`
+  a consumer (the application's side, as the specification reads them), the payloads those of
+  `message` (or each member of its `oneOf`), a message a local `$ref`; the channel's `servers`
+  are server names. 3.0: the name is the channel's `address` (a channel with none is skipped),
+  `action: send` is a producer and `receive` a consumer, the payloads those of the operation's
+  `messages` when it lists them, else every message of its channel; the channel's `servers` are
+  `$ref`s to `#/servers/<name>`. A channel uses the servers it lists, else every server of the
+  document; the lower-cased `protocol` gives the broker kind (`kafka`, `kafka-secure` ->
+  `kafka`; `amqp`, `amqps` -> `amqp`; `nats`; `redis`; `sqs`), any other is a `Problem::Protocol`
+  once and its channels are ignored. A name holding `{` or `}` is a `Problem::Parameters` and
+  ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
+  operations, several servers of one kind) are one, their payloads read together as one
+  `oneOf` shape. `yaml.rs`: `parse(text) -> Result<Value,
   (line, reason)>` over `yaml-rust2`'s event parser (`MarkedEventReceiver`, never `YamlLoader`):
   first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
@@ -276,7 +301,8 @@ give byte-identical output.
   `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). `declare` first adds the routes of the repository's
   documents (spec #21): a document route whose contract a code provider already has merges
-  into it (one provider, the code's handler site); any other becomes a provider of its own at
+  into it (one provider, the code's handler site; it also sets `Provider::shape` to none for every
+  other contract, so `Channel::declare` must run after it, as `KINDS` orders them); any other becomes a provider of its own at
   `<repository>::<document path>::<METHOD> <path>` (no handler), and a route an earlier
   document by path listed adds nothing. Each provider of a documented contract, merged or not,
   takes `Provider::shape` from the first document by path that lists it (none when that
@@ -321,7 +347,17 @@ give byte-identical output.
   whose key `pattern_matches` (topic-exchange rules whatever the exchange type): `exact` when
   the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
   <pattern>`; of several matches to one producer the strongest wins. `ContractKind::link`
-  takes the workspace's bindings beside its providers.
+  takes the workspace's bindings beside its providers. `declare` adds the channel sides of the
+  repository's AsyncAPI documents (`Summary::channels`, in path order): a document side whose
+  contract equals a code side's of the same direction merges into it (every such code provider
+  or consumer keeps its site and takes the document's shape unless it has one), any other is a
+  side without a handler, a provider at `<repository>::<document>::<broker> send <name>` or a
+  consumer (`via` null) at `<repository>::<document>::<broker> receive <name>`; a side an
+  earlier document by path already added merges the same way, so adds nothing. Both carry
+  `shape` (`Consumer::shape` is new, exported when present). `link` is unchanged: the documented
+  sides are ordinary providers and consumers, so a documented producer reaches the code
+  consumers of other repositories at `exact`, and a code producer reaches the documented
+  consumer. It sorts `providers` and `consumers` into the index's order afterwards.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,
@@ -331,8 +367,10 @@ give byte-identical output.
   the walk one row for it under the producing call (down, and from a call start) or the handler symbol:
   `<repository> <path>:<line> produces|consumes channel::<broker> (unresolved)`, no level and no
   hop. A repository-level side (`Graph::is_repo`) prints as `<repository>
-  (repository-level)`, and a route only a document lists (`Graph::documented`, from
-  `Export::document_of`) as `<repository> <document> GET /x (documented only)`; both end their
+  (repository-level)`, and a route or channel side only a document lists (`Graph::documented`,
+  from `Export::document_of` over providers and consumers) as `<repository> <document> GET /x
+  (documented only)` or `<repository> <document> kafka send orders.created (documented only)`;
+  both end their
   branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its row, pushes
   them and enters anything else. Starts take
   only HTTP routes, symbols and call sites; a `resource::...` or `channel::...` start gets an
@@ -357,15 +395,19 @@ give byte-identical output.
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
 - Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
   document lists, such as `example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}`
-  (`Export::document_of` recognises it).
+  (`Export::document_of` recognises it). Document channel side: `<repository>::<document
+  path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
+  document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   links}`; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open}`, `open`
-  absent when empty) when a document gives its route one. `documents` (absent when none was read) lists each
-  document read, in path order, as `{path, format, version, contracts}` (contracts sorted);
+  absent when empty) when a document gives its route or channel side one; a consumer has the same
+  `shape` for a channel side a document lists. `documents` (absent when none was read) lists each
+  document read, in path order, as `{path, format, version, contracts}` (route and channel
+  contracts, sorted);
   ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
   resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
@@ -408,10 +450,11 @@ give byte-identical output.
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
 - New **document format or document data** (spec #21 tickets after #50): what is read from the
-  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` sees
+  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` and
+  `asyncapi.rs` sees
   only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
   through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
-  (HTTP: `Http::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
+  (HTTP: `Http::declare`; channels: `Channel::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
@@ -442,7 +485,8 @@ give byte-identical output.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
-  and methods, the field paths of their response shapes and the external references met, the
+  and methods, channel sides (broker kind, name, role), the field paths of their response and
+  payload shapes and the external references met, the
   hosts and base paths of the root `servers` URLs, and the parser's reason and line for a
   document it could not read). `Call::args`,
   `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
@@ -515,7 +559,15 @@ give byte-identical output.
   `additionalProperties: true`, a cycle and an external `$ref`, plus a later
   `v2.openapi.json` listing one route again: the export with every shape and `status` with
   the external reference; freshness of an edited document and of a dropped `[serve]` is in
-  `freshness`). Table tests for discovery, format detection, routes, response selection, the
+  `freshness`), `asyncapi` (AsyncAPI documents over `asyncapi-events`, a repository with a
+  `[serve]` table whose `asyncapi.yaml` (2.6, `kafka-secure`), `billing.asyncapi.yaml` (3.0,
+  `amqp`), `sensors.asyncapi.yml` (`mqtt`) and `legacy.asyncapi.json` (1.2) sit beside two
+  code sides that merge with a documented one, and `asyncapi-services`, which names it as a
+  peer and holds the code on the other side of each documented one: both exports with the
+  channel contracts, shapes and links, the merge of a documented and a code side, `status`
+  (protocol, parameterized channel, version), `trace` down to a documented consumer and up
+  from a handler to a documented producer, `context` on documented channels with their payload
+  fields, and `search` of channels and of documents). Table tests for discovery, format detection, routes, response selection, the
   schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`.
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
