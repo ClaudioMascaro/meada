@@ -1,0 +1,1 @@
+example.com/chain/gateway orders.openapi.json (openapi 3.0.3, routes: 1) Chain gateway orders

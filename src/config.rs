@@ -47,6 +47,10 @@ pub struct Serve {
     /// What a gateway removes from the start of every path this repository serves.
     #[serde(default, deserialize_with = "gateway_key")]
     pub strip: Option<String>,
+    /// Documents (spec #21) besides those found by file name, repository-relative. One that
+    /// `.gitignore` ignores is read all the same.
+    #[serde(default, deserialize_with = "repo_paths")]
+    pub documents: Vec<String>,
     /// Whether `meada.toml` has a `[serve]` table, even an empty one: only then are the
     /// repository's documents provider sources (spec #21).
     #[serde(skip)]
@@ -96,6 +100,26 @@ pub fn gateway_path(
     .flatten()
     .collect();
     (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
+}
+
+/// Repository-relative paths: none may be absolute or climb out with `..`. `.` segments and
+/// doubled `/` are dropped.
+fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Vec<String>, D::Error> {
+    let mut paths = Vec::new();
+    for path in Vec::<String>::deserialize(d)? {
+        let segments: Vec<&str> = path.split('/').collect();
+        if path.starts_with('/') || segments.contains(&"..") {
+            return Err(D::Error::custom(Msg::NotInRepository(&path).text()));
+        }
+        paths.push(
+            segments
+                .into_iter()
+                .filter(|s| !matches!(*s, "" | "."))
+                .collect::<Vec<_>>()
+                .join("/"),
+        );
+    }
+    Ok(paths)
 }
 
 /// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
@@ -177,9 +201,6 @@ impl Config {
     }
 }
 
-/// Keys that track A adds after v0.1.
-const LATER: &[&str] = &["serve.documents"];
-
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
     read(root, "meada.toml")
@@ -223,11 +244,6 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
         (Some(field), parent) if message.starts_with("missing field") => {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
-        (Some(_), Some(key)) if file == "meada.toml" && LATER.contains(&key) => Msg::KeyLater {
-            key,
-            release: &Msg::TrackA.text(),
-        }
-        .text(),
         (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
         (_, None) => message.to_string(),
@@ -261,6 +277,7 @@ mod tests {
     fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {
         Serve {
             hosts: Vec::new(),
+            documents: Vec::new(),
             prefix: prefix.map(Into::into),
             strip: strip.map(Into::into),
             declared: true,

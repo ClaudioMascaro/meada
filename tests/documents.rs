@@ -129,3 +129,51 @@ fn servers_urls_add_hosts_and_base_paths() {
     // A variable without a default contributes nothing, not even its path.
     assert_eq!(link("unsetShipment"), None);
 }
+
+#[test]
+fn listed_documents_are_read_even_when_ignored_or_oddly_named() {
+    let (_, gateway, _) = documented_chain("documents_listed");
+
+    let export = Engine::open(&gateway).unwrap().export().unwrap();
+
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let strings = |key: &str, field: &str| -> Vec<String> {
+        let items = export[key].as_array().unwrap();
+        items
+            .iter()
+            .map(|i| i[field].as_str().unwrap().to_string())
+            .collect()
+    };
+    let documents = strings("documents", "path");
+    // Listed and gitignored; listed under a name discovery does not know.
+    assert!(documents.contains(&"generated/openapi.yaml".into()));
+    assert!(documents.contains(&"docs/api-contract.yaml".into()));
+    // Listed and missing: no document, no error.
+    assert!(!documents.contains(&"docs/missing.yaml".into()));
+    let providers = strings("providers", "contract");
+    assert!(providers.contains(&"http::GET::/api/generated".into()));
+    assert!(providers.contains(&"http::GET::/api/carriers".into()));
+}
+
+#[test]
+fn search_finds_a_document_by_path_or_title() {
+    let (web, gateway, _) = documented_chain("documents_find");
+    let engine = Engine::open(&gateway).unwrap();
+
+    let by = |query: &str| engine.search(query, Some("document"), None).unwrap();
+
+    assert_golden(
+        "chain-documents.search-document-path.txt",
+        &by("orders.openapi"),
+    );
+    assert_golden("chain-documents.search-document-title.txt", &by("CARRIERS"));
+    assert_eq!(by("nothing"), "no matches for `nothing`\n");
+    // The workspace's documents, from any repository; the vendored copy of a repository
+    // without `[serve]` is none.
+    let answer = Engine::open(&web)
+        .unwrap()
+        .search("openapi", Some("document"), None)
+        .unwrap();
+    assert!(answer.contains("chain/gateway openapi.yaml"), "{answer}");
+    assert!(!answer.contains("vendor"), "{answer}");
+}

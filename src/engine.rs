@@ -160,7 +160,7 @@ impl Engine {
             .zip(&exports)
             .map(|(repo, export)| {
                 let mut lines = resource::report(repo, export, &links);
-                lines.extend(document::report(export));
+                lines.extend(document::report(repo, export));
                 lines
             })
             .collect();
@@ -257,12 +257,16 @@ impl Engine {
     /// whose identifier or route path does, one line each: exact first, then prefix, then
     /// substring, ties by identity. `kind` keeps only `symbol`, `contract`, `route` (HTTP
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
-    /// by broker kind and name) matches; `ambiguous` and `unresolved` list the open items whose enclosing
+    /// by broker kind and name) matches; `document` lists the documents read, matched by path
+    /// or title (see `search_documents`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         if let Some(item_kind) = kind.and_then(ItemKind::parse) {
             return self.search_items(query, item_kind, budget);
+        }
+        if kind == Some("document") {
+            return self.search_documents(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
@@ -273,8 +277,8 @@ impl Engine {
             Some("resource") => (false, Some(resource::PREFIX)),
             Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
-                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `ambiguous` or \
-                             `unresolved`";
+                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, \
+                             `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -358,6 +362,42 @@ impl Engine {
                 };
                 let line = format!("{} {location} {}", repo.identity, channel::shown(&contract));
                 hits.push((r, format!("{contract} {site}"), line));
+            }
+        }
+        hits.sort();
+        if hits.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+        Ok(render::budgeted(&lines, budget))
+    }
+
+    /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
+    /// as `<repository> <path> (<format> <version>, routes: <n>) <title>`.
+    fn search_documents(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, path to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for (export, repo) in self.exports()?.iter().zip(&self.workspace.repos) {
+            for doc in &export.documents {
+                let Some(shown) = doc.summary.shown() else {
+                    continue;
+                };
+                let title = doc.summary.title.as_deref();
+                let path = doc.path.to_lowercase();
+                let title_lower = title.map(str::to_lowercase);
+                let Some(r) = [Some(path.as_str()), title_lower.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|n| rank(n, &needle))
+                    .min()
+                else {
+                    continue;
+                };
+                let title = title.map_or(String::new(), |t| format!(" {t}"));
+                let line = format!("{} {} ({shown}){title}", repo.identity, doc.path);
+                hits.push((r, format!("{} {}", repo.identity, doc.path), line));
             }
         }
         hits.sort();

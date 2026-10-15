@@ -36,7 +36,11 @@ give byte-identical output.
   `<repository> <document> response open: <paths>` (`shape_lines`). `status` also prints, under each
   repository, the lines `Engine::status_report` gathers (resource lines, then document lines
   from `document::report`; same indexed-only rule as decisions). `search` shows a route only a
-  document lists at `<document path> (documented only)` (`Export::document_of`).
+  document lists at `<document path> (documented only)` (`Export::document_of`). `search` kind
+  `document` (`search_documents`, an early branch like the open-item kinds) lists the documents
+  read across the workspace, matched by path and `info.title` (exact, prefix, substring), as
+  `<repository> <path> (<Summary::shown()>) <title>`; `shown` is `openapi 3.1.0, routes: 3`, the
+  one place that gains the channel count.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -120,11 +124,12 @@ give byte-identical output.
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
   `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config` parses
   `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`, normalized
-  by `gateway_key`; `Serve::declared` is set when the `[serve]` table is present, even empty,
-  which makes the repository's documents provider sources) and `[[resource]]` (`kind` checked
-  as a lowercase identifier, `id` not empty,
-  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`; keys later track A
-  specs add are listed in `LATER` so the error says "not in v0.1". `config::gateway_path(prefix,
+  by `gateway_key`), `[serve] documents` (`repo_paths`: repository-relative, none absolute or
+  with a `..` segment, `./` and doubled `/` dropped; added to the documents discovery finds;
+  `Serve::declared` is set when the `[serve]` table is present, even empty or with only
+  `documents`, which makes the repository's documents provider sources) and `[[resource]]`
+  (`kind` checked as a lowercase identifier, `id` not empty,
+  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`. `config::gateway_path(prefix,
   strip, path) -> Option<(gateway path, reason)>` is the one gateway rule (spec #19); `Serve::
   gateway_path(path)` applies it with `[serve]` prefix and strip, `Http::declare` with a
   document's server path as the prefix. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
@@ -161,7 +166,9 @@ give byte-identical output.
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
   from the code rows: a document edit re-extracts no code. Without `serve.declared` the
   repository has no documents and stored rows are deleted. The walk yields every file the
-  ignore rules keep; `lang::pack_for` and `document::is_document` split it. `export` loads
+  ignore rules keep; `lang::pack_for` and `document::is_document` split it, and
+  `documents_found` adds each `[serve] documents` path that is a file, stat'ed outside the walk
+  so `.gitignore` does not hide it; a listed path that is not a file has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order).
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `openapi.{yaml,yml,json}` and `*.openapi.{yaml,yml,json}`), `read(path, bytes) ->
@@ -173,8 +180,11 @@ give byte-identical output.
   defaults, a URL still holding one dropped, a relative URL giving only its path, host lower
   case, path normalized with no trailing `/`), `Problem::Unreadable {line, error}`,
   `Problem::Format {found}` and `Problem::ExternalRef {reference}` (structured,
-  rendered through `Msg`), and `report(export)`: the status lines (each problem, then each
-  route a later document by path lists again: `Msg::DuplicateRoute`). `openapi.rs`: `read(path,
+  rendered through `Msg`), `Summary::shown()` (what `search` prints of a document read) and
+  `report(repo, export)`: the status lines, per document in path order (`Msg::DocumentRead`
+  for one read, each problem of it, then each route a later document by path lists again:
+  `Msg::DuplicateRoute`), then `Msg::DocumentMissing` for each `[serve] documents` path with
+  no row. `openapi.rs`: `read(path,
   value)`: a top-level `openapi` of `3.0` or `3.1` (any patch; a YAML number counts), else
   `Problem::Format` naming the `openapi` or `swagger` field it found; every `paths` key starting
   with `/` and every method of `get put post delete options head patch trace` is a route, its
@@ -416,7 +426,7 @@ give byte-identical output.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
   A pack is done when that suite passes.
-- New **config key**: add the field to `Config`, delete it from `LATER`. Parse errors name file,
+- New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
   (descriptions plus parameter schemas) must stay within 1,000 tokens.
@@ -473,7 +483,9 @@ give byte-identical output.
   path `/gw`), `orders.openapi.json` (3.0, the same shipments route again: a duplicate; servers
   with variable defaults `https://{region}.example.com/{version}` and a relative `/relative/base`,
   and one URL with a variable without default, which gives nothing), a Swagger 2.0 `legacy.openapi.yaml` and an invalid
-  `broken.openapi.yaml`; the web app gains `src/shipments.ts` (the shipments route through
+  `broken.openapi.yaml`, `docs/api-contract.yaml` (3.0, `GET /api/carriers`) and the
+  gitignored `generated/openapi.yaml` (`GET /api/generated`), both listed, with a path that does
+  not exist, in the gateway's `[serve] documents` (the helper writes that line); the web app gains `src/shipments.ts` (the shipments route through
   `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
   since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
   goldens never change.
@@ -496,7 +508,8 @@ give byte-identical output.
   SQS by queue name and NATS wildcards at `inferred`), `channels_jobs` (the `channels-jobs-api`
   and `channels-jobs-worker` fixtures: BullMQ queues and Redis streams in both client styles),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
-  only", `search`, `status`, `context` on the merged route with its documented fields; over
+  only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
+  merged route with its documented fields; over
   the `documents-shapes` fixture, a repository with no code whose OpenAPI 3.0 JSON document
   has local `$ref`s into `components`, `allOf`, `oneOf`, an array response,
   `additionalProperties: true`, a cycle and an external `$ref`, plus a later

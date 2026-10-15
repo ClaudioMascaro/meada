@@ -17,6 +17,7 @@ use crate::http;
 use crate::index::Export;
 use crate::msg::Msg;
 use crate::shape::Shape;
+use crate::workspace::Repository;
 
 /// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
 /// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions.
@@ -50,6 +51,13 @@ pub struct Summary {
 }
 
 impl Summary {
+    /// What `search` shows of a document read: `openapi 3.1.0, routes: 3`. Nothing for one
+    /// ignored.
+    pub fn shown(&self) -> Option<String> {
+        let (format, version) = (self.format.as_ref()?, self.version.as_ref()?);
+        Some(format!("{format} {version}, routes: {}", self.routes.len()))
+    }
+
     fn problem(problem: Problem) -> Self {
         Summary {
             problems: vec![problem],
@@ -142,13 +150,25 @@ fn parse_any(path: &str, src: &[u8]) -> Result<Value, (usize, String)> {
     yaml::parse(text)
 }
 
-/// The status lines of a repository (its index content `export`) about its documents, in path
-/// order: each document ignored, with why, and each route a later document lists again.
-pub fn report(export: &Export) -> Vec<String> {
+/// The status lines of `repo` (its index content `export`) about its documents, in path
+/// order: each one read, each one ignored with why, and each route a later document lists
+/// again; then each path `[serve] documents` lists that has no document.
+pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
     let mut lines = Vec::new();
     let mut first: BTreeMap<String, &str> = BTreeMap::new();
     for doc in &export.documents {
         let path = doc.path.as_str();
+        if let (Some(format), Some(version)) = (&doc.summary.format, &doc.summary.version) {
+            lines.push(
+                Msg::DocumentRead {
+                    path,
+                    format,
+                    version,
+                    routes: doc.summary.routes.len(),
+                }
+                .text(),
+            );
+        }
         for problem in &doc.summary.problems {
             lines.push(
                 match problem {
@@ -180,6 +200,11 @@ pub fn report(export: &Export) -> Vec<String> {
                     first.insert(route.contract(), path);
                 }
             }
+        }
+    }
+    for path in &repo.config.serve.documents {
+        if !export.documents.iter().any(|d| d.path == *path) {
+            lines.push(Msg::DocumentMissing { path }.text());
         }
     }
     lines
