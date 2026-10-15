@@ -14,6 +14,10 @@
       "hash": "f1f790813876f50313e253b475c8385f850e06365d998431d30cd6d36cdbf642"
     },
     {
+      "path": "explicit/early.py",
+      "hash": "fa58edcb55ce81b20e97216057d4a4fab84c115cba214d7c16bca04f97b79df2"
+    },
+    {
       "path": "explicit/first.py",
       "hash": "61d4b84cce64e2625f17a7ea07f4c049d0388f201003045c356450e8eeb0f43d"
     },
@@ -26,8 +30,16 @@
       "hash": "f22291b2cb6b4e0ef5052561e5852d4f673281883fa57028ef51767cfcb98126"
     },
     {
+      "path": "explicit/order.py",
+      "hash": "ce63bc1c311104671f01578e79a5356e9392bb8e12ab46cbeaec4d65d83ceaa0"
+    },
+    {
       "path": "explicit/second.py",
       "hash": "81f02370c25fbabc3cfdf0ecba9f339eaa003bdd502d0373446d04d9a29c317d"
+    },
+    {
+      "path": "explicit/sweeper.py",
+      "hash": "9eab41da94f7d6ee3b1f2f5e0a2c3bb5d47bbd4cae15ff6f1a6c43f36e8a4e06"
     },
     {
       "path": "explicit/use.py",
@@ -244,6 +256,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::explicit/early.py::kept",
+      "span": {
+        "path": "explicit/early.py",
+        "start": 56,
+        "end": 80
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/early.py::swept",
+      "span": {
+        "path": "explicit/early.py",
+        "start": 28,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/early.py::taken",
+      "span": {
+        "path": "explicit/early.py",
+        "start": 0,
+        "end": 25
+      }
+    },
+    {
       "id": "example.com/acme/conformance::explicit/first.py::pick",
       "span": {
         "path": "explicit/first.py",
@@ -292,11 +328,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::explicit/order.py::order",
+      "span": {
+        "path": "explicit/order.py",
+        "start": 183,
+        "end": 230
+      }
+    },
+    {
       "id": "example.com/acme/conformance::explicit/second.py::pick",
       "span": {
         "path": "explicit/second.py",
         "start": 0,
         "end": 24
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/sweeper.py::swept",
+      "span": {
+        "path": "explicit/sweeper.py",
+        "start": 0,
+        "end": 25
       }
     },
     {
@@ -707,6 +759,39 @@
         "path": "defs.py",
         "start": 930,
         "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/order.py::order::kept#0",
+      "caller": "example.com/acme/conformance::explicit/order.py::order",
+      "target": "example.com/acme/conformance::explicit/early.py::kept",
+      "level": "exact",
+      "span": {
+        "path": "explicit/order.py",
+        "start": 224,
+        "end": 230
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/order.py::order::swept#0",
+      "caller": "example.com/acme/conformance::explicit/order.py::order",
+      "target": "example.com/acme/conformance::explicit/sweeper.py::swept",
+      "level": "exact",
+      "span": {
+        "path": "explicit/order.py",
+        "start": 212,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::explicit/order.py::order::taken#0",
+      "caller": "example.com/acme/conformance::explicit/order.py::order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "explicit/order.py",
+        "start": 200,
+        "end": 207
       }
     },
     {

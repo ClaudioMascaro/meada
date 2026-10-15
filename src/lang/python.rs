@@ -372,11 +372,13 @@ fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
             },
             _ => (text(item, src), text(item, src)),
         };
-        // `from p import m` also names the submodule `m` of `p`, when `p` exports no `m`. The
-        // resolver tries a name's imports last first, so the name of `p` comes after.
+        // `from p import m` also names the submodule `m` of `p`, when `p` exports no `m`.
         let join = if source.ends_with('.') { "" } else { "." };
-        add(local, &format!("{source}{join}{name}"), Imported::Namespace);
-        add(local, source, Imported::Name(name.to_string()));
+        let member = Imported::Member {
+            name: name.to_string(),
+            module: format!("{source}{join}{name}"),
+        };
+        add(local, source, member);
     }
 }
 
