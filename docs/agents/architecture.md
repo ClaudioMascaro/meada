@@ -67,6 +67,8 @@ give byte-identical output.
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
+  `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
+  package name are no call for a person to decide.
 - `decide.rs`: `meada decide`. `items(engine, only)` (`Engine::local_items`: the open items
   whose call lives in the repository where Meada runs, id order; with `--item`,
   `Engine::local_item`, which also takes a decided call, offered with every candidate so the
@@ -186,8 +188,32 @@ give byte-identical output.
   `documents_found` adds each `[serve] documents` path that is a file, stat'ed outside the walk
   so `.gitignore` does not hide it; a listed path that is not a file, or that has a symbolic
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
-  `Export::documents` (`Document {path, summary}`, path order). `sort_providers` and
+  `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
+  is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
+  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json` the walk
+  finds (`manifests_found`: any path with a `node_modules` segment is skipped, since the walk
+  yields it unless `.gitignore` lists it), a nameless one too, whatever `serve.declared` says;
+  `export` loads them as `Export::manifests` (`serde(skip)`). `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
+- `package.rs` (spec #22): packages as contracts. `read(bytes)` turns a `package.json` into a
+  `Summary {name, version, dependencies: [Entry {field, name, range}]}` (the four dependency
+  fields, sorted by field then name) and never fails: a file over `MAX_BYTES` (1 MiB), not a JSON
+  object or nested past `serde_json`'s depth limit reads as empty, a field of another type or an
+  empty string counts as absent, and a name that is empty, over `MAX_NAME` (214), or holds a
+  control character, whitespace or `:` is no name (a dependency entry with such a name is dropped).
+  The kind `Packages` (`package::npm::<name>`, sides `package` and `dependent`) has no `extract`;
+  `declare` makes a provider at `<repository>::<manifest path>` (`Provider::version` for the
+  reason) and a `packages` row `{name, version, repository, directory}` (`.` at the root) for each
+  named manifest, private ones too. `consume(exports)` is the workspace-wide step `Engine::exports`
+  runs after every repository's `declare` (one repository cannot see another's providers): for
+  each dependency entry whose package some repository of the workspace provides (a `workspace:`
+  range needs one in its own repository), it adds a consumer at `<repository>::<manifest
+  path>::<field>::<name>` (the range travels in `Consumer::method`, which is `serde(skip)`) and a
+  `dependencies` row `{manifest, field, name, range}`. An entry on a package outside the workspace
+  appears nowhere. `link` gives one candidate `exact` and several `ambiguous` (one link per
+  candidate, `workspace:` keeping the consumer's repository), with the reason `<identifier>
+  <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous. No
+  lockfile is read and no registry queried.
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
   `read(path, bytes) ->
@@ -443,6 +469,9 @@ give byte-identical output.
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
+  `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
+  path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
 - Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
   document lists, such as `example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}`
   (`Export::document_of` recognises it). Document channel side: `<repository>::<document
@@ -537,10 +566,10 @@ give byte-identical output.
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
-  a document's stored `summary`. A unit test in `index.rs` keeps all three in
+  a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
   `tests/golden/schema.v<version>.txt` (the facts of each pack's
-  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml` and
-  `sample.asyncapi.yaml` there) and never re-blesses it in place: a change
+  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml`,
+  `sample.asyncapi.yaml` and `sample.package.json` there) and never re-blesses it in place: a change
   fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
   An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
   so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
@@ -596,6 +625,15 @@ give byte-identical output.
   `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
   since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
   goldens never change.
+- `tests/packages.rs` (spec #22): the package fixtures `pkg-{shared,web,api,mono,fork}` as
+  siblings (`web`, `api` and `mono` name `shared` as a peer, `fork` names `mono`), through
+  `Engine::export`. `shared` holds `@example/shared` and an ignored-by-rule
+  `node_modules/left-pad/package.json`; `web` and `api` depend on it (`api`'s manifest has no
+  name and a non-string range; `web` also names `express` and `left-pad`, outside the workspace);
+  `mono` has `packages/{a,b,c}` (`b` on `a` through `workspace:*`, `c` on `a` with `^1.0.0`) and a
+  `.gitignore`d `ignored/`, and `fork` holds another `@example/a`. Goldens `pkg-*.export.json`;
+  a freshness test edits manifests in four repositories and compares with a cold export; a test
+  shows an ambiguous package link is no open item.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
@@ -697,6 +735,9 @@ give byte-identical output.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
+- `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
+  (1 MiB; a larger file reads as empty) and `MAX_NAME` (214 characters; a longer name is no
+  package). A range is stored as written and has no length limit of its own beyond `MAX_BYTES`.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
   larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no

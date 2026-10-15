@@ -8,6 +8,7 @@ use std::ops::Range;
 use crate::contract::{Level, Link};
 use crate::http;
 use crate::index::{Export, Provider};
+use crate::package;
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -108,7 +109,9 @@ impl OpenItem {
 /// leave.
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
-    for link in links.iter().filter(|l| l.level == Level::Ambiguous) {
+    // Several providers fit a package dependency, but no call is there for a person to decide.
+    let open = |l: &&Link| l.level == Level::Ambiguous && !l.contract.starts_with(package::PREFIX);
+    for link in links.iter().filter(open) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
     let routes: Vec<(&str, &Provider)> = exports

@@ -16,12 +16,13 @@ use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
+use crate::package::{self, Dependency, Manifest, Package};
 use crate::resolve::{Code, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
 /// `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 14;
+const SCHEMA_VERSION: i64 = 15;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -38,7 +39,9 @@ const SCHEMA_VERSION: i64 = 14;
 /// same stat and hash as `files`, and its `summary` (`document::Summary` as JSON: format,
 /// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
 /// derived from the bytes alone); a document that could not be read keeps its row, so its hash
-/// is cached too.
+/// is cached too. `manifests` holds each `package.json` (spec #22) the same way, its `summary`
+/// being `package::Summary` as JSON (name, version and dependency entries), read from the bytes
+/// alone; a manifest without a name keeps its row too.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -60,6 +63,10 @@ CREATE TABLE contracts (
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
@@ -194,7 +201,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
-                 DELETE FROM documents;",
+                 DELETE FROM documents; DELETE FROM manifests;",
             )?;
             None
         }
@@ -215,7 +222,16 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .collect::<rusqlite::Result<_>>()?;
 
     let all = walk(root);
-    refresh_documents(&tx, &documents_found(root, &all, serve), now)?;
+    refresh_stamped(
+        &tx,
+        "documents",
+        &documents_found(root, &all, serve),
+        now,
+        |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
+    )?;
+    refresh_stamped(&tx, "manifests", &manifests_found(&all), now, |_, src| {
+        Ok(serde_json::to_string(&package::read(src))?)
+    })?;
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -507,12 +523,31 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// Brings the `documents` table up to date with `found`, the documents on disk (path and
-/// absolute path), as `refresh` does `files`: stat, then hash, then read only what changed. A
-/// stored document not found leaves the table.
-fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemTime) -> Result<()> {
+/// The `package.json` files of a repository (path and absolute path), but those under a
+/// `node_modules` directory, which the walk finds when `.gitignore` does not list it.
+fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
+    let is_manifest = |path: &str| {
+        let mut segments = path.split('/').rev();
+        segments.next() == Some("package.json") && !segments.any(|s| s == "node_modules")
+    };
+    (walked.iter())
+        .filter(|(path, _)| is_manifest(path))
+        .cloned()
+        .collect()
+}
+
+/// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
+/// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
+/// hash, then `summarize` only what changed. A stored row not found leaves the table.
+fn refresh_stamped(
+    tx: &Transaction,
+    table: &str,
+    found: &[(String, PathBuf)],
+    now: SystemTime,
+    summarize: impl Fn(&str, &[u8]) -> Result<String>,
+) -> Result<()> {
     let stored: HashMap<String, Stamp> = tx
-        .prepare("SELECT path, hash, mtime, size FROM documents")?
+        .prepare(&format!("SELECT path, hash, mtime, size FROM {table}"))?
         .query_map([], |r| {
             let (hash, mtime, size) = (r.get(1)?, r.get(2)?, r.get(3)?);
             Ok((r.get(0)?, Stamp { hash, mtime, size }))
@@ -531,19 +566,22 @@ fn refresh_documents(tx: &Transaction, found: &[(String, PathBuf)], now: SystemT
         let hash = blake3::hash(&src).to_hex().to_string();
         if known.is_some_and(|k| k.hash == hash) {
             tx.execute(
-                "UPDATE documents SET mtime = ?2, size = ?3 WHERE path = ?1",
+                &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
                 params![path, mtime, size],
             )?;
             continue;
         }
-        let summary = serde_json::to_string(&document::read(path, &src))?;
+        let summary = summarize(path, &src)?;
         tx.execute(
-            "INSERT OR REPLACE INTO documents VALUES (?1, ?2, ?3, ?4, ?5)",
+            &format!("INSERT OR REPLACE INTO {table} VALUES (?1, ?2, ?3, ?4, ?5)"),
             params![path, hash, mtime, size, summary],
         )?;
     }
     for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
-        tx.execute("DELETE FROM documents WHERE path = ?1", params![path])?;
+        tx.execute(
+            &format!("DELETE FROM {table} WHERE path = ?1"),
+            params![path],
+        )?;
     }
     Ok(())
 }
@@ -706,6 +744,18 @@ pub(crate) struct Export {
     /// bindings route them to.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) publishes: Vec<Publish>,
+    /// The `package.json` files read (spec #22), in path order. Not exported as such:
+    /// `Package::declare` turns the named ones into `packages` and providers, and
+    /// `package::consume` the dependency entries that name a package of the workspace into
+    /// `dependencies` and consumers.
+    #[serde(skip)]
+    pub(crate) manifests: Vec<Manifest>,
+    /// The packages the repository provides, by name, then directory.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) packages: Vec<Package>,
+    /// The dependency entries naming a package of the workspace, by manifest, field, name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) dependencies: Vec<Dependency>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -828,6 +878,9 @@ pub(crate) struct Provider {
     /// against it.
     #[serde(skip)]
     pub(crate) hosts: Vec<String>,
+    /// The `version` of a package's manifest, for `package::link`.
+    #[serde(skip)]
+    pub(crate) version: Option<String>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.
@@ -1008,6 +1061,20 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<(String, String)> = db
+        .prepare(&format!(
+            "SELECT path, summary FROM {schema}.manifests ORDER BY path"
+        ))?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let manifests = (rows.into_iter())
+        .map(|(path, summary)| {
+            Ok(Manifest {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            })
+        })
+        .collect::<Result<_>>()?;
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1017,6 +1084,9 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         consumers,
         bindings,
         publishes,
+        manifests,
+        packages: Vec::new(),
+        dependencies: Vec::new(),
         links: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
@@ -1037,7 +1107,7 @@ mod tests {
     use std::path::Path;
 
     use super::{SCHEMA, SCHEMA_VERSION};
-    use crate::{document, lang};
+    use crate::{document, lang, package};
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
     /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never
@@ -1061,6 +1131,9 @@ mod tests {
             let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();
             actual += &format!("\n{name}\n{summary}\n");
         }
+        let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
+        let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
+        actual += &format!("\nsample.package.json\n{summary}\n");
 
         let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
         let Ok(expected) = fs::read_to_string(&golden) else {

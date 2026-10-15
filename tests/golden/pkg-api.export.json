@@ -1,0 +1,66 @@
+{
+  "repository": "example.com/pkg/api",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "via": null
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/shared",
+      "range": "1.2.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "optionalDependencies",
+      "name": "@example/shared"
+    },
+    {
+      "manifest": "package.json",
+      "field": "peerDependencies",
+      "name": "@example/shared",
+      "range": ">=1.0.0"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared 1.2.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared none (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
+    }
+  ]
+}
