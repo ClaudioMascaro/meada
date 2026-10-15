@@ -73,7 +73,7 @@
     "implement-spec": {
       "path": "skills/engineering/implement-spec",
       "upstreamTree": "0cfefc751d0cb64f0c948ffcb17e13b94e778f08",
-      "tree": "0cfefc751d0cb64f0c948ffcb17e13b94e778f08"
+      "tree": "ec7d851ab0340ec0a4645875c82ef3884490e6cc"
     },
     "improve-codebase-architecture": {
       "path": "skills/engineering/improve-codebase-architecture",
