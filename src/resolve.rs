@@ -381,7 +381,7 @@ impl<'a> Code<'a> {
                         origin.expr += "()";
                         origin
                     }
-                    Value::New(callee) => {
+                    Value::New(callee, _) => {
                         let mut origin = self.trace(at, within, callee, seen)?;
                         origin.expr = format!("new {}()", origin.expr);
                         origin
@@ -457,6 +457,22 @@ impl<'a> Code<'a> {
             }
             _ => None,
         }
+    }
+
+    /// The arguments of the `new` expression a `const` binding holds (`Origin::binding`), with
+    /// their constants folded; `None` when the binding holds no `new`.
+    pub fn constructed(&self, (path, constant): (&'a str, &'a str)) -> Option<Vec<Value>> {
+        let Value::New(_, args) = &self
+            .full(path)?
+            .consts
+            .iter()
+            .find(|c| c.name == constant)?
+            .value
+        else {
+            return None;
+        };
+        let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+        Some(args.iter().map(|a| self.value(path, within, a)).collect())
     }
 
     /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object

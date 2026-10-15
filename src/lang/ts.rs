@@ -602,9 +602,15 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             None if kind == "call_expression" => node
                 .child_by_field_name("function")
                 .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
-            None if kind == "new_expression" => node
-                .child_by_field_name("constructor")
-                .map_or(Value::Unknown, |f| Value::New(callee(f, src))),
+            None if kind == "new_expression" => {
+                node.child_by_field_name("constructor")
+                    .map_or(Value::Unknown, |f| {
+                        let args = node.child_by_field_name("arguments");
+                        let args = args.filter(|a| a.kind() == "arguments");
+                        let args = args.map(|a| named(a).map(|arg| value(arg, src, scope)));
+                        Value::New(callee(f, src), args.into_iter().flatten().collect())
+                    })
+            }
             None => Value::Unknown,
         },
     }

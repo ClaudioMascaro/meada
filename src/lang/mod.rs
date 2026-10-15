@@ -228,8 +228,9 @@ pub enum Value {
     Undefined,
     /// The result of calling the normalized callee, such as `express.Router`.
     Call(String),
-    /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`.
-    New(String),
+    /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
+    /// the arguments.
+    New(String, Vec<Value>),
     /// An array literal's elements.
     List(Vec<Value>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`

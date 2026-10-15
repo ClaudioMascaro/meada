@@ -202,7 +202,14 @@ give byte-identical output.
   last segment of the `QueueUrl`, so only that tail has to evaluate; the receive's handler is
   its enclosing function); `sqs-consumer` `Consumer.create({queueUrl, handleMessage})`; NATS
   `publish(subject)` / `subscribe(subject, {callback})` on a `connect()` connection (the
-  handler is the `callback`, else the enclosing function); and amqplib on a channel that
+  handler is the `callback`, else the enclosing function); BullMQ `add` on a binding that holds
+  `new Queue(name)` (the queue is named by the binding, read with `Code::constructed`, so a
+  wrapper around the `add` adds nothing: the `add` call is the producer) and `new Worker(name,
+  processor)` (the processor, a definition or a function in place, is the handler); ioredis
+  `xadd(stream, ...)` and `xreadgroup(..., 'STREAMS', s1, s2, id1, id2)` (every stream of the
+  first half after `STREAMS`; the enclosing function handles) on a `new Redis()` or default
+  import; node-redis `xAdd(stream, ...)` and `xReadGroup(group, consumer, {key} | [{key}])` on a
+  `createClient()` binding; and amqplib on a channel that
   traces to `connect().createChannel()` or `createConfirmChannel()` (default import, namespace
   or named `connect`): `sendToQueue(queue)`, `consume(queue, handler)` (a function in place or
   a definition; else the enclosing function), `publish(exchange, key)` and `bindQueue(queue,
@@ -442,10 +449,12 @@ give byte-identical output.
   fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
   publishes through a binding of another repository, the empty exchange, and a Kafka topic
   that shares a queue's name; the `channels-queues-api` and `channels-queues-worker` fixtures:
-  SQS by queue name and NATS wildcards at `inferred`), `documents` (provider documents over
-  `documented_chain`: export, `trace` to "documented only", `search`, `status`; freshness of an
-  edited document and of a dropped `[serve]` is in `freshness`). Table tests for discovery,
-  format detection, routes and the YAML reader are unit tests in `src/document/`.
+  SQS by queue name and NATS wildcards at `inferred`), `channels_jobs` (the `channels-jobs-api`
+  and `channels-jobs-worker` fixtures: BullMQ queues and Redis streams in both client styles),
+  `documents` (provider documents over `documented_chain`: export, `trace` to "documented
+  only", `search`, `status`; freshness of an edited document and of a dropped `[serve]` is in
+  `freshness`). Table tests for discovery, format detection, routes and the YAML reader are unit
+  tests in `src/document/`.
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -480,7 +489,7 @@ Each is marked `ponytail:` at its site unless noted.
   spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
-  and a `Value::New` carrying only the callee.
+  and a `Value::New(callee, args)`.
 - `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
@@ -488,6 +497,11 @@ Each is marked `ponytail:` at its site unless noted.
   (the function that subscribes handles); only the first `run` on a consumer binding counts. An
   amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped, and an
   exchange's type is not read: every pattern follows topic-exchange rules.
+  A BullMQ `Queue` is named by its own `new Queue(name)` binding: `new Queue(name).add(...)` with
+  no binding, a `Queue` that is a class field or a parameter, and `addBulk` are not recognized. A
+  node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
+  has no binding); a BullMQ processor given as a file path is not followed (the function that
+  makes the `Worker` handles).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
