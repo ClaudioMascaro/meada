@@ -18,7 +18,7 @@ use crate::{Result, qualify};
 pub struct Config {
     #[serde(default, rename = "peer")]
     pub peers: Vec<Peer>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "declared")]
     pub serve: Serve,
     #[serde(default, rename = "resource")]
     pub resources: Vec<Resource>,
@@ -47,6 +47,19 @@ pub struct Serve {
     /// What a gateway removes from the start of every path this repository serves.
     #[serde(default, deserialize_with = "gateway_key")]
     pub strip: Option<String>,
+    /// Whether `meada.toml` has a `[serve]` table, even an empty one: only then are the
+    /// repository's documents provider sources (spec #21).
+    #[serde(skip)]
+    pub declared: bool,
+}
+
+/// A `[serve]` table that is present: `declared` is set.
+fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
+    let serve = Serve::deserialize(d)?;
+    Ok(Serve {
+        declared: true,
+        ..serve
+    })
 }
 
 impl Serve {
@@ -248,6 +261,7 @@ mod tests {
             hosts: Vec::new(),
             prefix: prefix.map(Into::into),
             strip: strip.map(Into::into),
+            declared: true,
         }
     }
 

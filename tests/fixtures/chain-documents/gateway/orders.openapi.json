@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Chain gateway orders", "version": "1.0" },
+  "paths": {
+    "/api/shipments/{shipmentId}": {
+      "get": { "responses": { "200": { "description": "Also in openapi.yaml" } } }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+openapi: 3.1.0
+info:
+  title: Generated, and gitignored
+  version: "1.0"
+paths:
+  /api/generated:
+    get:
+      responses:
+        "200":
+          description: Never read

@@ -41,6 +41,21 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
+    DocumentUnreadable {
+        path: &'a str,
+        line: usize,
+        error: &'a str,
+    },
+    /// `found` is the format field and version the document has, such as `swagger 2.0`.
+    DocumentFormat {
+        path: &'a str,
+        found: Option<&'a str>,
+    },
+    DuplicateRoute {
+        route: &'a str,
+        path: &'a str,
+        first: &'a str,
+    },
     KeyMissing(&'a str),
     KeyLater {
         key: &'a str,
@@ -180,6 +195,24 @@ impl Msg<'_> {
             Msg::UnlinkedResource(contract) => pick(
                 format!("{contract} is unlinked: no writer and reader in different repositories"),
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
+            ),
+            Msg::DocumentUnreadable { path, line, error } => pick(
+                format!("{path}:{line}: unreadable document ({error}), ignored"),
+                format!("{path}:{line}: documento ilegível ({error}), ignorado"),
+            ),
+            Msg::DocumentFormat { path, found } => pick(
+                format!(
+                    "{path}: not OpenAPI 3.0 or 3.1 ({}), ignored",
+                    found.unwrap_or("no `openapi` field")
+                ),
+                format!(
+                    "{path}: não é OpenAPI 3.0 nem 3.1 ({}), ignorado",
+                    found.unwrap_or("sem o campo `openapi`")
+                ),
+            ),
+            Msg::DuplicateRoute { route, path, first } => pick(
+                format!("{route} in {path} is also in {first}: one route"),
+                format!("{route} em {path} também está em {first}: uma rota só"),
             ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
             Msg::KeyLater { key, release } => pick(

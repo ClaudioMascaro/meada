@@ -1,0 +1,7 @@
+example.com/chain/gateway (.) indexed, 8 files
+  broken.openapi.yaml:7: unreadable document (while parsing a flow sequence, expected ',' or ']'), ignored
+  legacy.openapi.yaml: not OpenAPI 3.0 or 3.1 (swagger 2.0), ignored
+  GET /api/shipments/{} in orders.openapi.json is also in openapi.yaml: one route
+example.com/chain/catalog (../chain-catalog) indexed, 4 files
+example.com/chain/web (../chain-web) indexed, 6 files
+example.com/chain/worker (../chain-worker) indexed, 3 files

@@ -1,10 +1,10 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{Binding, Consumer, Export as IndexExport, Provider};
+use crate::index::{Binding, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Value, literal, property};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -123,15 +123,16 @@ pub fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
-/// The contract `provider` serves at its gateway path, when `[serve]` rewrites its route.
-pub(crate) fn gateway_contract(provider: &Provider) -> Option<String> {
-    let (method, _) = route(&provider.contract)?;
-    Some(contract(method, provider.gateway.as_deref()?))
+/// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
+pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
+    let method = route(&provider.contract).map(|(method, _)| method);
+    (provider.gateways.iter())
+        .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
 }
 
-/// Whether `provider` serves `contract`, by its code path or by its gateway path.
+/// Whether `provider` serves `contract`, by its own path or by a gateway path.
 pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
-    provider.contract == contract || gateway_contract(provider).as_deref() == Some(contract)
+    provider.contract == contract || gateway_contracts(provider).any(|(g, _)| g == contract)
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -420,12 +421,40 @@ impl ContractKind for Http {
         found
     }
 
+    /// Adds the routes of the repository's documents (spec #21), then the gateway paths of
+    /// every route. A document route with the contract of a code route merges into it: the
+    /// code keeps the handler. Any other is a provider of its own, without a handler, at
+    /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
+    /// already listed adds nothing.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        let mut listed: HashSet<String> = (export.providers.iter())
+            .map(|p| p.contract.clone())
+            .collect();
+        let mut documented = Vec::new();
+        for doc in &export.documents {
+            for route in &doc.summary.routes {
+                let contract = route.contract();
+                if listed.insert(contract.clone()) {
+                    let site = format!("{}::{}::{}", repo.identity, doc.path, route.label());
+                    documented.push(Provider {
+                        contract,
+                        site,
+                        ..Provider::default()
+                    });
+                }
+            }
+        }
+        // The index's order.
+        export.providers.extend(documented);
+        let providers = &mut export.providers;
+        providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
         for p in &mut export.providers {
             let path = route(&p.contract).map(|(_, path)| path);
-            p.gateway = path
-                .and_then(|path| repo.config.serve.gateway_path(path))
-                .map(|g| g.0);
+            let served = path.and_then(|path| repo.config.serve.gateway_path(path));
+            p.gateway = served.as_ref().map(|(path, _)| path.clone());
+            p.gateways = (served.into_iter())
+                .map(|(path, reason)| Gateway { path, reason })
+                .collect();
         }
     }
 
@@ -448,11 +477,8 @@ impl ContractKind for Http {
                 if p.contract == *contract {
                     return Some((m, p, None));
                 }
-                if gateway_contract(p).as_deref() != Some(contract) {
-                    return None;
-                }
-                let (_, reason) = m.config.serve.gateway_path(route(&p.contract)?.1)?;
-                Some((m, p, Some(reason)))
+                let (_, reason) = gateway_contracts(p).find(|(g, _)| g == contract)?;
+                Some((m, p, Some(reason.to_string())))
             })
             .collect();
         let direct: Vec<&str> = (serving.iter())

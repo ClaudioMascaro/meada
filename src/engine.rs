@@ -11,10 +11,10 @@ pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
-use crate::render::{Files, REPOSITORY_LEVEL, callee, label, unresolved};
+use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, unresolved};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Workspace};
-use crate::{Result, channel, decisions, index, items, render, repo, resource, trace};
+use crate::{Result, channel, decisions, document, index, items, render, repo, resource, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -69,9 +69,11 @@ impl Engine {
     /// contracts at query time, so links that touch a changed file follow it.
     pub fn refresh(&self) -> Result<()> {
         for peer in &self.workspace.repos[1..] {
-            index::refresh(&index::open(&peer.root)?, &peer.root, &peer.identity)?;
+            let db = index::open(&peer.root)?;
+            index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
-        index::refresh(&self.db, &self.root, &self.identity)
+        let here = &self.workspace.repos[0];
+        index::refresh(&self.db, &self.root, &self.identity, &here.config.serve)
     }
 
     /// The canonical export of the repository where Meada runs: its whole index, plus the
@@ -146,18 +148,22 @@ impl Engine {
     }
 
     /// `decision_report`, with, for each repository of the workspace, in workspace order, the
-    /// status lines about its resources: a `via` that names no symbol, and a resource no link
-    /// reaches.
+    /// status lines about its resources (a `via` that names no symbol, a resource no link
+    /// reaches) and its documents (one ignored, a route listed twice).
     pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
         self.refresh()?;
         let exports = self.exports()?;
         let (links, evaluations) = self.links_and_decisions(&exports);
         let repos = self.workspace.repos.iter();
-        let resources = repos
+        let lines = repos
             .zip(&exports)
-            .map(|(repo, export)| resource::report(repo, export, &links))
+            .map(|(repo, export)| {
+                let mut lines = resource::report(repo, export, &links);
+                lines.extend(document::report(export));
+                lines
+            })
             .collect();
-        Ok((evaluations, resources))
+        Ok((evaluations, lines))
     }
 
     /// The decisions of the repository where Meada runs that are stale or waiting.
@@ -339,11 +345,15 @@ impl Engine {
                 let location = match span {
                     Some(span) => files.at(&span.path, span.start),
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
-                    // A route file that serves the contract with no function of its own.
-                    None => site
-                        .rsplit_once("::")
-                        .map_or(site.as_str(), |(_, p)| p)
-                        .to_string(),
+                    None => match export.document_of(site) {
+                        // A route only a document lists.
+                        Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
+                        // A route file that serves the contract with no function of its own.
+                        None => site
+                            .rsplit_once("::")
+                            .map_or(site.as_str(), |(_, p)| p)
+                            .to_string(),
+                    },
                 };
                 let line = format!("{} {location} {}", repo.identity, channel::shown(&contract));
                 hits.push((r, format!("{contract} {site}"), line));
