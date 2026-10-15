@@ -323,12 +323,12 @@ const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
 /// Python clients send requests with them.
 const HTTP_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
 
-/// An app or router: the file and index of the call that creates it.
-type Router<'a> = (&'a str, usize);
+/// A call by its file and index: what creates an app or a router, or a URLconf entry.
+type CallAt<'a> = (&'a str, usize);
 
 /// For each router, the routers it is mounted on and the segment the mount puts before its
 /// routes, `None` when it cannot be read.
-type Mounts<'a> = BTreeMap<Router<'a>, Vec<(Router<'a>, Option<String>)>>;
+type Mounts<'a> = BTreeMap<CallAt<'a>, Vec<(CallAt<'a>, Option<String>)>>;
 
 /// `prefix` and `path` joined with one `/`.
 fn join(prefix: &str, path: &str) -> String {
@@ -343,10 +343,10 @@ fn join(prefix: &str, path: &str) -> String {
 /// prefix of the router it is mounted on, or its `root` prefix when nothing mounts it (`None`
 /// when such a router is not served). A prefix that cannot be read adds none.
 fn prefixes<'a>(
-    router: Router<'a>,
+    router: CallAt<'a>,
     mounts: &Mounts<'a>,
-    root: &dyn Fn(Router<'a>) -> Option<String>,
-    seen: &mut Vec<Router<'a>>,
+    root: &dyn Fn(CallAt<'a>) -> Option<String>,
+    seen: &mut Vec<CallAt<'a>>,
 ) -> Vec<String> {
     let Some(parents) = mounts.get(&router) else {
         return root(router).into_iter().collect();
@@ -383,7 +383,7 @@ fn text(value: Value) -> Option<String> {
 
 /// Whether the call `router` creates an Express app or router: `express()`, `Router()` or
 /// `express.Router()`, unless an import from another module than `express` binds the name.
-fn is_express<'a>(code: &Code<'a>, (path, n): Router<'a>) -> bool {
+fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
     let call = &code.files()[path].calls[n];
     ROUTERS.contains(&call.callee.as_str())
         && (code.external(path, &call.scope, &call.callee))
@@ -395,7 +395,7 @@ fn is_express<'a>(code: &Code<'a>, (path, n): Router<'a>) -> bool {
 /// router is followed through constants, imports, arguments and return values.
 // ponytail: `router.route(path)` chains and `require` are not followed.
 fn express(code: &Code) -> Vec<Found> {
-    let routers = |path, scope, name| -> Vec<Router> {
+    let routers = |path, scope, name| -> Vec<CallAt> {
         let origins = code.origins(path, scope, name).into_iter();
         origins.filter(|&r| is_express(code, r)).collect()
     };
@@ -448,7 +448,7 @@ fn express(code: &Code) -> Vec<Found> {
             continue;
         };
         let route = render(&parts);
-        let root = |_: Router| Some(String::new());
+        let root = |_: CallAt| Some(String::new());
         for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
@@ -556,7 +556,7 @@ const FRAMEWORKS: &[Framework] = &[
 /// framework, may put it there instead.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     // The framework that creates an app or router, and whether it is an app.
-    let framework = |(path, n): Router<'a>| -> Option<(&Framework, bool)> {
+    let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
         let call = &code.files()[path].calls[n];
         let name = code.external(path, &call.scope, &call.callee)?;
         FRAMEWORKS.iter().find_map(|f| {
@@ -564,12 +564,12 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
             (app || f.routers.contains(&name.as_str())).then_some((f, app))
         })
     };
-    let routers = |path, scope, name| -> Vec<(Router, &Framework)> {
+    let routers = |path, scope, name| -> Vec<(CallAt, &Framework)> {
         let origins = code.origins(path, scope, name).into_iter();
         origins.filter_map(|r| Some((r, framework(r)?.0))).collect()
     };
     // The prefix a router's constructor gives it: none when absent.
-    let own = |router @ (path, n): Router<'a>| -> Option<String> {
+    let own = |router @ (path, n): CallAt<'a>| -> Option<String> {
         let call = code.call(path, n)?;
         match call.keyword(framework(router)?.0.prefix) {
             None => Some(String::new()),
@@ -578,7 +578,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     };
     let mut mounts = Mounts::new();
     // The apps and routers holding a mount that takes apps and whose child cannot be read.
-    let mut unread: Vec<(Router, &Framework)> = Vec::new();
+    let mut unread: Vec<(CallAt, &Framework)> = Vec::new();
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
@@ -607,7 +607,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                 let given = argument(mount, how.prefix)
                     .map(|p| code.value(path, &call.scope, p))
                     .filter(|p| !matches!(p, Value::Undefined));
-                let children: Vec<Router> = (code.value_origins(path, &call.scope, child))
+                let children: Vec<CallAt> = (code.value_origins(path, &call.scope, child))
                     .into_iter()
                     .filter(|&c| framework(c).is_some_and(|(f, _)| std::ptr::eq(f, kind)))
                     .collect();
@@ -627,7 +627,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     // Where a router nothing mounts is served: an app at its root, unless a mount that cannot
     // be read may hold it.
-    let root = |router: Router<'a>| -> Option<String> {
+    let root = |router: CallAt<'a>| -> Option<String> {
         let (kind, app) = framework(router)?;
         let elsewhere = (unread.iter()).any(|&(at, f)| at != router && std::ptr::eq(f, kind));
         (app && !elsewhere).then(|| own(router)).flatten()
@@ -920,68 +920,135 @@ fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
     allowed
 }
 
+/// What an `include()` argument names.
+enum Include<'a> {
+    /// A URLconf module of the repository.
+    Module(&'a str),
+    /// The entries of a list, as written.
+    Entries(&'a Value),
+    /// A dotted name no module of the repository answers to: a module outside it, or one
+    /// Meada cannot resolve, so any URLconf whose path ends with it may be that module.
+    Named(String),
+    /// Anything Meada cannot read: it may name any URLconf.
+    Unknown,
+}
+
+/// What the `include()` argument `arg`, written in `scope` of `path`, names: a module by dotted
+/// name or as a module, a list of entries, or either of them first in a tuple with the
+/// application namespace (`include(("shop.urls", "shop"))`).
+fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -> Include<'a> {
+    let dotted = |value: Value| -> Include<'a> {
+        let Value::Str(parts) = value else {
+            return Include::Unknown;
+        };
+        let Some(name) = literal(&parts) else {
+            return Include::Unknown;
+        };
+        match code.import_file(path, &name) {
+            Some(module) => Include::Module(module),
+            None => Include::Named(name),
+        }
+    };
+    let entries = || {
+        let origins = code.value_origins(path, scope, arg);
+        let known = !origins.is_empty()
+            && (origins.iter())
+                .all(|&o| is_call(code, o, DJANGO_PATH) || is_call(code, o, DJANGO_RE_PATH));
+        if known {
+            Include::Entries(arg)
+        } else {
+            Include::Unknown
+        }
+    };
+    match arg {
+        Value::List(items) => match &items[..] {
+            [first, Value::Str(_)] => include(code, path, scope, first),
+            _ => Include::Entries(arg),
+        },
+        Value::Str(_) => dotted(code.value(path, scope, arg)),
+        Value::Ref(name) => {
+            if let Some(module) = code.module(path, scope, name) {
+                return Include::Module(module);
+            }
+            if let Some(name) = code.external(path, scope, name) {
+                return Include::Named(name);
+            }
+            match code.value(path, scope, arg) {
+                value @ Value::Str(_) => dotted(value),
+                _ => entries(),
+            }
+        }
+        _ => entries(),
+    }
+}
+
 /// The URLconf entries an `include()` call at `index` of `path` holds: the `urlpatterns` of
-/// the module it names (by dotted name or as a module), or the entries of the list it is given.
-fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Router<'a>> {
+/// the module it names, or the entries of the list it is given.
+fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<CallAt<'a>> {
     let Some(call) = code.call(path, index) else {
         return Vec::new();
     };
     let Some(arg) = call.args.first() else {
         return Vec::new();
     };
-    match conf(code, path, &call.scope, arg) {
-        Some(module) => code.origins(module, "", "urlpatterns"),
-        None => code.value_origins(path, &call.scope, arg),
+    match include(code, path, &call.scope, arg) {
+        Include::Module(module) => code.origins(module, "", "urlpatterns"),
+        Include::Entries(list) => code.value_origins(path, &call.scope, list),
+        Include::Named(_) | Include::Unknown => Vec::new(),
     }
 }
 
-/// The URLconf module an `include()` argument names, by dotted name or as a module.
-fn conf<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -> Option<&'a str> {
-    match arg {
-        Value::Ref(name) => code.module(path, scope, name),
-        Value::Str(_) => {
-            let Value::Str(parts) = code.value(path, scope, arg) else {
-                return None;
-            };
-            code.import_file(path, &literal(&parts)?)
-        }
-        _ => None,
-    }
+/// Whether `module`, a file of the repository, may be what the dotted name `name` imports from
+/// some source root: its dotted path is `name` or ends with it.
+fn may_be(module: &str, name: &str) -> bool {
+    let module = module.strip_suffix(".py").unwrap_or(module);
+    let module = module.strip_suffix("/__init__").unwrap_or(module);
+    let module = module.replace('/', ".");
+    module == name || module.ends_with(&format!(".{name}"))
+}
+
+/// Whether the call at `at` is the function `name` outside the repository.
+fn is_call<'a>(code: &Code<'a>, (path, n): CallAt<'a>, name: &str) -> bool {
+    let call = &code.files()[path].calls[n];
+    code.external(path, &call.scope, &call.callee).as_deref() == Some(name)
 }
 
 /// Django providers: the `path()` and `re_path()` entries of every root URLconf's
-/// `urlpatterns` (a module no `include()` names), each `include()` followed at any depth with
-/// the route before it. A function view serves the methods its decorators allow, or every
-/// method (`ANY`); a class-based view (`View.as_view()`) the handler methods it defines.
+/// `urlpatterns`, each `include()` followed at any depth with the route before it. A root is a
+/// module no `include()` may name: none names it, none holds a dotted name its path ends with,
+/// and none holds an argument Meada cannot read. A function view serves the methods its
+/// decorators allow, or every method (`ANY`); a class-based view (`View.as_view()`) the handler
+/// methods it defines.
 fn django<'a>(code: &Code<'a>) -> Vec<Found> {
-    let is = |(path, n): Router<'a>, name: &str| {
-        let call = &code.files()[path].calls[n];
-        code.external(path, &call.scope, &call.callee).as_deref() == Some(name)
-    };
-    let mut confs: Vec<&str> = (code.files().iter())
+    let mut roots: Vec<&str> = (code.files().iter())
         .filter(|(_, f)| f.consts.iter().any(|c| c.name == "urlpatterns"))
         .map(|(&path, _)| path)
         .collect();
-    if confs.is_empty() {
+    if roots.is_empty() {
         return Vec::new();
     }
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
-            // The name check first: `is` resolves the callee.
+            // The name check first: `is_call` resolves the callee.
             let named = call.callee.rsplit('.').next() == Some("include");
-            if named
-                && is((path, n), DJANGO_INCLUDE)
-                && let Some(arg) = code.args(path, n).and_then(<[_]>::first)
-                && let Some(module) = conf(code, path, &call.scope, arg)
-            {
-                confs.retain(|&c| c != module);
+            if !named || !is_call(code, (path, n), DJANGO_INCLUDE) {
+                continue;
+            }
+            let Some(arg) = code.args(path, n).and_then(<[_]>::first) else {
+                continue;
+            };
+            match include(code, path, &call.scope, arg) {
+                Include::Module(module) => roots.retain(|&c| c != module),
+                Include::Named(name) => roots.retain(|c| !may_be(c, &name)),
+                Include::Unknown => roots.clear(),
+                Include::Entries(_) => {}
             }
         }
     }
     let mut found = Vec::new();
-    for root in confs {
+    for root in roots {
         let entries = code.origins(root, "", "urlpatterns");
-        urlconf(code, &is, entries, "", &mut Vec::new(), &mut found);
+        urlconf(code, entries, "", &mut Vec::new(), &mut found);
     }
     found
 }
@@ -990,14 +1057,16 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
 /// being followed, so one met again (a cycle) adds nothing.
 fn urlconf<'a>(
     code: &Code<'a>,
-    is: &dyn Fn(Router<'a>, &str) -> bool,
-    entries: Vec<Router<'a>>,
+    entries: Vec<CallAt<'a>>,
     prefix: &str,
-    stack: &mut Vec<Router<'a>>,
+    stack: &mut Vec<CallAt<'a>>,
     found: &mut Vec<Found>,
 ) {
     for entry @ (path, n) in entries {
-        let regex = match (is(entry, DJANGO_PATH), is(entry, DJANGO_RE_PATH)) {
+        let regex = match (
+            is_call(code, entry, DJANGO_PATH),
+            is_call(code, entry, DJANGO_RE_PATH),
+        ) {
             (true, _) => false,
             (_, true) => true,
             _ => continue,
@@ -1037,12 +1106,12 @@ fn urlconf<'a>(
             let Some(origin_call) = code.call(at, i) else {
                 continue;
             };
-            if is(origin, DJANGO_INCLUDE) {
+            if is_call(code, origin, DJANGO_INCLUDE) {
                 if stack.contains(&origin) {
                     continue;
                 }
                 stack.push(origin);
-                urlconf(code, is, included(code, at, i), &route, stack, found);
+                urlconf(code, included(code, at, i), &route, stack, found);
                 stack.pop();
             } else if let Some(class) = origin_call.callee.strip_suffix(".as_view")
                 && let Some(class) = code.definition(at, &origin_call.scope, class)

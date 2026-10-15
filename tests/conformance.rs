@@ -1254,6 +1254,28 @@ fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
 }
 
 #[test]
+fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
+    let (_, actual) = providers("python_django_includes", "python-django", "");
+    let expected = [
+        ("http::ANY::/health", "mysite/views.py::health"),
+        // `include()` of a tuple, holding a module's dotted name or a list of entries.
+        ("http::ANY::/shop/items", "shop/views.py::items"),
+        ("http::ANY::/extra/ping", "mysite/views.py::ping"),
+        // `apps/vendor/urls.py` may be what `include("vendor.urls")` names: no `/deals`.
+    ];
+    assert_eq!(actual, pairs(&expected));
+
+    // An `include()` whose argument cannot be read may name any URLconf: none is a root.
+    let repo = fixture_repo("python_django_unknown", "python-django", Some(ORIGIN));
+    let plugins = "from django.urls import include, path\nfrom registry import load\n\n\
+                   urlpatterns = [path(\"plugins/\", include(load()))]\n";
+    std::fs::write(repo.join("apps/plugins.py"), plugins).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(json["providers"], serde_json::json!([]));
+}
+
+#[test]
 fn python_routers_whose_mount_is_not_seen_are_not_served_at_the_root() {
     let (_, actual) = providers("python_mounts", "python-mounts", "");
     let expected = [
