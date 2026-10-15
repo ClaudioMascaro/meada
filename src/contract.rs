@@ -102,6 +102,11 @@ pub enum Role {
     /// `contract`: it holds no channel of its own and produces to the queues the bindings
     /// route it to (spec #20).
     Publish,
+    /// Neither side: a call through a binding imported from a bare specifier (`via`), naming
+    /// `method` of it (`greet`, `default`, `Client.create`), no `contract`. Stored, never
+    /// exported; at query time, one that resolves into a package of the workspace becomes a
+    /// consumer of that package (spec #22).
+    Import,
 }
 
 impl Role {
@@ -112,6 +117,7 @@ impl Role {
             Role::Consumer => "consumer",
             Role::Binding => "binding",
             Role::Publish => "publish",
+            Role::Import => "import",
         }
     }
 }

@@ -1,24 +1,275 @@
 {
   "repository": "example.com/pkg/shared",
-  "files": [],
-  "symbols": [],
-  "calls": [],
+  "files": [
+    {
+      "path": "esm/lib/parts/index.ts",
+      "hash": "f13869d7bbddb89e5feba9a21850ad9d2b9abf79c1ea4bdab535fdf009c1b392"
+    },
+    {
+      "path": "esm/lib/tool.ts",
+      "hash": "cdb73175f2667fe1c4ed098a067e91ad1b3976c62aa284905e79bb9a07543eba"
+    },
+    {
+      "path": "esm/src/index.mjs",
+      "hash": "0538f72569e57969370e40c0ce7769cc559d00de7c5030ed1c845d398349d48e"
+    },
+    {
+      "path": "kit/src/format.ts",
+      "hash": "8dc6cea527a5f83cdcb5e3ebb5ba0149c082d855a6264c1a1e6b7eaeab72f5ae"
+    },
+    {
+      "path": "kit/src/greet.ts",
+      "hash": "52da1ff633cc2f08e1d09aee4f2cad80fa6b17c2cfea983cb2787a116b5f456c"
+    },
+    {
+      "path": "kit/src/index.ts",
+      "hash": "34ea6b3d1bbc731b3a897d09daf78f612893930310016f08d47bbd645f298fb5"
+    },
+    {
+      "path": "kit/src/internal/secret.ts",
+      "hash": "ccf3913da78714d73e08750c1fd236cd74c094f6312973d6626f74ab7c67b46c"
+    },
+    {
+      "path": "kit/src/legacy.ts",
+      "hash": "31c2800150e264731e5410240721a3587a9c3bf49dc78f716ffed1d0f327f923"
+    },
+    {
+      "path": "kit/src/more.ts",
+      "hash": "da83c5d962751a6dd9ff0cdb26f017629300e4ab43a9aba3fb4f360fbd031272"
+    },
+    {
+      "path": "kit/src/utils/slug.ts",
+      "hash": "f76b02cee77f96941152b79568cf54d41e6758a3f0708b3cb2bd8a008bdcaaf3"
+    },
+    {
+      "path": "typed/src/index.ts",
+      "hash": "30c6f501adeca72e78c38331b928bf2ea31755df0e270369f4e406684240126d"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+      "span": {
+        "path": "esm/lib/parts/index.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+      "span": {
+        "path": "esm/lib/tool.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::esm/src/index.mjs::esm",
+      "span": {
+        "path": "esm/src/index.mjs",
+        "start": 7,
+        "end": 41
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/format.ts::format",
+      "span": {
+        "path": "kit/src/format.ts",
+        "start": 7,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 7,
+        "end": 80
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 82,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/index.ts::kit",
+      "span": {
+        "path": "kit/src/index.ts",
+        "start": 159,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/internal/secret.ts::secret",
+      "span": {
+        "path": "kit/src/internal/secret.ts",
+        "start": 7,
+        "end": 49
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/legacy.ts::greet",
+      "span": {
+        "path": "kit/src/legacy.ts",
+        "start": 74,
+        "end": 121
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 83,
+        "end": 156
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 100,
+        "end": 154
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::farewell",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 7,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "span": {
+        "path": "kit/src/utils/slug.ts",
+        "start": 7,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::typed/src/index.ts::typed",
+      "span": {
+        "path": "typed/src/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/shared::kit/src/format.ts::format::value.toFixed#0",
+      "caller": "example.com/pkg/shared::kit/src/format.ts::format",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/format.ts",
+        "start": 57,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::greet::shout#0",
+      "caller": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 55,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::shout::text.toUpperCase#0",
+      "caller": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 130,
+        "end": 148
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client.create::Client#0",
+      "caller": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "target": "example.com/pkg/shared::kit/src/more.ts::Client",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 137,
+        "end": 149
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify::text.toLowerCase#0",
+      "caller": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/utils/slug.ts",
+        "start": 57,
+        "end": 75
+      }
+    }
+  ],
   "providers": [
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/shared::esm/package.json"
+    },
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/shared::kit/package.json"
+    },
     {
       "contract": "package::npm::@example/shared",
       "site": "example.com/pkg/shared::package.json"
+    },
+    {
+      "contract": "package::npm::@example/typed",
+      "site": "example.com/pkg/shared::typed/package.json"
     }
   ],
   "consumers": [],
   "packages": [
     {
+      "name": "@example/esm",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "esm"
+    },
+    {
+      "name": "@example/kit",
+      "version": "2.1.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "kit"
+    },
+    {
       "name": "@example/shared",
       "version": "1.2.0",
       "repository": "example.com/pkg/shared",
       "directory": "."
+    },
+    {
+      "name": "@example/typed",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "typed"
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0)"
+    },
     {
       "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
       "provider": "example.com/pkg/shared::package.json",
@@ -41,6 +292,41 @@
       "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
     },
     {
+      "consumer": "example.com/pkg/api::src/report.js::report::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::e2e/package.json::devDependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/esm",
+      "provider": "example.com/pkg/shared::esm/package.json",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/shared",
       "provider": "example.com/pkg/shared::package.json",
       "contract": "package::npm::@example/shared",
@@ -48,11 +334,88 @@
       "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0)"
     },
     {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/typed",
+      "provider": "example.com/pkg/shared::typed/package.json",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0)"
+    },
+    {
       "consumer": "example.com/pkg/web::package.json::devDependencies::@example/shared",
       "provider": "example.com/pkg/shared::package.json",
       "contract": "package::npm::@example/shared",
       "level": "exact",
       "reason": "package::npm::@example/shared ~1.2.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::Client.create#0",
+      "provider": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::all.farewell#0",
+      "provider": "example.com/pkg/shared::kit/src/more.ts::farewell",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::fixed#0",
+      "provider": "example.com/pkg/shared::kit/src/format.ts::format",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::kit#0",
+      "provider": "example.com/pkg/shared::kit/src/index.ts::kit",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::slugify#0",
+      "provider": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::welcome::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "provider": "example.com/pkg/shared::esm/src/index.mjs::esm",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import module"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "provider": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "provider": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "provider": "example.com/pkg/shared::typed/src/index.ts::typed",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
     }
   ]
 }

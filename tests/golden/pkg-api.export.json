@@ -1,10 +1,41 @@
 {
   "repository": "example.com/pkg/api",
-  "files": [],
-  "symbols": [],
-  "calls": [],
+  "files": [
+    {
+      "path": "src/report.js",
+      "hash": "82b77eab26002f91d6f06c4e83fd47a2c2e775d7c294c77afcc01f514586962f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/api::src/report.js::report",
+      "span": {
+        "path": "src/report.js",
+        "start": 46,
+        "end": 90
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/api::src/report.js::report::greet#0",
+      "caller": "example.com/pkg/api::src/report.js::report",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/report.js",
+        "start": 75,
+        "end": 87
+      }
+    }
+  ],
   "providers": [],
   "consumers": [
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "via": null
+    },
     {
       "contract": "package::npm::@example/shared",
       "site": "example.com/pkg/api::package.json::dependencies::@example/shared",
@@ -19,9 +50,20 @@
       "contract": "package::npm::@example/shared",
       "site": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
       "via": null
+    },
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/api::src/report.js::report::greet#0",
+      "via": null
     }
   ],
   "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/kit",
+      "range": "2.x"
+    },
     {
       "manifest": "package.json",
       "field": "dependencies",
@@ -40,7 +82,24 @@
       "range": ">=1.0.0"
     }
   ],
+  "imports": [
+    {
+      "site": "example.com/pkg/api::src/report.js::report::greet#0",
+      "specifier": "@example/kit",
+      "name": "greet",
+      "level": "exact",
+      "how": "exports",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::greet"
+    }
+  ],
   "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0)"
+    },
     {
       "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
       "provider": "example.com/pkg/shared::package.json",
@@ -61,6 +120,13 @@
       "contract": "package::npm::@example/shared",
       "level": "exact",
       "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::src/report.js::report::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0); import exports"
     }
   ]
 }

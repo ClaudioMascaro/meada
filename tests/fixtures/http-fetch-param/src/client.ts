@@ -25,3 +25,18 @@ export async function other({ client = axios }) {
 export async function bare(send) {
   return send(`${BASE}/bare`);
 }
+
+// Hidden names: a binding spelled like a constant or a parameter of the same function hides
+// it, so neither call is read through it.
+export async function mirrors(urls: string[]) {
+  const url = `${BASE}/health`;
+  for (const url of urls) fetch(url);
+}
+
+export async function retry(request = fetch) {
+  try {
+    throw new Error("x");
+  } catch (request) {
+    return request(`${BASE}/again`);
+  }
+}

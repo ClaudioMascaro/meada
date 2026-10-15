@@ -16,8 +16,8 @@ use crate::contract::{self, Level, Link, Names, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
-use crate::package::{self, Dependency, Manifest, Package};
-use crate::resolve::{Code, Resolution, Resolver, Target};
+use crate::package::{self, Dependency, Hop, Import, ImportCall, Manifest, Package};
+use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::Shape;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's stored
@@ -40,8 +40,14 @@ const SCHEMA_VERSION: i64 = 15;
 /// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
 /// derived from the bytes alone); a document that could not be read keeps its row, so its hash
 /// is cached too. `manifests` holds each `package.json` (spec #22) the same way, its `summary`
-/// being `package::Summary` as JSON (name, version and dependency entries), read from the bytes
-/// alone; a manifest without a name keeps its row too.
+/// being `package::Summary` as JSON (name, version, dependency entries and the entry fields
+/// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
+/// name keeps its row too. An `import` row of `contracts` is a call through a binding imported
+/// from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
+/// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
+/// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
+/// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
+/// time to resolve imports of a package into another repository (spec #22).
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -70,6 +76,7 @@ CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -201,7 +208,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
-                 DELETE FROM documents; DELETE FROM manifests;",
+                 DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports;",
             )?;
             None
         }
@@ -460,6 +467,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         tx.execute(
             "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![role, contract, site, via, path, method, fragments],
+        )?;
+    }
+    tx.execute("DELETE FROM exports", [])?;
+    for e in resolvers.values().flat_map(Resolver::exported) {
+        tx.execute(
+            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
+            params![e.path, e.name, e.file, e.target],
         )?;
     }
     tx.execute("DELETE FROM meta", [])?;
@@ -764,6 +778,16 @@ pub(crate) struct Export {
     /// The dependency entries naming a package of the workspace, by manifest, field, name.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) dependencies: Vec<Dependency>,
+    /// The calls through a binding imported from a bare specifier, by site. Not exported:
+    /// `package::import` resolves those that name a package of the workspace.
+    #[serde(skip)]
+    pub(crate) import_calls: Vec<ImportCall>,
+    /// What each file exports (the `exports` table), sorted, for `package::import`.
+    #[serde(skip)]
+    pub(crate) exported: Vec<Exported>,
+    /// The imports resolved into a package of the workspace, by call site, then target.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) imports: Vec<Import>,
     pub(crate) links: Vec<Link>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -938,6 +962,10 @@ pub(crate) struct Consumer {
     pub(crate) method: Option<String>,
     #[serde(skip)]
     pub(crate) fragments: Vec<String>,
+    /// For a call through a package import, where it resolves in each provider of the package
+    /// (`package::import`); `Packages::link` turns them into links.
+    #[serde(skip)]
+    pub(crate) hops: Vec<Hop>,
 }
 
 /// The index content of the repository attached as `schema`, every list sorted. Links are
@@ -1025,6 +1053,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 fragments: fragments
                     .and_then(|f| serde_json::from_str(&f).ok())
                     .unwrap_or_default(),
+                hops: Vec::new(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -1075,7 +1104,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let manifests = (rows.into_iter())
+    let manifests: Vec<Manifest> = (rows.into_iter())
         .map(|(path, summary)| {
             Ok(Manifest {
                 path,
@@ -1083,6 +1112,42 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })
         .collect::<Result<_>>()?;
+    // Only a repository with a manifest can import a package, and only one with a named
+    // manifest provides one: the rows that resolve imports are read for those alone.
+    let import_calls = match manifests.is_empty() {
+        true => Vec::new(),
+        false => db
+            .prepare(&format!(
+                "SELECT site, path, via, method FROM {schema}.contracts \
+                 WHERE role = 'import' ORDER BY site, via, method"
+            ))?
+            .query_map([], |r| {
+                Ok(ImportCall {
+                    site: r.get(0)?,
+                    path: r.get(1)?,
+                    specifier: r.get(2)?,
+                    chain: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
+    let exported = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, name, file, target FROM {schema}.exports \
+                 ORDER BY path, name, file, target"
+            ))?
+            .query_map([], |r| {
+                Ok(Exported {
+                    path: r.get(0)?,
+                    name: r.get(1)?,
+                    file: r.get(2)?,
+                    target: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?,
+    };
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1095,6 +1160,9 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         manifests,
         packages: Vec::new(),
         dependencies: Vec::new(),
+        import_calls,
+        exported,
+        imports: Vec::new(),
         links: Vec::new(),
         documents,
         stale_decisions: Vec::new(),

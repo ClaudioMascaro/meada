@@ -5,16 +5,23 @@
 //! `consume` (a workspace-wide step, since one repository cannot see the others' providers)
 //! turns the entries that name one into consumers. Meada reads no lockfile and queries no
 //! registry: a dependency on anything outside the workspace adds nothing.
+//!
+//! Imports cross too: `extract` stores every call through a binding imported from a bare
+//! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
+//! workspace provides into the provider's symbol, through its entry fields and what its files
+//! export (`resolve::Exported`). Nothing of it is stored as a link: `link` derives the hop.
 
-use std::collections::HashMap;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::channel::Routes;
-use crate::contract::{ContractKind, Found, Level, Link};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{self, Consumer, Export, Provider};
-use crate::resolve::Code;
+use crate::lang::ts::with_extensions;
+use crate::resolve::{Code, Exported};
 use crate::workspace::Repository;
 
 pub struct Packages;
@@ -45,6 +52,64 @@ const FIELDS: [&str; 4] = [
 /// The prefix of a range that keeps a dependency inside its own repository.
 const WORKSPACE: &str = "workspace:";
 
+/// The conditions of an `exports` target Meada reads, in order: at each level the first one
+/// present is taken, and no other is followed.
+const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
+
+/// The longest chain of `export *` a lookup in a provider follows; a name further down is not
+/// found.
+// ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
+const MAX_REEXPORTS: usize = 64;
+
+/// The deepest an `exports` target nests conditions; deeper, the subpath has no target.
+// ponytail: real maps nest two or three levels; this bounds the walk over a hostile one.
+const MAX_CONDITIONS: usize = 32;
+
+/// The target the `exports` field of a manifest gives `subpath` (`.` for the bare name, else
+/// `./<rest>`), as written, `*` replaced: exact keys first, then the pattern with one `*` whose
+/// prefix is the longest. A string, or an object without subpath keys, is the target of `.`. A
+/// `null` target, an array of fallbacks, a key or a target with two `*`, keys that mix subpaths
+/// and conditions, or none of `CONDITIONS` present give no target.
+fn exported(exports: &Value, subpath: &str) -> Option<String> {
+    let map = match exports {
+        Value::Object(map) if map.keys().any(|k| k.starts_with('.')) => map,
+        _ => return (subpath == ".").then(|| target(exports, None, 0))?,
+    };
+    if !map.keys().all(|k| k.starts_with('.')) {
+        return None;
+    }
+    if let Some(value) = map.get(subpath) {
+        return target(value, None, 0);
+    }
+    let (_, star, value) = (map.iter())
+        .filter_map(|(key, value)| {
+            let (prefix, suffix) = key.split_once('*')?;
+            let star = subpath.strip_prefix(prefix)?.strip_suffix(suffix)?;
+            (!suffix.contains('*') && !star.is_empty()).then_some((
+                (prefix.len(), key.len()),
+                star,
+                value,
+            ))
+        })
+        .max_by_key(|(rank, _, _)| *rank)?;
+    target(value, Some(star), 0)
+}
+
+/// The path a target of `exports` names, through its conditions (see `exported`).
+fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
+    match value {
+        // One `*` at most, as in a key: the expansion stays the size of the subpath.
+        Value::String(t) if t.matches('*').nth(1).is_none() => {
+            Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s)))
+        }
+        Value::Object(conditions) if depth < MAX_CONDITIONS => {
+            let taken = CONDITIONS.iter().find_map(|c| conditions.get(*c))?;
+            target(taken, star, depth + 1)
+        }
+        _ => None,
+    }
+}
+
 /// What Meada read from one `package.json`. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
@@ -56,6 +121,16 @@ pub struct Summary {
     /// Sorted by field, then name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<Entry>,
+    /// The `exports` field as written; `None` when absent or `null`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exports: Option<Value>,
+    /// The `types`, `module` and `main` entry fields; a field that is not a string is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub types: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main: Option<String>,
 }
 
 /// One dependency entry of a manifest.
@@ -83,6 +158,42 @@ pub struct Package {
     pub repository: String,
     /// The directory of the manifest, relative to the repository root: `.` for the root.
     pub directory: String,
+}
+
+/// A call through a binding imported from a bare specifier, as the index stores it.
+pub struct ImportCall {
+    /// The call site.
+    pub site: String,
+    /// The file making the call.
+    pub path: String,
+    pub specifier: String,
+    /// What the call names of the import: `greet`, `default`, `Client.create`.
+    pub chain: String,
+}
+
+/// Where a call through a package import resolves in one provider of the package.
+pub struct Hop {
+    /// The provider's site: its manifest.
+    pub manifest: String,
+    /// The symbol reached.
+    pub target: String,
+    /// What resolved the import: `exports`, `types`, `module`, `main` or `path`.
+    pub how: &'static str,
+    /// The import's level.
+    pub level: Level,
+}
+
+/// An import resolved into a package of the workspace (`meada export`).
+#[derive(Serialize)]
+pub struct Import {
+    /// The call through the imported binding.
+    pub site: String,
+    pub specifier: String,
+    /// What the call names of the import.
+    pub name: String,
+    pub level: Level,
+    pub how: &'static str,
+    pub target: String,
 }
 
 /// A dependency entry that names a package of the workspace (`meada export`).
@@ -130,6 +241,10 @@ pub fn read(src: &[u8]) -> Summary {
         name: text(root.get("name")).filter(|n| valid_name(n)),
         version: text(root.get("version")),
         dependencies,
+        exports: root.get("exports").filter(|v| !v.is_null()).cloned(),
+        types: text(root.get("types")),
+        module: text(root.get("module")),
+        main: text(root.get("main")),
     }
 }
 
@@ -156,6 +271,246 @@ fn site(repository: &str, path: &str) -> String {
 /// The directory of the manifest at `path`: `.` for one at the root.
 fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
+}
+
+/// The package a bare specifier names and the subpath inside it: `@a/b/c` is `@a/b` and
+/// `./c`, `x` is `x` and `.`. `None` for a relative or absolute specifier, or a name npm does not
+/// accept (`node:fs` among them).
+fn split(specifier: &str) -> Option<(&str, String)> {
+    if specifier.starts_with(['.', '/']) {
+        return None;
+    }
+    let segments = if specifier.starts_with('@') { 2 } else { 1 };
+    let end = (specifier.match_indices('/').nth(segments - 1)).map_or(specifier.len(), |(i, _)| i);
+    let (name, rest) = specifier.split_at(end);
+    (valid_name(name) && (segments == 1 || name.contains('/'))).then(|| (name, format!(".{rest}")))
+}
+
+/// The manifest of the deepest directory holding `path`.
+fn nearest<'m>(manifests: &'m [Manifest], path: &str) -> Option<&'m Manifest> {
+    (manifests.iter())
+        .filter(|m| match directory(&m.path) {
+            "." => true,
+            dir => path
+                .strip_prefix(dir)
+                .is_some_and(|rest| rest.starts_with('/')),
+        })
+        .max_by_key(|m| m.path.len())
+}
+
+/// The files an import of `subpath` of the package at `manifest` may name, most likely first,
+/// and what named them: `exports` when the manifest has it; else, for the bare name, the first
+/// of `types`, `module` and `main` present; else the subpath as a path inside the package, with
+/// the trunk's extension and `index` rules (`path`). Every file stays inside the package
+/// directory.
+fn entry(manifest: &Manifest, subpath: &str) -> Option<(&'static str, Vec<String>)> {
+    let dir = directory(&manifest.path);
+    let s = &manifest.summary;
+    if let Some(exports) = &s.exports {
+        let target = exported(exports, subpath)?;
+        return Some(("exports", vec![inside(dir, target.strip_prefix("./")?)?]));
+    }
+    if subpath == "." {
+        let fields = [
+            ("types", &s.types),
+            ("module", &s.module),
+            ("main", &s.main),
+        ];
+        let (how, target) = fields
+            .into_iter()
+            .find_map(|(how, t)| Some((how, t.as_deref()?)))?;
+        let target = target.strip_prefix("./").unwrap_or(target);
+        return Some((how, vec![inside(dir, target)?]));
+    }
+    Some((
+        "path",
+        with_extensions(&inside(dir, subpath.strip_prefix("./")?)?),
+    ))
+}
+
+/// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
+/// it is empty, absolute, or has an empty, `.` or `..` segment.
+fn inside(dir: &str, path: &str) -> Option<String> {
+    if (path.split('/')).any(|s| s.is_empty() || s == "." || s == "..") {
+        return None;
+    }
+    Some(match dir {
+        "." => path.to_string(),
+        dir => format!("{dir}/{path}"),
+    })
+}
+
+/// What a provider answers imports with: its files and symbols, and what each file exports.
+struct Provided<'e> {
+    files: HashSet<&'e str>,
+    symbols: HashSet<&'e str>,
+    exported: HashMap<&'e str, Vec<&'e Exported>>,
+}
+
+impl<'e> Provided<'e> {
+    fn new(export: &'e Export) -> Self {
+        let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
+        for e in &export.exported {
+            exported.entry(&e.path).or_default().push(e);
+        }
+        Self {
+            files: export.files.iter().map(|f| f.path.as_str()).collect(),
+            symbols: export.symbols.iter().map(|s| s.id.as_str()).collect(),
+            exported,
+        }
+    }
+
+    /// The symbol an import of `subpath` of the package at `manifest` of `repository` names as
+    /// `chain`, and what resolved the import. The entry must be a source file the provider
+    /// indexes (a declaration file is none); the chain's head is what that file exports, and
+    /// each further name a member of that definition or a name the whole file exports.
+    fn resolve(
+        &self,
+        repository: &str,
+        manifest: &Manifest,
+        subpath: &str,
+        chain: &str,
+    ) -> Option<(&'static str, String)> {
+        let (how, candidates) = entry(manifest, subpath)?;
+        let file = (candidates.iter())
+            .find(|c| self.files.contains(c.as_str()) && !c.ends_with(".d.ts"))?;
+        let mut names = chain.split('.');
+        let mut at = self.lookup(file, names.next()?, 0, &mut HashSet::new())?;
+        for member in names {
+            at = match at {
+                (file, None) => self.lookup(&file, member, 0, &mut HashSet::new())?,
+                (file, Some(def)) => (file, Some(format!("{def}.{member}"))),
+            };
+        }
+        let (file, Some(def)) = at else {
+            return None;
+        };
+        let id = format!("{repository}::{file}::{def}");
+        self.symbols.contains(id.as_str()).then_some((how, id))
+    }
+
+    /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
+    /// `None` for the whole file. The file's own export of `name` decides; without one, the
+    /// files it re-exports with `export *` are looked into, for any name but `default`, at most
+    /// `MAX_REEXPORTS` deep: two that give it differently make it ambiguous, so not exported, as
+    /// in ES modules. `seen` cuts cycles.
+    fn lookup(
+        &self,
+        file: &str,
+        name: &str,
+        depth: usize,
+        seen: &mut HashSet<(String, String)>,
+    ) -> Option<(String, Option<String>)> {
+        if depth > MAX_REEXPORTS || !seen.insert((file.to_string(), name.to_string())) {
+            return None;
+        }
+        let rows = self.exported.get(file).map_or(&[][..], Vec::as_slice);
+        if let Some(own) = rows.iter().find(|e| e.name.as_deref() == Some(name)) {
+            return Some((own.file.clone()?, own.target.clone()));
+        }
+        if name == "default" {
+            return None;
+        }
+        let mut found = None;
+        for all in rows.iter().filter(|e| e.name.is_none()) {
+            let Some(hit) =
+                (all.file.as_deref()).and_then(|f| self.lookup(f, name, depth + 1, seen))
+            else {
+                continue;
+            };
+            if found.as_ref().is_some_and(|f| *f != hit) {
+                return None;
+            }
+            found = Some(hit);
+        }
+        found
+    }
+}
+
+/// The workspace step after `consume`: each call through a package import, whose package the
+/// importing file's nearest manifest depends on (in any of the four fields) and some repository
+/// of the workspace provides (a `workspace:` range: its own), resolves in each such provider
+/// (`Provided::resolve`). A call that resolves in one at least becomes a consumer of the package
+/// at its site, the range of the entry in `Consumer::method` and where it resolves in
+/// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
+/// provider. Any other, an import of a package outside the workspace included, adds nothing.
+pub fn import(exports: &mut [Export]) {
+    let mut providers: HashMap<&str, Vec<(usize, &Manifest)>> = HashMap::new();
+    for (n, export) in exports.iter().enumerate() {
+        for m in &export.manifests {
+            if let Some(name) = &m.summary.name {
+                providers.entry(name).or_default().push((n, m));
+            }
+        }
+    }
+    // Built for a provider the first time an import reaches it.
+    let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
+    let mut found = Vec::new();
+    for (n, export) in exports.iter().enumerate() {
+        let mut consumers = Vec::new();
+        let mut imports = Vec::new();
+        for call in &export.import_calls {
+            let Some((name, subpath)) = split(&call.specifier) else {
+                continue;
+            };
+            let Some(candidates) = providers.get(name) else {
+                continue;
+            };
+            let Some(entry) = nearest(&export.manifests, &call.path)
+                .and_then(|m| m.summary.dependencies.iter().find(|e| e.name == name))
+            else {
+                continue;
+            };
+            let local = entry
+                .range
+                .as_deref()
+                .is_some_and(|r| r.starts_with(WORKSPACE));
+            let mut hops = Vec::new();
+            for &(m, manifest) in candidates {
+                if local && m != n {
+                    continue;
+                }
+                let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
+                let repository = &exports[m].repository;
+                let Some((how, target)) = at.resolve(repository, manifest, &subpath, &call.chain)
+                else {
+                    continue;
+                };
+                imports.push(Import {
+                    site: call.site.clone(),
+                    specifier: call.specifier.clone(),
+                    name: call.chain.clone(),
+                    level: Level::Exact,
+                    how,
+                    target: target.clone(),
+                });
+                hops.push(Hop {
+                    manifest: site(repository, &manifest.path),
+                    target,
+                    how,
+                    level: Level::Exact,
+                });
+            }
+            if !hops.is_empty() {
+                consumers.push(Consumer {
+                    contract: Some(contract(name)),
+                    site: call.site.clone(),
+                    via: None,
+                    shape: None,
+                    method: entry.range.clone(),
+                    fragments: Vec::new(),
+                    hops,
+                });
+            }
+        }
+        found.push((consumers, imports));
+    }
+    for (export, (consumers, mut imports)) in exports.iter_mut().zip(found) {
+        export.consumers.extend(consumers);
+        index::sort_consumers(&mut export.consumers);
+        imports.sort_by(|a, b| (&a.site, &a.target).cmp(&(&b.site, &b.target)));
+        export.imports = imports;
+    }
 }
 
 /// The workspace step that follows every repository's `declare`: for each dependency entry
@@ -200,6 +555,7 @@ pub fn consume(exports: &mut [Export]) {
                     shape: None,
                     method: e.range.clone(),
                     fragments: Vec::new(),
+                    hops: Vec::new(),
                 });
                 dependencies.push(Dependency {
                     manifest: manifest.path.clone(),
@@ -310,9 +666,34 @@ impl ContractKind for Packages {
         Some(("package", "dependent"))
     }
 
-    /// No code names a package: the manifests are read apart from the packs.
-    fn extract(&self, _code: &Code) -> Vec<Found> {
-        Vec::new()
+    /// Every call through a binding imported from a bare specifier, as an `Import`: which of
+    /// them name a package of the workspace is known at query time only (`import`). The
+    /// manifests are read apart from the packs.
+    fn extract(&self, code: &Code) -> Vec<Found> {
+        let mut found = Vec::new();
+        for (&path, facts) in code.files() {
+            for (index, call) in facts.calls.iter().enumerate() {
+                let Some((specifier, chain)) = code.imported(path, &call.scope, &call.callee)
+                else {
+                    continue;
+                };
+                if chain.is_empty() || split(specifier).is_none() {
+                    continue;
+                }
+                found.push(Found {
+                    role: Role::Import,
+                    site: Site::Call {
+                        path: path.to_string(),
+                        index,
+                    },
+                    contract: None,
+                    via: Some(specifier.to_string()),
+                    method: Some(chain),
+                    fragments: Vec::new(),
+                });
+            }
+        }
+        found
     }
 
     /// One provider and one `packages` row per manifest with a valid name.
@@ -342,7 +723,9 @@ impl ContractKind for Packages {
 
     /// The dependency entry links to the providers of its package: one candidate is `exact`,
     /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
-    /// repository. The reason is `reason()`'s, flag included.
+    /// repository. The reason is `reason()`'s, flag included. A call through a package import
+    /// (`Consumer::hops`) links instead to the symbol it reaches in each provider, at the
+    /// weaker of that level and the import's, the reason followed by `; import <how>`.
     fn link(
         &self,
         consumer: &Consumer,
@@ -366,9 +749,9 @@ impl ContractKind for Packages {
             n => (Level::Ambiguous, Some(n)),
         };
         fits.into_iter()
-            .map(|(_, p)| {
+            .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
-                Link {
+                let link = Link {
                     consumer: consumer.site.clone(),
                     provider: p.site.clone(),
                     contract: contract.clone(),
@@ -379,7 +762,22 @@ impl ContractKind for Packages {
                     },
                     by: None,
                     p: None,
+                };
+                if consumer.hops.is_empty() {
+                    return vec![link];
                 }
+                (consumer.hops.iter())
+                    .filter(|h| h.manifest == p.site)
+                    .map(|h| Link {
+                        consumer: link.consumer.clone(),
+                        provider: h.target.clone(),
+                        contract: link.contract.clone(),
+                        level: link.level.max(h.level),
+                        reason: format!("{}; import {}", link.reason, h.how),
+                        by: None,
+                        p: None,
+                    })
+                    .collect()
             })
             .collect()
     }
@@ -560,6 +958,253 @@ mod tests {
             said(None, None),
             "package::npm::a none (local none), range unchecked"
         );
+    }
+
+    #[test]
+    fn the_exports_map_gives_each_subpath_its_target() {
+        let map = serde_json::json!({
+            ".": {"types": "./src/index.ts", "require": "./dist/index.cjs"},
+            "./format": "./src/format.ts",
+            "./conditions": {"node": "./node.ts", "import": "./import.ts", "default": "./d.ts"},
+            "./nested": {"default": {"require": "./r.ts", "import": "./i.ts"}},
+            "./required": {"require": "./required.ts"},
+            "./none": {"node": "./node.ts"},
+            "./utils/*": {"import": "./src/utils/*.ts"},
+            "./utils/special/*": "./src/special/*.js",
+            "./utils/blocked/*": null,
+            "./blocked": null,
+            "./typed": {"types": null, "default": "./typed.ts"},
+            "./fallbacks": ["./a.ts", "./b.ts"],
+            "./many/*/x/*": "./many.ts",
+            "./two/*": "./src/*/*.ts",
+        });
+        let cases: [(&str, Option<&str>); 18] = [
+            // The first of `types`, `import`, `default`, `require` present is taken.
+            (".", Some("./src/index.ts")),
+            ("./format", Some("./src/format.ts")),
+            ("./conditions", Some("./import.ts")),
+            ("./nested", Some("./i.ts")),
+            ("./required", Some("./required.ts")),
+            // Other conditions are not followed.
+            ("./none", None),
+            // Exact keys first, then the pattern with the longest prefix; `*` is replaced.
+            ("./utils/slug", Some("./src/utils/slug.ts")),
+            ("./utils/a/b", Some("./src/utils/a/b.ts")),
+            ("./utils/special/x", Some("./src/special/x.js")),
+            ("./utils/", None),
+            // A `null` target blocks the subpath, even under a condition taken.
+            ("./utils/blocked/x", None),
+            ("./blocked", None),
+            ("./typed", None),
+            // Fallback arrays and keys with two `*` are not read.
+            ("./fallbacks", None),
+            ("./many/a/x/b", None),
+            // A target with two `*` is not read either.
+            ("./two/x", None),
+            ("./missing", None),
+            ("./format/more", None),
+        ];
+        for (subpath, expected) in cases {
+            assert_eq!(exported(&map, subpath).as_deref(), expected, "{subpath}");
+        }
+        // A string or an object of conditions is the target of `.` alone; keys that mix
+        // subpaths and conditions make no target.
+        let sugar = serde_json::json!("./main.ts");
+        assert_eq!(exported(&sugar, ".").as_deref(), Some("./main.ts"));
+        assert_eq!(exported(&sugar, "./x"), None);
+        let conditions = serde_json::json!({"import": "./i.ts", "require": "./r.ts"});
+        assert_eq!(exported(&conditions, ".").as_deref(), Some("./i.ts"));
+        let mixed = serde_json::json!({".": "./a.ts", "import": "./b.ts"});
+        assert_eq!(exported(&mixed, "."), None);
+    }
+
+    #[test]
+    fn a_target_of_many_stars_is_not_expanded() {
+        let stars = format!("./{}.ts", "*".repeat(1 << 20));
+        let map = serde_json::json!({ "./h/*": stars, ".": stars });
+        assert_eq!(exported(&map, &format!("./h/{}", "x".repeat(64))), None);
+        assert_eq!(exported(&map, "."), None);
+    }
+
+    #[test]
+    fn conditions_nested_past_the_limit_give_no_target() {
+        let nest = |n: usize| {
+            let mut v = serde_json::json!("./deep.ts");
+            for _ in 0..n {
+                v = serde_json::json!({ "default": v });
+            }
+            v
+        };
+        assert_eq!(
+            exported(&nest(MAX_CONDITIONS), ".").as_deref(),
+            Some("./deep.ts")
+        );
+        assert_eq!(exported(&nest(MAX_CONDITIONS + 1), "."), None);
+    }
+
+    fn manifest(path: &str, json: &str) -> Manifest {
+        Manifest {
+            path: path.to_string(),
+            summary: read(json.as_bytes()),
+        }
+    }
+
+    #[test]
+    fn without_exports_the_bare_name_takes_types_then_module_then_main() {
+        let at = |json: &str, subpath: &str| entry(&manifest("lib/package.json", json), subpath);
+        let all = r#"{"types": "./t.ts", "module": "m.ts", "main": "./main.ts"}"#;
+        assert_eq!(at(all, "."), Some(("types", vec!["lib/t.ts".into()])));
+        let two = r#"{"module": "m.ts", "main": "./main.ts"}"#;
+        assert_eq!(at(two, "."), Some(("module", vec!["lib/m.ts".into()])));
+        assert_eq!(
+            at(r#"{"main": "src/index.js"}"#, "."),
+            Some(("main", vec!["lib/src/index.js".into()]))
+        );
+        assert_eq!(at("{}", "."), None);
+        // A subpath is a path inside the package, with the trunk's extension and index rules.
+        let (how, files) = at(all, "./util/x").unwrap();
+        assert_eq!(how, "path");
+        assert_eq!(
+            &files[..3],
+            ["lib/util/x", "lib/util/x.ts", "lib/util/x.tsx"]
+        );
+        assert!(files.contains(&"lib/util/x/index.ts".to_string()));
+        // `exports`, when present, is the only way in, and its targets start with `./`.
+        let both = r#"{"main": "./main.ts", "exports": {".": "./e.ts", "./bare": "e.ts"}}"#;
+        assert_eq!(at(both, "."), Some(("exports", vec!["lib/e.ts".into()])));
+        assert_eq!(at(both, "./util/x"), None);
+        assert_eq!(at(both, "./bare"), None);
+    }
+
+    #[test]
+    fn an_entry_never_leaves_the_package_directory() {
+        let at = |json: &str, subpath: &str| entry(&manifest("lib/package.json", json), subpath);
+        for main in ["../x.ts", "/x.ts", "./a/../../x.ts", "a//x.ts", "./", ""] {
+            let json = format!(r#"{{"main": {}}}"#, serde_json::to_string(main).unwrap());
+            assert_eq!(at(&json, "."), None, "{main}");
+        }
+        let star = r#"{"exports": {"./*": "./src/*.ts"}}"#;
+        assert_eq!(at(star, "./../../x"), None);
+        assert_eq!(at("{}", "./../x"), None);
+        // At the repository root the package directory is the root.
+        let root = manifest("package.json", r#"{"main": "./index.ts"}"#);
+        assert_eq!(entry(&root, "."), Some(("main", vec!["index.ts".into()])));
+    }
+
+    #[test]
+    fn a_specifier_splits_into_its_package_and_subpath() {
+        assert_eq!(split("x"), Some(("x", ".".into())));
+        assert_eq!(split("x/a/b"), Some(("x", "./a/b".into())));
+        assert_eq!(split("@a/b"), Some(("@a/b", ".".into())));
+        assert_eq!(split("@a/b/c"), Some(("@a/b", "./c".into())));
+        for none in ["./x", "../x", "/x", "node:fs", "@a", "a b"] {
+            assert_eq!(split(none), None, "{none}");
+        }
+    }
+
+    #[test]
+    fn the_nearest_manifest_is_in_the_deepest_directory_holding_the_file() {
+        let all = [
+            manifest("package.json", "{}"),
+            manifest("packages/a/package.json", "{}"),
+            manifest("packages/ab/package.json", "{}"),
+        ];
+        let of = |path| nearest(&all, path).map(|m| m.path.as_str());
+        assert_eq!(of("packages/a/src/x.ts"), Some("packages/a/package.json"));
+        assert_eq!(of("packages/abc/x.ts"), Some("package.json"));
+        assert_eq!(of("x.ts"), Some("package.json"));
+        assert!(nearest(&all[1..], "x.ts").is_none());
+    }
+
+    /// A provider whose files export what `rows` say.
+    fn provided<'e>(rows: &'e [Exported]) -> Provided<'e> {
+        let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
+        for e in rows {
+            exported.entry(&e.path).or_default().push(e);
+        }
+        Provided {
+            files: HashSet::new(),
+            symbols: HashSet::new(),
+            exported,
+        }
+    }
+
+    fn row(path: &str, name: Option<&str>, file: Option<&str>, target: Option<&str>) -> Exported {
+        Exported {
+            path: path.into(),
+            name: name.map(Into::into),
+            file: file.map(Into::into),
+            target: target.map(Into::into),
+        }
+    }
+
+    fn lookup(p: &Provided, file: &str, name: &str) -> Option<(String, Option<String>)> {
+        p.lookup(file, name, 0, &mut HashSet::new())
+    }
+
+    #[test]
+    fn a_name_is_looked_up_in_the_file_then_through_its_export_stars() {
+        let rows = [
+            row("i.ts", Some("own"), Some("d.ts"), Some("own")),
+            row("i.ts", Some("gone"), None, None),
+            row("i.ts", None, Some("a.ts"), None),
+            row("a.ts", Some("deep"), Some("a.ts"), Some("deep")),
+            row("a.ts", Some("gone"), Some("a.ts"), Some("gone")),
+            row("a.ts", Some("default"), Some("a.ts"), Some("main")),
+            row("a.ts", Some("ns"), Some("n.ts"), None),
+            // A cycle back to the entry.
+            row("a.ts", None, Some("i.ts"), None),
+        ];
+        let p = provided(&rows);
+        let def = |file: &str, name: &str| Some((file.to_string(), Some(name.to_string())));
+        assert_eq!(lookup(&p, "i.ts", "own"), def("d.ts", "own"));
+        assert_eq!(lookup(&p, "i.ts", "deep"), def("a.ts", "deep"));
+        assert_eq!(lookup(&p, "i.ts", "ns"), Some(("n.ts".into(), None)));
+        // The file's own export decides, even when it names nothing the repository holds.
+        assert_eq!(lookup(&p, "i.ts", "gone"), None);
+        // `export *` carries no `default`, and a cycle ends the lookup.
+        assert_eq!(lookup(&p, "i.ts", "default"), None);
+        assert_eq!(lookup(&p, "i.ts", "missing"), None);
+    }
+
+    #[test]
+    fn a_name_two_export_stars_give_differently_is_not_exported() {
+        let rows = [
+            row("i.ts", None, Some("a.ts"), None),
+            row("i.ts", None, Some("b.ts"), None),
+            row("i.ts", None, Some("c.ts"), None),
+            row("a.ts", Some("dup"), Some("a.ts"), Some("dup")),
+            row("b.ts", Some("dup"), Some("b.ts"), Some("dup")),
+            row("a.ts", Some("same"), Some("a.ts"), Some("same")),
+            row("c.ts", None, Some("a.ts"), None),
+        ];
+        let p = provided(&rows);
+        assert_eq!(lookup(&p, "i.ts", "dup"), None);
+        // Two ways to one definition are one export.
+        let same = Some(("a.ts".to_string(), Some("same".to_string())));
+        assert_eq!(lookup(&p, "i.ts", "same"), same);
+    }
+
+    #[test]
+    fn a_chain_of_export_stars_past_the_limit_is_not_followed() {
+        let chain = |n: usize| {
+            let mut rows: Vec<Exported> = (0..n)
+                .map(|i| {
+                    row(
+                        &format!("{i}.ts"),
+                        None,
+                        Some(&format!("{}.ts", i + 1)),
+                        None,
+                    )
+                })
+                .collect();
+            rows.push(row(&format!("{n}.ts"), Some("f"), Some("f.ts"), Some("f")));
+            rows
+        };
+        let found = chain(MAX_REEXPORTS);
+        assert!(lookup(&provided(&found), "0.ts", "f").is_some());
+        let past = chain(MAX_REEXPORTS + 1);
+        assert_eq!(lookup(&provided(&past), "0.ts", "f"), None);
     }
 
     #[test]
