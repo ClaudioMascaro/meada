@@ -4,7 +4,9 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::lang::{Call, Class, Def, Export, Facts, Imported, Kind, Modules, Part, Star, Value};
+use crate::lang::{
+    Call, Class, Def, Export, Facts, Imported, Kind, Modules, Param, Part, Star, Value,
+};
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -33,8 +35,9 @@ enum Binding<'a> {
     Module(&'a str),
     /// A `const` that holds no function: its file and qualified name.
     Const(&'a str, &'a str),
-    /// The parameter at this position of a function.
-    Param(Target<'a>, usize),
+    /// The parameter at this position of a function, and the field of its object pattern
+    /// when the name is one of those it destructures.
+    Param(Target<'a>, usize, Option<usize>),
     /// A name bound in a scope (`Facts::locals`): its file, scope and name.
     Local(&'a str, &'a str, &'a str),
     /// Something an import brings from outside the repository.
@@ -228,8 +231,12 @@ impl<'a> Resolver<'a> {
     /// stay as they are.
     fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
         let (path, scope, name) = match binding {
-            Binding::Param(f, n) => {
-                let name = self.defs[f.path][f.name].params[n].name.as_str();
+            Binding::Param(f, n, field) => {
+                let param = &self.defs[f.path][f.name].params[n];
+                let name = match field {
+                    Some(field) => param.fields[field].name.as_str(),
+                    None => param.name.as_str(),
+                };
                 (f.path, f.name, name)
             }
             Binding::Local(path, scope, name) => (path, scope, name),
@@ -396,13 +403,19 @@ impl<'a> Resolver<'a> {
                 return Binding::Const(path, constant);
             }
             if let Some((function, def)) = defs.get_key_value(s)
-                && let Some(n) = def.params.iter().position(|p| p.name == name)
+                && let Some((n, field)) = def.params.iter().enumerate().find_map(|(n, p)| {
+                    if p.name == name {
+                        return Some((n, None));
+                    }
+                    let field = p.fields.iter().position(|f| f.name == name)?;
+                    Some((n, Some(field)))
+                })
             {
                 let function = Target {
                     path,
                     name: function,
                 };
-                return Binding::Param(function, n);
+                return Binding::Param(function, n, field);
             }
             if self.locals[path].contains_key(&(s, name)) {
                 return Binding::Local(path, s, name);
@@ -599,6 +612,16 @@ impl<'a> Code<'a> {
         found
     }
 
+    /// The parameter at position `n` of `function`.
+    fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
+        let file = self.full(function.path)?;
+        file.defs
+            .iter()
+            .find(|d| d.name == function.name)?
+            .params
+            .get(n)
+    }
+
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
@@ -621,6 +644,28 @@ impl<'a> Code<'a> {
             }
             _ => None,
         }
+    }
+
+    /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object
+    /// parameter destructures) whose default value is the identifier `default`.
+    pub fn param_defaults_to(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        default: &str,
+    ) -> bool {
+        let Binding::Param(function, n, field) =
+            self.resolver.lexical(path, scope, name, &mut Seen::new())
+        else {
+            return false;
+        };
+        let param = self.param(function, n);
+        let value = match field {
+            Some(f) => param.and_then(|p| p.fields.get(f)).map(|f| &f.default),
+            None => param.map(|p| &p.default),
+        };
+        matches!(value, Some(Some(Value::Ref(r))) if r == default)
     }
 
     /// The definition `name` refers to from `scope` in `path`.
@@ -769,7 +814,7 @@ impl<'a> Code<'a> {
                 seen.pop();
                 folded
             }
-            Binding::Param(function, n) => match frames.get(depth) {
+            Binding::Param(function, n, field) => match frames.get(depth) {
                 Some(frame) if frame.def == function => {
                     let Some(call) = self.resolver.files[frame.path].calls.get(frame.index) else {
                         return Value::Unknown;
@@ -777,24 +822,13 @@ impl<'a> Code<'a> {
                     let Some(args) = self.args(frame.path, frame.index) else {
                         return Value::Unknown;
                     };
-                    if let Some(arg) = args.get(n) {
-                        return self.eval(
-                            frame.path,
-                            &call.scope,
-                            arg,
-                            frames,
-                            depth + 1,
-                            seen,
-                            wants,
-                        );
-                    }
-                    // A left-out argument takes the parameter's default.
-                    let default = self
-                        .full(function.path)
-                        .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-                        .and_then(|d| d.params.get(n)?.default.as_ref());
-                    match default {
-                        Some(default) => self.eval(
+                    let param = self.param(function, n);
+                    let bound = match (args.get(n), param.and_then(|p| p.default.as_ref())) {
+                        (Some(arg), _) => {
+                            self.eval(frame.path, &call.scope, arg, frames, depth + 1, seen, wants)
+                        }
+                        // A left-out argument takes the parameter's default.
+                        (None, Some(default)) => self.eval(
                             function.path,
                             function.name,
                             default,
@@ -803,7 +837,39 @@ impl<'a> Code<'a> {
                             seen,
                             wants,
                         ),
-                        None => Value::Undefined,
+                        (None, None) if field.is_some() => return Value::Unknown,
+                        (None, None) => return Value::Undefined,
+                    };
+                    let Some(field) = field.and_then(|f| param?.fields.get(f)) else {
+                        return bound;
+                    };
+                    // A destructured name reads one property of the object passed; anything
+                    // but a literal object is unknown. ponytail: a spread makes the name
+                    // unknown until a later key sets it, even a spread of an object whose
+                    // properties are known; read into the spread object if wrappers need it.
+                    let Value::Object(properties) = bound else {
+                        return Value::Unknown;
+                    };
+                    let mut read = None;
+                    for (key, value) in properties {
+                        if key == "..." {
+                            read = Some(Value::Unknown);
+                        } else if key == field.key {
+                            read = Some(value);
+                        }
+                    }
+                    match (read, field.default.as_ref()) {
+                        (Some(Value::Undefined) | None, Some(default)) => self.eval(
+                            function.path,
+                            function.name,
+                            default,
+                            frames,
+                            depth,
+                            seen,
+                            wants,
+                        ),
+                        (Some(read), _) => read,
+                        (None, None) => Value::Undefined,
                     }
                 }
                 // ponytail: a parameter of an outer function, captured by a closure, is

@@ -30,7 +30,14 @@ pub fn fixture_repo(case: &str, fixture: &str, origin: Option<&str>) -> PathBuf 
 }
 
 /// The chain fixture (spec #3) as siblings in one case directory: (web, gateway, catalog).
+/// The worker (spec #19), which reads a resource the gateway writes, is their sibling too, at
+/// [`worker`].
 pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    fixture_repo(
+        case,
+        "chain-worker",
+        Some("https://example.com/chain/worker.git"),
+    );
     (
         fixture_repo(case, "chain-web", Some("https://example.com/chain/web.git")),
         fixture_repo(
@@ -44,6 +51,24 @@ pub fn chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
             Some("https://example.com/chain/catalog.git"),
         ),
     )
+}
+
+/// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
+/// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
+/// gateway, whose workspace holds all four repositories.
+pub fn loose_chain(case: &str) -> PathBuf {
+    let (_, gateway, catalog) = chain(case);
+    let toml = catalog.join("meada.toml");
+    let loose = "\n[[resource]]\nkind = \"s3-bucket\"\nid = \"invoices\"\nrole = \"write\"\n\n\
+                 [[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"write\"\n\
+                 via = [\"lib/gone.ts::sync\"]\n";
+    fs::write(&toml, fs::read_to_string(&toml).unwrap() + loose).unwrap();
+    gateway
+}
+
+/// The chain's worker, next to any repository of the chain.
+pub fn worker(sibling: &Path) -> PathBuf {
+    sibling.with_file_name("chain-worker")
 }
 
 /// Copies `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml` (spec #18).

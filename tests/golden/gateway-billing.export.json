@@ -1,0 +1,133 @@
+{
+  "repository": "example.com/acme/billing",
+  "files": [
+    {
+      "path": "app/audit/route.ts",
+      "hash": "d22bcba96ff5be51ace4fb60faa6043f680a5deb90db39c2181d147dc20e3651"
+    },
+    {
+      "path": "app/status/route.ts",
+      "hash": "d22bcba96ff5be51ace4fb60faa6043f680a5deb90db39c2181d147dc20e3651"
+    },
+    {
+      "path": "app/v1/invoices/route.ts",
+      "hash": "d22bcba96ff5be51ace4fb60faa6043f680a5deb90db39c2181d147dc20e3651"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/billing::app/audit/route.ts::GET",
+      "span": {
+        "path": "app/audit/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/acme/billing::app/status/route.ts::GET",
+      "span": {
+        "path": "app/status/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "span": {
+        "path": "app/v1/invoices/route.ts",
+        "start": 7,
+        "end": 59
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/billing::app/audit/route.ts::GET::Response.json#0",
+      "caller": "example.com/acme/billing::app/audit/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/audit/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/billing::app/status/route.ts::GET::Response.json#0",
+      "caller": "example.com/acme/billing::app/status/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/status/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/billing::app/v1/invoices/route.ts::GET::Response.json#0",
+      "caller": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/v1/invoices/route.ts",
+        "start": 39,
+        "end": 56
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/audit",
+      "site": "example.com/acme/billing::app/audit/route.ts::GET",
+      "gateway": "/billing/audit"
+    },
+    {
+      "contract": "http::GET::/status",
+      "site": "example.com/acme/billing::app/status/route.ts::GET",
+      "gateway": "/billing/status"
+    },
+    {
+      "contract": "http::GET::/v1/invoices",
+      "site": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "gateway": "/billing/invoices"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "provider": "example.com/acme/billing::app/audit/route.ts::GET",
+      "contract": "http::GET::/billing/audit",
+      "level": "ambiguous",
+      "reason": "2 providers fit; gateway prefix /billing"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::hosted::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/billing/invoices",
+      "level": "inferred",
+      "reason": "gateway prefix /billing, gateway strip /v1"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::invoices::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/billing/invoices",
+      "level": "inferred",
+      "reason": "gateway prefix /billing, gateway strip /v1"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::status::fetch#0",
+      "provider": "example.com/acme/billing::app/status/route.ts::GET",
+      "contract": "http::GET::/billing/status",
+      "level": "inferred",
+      "reason": "gateway prefix /billing"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::versioned::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/v1/invoices",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use crate::contract::{ContractKind, Found, Level, Link, Site};
-use crate::index::{Consumer, Provider};
+use crate::index::{Consumer, Export as IndexExport, Provider};
 use crate::lang::{Export, Part, Value};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -124,6 +124,17 @@ fn fragments(parts: &[Part]) -> Vec<String> {
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
 pub fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
+}
+
+/// The contract `provider` serves at its gateway path, when `[serve]` rewrites its route.
+pub(crate) fn gateway_contract(provider: &Provider) -> Option<String> {
+    let (method, _) = route(&provider.contract)?;
+    Some(contract(method, provider.gateway.as_deref()?))
+}
+
+/// Whether `provider` serves `contract`, by its code path or by its gateway path.
+pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
+    provider.contract == contract || gateway_contract(provider).as_deref() == Some(contract)
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -391,7 +402,9 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
-                if call.callee != "fetch" || code.args(path, n).is_none_or(<[_]>::is_empty) {
+                let is_fetch = call.callee == "fetch"
+                    || code.param_defaults_to(path, &call.scope, &call.callee, "fetch");
+                if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
                 for (site, at, read) in code.expand(path, n, &fetch) {
@@ -439,6 +452,15 @@ impl ContractKind for Http {
         found
     }
 
+    fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        for p in &mut export.providers {
+            let path = route(&p.contract).map(|(_, path)| path);
+            p.gateway = path
+                .and_then(|path| repo.config.serve.gateway_path(path))
+                .map(|g| g.0);
+        }
+    }
+
     fn link(
         &self,
         consumer: &Consumer,
@@ -449,18 +471,39 @@ impl ContractKind for Http {
             return Vec::new();
         };
         let via = consumer.via.as_deref();
-        let serving = providers.iter().filter(|(_, p)| p.contract == *contract);
+        // A route serves a consumer by its code path, or by its gateway path with the reason
+        // for the rewrite. Within one repository a code path match wins over gateway path
+        // matches; across repositories both are candidates.
+        let mut serving: Vec<_> = (providers.iter())
+            .filter_map(|&(m, p)| {
+                if p.contract == *contract {
+                    return Some((m, p, None));
+                }
+                if gateway_contract(p).as_deref() != Some(contract) {
+                    return None;
+                }
+                let (_, reason) = m.config.serve.gateway_path(route(&p.contract)?.1)?;
+                Some((m, p, Some(reason)))
+            })
+            .collect();
+        let direct: Vec<&str> = (serving.iter())
+            .filter(|(.., gateway)| gateway.is_none())
+            .map(|&(m, ..)| m.identity.as_str())
+            .collect();
+        serving
+            .retain(|(m, _, gateway)| gateway.is_none() || !direct.contains(&m.identity.as_str()));
+        let serving = serving.into_iter();
         let var = via.and_then(|v| v.strip_prefix("env:"));
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving.filter(|(m, _)| m.config.serves(host)).collect();
+                let fits = serving.filter(|(m, ..)| m.config.serves(host)).collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving
-                    .filter(|(m, _)| peers.contains(&m.identity.as_str()))
+                    .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
                     .collect();
                 (
                     fits,
@@ -471,7 +514,7 @@ impl ContractKind for Http {
                 // The host is unresolved: a relative URL, an unknown base, or a variable no
                 // peer names. Exactly one repository serving the route is enough.
                 let fits: Vec<_> = serving.collect();
-                let mut repos: Vec<&str> = fits.iter().map(|(m, _)| m.identity.as_str()).collect();
+                let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
                 repos.sort();
                 repos.dedup();
                 let why = match var {
@@ -486,18 +529,29 @@ impl ContractKind for Http {
             };
         let ambiguous = fits.len() > 1;
         fits.iter()
-            .map(|(repo, provider)| Link {
-                consumer: consumer.site.clone(),
-                provider: provider.site.clone(),
-                contract: contract.clone(),
-                level: if ambiguous { Level::Ambiguous } else { level },
-                reason: if ambiguous {
-                    format!("{} providers fit; {reason} {}", fits.len(), repo.identity)
-                } else {
-                    format!("{reason} {}", repo.identity)
-                },
-                by: None,
-                p: None,
+            .map(|(repo, provider, gateway)| {
+                let n = fits.len();
+                // Through a gateway the link is inferred, whatever the consumer side gave, and
+                // its reason is the rewrite.
+                let reason = match (gateway, ambiguous) {
+                    (Some(rewrite), true) => format!("{n} providers fit; {rewrite}"),
+                    (Some(rewrite), false) => rewrite.clone(),
+                    (None, true) => format!("{n} providers fit; {reason} {}", repo.identity),
+                    (None, false) => format!("{reason} {}", repo.identity),
+                };
+                Link {
+                    consumer: consumer.site.clone(),
+                    provider: provider.site.clone(),
+                    contract: contract.clone(),
+                    level: match (ambiguous, gateway) {
+                        (true, _) => Level::Ambiguous,
+                        (_, Some(_)) => Level::Inferred,
+                        _ => level,
+                    },
+                    reason,
+                    by: None,
+                    p: None,
+                }
             })
             .collect()
     }

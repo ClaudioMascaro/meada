@@ -1,0 +1,4 @@
+[serve]
+hosts = ["billing.example.com"]
+prefix = "/billing"
+strip = "/v1"

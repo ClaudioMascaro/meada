@@ -77,7 +77,7 @@ fn search_rejects_an_unknown_kind_naming_the_valid_ones() {
 
     assert_eq!(
         error.to_string(),
-        "`kind` takes `symbol`, `contract`, `route`, `ambiguous` or `unresolved`, not `file`"
+        "`kind` takes `symbol`, `contract`, `route`, `resource`, `ambiguous` or `unresolved`, not `file`"
     );
 }
 
@@ -158,14 +158,41 @@ fn config_error(case: &str, toml: &str) -> String {
 fn invalid_config_errors_name_file_line_and_key() {
     for (case, toml, expected) in [
         (
-            "config_resource",
-            "[[peer]]\nrepo = \"example.com/acme/api\"\n\n[[resource]]\nkind = \"db\"\n",
-            "<repo>/meada.toml:4: `resource` is not in v0.1; track A adds it (resources and gateway)",
+            "config_documents",
+            "[serve]\nhosts = [\"api.example.com\"]\ndocuments = [\"openapi.yaml\"]\n",
+            "<repo>/meada.toml:3: `serve.documents` is not in v0.1; track A adds it (OpenAPI and AsyncAPI documents)",
+        ),
+        (
+            "config_resource_key",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"read\"\nschema = \"public\"\n",
+            "<repo>/meada.toml:5: `resource.schema` is not a meada.toml key",
+        ),
+        (
+            "config_resource_kind",
+            "[[resource]]\nkind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:2: `resource.kind`: `Postgres` is not a lowercase identifier \
+             (ASCII letters, digits and hyphens, starting with a letter)",
+        ),
+        (
+            "config_resource_role",
+            "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"append\"\n",
+            "<repo>/meada.toml:4: `resource.role`: unknown variant `append`, \
+             expected one of `read`, `write`, `read-write`",
+        ),
+        (
+            "config_resource_id",
+            "[[resource]]\nkind = \"postgres\"\nid = \"\"\nrole = \"read\"\n",
+            "<repo>/meada.toml:3: `resource.id`: is empty",
         ),
         (
             "config_prefix",
-            "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"/api\"\n",
-            "<repo>/meada.toml:3: `serve.prefix` is not in v0.1; track A adds it (resources and gateway)",
+            "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"api\"\n",
+            "<repo>/meada.toml:3: `serve.prefix`: `api` must start with `/`",
+        ),
+        (
+            "config_strip",
+            "[serve]\nstrip = \"v1/\"\n",
+            "<repo>/meada.toml:2: `serve.strip`: `v1/` must start with `/`",
         ),
         (
             "config_unknown",

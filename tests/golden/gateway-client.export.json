@@ -1,0 +1,332 @@
+{
+  "repository": "example.com/acme/client",
+  "files": [
+    {
+      "path": "src/client.ts",
+      "hash": "81c660d1758ab220b4b482ff5efbc732cc7621db76d2b8fe8d1395097d8855e4"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/client::src/client.ts::audit",
+      "span": {
+        "path": "src/client.ts",
+        "start": 573,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::direct",
+      "span": {
+        "path": "src/client.ts",
+        "start": 205,
+        "end": 236
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::hosted",
+      "span": {
+        "path": "src/client.ts",
+        "start": 910,
+        "end": 978
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::invoices",
+      "span": {
+        "path": "src/client.ts",
+        "start": 306,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::ledger",
+      "span": {
+        "path": "src/client.ts",
+        "start": 1123,
+        "end": 1154
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::order",
+      "span": {
+        "path": "src/client.ts",
+        "start": 1283,
+        "end": 1382
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::staleVersion",
+      "span": {
+        "path": "src/client.ts",
+        "start": 757,
+        "end": 807
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::status",
+      "span": {
+        "path": "src/client.ts",
+        "start": 442,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::throughGateway",
+      "span": {
+        "path": "src/client.ts",
+        "start": 87,
+        "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::versioned",
+      "span": {
+        "path": "src/client.ts",
+        "start": 703,
+        "end": 742
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 587,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::direct::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::direct",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 220,
+        "end": 236
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::hosted::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::hosted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 925,
+        "end": 978
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::invoices::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::invoices",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 323,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::ledger::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::ledger",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1138,
+        "end": 1154
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::order::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1321,
+        "end": 1379
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::order::tenant#0",
+      "caller": "example.com/acme/client::src/client.ts::order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 1338,
+        "end": 1346
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::staleVersion::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::staleVersion",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 778,
+        "end": 807
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::status::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::status",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 457,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::throughGateway::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::throughGateway",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 110,
+        "end": 131
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::versioned::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::versioned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 721,
+        "end": 742
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::GET::/billing/audit",
+      "site": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/client::src/client.ts::direct::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/billing/invoices",
+      "site": "example.com/acme/client::src/client.ts::hosted::fetch#0",
+      "via": "host:billing.example.com"
+    },
+    {
+      "contract": "http::GET::/billing/invoices",
+      "site": "example.com/acme/client::src/client.ts::invoices::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/ledger",
+      "site": "example.com/acme/client::src/client.ts::ledger::fetch#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/client::src/client.ts::order::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/billing/v1/invoices",
+      "site": "example.com/acme/client::src/client.ts::staleVersion::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/billing/status",
+      "site": "example.com/acme/client::src/client.ts::status::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/shop/orders",
+      "site": "example.com/acme/client::src/client.ts::throughGateway::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/v1/invoices",
+      "site": "example.com/acme/client::src/client.ts::versioned::fetch#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "provider": "example.com/acme/billing::app/audit/route.ts::GET",
+      "contract": "http::GET::/billing/audit",
+      "level": "ambiguous",
+      "reason": "2 providers fit; gateway prefix /billing"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "provider": "example.com/acme/orders::app/billing/audit/route.ts::GET",
+      "contract": "http::GET::/billing/audit",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/acme/orders"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::direct::fetch#0",
+      "provider": "example.com/acme/orders::app/orders/route.ts::GET",
+      "contract": "http::GET::/orders",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/orders"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::hosted::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/billing/invoices",
+      "level": "inferred",
+      "reason": "gateway prefix /billing, gateway strip /v1"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::invoices::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/billing/invoices",
+      "level": "inferred",
+      "reason": "gateway prefix /billing, gateway strip /v1"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::ledger::fetch#0",
+      "provider": "example.com/acme/ledger::app/ledger/route.ts::GET",
+      "contract": "http::GET::/ledger",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/ledger"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::status::fetch#0",
+      "provider": "example.com/acme/billing::app/status/route.ts::GET",
+      "contract": "http::GET::/billing/status",
+      "level": "inferred",
+      "reason": "gateway prefix /billing"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::throughGateway::fetch#0",
+      "provider": "example.com/acme/orders::app/orders/route.ts::GET",
+      "contract": "http::GET::/shop/orders",
+      "level": "inferred",
+      "reason": "gateway prefix /shop"
+    },
+    {
+      "consumer": "example.com/acme/client::src/client.ts::versioned::fetch#0",
+      "provider": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+      "contract": "http::GET::/v1/invoices",
+      "level": "inferred",
+      "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
+    }
+  ]
+}

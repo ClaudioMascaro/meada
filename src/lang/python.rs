@@ -341,6 +341,7 @@ fn params(node: Node, src: &[u8]) -> Vec<Param> {
         .map(|(name, _)| Param {
             name: name.map_or("", |n| text(n, src)).to_string(),
             default: None,
+            fields: Vec::new(),
         })
         .collect()
 }

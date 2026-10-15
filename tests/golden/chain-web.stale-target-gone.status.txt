@@ -2,3 +2,4 @@ example.com/chain/web (.) indexed, 5 files
   stale decision: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/catalog::http::POST::/api/events (target gone)
 example.com/chain/gateway (../chain-gateway) indexed, 4 files
 example.com/chain/catalog (../chain-catalog) indexed, 3 files
+example.com/chain/worker (../chain-worker) indexed, 2 files
