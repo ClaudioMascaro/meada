@@ -5,8 +5,8 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules, Param,
-    Part, Value, children, named, text,
+    Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules,
+    Param, Part, Value, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -110,6 +110,10 @@ impl LanguagePack for TsJs {
 
     fn receiver(&self) -> Option<&'static str> {
         Some("this")
+    }
+
+    fn base_receiver(&self) -> Option<&'static str> {
+        Some("super")
     }
 
     fn globals(&self) -> &'static [&'static str] {
@@ -332,6 +336,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
     if list.kind() == "identifier" {
         return vec![Param {
             name: text(list, src).to_string(),
+            binds: Binds::Any,
             default: None,
             fields: Vec::new(),
         }];
@@ -355,6 +360,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
                     .filter(|n| n.kind() == "identifier")
                     .map_or("", |n| text(n, src))
                     .to_string(),
+                binds: Binds::Any,
                 default: default.map(|d| value(d, src, scope)),
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")

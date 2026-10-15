@@ -6,10 +6,10 @@ use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local, Modules,
-    Param, Part, Star, Value, children, named, text,
+    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local,
+    Modules, Param, Part, Star, Value, children, named, text,
 };
-use crate::{Result, qualify};
+use crate::{Result, parent, qualify};
 
 pub struct Python;
 
@@ -73,7 +73,7 @@ impl LanguagePack for Python {
                                 name: inner.clone(),
                                 kind,
                                 range: span(node),
-                                params: params(node, src),
+                                params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
                                 decorators: bare.remove(&inner).unwrap_or_default(),
                                 returns: Vec::new(),
@@ -394,34 +394,60 @@ fn span(node: Node) -> Range<usize> {
     }
 }
 
-/// The parameters of a function `node` in order, `self` included, with their defaults. `*args`
-/// and `**kwargs` keep their stars in the name, and so does the bare `*`: such a parameter
-/// binds no argument, and the ones after it are keyword-only (`Param::name`).
-fn params(node: Node, src: &[u8]) -> Vec<Param> {
+/// The parameters of a function `node` in order, with their defaults: the receiver of a
+/// `method` (`self`, `cls`) first, unless it is static. `*args` and `**kwargs` bind no single
+/// argument, and the parameters after them or after the bare `*` only a keyword argument.
+fn params(node: Node, method: bool, src: &[u8]) -> Vec<Param> {
     let Some(list) = node.child_by_field_name("parameters") else {
         return Vec::new();
     };
-    named(list)
-        .filter_map(|p| {
-            let (name, default) = match p.kind() {
-                "default_parameter" | "typed_default_parameter" => (
-                    text(identifier(p.child_by_field_name("name")?)?, src).to_string(),
-                    p.child_by_field_name("value"),
-                ),
-                "identifier" | "typed_parameter" => (text(identifier(p)?, src).to_string(), None),
-                "list_splat_pattern" => (format!("*{}", text(identifier(p)?, src)), None),
-                "dictionary_splat_pattern" => (format!("**{}", text(identifier(p)?, src)), None),
-                "keyword_separator" => ("*".to_string(), None),
-                // The `/` separator binds nothing.
-                _ => return None,
-            };
-            Some(Param {
-                name,
-                default: default.map(|d| value(d, src)),
-                fields: Vec::new(),
-            })
-        })
-        .collect()
+    let mut receiver = match method && !decorated(node, "staticmethod", src) {
+        false => None,
+        true if decorated(node, "classmethod", src) => Some(Binds::Class),
+        true => Some(Binds::Instance),
+    };
+    let mut keyword = false;
+    let mut out = Vec::new();
+    for p in named(list) {
+        // A typed `*args: T` holds its splat.
+        let inner = match p.kind() {
+            "typed_parameter" => named(p).next().unwrap_or(p),
+            _ => p,
+        };
+        let (name, default, binds) = match inner.kind() {
+            "default_parameter" | "typed_default_parameter" => (
+                p.child_by_field_name("name"),
+                p.child_by_field_name("value"),
+                None,
+            ),
+            "identifier" => (Some(inner), None, None),
+            "list_splat_pattern" | "dictionary_splat_pattern" => {
+                keyword = true;
+                (Some(inner), None, Some(Binds::Rest))
+            }
+            "keyword_separator" => {
+                keyword = true;
+                continue;
+            }
+            // The `/` separator binds nothing.
+            _ => continue,
+        };
+        let Some(name) = name.and_then(identifier) else {
+            continue;
+        };
+        // The first parameter takes the receiver, if any.
+        let binds = binds.or(receiver.take()).unwrap_or(match keyword {
+            true => Binds::Keyword,
+            false => Binds::Any,
+        });
+        out.push(Param {
+            name: text(name, src).to_string(),
+            binds,
+            default: default.map(|d| value(d, src)),
+            fields: Vec::new(),
+        });
+    }
+    out
 }
 
 /// Each parameter of a function `node` in order: the identifier it binds and its annotation.
@@ -697,11 +723,6 @@ fn constructor(call: Node, src: &[u8]) -> Option<String> {
     Some(callee(function, src)).filter(|f| !f.starts_with('('))
 }
 
-/// The scope enclosing `scope`, empty at the top level.
-fn parent(scope: &str) -> &str {
-    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
-}
-
 /// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also
 /// inside `a, (b, c)`.
 fn targets(node: Node) -> Vec<Node> {
@@ -964,8 +985,8 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
                 .filter_map(|part| match part.kind() {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
-                        Some(e) if e.kind() == "identifier" => Part::Ref(text(e, src).into()),
-                        Some(e) => parts(e, src).and_then(single_env).unwrap_or(Part::Hole),
+                        Some(e) => (name(e, src).or_else(|| parts(e, src).and_then(single_env)))
+                            .unwrap_or(Part::Hole),
                         None => Part::Hole,
                     }),
                     _ => None,
@@ -991,9 +1012,19 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
             Some(vec![if more { Part::Hole } else { env }])
         }
-        "identifier" => Some(vec![Part::Ref(text(node, src).to_string())]),
+        "identifier" | "attribute" => name(node, src).map(|name| vec![name]),
         "parenthesized_expression" => parts(named(node).next()?, src),
         "subscript" | "call" => env_read(node, src).map(|env| vec![env]),
+        _ => None,
+    }
+}
+
+/// A name or a member chain (`config.BASE`) inside a string, folded like `Value::Ref`.
+fn name(node: Node, src: &[u8]) -> Option<Part> {
+    match node.kind() {
+        "identifier" | "attribute" => Some(callee(node, src))
+            .filter(|name| !name.starts_with('('))
+            .map(Part::Ref),
         _ => None,
     }
 }

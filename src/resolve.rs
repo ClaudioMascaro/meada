@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Star,
-    Value,
+    Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
+    Star, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -45,6 +45,15 @@ enum Binding<'a> {
     External,
     /// Neither scope nor import resolution knows it.
     Unknown,
+}
+
+/// A call site whose single target is a definition. `by_name` when only a name match of a
+/// member call (`data.get(...)`) found it: its receiver may be any object.
+#[derive(Clone, Copy)]
+struct Caller<'a> {
+    path: &'a str,
+    index: usize,
+    by_name: bool,
 }
 
 /// Seen `(file, exported name)` pairs: re-exports may form cycles.
@@ -92,10 +101,12 @@ pub struct Resolver<'a> {
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
     receiver: Option<&'static str>,
+    /// The pack's keyword for the base of the enclosing class (`LanguagePack::base_receiver`).
+    base_receiver: Option<&'static str>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
-    callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
+    callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
@@ -151,6 +162,7 @@ impl<'a> Resolver<'a> {
             locals,
             families: HashMap::new(),
             receiver: language.receiver(),
+            base_receiver: language.base_receiver(),
             globals: language.globals(),
             callers: HashMap::new(),
             by_name,
@@ -169,12 +181,20 @@ impl<'a> Resolver<'a> {
             }
         }
         resolver.families = work.families;
-        let mut callers: HashMap<Target, Vec<(&str, usize)>> = HashMap::new();
+        let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
-            for (n, call) in facts.calls.iter().enumerate() {
-                if let Resolution::Exact(t) | Resolution::Inferred(t) = resolver.call(path, call) {
-                    callers.entry(t).or_default().push((path, n));
-                }
+            for (index, call) in facts.calls.iter().enumerate() {
+                let (target, by_name) = match resolver.call(path, call) {
+                    Resolution::Exact(t) => (t, false),
+                    Resolution::Inferred(t) => (t, call.callee.contains('.')),
+                    _ => continue,
+                };
+                let caller = Caller {
+                    path,
+                    index,
+                    by_name,
+                };
+                callers.entry(target).or_default().push(caller);
             }
         }
         resolver.callers = callers;
@@ -182,8 +202,7 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        let work = &mut Work::default();
-        match self.resolve(path, &call.scope, &call.callee, &mut Seen::new(), work) {
+        match self.binding(path, &call.scope, &call.callee) {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::External => Resolution::Unresolved,
             Binding::Instance(_)
@@ -193,6 +212,11 @@ impl<'a> Resolver<'a> {
             | Binding::Local(..)
             | Binding::Unknown => self.infer(&call.callee),
         }
+    }
+
+    /// `resolve` of one name on its own, with nothing seen or being resolved yet.
+    fn binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
+        self.resolve(path, scope, callee, &mut Seen::new(), &mut Work::default())
     }
 
     /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
@@ -209,7 +233,7 @@ impl<'a> Resolver<'a> {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
-                "super" => Binding::Unknown,
+                _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
                 _ => self.lexical(path, scope, head, seen),
             };
@@ -329,7 +353,7 @@ impl<'a> Resolver<'a> {
 
     /// What each base `class` writes is, in order, resolved from the scope enclosing it.
     fn bases(&self, class: Target<'a>, work: &mut Work<'a>) -> Vec<Ancestor<'a>> {
-        let scope = class.name.rsplit_once('.').map_or("", |(scope, _)| scope);
+        let scope = crate::parent(class.name);
         let bases = self.defs[class.path][class.name].bases.iter().enumerate();
         bases
             .map(
@@ -394,7 +418,7 @@ impl<'a> Resolver<'a> {
             {
                 return Binding::Def(Target { path, name });
             }
-            scope = scope.rsplit_once('.').map_or("", |(parent, _)| parent);
+            scope = crate::parent(scope);
         }
         Binding::Unknown
     }
@@ -414,7 +438,7 @@ impl<'a> Resolver<'a> {
         let mut scope = Some(scope);
         let mut first = true;
         while let Some(s) = scope {
-            scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+            scope = (!s.is_empty()).then(|| crate::parent(s));
             let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
             first = false;
             if class_body {
@@ -612,6 +636,16 @@ enum Flow<'a> {
     Returns(Target<'a>),
 }
 
+/// What `Code::origins` carries along: `frames` bind the parameters of the functions whose
+/// return values are being followed, innermost last; `busy` is what is being followed, met
+/// again only through a cycle; `out` holds the origins found.
+#[derive(Default)]
+struct Trail<'a> {
+    frames: Vec<Frame<'a>>,
+    busy: Vec<Flow<'a>>,
+    out: BTreeSet<(&'a str, usize)>,
+}
+
 /// Values evaluated across files for contract kinds: constants folded where they are
 /// defined, imported ones included, and the arguments of client wrapper calls substituted
 /// for their parameters.
@@ -663,8 +697,7 @@ impl<'a> Code<'a> {
     /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
     /// the repository binds it.
     pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        let binding =
-            (self.resolver).resolve(path, scope, callee, &mut Seen::new(), &mut Work::default());
+        let binding = self.resolver.binding(path, scope, callee);
         matches!(binding, Binding::External).then(|| self.resolver.imported_name(path, callee))
     }
 
@@ -680,39 +713,40 @@ impl<'a> Code<'a> {
     ) -> Option<&'a Value> {
         let call = self.call(path, index)?;
         let params = &self.resolver.defs[function.path][function.name].params;
-        let locals = &self.resolver.locals[function.path];
-        let bound = call.callee.contains('.')
-            && params.first().is_some_and(|p| {
-                locals.get(&(function.name, p.name.as_str())) == Some(&&Class::Enclosing)
-            });
+        let param = params.get(n)?;
+        // The call's receiver binds a class method's first parameter, and a method's when it
+        // is called on an instance rather than on the class.
+        let bound = match params.first().map(|p| p.binds) {
+            Some(Binds::Class) => true,
+            Some(Binds::Instance) => call.callee.rsplit_once('.').is_some_and(|(receiver, _)| {
+                let class = self.definition(path, &call.scope, receiver);
+                !class.is_some_and(|c| self.resolver.is_class(c))
+            }),
+            _ => false,
+        };
         let position = match bound {
             true => n.checked_sub(1),
             false => Some(n),
         };
-        // A starred parameter (`*args`, `**kwargs`, the bare `*`) ends the positional ones.
-        let open = params.iter().take(n + 1).all(|p| !p.name.starts_with('*'));
-        position
-            .filter(|_| open)
-            .and_then(|at| call.args.get(at))
-            .or_else(|| call.keyword(&params.get(n)?.name))
+        match param.binds {
+            Binds::Rest => None,
+            Binds::Keyword => call.keyword(&param.name),
+            Binds::Any | Binds::Instance | Binds::Class => (position)
+                .and_then(|at| call.args.get(at))
+                .or_else(|| call.keyword(&param.name)),
+        }
     }
 
     /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
     /// through constants and imports, the arguments callers pass to parameters, the values
-    /// functions of the repository return and the items of a list or tuple. A call that reaches no such function is where the
-    /// value comes from, such as a constructor (`APIRouter()`); whatever else the name may
-    /// hold (an assignment that is not its only binding, an attribute) is left out.
+    /// functions of the repository return and the items of a list or tuple. A call that
+    /// reaches no such function is where the value comes from, such as a constructor
+    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
+    /// binding, an attribute) is left out.
     pub fn origins(&self, path: &'a str, scope: &'a str, name: &'a str) -> Vec<(&'a str, usize)> {
-        let mut out = BTreeSet::new();
-        self.flow_name(
-            path,
-            scope,
-            name,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut out,
-        );
-        out.into_iter().collect()
+        let mut trail = Trail::default();
+        self.flow_name(path, scope, name, &mut trail);
+        trail.out.into_iter().collect()
     }
 
     /// `origins` of a value as written.
@@ -722,31 +756,14 @@ impl<'a> Code<'a> {
         scope: &'a str,
         value: &'a Value,
     ) -> Vec<(&'a str, usize)> {
-        let mut out = BTreeSet::new();
-        self.flow(
-            path,
-            scope,
-            value,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut out,
-        );
-        out.into_iter().collect()
+        let mut trail = Trail::default();
+        self.flow(path, scope, value, &mut trail);
+        trail.out.into_iter().collect()
     }
 
-    /// `frames` bind the parameters of the functions whose return values are being followed,
-    /// innermost last; `busy` is what is being followed, met again only through a cycle.
-    fn flow(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        value: &'a Value,
-        frames: &mut Vec<Frame<'a>>,
-        busy: &mut Vec<Flow<'a>>,
-        out: &mut BTreeSet<(&'a str, usize)>,
-    ) {
+    fn flow(&self, path: &'a str, scope: &'a str, value: &'a Value, trail: &mut Trail<'a>) {
         match value {
-            Value::Ref(name) => self.flow_name(path, scope, name, frames, busy, out),
+            Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(range) => {
                 let calls = &self.resolver.files[path].calls;
                 let Some(index) = calls.iter().position(|c| c.range == *range) else {
@@ -755,7 +772,7 @@ impl<'a> Code<'a> {
                 let function = match self.resolver.call(path, &calls[index]) {
                     Resolution::Exact(t) if !self.resolver.is_class(t) => t,
                     _ => {
-                        out.insert((path, index));
+                        trail.out.insert((path, index));
                         return;
                     }
                 };
@@ -764,43 +781,32 @@ impl<'a> Code<'a> {
                 else {
                     return;
                 };
-                if busy.contains(&Flow::Returns(function)) {
+                if trail.busy.contains(&Flow::Returns(function)) {
                     return;
                 }
-                busy.push(Flow::Returns(function));
-                frames.push(Frame {
+                trail.busy.push(Flow::Returns(function));
+                trail.frames.push(Frame {
                     def: function,
                     path,
                     index,
                 });
                 for returned in &def.returns {
-                    self.flow(function.path, function.name, returned, frames, busy, out);
+                    self.flow(function.path, function.name, returned, trail);
                 }
-                frames.pop();
-                busy.pop();
+                trail.frames.pop();
+                trail.busy.pop();
             }
             Value::List(items) => {
                 for item in items {
-                    self.flow(path, scope, item, frames, busy, out);
+                    self.flow(path, scope, item, trail);
                 }
             }
             _ => {}
         }
     }
 
-    fn flow_name(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        name: &'a str,
-        frames: &mut Vec<Frame<'a>>,
-        busy: &mut Vec<Flow<'a>>,
-        out: &mut BTreeSet<(&'a str, usize)>,
-    ) {
-        let work = &mut Work::default();
-        let binding = self
-            .resolver
-            .resolve(path, scope, name, &mut Seen::new(), work);
+    fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
+        let binding = self.resolver.binding(path, scope, name);
         // An attribute assigned a call once in its class (`self.client = Client()`) is a
         // constant of the class.
         let binding = match binding {
@@ -818,43 +824,41 @@ impl<'a> Code<'a> {
                 let Some(found) = found else {
                     return;
                 };
-                if busy.contains(&Flow::Const(at, constant)) {
+                if trail.busy.contains(&Flow::Const(at, constant)) {
                     return;
                 }
-                busy.push(Flow::Const(at, constant));
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
-                self.flow(at, within, &found.value, frames, busy, out);
-                busy.pop();
+                trail.busy.push(Flow::Const(at, constant));
+                self.flow(at, crate::parent(constant), &found.value, trail);
+                trail.busy.pop();
             }
             Binding::Param(function, n, None) => {
                 // Inside a function whose return value is followed, its call binds the
                 // parameter; else every call of it does.
-                let sites = match frames.last() {
+                let sites = match trail.frames.last() {
                     Some(frame) if frame.def == function => vec![(frame.path, frame.index)],
                     // ponytail: a parameter of an outer function, captured by a closure, is
                     // not followed.
                     Some(_) => return,
-                    None => self
-                        .resolver
-                        .callers
-                        .get(&function)
-                        .cloned()
-                        .unwrap_or_default(),
+                    None => (self.resolver.callers.get(&function).into_iter().flatten())
+                        .map(|c| (c.path, c.index))
+                        .collect(),
                 };
-                if busy.contains(&Flow::Param(function, n)) {
+                if trail.busy.contains(&Flow::Param(function, n)) {
                     return;
                 }
-                busy.push(Flow::Param(function, n));
-                let frame = frames.pop();
+                trail.busy.push(Flow::Param(function, n));
+                let frame = trail.frames.pop();
                 for (caller, index) in sites {
                     let scope = &self.resolver.files[caller].calls[index].scope;
                     if let Some(arg) = self.arg(caller, index, function, n) {
-                        self.flow(caller, scope, arg, frames, busy, out);
+                        self.flow(caller, scope, arg, trail);
                     }
                 }
-                frames.extend(frame);
-                busy.pop();
+                trail.frames.extend(frame);
+                trail.busy.pop();
             }
+            // ponytail: a name its scope binds more than once, and an attribute not assigned a
+            // call once in its class, hold no constant, so what they hold is not followed.
             _ => {}
         }
     }
@@ -908,11 +912,7 @@ impl<'a> Code<'a> {
     /// The definition `name` (also a member chain, such as `views.index`) refers to from
     /// `scope` in `path`.
     pub fn definition(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
-        let work = &mut Work::default();
-        match self
-            .resolver
-            .resolve(path, scope, name, &mut Seen::new(), work)
-        {
+        match self.resolver.binding(path, scope, name) {
             Binding::Def(t) => Some(t),
             _ => None,
         }
@@ -920,11 +920,7 @@ impl<'a> Code<'a> {
 
     /// The file `name`, written in `scope` of `path`, refers to as a whole module.
     pub fn module(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<&'a str> {
-        let work = &mut Work::default();
-        match self
-            .resolver
-            .resolve(path, scope, name, &mut Seen::new(), work)
-        {
+        match self.resolver.binding(path, scope, name) {
             Binding::Module(m) => Some(m),
             _ => None,
         }
@@ -990,8 +986,13 @@ impl<'a> Code<'a> {
         if frames.iter().any(|f| f.def == wrapper) {
             return;
         }
-        let callers = self.resolver.callers.get(&wrapper);
-        let callers = callers.map_or(&[][..], Vec::as_slice);
+        // A call that only matches the wrapper's name may be on any object: it is not climbed.
+        // ponytail: so a wrapper method called on a receiver whose class Meada cannot tell is
+        // read where it stands, its parameters unknown.
+        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
+            .filter(|c| !c.by_name)
+            .copied()
+            .collect();
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
             let kwargs: Vec<(String, Value)> =
@@ -999,11 +1000,11 @@ impl<'a> Code<'a> {
             out.extend(read(&values, &kwargs).map(|found| (site, at, found)));
             return;
         }
-        for &(caller, n) in callers {
+        for caller in callers {
             frames.push(Frame {
                 def: wrapper,
-                path: caller,
-                index: n,
+                path: caller.path,
+                index: caller.index,
             });
             self.walk(path, index, frames, read, out);
             frames.pop();
@@ -1070,9 +1071,7 @@ impl<'a> Code<'a> {
         seen: &mut Vec<(&'a str, &'a str)>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        let binding =
-            (self.resolver).resolve(path, scope, name, &mut Seen::new(), &mut Work::default());
-        match binding {
+        match self.resolver.binding(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if seen.contains(&(at, constant)) {
@@ -1084,11 +1083,18 @@ impl<'a> Code<'a> {
                 let Some(found) = found else {
                     return Value::Unknown;
                 };
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                let within = crate::parent(constant);
                 seen.push((at, constant));
                 let folded = self.eval(at, within, &found.value, frames, depth, seen, wants);
                 seen.pop();
                 folded
+            }
+            // `*args` and `**kwargs` hold what no single argument gives.
+            Binding::Param(function, n, _)
+                if self.resolver.defs[function.path][function.name].params[n].binds
+                    == Binds::Rest =>
+            {
+                Value::Unknown
             }
             Binding::Param(function, n, field) => match frames.get(depth) {
                 Some(frame) if frame.def == function => {

@@ -220,7 +220,9 @@ fn python() {
             "clients/environment.py::subscript",
             "clients/environment.py::two_variables",
             "clients/modules.py::create_user",
+            "clients/modules.py::list_orders",
             "clients/modules.py::list_users",
+            "clients/modules.py::read_order",
             "clients/modules.py::lookup",
             "clients/modules.py::purge",
             "clients/modules.py::rename_user",
@@ -246,6 +248,17 @@ fn python() {
             "clients/wrappers.py::backoff",
             "clients/wrappers.py::drop_order",
             "clients/wrappers.py::get",
+            "clients/wrappers.py::Pages",
+            "clients/wrappers.py::Pages.__init__",
+            "clients/wrappers.py::Pages.load",
+            "clients/wrappers.py::Pages.load_shared",
+            "clients/wrappers.py::class_method",
+            "clients/wrappers.py::explicit_instance",
+            "clients/wrappers.py::Inventory",
+            "clients/wrappers.py::Inventory.__init__",
+            "clients/wrappers.py::Inventory.fetch_item",
+            "clients/wrappers.py::not_a_client",
+            "clients/wrappers.py::stock",
             "clients/wrappers.py::list_by_keyword",
             "clients/wrappers.py::list_orders",
             "clients/wrappers.py::list_patiently",
@@ -445,6 +458,7 @@ fn python() {
             "shop/views.py::archive",
             "shop/views.py::contact",
             "shop/views.py::health",
+            "shop/views.py::legal",
             "shop/views.py::vintage",
             "src/billing/invoice.py::total",
             "src/billing/tax.py::fee",
@@ -466,6 +480,10 @@ fn python() {
             "web/factory.py::relay",
             "web/items.py::create_item",
             "web/items.py::read_item",
+            "web/partial.py::build",
+            "web/partial.py::build.items",
+            "web/partial.py::read_part",
+            "web/partial.py::read_user",
             "web/pages.py::daily",
             "web/pages.py::fetch",
             "web/pages.py::index",
@@ -1081,7 +1099,13 @@ fn python() {
 /// The Python conformance fixture's export, and its providers (contract, site) whose site is
 /// under `dir`, sorted.
 fn python_providers(case: &str, dir: &str) -> (Value, Vec<(String, String)>) {
-    let repo = fixture_repo(case, "conformance-python", Some(ORIGIN));
+    providers(case, "conformance-python", dir)
+}
+
+/// The export of `fixture`, and its providers (contract, site) whose site is under `dir`,
+/// sorted.
+fn providers(case: &str, fixture: &str, dir: &str) -> (Value, Vec<(String, String)>) {
+    let repo = fixture_repo(case, fixture, Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
     let mut providers: Vec<(String, String)> = json["providers"]
@@ -1177,6 +1201,9 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
         ("http::DELETE::/orders/{}", "web/pages.py::order"),
         ("http::GET::/reports/daily/{}", "web/pages.py::daily"),
         ("http::PUT::/members/{}", "web/accounts.py::update"),
+        // A prefix or a path with a part that cannot be read yields no route; a path
+        // parameter written in the literal stays one.
+        ("http::GET::/partial/{}", "web/partial.py::read_part"),
     ];
     assert_eq!(actual, pairs(&expected));
     // A Python function named `fetch` is no HTTP consumer.
@@ -1193,7 +1220,8 @@ fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
         // `static(...)` added between them is left out and voids nothing.
         ("http::ANY::/about", "shop/views.py::about"),
         ("http::ANY::/contact", "shop/views.py::contact"),
-        // A `re_path()` with a simple named group; the one beyond them yields nothing.
+        // A `re_path()` with a simple named group; the one beyond them yields nothing, and so
+        // does a route with a part that cannot be read.
         ("http::ANY::/vintage/{}", "shop/views.py::vintage"),
         // `include()` by dotted name, two levels deep: `require_http_methods`, a class-based
         // view's own handler methods, and `require_safe` reached through its module.
@@ -1227,6 +1255,43 @@ fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
             "http::POST::/catalog/upload",
             "shop/catalog/urls.py::upload",
         ),
+    ];
+    assert_eq!(actual, pairs(&expected));
+}
+
+#[test]
+fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
+    let (_, actual) = providers("python_django_includes", "python-django", "");
+    let expected = [
+        ("http::ANY::/health", "mysite/views.py::health"),
+        // `include()` of a tuple, holding a module's dotted name or a list of entries.
+        ("http::ANY::/shop/items", "shop/views.py::items"),
+        ("http::ANY::/extra/ping", "mysite/views.py::ping"),
+        // `apps/vendor/urls.py` may be what `include("vendor.urls")` names: no `/deals`.
+    ];
+    assert_eq!(actual, pairs(&expected));
+
+    // An `include()` whose argument cannot be read may name any URLconf: none is a root.
+    let repo = fixture_repo("python_django_unknown", "python-django", Some(ORIGIN));
+    let plugins = "from django.urls import include, path\nfrom registry import load\n\n\
+                   urlpatterns = [path(\"plugins/\", include(load()))]\n";
+    std::fs::write(repo.join("apps/plugins.py"), plugins).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(json["providers"], serde_json::json!([]));
+}
+
+#[test]
+fn python_routers_whose_mount_is_not_seen_are_not_served_at_the_root() {
+    let (_, actual) = providers("python_mounts", "python-mounts", "");
+    let expected = [
+        // The apps, at their root, and a sub-application under the path that mounts it.
+        ("http::GET::/health", "backend/app/main.py::health"),
+        ("http::GET::/v1/ping", "backend/app/main.py::ping"),
+        ("http::GET::/about", "backend/app/site.py::about"),
+        // The users router and the pages Blueprint are mounted through imports that do not
+        // resolve, and `legacy` may be what an unreadable mount puts under `/legacy`: none of
+        // them is served at the root.
     ];
     assert_eq!(actual, pairs(&expected));
 }
@@ -1379,6 +1444,17 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
             host,
             &site("purge", "httpx.request#0"),
         ),
+        // A module's attribute, joined with `+` and inside an f-string.
+        (
+            "http::GET::/orders",
+            host,
+            &site("list_orders", "requests.get#0"),
+        ),
+        (
+            "http::GET::/orders/{}",
+            host,
+            &site("read_order", "requests.get#0"),
+        ),
     ]);
 
     // `get` on a parameter or on another object (`lookup`) is no consumer.
@@ -1484,6 +1560,25 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
             "http::GET::/api/users/me",
             host,
             &site("Api.profile", "self.user#0"),
+        ),
+        // A method wrapper called on an instance of its class; a call that only matches its
+        // name (`not_a_client`) is no consumer.
+        (
+            "http::GET::/stock",
+            host,
+            &site("stock", "inventory.fetch_item#0"),
+        ),
+        // Called on the class: the instance passed explicitly takes the receiver, a class
+        // method's receiver is the class.
+        (
+            "http::GET::/pages",
+            host,
+            &site("explicit_instance", "Pages.load#0"),
+        ),
+        (
+            "http::GET::/shared",
+            host,
+            &site("class_method", "Pages.load_shared#0"),
         ),
     ]);
 

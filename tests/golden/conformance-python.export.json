@@ -27,7 +27,7 @@
     },
     {
       "path": "clients/modules.py",
-      "hash": "0d75a2eba6f7830daa1e56074c0c4b04e2d204ae3c20625ad3d9466ee363ba52"
+      "hash": "5712d8be650e3cc3acd0632b725108acebd1ac5215ba824cefc817483d9077d6"
     },
     {
       "path": "clients/sessions.py",
@@ -35,7 +35,7 @@
     },
     {
       "path": "clients/wrappers.py",
-      "hash": "b038e8b8f2a29b9a54c026bfa43327b2923da2fb330a586d0f9fcc3e40dc1a27"
+      "hash": "15058bb03b424f2098e2623e9b1322a16930f75c84e37234c2aa0904ff4e1106"
     },
     {
       "path": "cycle_a.py",
@@ -183,11 +183,11 @@
     },
     {
       "path": "shop/urls.py",
-      "hash": "71e56eacc500e3097b2bf6650e0f56350c3df30734b5071371c518b1d5552615"
+      "hash": "6f1d149e617f871ddeaeaf4af8164f0d04d80a1e5aa661324f2cbb48ea1661c2"
     },
     {
       "path": "shop/views.py",
-      "hash": "28c3ebcbcc1497bda74a881339b33621cac6c8b07e1c0a457152560ec1f01af6"
+      "hash": "9fdf6fb9c035b3cdfdf8f06d8bb4c8754b90e46ec36051d792039300ab1c17c8"
     },
     {
       "path": "src/billing/__init__.py",
@@ -240,6 +240,10 @@
     {
       "path": "web/pages.py",
       "hash": "d754de37df2ee33ccebc0cbf7c37abf9ae3504f18abfbf31c223fbc6d924527b"
+    },
+    {
+      "path": "web/partial.py",
+      "hash": "6adcaef715d7717ad40944cfa89f36bbe308378a5ed5ca59bb4fded4876edf43"
     }
   ],
   "symbols": [
@@ -823,48 +827,64 @@
       "id": "example.com/acme/conformance::clients/modules.py::create_user",
       "span": {
         "path": "clients/modules.py",
-        "start": 313,
-        "end": 439
+        "start": 334,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/modules.py::list_orders",
+      "span": {
+        "path": "clients/modules.py",
+        "start": 1071,
+        "end": 1182
       }
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::list_users",
       "span": {
         "path": "clients/modules.py",
-        "start": 190,
-        "end": 310
+        "start": 211,
+        "end": 331
       }
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::lookup",
       "span": {
         "path": "clients/modules.py",
-        "start": 911,
-        "end": 1047
+        "start": 932,
+        "end": 1068
       }
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::purge",
       "span": {
         "path": "clients/modules.py",
-        "start": 726,
-        "end": 908
+        "start": 747,
+        "end": 929
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/modules.py::read_order",
+      "span": {
+        "path": "clients/modules.py",
+        "start": 1185,
+        "end": 1317
       }
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::rename_user",
       "span": {
         "path": "clients/modules.py",
-        "start": 442,
-        "end": 593
+        "start": 463,
+        "end": 614
       }
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::status",
       "span": {
         "path": "clients/modules.py",
-        "start": 596,
-        "end": 723
+        "start": 617,
+        "end": 744
       }
     },
     {
@@ -1012,6 +1032,62 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Inventory",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1129,
+        "end": 1357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1218,
+        "end": 1279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1285,
+        "end": 1357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1631,
+        "end": 1959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1739,
+        "end": 1806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1812,
+        "end": 1868
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1874,
+        "end": 1959
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "span": {
         "path": "clients/wrappers.py",
@@ -1020,11 +1096,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::class_method",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2048,
+        "end": 2107
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::drop_order",
       "span": {
         "path": "clients/wrappers.py",
         "start": 448,
         "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1962,
+        "end": 2045
       }
     },
     {
@@ -1060,6 +1152,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::not_a_client",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1445,
+        "end": 1628
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::remove",
       "span": {
         "path": "clients/wrappers.py",
@@ -1081,6 +1181,14 @@
         "path": "clients/wrappers.py",
         "start": 139,
         "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::stock",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1360,
+        "end": 1442
       }
     },
     {
@@ -2292,6 +2400,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::shop/views.py::legal",
+      "span": {
+        "path": "shop/views.py",
+        "start": 293,
+        "end": 331
+      }
+    },
+    {
       "id": "example.com/acme/conformance::shop/views.py::vintage",
       "span": {
         "path": "shop/views.py",
@@ -2497,6 +2613,38 @@
         "path": "web/pages.py",
         "start": 478,
         "end": 582
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::build",
+      "span": {
+        "path": "web/partial.py",
+        "start": 384,
+        "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::build.items",
+      "span": {
+        "path": "web/partial.py",
+        "start": 431,
+        "end": 495
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::read_part",
+      "span": {
+        "path": "web/partial.py",
+        "start": 303,
+        "end": 381
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::read_user",
+      "span": {
+        "path": "web/partial.py",
+        "start": 228,
+        "end": 300
       }
     }
   ],
@@ -3399,8 +3547,19 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 398,
-        "end": 439
+        "start": 419,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/modules.py::list_orders::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/modules.py::list_orders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/modules.py",
+        "start": 1145,
+        "end": 1182
       }
     },
     {
@@ -3410,8 +3569,8 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 284,
-        "end": 310
+        "start": 305,
+        "end": 331
       }
     },
     {
@@ -3425,8 +3584,8 @@
       ],
       "span": {
         "path": "clients/modules.py",
-        "start": 994,
-        "end": 1010
+        "start": 1015,
+        "end": 1031
       }
     },
     {
@@ -3440,8 +3599,8 @@
       ],
       "span": {
         "path": "clients/modules.py",
-        "start": 1022,
-        "end": 1047
+        "start": 1043,
+        "end": 1068
       }
     },
     {
@@ -3451,8 +3610,8 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 852,
-        "end": 908
+        "start": 873,
+        "end": 929
       }
     },
     {
@@ -3462,8 +3621,19 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 797,
-        "end": 840
+        "start": 818,
+        "end": 861
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/modules.py::read_order::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/modules.py::read_order",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/modules.py",
+        "start": 1269,
+        "end": 1317
       }
     },
     {
@@ -3473,8 +3643,8 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 549,
-        "end": 593
+        "start": 570,
+        "end": 614
       }
     },
     {
@@ -3484,8 +3654,8 @@
       "level": null,
       "span": {
         "path": "clients/modules.py",
-        "start": 684,
-        "end": 723
+        "start": 705,
+        "end": 744
       }
     },
     {
@@ -3809,6 +3979,69 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__::requests.Session#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1261,
+        "end": 1279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item::self.session.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::clients/sessions.py::Cache.get",
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+      ],
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1328,
+        "end": 1357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__::httpx.Client#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1779,
+        "end": 1806
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load::self.http.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::clients/sessions.py::Cache.get",
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+      ],
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1849,
+        "end": 1868
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared::requests.get#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1934,
+        "end": 1959
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff::retry#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::backoff",
       "target": "example.com/acme/conformance::clients/wrappers.py::retry",
@@ -3820,6 +4053,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::class_method::Pages.load_shared#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::class_method",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2079,
+        "end": 2107
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::drop_order::remove#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::drop_order",
       "target": "example.com/acme/conformance::clients/wrappers.py::remove",
@@ -3828,6 +4072,28 @@
         "path": "clients/wrappers.py",
         "start": 485,
         "end": 514
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1999,
+        "end": 2006
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages.load#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 2018,
+        "end": 2045
       }
     },
     {
@@ -3875,6 +4141,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::clients/wrappers.py::not_a_client::cfg.fetch_item#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::not_a_client",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+      "level": "inferred",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1603,
+        "end": 1628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::not_a_client::data.fetch_item#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::not_a_client",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+      "level": "inferred",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1553,
+        "end": 1578
+      }
+    },
+    {
       "id": "example.com/acme/conformance::clients/wrappers.py::remove::send#0",
       "caller": "example.com/acme/conformance::clients/wrappers.py::remove",
       "target": "example.com/acme/conformance::clients/wrappers.py::send",
@@ -3916,6 +4204,28 @@
         "path": "clients/wrappers.py",
         "start": 174,
         "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::stock::Inventory#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::stock",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Inventory",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1389,
+        "end": 1400
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::clients/wrappers.py::stock::inventory.fetch_item#0",
+      "caller": "example.com/acme/conformance::clients/wrappers.py::stock",
+      "target": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+      "level": "exact",
+      "span": {
+        "path": "clients/wrappers.py",
+        "start": 1412,
+        "end": 1442
       }
     },
     {
@@ -5430,8 +5740,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 313,
-        "end": 340
+        "start": 346,
+        "end": 373
       }
     },
     {
@@ -5441,8 +5751,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 393,
-        "end": 414
+        "start": 426,
+        "end": 447
       }
     },
     {
@@ -5452,8 +5762,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 225,
-        "end": 254
+        "start": 258,
+        "end": 287
       }
     },
     {
@@ -5463,8 +5773,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 299,
-        "end": 341
+        "start": 332,
+        "end": 374
       }
     },
     {
@@ -5474,8 +5784,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 376,
-        "end": 415
+        "start": 409,
+        "end": 448
       }
     },
     {
@@ -5485,8 +5795,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 680,
-        "end": 707
+        "start": 670,
+        "end": 721
       }
     },
     {
@@ -5496,8 +5806,19 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 796,
-        "end": 827
+        "start": 827,
+        "end": 854
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::shop/urls.py::path#5",
+      "caller": "example.com/acme/conformance::shop/urls.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "shop/urls.py",
+        "start": 943,
+        "end": 974
       }
     },
     {
@@ -5507,8 +5828,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 421,
-        "end": 472
+        "start": 454,
+        "end": 505
       }
     },
     {
@@ -5518,8 +5839,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 529,
-        "end": 574
+        "start": 562,
+        "end": 607
       }
     },
     {
@@ -5529,8 +5850,8 @@
       "level": null,
       "span": {
         "path": "shop/urls.py",
-        "start": 726,
-        "end": 766
+        "start": 873,
+        "end": 913
       }
     },
     {
@@ -5895,6 +6216,105 @@
         "start": 415,
         "end": 444
       }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::APIRouter#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 177,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::FastAPI#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 159,
+        "end": 168
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::app.get#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 304,
+        "end": 333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::app.include_router#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 517,
+        "end": 542
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::app.include_router#1",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 543,
+        "end": 576
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::build#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": "example.com/acme/conformance::web/partial.py::build",
+      "level": "exact",
+      "span": {
+        "path": "web/partial.py",
+        "start": 562,
+        "end": 575
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::build::APIRouter#0",
+      "caller": "example.com/acme/conformance::web/partial.py::build",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 414,
+        "end": 425
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::build::router.get#0",
+      "caller": "example.com/acme/conformance::web/partial.py::build",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 432,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/partial.py::users.get#0",
+      "caller": "example.com/acme/conformance::web/partial.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/partial.py",
+        "start": 229,
+        "end": 252
+      }
     }
   ],
   "providers": [
@@ -5953,6 +6373,10 @@
     {
       "contract": "http::GET::/orders/{}",
       "site": "example.com/acme/conformance::web/pages.py::order"
+    },
+    {
+      "contract": "http::GET::/partial/{}",
+      "site": "example.com/acme/conformance::web/partial.py::read_part"
     },
     {
       "contract": "http::GET::/ping",
@@ -6148,6 +6572,11 @@
       "via": "host:api.example.com"
     },
     {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::clients/modules.py::list_orders::requests.get#0",
+      "via": "host:api.example.com"
+    },
+    {
       "contract": "http::GET::/users",
       "site": "example.com/acme/conformance::clients/modules.py::list_users::requests.get#0",
       "via": "host:api.example.com"
@@ -6160,6 +6589,11 @@
     {
       "contract": "http::DELETE::/cache",
       "site": "example.com/acme/conformance::clients/modules.py::purge::requests.request#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/acme/conformance::clients/modules.py::read_order::requests.get#0",
       "via": "host:api.example.com"
     },
     {
@@ -6233,8 +6667,18 @@
       "via": "host:api.example.com"
     },
     {
+      "contract": "http::GET::/shared",
+      "site": "example.com/acme/conformance::clients/wrappers.py::class_method::Pages.load_shared#0",
+      "via": "host:api.example.com"
+    },
+    {
       "contract": "http::DELETE::/orders/{}",
       "site": "example.com/acme/conformance::clients/wrappers.py::drop_order::remove#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/pages",
+      "site": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages.load#0",
       "via": "host:api.example.com"
     },
     {
@@ -6250,6 +6694,11 @@
     {
       "contract": "http::GET::/orders/slow",
       "site": "example.com/acme/conformance::clients/wrappers.py::list_patiently::retry#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/stock",
+      "site": "example.com/acme/conformance::clients/wrappers.py::stock::inventory.fetch_item#0",
       "via": "host:api.example.com"
     }
   ],

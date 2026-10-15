@@ -213,6 +213,13 @@
       "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
     },
     {
+      "consumer": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "provider": "example.com/xlang/storefront::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host storefront.example.com is served by example.com/xlang/storefront"
+    },
+    {
       "consumer": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
       "provider": "example.com/xlang/storefront::app/api/health/route.ts::GET",
       "contract": "http::GET::/api/health",

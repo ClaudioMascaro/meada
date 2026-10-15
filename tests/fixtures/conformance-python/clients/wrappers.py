@@ -57,3 +57,48 @@ class Api:
 
     def profile(self):
         return self.user("me")
+
+
+class Inventory:
+    """A method wrapper whose name is unique in the repository."""
+
+    def __init__(self):
+        self.session = requests.Session()
+
+    def fetch_item(self, path):
+        return self.session.get(HOST + path)
+
+
+def stock():
+    inventory = Inventory()
+    return inventory.fetch_item("/stock")
+
+
+def not_a_client(data):
+    # Only the name matches `Inventory.fetch_item`: neither call is a consumer.
+    data.fetch_item("/items")
+    cfg = {}
+    return cfg.fetch_item("/orders")
+
+
+class Pages:
+    """Methods called on the class: the instance passed explicitly, or a class method."""
+
+    def __init__(self):
+        self.http = httpx.Client(base_url=HOST)
+
+    def load(self, path):
+        return self.http.get(path)
+
+    @classmethod
+    def load_shared(cls, path):
+        return requests.get(HOST + path)
+
+
+def explicit_instance():
+    pages = Pages()
+    return Pages.load(pages, "/pages")
+
+
+def class_method():
+    return Pages.load_shared("/shared")

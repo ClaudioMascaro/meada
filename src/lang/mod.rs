@@ -33,6 +33,12 @@ pub trait LanguagePack {
         None
     }
 
+    /// A keyword naming the base of the enclosing class, such as `super`: what its members
+    /// are is not resolved.
+    fn base_receiver(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
@@ -194,15 +200,35 @@ pub struct Def {
 
 #[derive(Serialize, Deserialize)]
 pub struct Param {
-    /// A Python `*args`, `**kwargs` or the bare `*` keeps its stars: it binds no argument, and
-    /// the parameters after the first of them are keyword-only.
     pub name: String,
+    /// Which argument of a call binds it.
+    #[serde(default)]
+    pub binds: Binds,
     /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub default: Option<Value>,
     /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
+}
+
+/// Which argument of a call binds a parameter. A positional argument binds the parameters that
+/// take one in order; a keyword argument binds the parameter of its name.
+#[derive(Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub enum Binds {
+    /// A positional or a keyword argument.
+    #[default]
+    Any,
+    /// Only a keyword argument: a Python parameter after `*` or `*args`.
+    Keyword,
+    /// No single argument: Python's `*args` and `**kwargs`.
+    Rest,
+    /// The receiver of a method (`self`): a call on an instance binds it, so its positional
+    /// arguments start at the next parameter; a call on the class passes it first.
+    Instance,
+    /// The receiver of a class method (`cls`): the call binds it, on the class or on an
+    /// instance.
+    Class,
 }
 
 /// A name bound by a destructured object parameter: `{ key: name = default }`.
