@@ -1,0 +1,13 @@
+package::npm::@example/kit
+  example.com/pkg/shared package kit/package.json
+  example.com/pkg/api dependent package.json dependencies
+  example.com/pkg/api dependent src/report.js:4 report
+  example.com/pkg/web dependent e2e/package.json devDependencies
+  example.com/pkg/web dependent e2e/smoke.ts:5 smoke
+  example.com/pkg/web dependent package.json dependencies
+  example.com/pkg/web dependent src/app.ts:10 welcome
+  example.com/pkg/web dependent src/app.ts:14 main
+  example.com/pkg/web dependent src/app.ts:15 main
+  example.com/pkg/web dependent src/app.ts:16 main
+  example.com/pkg/web dependent src/app.ts:17 main
+  example.com/pkg/web dependent src/app.ts:18 main

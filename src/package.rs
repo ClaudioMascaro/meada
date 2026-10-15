@@ -19,7 +19,7 @@ use serde_json::Value;
 
 use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::index::{self, Consumer, Export, Provider};
+use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::resolve::{Code, Exported};
 use crate::workspace::Repository;
@@ -158,6 +158,16 @@ pub struct Package {
     pub repository: String,
     /// The directory of the manifest, relative to the repository root: `.` for the root.
     pub directory: String,
+}
+
+impl Package {
+    /// The site of its manifest, which a dependency entry's link names as its provider.
+    pub fn site(&self) -> String {
+        match self.directory.as_str() {
+            "." => site(&self.repository, "package.json"),
+            dir => site(&self.repository, &format!("{dir}/package.json")),
+        }
+    }
 }
 
 /// A call through a binding imported from a bare specifier, as the index stores it.
@@ -844,6 +854,68 @@ pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> Str
     }
 }
 
+/// Where a package site of `repository` sits: a manifest provider (`<repository>::<path>`) as
+/// `<path>`, a dependency entry's consumer (`<repository>::<path>::<field>::<name>`) as `<path>
+/// <field>`; `None` for any other site.
+pub fn place(repository: &str, site: &str) -> Option<String> {
+    let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
+    let parts: Vec<&str> = rest.split("::").collect();
+    match parts[..] {
+        [path] if path.ends_with("package.json") => Some(path.to_string()),
+        [path, field, _] if path.ends_with("package.json") => Some(format!("{path} {field}")),
+        _ => None,
+    }
+}
+
+/// A call that reaches a symbol through a package import, for `context`.
+pub struct Reach<'e> {
+    /// The position in `exports` of the repository holding the call.
+    pub repository: usize,
+    pub call: &'e CallSite,
+    pub level: Level,
+    /// What the dependency's range says of the provider's version, when not a plain accept.
+    pub flag: Option<Flag>,
+}
+
+/// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
+/// with the link's level and the range flag of the dependency entry it went through.
+pub fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
+    let mut found = Vec::new();
+    for link in links
+        .iter()
+        .filter(|l| l.provider == symbol && l.contract.starts_with(PREFIX))
+    {
+        let Some((repository, consumer)) = (exports.iter().enumerate())
+            .flat_map(|(n, e)| e.consumers.iter().map(move |c| (n, c)))
+            .find(|(_, c)| c.site == link.consumer)
+        else {
+            continue;
+        };
+        let Some(call) = exports[repository]
+            .calls
+            .iter()
+            .find(|c| c.id == consumer.site)
+        else {
+            continue;
+        };
+        // The manifest the hop went through holds the provider's version.
+        let version = (consumer.hops.iter())
+            .find(|h| h.target == symbol)
+            .and_then(|h| {
+                (exports.iter().flat_map(|e| &e.providers))
+                    .find(|p| p.site == h.manifest && p.contract == link.contract)
+            })
+            .and_then(|p| p.version.as_deref());
+        found.push(Reach {
+            repository,
+            call,
+            level: link.level,
+            flag: flag(consumer.method.as_deref(), version),
+        });
+    }
+    found
+}
+
 impl ContractKind for Packages {
     fn prefix(&self) -> &'static str {
         "package"
@@ -978,6 +1050,29 @@ mod tests {
         (s.dependencies.iter())
             .map(|e| (e.field.as_str(), e.name.as_str(), e.range.as_deref()))
             .collect()
+    }
+
+    #[test]
+    fn a_package_site_shows_its_manifest_and_field() {
+        let repo = "example.com/a";
+        let at = |site: &str| place(repo, site);
+        assert_eq!(
+            at("example.com/a::package.json"),
+            Some("package.json".into())
+        );
+        assert_eq!(
+            at("example.com/a::kit/package.json::devDependencies::x"),
+            Some("kit/package.json devDependencies".into())
+        );
+        for other in [
+            "example.com/a",
+            "example.com/a::src/app.ts::main",
+            "example.com/a::src/app.ts::main::greet#0",
+            "example.com/b::package.json",
+            "example.com/a::package.json::dependencies",
+        ] {
+            assert_eq!(at(other), None, "{other}");
+        }
     }
 
     #[test]

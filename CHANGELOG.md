@@ -29,6 +29,16 @@ tagging.
   `mcp`. Messages follow `LANG`: Portuguese or English.
 - An MCP server over stdio with three read-only tools, `search`, `context` and `trace`, whose
   answers are compact English lines under a token budget, with a chain footer on `trace`.
+- Packages as contracts (spec #22): each named `package.json` provides `package::npm::<name>`,
+  and each dependency entry that names a package of the workspace (any repository, its own
+  included; a `workspace:` range keeps its own) links to it, flagged
+  `range mismatch` or `range unchecked` when the range does not plainly accept the provider's
+  version. A call to a function imported from such a package links to the function in the
+  provider, across repositories, through `exports`, `types`, `module`, `main` and re-exports,
+  and through the `tsconfig.json` `outDir` back to the source. `search` takes the kind
+  `package` (repository, directory, version and consumers), and `context` on an exported
+  function lists its consumers, from any repository of the workspace, with the range flag of
+  each.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

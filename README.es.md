@@ -200,12 +200,22 @@ BullMQ y streams Redis (`ioredis` y `node-redis`), con el productor enlazado al 
 consumidor, también en el mismo repositorio. Un repositorio con la tabla `[serve]` también lee
 sus documentos OpenAPI (3.0 y 3.1) y AsyncAPI (2.x y 3.0), encontrados por el nombre o listados
 en `[serve] documents`: las rutas y los canales que describen se vuelven contratos, con los
-campos de cada respuesta o payload, y `meada status` dice qué leyó y qué ignoró. Cada enlace
-tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
+campos de cada respuesta o payload, y `meada status` dice qué leyó y qué ignoró. Cada
+`package.json` con nombre se vuelve el contrato `package::npm::<nombre>`, y cada dependencia
+(`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) que nombra un
+paquete del workspace (de cualquier repositorio, el propio incluido) se enlaza a él, con el rango de versión comprobado
+contra la versión local (`range mismatch` cuando no la acepta, `range unchecked` cuando no se
+puede comprobar). Una llamada a una función importada de ese paquete atraviesa hasta el código
+del proveedor, por los campos `exports`, `types`, `module` y `main` y por los re-exports,
+también cuando el punto de entrada apunta a la carpeta de build (el `outDir` del
+`tsconfig.json`, mapeado de vuelta al `rootDir`). `search` con el tipo `package` encuentra el
+paquete por el nombre, con el repositorio, la carpeta, la versión y el número de consumidores,
+y `context` de una función exportada lista quién la llama, en cualquier repositorio del workspace. No lee
+lockfile ni consulta el registro npm. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
 se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
 `decided`. Los clústeres de broker no se modelan: dos clústeres que tienen un tópico con el
 mismo nombre se enlazan como si fueran uno solo. Aún no hay: otros lenguajes, otros clientes HTTP
-además de `fetch`, otros clientes de mensajería además de estos, paquetes ni el paquete npm. El alcance y el orden del trabajo están
+además de `fetch`, otros clientes de mensajería además de estos, ni el paquete npm de Meada. El alcance y el orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
 

@@ -1,0 +1,11 @@
+example.com/pkg/shared kit/src/greet.ts:1 greet
+function greet(name: string): string {
+  return shout(`hello ${name}`);
+}
+callers: none
+callees:
+example.com/pkg/shared kit/src/greet.ts:5 shout
+consumers:
+example.com/pkg/api src/report.js:4 report
+example.com/pkg/web e2e/smoke.ts:5 smoke
+example.com/pkg/web src/app.ts:10 welcome
