@@ -289,6 +289,14 @@ struct Frame<'a> {
     index: usize,
 }
 
+/// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
+struct Written<'a> {
+    path: &'a str,
+    scope: &'a str,
+    args: &'a [Value],
+    at: (&'a str, usize),
+}
+
 /// Values evaluated across files for contract kinds: constants folded where they are
 /// defined, imported ones included, and the arguments of client wrapper calls substituted
 /// for their parameters.
@@ -367,13 +375,7 @@ impl<'a> Code<'a> {
                     return None;
                 }
                 seen.push((at, constant));
-                let value = &self
-                    .full(at)?
-                    .consts
-                    .iter()
-                    .find(|c| c.name == constant)?
-                    .value;
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                let (value, within) = self.held(at, constant)?;
                 let mut origin = match value {
                     Value::Ref(name) => self.trace(at, within, name, seen)?,
                     Value::Call(callee) => {
@@ -450,29 +452,21 @@ impl<'a> Code<'a> {
         name: &'a str,
     ) -> Option<((&'a str, &'a str), &'a Value)> {
         match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
-            Binding::Const(at, constant) => {
-                let facts = self.full(at)?;
-                let value = &facts.consts.iter().find(|c| c.name == constant)?.value;
-                Some(((at, constant), value))
-            }
+            Binding::Const(at, constant) => Some(((at, constant), self.held(at, constant)?.0)),
             _ => None,
         }
     }
 
-    /// The arguments of the `new` expression a `const` binding holds (`Origin::binding`), with
-    /// their constants folded; `None` when the binding holds no `new`.
-    pub fn constructed(&self, (path, constant): (&'a str, &'a str)) -> Option<Vec<Value>> {
-        let Value::New(_, args) = &self
+    /// The value the `const` `constant` of `path` holds, as written, and the scope it is
+    /// written in.
+    fn held(&self, path: &'a str, constant: &'a str) -> Option<(&'a Value, &'a str)> {
+        let value = &self
             .full(path)?
             .consts
             .iter()
             .find(|c| c.name == constant)?
-            .value
-        else {
-            return None;
-        };
-        let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
-        Some(args.iter().map(|a| self.value(path, within, a)).collect())
+            .value;
+        Some((value, constant.rsplit_once('.').map_or("", |(s, _)| s)))
     }
 
     /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object
@@ -519,29 +513,61 @@ impl<'a> Code<'a> {
         index: usize,
         read: &dyn Fn(&[Value]) -> Option<R>,
     ) -> Vec<(&'a str, usize, R)> {
+        let call = self.resolver.files[path].calls.get(index);
+        let (Some(call), Some(args)) = (call, self.args(path, index)) else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
-        self.walk(path, index, &mut Vec::new(), read, &mut out);
+        let written = Written {
+            path,
+            scope: &call.scope,
+            args,
+            at: (path, index),
+        };
+        self.walk(&written, &mut Vec::new(), read, &mut out);
+        out
+    }
+
+    /// `expand` for the arguments of the `new` expression the `const` `binding` holds
+    /// (`Origin::binding`), on behalf of the call `at` made on that binding: `at` is the site
+    /// when they evaluate where the binding stands, and the function enclosing the binding is
+    /// the client wrapper when they depend on its parameters.
+    pub fn expand_constructed<R>(
+        &self,
+        (file, constant): (&'a str, &'a str),
+        at: (&'a str, usize),
+        read: &dyn Fn(&[Value]) -> Option<R>,
+    ) -> Vec<(&'a str, usize, R)> {
+        let Some((Value::New(_, args), scope)) = self.held(file, constant) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let written = Written {
+            path: file,
+            scope,
+            args,
+            at,
+        };
+        self.walk(&written, &mut Vec::new(), read, &mut out);
         out
     }
 
     fn walk<R>(
         &self,
-        path: &'a str,
-        index: usize,
+        written: &Written<'a>,
         frames: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value]) -> Option<R>,
         out: &mut Vec<(&'a str, usize, R)>,
     ) {
-        let call = self.resolver.files[path].calls.get(index);
-        let (Some(call), Some(args)) = (call, self.args(path, index)) else {
-            return;
-        };
+        let &Written {
+            path, scope, args, ..
+        } = written;
         let mut wants = None;
         let values: Vec<Value> = args
             .iter()
-            .map(|a| self.eval(path, &call.scope, a, frames, 0, &mut Vec::new(), &mut wants))
+            .map(|a| self.eval(path, scope, a, frames, 0, &mut Vec::new(), &mut wants))
             .collect();
-        let (site, at) = frames.last().map_or((path, index), |f| (f.path, f.index));
+        let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if let Some(found) = read(&values) {
             out.push((site, at, found));
             return;
@@ -565,7 +591,7 @@ impl<'a> Code<'a> {
                 path: caller,
                 index: n,
             });
-            self.walk(path, index, frames, read, out);
+            self.walk(written, frames, read, out);
             frames.pop();
         }
     }
@@ -637,15 +663,11 @@ impl<'a> Code<'a> {
                 if seen.contains(&(at, constant)) {
                     return Value::Unknown;
                 }
-                let found = self
-                    .full(at)
-                    .and_then(|f| f.consts.iter().find(|c| c.name == constant));
-                let Some(found) = found else {
+                let Some((value, within)) = self.held(at, constant) else {
                     return Value::Unknown;
                 };
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
                 seen.push((at, constant));
-                let folded = self.eval(at, within, &found.value, frames, depth, seen, wants);
+                let folded = self.eval(at, within, value, frames, depth, seen, wants);
                 seen.pop();
                 folded
             }

@@ -4,12 +4,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::contract::{Level, Link};
+use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{channel, http, render, resource};
+use crate::{channel, http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -49,7 +49,7 @@ pub(crate) struct Graph<'a> {
     /// The channel sides whose name Meada could not evaluate, by site (the producing call or
     /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
     /// chain would not otherwise show them.
-    holes: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
+    unresolved_sides: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
     /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
     /// handles it: data goes from the provider (a writer, or the call that produces) to that
@@ -69,7 +69,7 @@ impl<'a> Graph<'a> {
             callers: HashMap::new(),
             consumers: HashMap::new(),
             providers: Vec::new(),
-            holes: HashMap::new(),
+            unresolved_sides: HashMap::new(),
             out: HashMap::new(),
             into: HashMap::new(),
         };
@@ -98,7 +98,11 @@ impl<'a> Graph<'a> {
                 .chain(consumed.map(|c| ("consumes", c.contract.as_ref(), &c.site)));
             for (verb, contract, site) in sides {
                 if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
-                    graph.holes.entry(site).or_default().push((verb, contract));
+                    graph
+                        .unresolved_sides
+                        .entry(site)
+                        .or_default()
+                        .push((verb, contract));
                 }
             }
         }
@@ -158,15 +162,14 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        let sides = match () {
-            _ if from.starts_with(resource::PREFIX) => Some(("resource", "writers and readers")),
-            _ if from.starts_with(channel::PREFIX) => Some(("channel", "producers and consumers")),
-            _ => None,
-        };
-        if let Some((kind, sides)) = sides {
+        if let Some(kind) = contract::kind_of(from)
+            && let Some((provider, consumer)) = kind.sides()
+        {
             return Lookup::Answer(vec![format!(
-                "`{from}` is a {kind}, and a trace starts from a symbol, a route or a call \
-                 site: run `context` on it for its {sides}, then trace from one"
+                "`{from}` is a {}, and a trace starts from a symbol, a route or a call \
+                 site: run `context` on it for its {provider}s and {consumer}s, then trace \
+                 from one",
+                kind.prefix()
             )]);
         }
         let (contract, path) = if http::route(from).is_some() {
@@ -347,7 +350,7 @@ impl<'a> Walk<'_, 'a> {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
             Direction::Up => {
                 let site = self.site(call);
-                self.holes(&call.1.id, 1, call.0, &site);
+                self.unresolved_sides(&call.1.id, 1, call.0, &site);
                 let text = format!("{site} {}", self.caller(call));
                 self.enter(&call.1.caller, 1, Row::call(text, call.0, None));
             }
@@ -376,7 +379,7 @@ impl<'a> Walk<'_, 'a> {
                 graph.workspace.repos[n].identity,
                 self.files[n].at(&s.span.path, s.span.start)
             );
-            self.holes(id, depth + 1, n, &place);
+            self.unresolved_sides(id, depth + 1, n, &place);
         }
         // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
@@ -505,7 +508,7 @@ impl<'a> Walk<'_, 'a> {
             }
         }
         let place = self.site(call);
-        self.holes(&c.id, depth, n, &place);
+        self.unresolved_sides(&c.id, depth, n, &place);
         // A call that produces to a channel goes on to the handlers of its consumers.
         for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
             let handler = link.consumer.as_str();
@@ -519,9 +522,9 @@ impl<'a> Walk<'_, 'a> {
     }
 
     /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
-    fn holes(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
-        let holes = self.graph.holes.get(site).into_iter().flatten();
-        for &(verb, contract) in holes {
+    fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
+        let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
+        for &(verb, contract) in sides {
             let text = format!("{place} {verb} {}", channel::shown(contract));
             self.push(depth, Row::call(text, repo, None));
         }

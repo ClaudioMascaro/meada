@@ -2525,18 +2525,6 @@
   ],
   "providers": [
     {
-      "contract": "channel::amqp-exchange::events::order.created",
-      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0"
-    },
-    {
-      "contract": "channel::amqp-exchange::events::order.shipped",
-      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1"
-    },
-    {
-      "contract": "channel::amqp-exchange::events::refund.paid",
-      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#3"
-    },
-    {
       "contract": "channel::amqp::invoices",
       "site": "example.com/acme/conformance::src/messages/queues.ts::enqueue::confirming.sendToQueue#0"
     },
@@ -2811,6 +2799,23 @@
       "exchange": "events",
       "pattern": "*.shipped",
       "site": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#2"
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "events",
+      "key": "order.created",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0"
+    },
+    {
+      "exchange": "events",
+      "key": "order.shipped",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1"
+    },
+    {
+      "exchange": "events",
+      "key": "refund.paid",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#3"
     }
   ],
   "links": [

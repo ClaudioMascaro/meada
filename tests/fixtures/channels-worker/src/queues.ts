@@ -16,6 +16,13 @@ export async function work() {
   await channel.consume("shipments", onShipment);
 }
 
+// Queues named like the `events` exchange and like an unbound routing key: no publish to the
+// exchange reaches them, since no binding routes it there.
+export async function lookalikes() {
+  await channel.consume("events");
+  await channel.consume("order.refunded");
+}
+
 function onOrder(message: unknown) {
   return message;
 }
