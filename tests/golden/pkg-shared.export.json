@@ -50,8 +50,24 @@
       "hash": "f76b02cee77f96941152b79568cf54d41e6758a3f0708b3cb2bd8a008bdcaaf3"
     },
     {
+      "path": "nest/index/index.ts",
+      "hash": "6b22d4265f0bde1321c36cacd219cd37620757360db53889dbeefd3421e4211c"
+    },
+    {
+      "path": "nest/sub/deep.ts",
+      "hash": "00a3d0fc825bad7656e6a3cac62988146e730ac0c0d1eff921f5ec5192d6ad59"
+    },
+    {
       "path": "plain/index.ts",
       "hash": "016f1c092cff2ae70d39e0d4071eda485c70377fbf138a555df371e65ffb1802"
+    },
+    {
+      "path": "prec/index.ts",
+      "hash": "b9ff91e30adeb9f3aab3a436cfa0e376cd730069ed64134f5e29dc560612f02d"
+    },
+    {
+      "path": "prec/legacy.ts",
+      "hash": "abfe5bd639813eb7551371a6ff7b51f8934c25223772aca0604ef4b5b5a1ef07"
     },
     {
       "path": "sealed/src/one.ts",
@@ -204,9 +220,41 @@
       }
     },
     {
+      "id": "example.com/pkg/shared::nest/index/index.ts::inner",
+      "span": {
+        "path": "nest/index/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::nest/sub/deep.ts::deep",
+      "span": {
+        "path": "nest/sub/deep.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
       "id": "example.com/pkg/shared::plain/index.ts::plain",
       "span": {
         "path": "plain/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::prec/index.ts::prec",
+      "span": {
+        "path": "prec/index.ts",
+        "start": 7,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::prec/legacy.ts::prec",
+      "span": {
+        "path": "prec/legacy.ts",
         "start": 7,
         "end": 53
       }
@@ -398,8 +446,16 @@
       "site": "example.com/pkg/shared::kit/package.json"
     },
     {
+      "contract": "package::npm::@example/nest",
+      "site": "example.com/pkg/shared::nest/package.json"
+    },
+    {
       "contract": "package::npm::@example/plain",
       "site": "example.com/pkg/shared::plain/package.json"
+    },
+    {
+      "contract": "package::npm::@example/prec",
+      "site": "example.com/pkg/shared::prec/package.json"
     },
     {
       "contract": "package::npm::@example/sealed",
@@ -441,10 +497,22 @@
       "directory": "kit"
     },
     {
+      "name": "@example/nest",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "nest"
+    },
+    {
       "name": "@example/plain",
       "version": "1.0.0",
       "repository": "example.com/pkg/shared",
       "directory": "plain"
+    },
+    {
+      "name": "@example/prec",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "prec"
     },
     {
       "name": "@example/sealed",
@@ -551,11 +619,25 @@
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
     },
     {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/nest",
+      "provider": "example.com/pkg/shared::nest/package.json",
+      "contract": "package::npm::@example/nest",
+      "level": "exact",
+      "reason": "package::npm::@example/nest 1.0.0 (local 1.0.0)"
+    },
+    {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/plain",
       "provider": "example.com/pkg/shared::plain/package.json",
       "contract": "package::npm::@example/plain",
       "level": "exact",
       "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/prec",
+      "provider": "example.com/pkg/shared::prec/package.json",
+      "contract": "package::npm::@example/prec",
+      "level": "exact",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
@@ -675,6 +757,13 @@
       "contract": "package::npm::@example/typed",
       "level": "exact",
       "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/nest.ts::nest::prec#0",
+      "provider": "example.com/pkg/shared::prec/index.ts::prec",
+      "contract": "package::npm::@example/prec",
+      "level": "inferred",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0); import outDir"
     },
     {
       "consumer": "example.com/pkg/web::src/text.ts::clean::normalize#0",

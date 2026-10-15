@@ -256,10 +256,13 @@ give byte-identical output.
   the `*` pattern with the longest prefix, the first of `types`, `import`, `default`, `require`
   at each level, `null` blocking, a key or a target with two `*` not read, the only way in when
   present; without `exports`, for the bare name one way for each of `types`, `module`, `main`
-  present, tried in that order, or, with none of the three, the subpath `./index` as a path;
-  for any other subpath, the subpath itself, as a path with the trunk's extension and `index`
-  rules, `path`). A file must stay inside the package directory (`inside`) and be a source file
-  the provider indexes, not a `.d.ts`; the first way that leads to one, directly or through the
+  present, tried in that order (an empty or non-string `types`, `module` or `main` counts as
+  absent), or, with none of the three, `index.<ext>` for each pack extension, as Node's default
+  does (`path`, never `index` alone or `index/index.<ext>`); for any other subpath, the subpath
+  itself, as a path with the trunk's extension and `index` rules, `path`). A file must stay
+  inside the package directory (`inside`), be a source file the provider indexes, not a
+  `.d.ts`, and have this package's manifest as its nearest (`owned_source`: a file of a nested
+  package is not the outer package's); the first way that leads to one, directly or through the
   mapping, wins, so a field that leads nowhere does not stop the search. One that is build output
   maps back to source: `mapped` takes the `tsconfig.json` in the package directory; only when that
   file is absent or invalid (stored as `null`, no `Config`) the repository root's, and a valid
@@ -780,7 +783,11 @@ give byte-identical output.
   `shared` also holds `@example/dts` (`types` to a declaration file that is no source, `main` to
   `index.js`: `exact`, `import main`), `@example/plain` (no entry field, an `index.ts`: `exact`,
   `path`) and `@example/bare` (no entry field and no `index`, one file exporting the name:
-  `ambiguous`, `path`), called from `web/src/entries.ts`. The freshness test also asserts the calls through the renamed export and subpath no longer
+  `ambiguous`, `path`), called from `web/src/entries.ts`; `@example/prec` (`types` into `dist`,
+  mapped through its own `tsconfig.json`, and a later `main` that is a source: the first field
+  wins, `inferred`) and `@example/nest` (no entry field, with `index/` and `sub/` nested
+  packages: `index/index.ts` is not its default and a subpath into `sub/` does not cross),
+  called from `web/src/nest.ts`. The freshness test also asserts the calls through the renamed export and subpath no longer
   cross. Hidden names in the trunk: `conformance-ts-js/src/shadow.ts` (`catch`, `for ... of`,
   `let`, `var`, an arrow parameter without parentheses, nested and array parameter patterns, a
   same-scope constant and parameter, each never `exact`) and two value-flow cases in

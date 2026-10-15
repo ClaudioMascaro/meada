@@ -234,6 +234,28 @@ fn a_field_that_leads_to_no_source_does_not_stop_the_search_and_no_field_reads_a
     );
 }
 
+#[test]
+fn the_first_field_that_leads_to_a_file_wins_and_a_nested_package_is_not_the_outer_ones() {
+    let p = packages("packages_entry_owner");
+    let at = |callee: &str| format!("example.com/pkg/web::src/nest.ts::nest::{callee}#0");
+    let shared = |file: &str, name: &str| format!("example.com/pkg/shared::{file}::{name}");
+
+    // `types` maps through the `outDir` (inferred) to `index.ts`; the later `main`, a source
+    // that would be exact, is not tried.
+    assert_eq!(
+        imports_of(&p.web, &at("prec")),
+        [(
+            "inferred".to_string(),
+            "outDir".to_string(),
+            shared("prec/index.ts", "prec")
+        )]
+    );
+    // With no entry field Node reads `index.<ext>`, never `index/index.ts`; and that file, like
+    // a subpath file, belongs to a nested package, not to `@example/nest`.
+    assert!(imports_of(&p.web, &at("inner")).is_empty());
+    assert!(imports_of(&p.web, &at("deep")).is_empty());
+}
+
 const CLEAN: &str = "example.com/pkg/web::src/text.ts::clean::normalize#0";
 const NORMALIZE: &str = "example.com/pkg/shared::src/text.ts::normalize";
 

@@ -437,7 +437,15 @@ fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
         (How::Main, &s.main),
     ];
     if fields.iter().all(|(_, t)| t.is_none()) {
-        return path("./index").into_iter().collect();
+        // Node's default tries `index.<ext>` only, not `index` or `index/index.<ext>`.
+        let index = EXTENSIONS
+            .iter()
+            .map(|ext| inside(dir, &format!("index.{ext}")));
+        return index
+            .collect::<Option<_>>()
+            .map(|files| (How::Path, files))
+            .into_iter()
+            .collect();
     }
     (fields.into_iter())
         .filter_map(|(how, t)| {
@@ -548,7 +556,7 @@ impl<'e> Provided<'e> {
         let tried = ways(manifest, subpath);
         let first = tried.first()?.0;
         let followed = tried.iter().find_map(|(how, files)| {
-            if let Some(file) = files.iter().find(|f| self.source(f)) {
+            if let Some(file) = files.iter().find(|f| self.owned_source(manifest, f)) {
                 return Some((file.clone(), *how, Level::Exact));
             }
             Some((self.mapped(manifest, files)?, How::OutDir, Level::Inferred))
@@ -584,7 +592,13 @@ impl<'e> Provided<'e> {
         let (out_dir, root_dir) = roots(&config.path, &config.tsconfig, dir)?;
         (entries.iter())
             .flat_map(|e| sources(e, &out_dir, &root_dir))
-            .find(|s| self.source(s))
+            .find(|s| self.owned_source(manifest, s))
+    }
+
+    /// Whether `path` is a source file the provider indexes (`source`) whose nearest manifest
+    /// is `manifest`: a file of a nested package is not the outer package's.
+    fn owned_source(&self, manifest: &Manifest, path: &str) -> bool {
+        self.source(path) && nearest(self.manifests, path).is_some_and(|m| m.path == manifest.path)
     }
 
     /// The symbols `chain` names in the source files of the package at `manifest` (those whose
@@ -1398,12 +1412,19 @@ mod tests {
         // A field that is absent, or cannot be followed, is skipped, not a stop.
         let two = r#"{"types": "../t.ts", "main": "src/index.js"}"#;
         assert_eq!(at(two, "."), [(How::Main, vec!["lib/src/index.js".into()])]);
-        // None of the fields: Node's default, `./index` as a path.
-        let [(how, files)] = &at("{}", ".")[..] else {
-            panic!("one way")
-        };
-        assert_eq!(*how, How::Path);
-        assert_eq!(&files[..2], ["lib/index", "lib/index.ts"]);
+        // None of the fields (an empty or non-string one is absent): Node's default, `index.<ext>`
+        // alone, in the pack's order.
+        for json in ["{}", r#"{"main": "", "module": 3}"#] {
+            let [(how, files)] = &at(json, ".")[..] else {
+                panic!("one way")
+            };
+            assert_eq!(*how, How::Path);
+            assert_eq!(
+                &files[..3],
+                ["lib/index.ts", "lib/index.tsx", "lib/index.js"]
+            );
+            assert_eq!(files.len(), EXTENSIONS.len());
+        }
         // A subpath is a path inside the package, with the trunk's extension and index rules.
         let [(how, files)] = &at(all, "./util/x")[..] else {
             panic!("one way")
