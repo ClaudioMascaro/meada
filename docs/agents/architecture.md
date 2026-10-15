@@ -662,13 +662,13 @@ Each is marked `ponytail:` at its site unless noted.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers, and does not climb a
-  call found only by a name match, so a wrapper method called on a receiver whose class Meada
-  cannot tell (in TypeScript any receiver but `this`, a `const api = new Api()` included), or a
-  function called by a bare name no import binds, is read where it stands; a
-  parameter captured by a closure is unknown; a nested or rest pattern in a destructured
-  parameter binds nothing, and a spread in the object a caller passes makes the names it may
-  override unknown.
+- `resolve.rs`: wrapper expansion (HTTP clients, message producers and consumers) walks every
+  simple path up the callers, and does not climb a call found only by a name match, so a wrapper
+  method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
+  `this`, a `const api = new Api()` included), or a function called by a bare name no import
+  binds, is read where it stands; a parameter captured by a closure is unknown; a nested or rest
+  pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
+  makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`.
