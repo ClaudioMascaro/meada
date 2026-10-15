@@ -42,6 +42,15 @@ enum Binding<'a> {
     Unknown,
 }
 
+/// A call site whose single target is a definition. `by_name` when only a name match found it
+/// (`data.get(...)`, or a bare name no import binds): it may reach any object or function.
+#[derive(Clone, Copy)]
+struct Caller<'a> {
+    path: &'a str,
+    index: usize,
+    by_name: bool,
+}
+
 /// Seen `(file, exported name)` pairs: re-exports may form cycles.
 type Seen<'a> = HashSet<(&'a str, &'a str)>;
 
@@ -51,7 +60,7 @@ pub struct Resolver<'a> {
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     consts: HashMap<&'a str, HashSet<&'a str>>,
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
-    callers: HashMap<Target<'a>, Vec<(&'a str, usize)>>,
+    callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
@@ -95,12 +104,20 @@ impl<'a> Resolver<'a> {
             by_name,
             modules,
         };
-        let mut callers: HashMap<Target, Vec<(&str, usize)>> = HashMap::new();
+        let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
-            for (n, call) in facts.calls.iter().enumerate() {
-                if let Resolution::Exact(t) | Resolution::Inferred(t) = resolver.call(path, call) {
-                    callers.entry(t).or_default().push((path, n));
-                }
+            for (index, call) in facts.calls.iter().enumerate() {
+                let (target, by_name) = match resolver.call(path, call) {
+                    Resolution::Exact(t) => (t, false),
+                    Resolution::Inferred(t) => (t, true),
+                    _ => continue,
+                };
+                let caller = Caller {
+                    path,
+                    index,
+                    by_name,
+                };
+                callers.entry(target).or_default().push(caller);
             }
         }
         resolver.callers = callers;
@@ -578,18 +595,25 @@ impl<'a> Code<'a> {
         if frames.iter().any(|f| f.def == wrapper) {
             return;
         }
-        let callers = self.resolver.callers.get(&wrapper);
-        let callers = callers.map_or(&[][..], Vec::as_slice);
+        // A call that only matches the wrapper's name may be on any object, or reach another
+        // function: it is not climbed.
+        // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
+        // class Meada cannot tell, a bare name no import binds) is read where it stands, its
+        // parameters unknown.
+        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
+            .filter(|c| !c.by_name)
+            .copied()
+            .collect();
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
             out.extend(read(&values).map(|found| (site, at, found)));
             return;
         }
-        for &(caller, n) in callers {
+        for caller in callers {
             frames.push(Frame {
                 def: wrapper,
-                path: caller,
-                index: n,
+                path: caller.path,
+                index: caller.index,
             });
             self.walk(written, frames, read, out);
             frames.pop();

@@ -318,6 +318,10 @@ give byte-identical output.
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  `Code::expand` climbs only callers that resolved exact: a call found only by a name match
+  (`Caller::by_name`: `data.get(...)` matched to a wrapper method, or a bare name no import
+  binds) may be on any object or reach another function, so a wrapper with no exact caller is
+  read where it stands.
   `Code::origin(path, scope, chain) -> Option<Origin {package, expr, binding}>` is the
   **receiver tracing** every message library form relies on: it follows a name or member chain
   through `const` bindings (same file and imported) down to an import whose module is outside
@@ -669,9 +673,13 @@ give byte-identical output.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
-  a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
-  spread in the object a caller passes makes the names it may override unknown.
+- `resolve.rs`: wrapper expansion (HTTP clients, message producers and consumers) walks every
+  simple path up the callers, and does not climb a call found only by a name match, so a wrapper
+  method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
+  `this`, a `const api = new Api()` included), or a function called by a bare name no import
+  binds, is read where it stands; a parameter captured by a closure is unknown; a nested or rest
+  pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
+  makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`.
