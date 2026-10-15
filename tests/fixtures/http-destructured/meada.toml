@@ -1,0 +1,3 @@
+[[peer]]
+repo = "example.com/acme/reports"
+base_url_env = ["SERVICE_URL"]

@@ -9,7 +9,8 @@ updates it. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 `Engine::open(dir)` finds the **workspace**, creates or recreates each **repository**'s **index**
 in its own `.meada/index.db`, and ATTACHes every **peer** to the first repository's connection
 as `peer<n>`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
-reads each index through `index::export`, derives **links** from the stored contracts, and renders.
+reads each index through `index::export`, adds the contracts each `meada.toml` declares
+(`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside `.meada/` is written. Everything the engine returns is sorted: the same files
 give byte-identical output.
 
@@ -21,7 +22,11 @@ give byte-identical output.
   an index; when every repository is already indexed at the current schema it refreshes them
   like a query, to evaluate decisions, and writes
   only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`.
+  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. `search`
+  kind `resource` is the contracts under `resource::` (matched by kind and id), the same lines
+  `contract` and no kind list; `context` on `resource::<kind>::<id>` lists the writers and
+  readers across the workspace (`resource_sides`). `status` also prints, under each
+  repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -103,30 +108,36 @@ give byte-identical output.
 - `workspace.rs`, `config.rs`: `Workspace::discover` finds `Repository { root, identity, config }`
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
   repository already in join, transitively; a sibling with an invalid `meada.toml` or
-  `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config`
-  parses the v0.1 subset (`[[peer]]`, `[serve] hosts`) with `deny_unknown_fields`; keys track A
-  adds are listed in `LATER` so the error says "not in v0.1". `config::read<T>(root, name)` is the
-  shared TOML reader (file, line and key in every error), also used for the decisions file;
-  `Repository` carries both `config` and `decisions`, loaded together at discovery.
+  `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config` parses
+  `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`, normalized
+  by `gateway_key`) and `[[resource]]` (`kind` checked as a lowercase identifier, `id` not empty,
+  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`; keys later track A
+  specs add are listed in `LATER` so the error says "not in v0.1". `Serve::gateway_path(code path)
+  -> Option<(gateway path, reason)>` is the one gateway rule (spec #19), written for A4's document
+  routes to reuse. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
+  every error), also used for the decisions file; `Repository` carries both `config` and
+  `decisions`, loaded together at discovery.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
   `Decision { kind (ambiguous-link | dynamic-url), call, target, by, p }`, `load(root)` and
   `replay(links, workspace, exports) -> (links, Vec<Evaluation>)`, called by
   `Engine::links_and_decisions` at the end. Replay is a pure function of links, exports and the
   files, so nothing is stored and a changed file needs no reindex. `evaluate` is the one place
-  that decides a decision's `Fate`, in this order: call gone (`Cause::CallGone`), target repository a
-  missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no longer open
-  (the core resolves the call on its own, or the item is not of the decision's kind:
+  that decides a decision's `Fate`, in this order: call gone (`Cause::CallGone`), target
+  repository a missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no
+  longer open (the core resolves the call on its own, or the item is not of the decision's kind:
   `ItemNotOpen`), target gone (`TargetGone`), target not among the ambiguous link's candidates
-  (`NotCandidate`); else it applies. A stale or waiting decision changes no link. `Evaluation
-  { repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target,
-  peer}> }` is per repository, in file order; `Engine::decision_report()` returns them for the
-  workspace (`Engine::local_decisions()` the one of the repository where Meada runs), `export`
-  and `status` render them, and `Evaluation::lines` is the one rendering of the stale and
-  waiting lines (`status`, `meada decide --list`); `--prune` reuses the same call.
-  `probability(p)` is the one [0,1] check, for the file's `p`, a decider's answer and
-  `--min-p`. `load` rejects a file that repeats a `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)` (existing entries minus those of the same
-  `call`, plus `new`, sorted by `call`, no comments or timestamps; `Decision::human(item,
-  candidate)` builds a human pick) and `save(root, text)`.
+  (`NotCandidate`); else it applies. A stale or waiting decision changes no link. `Evaluation {
+  repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target, peer}>
+  }` is per repository, in file order; `Engine::decision_report()` returns them for the workspace
+  (`Engine::local_decisions()` the one of the repository where Meada runs,
+  `Engine::status_report()` them and the resource lines in one pass), `export` and `status` render
+  them, and `Evaluation::lines` is the one rendering of the stale and waiting lines (`status`,
+  `meada decide --list`); `--prune` reuses the same call. `probability(p)` is the one [0,1] check,
+  for the file's `p`, a decider's answer and `--min-p`. `load` rejects a file that repeats a
+  `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file
+  invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)`
+  (existing entries minus those of the same `call`, plus `new`, sorted by `call`, no comments or
+  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -136,13 +147,32 @@ give byte-identical output.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`), and the `Facts`/`Value` types. `lang/ts.rs` is the only pack
   (`.ts .tsx .js .jsx .mjs .cjs`). A pack sees one file at a time and never touches the index.
-- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
-  imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code` folds
-  constants and client wrapper arguments into values for contract kinds.
-- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `link`), `KINDS`, `Level`, `Link`,
-  `Names`. `http.rs` is the only kind: `fetch` consumers, Next.js app-router and Express
-  providers, `normalize_path`, and the link rules (host, `base_url_env`, unique provider).
-- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer.
+- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
+  (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
+  folds constants and client wrapper arguments into values for contract kinds, a destructured
+  object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
+  `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
+  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
+  `base_url_env`, unique provider). A route also matches by its gateway path: `declare` fills
+  `Provider::gateway`, `http::gateway_contract` turns it into a contract and
+  `http::serves(provider, contract)` is the one check of either path (also used by open items and
+  decision replay, so a gateway candidate carries the provider's own contract). That link is
+  `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
+  within one repository a code path match wins over gateway path matches. `resource.rs` (spec
+  #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
+  provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
+  reader to every writer of another repository at `declared`, reason the contract. A `via` that
+  names no symbol is dropped. An entry without `via`, or with none matched, makes the repository
+  the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
+  `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
+  level, and a resource with no link in the workspace (unlinked).
+- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
+  whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
+  down and back going up; a call-site consumer the other way. A repository-level side
+  (`Graph::is_repo`) prints as `<repository> (repository-level)` and ends its branch: it is
+  pushed as a row, never entered. Starts take only HTTP routes, symbols and call sites; a
+  `resource::...` start gets an answer pointing to `context`.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
   2000) and the line helpers `Files`, `label`, `callee`, `unresolved`. Display only.
 - `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
@@ -159,16 +189,20 @@ give byte-identical output.
 - Inline route handlers: a pack emits anonymous function arguments as `Kind::Inline` named
   `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
   the second equal name) and folds the rest into the enclosing symbol.
-- Contract: `<prefix>::...`, `http::GET::/users/{}`. A path parameter of any spelling is `{}`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`. An unresolved
-  consumer's method and URL fragments live in the index (`contracts.method`, `contracts.fragments`)
-  and are left out of the export. A call has
-  `level` (`exact`, `inferred`, `ambiguous` or null) and `target`; an ambiguous call has
-  `target: null` and a sorted `candidates`. `export` keeps only the links that touch the
-  repository where Meada runs. A repository with stale decisions also has `stale_decisions:
-  [{call, target, cause}]` (`call-gone`, `item-not-open`, `target-gone`, `not-candidate`), absent
-  when empty; decisions waiting on a missing peer are not exported. A `decided` link also has `by` (`human` or a model id) and, for
-  a model, `p`; its reason is `decided by <by> (p=<p>)` (two decimals) or `decided by human`.
+- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
+  parameter of any spelling is `{}`.
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
+  `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
+  live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
+  resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
+  identity for a repository-level side (a consumer's `via` is null). A call has `level` (`exact`,
+  `inferred`, `ambiguous` or null) and `target`; an ambiguous call has `target: null` and a sorted
+  `candidates`. `export` keeps only the links that touch the repository where Meada runs. A
+  repository with stale decisions also has `stale_decisions: [{call, target, cause}]`
+  (`call-gone`, `item-not-open`, `target-gone`, `not-candidate`), absent when empty; decisions
+  waiting on a missing peer are not exported. A `decided` link also has `by` (`human` or a model
+  id) and, for a model, `p`; its reason is `decided by <by> (p=<p>)` (two decimals) or `decided by
+  human`.
 - Decision `target`: `<provider repository identity>::<contract>`, such as
   `example.com/chain/gateway::http::GET::/api/health`; split at the first `::`. The target names
   no site: if the repository serves the contract from several, the link goes to the first by site.
@@ -178,7 +212,9 @@ give byte-identical output.
 
 - New **contract kind**: implement `ContractKind`, add it to `KINDS`. `extract` reads `Code`
   (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
-  `link` receives the whole workspace's providers. A kind's rules stay in its own file.
+  a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
+  calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
+  whole workspace's providers. A kind's rules stay in its own file.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
@@ -199,14 +235,14 @@ give byte-identical output.
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
   index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`, `Param::default` and `Const::value`
-  are `serde(skip)`, so unchanged files come back from SQLite without them. `Code` records every
-  file it needs but lacks as a miss, and `refresh` re-parses those and extracts again until none
-  is missed. A contract kind that reads a value from a new place relies on this loop.
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
+  `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
+  back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
+  `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
+  value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
-  no relinking. `Level` order: `exact` < `inferred` < `decided` < `ambiguous` (`declared` joins
-  with spec #19).
+  no relinking. `Level` order: `exact` < `declared` < `inferred` < `decided` < `ambiguous`.
 - Network: `decider::Config::send` is the only code that opens a connection, and only
   `meada decide --decider` without `--show-request` or `--list` reaches it. Indexing, queries,
   `status` and the MCP server never read the `MEADA_DECIDER_*` variables. `ureq` is the only
@@ -222,7 +258,10 @@ give byte-identical output.
 - `tests/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
-  the three-repository chain as siblings. `git()` pins config, author and dates; `age()` pushes
+  the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
+  the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
+  level). `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
+  catalog. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
   has none.
@@ -231,13 +270,14 @@ give byte-identical output.
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `urls`
-  (constants, wrappers, Express, inferred links), `trace`, `decisions` (replay, parse
-  errors), `stale` (stale and waiting decisions in `status` and `export`), `decide` (the binary
-  in human mode over scripted stdin), `decider` (decider mode against the stub), `freshness`
-  (cold vs refreshed), `items` (open items and their `search` goldens, fixtures `open-few` and
-  `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE
-  `LANG`), `mcp` (the binary over stdio).
+  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `decisions`
+  (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
+  (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
+  `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
+  (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
+  over the chain).
 - **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
@@ -268,7 +308,8 @@ Each is marked `ponytail:` at its site unless noted.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
 - `resolve.rs`: wrapper expansion walks every simple path up the callers; a parameter captured by
-  a closure is unknown.
+  a closure is unknown; a nested or rest pattern in a destructured parameter binds nothing, and a
+  spread in the object a caller passes makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and

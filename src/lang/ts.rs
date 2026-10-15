@@ -5,8 +5,8 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Value,
+    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Modules, Param,
+    Part, Value,
 };
 use crate::{Result, qualify};
 
@@ -320,6 +320,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
         return vec![Param {
             name: text(list, src).to_string(),
             default: None,
+            fields: Vec::new(),
         }];
     }
     named(list)
@@ -342,7 +343,50 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
                     .map_or("", |n| text(n, src))
                     .to_string(),
                 default: default.map(|d| value(d, src, scope)),
+                fields: pattern
+                    .filter(|n| n.kind() == "object_pattern")
+                    .map_or_else(Vec::new, |n| fields(n, src, scope)),
             }
+        })
+        .collect()
+}
+
+/// The names an object pattern binds: `{ a, b = 1, c: d, e: f = 2 }`.
+// ponytail: a rest (`...rest`) or nested (`{ a: { b } }`) pattern binds nothing, so a name it
+// holds stays unknown; bind them when a wrapper reads through one.
+fn fields(pattern: Node, src: &[u8], scope: &str) -> Vec<Field> {
+    named(pattern)
+        .filter_map(|p| {
+            let (key, target, default) = match p.kind() {
+                "shorthand_property_identifier_pattern" => (p, p, None),
+                "object_assignment_pattern" => (
+                    p.child_by_field_name("left")?,
+                    p.child_by_field_name("left")?,
+                    p.child_by_field_name("right"),
+                ),
+                "pair_pattern" => {
+                    let target = p.child_by_field_name("value")?;
+                    match target.kind() {
+                        "assignment_pattern" => (
+                            p.child_by_field_name("key")?,
+                            target.child_by_field_name("left")?,
+                            target.child_by_field_name("right"),
+                        ),
+                        _ => (p.child_by_field_name("key")?, target, None),
+                    }
+                }
+                _ => return None,
+            };
+            (target.kind() == "identifier"
+                || target.kind() == "shorthand_property_identifier_pattern")
+                .then(|| Field {
+                    name: text(target, src).to_string(),
+                    key: match key.kind() {
+                        "string" => unquote(key, src),
+                        _ => text(key, src).to_string(),
+                    },
+                    default: default.map(|d| value(d, src, scope)),
+                })
         })
         .collect()
 }

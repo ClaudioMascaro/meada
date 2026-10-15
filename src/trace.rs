@@ -4,12 +4,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::contract::{self, Level, Link};
+use crate::contract::{Level, Link};
 use crate::index::{CallSite, Consumer, Export, Symbol};
-use crate::render::{Files, callee, label, line_of, unresolved};
+use crate::render::{Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{http, render};
+use crate::{http, render, resource};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -45,7 +45,9 @@ pub(crate) struct Graph<'a> {
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
     /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
-    /// Links by consumer and by provider, each sorted as the engine sorts links.
+    /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
+    /// consumer is a call site, or, for a resource, the symbol that reads it: data goes from
+    /// the provider (writer) to that consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
 }
@@ -139,7 +141,13 @@ impl<'a> Graph<'a> {
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
-        let (contract, path) = if contract::kind_of(from).is_some() {
+        if from.starts_with(resource::PREFIX) {
+            return Lookup::Answer(vec![format!(
+                "`{from}` is a resource, and a trace starts from a symbol, a route or a call \
+                 site: run `context` on it for its writers and readers, then trace from one"
+            )]);
+        }
+        let (contract, path) = if http::route(from).is_some() {
             (Some(from.to_string()), None)
         } else if let Some((method, path)) = from.split_once(' ')
             && path.starts_with('/')
@@ -235,10 +243,17 @@ impl<'a> Graph<'a> {
         }
         (self.workspace.repos.iter())
             .position(|m| {
-                id.strip_prefix(&m.identity)
-                    .is_some_and(|r| r.starts_with("::"))
+                id == m.identity
+                    || id
+                        .strip_prefix(&m.identity)
+                        .is_some_and(|r| r.starts_with("::"))
             })
             .unwrap_or(0)
+    }
+
+    /// Whether `id` is a whole repository: the side of a resource declared with no `via`.
+    fn is_repo(&self, id: &str) -> bool {
+        self.workspace.repos.iter().any(|m| m.identity == id)
     }
 }
 
@@ -338,6 +353,21 @@ impl<'a> Walk<'_, 'a> {
                 for &call in graph.callees.get(id).into_iter().flatten() {
                     self.call_down(call, depth + 1, &mut shown);
                 }
+                // A writer goes on to the readers of what it writes; a repository-level reader
+                // ends the branch.
+                for link in graph.into.get(id).into_iter().flatten() {
+                    let reader = link.consumer.as_str();
+                    let whole = graph.is_repo(reader);
+                    if (whole || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
+                    {
+                        let (m, text) = self.node(reader);
+                        let text = format!("{} {text}", arrow(link));
+                        match whole {
+                            true => self.push(depth + 1, Row::link(text, m, link)),
+                            false => self.enter(reader, depth + 1, Row::link(text, m, link)),
+                        }
+                    }
+                }
             }
             Direction::Up => {
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
@@ -357,6 +387,19 @@ impl<'a> Walk<'_, 'a> {
                     }
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
                     self.enter(&c.caller, depth + 1, Row::link(text, n, link));
+                }
+                // A reader goes back to the writers of what it reads; a repository-level writer
+                // ends the branch.
+                for link in graph.out.get(id).into_iter().flatten() {
+                    let writer = link.provider.as_str();
+                    if shown.insert((writer, true)) {
+                        let (m, text) = self.node(writer);
+                        let text = format!("{} {text}", arrow(link));
+                        match graph.is_repo(writer) {
+                            true => self.push(depth + 1, Row::link(text, m, link)),
+                            false => self.enter(writer, depth + 1, Row::link(text, m, link)),
+                        }
+                    }
                 }
             }
         }
@@ -436,6 +479,7 @@ impl<'a> Walk<'_, 'a> {
                 let at = self.files[n].at(&s.span.path, s.span.start);
                 format!("{identity} {at} {}", label(id))
             }
+            None if graph.is_repo(id) => format!("{identity} {REPOSITORY_LEVEL}"),
             None => format!("{identity} {} (top level)", label(id)),
         };
         (n, text)

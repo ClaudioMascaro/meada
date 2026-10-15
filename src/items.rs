@@ -7,7 +7,7 @@ use std::ops::Range;
 
 use crate::contract::{Level, Link};
 use crate::http;
-use crate::index::Export;
+use crate::index::{Export, Provider};
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -111,15 +111,15 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     for link in links.iter().filter(|l| l.level == Level::Ambiguous) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
-    let routes: Vec<(&str, &str, &str)> = exports
+    let routes: Vec<(&str, &Provider)> = exports
         .iter()
-        .flat_map(|e| {
-            let repository = e.repository.as_str();
-            e.providers
-                .iter()
-                .map(move |p| (repository, p.contract.as_str(), p.site.as_str()))
-        })
+        .flat_map(|e| e.providers.iter().map(|p| (e.repository.as_str(), p)))
         .collect();
+    // A candidate carries the provider's own contract, also when it fits by its gateway path,
+    // so a decision for it names a contract its repository serves.
+    fn candidate<'a>(&(repository, p): &(&'a str, &'a Provider)) -> (&'a str, &'a str, &'a str) {
+        (repository, p.contract.as_str(), p.site.as_str())
+    }
     let mut items = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
         let calls: HashMap<&str, _> = export.calls.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -132,21 +132,20 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
                     (None, _) => {
                         let method = consumer.method.as_deref();
-                        let fits = routes
-                            .iter()
-                            .filter(|(_, contract, _)| {
-                                http::route_fits(contract, method, &consumer.fragments)
-                            })
-                            .copied();
-                        (ItemKind::Unresolved, fits.collect::<Vec<_>>())
+                        let fits = |c: &str| http::route_fits(c, method, &consumer.fragments);
+                        let fitting = routes.iter().filter(|(_, p)| {
+                            fits(&p.contract) || http::gateway_contract(p).is_some_and(|g| fits(&g))
+                        });
+                        (
+                            ItemKind::Unresolved,
+                            fitting.map(candidate).collect::<Vec<_>>(),
+                        )
                     }
                     (Some(_), Some(links)) => {
-                        let listed = links.iter().map(|l| {
-                            let repository = exports
-                                .iter()
-                                .find(|e| l.provider.starts_with(&format!("{}::", e.repository)))
-                                .map_or("", |e| e.repository.as_str());
-                            (repository, l.contract.as_str(), l.provider.as_str())
+                        let listed = links.iter().filter_map(|l| {
+                            (routes.iter())
+                                .find(|(_, p)| p.site == l.provider && http::serves(p, &l.contract))
+                                .map(candidate)
                         });
                         (ItemKind::Ambiguous, listed.collect())
                     }

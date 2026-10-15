@@ -1,0 +1,110 @@
+{
+  "repository": "example.com/chain/worker",
+  "files": [
+    {
+      "path": "src/jobs.ts",
+      "hash": "811ccc3cc9dc740ea8b33852f6199c06536f9e73b1f06d3b35559aa33386c45e"
+    },
+    {
+      "path": "src/notify.ts",
+      "hash": "3036e55584328d004c6653969d63f404a813a45452b445a6aa279d3403093887"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "span": {
+        "path": "src/jobs.ts",
+        "start": 101,
+        "end": 149
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/notify.ts::notify",
+      "span": {
+        "path": "src/notify.ts",
+        "start": 7,
+        "end": 67
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/worker::src/jobs.ts::settleOrders::notify#0",
+      "caller": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "target": "example.com/chain/worker::src/notify.ts::notify",
+      "level": "exact",
+      "span": {
+        "path": "src/jobs.ts",
+        "start": 129,
+        "end": 146
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/notify.ts::notify::console.log#0",
+      "caller": "example.com/chain/worker::src/notify.ts::notify",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/notify.ts",
+        "start": 44,
+        "end": 64
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "resource::postgres::orders",
+      "site": "example.com/chain/worker::src/notify.ts::notify"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::postgres::orders",
+      "site": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "via": null
+    },
+    {
+      "contract": "resource::postgres::orders",
+      "site": "example.com/chain/worker::src/notify.ts::notify",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/chain/catalog",
+      "provider": "example.com/chain/worker::src/notify.ts::notify",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/worker::src/notify.ts::notify",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/worker::src/notify.ts::notify",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "resource::postgres::orders",
+      "level": "declared",
+      "reason": "resource::postgres::orders"
+    }
+  ]
+}

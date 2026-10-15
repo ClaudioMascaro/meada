@@ -56,6 +56,9 @@ pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
     (shown, out)
 }
 
+/// How a side that is a whole repository shows: a resource declared with no `via`.
+pub(crate) const REPOSITORY_LEVEL: &str = "(repository-level)";
+
 /// The name part of a symbol identity: `<repository>::<path>::<name>`.
 pub(crate) fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)

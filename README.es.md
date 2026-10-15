@@ -38,7 +38,29 @@ Quien sirve la ruta declara los hosts en los que responde:
 ```toml
 [serve]
 hosts = ["api.example.com"]
+prefix = "/shop"                         # opcional: lo que el gateway pone delante de las rutas
+strip = "/v1"                            # opcional: lo que les quita del comienzo
 ```
+
+Con `prefix` y `strip`, una llamada a `/shop/orders` llega a la ruta `/v1/orders` del código, en
+el nivel `inferred` y con el motivo `gateway prefix /shop, gateway strip /v1`. Un segmento de
+versión solo se quita cuando lo escribes en `strip`, y quien llama a la ruta del código sigue
+enlazando como antes.
+
+Un recurso compartido que ningún código nombra, como una tabla o un bucket, entra como
+`[[resource]]`:
+
+```toml
+[[resource]]
+kind = "postgres"                        # identificador en minúsculas
+id = "orders"
+role = "write"                           # read, write o read-write
+via = ["src/orders.ts::cancelOrder"]     # opcional: los símbolos que hacen el acceso
+```
+
+Cada escritor enlaza con cada lector del mismo recurso en otro repositorio, en el nivel
+`declared`. Sin `via`, o si ningún `via` corresponde a un símbolo, el lado es el repositorio
+entero.
 
 Meada encuentra los pares por su remoto git, aunque el clon esté en otra ruta en cada máquina.
 Una clave desconocida o mal escrita da un error con el archivo, la línea y la clave. Sin
@@ -50,7 +72,8 @@ En la raíz del repositorio:
 
 - `meada index` arma el índice, en `.meada/`, del repositorio y de los pares;
 - `meada status` muestra el conjunto de repositorios, el estado de cada índice y los pares que
-  no se encontraron;
+  no se encontraron; bajo cada repositorio, los recursos sin enlace y los `via` que no
+  corresponden a ningún símbolo;
 - `meada export` imprime todo el índice como JSON ordenado, útil para comparar dos ejecuciones
   con `diff`;
 - `meada decide` resuelve enlaces ambiguos y URLs dinámicas, ver Decisiones;
@@ -76,10 +99,12 @@ tu agente (por ejemplo el `.mcp.json` de Claude Code):
 
 Son tres herramientas, siempre en inglés, y ninguna escribe:
 
-- `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `ambiguous`
-  o `unresolved`, lista los ítems abiertos (ver Decisiones);
+- `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
+  un recurso por su tipo o su id; con el tipo `ambiguous` o `unresolved`, lista los ítems
+  abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
-  contratos que toca;
+  contratos que toca; en un recurso (`resource::postgres::orders`), lista quién lo escribe y
+  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero;
 - `trace` sigue una cadena de llamadas por varios repositorios, río abajo (`down`) o río arriba
   (`up`); con `changes: uncommitted`, parte del diff del árbol de trabajo y sirve para analizar
   el impacto de lo que se acaba de editar.
@@ -162,11 +187,12 @@ Constantes fijas:
 ## Estado
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) y enlaza repositorios por contratos HTTP: `fetch` del lado que consume,
-Next.js (app router) y Express del lado que sirve. Cada enlace tiene el nivel `exact`,
+`.jsx`, `.mjs`, `.cjs`) y enlaza repositorios por contratos HTTP (`fetch` del lado que consume,
+Next.js (app router) y Express del lado que sirve, también detrás de un gateway) y por los
+recursos declarados en el `meada.toml`. Cada enlace tiene el nivel `exact`, `declared`,
 `inferred`, `decided` o `ambiguous`; una llamada cuya URL no se puede resolver aparece como no
-resuelta y solo se vuelve enlace por una decisión, en el nivel `decided`. Aún no hay: otros lenguajes, otros clientes HTTP además de `fetch`, colas,
-paquetes ni el paquete npm. El alcance y el orden del trabajo están
+resuelta y solo se vuelve enlace por una decisión, en el nivel `decided`. Aún no hay: otros
+lenguajes, otros clientes HTTP además de `fetch`, colas, paquetes ni el paquete npm. El alcance y el orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
 
