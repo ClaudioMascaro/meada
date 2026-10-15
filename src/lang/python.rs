@@ -9,7 +9,7 @@ use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local,
     Modules, Param, Part, Star, Value, children, named, text,
 };
-use crate::{Result, qualify};
+use crate::{Result, parent, qualify};
 
 pub struct Python;
 
@@ -721,11 +721,6 @@ impl Locals {
 fn constructor(call: Node, src: &[u8]) -> Option<String> {
     let function = call.child_by_field_name("function")?;
     Some(callee(function, src)).filter(|f| !f.starts_with('('))
-}
-
-/// The scope enclosing `scope`, empty at the top level.
-fn parent(scope: &str) -> &str {
-    scope.rsplit_once('.').map_or("", |(parent, _)| parent)
 }
 
 /// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also

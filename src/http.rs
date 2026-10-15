@@ -374,6 +374,8 @@ fn prefixes<'a>(
 
 /// A provider's prefix or path as written: `None` when it is not a string, or when a part of it
 /// cannot be read. A path parameter written in the literal (`{id}`, `<int:id>`) stays one.
+// ponytail: a prefix or path that depends on a parameter is not read through the callers, as
+// `Code::expand` reads a client wrapper's URL; it yields no route.
 fn text(value: Value) -> Option<String> {
     match value {
         Value::Str(parts) => literal(&parts),
@@ -553,7 +555,9 @@ const FRAMEWORKS: &[Framework] = &[
 /// values; a decorator counts only on one its framework's constructor creates. A router is
 /// served only under the mounts Meada reads; an app nothing mounts is served at its root,
 /// unless a mount whose child cannot be read, called on another app or router of its
-/// framework, may put it there instead.
+/// framework, may mount it.
+// ponytail: such a mount hides every other app of its framework that nothing else mounts, even
+// one it cannot hold.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     // The framework that creates an app or router, and whether it is an app.
     let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
@@ -729,6 +733,8 @@ fn sends(member: &str) -> bool {
 /// with, `None` when it is not a client: `Some(None)` when it has no base URL, an unknown one
 /// when the clients differ. A client is the call of a library's constructor that the receiver
 /// traces back to, by assignment, `with`, a `self` attribute or an argument.
+// ponytail: a receiver that is the result of a call (`Session().get(...)`, `make().get(...)`)
+// is not read; a parameter given a client takes the base of every caller that passes one.
 fn client_base<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -880,7 +886,7 @@ fn regex_route(pattern: &str) -> Option<String> {
 /// and `HEAD`), all of them when several restrict it; `None` when nothing restricts it.
 fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
     let facts = code.files()[view.path];
-    let scope = view.name.rsplit_once('.').map_or("", |(s, _)| s);
+    let scope = crate::parent(view.name);
     let def = facts.defs.iter().find(|d| d.name == view.name)?;
     let mut allowed: Option<Vec<String>> = None;
     let mut restrict = |methods: Vec<String>| {
@@ -1019,6 +1025,8 @@ fn is_call<'a>(code: &Code<'a>, (path, n): CallAt<'a>, name: &str) -> bool {
 /// and none holds an argument Meada cannot read. A function view serves the methods its
 /// decorators allow, or every method (`ANY`); a class-based view (`View.as_view()`) the handler
 /// methods it defines.
+// ponytail: one `include()` Meada cannot read leaves no root at all; a single `urlpatterns =
+// [...] + other` (no list literal as a whole) yields no entry.
 fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut roots: Vec<&str> = (code.files().iter())
         .filter(|(_, f)| f.consts.iter().any(|c| c.name == "urlpatterns"))
@@ -1055,6 +1063,10 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
 
 /// The providers of URLconf `entries` under `prefix`; `stack` holds the `include()` calls
 /// being followed, so one met again (a cycle) adds nothing.
+// ponytail: `django.conf.urls.url`, a view wrapped in a call (`require_POST(view)`), a handler
+// method a class-based view inherits and `as_view()` on a class outside the repository yield
+// nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
+// backslashes yields nothing.
 fn urlconf<'a>(
     code: &Code<'a>,
     entries: Vec<CallAt<'a>>,
