@@ -17,6 +17,10 @@ CREATE TABLE contracts (
     method TEXT, fragments TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
+CREATE TABLE documents (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
 
 sample.ts
 {

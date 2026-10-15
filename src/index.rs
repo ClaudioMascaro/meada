@@ -296,7 +296,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         // over and keeps nothing.
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
-        return refresh(db, root, identity);
+        return refresh(db, root, identity, serve);
     };
     let all: BTreeMap<&str, &Facts> = changed
         .iter()
