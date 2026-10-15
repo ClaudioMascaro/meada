@@ -20,7 +20,7 @@ use serde_json::Value;
 use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{self, CallSite, Consumer, Export, Provider};
-use crate::lang::ts::with_extensions;
+use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::resolve::{Code, Exported};
 use crate::workspace::Repository;
 
@@ -187,7 +187,8 @@ pub struct Hop {
     pub manifest: String,
     /// The symbol reached.
     pub target: String,
-    /// What resolved the import: `exports`, `types`, `module`, `main` or `path`.
+    /// What resolved the import: `exports`, `types`, `module`, `main`, `path`, or `outDir` when
+    /// the output-to-source mapping found the file.
     pub how: &'static str,
     /// The import's level.
     pub level: Level,
@@ -215,6 +216,74 @@ pub struct Dependency {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub range: Option<String>,
+}
+
+/// The two `compilerOptions` of a `tsconfig.json` that map build output back to source, as
+/// written. `extends` is not followed.
+// ponytail: the trunk follows no `extends` either (`lang/ts.rs`); a base config's `outDir`
+// counts as absent. Lifted together with the trunk's `paths`.
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
+pub struct Tsconfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub out_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_dir: Option<String>,
+}
+
+/// A `tsconfig.json` of the index: its repository-relative path and what was read of it.
+pub struct Config {
+    pub path: String,
+    pub tsconfig: Tsconfig,
+}
+
+/// Reads a `tsconfig.json` (JSON with comments and trailing commas) from its bytes. Hostile
+/// input, as for `read`: a file too large, not UTF-8, not JSON, nested past `serde_json`'s depth
+/// limit or not an object is invalid, `None`, which counts as no config at all (the repository
+/// root's is tried instead); an option that is not a string counts as absent in a valid one.
+pub fn read_tsconfig(src: &[u8]) -> Option<Tsconfig> {
+    let text = std::str::from_utf8(src)
+        .ok()
+        .filter(|_| src.len() <= MAX_BYTES);
+    let Some(Ok(Value::Object(root))) = text.map(|t| serde_json::from_str(&strip_jsonc(t))) else {
+        return None;
+    };
+    let option = |name: &str| match root.get("compilerOptions")?.get(name)? {
+        Value::String(s) if !s.is_empty() => Some(s.clone()),
+        _ => None,
+    };
+    Some(Tsconfig {
+        out_dir: option("outDir"),
+        root_dir: option("rootDir"),
+    })
+}
+
+/// `outDir` and `rootDir` as repository-relative directories, for the config at `config`
+/// (its options are relative to its directory) of a package at `package_dir`: `rootDir` defaults
+/// to the package directory. `None` when there is no `outDir`, when either path is not relative
+/// and inside the repository (absolute, or with an empty or `..` segment), or when `outDir` is
+/// the config's own directory. A path read from a config stays inside the repository, and a
+/// declared option that cannot be read voids the mapping instead of falling back.
+fn roots(config: &str, t: &Tsconfig, package_dir: &str) -> Option<(String, String)> {
+    let dir = directory(config);
+    let resolve = |path: &str| {
+        let path = path.strip_prefix("./").unwrap_or(path);
+        let path = path.strip_suffix('/').unwrap_or(path);
+        match path {
+            "" | "." => Some(dir.to_string()),
+            path => inside(dir, path),
+        }
+    };
+    let out = resolve(t.out_dir.as_deref()?)?;
+    let root = match &t.root_dir {
+        Some(root) => resolve(root)?,
+        None => package_dir.to_string(),
+    };
+    (out != dir).then_some((out, root))
+}
+
+/// Whether the manifest-table row at `path` is a `tsconfig.json` (else a `package.json`).
+pub fn is_tsconfig(path: &str) -> bool {
+    path.rsplit('/').next() == Some("tsconfig.json")
 }
 
 /// Reads a `package.json` from its bytes. Hostile input: a file too large, not JSON, nested
@@ -350,12 +419,51 @@ fn inside(dir: &str, path: &str) -> Option<String> {
     })
 }
 
+/// The output extensions `sources` strips, longest first.
+const OUTPUT: [&str; 5] = [".d.ts", ".js", ".mjs", ".cjs", ".jsx"];
+
+/// The source files a build-output `entry` may come from, in the order to try them: the same
+/// path relative to `out_dir` under `root_dir`, its output extension (`.d.ts`, `.js`, `.mjs`,
+/// `.cjs`, `.jsx`) replaced by each extension the TS/JS pack handles. All are repository-relative
+/// (`root_dir` may be `.`). Nothing when `entry` is not inside `out_dir` or has no output
+/// extension.
+fn sources(entry: &str, out_dir: &str, root_dir: &str) -> Vec<String> {
+    let Some(relative) = entry
+        .strip_prefix(out_dir)
+        .and_then(|rest| rest.strip_prefix('/'))
+    else {
+        return Vec::new();
+    };
+    let Some(stem) = OUTPUT.iter().find_map(|ext| relative.strip_suffix(ext)) else {
+        return Vec::new();
+    };
+    let base = match root_dir {
+        "." => stem.to_string(),
+        root => format!("{root}/{stem}"),
+    };
+    EXTENSIONS
+        .iter()
+        .map(|ext| format!("{base}.{ext}"))
+        .collect()
+}
+
 /// What a provider answers imports with: its files and symbols, and what each file exports.
 struct Provided<'e> {
     files: HashSet<&'e str>,
     symbols: HashSet<&'e str>,
     exported: HashMap<&'e str, Vec<&'e Exported>>,
+    manifests: &'e [Manifest],
+    configs: &'e [Config],
+    /// The source files that export something, by the path of the manifest that is their
+    /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
+    /// asks (`candidates`), once for all.
+    owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
+
+/// What an import of a package resolved to in one provider: what named the entry (`outDir` when
+/// the output-to-source mapping found the file), the import's level, and the symbols reached,
+/// more than one only when ambiguous.
+type Resolved = (&'static str, Level, Vec<String>);
 
 impl<'e> Provided<'e> {
     fn new(export: &'e Export) -> Self {
@@ -367,23 +475,99 @@ impl<'e> Provided<'e> {
             files: export.files.iter().map(|f| f.path.as_str()).collect(),
             symbols: export.symbols.iter().map(|s| s.id.as_str()).collect(),
             exported,
+            manifests: &export.manifests,
+            configs: &export.tsconfigs,
+            owned: OnceCell::new(),
         }
     }
 
+    /// Whether `path` is a source file the provider indexes (a declaration file is none).
+    fn source(&self, path: &str) -> bool {
+        self.files.contains(path) && !path.ends_with(".d.ts")
+    }
+
     /// The symbol an import of `subpath` of the package at `manifest` of `repository` names as
-    /// `chain`, and what resolved the import. The entry must be a source file the provider
-    /// indexes (a declaration file is none); the chain's head is what that file exports, and
-    /// each further name a member of that definition or a name the whole file exports.
+    /// `chain`. The entry must be a source file the provider indexes: found by the declared
+    /// field it names, the import is `exact`; found through the package's `outDir` and
+    /// `rootDir` (`sources`), `inferred`. When neither leads to a file, the import is
+    /// `ambiguous` and every source file of the package that exports the chain's head gives a
+    /// symbol (`candidates`). The chain's head is what the file exports, and each further name
+    /// a member of that definition or a name the whole file exports.
     fn resolve(
         &self,
         repository: &str,
         manifest: &Manifest,
         subpath: &str,
         chain: &str,
-    ) -> Option<(&'static str, String)> {
-        let (how, candidates) = entry(manifest, subpath)?;
-        let file = (candidates.iter())
-            .find(|c| self.files.contains(c.as_str()) && !c.ends_with(".d.ts"))?;
+    ) -> Option<Resolved> {
+        let (how, entries) = entry(manifest, subpath)?;
+        let (file, how, level) = match entries.iter().find(|c| self.source(c)) {
+            Some(file) => (file.clone(), how, Level::Exact),
+            None => match self.mapped(manifest, &entries) {
+                Some(file) => (file, "outDir", Level::Inferred),
+                None => {
+                    let ids = self.candidates(repository, manifest, chain);
+                    return (!ids.is_empty()).then_some((how, Level::Ambiguous, ids));
+                }
+            },
+        };
+        let id = self.reach(repository, &file, chain)?;
+        Some((how, level, vec![id]))
+    }
+
+    /// The first source file the provider indexes that one of `entries`, build output inside
+    /// the `outDir` of the package's `tsconfig.json` (its directory's, else the repository
+    /// root's), maps back to.
+    fn mapped(&self, manifest: &Manifest, entries: &[String]) -> Option<String> {
+        let dir = directory(&manifest.path);
+        let config = [
+            inside(dir, "tsconfig.json"),
+            Some("tsconfig.json".to_string()),
+        ]
+        .into_iter()
+        .flatten()
+        .find_map(|p| self.configs.iter().find(|c| c.path == p))?;
+        let (out_dir, root_dir) = roots(&config.path, &config.tsconfig, dir)?;
+        (entries.iter())
+            .flat_map(|e| sources(e, &out_dir, &root_dir))
+            .find(|s| self.source(s))
+    }
+
+    /// The symbols `chain` names in the source files of the package at `manifest` (those whose
+    /// nearest manifest it is, `node_modules` ones left out) that export its head, sorted,
+    /// without repeats. Every one is listed: a package has as many as it has files exporting
+    /// the name.
+    fn candidates(&self, repository: &str, manifest: &Manifest, chain: &str) -> Vec<String> {
+        let head = chain.split('.').next();
+        let owned = self.owned.get_or_init(|| {
+            let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
+            for &path in self.exported.keys() {
+                if self.source(path)
+                    && !path.split('/').any(|s| s == "node_modules")
+                    && let Some(m) = nearest(self.manifests, path)
+                {
+                    owned.entry(&m.path).or_default().push(path);
+                }
+            }
+            owned
+        });
+        let files = owned.get(manifest.path.as_str()).into_iter().flatten();
+        let mut ids: Vec<String> = files
+            .filter(|path| {
+                self.exported[**path]
+                    .iter()
+                    .any(|e| e.name.as_deref() == head)
+            })
+            .filter_map(|path| self.reach(repository, path, chain))
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// The symbol `chain` names as exported by `file`: the head is what the file exports, and
+    /// each further name a member of that definition or a name the whole file exports.
+    fn reach(&self, repository: &str, file: &str, chain: &str) -> Option<String> {
         let mut names = chain.split('.');
         let mut at = self.lookup(file, names.next()?, 0, &mut HashSet::new())?;
         for member in names {
@@ -396,7 +580,7 @@ impl<'e> Provided<'e> {
             return None;
         };
         let id = format!("{repository}::{file}::{def}");
-        self.symbols.contains(id.as_str()).then_some((how, id))
+        self.symbols.contains(id.as_str()).then_some(id)
     }
 
     /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
@@ -482,24 +666,27 @@ pub fn import(exports: &mut [Export]) {
                 }
                 let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
                 let repository = &exports[m].repository;
-                let Some((how, target)) = at.resolve(repository, manifest, &subpath, &call.chain)
+                let Some((how, level, targets)) =
+                    at.resolve(repository, manifest, &subpath, &call.chain)
                 else {
                     continue;
                 };
-                imports.push(Import {
-                    site: call.site.clone(),
-                    specifier: call.specifier.clone(),
-                    name: call.chain.clone(),
-                    level: Level::Exact,
-                    how,
-                    target: target.clone(),
-                });
-                hops.push(Hop {
-                    manifest: site(repository, &manifest.path),
-                    target,
-                    how,
-                    level: Level::Exact,
-                });
+                for target in targets {
+                    imports.push(Import {
+                        site: call.site.clone(),
+                        specifier: call.specifier.clone(),
+                        name: call.chain.clone(),
+                        level,
+                        how,
+                        target: target.clone(),
+                    });
+                    hops.push(Hop {
+                        manifest: site(repository, &manifest.path),
+                        target,
+                        how,
+                        level,
+                    });
+                }
             }
             if !hops.is_empty() {
                 consumers.push(Consumer {
@@ -1211,6 +1398,132 @@ mod tests {
         assert!(nearest(&all[1..], "x.ts").is_none());
     }
 
+    #[test]
+    fn build_output_maps_back_to_the_same_path_under_the_root_dir() {
+        let all = |stem: &str| {
+            ["ts", "tsx", "js", "jsx", "mjs", "cjs"]
+                .map(|ext| format!("{stem}.{ext}"))
+                .to_vec()
+        };
+        // (entry, outDir, rootDir, the source files tried, in order)
+        let table: [(&str, &str, &str, Vec<String>); 12] = [
+            ("dist/index.d.ts", "dist", "src", all("src/index")),
+            ("dist/index.js", "dist", "src", all("src/index")),
+            ("dist/index.cjs", "dist", "src", all("src/index")),
+            ("dist/index.mjs", "dist", "src", all("src/index")),
+            ("dist/ui/button.jsx", "dist", "src", all("src/ui/button")),
+            // A package below the root keeps its directory in both.
+            (
+                "lib/a/dist/x.js",
+                "lib/a/dist",
+                "lib/a/src",
+                all("lib/a/src/x"),
+            ),
+            // `rootDir` at the package directory (its default) or at the repository root.
+            ("lib/a/dist/x.js", "lib/a/dist", "lib/a", all("lib/a/x")),
+            ("dist/x.js", "dist", ".", all("x")),
+            // Not in `outDir` (a name sharing its prefix included), no output extension, or the
+            // directory itself: nothing to try.
+            ("lib/index.js", "dist", "src", vec![]),
+            ("distribution/index.js", "dist", "src", vec![]),
+            ("dist/data.json", "dist", "src", vec![]),
+            ("dist", "dist", "src", vec![]),
+        ];
+        for (entry, out_dir, root_dir, expected) in table {
+            assert_eq!(sources(entry, out_dir, root_dir), expected, "{entry}");
+        }
+    }
+
+    fn tsconfig(json: &str) -> Option<Tsconfig> {
+        read_tsconfig(json.as_bytes())
+    }
+
+    #[test]
+    fn a_tsconfig_gives_its_out_dir_and_root_dir() {
+        let t = tsconfig(
+            r#"{
+                // comments and trailing commas are allowed
+                "compilerOptions": { "outDir": "dist", /* x */ "rootDir": "src", },
+                "extends": "./base.json",
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (t.out_dir.as_deref(), t.root_dir.as_deref()),
+            (Some("dist"), Some("src"))
+        );
+        // `extends` is not followed: what the base declares is not read.
+        // A valid config without usable options is empty, not invalid.
+        let empty = Some(Tsconfig::default());
+        for valid in [
+            "{}",
+            r#"{"compilerOptions": 3}"#,
+            r#"{"compilerOptions": {"outDir": 1, "rootDir": ["src"]}}"#,
+            r#"{"compilerOptions": {"outDir": "", "rootDir": ""}}"#,
+        ] {
+            assert_eq!(tsconfig(valid), empty, "{valid}");
+        }
+        // Invalid input is no config.
+        for bad in ["", "[]", "{ not json", "3"] {
+            assert_eq!(tsconfig(bad), None, "{bad}");
+        }
+        let huge = format!(
+            r#"{{"compilerOptions": {{"outDir": "{}"}}}}"#,
+            "d".repeat(MAX_BYTES)
+        );
+        assert_eq!(tsconfig(&huge), None);
+        let nested = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
+        assert_eq!(tsconfig(&nested), None);
+    }
+
+    #[test]
+    fn the_roots_stay_inside_the_repository_relative_to_the_config() {
+        let at = |config: &str, out: Option<&str>, root: Option<&str>, package: &str| {
+            let t = Tsconfig {
+                out_dir: out.map(String::from),
+                root_dir: root.map(String::from),
+            };
+            roots(config, &t, package)
+        };
+        let some = |out: &str, root: &str| Some((out.to_string(), root.to_string()));
+        assert_eq!(
+            at("lib/tsconfig.json", Some("dist"), Some("src"), "lib"),
+            some("lib/dist", "lib/src")
+        );
+        // `rootDir` defaults to the package directory, not the config's.
+        assert_eq!(
+            at("tsconfig.json", Some("./dist/"), None, "lib"),
+            some("dist", "lib")
+        );
+        assert_eq!(
+            at("tsconfig.json", Some("dist"), Some("."), "."),
+            some("dist", ".")
+        );
+        assert_eq!(
+            at("lib/tsconfig.json", Some("dist"), Some("./"), "lib"),
+            some("lib/dist", "lib")
+        );
+        // No `outDir`, one that is the config's own directory, or a path that leaves the
+        // repository or is absolute: no mapping, and a bad `rootDir` voids the pair too.
+        for (out, root) in [
+            (None, Some("src")),
+            (Some("."), Some("src")),
+            (Some(""), None),
+            (Some("../dist"), None),
+            (Some("a/../../dist"), None),
+            (Some("/abs/dist"), None),
+            (Some("a//dist"), None),
+            (Some("dist"), Some("../src")),
+            (Some("dist"), Some("/src")),
+        ] {
+            assert_eq!(
+                at("tsconfig.json", out, root, "."),
+                None,
+                "{out:?} {root:?}"
+            );
+        }
+    }
+
     /// A provider whose files export what `rows` say.
     fn provided<'e>(rows: &'e [Exported]) -> Provided<'e> {
         let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
@@ -1221,6 +1534,9 @@ mod tests {
             files: HashSet::new(),
             symbols: HashSet::new(),
             exported,
+            manifests: &[],
+            configs: &[],
+            owned: OnceCell::new(),
         }
     }
 
@@ -1300,6 +1616,75 @@ mod tests {
         assert!(lookup(&provided(&found), "0.ts", "f").is_some());
         let past = chain(MAX_REEXPORTS + 1);
         assert_eq!(lookup(&provided(&past), "0.ts", "f"), None);
+    }
+
+    #[test]
+    fn candidates_are_the_exporting_source_files_of_that_package_alone() {
+        let root = manifest("package.json", "{}");
+        let nested = manifest("sealed/package.json", "{}");
+        let manifests = [root, nested];
+        let paths = [
+            "src/a.ts",
+            "src/a.d.ts",
+            "sealed/src/b.ts",
+            "node_modules/x/c.ts",
+            "sealed/node_modules/y/d.ts",
+        ];
+        let rows: Vec<Exported> = (paths.iter())
+            .map(|p| row(p, Some("f"), Some(p), Some("f")))
+            .collect();
+        let mut p = provided(&rows);
+        p.files = paths.iter().copied().collect();
+        let ids: Vec<String> = paths.iter().map(|p| format!("r::{p}::f")).collect();
+        p.symbols = ids.iter().map(String::as_str).collect();
+        p.manifests = &manifests;
+
+        // The root package does not take the nested package's file (a directory-prefix test
+        // would), a declaration file, or one under `node_modules`; the nested one neither.
+        assert_eq!(p.candidates("r", &manifests[0], "f"), ["r::src/a.ts::f"]);
+        assert_eq!(
+            p.candidates("r", &manifests[1], "f"),
+            ["r::sealed/src/b.ts::f"]
+        );
+        assert!(p.candidates("r", &manifests[0], "g").is_empty());
+    }
+
+    #[test]
+    fn an_invalid_package_tsconfig_falls_back_to_the_root_one_and_a_valid_one_does_not() {
+        let manifests = [manifest("pkg/package.json", "{}")];
+        let rows = [];
+        let mut p = provided(&rows);
+        p.files = ["pkg/src/index.ts"].into_iter().collect();
+        p.manifests = &manifests;
+        let entries = ["pkg/dist/index.js".to_string()];
+        let config = |path: &str, out: Option<&str>, root: &str| Config {
+            path: path.into(),
+            tsconfig: Tsconfig {
+                out_dir: out.map(Into::into),
+                root_dir: Some(root.into()),
+            },
+        };
+        let root = config("tsconfig.json", Some("pkg/dist"), "pkg/src");
+        let found = Some("pkg/src/index.ts".to_string());
+
+        // An invalid `pkg/tsconfig.json` has no `Config` (see `read_tsconfig`): the root's maps.
+        let configs = [root];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), found);
+        // A valid one without `outDir` maps nothing, and the root's is not tried.
+        let configs = [
+            config("pkg/tsconfig.json", None, "src"),
+            config("tsconfig.json", Some("pkg/dist"), "pkg/src"),
+        ];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), None);
+        // With its own `outDir`, the package's config is the one used.
+        let configs = [
+            config("pkg/tsconfig.json", Some("dist"), "src"),
+            config("tsconfig.json", Some("elsewhere"), "pkg/src"),
+        ];
+        p.configs = &configs;
+        assert_eq!(p.mapped(&manifests[0], &entries), found);
     }
 
     #[test]

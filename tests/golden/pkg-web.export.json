@@ -14,6 +14,10 @@
       "hash": "e9b992b17b8e723b8f14f4e52f957366b76c382f666614e816f8eba734496569"
     },
     {
+      "path": "src/text.ts",
+      "hash": "7a12cc760143ec9bab799f4565d3ee032c31baa0ad9d7f90f459efbcfd9f4e24"
+    },
+    {
       "path": "tools/run.ts",
       "hash": "b96f0ec3011835f3d06319a0b7553dfbe157241ab1556ab8acdeabdb6ccd892b"
     }
@@ -81,6 +85,30 @@
         "path": "src/entries.ts",
         "start": 317,
         "end": 385
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/text.ts::clean",
+      "span": {
+        "path": "src/text.ts",
+        "start": 315,
+        "end": 379
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/text.ts::lock",
+      "span": {
+        "path": "src/text.ts",
+        "start": 461,
+        "end": 505
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/text.ts::squash",
+      "span": {
+        "path": "src/text.ts",
+        "start": 388,
+        "end": 452
       }
     },
     {
@@ -325,6 +353,39 @@
       }
     },
     {
+      "id": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "caller": "example.com/pkg/web::src/text.ts::clean",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/text.ts",
+        "start": 362,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "caller": "example.com/pkg/web::src/text.ts::lock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/text.ts",
+        "start": 496,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "caller": "example.com/pkg/web::src/text.ts::squash",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/text.ts",
+        "start": 436,
+        "end": 449
+      }
+    },
+    {
       "id": "example.com/pkg/web::tools/run.ts::run::greet#0",
       "caller": "example.com/pkg/web::tools/run.ts::run",
       "target": null,
@@ -361,6 +422,11 @@
     {
       "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/web::package.json::dependencies::@example/kit",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/sealed",
+      "site": "example.com/pkg/web::package.json::dependencies::@example/sealed",
       "via": null
     },
     {
@@ -427,6 +493,21 @@
       "contract": "package::npm::@example/typed",
       "site": "example.com/pkg/web::src/entries.ts::entries::typed#0",
       "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/sealed",
+      "site": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "via": null
     }
   ],
   "packages": [
@@ -455,6 +536,12 @@
       "field": "dependencies",
       "name": "@example/kit",
       "range": "^2.0.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/sealed",
+      "range": "0.3.0"
     },
     {
       "manifest": "package.json",
@@ -563,6 +650,38 @@
       "level": "exact",
       "how": "types",
       "target": "example.com/pkg/shared::typed/src/index.ts::typed"
+    },
+    {
+      "site": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "specifier": "@example/shared",
+      "name": "normalize",
+      "level": "inferred",
+      "how": "outDir",
+      "target": "example.com/pkg/shared::src/text.ts::normalize"
+    },
+    {
+      "site": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "specifier": "@example/sealed",
+      "name": "seal",
+      "level": "ambiguous",
+      "how": "main",
+      "target": "example.com/pkg/shared::sealed/src/one.ts::seal"
+    },
+    {
+      "site": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "specifier": "@example/sealed",
+      "name": "seal",
+      "level": "ambiguous",
+      "how": "main",
+      "target": "example.com/pkg/shared::sealed/src/two.ts::seal"
+    },
+    {
+      "site": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "specifier": "@example/shared/utils/collapse",
+      "name": "collapse",
+      "level": "inferred",
+      "how": "outDir",
+      "target": "example.com/pkg/shared::src/utils/collapse.ts::collapse"
     }
   ],
   "links": [
@@ -593,6 +712,13 @@
       "contract": "package::npm::@example/kit",
       "level": "exact",
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
+      "provider": "example.com/pkg/shared::sealed/package.json",
+      "contract": "package::npm::@example/sealed",
+      "level": "exact",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/shared",
@@ -684,6 +810,34 @@
       "contract": "package::npm::@example/typed",
       "level": "exact",
       "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/one.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/two.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "provider": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
     }
   ]
 }

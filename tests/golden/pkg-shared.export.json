@@ -42,6 +42,30 @@
       "hash": "f76b02cee77f96941152b79568cf54d41e6758a3f0708b3cb2bd8a008bdcaaf3"
     },
     {
+      "path": "sealed/src/one.ts",
+      "hash": "4168d8686775eec83309aaf2b50b2372b36ea6cd3fafd0782ef7d284b8217ff7"
+    },
+    {
+      "path": "sealed/src/two.ts",
+      "hash": "ed75595565f70cfa13bf8d06d1c2736749c5e6746d7387a298a150597fbed04b"
+    },
+    {
+      "path": "src/index.ts",
+      "hash": "4598d6f302bacce6bf50978d52c18128d4fb4edff2c4e1f001fc30655640aa25"
+    },
+    {
+      "path": "src/text.ts",
+      "hash": "07f3572867c5c39f0d6d715c3a775da7391e1301fbd89f2d01d5d6c37072d782"
+    },
+    {
+      "path": "src/utils/collapse.ts",
+      "hash": "845b7f37a7e1b0111ebaa606e945f504bb388be38a460351c8ce6a302bfc1cc0"
+    },
+    {
+      "path": "src/utils/trim.ts",
+      "hash": "7397e61a19ce21ca145da94670b097e95aa32680f785af3e201a1eb958c0c2ca"
+    },
+    {
       "path": "typed/src/index.ts",
       "hash": "30c6f501adeca72e78c38331b928bf2ea31755df0e270369f4e406684240126d"
     }
@@ -152,6 +176,54 @@
       }
     },
     {
+      "id": "example.com/pkg/shared::sealed/src/one.ts::normalize",
+      "span": {
+        "path": "sealed/src/one.ts",
+        "start": 154,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/one.ts::seal",
+      "span": {
+        "path": "sealed/src/one.ts",
+        "start": 7,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/two.ts::seal",
+      "span": {
+        "path": "sealed/src/two.ts",
+        "start": 7,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize",
+      "span": {
+        "path": "src/text.ts",
+        "start": 90,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "span": {
+        "path": "src/utils/collapse.ts",
+        "start": 7,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "span": {
+        "path": "src/utils/trim.ts",
+        "start": 7,
+        "end": 68
+      }
+    },
+    {
       "id": "example.com/pkg/shared::typed/src/index.ts::typed",
       "span": {
         "path": "typed/src/index.ts",
@@ -215,6 +287,61 @@
         "start": 57,
         "end": 75
       }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::(call_expression).toLowerCase#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/text.ts",
+        "start": 141,
+        "end": 174
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::collapse#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "level": "exact",
+      "span": {
+        "path": "src/text.ts",
+        "start": 141,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::trim#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "level": "exact",
+      "span": {
+        "path": "src/text.ts",
+        "start": 150,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/collapse.ts::collapse::text.replace#0",
+      "caller": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/utils/collapse.ts",
+        "start": 58,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/trim.ts::trim::text.trim#0",
+      "caller": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/utils/trim.ts",
+        "start": 54,
+        "end": 65
+      }
     }
   ],
   "providers": [
@@ -225,6 +352,10 @@
     {
       "contract": "package::npm::@example/kit",
       "site": "example.com/pkg/shared::kit/package.json"
+    },
+    {
+      "contract": "package::npm::@example/sealed",
+      "site": "example.com/pkg/shared::sealed/package.json"
     },
     {
       "contract": "package::npm::@example/shared",
@@ -248,6 +379,12 @@
       "version": "2.1.0",
       "repository": "example.com/pkg/shared",
       "directory": "kit"
+    },
+    {
+      "name": "@example/sealed",
+      "version": "0.3.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "sealed"
     },
     {
       "name": "@example/shared",
@@ -292,6 +429,13 @@
       "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
     },
     {
+      "consumer": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch; import outDir"
+    },
+    {
       "consumer": "example.com/pkg/api::src/report.js::report::greet#0",
       "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
       "contract": "package::npm::@example/kit",
@@ -325,6 +469,13 @@
       "contract": "package::npm::@example/kit",
       "level": "exact",
       "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
+      "provider": "example.com/pkg/shared::sealed/package.json",
+      "contract": "package::npm::@example/sealed",
+      "level": "exact",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0)"
     },
     {
       "consumer": "example.com/pkg/web::package.json::dependencies::@example/shared",
@@ -416,6 +567,34 @@
       "contract": "package::npm::@example/typed",
       "level": "exact",
       "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/one.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/two.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "provider": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
     }
   ]
 }

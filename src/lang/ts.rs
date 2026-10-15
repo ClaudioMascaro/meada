@@ -225,7 +225,7 @@ impl Aliases {
 }
 
 /// JSON with comments and trailing commas, as `tsconfig.json` allows, made plain JSON.
-fn strip_jsonc(src: &str) -> String {
+pub(crate) fn strip_jsonc(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let mut chars = src.chars().peekable();
     while let Some(c) = chars.next() {
@@ -259,7 +259,7 @@ fn strip_jsonc(src: &str) -> String {
     out
 }
 
-const EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+pub(crate) const EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
 /// The files a module path may name: itself, its `.ts` source when it names `.js` output,
 /// itself with each extension, and its `index` file.

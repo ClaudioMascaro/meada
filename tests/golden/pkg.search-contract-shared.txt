@@ -1,6 +1,9 @@
 example.com/pkg/api package.json dependencies package::npm::@example/shared
 example.com/pkg/api package.json optionalDependencies package::npm::@example/shared
 example.com/pkg/api package.json peerDependencies package::npm::@example/shared
+example.com/pkg/api src/label.js:4 package::npm::@example/shared
 example.com/pkg/shared package.json package::npm::@example/shared
 example.com/pkg/web package.json dependencies package::npm::@example/shared
 example.com/pkg/web package.json devDependencies package::npm::@example/shared
+example.com/pkg/web src/text.ts:8 package::npm::@example/shared
+example.com/pkg/web src/text.ts:12 package::npm::@example/shared

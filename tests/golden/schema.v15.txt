@@ -400,3 +400,9 @@ sample.package.json
   "module": "./dist/index.mjs",
   "main": "./dist/index.cjs"
 }
+
+sample.tsconfig.json
+{
+  "out_dir": "./dist",
+  "root_dir": "src"
+}
