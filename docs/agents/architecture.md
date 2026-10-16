@@ -272,10 +272,13 @@ one for the area a change touches.
   makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
-  and a `Value::New(callee, args)`. `MAX_NESTING` (128): definitions nested deeper are no
-  definitions (their body belongs to the one around them), and a value nested deeper in
-  arguments, objects and arrays is `Unknown`, since qualified names and `Resolver::lexical`
-  cost time cubic in the nesting. The parent of every node is read once (`Parents`), as
+  and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
+  is not a definition (its body belongs to the one around it, and its name is a local that hides outer
+  ones), since qualified names and `Resolver::lexical` cost time cubic in the nesting; a function
+  written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
+  arguments, objects and arrays is `Unknown`. `FOLD_DEPTH` (256): a `+` chain or a chain of
+  string method calls folds only that deep (the rest is a hole), and a member chain in a callee
+  is cut to the node kind. The parent of every node is read once (`Parents`), as
   `Node::parent` is linear in the tree's depth.
 - `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a

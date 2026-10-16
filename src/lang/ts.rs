@@ -14,13 +14,24 @@ use crate::{Result, qualify};
 
 mod messages;
 
-/// How many definitions may nest in one file, and how many levels of arguments, objects and
-/// arrays `value` reads. Names are qualified by the definitions around them and each call
-/// resolves its names up that chain, so unbounded nesting costs cubic time; a value is read
-/// again by every `new` around it. Past the limit a function is no definition (its body belongs
-/// to the one around it) and a value is `Unknown`.
-// ponytail: real code nests a few dozen levels; 128 matches the document readers.
-const MAX_NESTING: usize = 128;
+/// How many definitions may nest in one file. Names are qualified by the definitions around
+/// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
+/// Past the limit a function is not a definition (its body belongs to the one around it, and
+/// its name hides outer ones as a local).
+// ponytail: real code nests a few dozen levels; 128 is the depth `document/schema.rs` reads
+// (`MAX_DEPTH`).
+const DEFINITION_DEPTH: usize = 128;
+
+/// How many levels of arguments, objects and arrays `value` reads; deeper is `Unknown`. A
+/// value is read again by every `new` around it, and the recursion must stay shallow.
+// ponytail: real code nests a few levels of options; 64 is far past any.
+const VALUE_DEPTH: usize = 64;
+
+/// How deep `parts`, `env_read` and `callee` follow a `+` chain, a chain of string method
+/// calls or a member chain; the cut side is a hole (`parts`) or its node kind (`callee`).
+// ponytail: real code concatenates and chains a few dozen terms; the recursion must stay
+// shallow, whatever the file.
+const FOLD_DEPTH: usize = 256;
 
 pub struct TsJs;
 
@@ -60,7 +71,14 @@ impl LanguagePack for TsJs {
         }) = stack.pop()
         {
             let mut inner = scope.clone();
-            let defined = definition(node, binding, src, &parents).filter(|_| depth < MAX_NESTING);
+            let mut defined = definition(node, binding, src, &parents);
+            if depth >= DEFINITION_DEPTH
+                && let Some((name, kind, _)) = defined.take()
+                && matches!(kind, Kind::Function | Kind::Class)
+            {
+                // Not a definition, but its name still hides the outer one, as a `let` does.
+                facts.locals.push(qualify(&scope, &name));
+            }
             let is_def = defined.is_some();
             if let Some((name, kind, range)) = defined {
                 inner = qualify(&scope, &name);
@@ -663,6 +681,20 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
+/// The function written in place as `inline` within `scope`: `Unknown` when `scope` is as deep
+/// as definitions go, since no definition stands behind it.
+fn function(scope: &str, inline: &str) -> Value {
+    let nested = if scope.is_empty() {
+        0
+    } else {
+        scope.matches('.').count() + 1
+    };
+    if nested >= DEFINITION_DEPTH {
+        return Value::Unknown;
+    }
+    Value::Function(qualify(scope, inline))
+}
+
 /// What an expression is, as far as its own syntax tells; `scope` is the qualified name of
 /// the enclosing definition.
 fn value(node: Node, src: &[u8], scope: &str, up: &Parents) -> Value {
@@ -671,7 +703,7 @@ fn value(node: Node, src: &[u8], scope: &str, up: &Parents) -> Value {
 
 /// `value` of a node `depth` levels inside the expression it started from.
 fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> Value {
-    if depth >= MAX_NESTING {
+    if depth >= VALUE_DEPTH {
         return Value::Unknown;
     }
     match node.kind() {
@@ -702,7 +734,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                 }
                 "method_definition" if in_options(property, up) => {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
-                    Some((key, Value::Function(qualify(scope, &inline(property)))))
+                    Some((key, function(scope, &inline(property))))
                 }
                 _ => None,
             });
@@ -719,7 +751,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
-            Value::Function(qualify(scope, &inline(node)))
+            function(scope, &inline(node))
         }
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
@@ -744,8 +776,18 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
 /// A string expression folded into literal text, environment reads and holes; `None` when
 /// `node` is not a string expression Meada folds.
 fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
+    parts_at(node, src, 0)
+}
+
+/// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
+/// the rest is a hole.
+fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
+    if depth >= FOLD_DEPTH {
+        return Some(vec![Part::Hole]);
+    }
+    let parts = |n: Node| parts_at(n, src, depth + 1);
     // Anything inside a string that is not itself foldable is a hole.
-    let inside = |n: Node| parts(n, src).unwrap_or_else(|| vec![Part::Hole]);
+    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
     match node.kind() {
         "string" => Some(vec![Part::Text(unquote(node, src))]),
         "template_string" => {
@@ -768,7 +810,7 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             match text(node.child_by_field_name("operator")?, src) {
                 // At least one side must be a string for `+` to concatenate.
                 "+" => {
-                    let (left, right) = (parts(left, src), parts(right, src));
+                    let (left, right) = (parts(left), parts(right));
                     if left.is_none() && right.is_none() {
                         return None;
                     }
@@ -778,7 +820,7 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
                 }
                 // A fallback keeps the environment read on its left, if it is the only one.
                 "||" | "??" => {
-                    let env = single_env(parts(left, src)?)?;
+                    let env = single_env(parts(left)?)?;
                     let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
                     Some(vec![if more { Part::Hole } else { env }])
                 }
@@ -791,14 +833,14 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
         "parenthesized_expression"
         | "non_null_expression"
         | "as_expression"
-        | "satisfies_expression" => parts(named(node).next()?, src),
-        _ => env_read(node, src).map(|env| vec![env]),
+        | "satisfies_expression" => parts(named(node).next()?),
+        _ => env_read(node, src, depth).map(|env| vec![env]),
     }
 }
 
 /// `process.env.X`, `process.env["X"]` or `import.meta.env.X`, also through string method
 /// calls such as `.replace(...)` or `.trim()`.
-fn env_read(node: Node, src: &[u8]) -> Option<Part> {
+fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "replace",
         "replaceAll",
@@ -827,7 +869,11 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
             }
-            single_env(parts(function.child_by_field_name("object")?, src)?)
+            single_env(parts_at(
+                function.child_by_field_name("object")?,
+                src,
+                depth + 1,
+            )?)
         }
         _ => None,
     }
@@ -869,21 +915,33 @@ fn unquote(node: Node, src: &[u8]) -> String {
 /// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
 /// so no source text beyond names reaches the index.
 fn callee(node: Node, src: &[u8]) -> String {
-    match node.kind() {
-        "identifier" | "this" | "super" | "property_identifier" | "private_property_identifier" => {
-            text(node, src).to_string()
+    // The properties of the chain, outermost first; a chain longer than `FOLD_DEPTH` ends in
+    // the kind of the node where it is cut.
+    let (mut node, mut names) = (node, Vec::new());
+    let base = loop {
+        match node.kind() {
+            "identifier"
+            | "this"
+            | "super"
+            | "property_identifier"
+            | "private_property_identifier" => break text(node, src).to_string(),
+            "member_expression" if names.len() < FOLD_DEPTH => match (
+                node.child_by_field_name("object"),
+                node.child_by_field_name("property"),
+            ) {
+                (Some(object), Some(property)) => {
+                    names.push(text(property, src));
+                    node = object;
+                }
+                _ => break format!("({})", node.kind()),
+            },
+            kind => break format!("({kind})"),
         }
-        "member_expression" => match (
-            node.child_by_field_name("object"),
-            node.child_by_field_name("property"),
-        ) {
-            (Some(object), Some(property)) => {
-                format!("{}.{}", callee(object, src), text(property, src))
-            }
-            _ => format!("({})", node.kind()),
-        },
-        kind => format!("({kind})"),
-    }
+    };
+    names
+        .iter()
+        .rev()
+        .fold(base, |path, name| path + "." + name)
 }
 
 fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
@@ -894,7 +952,7 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 mod tests {
     use super::*;
 
-    fn facts(src: &str) -> Facts {
+    fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
     }
 
@@ -908,24 +966,80 @@ mod tests {
     #[test]
     fn definitions_nest_to_a_limit() {
         let n = 512;
-        let facts = facts(&format!("{}1{};", "f(() => ".repeat(n), ")".repeat(n)));
+        let facts = parse(&format!("{}1{};", "f(() => ".repeat(n), ")".repeat(n)));
         assert_eq!(facts.calls.len(), n);
         let deepest = (facts.defs.iter()).map(|d| d.name.matches('.').count() + 1);
-        assert_eq!(deepest.max(), Some(MAX_NESTING.min(n)));
+        assert_eq!(deepest.max(), Some(DEFINITION_DEPTH.min(n)));
     }
 
     #[test]
     fn values_nest_to_a_limit() {
         let n = 512;
-        let facts = facts(&format!("{}{};", "new F(".repeat(n), ")".repeat(n)));
+        let facts = parse(&format!("{}{};", "new F(".repeat(n), ")".repeat(n)));
         assert_eq!(facts.calls.len(), n);
         let deepest = (facts.calls.iter().flat_map(|c| &c.args)).map(depth);
-        assert_eq!(deepest.max(), Some(MAX_NESTING + 1));
+        assert_eq!(deepest.max(), Some(VALUE_DEPTH + 1));
+    }
+
+    #[test]
+    fn a_definition_past_the_limit_hides_its_name() {
+        let n = DEFINITION_DEPTH;
+        let src = format!(
+            "function g() {{}}\n{}function g() {{}} g();{}",
+            "f(() => {".repeat(n),
+            "});".repeat(n)
+        );
+        let facts = parse(&src);
+        let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert!(facts.locals.contains(&qualify(&call.scope, "g")));
+        assert!(
+            facts
+                .defs
+                .iter()
+                .all(|d| d.name != qualify(&call.scope, "g"))
+        );
+    }
+
+    #[test]
+    fn a_handler_past_the_limit_is_unknown() {
+        let n = DEFINITION_DEPTH;
+        let src = format!("{}h(() => 1){}", "f(() => {".repeat(n), "});".repeat(n));
+        let facts = parse(&src);
+        let call = facts.calls.iter().find(|c| c.callee == "h").unwrap();
+        assert!(matches!(call.args[..], [Value::Unknown]));
+        let options = format!(
+            "{}h({{ a() {{}} }}){}",
+            "f(() => {".repeat(n),
+            "});".repeat(n)
+        );
+        let options = parse(&options);
+        let call = options.calls.iter().find(|c| c.callee == "h").unwrap();
+        assert!(
+            matches!(&call.args[..], [Value::Object(p)] if matches!(p[..], [(_, Value::Unknown)]))
+        );
+    }
+
+    #[test]
+    fn long_chains_are_cut() {
+        let n = 30_000;
+        let sum = parse(&format!("const a = '' + {}b;", "b + ".repeat(n)));
+        let Value::Str(parts) = &sum.consts[0].value else {
+            panic!("a string");
+        };
+        assert!(parts.len() <= FOLD_DEPTH + 2);
+        let env = parse(&format!("const a = process.env.X{};", ".trim()".repeat(n)));
+        assert!(matches!(
+            env.consts[0].value,
+            Value::Str(_) | Value::Call(_)
+        ));
+        let member = parse(&format!("a{}.f();", ".b".repeat(n)));
+        assert_eq!(member.calls.len(), 1);
+        assert!(member.calls[0].callee.len() < 10 * FOLD_DEPTH);
     }
 
     #[test]
     fn concatenation_folds_once_per_term() {
-        let facts = facts(&format!("const a = '/x' + {}'y';", "b + ".repeat(64)));
+        let facts = parse(&format!("const a = '/x' + {}'y';", "b + ".repeat(64)));
         let Value::Str(parts) = &facts.consts[0].value else {
             panic!("a string");
         };
