@@ -32,7 +32,10 @@ modules updates it.
   zod routes (`app/api/comments`) give shapes with source `zod`, `trace` up from them (golden
   `chain-drift.trace-zod.txt`) shows the drift of the web reads, and a document wins over a zod
   schema, which wins over literals; the reading rules and limits of `zod.rs` are unit tests
-  there),
+  there; the catalog's `app/api/batches` route and the web's `src/batches.ts` consumers
+  (golden `chain-drift.trace-batches.txt`) destructure, iterate and map over the response,
+  with the hidden names and the values handed to a function that are not followed; the rules
+  and the pattern depth limit are unit tests in `lang/ts/uses.rs`),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

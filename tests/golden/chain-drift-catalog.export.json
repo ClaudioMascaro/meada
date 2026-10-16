@@ -2,6 +2,10 @@
   "repository": "example.com/chain/catalog",
   "files": [
     {
+      "path": "app/api/batches/route.ts",
+      "hash": "ecd0d1e9e9d005e2f2f7458c5a0a50cf381f4ea70fb55d789c5c31c7fa0950ba"
+    },
+    {
       "path": "app/api/cached/route.ts",
       "hash": "28715cb31c5ac0a8a141362a4b37e10ba35aac1f7e61d17692b203723b756b37"
     },
@@ -47,6 +51,14 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "span": {
+        "path": "app/api/batches/route.ts",
+        "start": 148,
+        "end": 291
+      }
+    },
     {
       "id": "example.com/chain/catalog::app/api/cached/route.ts::GET",
       "span": {
@@ -161,6 +173,17 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/chain/catalog::app/api/batches/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/batches/route.ts",
+        "start": 180,
+        "end": 288
+      }
+    },
     {
       "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::(new_expression).searchParams.has#0",
       "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
@@ -659,6 +682,31 @@
   ],
   "providers": [
     {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/batches/route.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].owner",
+          "items[].owner.name",
+          "items[].qty",
+          "page",
+          "page.number"
+        ],
+        "scalars": [
+          "items[].id",
+          "items[].owner.name",
+          "items[].qty",
+          "page.number"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/cached",
       "site": "example.com/chain/catalog::app/api/cached/route.ts::GET",
       "shape": {
@@ -855,6 +903,65 @@
       "contract": "http::GET::/api/products/{}",
       "level": "exact",
       "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].owner.email": "inferred",
+          "items[].weight": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "page.size": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].note": "inferred",
+          "items[].sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
     },
     {
       "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",

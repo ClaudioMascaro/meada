@@ -61,8 +61,11 @@ modules updates it.
   facts: each chain of `Step`s (`Field`, `Element`, `Call(method)`, `Return`) the function
   making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
   `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
-  of a `const` of a plain name that nothing else in the function binds; `Return` only from the
-  call's own function), within `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation (`serde(skip)`, reparsed). `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
+  of the names a `const` binds, a destructuring pattern (`PATTERN_DEPTH` deep; each field or
+  element it names is a read), the variable of a `for...of` and the first parameter of an
+  array method's callback written in place (`ELEMENT_METHODS`), each only when nothing else in
+  the function binds or assigns the name; `Return` only from the call's own function), within
+  `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation (`serde(skip)`, reparsed). `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
   `Call(Invocation)` (the callee, the receiver value of a method call and its arguments, so a
   chain such as `z.object({..}).optional()` is read), `Member(object, property)` (`schema.shape`),
   `Schema(name)` (a constant annotated `z.infer<typeof name>`, from `lang/ts/types.rs`) and

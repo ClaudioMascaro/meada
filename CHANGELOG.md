@@ -71,6 +71,12 @@ tagging.
   `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable are open, and so is a
   schema from a package import. Schemas are followed through local and same-repository imported
   constants. The export names the source `zod`; a document wins over zod, and zod over literals.
+- Shape drift (spec #23), consumer reads: a consumer's destructuring (nested, with defaults and
+  renames; array patterns read elements), `for...of` loops and the element parameter of array
+  methods (`map`, `forEach`, `filter`, `find` and the like) read fields and `[]` elements of the
+  response like dotted reads, and `obj["key"]` is a read of that field. A name rebound in the
+  function (a parameter, a `catch`, an assignment) is not followed, nor is a value passed to
+  another function; a pattern nested past 32 levels reads nothing.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

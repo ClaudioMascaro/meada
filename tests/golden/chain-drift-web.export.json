@@ -14,6 +14,10 @@
       "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
     },
     {
+      "path": "src/batches.ts",
+      "hash": "dbb17762eb8fde12b610a04540ca8f40d563a86f2c3758c603ea2c127f8626b4"
+    },
+    {
       "path": "src/comments.ts",
       "hash": "a87236f180671906c9225e8028bd4a3541633b03930f7856a8b404835b8b9506"
     },
@@ -57,6 +61,62 @@
         "path": "src/api/client.ts",
         "start": 127,
         "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2157,
+        "end": 2400
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 592,
+        "end": 897
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 203,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 997,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1381,
+        "end": 1609
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1766,
+        "end": 2065
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed.inner",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2001,
+        "end": 2027
       }
     },
     {
@@ -367,6 +427,325 @@
         "path": "src/api/client.ts",
         "start": 185,
         "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2203,
+        "end": 2234
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::items.forEach#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2337,
+        "end": 2356
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2367,
+        "end": 2397
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2268,
+        "end": 2278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2308,
+        "end": 2319
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#1",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2323,
+        "end": 2333
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#2",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2389,
+        "end": 2396
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 635,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::out.push#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 758,
+        "end": 788
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::out.push#1",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 855,
+        "end": 876
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 689,
+        "end": 699
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::pageOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 249,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::pageOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 343,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::(call_expression).concat#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1228,
+        "end": 1274
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.filter#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1128,
+        "end": 1164
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.forEach#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1168,
+        "end": 1217
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1228,
+        "end": 1261
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1047,
+        "end": 1078
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1101,
+        "end": 1111
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1206,
+        "end": 1216
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1428,
+        "end": 1459
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1518,
+        "end": 1547
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1487,
+        "end": 1497
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1814,
+        "end": 1845
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::inner#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": "example.com/chain/web::src/batches.ts::shadowed.inner",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2041,
+        "end": 2049
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1967,
+        "end": 2062
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::other#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1924,
+        "end": 1931
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1873,
+        "end": 1883
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1937,
+        "end": 1952
       }
     },
     {
@@ -978,6 +1357,101 @@
   "providers": [],
   "consumers": [
     {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "page"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].owner",
+          "items[].owner.email",
+          "items[].owner.name",
+          "items[].weight"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items.length",
+          "page",
+          "page.number",
+          "page.size"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].note",
+          "items[].qty",
+          "items[].sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/comments",
       "site": "example.com/chain/web::src/comments.ts::comments::fetch#0",
       "via": "env:CATALOG_URL",
@@ -1312,6 +1786,65 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].owner.email": "inferred",
+          "items[].weight": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "page.size": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].note": "inferred",
+          "items[].sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
     {
       "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",
       "provider": "example.com/chain/catalog::app/api/comments/route.ts::GET",
