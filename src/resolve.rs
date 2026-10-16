@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Call, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Step, Value,
+    Call, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part, Step, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -537,17 +537,36 @@ impl<'a> Code<'a> {
         Some(self.full(path)?.calls.get(index)?.args.as_slice())
     }
 
+    /// The type the argument `n` of the call at `index` of `path` is cast to (`Call::arg_types`).
+    pub fn arg_type(&self, path: &'a str, index: usize, n: usize) -> Option<&'a Ty> {
+        self.full(path)?
+            .calls
+            .get(index)?
+            .arg_types
+            .get(n)?
+            .as_ref()
+    }
+
+    /// The type the constant `constant` of `path` is declared to have (`Const::ty`).
+    pub fn constant_type(&self, path: &'a str, constant: &str) -> Option<&'a Ty> {
+        let consts = &self.full(path)?.consts;
+        consts
+            .iter()
+            .find(|c| c.name == constant && c.ty.is_some())?
+            .ty
+            .as_ref()
+    }
+
     /// What the function making the call at `index` of `path` does with its result
     /// (`Call::uses`).
     pub fn uses(&self, path: &'a str, index: usize) -> Option<&'a [Vec<Step>]> {
         Some(self.full(path)?.calls.get(index)?.uses.as_slice())
     }
 
-    /// The schema the declared return type of the definition `name` of `path` is inferred from
-    /// (`Def::returns`).
-    pub fn returns(&self, path: &'a str, name: &str) -> Option<&'a str> {
+    /// The declared return type of the definition `name` of `path` (`Def::returns`).
+    pub fn returns(&self, path: &'a str, name: &str) -> Option<&'a Ty> {
         let def = self.full(path)?.defs.iter().find(|d| d.name == name)?;
-        def.returns.as_deref()
+        def.returns.as_ref()
     }
 
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
@@ -595,9 +614,32 @@ impl<'a> Code<'a> {
             .full(path)?
             .consts
             .iter()
-            .find(|c| c.name == constant)?
+            .find(|c| c.name == constant && !matches!(c.value, Value::Type(_)))?
             .value;
         Some((value, constant.rsplit_once('.').map_or("", |(s, _)| s)))
+    }
+
+    /// The `interface` or `type` declaration `name` refers to from `scope` in `path` (spec #23),
+    /// through the file's imports and the repository's modules: the file it is written in, its
+    /// qualified name and the type. A type of a package outside the repository, a class and a
+    /// name no declaration spells give `None`.
+    pub fn declared_type(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a str, &'a Ty)> {
+        let Binding::Const(at, constant) =
+            self.resolver.lexical(path, scope, name, &mut Seen::new())
+        else {
+            return None;
+        };
+        let declared = (self.full(at)?.consts.iter())
+            .find(|c| c.name == constant && matches!(c.value, Value::Type(_)))?;
+        match &declared.value {
+            Value::Type(ty) => Some((at, constant, ty)),
+            _ => None,
+        }
     }
 
     /// Whether `name`, called from `scope` in `path`, is a parameter (or a name an object

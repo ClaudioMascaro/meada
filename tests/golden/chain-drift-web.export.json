@@ -14,6 +14,14 @@
       "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
     },
     {
+      "path": "src/api/typed.ts",
+      "hash": "2d976b09669537a6e0532138064a6c7dc2f8cda5fa3d430834d07fbe64b19312"
+    },
+    {
+      "path": "src/api/types.ts",
+      "hash": "7d1634392281fc28dbde5c380e4d469fb5fd890e8599f0cea50b25c830ecf9b9"
+    },
+    {
       "path": "src/batches.ts",
       "hash": "dbb17762eb8fde12b610a04540ca8f40d563a86f2c3758c603ea2c127f8626b4"
     },
@@ -26,8 +34,16 @@
       "hash": "74f647de1ae0c993b4dcd83051b9d7c95034032101df53d1a017c4765287400f"
     },
     {
+      "path": "src/declared.ts",
+      "hash": "7df05b62fe9b7eb1bb9f15040dfa5d25b1cc652cc56047092befce8c911470e9"
+    },
+    {
       "path": "src/drift.ts",
       "hash": "082f1cb20bac614e56a893e19874fee607ee1d1603500809406c7f9da3a1abb4"
+    },
+    {
+      "path": "src/labels.ts",
+      "hash": "7845adace481ad3a72feb4318a9bb126f2cc5fa6730a3214634f8fd515a8033f"
     },
     {
       "path": "src/orders.ts",
@@ -61,6 +77,14 @@
         "path": "src/api/client.ts",
         "start": 127,
         "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 125,
+        "end": 259
       }
     },
     {
@@ -160,6 +184,54 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::cast",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 609,
+        "end": 725
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::counts",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 867,
+        "end": 937
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1659,
+        "end": 1861
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1383,
+        "end": 1534
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1106,
+        "end": 1243
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1922,
+        "end": 2035
+      }
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::both",
       "span": {
         "path": "src/drift.ts",
@@ -237,6 +309,14 @@
         "path": "src/drift.ts",
         "start": 1079,
         "end": 1235
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels",
+      "span": {
+        "path": "src/labels.ts",
+        "start": 164,
+        "end": 347
       }
     },
     {
@@ -427,6 +507,28 @@
         "path": "src/api/client.ts",
         "start": 185,
         "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson::fetch#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::getJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 199,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson::res.json#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::getJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 240,
+        "end": 250
       }
     },
     {
@@ -859,6 +961,171 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 653,
+        "end": 685
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 703,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "caller": "example.com/chain/web::src/declared.ts::counts",
+      "target": "example.com/chain/web::src/api/typed.ts::getJson",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 902,
+        "end": 934
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1706,
+        "end": 1738
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1764,
+        "end": 1774
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::res.json#1",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1811,
+        "end": 1821
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1428,
+        "end": 1460
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1506,
+        "end": 1516
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1152,
+        "end": 1184
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1215,
+        "end": 1225
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1971,
+        "end": 2003
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2014,
+        "end": 2032
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.number#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1341,
+        "end": 1351
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.number#1",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1360,
+        "end": 1370
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.object#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1323,
+        "end": 1373
+      }
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::both::console.log#0",
       "caller": "example.com/chain/web::src/drift.ts::both",
       "target": null,
@@ -1076,6 +1343,28 @@
         "path": "src/drift.ts",
         "start": 1129,
         "end": 1147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "caller": "example.com/chain/web::src/labels.ts::labels",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/labels.ts",
+        "start": 210,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels::res.json#0",
+      "caller": "example.com/chain/web::src/labels.ts::labels",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/labels.ts",
+        "start": 263,
+        "end": 273
       }
     },
     {
@@ -1506,6 +1795,131 @@
       "via": "env:GATEWAY_URL"
     },
     {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "cursor",
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].address.zip",
+          "items[].id",
+          "items[].name",
+          "items[].nickname",
+          "items[].phone",
+          "total"
+        ],
+        "declared": [
+          "cursor",
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].address.zip",
+          "items[].id",
+          "items[].name",
+          "items[].nickname",
+          "items[].phone",
+          "total"
+        ],
+        "optional": [
+          "cursor",
+          "items[].phone"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "via": "env:CATALOG_URL"
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "pages",
+          "total"
+        ],
+        "declared": [
+          "pages",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].rank",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].rank",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
       "via": "env:GATEWAY_URL",
@@ -1624,6 +2038,23 @@
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/web::src/drift.ts::rebound::get#0",
       "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/labels",
+      "site": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/labels.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.other",
+          "labels.title",
+          "ok",
+          "status"
+        ]
+      }
     },
     {
       "contract": "http::PUT::/api/orders/{}",
@@ -1892,6 +2323,75 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].address.zip": "exact",
+          "items[].nickname": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "pages": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact",
+          "items[].rank": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
       "consumer": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
       "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
       "contract": "http::GET::/api/orders",
@@ -1967,6 +2467,22 @@
       "contract": "http::GET::/api/orders",
       "level": "inferred",
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "contract": "http::GET::/api/labels",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "status": "inferred"
+        },
+        "unchecked": {
+          "labels.other": "labels",
+          "labels.title": "labels"
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",

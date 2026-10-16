@@ -6,7 +6,7 @@ use tree_sitter::{Language, Node, Parser};
 
 use super::{
     Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind, LanguagePack,
-    Message, Modules, Param, Part, Value,
+    Message, Modules, Param, Part, Ty, Value,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
@@ -58,7 +58,7 @@ impl LanguagePack for TsJs {
                 facts.defs.push(Def {
                     params: params(node, src, &inner),
                     returns: (node.child_by_field_name("return_type"))
-                        .and_then(|t| types::inferred(t, src)),
+                        .and_then(|t| types::returned(t, src)),
                     name: inner.clone(),
                     kind,
                     range,
@@ -71,17 +71,29 @@ impl LanguagePack for TsJs {
                     let function = node
                         .child_by_field_name("function")
                         .or_else(|| node.child_by_field_name("constructor"));
+                    let arguments =
+                        (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
                     if let Some(function) = function {
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: node.byte_range(),
-                            args: node
-                                .child_by_field_name("arguments")
-                                .filter(|a| a.kind() == "arguments")
+                            args: arguments
                                 .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
                                 .unwrap_or_default(),
+                            arg_types: arguments
+                                .map(|a| named(a).map(|arg| cast(arg, src)).collect())
+                                .unwrap_or_default(),
                             uses: uses.of(node),
+                        });
+                    }
+                }
+                "interface_declaration" | "type_alias_declaration" => {
+                    if let Some(name) = node.child_by_field_name("name") {
+                        facts.consts.push(Const {
+                            name: qualify(&scope, text(name, src)),
+                            value: Value::Type(types::declaration(node, src, &mut 0)),
+                            ty: None,
                         });
                     }
                 }
@@ -120,11 +132,12 @@ impl LanguagePack for TsJs {
                 && !FUNCTIONS.contains(&value_node.kind())
                 && !matches!(value_node.kind(), "class")
             {
+                let (value, ty) =
+                    declared(node.child_by_field_name("type"), *value_node, src, &scope);
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value: (node.child_by_field_name("type"))
-                        .and_then(|t| types::inferred(t, src))
-                        .map_or_else(|| value(*value_node, src, &scope), Value::Schema),
+                    value,
+                    ty,
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();
@@ -652,10 +665,14 @@ fn value_at(node: Node, src: &[u8], scope: &str, depth: usize) -> Value {
         return Value::Unknown;
     }
     let deeper = |n: Node| value_at(n, src, scope, depth + 1);
-    // `x as z.infer<typeof S>` is typed by the schema, whatever `x` is.
-    let typed = (node.kind() == "as_expression").then(|| named(node).nth(1));
-    if let Some(schema) = typed.flatten().and_then(|t| types::inferred(t, src)) {
-        return Value::Schema(schema);
+    // `x as T` is `x`, or the schema `T` infers; the type of a cast is `cast`'s.
+    if node.kind() == "as_expression"
+        && let Some(inner) = named(node).next()
+    {
+        return match named(node).nth(1).map(|t| types::ty(t, src, &mut 0)) {
+            Some(Ty::Schema(schema)) => Value::Schema(schema),
+            _ => deeper(inner),
+        };
     }
     match node.kind() {
         "object" => {
@@ -740,6 +757,26 @@ fn value_at(node: Node, src: &[u8], scope: &str, depth: usize) -> Value {
             None => Value::Unknown,
         },
     }
+}
+
+/// The type a cast `node` (`x as T`) declares, when it lists fields (`z.infer` types are the
+/// value's, see `value_at`).
+fn cast(node: Node, src: &[u8]) -> Option<Ty> {
+    let declared = named(node)
+        .nth(1)
+        .filter(|_| node.kind() == "as_expression")?;
+    Some(types::ty(declared, src, &mut 0)).filter(|t| !matches!(t, Ty::Unknown | Ty::Schema(_)))
+}
+
+/// What a `const` holds and the type it is declared to have: by the annotation of the variable
+/// or by a cast of its initializer. A `z.infer` type gives the value the schema it names.
+fn declared(annotation: Option<Node>, init: Node, src: &[u8], scope: &str) -> (Value, Option<Ty>) {
+    let annotated = annotation.map(|t| types::ty(t, src, &mut 0));
+    if let Some(Ty::Schema(schema)) = annotated {
+        return (Value::Schema(schema), None);
+    }
+    let ty = annotated.or_else(|| cast(init, src));
+    (value(init, src, scope), ty.filter(|t| *t != Ty::Unknown))
 }
 
 /// A string expression folded into literal text, environment reads and holes; `None` when

@@ -7,6 +7,7 @@ mod contract;
 pub mod decide;
 mod decider;
 mod decisions;
+mod declared;
 mod document;
 pub mod engine;
 mod http;

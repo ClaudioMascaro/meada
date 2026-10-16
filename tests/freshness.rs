@@ -462,6 +462,32 @@ fn an_edited_client_wrapper_changes_its_callers_drift_like_a_cold_chain() {
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
+/// The web's shared `Entity` type renames `id`: the consumers that extend it, in another file
+/// and unchanged, declare `key` instead.
+fn rename_a_shared_field(web: &Path) {
+    let path = web.join("src/api/types.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace("  id: string;", "  key: string;");
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+#[test]
+fn an_edited_shared_type_changes_the_drift_of_its_users_like_a_cold_chain() {
+    let (web, _, _) = drift_chain("fresh_type");
+    age(web.parent().unwrap());
+    let before = Engine::open(&web).unwrap().export().unwrap();
+    rename_a_shared_field(&web);
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_type_cold");
+    rename_a_shared_field(&cold);
+    assert!(!before.contains("\"items[].key\": \"exact\""));
+    assert!(refreshed.contains("\"items[].key\": \"exact\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}
+
 /// The catalog's zod schema drops `title`, which a consumer in the web app reads.
 fn drop_a_schema_field(catalog: &Path) {
     let path = catalog.join("lib/schemas.ts");

@@ -77,6 +77,14 @@ tagging.
   response like dotted reads, and `obj["key"]` is a read of that field. A name rebound in the
   function (a parameter, a `catch`, an assignment) is not followed, nor is a value passed to
   another function; a pattern nested past 32 levels reads nothing.
+- Shape drift (spec #23), consumer declared types: a cast (`as T`), a type argument given to a
+  client wrapper or to `json<T>()`, and an annotation on the receiving variable make every field
+  of the type a read. Interfaces (with `extends`, also from another file), aliases to object
+  types, intersections, arrays and `z.infer<typeof schema>` give fields; other forms and types
+  of a package add none. An optional field (`?`) adds no drift. A missing path is `exact` when
+  the provider's shape comes from a document or zod. An index signature in the type of a
+  handler's returned value (a typed constant, a cast, the return annotation) opens that part of
+  the provider's shape.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

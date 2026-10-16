@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::channel::Routes;
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::declared::{self, Types};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Step, Value, literal, property};
 use crate::literals::{Handler, Literals};
@@ -104,6 +105,7 @@ fn fetch(args: &[Value]) -> Option<Read> {
 /// body or a part of the body. `None` when nothing is read.
 fn response_reads<'a>(
     code: &Code<'a>,
+    types: &mut Types,
     call: (&'a str, usize),
     frames: &[Frame<'a>],
 ) -> Option<Shape> {
@@ -114,6 +116,8 @@ fn response_reads<'a>(
         Body(Vec<&'s Step>),
     }
     let mut fields = BTreeSet::new();
+    // The fields declared types list, by path, with whether the type marks each optional.
+    let mut declared: BTreeMap<String, bool> = BTreeMap::new();
     let (mut got, mut at) = (Got::Response, call);
     for level in 0..=frames.len() {
         let mut returned = Vec::new();
@@ -132,9 +136,22 @@ fn response_reads<'a>(
                 .take_while(|s| matches!(s, Step::Field(_) | Step::Element))
                 .count();
             path.extend(&rest[..read]);
-            fields.extend(shape::prefixes(&written(&path)).map(String::from));
-            if rest.get(read) == Some(&Step::Return) {
-                returned.push(Got::Body(path));
+            let base = written(&path);
+            fields.extend(shape::prefixes(&base).map(String::from));
+            match rest.get(read) {
+                Some(Step::Return) => returned.push(Got::Body(path)),
+                // The type declares what the value holds: the scope is the call's.
+                Some(Step::Typed(ty)) => {
+                    let scope = code.files()[at.0].calls[at.1].scope.as_str();
+                    let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
+                    for (field, optional) in listed.fields {
+                        let all = declared
+                            .entry(declared::under(&base, &field))
+                            .or_insert(optional);
+                        *all &= optional;
+                    }
+                }
+                _ => {}
             }
         }
         let Some(frame) = frames.get(level) else {
@@ -150,9 +167,18 @@ fn response_reads<'a>(
         at = (frame.path, frame.index);
     }
     fields.remove("");
+    // A path that is read is certain, whatever the type says of it.
+    let optional = (declared.iter())
+        .filter(|&(p, &optional)| optional && !fields.contains(p))
+        .map(|(p, _)| p.clone())
+        .collect();
+    let declared: BTreeSet<String> = declared.into_keys().collect();
+    fields.extend(declared.iter().cloned());
     let site = frames.last().map_or(call.0, |f| f.path);
     (!fields.is_empty()).then(|| Shape {
         fields,
+        declared,
+        optional,
         ..Shape::new(Source::Reads(site.to_string()))
     })
 }
@@ -538,6 +564,7 @@ impl ContractKind for Http {
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         let mut readers = Readers::default();
+        let mut types = Types::default();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
                 let is_fetch = call.callee == "fetch"
@@ -547,7 +574,7 @@ impl ContractKind for Http {
                 }
                 for (site, at, frames, read) in code.expand_frames(path, n, &fetch) {
                     found.push(Found {
-                        shape: response_reads(code, (path, n), &frames),
+                        shape: response_reads(code, &mut types, (path, n), &frames),
                         role: Role::Consumer,
                         site: Site::Call {
                             path: site.into(),

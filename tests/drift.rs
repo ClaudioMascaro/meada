@@ -104,6 +104,30 @@ fn trace_ends_the_links_of_consumers_destructuring_and_iterating_the_response() 
     assert_golden("chain-drift.trace-batches.txt", &answer);
 }
 
+#[test]
+fn trace_ends_the_links_of_consumers_reading_past_a_declared_type() {
+    let (web, _, _) = drift_chain("drift_declared_trace");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("GET /api/profiles"), Direction::Up, None)
+        .unwrap();
+
+    assert_golden("chain-drift.trace-declared.txt", &answer);
+}
+
+#[test]
+fn trace_marks_reads_under_an_index_signature_of_the_return_type_not_checked() {
+    let (web, _, _) = drift_chain("drift_labels_trace");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("GET /api/labels"), Direction::Up, None)
+        .unwrap();
+
+    assert_golden("chain-drift.trace-labels.txt", &answer);
+}
+
 /// The gateway's `listOrders` sends a body parsed with a zod schema.
 fn parse_the_orders(gateway: &std::path::Path) {
     let path = gateway.join("src/orders.ts");

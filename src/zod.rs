@@ -3,9 +3,9 @@
 //! literals. `z.object` gives fields, `z.array` elements, the primitives scalars, and anything
 //! whose output Meada cannot read (`.transform`, `z.lazy`, `.passthrough()`, `z.any`) is open.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::lang::{Invocation, Value};
+use crate::lang::{Invocation, Ty, Value};
 use crate::literals::Responses;
 use crate::resolve::Code;
 use crate::shape::{Shape, Source};
@@ -167,8 +167,8 @@ impl Zod {
             spent: self.spent.entry(path.to_string()).or_default(),
         };
         let mut node = match code.returns(path, name) {
-            Some(schema) => reader.named(path, scope, schema, 0)?,
-            None => None,
+            Some(Ty::Schema(schema)) => reader.named(path, scope, schema, 0)?,
+            _ => None,
         };
         if node.is_none() && !responses.bodies.is_empty() {
             let mut all: Option<Node> = None;
@@ -187,6 +187,27 @@ impl Zod {
             shape.open.insert(String::new());
         }
         Some(shape)
+    }
+}
+
+impl Zod {
+    /// The field paths below the root of the output of the schema `name`, written in `path`
+    /// within `scope`: what `z.infer<typeof name>` lists. `None` when it is no schema Meada
+    /// reads, or past the file's budget.
+    pub fn inferred<'a>(
+        &mut self,
+        code: &Code<'a>,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<BTreeSet<String>> {
+        let mut reader = Reader {
+            code,
+            spent: self.spent.entry(path.to_string()).or_default(),
+        };
+        let mut shape = Shape::new(Source::Zod(path.to_string()));
+        reader.named(path, scope, name, 0)??.render("", &mut shape);
+        Some(shape.fields)
     }
 }
 

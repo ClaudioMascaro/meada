@@ -34,7 +34,11 @@ modules updates it.
   schema, which wins over literals; the reading rules and limits of `zod.rs` are unit tests
   there; the catalog's `app/api/batches` route and the web's `src/batches.ts` consumers
   (golden `chain-drift.trace-batches.txt`) destructure, iterate and map over the response,
-  with the hidden names and the values handed to a function that are not followed; the rules
+  with the hidden names and the values handed to a function that are not followed; the
+  catalog's `app/api/profiles` route and the web's `src/declared.ts` consumers (golden
+  `chain-drift.trace-declared.txt`) read declared types, with the optional fields, the package
+  type and the freshness of an edited shared type in `freshness`, the limits being unit tests in
+  `declared.rs` and `lang/ts/types.rs`; the rules
   and the pattern depth limit are unit tests in `lang/ts/uses.rs`),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
