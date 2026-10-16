@@ -98,6 +98,13 @@ tagging.
   `export *` that give one name differently (a function in one file, a constant or type in
   another) export neither, as in ES modules, so a call to that name through the package no
   longer links.
+- Shape drift (spec #23), where it shows: `context` on a route names its shape source (the
+  document, `(zod)` or `(literals)` after the file) and lists, per drifting consumer, the missing
+  paths with their level and the reads not checked under an open part; `search` takes the kind
+  `drift`, one line per missing path (consumer location, route, path and level) matched by route
+  path or field path; `meada status` prints, under each repository, the number of missing paths
+  its consumers read (nothing when there is none), in Portuguese and English. The MCP server
+  still has three tools.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

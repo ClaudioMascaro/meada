@@ -113,7 +113,8 @@ a field the consumer reads that the provider no longer returns. Paths are compar
 root; one that reaches an open part of the provider's shape is not checked and never drift.
 Each drifting path carries its own level, `exact` when the provider's shape and the consumer's
 path are both declared (a document, a schema, a type) and `inferred` when either comes from
-what code does (field reads, returned literals), while the link keeps its level.
+what code does (field reads, returned literals), while the link keeps its level. `trace`,
+`context`, `search` and `meada status` show it.
 _Avoid_: breaking change, mismatch, schema diff
 
 **Resource**:

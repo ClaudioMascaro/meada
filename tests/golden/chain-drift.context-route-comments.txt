@@ -1,0 +1,7 @@
+http::GET::/api/comments
+  example.com/chain/catalog provider app/api/comments/route.ts:7 GET
+    example.com/chain/catalog app/api/comments/route.ts (zod) response fields: [], [].author, [].author.name, [].id, [].meta, [].tags, [].tags[], [].title
+    example.com/chain/catalog app/api/comments/route.ts (zod) response open: [].meta
+  example.com/chain/web consumer src/comments.ts:6 comments
+    drift: missing [].rating (inferred)
+    not checked: [].meta.stars under [].meta

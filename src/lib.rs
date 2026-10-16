@@ -9,6 +9,7 @@ mod decider;
 mod decisions;
 mod declared;
 mod document;
+mod drift_view;
 pub mod engine;
 mod http;
 mod index;

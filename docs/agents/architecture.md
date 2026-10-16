@@ -23,6 +23,7 @@ one for the area a change touches.
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
   items, derived in one place. `trace.rs`: the `Graph`, the walk and the chain footer.
+  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
@@ -178,7 +179,9 @@ one for the area a change touches.
   document gives the route one. Drift is one pure function, `shape::drift(provider,
   consumer)`, which `http::drift` runs over the workspace's links in
   `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
-  (`Row::link`), the export and every other reader of links see the same value.
+  (`Row::link`), the export and every other reader of links see the same value;
+  `drift_view.rs` renders it for `context` (a route's drifting consumers), `search` (kind
+  `drift`) and `status` (a count per repository) from the links alone, computing nothing.
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
   importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
