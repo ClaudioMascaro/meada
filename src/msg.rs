@@ -42,7 +42,7 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
-    /// The missing paths the repository's consumers read from the routes they call (spec #23).
+    /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
     DocumentUnreadable {
         path: &'a str,
@@ -247,8 +247,8 @@ impl Msg<'_> {
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
             ),
             Msg::Drift(n) => pick(
-                format!("shape drift: {n} missing paths read from the routes it calls"),
-                format!("drift de formato: {n} caminhos lidos das rotas que chama e ausentes nelas"),
+                format!("shape drift, missing reads: {n}"),
+                format!("drift de formato, leituras ausentes: {n}"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

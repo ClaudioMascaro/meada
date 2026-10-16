@@ -1,5 +1,5 @@
 example.com/chain/web (.) indexado, 16 arquivos
-  drift de formato: 36 caminhos lidos das rotas que chama e ausentes nelas
+  drift de formato, leituras ausentes: 36
 example.com/chain/gateway (../chain-gateway) indexado, 11 arquivos
   broken.openapi.yaml:7: documento ilegível (while parsing a flow sequence, expected ',' or ']'), ignorado
   docs/api-contract.yaml: openapi 3.0.3, rotas: 1

@@ -13,7 +13,7 @@ use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, unresolved};
-use crate::shape::{self, Shape, Source};
+use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
 use crate::{
@@ -807,11 +807,7 @@ fn contracts(
 /// What a route's response (or a channel's payload: `what`) carries, after its `provides` line:
 /// the fields and the parts left open, each line naming where the shape comes from.
 fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
-    let at = match &shape.source {
-        Source::Zod(path) => format!("{path} (zod)"),
-        Source::Literals(path) => format!("{path} (literals)"),
-        source => source.at().to_string(),
-    };
+    let at = shape.source.at();
     let list = |paths: &BTreeSet<String>| {
         let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
         paths.join(", ")

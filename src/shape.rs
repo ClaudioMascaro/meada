@@ -311,13 +311,14 @@ pub enum Source {
 }
 
 impl Source {
-    /// The document, or the place in code, the shape comes from.
-    pub fn at(&self) -> &str {
+    /// Where the shape comes from, as people see it: the file and what read it, such as
+    /// `openapi.yaml (document)` or `src/orders.ts (zod)`.
+    pub fn at(&self) -> String {
         match self {
-            Source::Document(path)
-            | Source::Zod(path)
-            | Source::Literals(path)
-            | Source::Reads(path) => path,
+            Source::Document(path) => format!("{path} (document)"),
+            Source::Zod(path) => format!("{path} (zod)"),
+            Source::Literals(path) => format!("{path} (literals)"),
+            Source::Reads(path) => format!("{path} (reads)"),
         }
     }
 

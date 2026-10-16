@@ -1,5 +1,5 @@
 example.com/chain/web (.) indexed, 16 files
-  shape drift: 36 missing paths read from the routes it calls
+  shape drift, missing reads: 36
 example.com/chain/gateway (../chain-gateway) indexed, 11 files
   broken.openapi.yaml:7: unreadable document (while parsing a flow sequence, expected ',' or ']'), ignored
   docs/api-contract.yaml: openapi 3.0.3, routes: 1

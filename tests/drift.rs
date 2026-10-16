@@ -67,7 +67,9 @@ fn context_on_a_route_names_the_shape_source_and_the_drift_of_its_consumers() {
     let (web, _, _) = drift_chain("drift_context");
     let engine = Engine::open(&web).unwrap();
 
-    // A document, a zod schema and returned literals; and a route no consumer drifts from.
+    // A document (its consumers with drift, with reads not checked, and with neither, which are
+    // listed too), a zod schema and returned literals; and a route whose consumer only has reads
+    // not checked.
     let routes = [
         ("orders", "http::GET::/api/orders"),
         ("comments", "http::GET::/api/comments"),

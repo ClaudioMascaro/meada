@@ -64,14 +64,16 @@ modules updates it.
 - `drift_view.rs`: shape drift (spec #23) as `context`, `search` and `status` show it, from
   `Link::drift` alone (`entries` finds each drifting link's consumer call, `consumers`,
   `matches` and `counts` render). `context` on an HTTP route appends, after the providers, one
-  `<repository> consumer <path>:<line> <caller>` per drifting consumer (sorted), with `drift:
-  missing <path> (<level>), ...` and `not checked: <path> under <open path>, ...` lines; a
-  consumer with no drift is not listed. The provider's shape lines name the source: the
-  document path, or `<file> (zod)` / `<file> (literals)` (`shape_lines`). `search` kind `drift`
+  `<repository> consumer <path>:<line> <caller>` per linked consumer that read fields of the
+  response (ambiguous links apart), sorted by repository, file and numeric line, with `drift:
+  missing <path> (<level>), ...` and `not checked: <path> under <open path>, ...` lines when it
+  has any. The provider's shape lines name the source: `<file> (document)`, `(zod)` or
+  `(literals)` (`Source::at`). `search` kind `drift`
   (`search_drift`, an early branch) gives one line per missing path, `<repository>
   <path>:<line> <caller> <contract> missing <path> (<level>)`, matched by the route path or the
   field path; the reads not checked are never listed. `status` prints `Msg::Drift(n)` under a
-  repository whose consumers read `n` > 0 missing paths (`Engine::status_report`), nothing
+  repository whose consumers have `n` > 0 missing reads, link and path pairs
+  (`Engine::status_report`), nothing
   otherwise, so no repository without drift changes.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
