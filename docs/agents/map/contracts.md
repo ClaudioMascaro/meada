@@ -17,8 +17,9 @@ modules updates it.
   caller reaches), Next.js app-router and Express providers (each with a `Found::shape` from
   `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
-  lists once with `Literals::responses`): one `Readers { zod, literals }` per `extract`, holding the budget of
-  each handler file; Express reads a handler once for every prefix it is mounted under),
+  lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
+  `Zod`, which `response_reads` and `provider_shape` reach through it), holding the budgets of
+  each file; Express reads a handler once for every prefix it is mounted under),
   `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). `http::drift(links, exports)` sets `Link::drift` on every
   HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site

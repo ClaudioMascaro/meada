@@ -4,11 +4,11 @@
 //! name that is not declared in the repository (a type parameter) adds none either. A type or
 //! schema a package exports is an import the query fills (issue #175).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::lang::{TYPE_DEPTH, Ty};
-use crate::resolve::Code;
-use crate::shape::{Import, Shape, Source, Want, under};
+use crate::resolve::{Code, scope_of};
+use crate::shape::{Budget, Import, Shape, Source, Spent, Want, under};
 use crate::zod::Zod;
 
 /// What reading the types of one file's consumers may cost: every type examined, over all the
@@ -17,11 +17,12 @@ use crate::zod::Zod;
 // aliases that each intersect the previous one twice would otherwise cost exponential time.
 const TYPES_BUDGET: usize = 1 << 14;
 
-/// Reads declared types, keeping the budget of each file.
+/// Reads declared types, keeping the budget of each file, with the `Zod` that reads the schemas
+/// a `z.infer` names: an extraction reaches zod through this one, so `ZOD_BUDGET` is spent once.
 #[derive(Default)]
 pub struct Types {
     zod: Zod,
-    spent: HashMap<String, usize>,
+    spent: Budget<TYPES_BUDGET>,
 }
 
 /// What the type arguments of a call stand for in a type written in the function it calls: the
@@ -48,6 +49,11 @@ pub struct Declared {
 }
 
 impl Types {
+    /// The schema reader these types share.
+    pub fn zod(&mut self) -> &mut Zod {
+        &mut self.zod
+    }
+
     /// The fields `ty`, written in `path` within `scope`, lists, below the root. `None` past the
     /// file's budget.
     pub fn read<'a>(
@@ -74,7 +80,7 @@ impl Types {
             code,
             args,
             zod: &mut self.zod,
-            spent: self.spent.entry(path.to_string()).or_default(),
+            spent: self.spent.of(path),
             out: Declared::default(),
             visiting: Vec::new(),
         };
@@ -88,20 +94,17 @@ impl Types {
     /// type declaration, or past the file's budget.
     pub fn exported<'a>(&mut self, code: &Code<'a>, path: &'a str, name: &'a str) -> Option<Shape> {
         let (file, constant, ty) = code.declared_type(path, "", name)?;
-        let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+        let within = scope_of(constant);
         let read = self.read(code, file, within, ty)?;
-        let optional = (read.fields.iter())
-            .filter(|&(_, &o)| o)
-            .map(|(p, _)| p.clone());
-        let fields: BTreeSet<String> = read.fields.keys().cloned().collect();
-        Some(Shape {
-            optional: optional.collect(),
-            declared: fields.clone(),
-            fields,
+        let mut shape = Shape {
             open: read.open,
             imports: read.imports,
             ..Shape::new(Source::Reads(path.to_string()))
-        })
+        };
+        for (field, optional) in read.fields {
+            shape.list(field, optional, true);
+        }
+        Some(shape)
     }
 }
 
@@ -109,7 +112,7 @@ struct Reader<'c, 'a> {
     code: &'c Code<'a>,
     args: Option<Args<'a>>,
     zod: &'c mut Zod,
-    spent: &'c mut usize,
+    spent: Spent<'c, TYPES_BUDGET>,
     out: Declared,
     /// The declarations being followed, to stop at one that leads back to itself.
     visiting: Vec<(&'a str, &'a str)>,
@@ -125,10 +128,7 @@ impl<'a> Reader<'_, 'a> {
         prefix: &str,
         depth: usize,
     ) -> Option<()> {
-        *self.spent += 1;
-        if *self.spent > TYPES_BUDGET {
-            return None;
-        }
+        self.spent.charge()?;
         if depth >= TYPE_DEPTH {
             return Some(());
         }
@@ -168,7 +168,7 @@ impl<'a> Reader<'_, 'a> {
                     return Some(());
                 }
                 self.visiting.push((file, constant));
-                let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+                let within = scope_of(constant);
                 let done = self.walk((file, within), declared, prefix, depth + 1);
                 self.visiting.pop();
                 done?;

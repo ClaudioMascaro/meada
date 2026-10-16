@@ -1,19 +1,18 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::channel::Routes;
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::declared::{self, Types};
+use crate::declared::{self, Declared, Types};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Step, Ty, Value, literal, property};
 use crate::literals::{Handler, Literals};
-use crate::resolve::{Code, Frame, Target};
+use crate::resolve::{Code, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
 use crate::workspace::Repository;
-use crate::zod::Zod;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
@@ -115,11 +114,8 @@ fn response_reads<'a>(
         Response,
         Body(Vec<&'s Step>),
     }
-    let mut fields = BTreeSet::new();
-    // The fields declared types list, by path, with whether the type marks each optional.
-    let mut declared: BTreeMap<String, bool> = BTreeMap::new();
-    // The types and schemas of a package the declared types name, for the query to fill.
-    let mut imports: BTreeSet<Import> = BTreeSet::new();
+    let site = frames.last().map_or(call.0, |f| f.path);
+    let mut out = Shape::new(Source::Reads(site.to_string()));
     let (mut got, mut at) = (Got::Response, call);
     // The types the wrapper below declares for the body with its own type parameters, by path:
     // its call gives the arguments that stand for them. And that wrapper.
@@ -147,7 +143,9 @@ fn response_reads<'a>(
                 .count();
             path.extend(&rest[..read]);
             let base = written(&path);
-            fields.extend(shape::prefixes(&base).map(String::from));
+            for prefix in shape::prefixes(&base) {
+                out.list(prefix.to_string(), false, false);
+            }
             match rest.get(read) {
                 Some(Step::Return) => returned.push(Got::Body(path)),
                 // The type declares what the value holds: the scope is the call's.
@@ -155,14 +153,7 @@ fn response_reads<'a>(
                 Some(Step::Typed(ty)) => {
                     let Some(scope) = scope else { continue };
                     let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
-                    for (field, optional) in listed.fields {
-                        let all = declared.entry(under(&base, &field)).or_insert(optional);
-                        *all &= optional;
-                    }
-                    for import in listed.imports {
-                        let at = under(&base, &import.at);
-                        imports.insert(Import { at, ..import });
-                    }
+                    typed(&mut out, &base, listed);
                 }
                 // The wrapper's type parameters, given here, stand in the types it declared.
                 Some(Step::Argument(tys)) => {
@@ -179,14 +170,7 @@ fn response_reads<'a>(
                         let listed = types
                             .read_with(code, at.0, scope, ty, Some(args))
                             .unwrap_or_default();
-                        for (field, optional) in listed.fields {
-                            let all = declared.entry(under(base, &field)).or_insert(optional);
-                            *all &= optional;
-                        }
-                        for import in listed.imports {
-                            let at = under(base, &import.at);
-                            imports.insert(Import { at, ..import });
-                        }
+                        typed(&mut out, base, listed);
                     }
                 }
                 _ => {}
@@ -212,22 +196,20 @@ fn response_reads<'a>(
         (generic, wrapper) = (deferred, Some(frame.def));
         at = (frame.path, frame.index);
     }
-    fields.remove("");
-    // A path that is read is certain, whatever the type says of it.
-    let optional = (declared.iter())
-        .filter(|&(p, &optional)| optional && !fields.contains(p))
-        .map(|(p, _)| p.clone())
-        .collect();
-    let declared: BTreeSet<String> = declared.into_keys().collect();
-    fields.extend(declared.iter().cloned());
-    let site = frames.last().map_or(call.0, |f| f.path);
-    (!fields.is_empty() || !imports.is_empty()).then(|| Shape {
-        fields,
-        declared,
-        optional,
-        imports,
-        ..Shape::new(Source::Reads(site.to_string()))
-    })
+    out.fields.remove("");
+    (!out.fields.is_empty() || !out.imports.is_empty()).then_some(out)
+}
+
+/// Adds the fields a declared type lists, below `base`, to a consumer's `shape`, with the types
+/// and schemas of a package it names for the query to fill.
+fn typed(shape: &mut Shape, base: &str, listed: Declared) {
+    for (field, optional) in listed.fields {
+        shape.list(under(base, &field), optional, true);
+    }
+    for import in listed.imports {
+        let at = under(base, &import.at);
+        shape.imports.insert(Import { at, ..import });
+    }
 }
 
 /// The field path `steps` (fields and elements) read: `items[].id`.
@@ -469,27 +451,20 @@ fn prefixes<'a>(
     out
 }
 
-/// What reads a handler's shape from the code, keeping the budgets of each file.
-#[derive(Default)]
-struct Readers {
-    zod: Zod,
-    literals: Literals,
-}
-
 /// The shape the handler `name` of `path` gives its route from what the code returns (spec
 /// #23): the one place that picks the source of a code route's shape. The sources come in the
 /// order of ADR 0009, a document merged later in `declare`, then the zod schema the response
 /// is parsed with or typed with, then the returned literals.
 fn provider_shape(
     code: &Code,
-    readers: &mut Readers,
+    literals: &mut Literals,
     path: &str,
     name: &str,
     kind: Handler,
 ) -> Option<Shape> {
-    let responses = readers.literals.responses(code, path, name, kind)?;
-    (readers.zod.returned(code, &responses, name))
-        .or_else(|| readers.literals.shape(code, &responses))
+    let responses = literals.responses(code, path, name, kind)?;
+    (literals.types().zod().returned(code, &responses, name))
+        .or_else(|| literals.shape(code, &responses))
 }
 
 /// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on a constant
@@ -497,7 +472,7 @@ fn provider_shape(
 /// through imports and at any depth.
 // ponytail: an app or router passed as a parameter, `router.route(path)` chains and
 // `require` are not followed.
-fn express(code: &Code, readers: &mut Readers) -> Vec<Found> {
+fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
     let router = |path, scope, name| -> Option<Router> {
         let (at, value) = code.constant(path, scope, name)?;
         matches!(value, Value::Call(c) if ROUTERS.contains(&c.callee.as_str())).then_some(at)
@@ -570,8 +545,8 @@ fn express(code: &Code, readers: &mut Readers) -> Vec<Found> {
             Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
             _ => None,
         };
-        let shape =
-            target.and_then(|(at, name)| provider_shape(code, readers, at, name, Handler::Express));
+        let shape = target
+            .and_then(|(at, name)| provider_shape(code, literals, at, name, Handler::Express));
         for prefix in prefixes(at, &mounts, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
@@ -610,8 +585,8 @@ impl ContractKind for Http {
 
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
-        let mut readers = Readers::default();
-        let mut types = Types::default();
+        // One reader of each shape source for the whole extraction: each budget per file once.
+        let mut literals = Literals::default();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
                 let is_fetch = call.callee == "fetch"
@@ -619,9 +594,15 @@ impl ContractKind for Http {
                 if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
-                for (site, at, frames, read) in code.expand_frames(path, n, &fetch) {
+                let expanded = code.expand_frames(path, n, &fetch);
+                for Expanded {
+                    site: (site, at),
+                    frames,
+                    found: read,
+                } in expanded
+                {
                     found.push(Found {
-                        shape: response_reads(code, &mut types, (path, n), &frames),
+                        shape: response_reads(code, literals.types(), (path, n), &frames),
                         role: Role::Consumer,
                         site: Site::Call {
                             path: site.into(),
@@ -653,7 +634,7 @@ impl ContractKind for Http {
                     };
                     (
                         site,
-                        provider_shape(code, &mut readers, path, local, Handler::Next),
+                        provider_shape(code, &mut literals, path, local, Handler::Next),
                     )
                 } else {
                     (Site::File(path.into()), None)
@@ -669,7 +650,7 @@ impl ContractKind for Http {
                 });
             }
         }
-        found.extend(express(code, &mut readers));
+        found.extend(express(code, &mut literals));
         found
     }
 

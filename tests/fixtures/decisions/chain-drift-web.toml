@@ -1,0 +1,6 @@
+# The drift chain's unresolved `rate` call in the web repository, resolved to a route with a shape.
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/chain/web::src/open.ts::rate::fetch#0"
+target = "example.com/chain/catalog::http::GET::/api/reviews"
+by = "human"

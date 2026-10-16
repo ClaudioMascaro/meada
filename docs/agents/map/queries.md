@@ -61,9 +61,11 @@ modules updates it.
   of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
   plain: a consumer through one always shows `range unchecked`, even inside its own repository,
   which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
-- `drift_view.rs`: shape drift (spec #23) as `context`, `search` and `status` show it, from
-  `Link::drift` alone (`entries` finds each drifting link's consumer call, `consumers`,
-  `matches` and `counts` render). `context` on an HTTP route appends, after the providers, one
+- `drift_view.rs`: shape drift (spec #23) as `context`, `search` and `status` show it, with no
+  drift computed of its own: `entries` takes every link with a `Link::drift` or, but for an
+  ambiguous one, whose consumer has a shape in the exports, and finds its consumer call by
+  scanning every repository's calls (Known ceilings); `consumers`, `matches` and `counts`
+  render. `context` on an HTTP route appends, after the providers, one
   `<repository> consumer <path>:<line> <caller>` per linked consumer that read fields of the
   response (ambiguous links apart), sorted by repository, file and numeric line, with `drift:
   missing <path> (<level>), ...` and `not checked: <path> under <open path>, ...` lines when it

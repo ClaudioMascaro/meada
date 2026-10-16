@@ -90,3 +90,11 @@ export async function wrapped() {
   const body = enveloped<Counts>("/api/profiles");
   return (await body).data;
 }
+
+// The same removed `nickname` as `cast` reads, with plain member access: `inferred` drift
+// where the cast's is `exact`.
+export async function plain() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  const page = await res.json();
+  return page.items[0].nickname;
+}

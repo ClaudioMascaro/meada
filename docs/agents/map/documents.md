@@ -80,17 +80,23 @@ modules updates it.
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
   included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
   document is unreadable). Readers only see `serde_json::Value`.
-- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared}`, the one form of what a
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
+  imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
   caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
   for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
   node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
   (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
-  anything below it may be present. Presence only: no types, formats, `required` or
-  `nullable`; `scalars` are the paths known to hold a string, number or boolean (nothing below
-  them), and `declared`, on a consumer, the paths a declared type gives rather than a field read
-  (empty until spec #23's declared types). `Shape::merge` adds another shape's paths (one side
-  reached by several Founds). `schema::read` marks a part scalar when its `type` is only
+  anything below it may be present. What is recorded is presence, the scalar leaves and the
+  optional fields, never types compared: no types, formats, `required` or `nullable`; `scalars`
+  are the paths known to hold a string, number or boolean (nothing below them); on a consumer,
+  `declared` are the paths a declared type gives rather than a field read and `optional` those
+  it marks optional (`Shape::list` is the one place either grows, keeping them within
+  `fields`); `imports` are the parts a package import leaves for the query to fill (stored,
+  never exported) and `guessed`, on a provider, the parts one filled through a resolution that
+  was not `exact` (issue #175). `Shape::merge` adds another shape's paths (one side reached by
+  several Founds). `shape::Budget` is the per-file budget the code readers (`zod.rs`,
+  `declared.rs`, `literals.rs`) charge, one per extraction. `schema::read` marks a part scalar when its `type` is only
   `string`, `number`, `integer` or `boolean` (with `null` or not) and no other structure keyword
   is there, and drops the mark where another member gives the part fields or leaves it open. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
   `Source::Literals(path)` (`{"literals": "src/orders.ts"}`, the object literals a route
@@ -115,7 +121,9 @@ modules updates it.
   handler's byte range (and its inline callbacks), keeps the ones that send a response (Express:
   `<res>.json|send`, `res` being the handler's second parameter, also after `<res>.status(n)`
   in a chain; Next: `NextResponse.json` imported from `next/server` and the global
-  `Response.json`, status from the options' `status`), drops a literal status outside 2xx, and
+  `Response.json`, status from the options' `status`), drops any response with a literal
+  status outside 2xx whatever its form (also `res.sendStatus(n)`, a status chained before
+  `end` or `render`, `new Response(body, { status })`) and Express's `next(err)`, and
   unions the bodies. It follows constants one at a time through `Code::constant` (imports
   included), not through `Code::value`, so `LITERALS_DEPTH` bounds nesting and constant hops
   alike and `LITERALS_BUDGET` the work of a file; a body it cannot read is open at that path

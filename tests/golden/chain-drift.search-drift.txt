@@ -5,4 +5,7 @@ example.com/chain/web src/comments.ts:19 summary http::GET::/api/comments/summar
 example.com/chain/web src/drift.ts:7 orderTotal http::GET::/api/orders missing [].total (inferred)
 example.com/chain/web src/drift.ts:73 pair http::GET::/api/orders missing [].total (inferred)
 
+example.com/chain/web src/declared.ts:25 cast http::GET::/api/profiles missing items[].nickname (exact)
+example.com/chain/web src/declared.ts:97 plain http::GET::/api/profiles missing items[].nickname (inferred)
+
 no matches for `nothing-like-this`

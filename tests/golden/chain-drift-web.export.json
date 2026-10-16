@@ -35,7 +35,7 @@
     },
     {
       "path": "src/declared.ts",
-      "hash": "df708a27b11000d90a6b8d17064b5d474d79b6f7cdbe1f62a8c3e2b5980cbe49"
+      "hash": "ddc817915f24780b310a45de8d4e45533c5b6bf5df00c44bfef34264b7848995"
     },
     {
       "path": "src/drift.ts",
@@ -44,6 +44,10 @@
     {
       "path": "src/labels.ts",
       "hash": "7845adace481ad3a72feb4318a9bb126f2cc5fa6730a3214634f8fd515a8033f"
+    },
+    {
+      "path": "src/open.ts",
+      "hash": "f7358354d72fa7b80dd72033645e839b912044d8edd959c0874b20d3d9f3c4b4"
     },
     {
       "path": "src/orders.ts",
@@ -63,7 +67,7 @@
     },
     {
       "path": "src/stock.ts",
-      "hash": "e0f5c4a0540a7652359df7a2da8e935ea4009829ed1503f6336eb17553982005"
+      "hash": "5c60038ed1fdb24094c23954e6849ec2bb8c8fb79783279e380f514cf6315cbe"
     }
   ],
   "symbols": [
@@ -244,6 +248,14 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::plain",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2795,
+        "end": 2941
+      }
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::ranked",
       "span": {
         "path": "src/declared.ts",
@@ -369,6 +381,22 @@
         "path": "src/labels.ts",
         "start": 164,
         "end": 347
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping",
+      "span": {
+        "path": "src/open.ts",
+        "start": 492,
+        "end": 623
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate",
+      "span": {
+        "path": "src/open.ts",
+        "start": 181,
+        "end": 334
       }
     },
     {
@@ -580,11 +608,27 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::price",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2024,
+        "end": 2196
+      }
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::restock",
       "span": {
         "path": "src/stock.ts",
         "start": 1109,
         "end": 1246
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2205,
+        "end": 2354
       }
     },
     {
@@ -1266,6 +1310,28 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::plain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2840,
+        "end": 2872
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::plain::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::plain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2895,
+        "end": 2905
+      }
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
       "caller": "example.com/chain/web::src/declared.ts::ranked",
       "target": null,
@@ -1615,6 +1681,50 @@
         "path": "src/labels.ts",
         "start": 263,
         "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "caller": "example.com/chain/web::src/open.ts::ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 536,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping::res.json#0",
+      "caller": "example.com/chain/web::src/open.ts::ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 577,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate::fetch#0",
+      "caller": "example.com/chain/web::src/open.ts::rate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 247,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate::res.json#0",
+      "caller": "example.com/chain/web::src/open.ts::rate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 286,
+        "end": 296
       }
     },
     {
@@ -2058,6 +2168,28 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2080,
+        "end": 2126
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::price::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2149,
+        "end": 2159
+      }
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::restock::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::restock",
       "target": null,
@@ -2077,6 +2209,28 @@
         "path": "src/stock.ts",
         "start": 1223,
         "end": 1233
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::reviews",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2252,
+        "end": 2283
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::reviews",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2306,
+        "end": 2316
       }
     },
     {
@@ -2363,6 +2517,21 @@
     },
     {
       "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].nickname"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
       "site": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
       "via": "env:CATALOG_URL",
       "shape": {
@@ -2583,6 +2752,34 @@
           "labels.title",
           "ok",
           "status"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/ping",
+      "site": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "via": null,
+      "shape": {
+        "source": {
+          "reads": "src/open.ts"
+        },
+        "fields": [
+          "ok",
+          "uptime"
+        ]
+      }
+    },
+    {
+      "contract": null,
+      "site": "example.com/chain/web::src/open.ts::rate::fetch#0",
+      "via": null,
+      "shape": {
+        "source": {
+          "reads": "src/open.ts"
+        },
+        "fields": [
+          "stars",
+          "votes"
         ]
       }
     },
@@ -2878,6 +3075,20 @@
       }
     },
     {
+      "contract": "http::GET::/api/inventory/{}/price",
+      "site": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "amount",
+          "tax"
+        ]
+      }
+    },
+    {
       "contract": "http::POST::/api/stock",
       "site": "example.com/chain/web::src/stock.ts::restock::fetch#0",
       "via": "env:CATALOG_URL",
@@ -2887,6 +3098,20 @@
         },
         "fields": [
           "whatever"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/reviews",
+      "site": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "stars",
+          "votes"
         ]
       }
     },
@@ -3091,6 +3316,18 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].nickname": "inferred"
+        }
+      }
+    },
+    {
       "consumer": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
       "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
       "contract": "http::GET::/api/profiles",
@@ -3238,6 +3475,20 @@
           "labels.title": "labels"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
     },
     {
       "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
@@ -3490,6 +3741,18 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "contract": "http::GET::/api/inventory/{}/price",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "tax": "inferred"
+        }
+      }
+    },
+    {
       "consumer": "example.com/chain/web::src/stock.ts::restock::fetch#0",
       "provider": "example.com/chain/catalog::app/api/stock/route.ts::POST",
       "contract": "http::POST::/api/stock",
@@ -3498,6 +3761,18 @@
       "drift": {
         "unchecked": {
           "whatever": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "contract": "http::GET::/api/reviews",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "votes": "inferred"
         }
       }
     },

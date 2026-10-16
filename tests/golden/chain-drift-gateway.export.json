@@ -19,7 +19,7 @@
     },
     {
       "path": "src/inventory.ts",
-      "hash": "86c93c965f58cfe7d86664b17ff8bb9f6f4619f72d2cc06212f68ce902d93963"
+      "hash": "3247ddeb6564124c706c0b2e075498ca13f94d3ebef0bd84ae2e695e7a67d998"
     },
     {
       "path": "src/kafka.ts",
@@ -28,6 +28,10 @@
     {
       "path": "src/orders.ts",
       "hash": "cc219d2699a0df0993157f43a7296a4e647d8d067d38a8f5b5ec597878c2bf7b"
+    },
+    {
+      "path": "src/ping.ts",
+      "hash": "98eac4a61775a60302f5523ba3c2c65054b520010385538a0d93d1fc1c8a575a"
     },
     {
       "path": "src/routes.ts",
@@ -80,6 +84,14 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1121,
+        "end": 1379
+      }
+    },
+    {
       "id": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
       "span": {
         "path": "src/inventory.ts",
@@ -109,6 +121,14 @@
         "path": "src/orders.ts",
         "start": 95,
         "end": 265
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "span": {
+        "path": "src/ping.ts",
+        "start": 146,
+        "end": 200
       }
     },
     {
@@ -245,6 +265,61 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::(call_expression).end#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1254,
+        "end": 1281
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::next#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1363,
+        "end": 1372
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::res.json#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1299,
+        "end": 1339
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::res.sendStatus#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1194,
+        "end": 1213
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::res.status#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1254,
+        "end": 1275
+      }
+    },
+    {
       "id": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory::res.send#0",
       "caller": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
       "target": null,
@@ -275,6 +350,17 @@
         "path": "src/inventory.ts",
         "start": 754,
         "end": 901
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::api.get#2",
+      "caller": "example.com/chain/gateway::src/inventory.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1088,
+        "end": 1380
       }
     },
     {
@@ -385,6 +471,28 @@
         "path": "src/orders.ts",
         "start": 229,
         "end": 262
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/ping.ts::GET /api/ping::res.json#0",
+      "caller": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/ping.ts",
+        "start": 175,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/ping.ts::api.get#0",
+      "caller": "example.com/chain/gateway::src/ping.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/ping.ts",
+        "start": 129,
+        "end": 201
       }
     },
     {
@@ -639,6 +747,23 @@
       }
     },
     {
+      "contract": "http::GET::/api/inventory/{}/price",
+      "site": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "shape": {
+        "source": {
+          "literals": "src/inventory.ts"
+        },
+        "fields": [
+          "amount",
+          "currency"
+        ],
+        "scalars": [
+          "amount",
+          "currency"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/gateway::src/orders.ts::listOrders",
       "shape": {
@@ -655,6 +780,21 @@
         ],
         "scalars": [
           "[].id"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/ping",
+      "site": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "shape": {
+        "source": {
+          "literals": "src/ping.ts"
+        },
+        "fields": [
+          "ok"
+        ],
+        "scalars": [
+          "ok"
         ]
       }
     },
@@ -906,6 +1046,13 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    },
+    {
       "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
       "provider": "example.com/chain/gateway::src/checkout.ts::createOrder",
       "contract": "http::PUT::/api/orders/{}",
@@ -1012,6 +1159,18 @@
         },
         "unchecked": {
           "sku.length": "sku"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "contract": "http::GET::/api/inventory/{}/price",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "tax": "inferred"
         }
       }
     },

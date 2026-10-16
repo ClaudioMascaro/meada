@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{assert_golden, drift_chain};
+use common::{assert_golden, decisions, drift_chain};
 use meada::engine::{self, Direction, Engine, Start};
 
 #[test]
@@ -54,6 +54,8 @@ fn trace_ends_the_links_of_consumers_reading_past_a_literal_shape() {
         "GET /api/stock/{}",
         "GET /api/cached",
         "GET /api/inventory/{}/image",
+        "GET /api/inventory/{}/price",
+        "GET /api/reviews",
     ] {
         let start = Start::From(route);
         answers.push(engine.trace(start, Direction::Up, None).unwrap());
@@ -89,7 +91,7 @@ fn search_drift_lists_each_missing_path_with_its_consumer_and_level() {
 
     // The query matches the route path or the field path.
     let mut answers = Vec::new();
-    for query in ["/api/stock", "total", "nothing-like-this"] {
+    for query in ["/api/stock", "total", "nickname", "nothing-like-this"] {
         answers.push(engine.search(query, Some("drift"), None).unwrap());
     }
 
@@ -178,6 +180,34 @@ fn trace_ends_the_links_of_consumers_of_shapes_shared_through_a_package() {
     }
 
     assert_golden("chain-drift.trace-shared.txt", &answers.join("\n"));
+}
+
+#[test]
+fn a_decided_link_has_drift_and_an_ambiguous_one_none() {
+    let (web, _, _) = drift_chain("drift_decided_trace");
+    decisions(&web, "chain-drift-web");
+    let engine = Engine::open(&web).unwrap();
+
+    // `rate` reaches `GET /api/reviews` through a decision; `ping` fits two `GET /api/ping`.
+    let mut answers = Vec::new();
+    for route in ["GET /api/reviews", "GET /api/ping"] {
+        let start = Start::From(route);
+        answers.push(engine.trace(start, Direction::Up, None).unwrap());
+    }
+
+    assert_golden("chain-drift.trace-decided.txt", &answers.join("\n"));
+}
+
+#[test]
+fn trace_down_from_a_consumer_ends_its_link_line_with_the_missing_paths() {
+    let (web, _, _) = drift_chain("drift_trace_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("src/stock.ts::price"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("chain-drift.trace-down.txt", &answer);
 }
 
 /// The gateway's `listOrders` sends a body parsed with a zod schema.

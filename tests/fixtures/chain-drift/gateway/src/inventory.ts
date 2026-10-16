@@ -25,3 +25,19 @@ api.get("/inventory/:sku/image", (req: any, res: any) => {
   }
   res.json({ url: "u" });
 });
+
+// Error answers in other forms: `sendStatus`, a literal status chained to `end` and `next(err)`
+// are left out of the shape like any literal status outside 2xx, so `tax` is missing.
+api.get("/inventory/:sku/price", (req: any, res: any, next: any) => {
+  if (!req.params.sku) {
+    return res.sendStatus(400);
+  }
+  if (req.query.gone) {
+    return res.status(NOT_FOUND).end();
+  }
+  try {
+    res.json({ amount: 1, currency: "BRL" });
+  } catch (err) {
+    next(err);
+  }
+});

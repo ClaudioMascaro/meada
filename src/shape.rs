@@ -2,7 +2,7 @@
 //! in one form whatever it was read from, so shape drift (spec #23) compares shapes without
 //! caring about their source.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 
@@ -10,8 +10,9 @@ use crate::contract::Level;
 
 /// The field paths a payload carries. A path is dotted, with array elements written `[]`
 /// (`items[].id`); a payload that is itself an array starts with `[]` (`[].id`). Every node
-/// below the root is a field, so `items` and `items[]` are listed with `items[].id`. Presence
-/// only: no type, format or requiredness is recorded.
+/// below the root is a field, so `items` and `items[]` are listed with `items[].id`. What is
+/// recorded is presence, the scalar leaves and a consumer's optional fields; types are never
+/// compared, and no format is kept.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Shape {
     pub source: Source,
@@ -60,19 +61,31 @@ impl Shape {
         }
     }
 
+    /// Lists `path`: read or required (`optional` false), or marked optional by the type that
+    /// gives it, and `declared` when that type counts as declared. The one place a field joins
+    /// `optional` or `declared`, so both stay within `fields`, and a path is optional only while
+    /// everything listing it says so: a read or a type requiring it makes it certain, in any
+    /// order.
+    pub fn list(&mut self, path: String, optional: bool, declared: bool) {
+        let optional = optional && (!self.fields.contains(&path) || self.optional.contains(&path));
+        match optional {
+            true => self.optional.insert(path.clone()),
+            false => self.optional.remove(&path),
+        };
+        if declared {
+            self.declared.insert(path.clone());
+        }
+        self.fields.insert(path);
+    }
+
     /// Adds the paths of `other`, read from the same side, to this shape.
     pub fn merge(&mut self, other: &Shape) {
         self.open.extend(other.open.iter().cloned());
         self.scalars.extend(other.scalars.iter().cloned());
-        self.declared.extend(other.declared.iter().cloned());
-        // A path either side requires (lists, and does not mark optional) is certain.
-        let requires = |s: &Shape, p: &String| s.fields.contains(p) && !s.optional.contains(p);
-        let optional: BTreeSet<String> = (self.optional.iter().chain(&other.optional))
-            .filter(|p| !requires(self, p) && !requires(other, p))
-            .cloned()
-            .collect();
-        self.optional = optional;
-        self.fields.extend(other.fields.iter().cloned());
+        for p in &other.fields {
+            let (optional, declared) = (other.optional.contains(p), other.declared.contains(p));
+            self.list(p.clone(), optional, declared);
+        }
         self.imports.extend(other.imports.iter().cloned());
         self.guessed.extend(other.guessed.iter().cloned());
     }
@@ -118,17 +131,7 @@ impl Shape {
             return;
         };
         for p in &s.declared {
-            let q = under(at, p);
-            let optional =
-                s.optional.contains(p) && (!self.fields.contains(&q) || self.optional.contains(&q));
-            match optional {
-                true => self.optional.insert(q.clone()),
-                false => self.optional.remove(&q),
-            };
-            if level == Level::Exact {
-                self.declared.insert(q.clone());
-            }
-            self.fields.insert(q);
+            self.list(under(at, p), s.optional.contains(p), level == Level::Exact);
         }
     }
 }
@@ -278,6 +281,31 @@ fn filled<'s, R: Copy>(
         out.graft(import, stored.as_ref().map(|(s, level)| (s, *level)));
     }
     out
+}
+
+/// What one extraction has spent, by file, of a shape reader's per-file budget `LIMIT`
+/// (`ZOD_BUDGET`, `TYPES_BUDGET`, `LITERALS_BUDGET`). An extraction holds one reader of each
+/// source (`Literals` holds its `Types`, which hold their `Zod`), so each budget is spent at
+/// most once per file.
+#[derive(Default)]
+pub struct Budget<const LIMIT: usize>(HashMap<String, usize>);
+
+impl<const LIMIT: usize> Budget<LIMIT> {
+    /// What the file `path` has spent, to charge.
+    pub fn of(&mut self, path: &str) -> Spent<'_, LIMIT> {
+        Spent(self.0.entry(path.to_string()).or_default())
+    }
+}
+
+/// What one file has spent of a `Budget`.
+pub struct Spent<'c, const LIMIT: usize>(&'c mut usize);
+
+impl<const LIMIT: usize> Spent<'_, LIMIT> {
+    /// Charges one unit; `None` once the file's budget is spent.
+    pub fn charge(&mut self) -> Option<()> {
+        *self.0 += 1;
+        (*self.0 <= LIMIT).then_some(())
+    }
 }
 
 /// The path `path`, written from the root of a part found at `prefix`: `items` below `a` is

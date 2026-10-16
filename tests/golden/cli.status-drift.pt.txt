@@ -1,6 +1,6 @@
-example.com/chain/web (.) indexado, 16 arquivos
-  drift de formato, leituras ausentes: 36
-example.com/chain/gateway (../chain-gateway) indexado, 11 arquivos
+example.com/chain/web (.) indexado, 17 arquivos
+  drift de formato, leituras ausentes: 39
+example.com/chain/gateway (../chain-gateway) indexado, 12 arquivos
   broken.openapi.yaml:7: documento ilegível (while parsing a flow sequence, expected ',' or ']'), ignorado
   docs/api-contract.yaml: openapi 3.0.3, rotas: 1
   generated/openapi.yaml: openapi 3.1.0, rotas: 1
@@ -9,5 +9,5 @@ example.com/chain/gateway (../chain-gateway) indexado, 11 arquivos
   orders.openapi.json: openapi 3.0.3, rotas: 1
   GET /api/shipments/{} em orders.openapi.json também está em openapi.yaml: uma rota só
   docs/missing.yaml: listado em `serve.documents`, não encontrado
-example.com/chain/catalog (../chain-catalog) indexado, 23 arquivos
+example.com/chain/catalog (../chain-catalog) indexado, 25 arquivos
 example.com/chain/worker (../chain-worker) indexado, 3 arquivos
