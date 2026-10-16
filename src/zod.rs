@@ -3,12 +3,12 @@
 //! literals. `z.object` gives fields, `z.array` elements, the primitives scalars, and anything
 //! whose output Meada cannot read (`.transform`, `z.lazy`, `.passthrough()`, `z.any`) is open.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::BTreeMap;
 
 use crate::lang::{Invocation, Ty, Value};
 use crate::literals::Responses;
-use crate::resolve::Code;
-use crate::shape::{Import, Shape, Source, Want};
+use crate::resolve::{Code, scope_of};
+use crate::shape::{Budget, Import, Shape, Source, Spent, Want};
 
 /// What reading the schemas of one file's handlers may cost: every expression of a schema
 /// examined, over all the handlers of the file. Past it, the file's remaining handlers give no
@@ -212,7 +212,7 @@ impl Node {
 /// Reads handlers' schemas, keeping the budget of each file.
 #[derive(Default)]
 pub struct Zod {
-    spent: HashMap<String, usize>,
+    spent: Budget<ZOD_BUDGET>,
 }
 
 impl Zod {
@@ -227,10 +227,10 @@ impl Zod {
     ) -> Option<Shape> {
         let path = responses.path;
         let def = code.files()[path].defs.iter().find(|d| d.name == name)?;
-        let scope = def.name.rsplit_once('.').map_or("", |(s, _)| s);
+        let scope = scope_of(&def.name);
         let mut reader = Reader {
             code,
-            spent: self.spent.entry(path.to_string()).or_default(),
+            spent: self.spent.of(path),
         };
         let mut node = match code.returns(path, name) {
             Some(Ty::Schema(schema)) => reader.named(path, scope, schema, 0)?,
@@ -238,8 +238,8 @@ impl Zod {
         };
         if node.is_none() && !responses.bodies.is_empty() {
             let mut all: Option<Node> = None;
-            for &(scope, body) in &responses.bodies {
-                let found = reader.body(path, scope, body, 0)??;
+            for body in &responses.bodies {
+                let found = reader.body(path, body.scope, body.value, 0)??;
                 match &mut all {
                     Some(all) => all.union(found),
                     None => all = Some(found),
@@ -270,7 +270,7 @@ impl Zod {
     ) -> Option<(BTreeMap<String, bool>, Vec<Import>)> {
         let mut reader = Reader {
             code,
-            spent: self.spent.entry(path.to_string()).or_default(),
+            spent: self.spent.of(path),
         };
         let (mut out, mut imports) = (BTreeMap::new(), Vec::new());
         reader
@@ -291,24 +291,20 @@ impl Zod {
     ) -> Option<(Shape, Shape)> {
         let mut reader = Reader {
             code,
-            spent: self.spent.entry(path.to_string()).or_default(),
+            spent: self.spent.of(path),
         };
         let node = reader.named(path, "", name, 0)??;
         let mut sent = Shape::new(Source::Zod(path.to_string()));
         node.render("", &mut sent);
         let (mut out, mut imports) = (BTreeMap::new(), Vec::new());
         node.declared("", &mut out, &mut imports);
-        let declared: BTreeSet<String> = out.keys().cloned().collect();
-        let typed = Shape {
-            fields: declared.clone(),
-            declared,
-            optional: (out.iter())
-                .filter(|&(_, &o)| o)
-                .map(|(p, _)| p.clone())
-                .collect(),
+        let mut typed = Shape {
             imports: imports.into_iter().collect(),
             ..Shape::new(Source::Zod(path.to_string()))
         };
+        for (field, optional) in out {
+            typed.list(field, optional, true);
+        }
         Some((sent, typed))
     }
 }
@@ -319,16 +315,10 @@ type Read = Option<Option<Node>>;
 
 struct Reader<'c, 'a> {
     code: &'c Code<'a>,
-    spent: &'c mut usize,
+    spent: Spent<'c, ZOD_BUDGET>,
 }
 
 impl<'a> Reader<'_, 'a> {
-    /// Charges one unit of the file's budget; `None` once it is spent.
-    fn charge(&mut self) -> Option<()> {
-        *self.spent += 1;
-        (*self.spent <= ZOD_BUDGET).then_some(())
-    }
-
     /// The constant `name` refers to: its file, the scope it is written in and its value.
     fn constant(
         &self,
@@ -337,13 +327,13 @@ impl<'a> Reader<'_, 'a> {
         name: &'a str,
     ) -> Option<(&'a str, &'a str, &'a Value)> {
         let ((at, constant), held) = self.code.constant(path, scope, name)?;
-        Some((at, constant.rsplit_once('.').map_or("", |(s, _)| s), held))
+        Some((at, scope_of(constant), held))
     }
 
     /// The schema a response body is the output of: `S.parse(..)`, the `data` of
     /// `S.safeParse(..)`, a value typed `z.infer<typeof S>`, or a constant holding one.
     fn body(&mut self, path: &'a str, scope: &'a str, value: &'a Value, depth: usize) -> Read {
-        self.charge()?;
+        self.spent.charge()?;
         if depth >= ZOD_DEPTH {
             return Some(None);
         }
@@ -388,7 +378,7 @@ impl<'a> Reader<'_, 'a> {
 
     /// The output of the schema `value` stands for.
     fn schema(&mut self, path: &'a str, scope: &'a str, value: &'a Value, depth: usize) -> Read {
-        self.charge()?;
+        self.spent.charge()?;
         if depth >= ZOD_DEPTH {
             return Some(Some(Node::open()));
         }
@@ -576,7 +566,7 @@ impl<'a> Reader<'_, 'a> {
             "pick" | "omit" => match args.first() {
                 Some(Value::Object(keys)) if keys.iter().all(|(k, _)| k != "...") => {
                     for _ in keys {
-                        self.charge()?;
+                        self.spent.charge()?;
                     }
                     let named = |k: &String| keys.iter().any(|(key, _)| key == k);
                     on.fields.retain(|k, _| named(k) == (name == "pick"));

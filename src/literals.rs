@@ -7,8 +7,8 @@ use std::collections::HashMap;
 
 use crate::declared::Types;
 use crate::lang::{Call, Part, Step, Ty, Value, property};
-use crate::resolve::{Code, Target};
-use crate::shape::{Import, Shape, Source, Want, under};
+use crate::resolve::{Code, Target, scope_of};
+use crate::shape::{Budget, Import, Shape, Source, Spent, Want, under};
 
 /// What reading the literals of one file's handlers may cost: every call examined and every
 /// value read or constant followed, over all the handlers of the file. Past it, the file's
@@ -33,25 +33,34 @@ pub enum Handler {
     Next,
 }
 
-/// Reads handlers, keeping the budget of each file.
+/// Reads handlers, keeping the budget of each file, with the `Types` that read the types of
+/// their values: an extraction reaches types and zod schemas through this one, so each per-file
+/// budget is spent once.
 #[derive(Default)]
 pub struct Literals {
-    spent: HashMap<String, usize>,
+    spent: Budget<LITERALS_BUDGET>,
     types: Types,
 }
 
 /// The 2xx responses a handler sends.
 pub struct Responses<'a> {
     pub path: &'a str,
-    /// The body of each response Meada recognizes, with the scope it is written in.
-    pub bodies: Vec<(&'a str, &'a Value)>,
-    /// The type each body is cast to (`body as Reply`), by position in `bodies`.
-    pub casts: Vec<Option<&'a Ty>>,
+    /// The body of each response Meada recognizes.
+    pub bodies: Vec<Body<'a>>,
     /// The declared return type of the handler, with the scope it is written in.
     pub returns: Option<(&'a str, &'a Ty)>,
     /// Whether the handler may answer another way: a call whose result it returns, `res` handed
     /// to another function, `next()`. Any shape read from the bodies alone is then incomplete.
     pub other: bool,
+}
+
+/// The body a response sends.
+pub struct Body<'a> {
+    /// The scope the body is written in.
+    pub scope: &'a str,
+    pub value: &'a Value,
+    /// The type the body is cast to (`body as Reply`).
+    pub cast: Option<&'a Ty>,
 }
 
 /// What a call of a handler does with the response.
@@ -65,6 +74,21 @@ enum Sends {
 }
 
 impl Literals {
+    /// The types reader these handlers share.
+    pub fn types(&mut self) -> &mut Types {
+        &mut self.types
+    }
+
+    fn reader<'c, 'a>(&'c mut self, code: &'c Code<'a>, path: &str) -> Reader<'c, 'a> {
+        Reader {
+            code,
+            spent: self.spent.of(path),
+            types: &mut self.types,
+            seen: Vec::new(),
+            shape: Shape::new(Source::Literals(path.to_string())),
+        }
+    }
+
     /// The 2xx responses the handler `name` of `path` sends: the bodies of the sends Meada
     /// recognizes, a literal status outside 2xx leaving the response out (one whose status
     /// cannot be read counts). `None` when the handler is not there or the file's budget is
@@ -87,19 +111,13 @@ impl Literals {
         let from = facts
             .calls
             .partition_point(|c| c.range.start < def.range.start);
-        let mut reader = Reader {
-            code,
-            spent: self.spent.entry(path.to_string()).or_default(),
-            types: &mut self.types,
-            seen: Vec::new(),
-            shape: Shape::new(Source::Literals(path.to_string())),
-        };
+        let mut reader = self.reader(code, path);
         let mut body = Vec::new();
         for (i, call) in facts.calls.iter().enumerate().skip(from) {
             if call.range.start >= def.range.end {
                 break;
             }
-            reader.charge()?;
+            reader.spent.charge()?;
             if call.scope == name || call.scope.starts_with(&nested) {
                 body.push(i);
             }
@@ -114,9 +132,7 @@ impl Literals {
         let mut responses = Responses {
             path,
             bodies: Vec::new(),
-            casts: Vec::new(),
-            returns: (code.returns(path, name))
-                .map(|ty| (def.name.rsplit_once('.').map_or("", |(s, _)| s), ty)),
+            returns: (code.returns(path, name)).map(|ty| (scope_of(&def.name), ty)),
             other: false,
         };
         for &i in &body {
@@ -130,8 +146,11 @@ impl Literals {
                 Sends::Other => responses.other = true,
                 Sends::Body => {
                     if let Some(arg) = code.args(path, i)?.first() {
-                        responses.bodies.push((&call.scope, arg));
-                        responses.casts.push(code.arg_type(path, i, 0));
+                        responses.bodies.push(Body {
+                            scope: &call.scope,
+                            value: arg,
+                            cast: code.arg_type(path, i, 0),
+                        });
                     }
                 }
             }
@@ -147,15 +166,9 @@ impl Literals {
             return None;
         }
         let path = responses.path;
-        let mut reader = Reader {
-            code,
-            spent: self.spent.entry(path.to_string()).or_default(),
-            types: &mut self.types,
-            seen: Vec::new(),
-            shape: Shape::new(Source::Literals(path.to_string())),
-        };
-        for (&(scope, body), &cast) in responses.bodies.iter().zip(&responses.casts) {
-            reader.read(path, scope, body, "", 0)?;
+        let mut reader = self.reader(code, path);
+        for &Body { scope, value, cast } in &responses.bodies {
+            reader.read(path, scope, value, "", 0)?;
             if let Some(ty) = cast {
                 reader.typed(path, scope, ty, "");
             }
@@ -177,13 +190,7 @@ impl Literals {
         if !matches!(held, Value::Object(_) | Value::List(_)) {
             return None;
         }
-        let mut reader = Reader {
-            code,
-            spent: self.spent.entry(path.to_string()).or_default(),
-            types: &mut self.types,
-            seen: Vec::new(),
-            shape: Shape::new(Source::Literals(path.to_string())),
-        };
+        let mut reader = self.reader(code, path);
         reader.read(path, "", held, "", 1)?;
         if let Some(ty) = code.constant_type(path, name) {
             reader.typed(path, "", ty, "");
@@ -195,7 +202,7 @@ impl Literals {
 /// Reads one handler's values into a shape.
 struct Reader<'c, 'a> {
     code: &'c Code<'a>,
-    spent: &'c mut usize,
+    spent: Spent<'c, LITERALS_BUDGET>,
     types: &'c mut Types,
     /// The types of the constants `resolve` followed, with the file of each.
     seen: Vec<(&'a str, &'a Ty)>,
@@ -203,12 +210,6 @@ struct Reader<'c, 'a> {
 }
 
 impl<'a> Reader<'_, 'a> {
-    /// Charges one unit of the file's budget; `None` once it is spent.
-    fn charge(&mut self) -> Option<()> {
-        *self.spent += 1;
-        (*self.spent <= LITERALS_BUDGET).then_some(())
-    }
-
     /// `value`, written in `path` within `scope`, with the constants it names followed: the
     /// value that stands for it, where that is written, and the depth reached. A name that is
     /// no constant (a parameter, a definition) or past the depth limit is `Unknown`.
@@ -221,7 +222,7 @@ impl<'a> Reader<'_, 'a> {
     ) -> Option<(&'a str, &'a str, &'a Value, usize)> {
         static UNKNOWN: Value = Value::Unknown;
         while let Value::Ref(name) = value {
-            self.charge()?;
+            self.spent.charge()?;
             depth += 1;
             // Nothing records a later write to a function-local constant's object
             // (`body.next = cursor`), so only a module-level one is followed.
@@ -291,7 +292,7 @@ impl<'a> Reader<'_, 'a> {
         at: &str,
         depth: usize,
     ) -> Option<()> {
-        self.charge()?;
+        self.spent.charge()?;
         let mark = self.seen.len();
         let (path, scope, value, depth) = self.resolve(path, scope, value, depth)?;
         for (file, ty) in self.seen.split_off(mark) {
@@ -479,7 +480,7 @@ fn express<'a>(
     // `res`, the last `status` call sets the status.
     let mut chain = Vec::new();
     for &j in &by_start[&call.range.start] {
-        reader.charge()?;
+        reader.spent.charge()?;
         if calls[j].range.end < call.range.end {
             chain.push(j);
         }

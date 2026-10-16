@@ -25,6 +25,12 @@ pub enum Resolution<'a> {
     Unresolved,
 }
 
+/// The scope a qualified name is written in: `outer` for `outer.inner`, the empty top-level
+/// scope for a top-level name.
+pub fn scope_of(name: &str) -> &str {
+    name.rsplit_once('.').map_or("", |(scope, _)| scope)
+}
+
 /// What a name or a member chain refers to.
 enum Binding<'a> {
     Def(Target<'a>),
@@ -38,6 +44,9 @@ enum Binding<'a> {
     /// Something an import brings from outside the repository: the specifier imported from
     /// and what it names there.
     External(&'a str, &'a Imported),
+    /// A `let`, a `catch` binding, a destructured name: it hides every name it spells, and what
+    /// it holds is not known.
+    Hidden,
     /// Neither scope nor import resolution knows it.
     Unknown,
 }
@@ -151,9 +160,11 @@ impl<'a> Resolver<'a> {
         match binding {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::External(..) => Resolution::Unresolved,
-            Binding::Module(_) | Binding::Const(..) | Binding::Param(..) | Binding::Unknown => {
-                self.infer(&call.callee)
-            }
+            Binding::Module(_)
+            | Binding::Const(..)
+            | Binding::Param(..)
+            | Binding::Hidden
+            | Binding::Unknown => self.infer(&call.callee),
         }
     }
 
@@ -193,7 +204,7 @@ impl<'a> Resolver<'a> {
             {
                 return Binding::Def(Target { path, name });
             }
-            scope = scope.rsplit_once('.').map_or("", |(parent, _)| parent);
+            scope = scope_of(scope);
         }
         Binding::Unknown
     }
@@ -220,7 +231,7 @@ impl<'a> Resolver<'a> {
             // it hides every name it spells, outer ones and those of its own definition (a
             // definition, constant or parameter it may shadow in a block alike).
             if self.locals[path].contains(candidate.as_str()) {
-                return Binding::Unknown;
+                return Binding::Hidden;
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
@@ -245,7 +256,7 @@ impl<'a> Resolver<'a> {
                 };
                 return Binding::Param(function, n, field);
             }
-            scope = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+            scope = (!s.is_empty()).then(|| scope_of(s));
         }
         match self.files[path].imports.iter().find(|i| i.local == name) {
             Some(import) => self.import(path, &import.source, &import.name, seen),
@@ -374,10 +385,15 @@ pub struct Frame<'a> {
     pub index: usize,
 }
 
-/// What `Code::expand_frames` finds at one site: the site's file and call position, the
-/// wrapper calls climbed to reach it (innermost first; the last is the site), and what the
-/// reader made of the arguments there.
-pub type Expanded<'a, R> = (&'a str, usize, Vec<Frame<'a>>, R);
+/// What `Code::expand_frames` finds at one site.
+pub struct Expanded<'a, R> {
+    /// The site's file and call position.
+    pub site: (&'a str, usize),
+    /// The wrapper calls climbed to reach the site, innermost first; the last is the site.
+    pub frames: Vec<Frame<'a>>,
+    /// What the reader made of the arguments there.
+    pub found: R,
+}
 
 /// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
 struct Written<'a> {
@@ -645,7 +661,7 @@ impl<'a> Code<'a> {
             .iter()
             .find(|c| c.name == constant && !matches!(c.value, Value::Type(_)))?
             .value;
-        Some((value, constant.rsplit_once('.').map_or("", |(s, _)| s)))
+        Some((value, scope_of(constant)))
     }
 
     /// The `interface` or `type` declaration `name` refers to from `scope` in `path` (spec #23),
@@ -714,17 +730,6 @@ impl<'a> Code<'a> {
     /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a
     /// global such as `Response`. A local binding of the name hides the global.
     pub fn is_global(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
-        let mut at = Some(scope);
-        while let Some(s) = at {
-            let candidate = match s.is_empty() {
-                true => name.to_string(),
-                false => format!("{s}.{name}"),
-            };
-            if self.resolver.locals[path].contains(candidate.as_str()) {
-                return false;
-            }
-            at = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
-        }
         matches!(
             self.resolver.lexical(path, scope, name, &mut Seen::new()),
             Binding::Unknown
@@ -754,7 +759,7 @@ impl<'a> Code<'a> {
         read: &dyn Fn(&[Value]) -> Option<R>,
     ) -> Vec<(&'a str, usize, R)> {
         (self.expand_frames(path, index, read).into_iter())
-            .map(|(site, at, _, found)| (site, at, found))
+            .map(|e| (e.site.0, e.site.1, e.found))
             .collect()
     }
 
@@ -802,7 +807,7 @@ impl<'a> Code<'a> {
         };
         self.walk(&written, &mut Vec::new(), read, &mut out);
         (out.into_iter())
-            .map(|(site, at, _, found)| (site, at, found))
+            .map(|e| (e.site.0, e.site.1, e.found))
             .collect()
     }
 
@@ -823,7 +828,11 @@ impl<'a> Code<'a> {
             .collect();
         let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if let Some(found) = read(&values) {
-            out.push((site, at, frames.clone(), found));
+            out.push(Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            });
             return;
         }
         let Some(wrapper) = wants else {
@@ -843,7 +852,11 @@ impl<'a> Code<'a> {
             .collect();
         if callers.is_empty() {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
-            out.extend(read(&values).map(|found| (site, at, frames.clone(), found)));
+            out.extend(read(&values).map(|found| Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            }));
             return;
         }
         for caller in callers {

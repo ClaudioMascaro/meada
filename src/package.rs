@@ -23,14 +23,12 @@ use serde_json::Value;
 
 use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::declared::Types;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::literals::Literals;
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
-use crate::zod::Zod;
 
 pub struct Packages;
 
@@ -780,32 +778,32 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
         let mut consumers = Vec::new();
         let mut imports = Vec::new();
         for call in &export.import_calls {
-            let Some((name, subpath)) = split(&call.specifier) else {
-                continue;
-            };
-            let Some(entry) = nearest(&export.manifests, &call.path)
-                .and_then(|m| m.summary.dependencies.iter().find(|e| e.name == name))
-            else {
+            let (from, chain) = ((n, call.path.as_str()), call.chain.as_str());
+            let symbol = |at: &Provided, id: &str| at.symbol(id);
+            let Some((entry, resolved)) = resolutions(
+                exports,
+                providers,
+                &provided,
+                from,
+                &call.specifier,
+                chain,
+                symbol,
+            ) else {
                 continue;
             };
             let mut hops = Vec::new();
-            for &(m, i) in providers.of(name) {
-                if !reaches(entry.range.as_deref(), m == n) {
-                    continue;
-                }
-                let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
-                let repository = &exports[m].repository;
-                let manifest = &exports[m].manifests[i];
-                let Some(Resolved {
+            for (
+                m,
+                manifest,
+                _,
+                Resolved {
                     how,
                     level,
                     targets,
-                }) = at.resolve(repository, manifest, &subpath, &call.chain, &|id| {
-                    at.symbol(id)
-                })
-                else {
-                    continue;
-                };
+                },
+            ) in resolved
+            {
+                let repository = &exports[m].repository;
                 for target in targets {
                     imports.push(Import {
                         site: call.site.clone(),
@@ -825,7 +823,7 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
             }
             if !hops.is_empty() {
                 consumers.push(Consumer {
-                    contract: Some(contract(name)),
+                    contract: Some(contract(&entry.name)),
                     site: call.site.clone(),
                     via: None,
                     shape: None,
@@ -853,31 +851,26 @@ pub fn shapes(exports: &mut [Export], providers: &Providers) {
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let all: &[Export] = exports;
     let mut find = |n, import: &shape::Import| kept(all, providers, &provided, n, import);
-    // (repository, provider or consumer, position, filled shape)
-    let mut filled = Vec::new();
+    // Each side with imports, filled: (repository, position, shape).
+    let (mut provided_by, mut consumed_by) = (Vec::new(), Vec::new());
     for (n, export) in all.iter().enumerate() {
-        let provided = export
-            .providers
-            .iter()
-            .map(|p| (true, &p.shape))
-            .enumerate();
-        let consumed = export
-            .consumers
-            .iter()
-            .map(|c| (false, &c.shape))
-            .enumerate();
-        for (i, (provider, side)) in provided.chain(consumed) {
-            if let Some(s) = side.as_ref().filter(|s| !s.imports.is_empty()) {
-                filled.push((n, provider, i, shape::fill(s, n, &mut find)));
-            }
+        let mut fill = |side: &Option<Shape>| {
+            let s = side.as_ref().filter(|s| !s.imports.is_empty())?;
+            Some(shape::fill(s, n, &mut find))
+        };
+        for (i, p) in export.providers.iter().enumerate() {
+            provided_by.extend(fill(&p.shape).map(|s| (n, i, s)));
+        }
+        for (i, c) in export.consumers.iter().enumerate() {
+            consumed_by.extend(fill(&c.shape).map(|s| (n, i, s)));
         }
     }
-    for (n, provider, i, s) in filled {
-        match provider {
-            true => exports[n].providers[i].shape = Some(s),
-            // A consumer whose imports added nothing reads nothing, as one that never had any.
-            false => exports[n].consumers[i].shape = (!s.fields.is_empty()).then_some(s),
-        }
+    for (n, i, s) in provided_by {
+        exports[n].providers[i].shape = Some(s);
+    }
+    // A consumer whose imports added nothing reads nothing, as one that never had any.
+    for (n, i, s) in consumed_by {
+        exports[n].consumers[i].shape = (!s.fields.is_empty()).then_some(s);
     }
 }
 
@@ -895,23 +888,20 @@ fn kept<'e>(
     n: usize,
     import: &shape::Import,
 ) -> Option<(usize, &'e Shape, Level)> {
-    let (name, subpath) = split(&import.specifier)?;
-    let manifest = nearest(&exports[n].manifests, &import.from)?;
-    let entry = (manifest.summary.dependencies.iter()).find(|e| e.name == name)?;
     let want = import.want.kept();
+    let from = (n, import.from.as_str());
+    let known = |at: &Provided, id: &str| at.shapes.contains_key(&(id.to_string(), want));
+    let (_, resolved) = resolutions(
+        exports,
+        providers,
+        provided,
+        from,
+        &import.specifier,
+        &import.name,
+        known,
+    )?;
     let mut found: Option<(usize, &Shape, Level)> = None;
-    for &(m, i) in providers.of(name) {
-        if !reaches(entry.range.as_deref(), m == n) {
-            continue;
-        }
-        let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
-        let known = |id: &str| at.shapes.contains_key(&(id.to_string(), want));
-        let repository = &exports[m].repository;
-        let manifest = &exports[m].manifests[i];
-        let Some(resolved) = at.resolve(repository, manifest, &subpath, &import.name, &known)
-        else {
-            continue;
-        };
+    for (m, _, at, resolved) in resolved {
         let [target] = resolved.targets.as_slice() else {
             return None;
         };
@@ -927,6 +917,45 @@ fn kept<'e>(
         };
     }
     found
+}
+
+/// A repository providing a package (its position), its manifest and its `Provided`, and where
+/// a name imported from the package resolves there.
+type Resolution<'e> = (usize, &'e Manifest, &'e Provided<'e>, Resolved);
+
+/// Where the name `chain`, which the file `from.1` of the repository `from.0` imports from
+/// `specifier`, resolves (the rules of a call through an import, `Provided::resolve`): the
+/// dependency entry of the file's nearest manifest naming the package, and each repository
+/// providing it that the entry reaches and where the name resolves there, with that
+/// repository's position, its manifest and its `Provided`. `known` says which ids of a provider
+/// the name may resolve to. `None` when the package is no dependency of the file.
+fn resolutions<'e>(
+    exports: &'e [Export],
+    providers: &Providers,
+    provided: &'e [OnceCell<Provided<'e>>],
+    (n, from): (usize, &str),
+    specifier: &str,
+    chain: &str,
+    known: impl Fn(&Provided<'e>, &str) -> bool,
+) -> Option<(&'e Entry, Vec<Resolution<'e>>)> {
+    let (name, subpath) = split(specifier)?;
+    let manifest = nearest(&exports[n].manifests, from)?;
+    let entry = (manifest.summary.dependencies.iter()).find(|e| e.name == name)?;
+    let mut out = Vec::new();
+    for &(m, i) in providers.of(name) {
+        if !reaches(entry.range.as_deref(), m == n) {
+            continue;
+        }
+        let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
+        let manifest = &exports[m].manifests[i];
+        let known = |id: &str| known(at, id);
+        if let Some(resolved) =
+            at.resolve(&exports[m].repository, manifest, &subpath, chain, &known)
+        {
+            out.push((m, manifest, at, resolved));
+        }
+    }
+    Some((entry, out))
 }
 
 /// The files of a repository an import of one of its packages can reach (issue #175), so the
@@ -984,8 +1013,9 @@ pub fn surface(
 /// of an object or array literal (`Want::Literals`, `literals.rs`). Each source's rules stay in
 /// its own module; a name none of them reads keeps nothing.
 pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
-    let (mut types, mut zod, mut literals) =
-        (Types::default(), Zod::default(), Literals::default());
+    // One reader of each source, the types and zod schemas through `literals`: each budget per
+    // file once.
+    let mut literals = Literals::default();
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
         if !surface.contains(path) {
@@ -999,8 +1029,8 @@ pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
                 continue;
             }
             let mut kept = Vec::new();
-            kept.extend(types.exported(code, path, local).map(|s| (Want::Type, s)));
-            match zod.exported(code, path, local) {
+            kept.extend((literals.types().exported(code, path, local)).map(|s| (Want::Type, s)));
+            match literals.types().zod().exported(code, path, local) {
                 Some((sent, typed)) => kept.extend([(Want::Zod, sent), (Want::Infer, typed)]),
                 None => kept.extend(
                     literals
