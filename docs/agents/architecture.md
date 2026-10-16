@@ -72,7 +72,9 @@ one for the area a change touches.
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
-  declared}`, each of the last three absent when empty) when a document gives its route or channel side one; a consumer has the same
+  declared}`, each of the last three absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
+  no document, when its handler returns object literals (`{"source": {"literals": "<file>"}, ...}`,
+  spec #23); a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
   response has `shape` `{"source": {"reads": "<file>"}, fields}` (spec #23). A link of an HTTP
   route with a shape on both sides and a single provider has `drift` (`{missing, unchecked}`,
@@ -158,8 +160,8 @@ one for the area a change touches.
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
-- New **shape source** (spec #23 tickets after #60): a provider's (zod schemas, then returned
-  literals, in that order after documents) or a consumer's (destructuring, iteration, declared
+- New **shape source** (spec #23 tickets after #60): a provider's (zod schemas, in that order
+  between documents and the returned literals `literals.rs` reads) or a consumer's (destructuring, iteration, declared
   types) is a `shape::Source` variant, never a new shape type, with an arm in `Source::at` and
   `Source::declared`. A source that knows scalar leaves fills `Shape::scalars` (documents do,
   from primitive `type`s); a consumer source that declares paths (a type) fills
@@ -208,7 +210,8 @@ one for the area a change touches.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
-  consumer reads from the parsed response, spec #23), and what a
+  consumer reads from the parsed response, and those of the object literals a route handler
+  returns, spec #23), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the
@@ -347,6 +350,25 @@ one for the area a change touches.
   value passed to a function end it (no marker). A wrapper's caller is read only when the
   wrapper returns one thing (the response, the body or one path below it) from the function
   holding its call; whether the body was awaited is not checked (no marker).
+- `literals.rs`: reading a handler's returned literals charges every call examined and every
+  value read or constant followed, over all the handlers of a file, to `LITERALS_BUDGET` (2^16);
+  past it, the file's remaining handlers give their routes no shape. Nested literals and
+  constant hops count together against `LITERALS_DEPTH` (32): a part deeper is present and open,
+  and a constant chain longer is unknown. Only a body Meada reads (an object or array literal,
+  a constant naming one) gives fields; a call, a `map` over rows, a parameter or a spread of
+  anything but a known object is open (no marker). The handler is the function `res.json` and
+  its kin sit in or in a callback inside it. A response sent another way opens the root of the
+  shape (no marker): in Next.js, a call whose result the handler itself returns and that is no
+  `NextResponse.json` / `Response.json` (`return ok(user)`, `new Response(..)`, `redirect`); in
+  Express, `res` passed to another call, a `res` method other than `json`, `send` and the ones
+  that only set a header or the status (`end`, `render`, `redirect`, `sendFile`, ...), or a call
+  of the handler's `next`. A `res` stored in another name or a status set in a separate
+  statement (`res.status(404);` then `res.json(...)`) is not followed, so such a send counts as
+  2xx (no marker). Only a module-level constant is followed: nothing records a later write to
+  a function-local one (`body.next = cursor`, `Object.assign(body, x)`), so it is unknown and
+  open; a module-level object mutated after its declaration is still read as written. A constant
+  held by another repository (a package import the repository's `Resolver` does not map to one
+  of its files) is unknown, so open.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (an object literal

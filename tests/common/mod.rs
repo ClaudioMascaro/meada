@@ -103,14 +103,20 @@ pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
 /// (`tests/fixtures/chain-drift/`): the web app gains consumers of the gateway's documented
 /// `GET /api/orders` reading a field the document lacks, a present field, a field under its
 /// open part, a field through a client wrapper that returns the parsed body, and a name the
-/// function rebinds. Each overlaid repository gets a third commit. Returns (web, gateway,
-/// catalog).
+/// function rebinds. For the provider shapes the object literals of a handler give, the gateway
+/// gains Express routes returning literals (an imported constant spread, an error branch with
+/// a literal status, a spread of an unknown value) and the catalog Next.js routes doing the
+/// same through `NextResponse.json` and `Response.json`; the web app reaches both through
+/// `GATEWAY_URL` and `CATALOG_URL`. Each overlaid repository gets a third commit. Returns
+/// (web, gateway, catalog).
 pub fn drift_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     let (web, gateway, catalog) = documented_chain(case);
     let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-drift");
-    copy_dir(&overlay.join("web"), &web);
-    git(&web, &["add", "-A"]);
-    git(&web, &["commit", "-q", "-m", "drift"]);
+    for (repo, dir) in [(&web, "web"), (&gateway, "gateway"), (&catalog, "catalog")] {
+        copy_dir(&overlay.join(dir), repo);
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "drift"]);
+    }
     (web, gateway, catalog)
 }
 

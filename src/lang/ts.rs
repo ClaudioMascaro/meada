@@ -657,6 +657,12 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, Value::Function(qualify(scope, &inline(property)))))
                 }
+                // A getter or method of a literal that is no options object: a key whose value
+                // Meada does not read, not a key that is absent.
+                "method_definition" => {
+                    let key = text(property.child_by_field_name("name")?, src).to_string();
+                    Some((key, Value::Unknown))
+                }
                 _ => None,
             });
             Value::Object(properties.collect())
@@ -665,6 +671,8 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         "await_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, scope)),
+        "number" => Value::Scalar(text(node, src).parse().ok()),
+        "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node) => {

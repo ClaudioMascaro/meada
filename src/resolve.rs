@@ -614,6 +614,42 @@ impl<'a> Code<'a> {
         matches!(value, Some(Some(Value::Ref(r))) if r == default)
     }
 
+    /// Whether `name`, written in `path` within `scope`, is the plain parameter at position `n`
+    /// of `function`: no binding of the same spelling in between hides it.
+    pub fn is_param(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        function: Target<'a>,
+        n: usize,
+    ) -> bool {
+        matches!(
+            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            Binding::Param(f, at, None) if f == function && at == n
+        )
+    }
+
+    /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a
+    /// global such as `Response`. A local binding of the name hides the global.
+    pub fn is_global(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
+        let mut at = Some(scope);
+        while let Some(s) = at {
+            let candidate = match s.is_empty() {
+                true => name.to_string(),
+                false => format!("{s}.{name}"),
+            };
+            if self.resolver.locals[path].contains(candidate.as_str()) {
+                return false;
+            }
+            at = (!s.is_empty()).then(|| s.rsplit_once('.').map_or("", |(parent, _)| parent));
+        }
+        matches!(
+            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            Binding::Unknown
+        )
+    }
+
     /// The definition `name` refers to from `scope` in `path`.
     pub fn definition(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Target<'a>> {
         match self.resolver.lexical(path, scope, name, &mut Seen::new()) {

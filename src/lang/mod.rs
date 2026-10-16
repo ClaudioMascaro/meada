@@ -269,6 +269,9 @@ pub enum Value {
     New(String, Vec<Value>),
     /// An array literal's elements.
     List(Vec<Value>),
+    /// A number or a boolean literal (spec #23): a scalar. A number written as a plain integer
+    /// carries it (an HTTP status).
+    Scalar(Option<u32>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),

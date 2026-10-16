@@ -60,6 +60,9 @@ impl Shape {
 pub enum Source {
     /// A provider document, by its repository-relative path.
     Document(String),
+    /// The object literals a route handler returns (spec #23), by the repository-relative path
+    /// of the file holding the handler.
+    Literals(String),
     /// The field reads of a consumer on the parsed response (spec #23), in the file holding
     /// the consumer's call site.
     Reads(String),
@@ -69,7 +72,7 @@ impl Source {
     /// The document, or the place in code, the shape comes from.
     pub fn at(&self) -> &str {
         match self {
-            Source::Document(path) | Source::Reads(path) => path,
+            Source::Document(path) | Source::Literals(path) | Source::Reads(path) => path,
         }
     }
 
@@ -79,7 +82,7 @@ impl Source {
     fn declared(&self) -> bool {
         match self {
             Source::Document(_) => true,
-            Source::Reads(_) => false,
+            Source::Literals(_) | Source::Reads(_) => false,
         }
     }
 }

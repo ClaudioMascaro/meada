@@ -93,9 +93,24 @@ modules updates it.
   reached by several Founds). `schema::read` marks a part scalar when its `type` is only
   `string`, `number`, `integer` or `boolean` (with `null` or not) and no other structure keyword
   is there, and drops the mark where another member gives the part fields or leaves it open. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
+  `Source::Literals(path)` (`{"literals": "src/orders.ts"}`, the object literals a route
+  handler returns, in the file holding the handler; spec #23) and
   `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
-  file of its call site; spec #23) are the sources yet; later spec #23 tickets add the zod and
-  literal provider sources and the declared-type consumer source as variants. `Source::at`
+  file of its call site; spec #23) are the sources yet; later spec #23 tickets add the zod
+  provider source (between a document and literals) and the declared-type consumer source as
+  variants. `literals.rs` (spec #23) reads a handler's returned literals into a `Shape`:
+  `Literals::returned(code, path, handler, Handler::Express | Next)` takes the calls in the
+  handler's byte range (and its inline callbacks), keeps the ones that send a response (Express:
+  `<res>.json|send`, `res` being the handler's second parameter, also after `<res>.status(n)`
+  in a chain; Next: `NextResponse.json` imported from `next/server` and the global
+  `Response.json`, status from the options' `status`), drops a literal status outside 2xx, and
+  unions the bodies. It follows constants one at a time through `Code::constant` (imports
+  included), not through `Code::value`, so `LITERALS_DEPTH` bounds nesting and constant hops
+  alike and `LITERALS_BUDGET` the work of a file; a body it cannot read is open at that path
+  (an empty array and a spread of anything but a known object included), a string with more
+  than one part, a number and a boolean are scalar leaves. `Literals::responses` lists the 2xx
+  bodies (and whether the handler answers another way, which opens the root; see the Known
+  ceilings), `returned` reads them; only module-level constants are followed. `Source::at`
   names it in `context`; `Source::declared` tells a declared source (a document) from one read
   from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the
   one drift comparison: each consumer path is checked from the root one step at a time

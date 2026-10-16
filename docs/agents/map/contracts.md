@@ -14,7 +14,11 @@ modules updates it.
   `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
-  caller reaches), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
+  caller reaches), Next.js app-router and Express providers (each with a `Found::shape` from
+  `http::provider_shape`, the one place that picks a route's code source, over `literals::Literals::
+  returned` (spec #23; it lists the 2xx bodies with `Literals::responses`): one `Literals` per `extract`, holding the budget of
+  each handler file; Express reads a handler once for every prefix it is mounted under),
+  `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). `http::drift(links, exports)` sets `Link::drift` on every
   HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site
   alone for an unresolved one; several of one contract count only when their shapes agree) and

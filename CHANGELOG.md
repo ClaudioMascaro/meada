@@ -50,6 +50,18 @@ tagging.
   `drift: missing <path>`, and `meada export` carries each consumer's shape and each link's
   drift: each missing path with its level, and the reads not checked under an open part of the
   provider's shape.
+- Shape drift (spec #23), provider shapes from returned object literals: a route with no
+  document gets the shape of the object literals its handler returns through
+  `NextResponse.json`, `Response.json`, `res.json` or `res.send`. Properties give fields and
+  array literals `[]` elements; literal strings, numbers and booleans are scalar leaves (a read
+  below one, such as `name.length`, is checked up to it); a spread of a known literal or
+  constant merges its fields and a spread of an unknown value, or a property that is not a
+  literal (a call, `rows.map(...)`), is present with open content, so drift under it is not
+  checked. Several returns give the union of their fields, and a return with a literal status
+  outside 2xx (`{ status: 404 }`, `res.status(404)`) is left out. A response sent another way
+  (`return ok(user)`, `res.redirect(..)`, `res` handed to a function, `next()`) opens the root.
+  Module-level constants are followed through
+  imports. The export names the source `literals`; a document still wins over literals.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

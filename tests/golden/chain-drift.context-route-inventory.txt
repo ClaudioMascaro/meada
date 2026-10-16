@@ -1,0 +1,4 @@
+http::GET::/api/inventory/{}
+  example.com/chain/gateway provider src/inventory.ts:7 getItem
+    example.com/chain/gateway src/inventory.ts response fields: price, price.amount, price.currency, reserved, sku, warehouse
+    example.com/chain/gateway src/inventory.ts response open: sku

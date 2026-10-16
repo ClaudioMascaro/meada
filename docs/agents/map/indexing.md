@@ -62,7 +62,10 @@ modules updates it.
   making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
   `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
   of a `const` of a plain name that nothing else in the function binds; `Return` only from the
-  call's own function), within `USES_BUDGET` per file. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
+  call's own function), within `USES_BUDGET` per file. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal) and
+  `Scalar(Option<u32>)` (a number or boolean literal, spec #23; a plain integer carries its value,
+  a status), and `Code::is_param` and `Code::is_global` tell a name that is the handler's own
+  parameter, or a global such as `Response`, from one a local binding hides;
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>

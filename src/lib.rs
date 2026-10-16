@@ -13,6 +13,7 @@ mod http;
 mod index;
 mod items;
 mod lang;
+mod literals;
 pub mod mcp;
 pub mod msg;
 mod package;
