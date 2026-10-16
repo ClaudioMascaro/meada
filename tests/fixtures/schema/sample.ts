@@ -28,4 +28,11 @@ export function serve(port = 8080, ...[first]: number[]) {
   return app.listen(port, () => path.join("a", "b"));
 }
 
+// Type declarations are stored as constants (spec #23): their names, not their members.
+interface Row {
+  id: string;
+}
+
+type Rows = Row[];
+
 export default Router();

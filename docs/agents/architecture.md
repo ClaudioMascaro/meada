@@ -74,7 +74,7 @@ one for the area a change touches.
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
-  declared}`, each of the last three absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
+  declared, optional}`, each of the last four absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
   no document, when its handler returns a zod schema's value (`{"source": {"zod": "<file>"}, ...}`)
   or object literals (`{"source": {"literals": "<file>"}, ...}`, spec #23); a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
@@ -223,8 +223,10 @@ one for the area a change touches.
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition or file they name). `Call::args`,
-  `Call::uses`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
-  back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
+  `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::type_params`, `Param::default`,
+  `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
+  back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
+  name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
@@ -273,7 +275,14 @@ one for the area a change touches.
   wrapper `src/api/body.ts` (`get(path)`, which returns the parsed body), and one whose name a
   `catch` rebinds (no reads), plus a read below a documented scalar (`[].id.length`), a wrapper
   `load` fetching two routes whose two consumers share their caller's site, and a wrapper `both`
-  calling `get` twice, which reaches one consumer site by two paths. Later spec #23 tickets extend this overlay, so the `chain` and
+  calling `get` twice, which reaches one consumer site by two paths. Declared types (#64) add
+  the catalog route `app/api/profiles/route.ts` (a zod page of profiles) and, in the web app,
+  `src/declared.ts` (casts, type arguments of the wrapper `src/api/typed.ts` and of
+  `res.json<T>()`, an annotation, `z.infer`, a package type and an optional field),
+  `src/api/types.ts` (an interface another file extends) and the golden
+  `chain-drift.trace-declared.txt`; the catalog route `app/api/labels/route.ts` returns a literal
+  typed by an index signature, and the web's `src/labels.ts` reads under that open part (golden
+  `chain-drift.trace-labels.txt`). Later spec #23 tickets extend this overlay, so the `chain` and
   `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
@@ -367,6 +376,28 @@ one for the area a change touches.
   function-local `const out = Schema.parse(..)`) is followed, unlike in `literals.rs`, and
   nothing records a later write to it (`Object.assign(out, { extra: 1 })`), so it is still
   read as the schema's shape (no marker).
+- Declared types (spec #23, `declared.rs`, `lang/ts/types.rs`): a type is read to at most
+  `TYPE_DEPTH` (32) levels, both when it is written (`lang/mod.rs`, the nesting of an object or
+  array type) and when a consumer's cast, type argument or annotation is followed through
+  `extends`, aliases and intersections; a level deeper adds no fields. Reading the types of one
+  consumer file charges every type examined to `TYPES_BUDGET` (2^14); past it, the type being
+  read adds no fields on a consumer, and opens the value on a provider. A declaration that leads
+  back to itself (`interface A extends B`, `interface B extends A`) adds what it did the first
+  time. A type parameter hides a declared type of its name only when it sits within
+  `HIDING_CLIMB` (64) levels of the use; one declared farther up leaves the name unknown, so
+  it adds no fields. Only interfaces (with `extends`), aliases to object types, intersections,
+  arrays and `z.infer<typeof S>` give fields; a union, a mapped or conditional type
+  and a type from a package (issue #175) add none (no marker). A generic of the repository
+  (`Paged<Row>`) adds its own fields, its type arguments not substituted (its `T` adds none).
+  An optional field (`?`) adds no drift, nor does what lies below it; the fields of a
+  `z.infer` schema that `.optional()`, `.nullish()` or `.partial()` make may be absent are
+  optional too (`.required()` undoes it), and a schema union adds no fields. A type argument
+  given to a wrapper types the body only when the wrapper's return type is its own type
+  parameter (`Promise<T>`) or it casts the body to it (`as T`, `json<T>()`); `json<T>()` and
+  the like type their result when they have exactly one type argument. A cast or an annotation is read at the top of a value (not
+  inside an object literal), and a value that goes through a function, a `let` or a rebinding
+  is not followed (no marker). On a provider, an index signature in the type of a returned
+  constant, a cast body or the handler's return annotation opens that part of the shape.
 - `lang/ts.rs` (`VALUE_DEPTH`, 64): an expression nested deeper than 64 levels (calls inside
   calls, members, objects) is read as unknown from there (no marker).
 - `literals.rs`: reading a handler's returned literals charges every call examined and every

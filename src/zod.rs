@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::lang::{Invocation, Value};
+use crate::lang::{Invocation, Ty, Value};
 use crate::literals::Responses;
 use crate::resolve::Code;
 use crate::shape::{Shape, Source};
@@ -80,6 +80,10 @@ struct Node {
     scalar: bool,
     /// Anything may be here besides what the tree lists.
     open: bool,
+    /// The value may be absent from its object (`.optional()`, `.nullish()`, `.partial()`).
+    optional: bool,
+    /// A union: the parts it gives may be there or not, whichever member holds.
+    mixed: bool,
 }
 
 impl Node {
@@ -111,12 +115,35 @@ impl Node {
         };
         self.scalar |= other.scalar;
         self.open |= other.open;
+        self.optional |= other.optional;
+        self.mixed |= other.mixed;
     }
 
     /// The fields of `other` added to this object, replacing those of the same name.
     fn overlay(&mut self, other: Node) {
         self.fields.extend(other.fields);
         self.open |= other.open;
+    }
+
+    /// Adds the paths a consumer's `z.infer` type lists below `at` to `out`, each with whether it
+    /// may be absent. A union lists no part below it: which member holds is not known.
+    fn declared(&self, at: &str, out: &mut BTreeMap<String, bool>) {
+        if self.mixed {
+            return;
+        }
+        for (key, node) in &self.fields {
+            let path = match at.is_empty() {
+                true => key.clone(),
+                false => format!("{at}.{key}"),
+            };
+            out.insert(path.clone(), node.optional);
+            node.declared(&path, out);
+        }
+        if let Some(element) = &self.element {
+            let path = format!("{at}[]");
+            out.insert(path.clone(), false);
+            element.declared(&path, out);
+        }
     }
 
     /// Adds the paths of the tree below `at` to `shape`. A part that is a scalar for one member
@@ -167,8 +194,8 @@ impl Zod {
             spent: self.spent.entry(path.to_string()).or_default(),
         };
         let mut node = match code.returns(path, name) {
-            Some(schema) => reader.named(path, scope, schema, 0)?,
-            None => None,
+            Some(Ty::Schema(schema)) => reader.named(path, scope, schema, 0)?,
+            _ => None,
         };
         if node.is_none() && !responses.bodies.is_empty() {
             let mut all: Option<Node> = None;
@@ -187,6 +214,27 @@ impl Zod {
             shape.open.insert(String::new());
         }
         Some(shape)
+    }
+}
+
+impl Zod {
+    /// The field paths below the root of the output of the schema `name`, written in `path`
+    /// within `scope`: what `z.infer<typeof name>` lists, each with whether the output may lack
+    /// it. `None` when it is no schema Meada reads, or past the file's budget.
+    pub fn inferred<'a>(
+        &mut self,
+        code: &Code<'a>,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<BTreeMap<String, bool>> {
+        let mut reader = Reader {
+            code,
+            spent: self.spent.entry(path.to_string()).or_default(),
+        };
+        let mut out = BTreeMap::new();
+        reader.named(path, scope, name, 0)??.declared("", &mut out);
+        Some(out)
     }
 }
 
@@ -355,6 +403,7 @@ impl<'a> Reader<'_, 'a> {
                 for member in members {
                     all.union(self.part(path, scope, member, depth)?);
                 }
+                all.mixed = true;
                 all
             }
             name if SCALARS.contains(&name) => Node::scalar(),
@@ -394,6 +443,10 @@ impl<'a> Reader<'_, 'a> {
         depth: usize,
     ) -> Option<Node> {
         match name {
+            "optional" | "nullish" => on.optional = true,
+            "partial" | "required" => {
+                (on.fields.values_mut()).for_each(|f| f.optional = name == "partial")
+            }
             name if KEEPS.contains(&name) => {}
             "array" => {
                 on = Node {
@@ -402,7 +455,10 @@ impl<'a> Reader<'_, 'a> {
                 }
             }
             "or" => match args.first() {
-                Some(other) => on.union(self.part(path, scope, other, depth)?),
+                Some(other) => {
+                    on.union(self.part(path, scope, other, depth)?);
+                    on.mixed = true;
+                }
                 None => on.open = true,
             },
             "extend" => match args.first() {

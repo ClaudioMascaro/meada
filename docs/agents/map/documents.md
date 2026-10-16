@@ -98,8 +98,8 @@ modules updates it.
   `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
   file of its call site; spec #23) and `Source::Zod(path)` (`{"zod": "src/orders.ts"}`, the
   zod schema a route handler's response passes through, in the handler's file; declared, like
-  a document) are the sources yet; a later spec #23 ticket adds the declared-type consumer
-  source as a variant. `zod.rs` (spec #23) reads the schema into a `Shape`:
+  a document) are the sources yet; the declared types of a consumer
+  (`declared.rs`, spec #23) fill `Shape::declared` and `Shape::optional` of a `Reads` shape. `zod.rs` (spec #23) reads the schema into a `Shape`:
   `Zod::returned(code, responses, handler)` takes the 2xx bodies `Literals::responses` lists
   and reads each as a schema, from `schema.parse(x)`, `schema.safeParse(x).data`, or a value
   or handler return type annotated `z.infer<typeof schema>` (`lang/ts/types.rs` names the
@@ -121,7 +121,8 @@ modules updates it.
   alike and `LITERALS_BUDGET` the work of a file; a body it cannot read is open at that path
   (an empty array and a spread of anything but a known object included), a string with more
   than one part, a number and a boolean are scalar leaves. `Literals::responses` lists the 2xx
-  bodies (and whether the handler answers another way, which opens the root; see the Known
+  bodies (with the type each is cast to and the handler's return type, whose index signatures
+  open the part they type, as do those of a typed constant it follows; and whether the handler answers another way, which opens the root; see the Known
   ceilings), `Literals::shape` reads them; only module-level constants are followed. `Source::at`
   names it in `context`; `Source::declared` tells a declared source (a document) from one read
   from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the

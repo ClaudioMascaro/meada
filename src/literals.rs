@@ -5,7 +5,8 @@
 
 use std::collections::HashMap;
 
-use crate::lang::{Call, Part, Step, Value, property};
+use crate::declared::{self, Types};
+use crate::lang::{Call, Part, Step, Ty, Value, property};
 use crate::resolve::{Code, Target};
 use crate::shape::{Shape, Source};
 
@@ -36,6 +37,7 @@ pub enum Handler {
 #[derive(Default)]
 pub struct Literals {
     spent: HashMap<String, usize>,
+    types: Types,
 }
 
 /// The 2xx responses a handler sends.
@@ -43,6 +45,10 @@ pub struct Responses<'a> {
     pub path: &'a str,
     /// The body of each response Meada recognizes, with the scope it is written in.
     pub bodies: Vec<(&'a str, &'a Value)>,
+    /// The type each body is cast to (`body as Reply`), by position in `bodies`.
+    pub casts: Vec<Option<&'a Ty>>,
+    /// The declared return type of the handler, with the scope it is written in.
+    pub returns: Option<(&'a str, &'a Ty)>,
     /// Whether the handler may answer another way: a call whose result it returns, `res` handed
     /// to another function, `next()`. Any shape read from the bodies alone is then incomplete.
     pub other: bool,
@@ -84,6 +90,8 @@ impl Literals {
         let mut reader = Reader {
             code,
             spent: self.spent.entry(path.to_string()).or_default(),
+            types: &mut self.types,
+            seen: Vec::new(),
             shape: Shape::new(Source::Literals(path.to_string())),
         };
         let mut body = Vec::new();
@@ -106,6 +114,9 @@ impl Literals {
         let mut responses = Responses {
             path,
             bodies: Vec::new(),
+            casts: Vec::new(),
+            returns: (code.returns(path, name))
+                .map(|ty| (def.name.rsplit_once('.').map_or("", |(s, _)| s), ty)),
             other: false,
         };
         for &i in &body {
@@ -123,6 +134,7 @@ impl Literals {
                     }
                     if let Some(arg) = code.args(path, i)?.first() {
                         responses.bodies.push((&call.scope, arg));
+                        responses.casts.push(code.arg_type(path, i, 0));
                     }
                 }
             }
@@ -141,10 +153,18 @@ impl Literals {
         let mut reader = Reader {
             code,
             spent: self.spent.entry(path.to_string()).or_default(),
+            types: &mut self.types,
+            seen: Vec::new(),
             shape: Shape::new(Source::Literals(path.to_string())),
         };
-        for &(scope, body) in &responses.bodies {
+        for (&(scope, body), &cast) in responses.bodies.iter().zip(&responses.casts) {
             reader.read(path, scope, body, "", 0)?;
+            if let Some(ty) = cast {
+                reader.typed(path, scope, ty, "");
+            }
+            if let Some((scope, ty)) = responses.returns {
+                reader.typed(path, scope, ty, "");
+            }
         }
         if responses.other {
             reader.open("");
@@ -157,6 +177,9 @@ impl Literals {
 struct Reader<'c, 'a> {
     code: &'c Code<'a>,
     spent: &'c mut usize,
+    types: &'c mut Types,
+    /// The types of the constants `resolve` followed, with the file of each.
+    seen: Vec<(&'a str, &'a Ty)>,
     shape: Shape,
 }
 
@@ -188,14 +211,32 @@ impl<'a> Reader<'_, 'a> {
                     .filter(|((_, constant), _)| !constant.contains('.')),
                 false => None,
             };
-            let Some(((at, _), held)) = found else {
+            let Some(((at, constant), held)) = found else {
                 return Some((path, scope, &UNKNOWN, depth));
             };
+            if let Some(ty) = self.code.constant_type(at, constant) {
+                self.seen.push((at, ty));
+            }
             path = at;
             scope = "";
             value = held;
         }
         Some((path, scope, value, depth))
+    }
+
+    /// Opens the parts of the value at `at` that the type `ty`, written in `path` within
+    /// `scope`, gives an index signature: anything may be there. A type read past the budget
+    /// opens the whole value.
+    fn typed(&mut self, path: &'a str, scope: &'a str, ty: &'a Ty, at: &str) {
+        let Some(read) = self.types.read(self.code, path, scope, ty) else {
+            return self.open(at);
+        };
+        for open in &read.open {
+            match open.is_empty() {
+                true => self.open(at),
+                false => self.open(&declared::under(at, open)),
+            }
+        }
     }
 
     fn field(&mut self, at: &str) {
@@ -224,7 +265,11 @@ impl<'a> Reader<'_, 'a> {
         depth: usize,
     ) -> Option<()> {
         self.charge()?;
+        let mark = self.seen.len();
         let (path, scope, value, depth) = self.resolve(path, scope, value, depth)?;
+        for (file, ty) in self.seen.split_off(mark) {
+            self.typed(file, "", ty, at);
+        }
         match value {
             Value::Object(properties) => self.object(path, scope, properties, at, depth)?,
             Value::List(items) if depth < LITERALS_DEPTH => {
@@ -265,7 +310,12 @@ impl<'a> Reader<'_, 'a> {
         self.field(at);
         for (key, value) in properties {
             if key == "..." {
-                match self.resolve(path, scope, value, depth + 1)? {
+                let mark = self.seen.len();
+                let spread = self.resolve(path, scope, value, depth + 1)?;
+                for (file, ty) in self.seen.split_off(mark) {
+                    self.typed(file, "", ty, at);
+                }
+                match spread {
                     (path, scope, Value::Object(inner), depth) => {
                         self.object(path, scope, inner, at, depth)?
                     }
@@ -478,6 +528,46 @@ mod tests {
         assert_eq!(paths(&shape.open), ["", "got", "mapped", "none[]"]);
         let scalars = ["kind", "n", "name", "ok", "rows[].id"];
         assert_eq!(paths(&shape.scalars), scalars);
+    }
+
+    #[test]
+    fn an_index_signature_in_a_type_of_the_returned_value_opens_that_part() {
+        let types = "interface Meta { [k: string]: string }\n\
+                     interface Reply { [k: string]: unknown; ok: boolean; meta: Meta }\n\
+                     interface Plain { ok: boolean; meta: Meta }\n";
+        let opens = |handler: &str| {
+            let shape = express(&format!("{types}{handler}")).unwrap();
+            paths(&shape.open).join(",")
+        };
+        // The type of a constant, of a cast, and the declared return type of the handler.
+        for (handler, open) in [
+            (
+                "const body: Reply = { ok: true };\nexport function h(req, res) { res.json(body); }",
+                ",meta",
+            ),
+            (
+                "export function h(req, res) { res.json({ ok: true } as Reply); }",
+                ",meta",
+            ),
+            (
+                "export function h(req, res): Reply { res.json({ ok: true }); }",
+                ",meta",
+            ),
+            (
+                "export function h(req, res) { res.json({ ok: true, meta: {} } as Plain); }",
+                "meta",
+            ),
+            (
+                "export function h(req, res) { res.json({ ok: true } as Elsewhere); }",
+                "",
+            ),
+            (
+                "export function h(req, res) { res.json({ ok: true }); }",
+                "",
+            ),
+        ] {
+            assert_eq!(opens(handler), open, "{handler}");
+        }
     }
 
     #[test]

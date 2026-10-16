@@ -9,8 +9,8 @@ use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
-use super::{BODIES, bound_nodes, named, text, unquote};
-use crate::lang::Step;
+use super::{BODIES, bound_nodes, named, text, types, unquote};
+use crate::lang::{Step, Ty};
 
 /// What following values may cost in one file: every node visited, by the climb from a call or
 /// by the scan of a function for a name's uses, and every step copied when a `const` is
@@ -77,6 +77,11 @@ impl<'t> Uses<'t> {
         let mut out = Vec::new();
         let mut followed = HashSet::new();
         let mut pending = vec![(call, Vec::new())];
+        // The type arguments of the call itself (`get<T>(path)`): the function called says
+        // whether they type what it returns.
+        if !self.arguments(call, &mut out) {
+            return Vec::new();
+        }
         while let Some((node, mut steps)) = pending.pop() {
             let mut at = node;
             while let Some(parent) = at.parent() {
@@ -88,7 +93,16 @@ impl<'t> Uses<'t> {
                 match parent.kind() {
                     "await_expression" | "parenthesized_expression" | "non_null_expression" => {}
                     "as_expression" | "satisfies_expression"
-                        if named(parent).next().is_some_and(|c| c.id() == at.id()) => {}
+                        if named(parent).next().is_some_and(|c| c.id() == at.id()) =>
+                    {
+                        // What the cast declares counts; the reads that follow it go on.
+                        let cast = Some(parent).filter(|p| p.kind() == "as_expression");
+                        if let Some(t) = cast.and_then(|p| named(p).nth(1))
+                            && !self.typed(&steps, t, &mut out)
+                        {
+                            return Vec::new();
+                        }
+                    }
                     "member_expression" if is("object") => {
                         let Some(property) = parent.child_by_field_name("property") else {
                             break;
@@ -108,6 +122,11 @@ impl<'t> Uses<'t> {
                     }
                     "call_expression" if is("function") => match steps.pop() {
                         Some(Step::Field(method)) => {
+                            // `json<T>()`: the type argument declares what the method returns.
+                            let called = [steps.clone(), vec![Step::Call(method.clone())]].concat();
+                            if !self.type_argument(parent, &called, &mut out) {
+                                return Vec::new();
+                            }
                             if ELEMENT_METHODS.contains(&method.as_str())
                                 && let Some((callback, param)) = element_param(parent)
                             {
@@ -135,6 +154,12 @@ impl<'t> Uses<'t> {
                     },
                     // What was read so far counts, and so do the uses of the names it is bound to.
                     "variable_declarator" if is("value") => {
+                        // An annotation declares the type of the variable.
+                        if let Some(t) = parent.child_by_field_name("type")
+                            && !self.typed(&steps, t, &mut out)
+                        {
+                            return Vec::new();
+                        }
                         if followed.insert(parent.id())
                             && is_const(parent, self.src)
                             && let Some(name) = parent.child_by_field_name("name")
@@ -181,6 +206,43 @@ impl<'t> Uses<'t> {
             }
         }
         out
+    }
+
+    /// Adds the chain `steps` then the type `node` writes, unless it lists no fields. `false`
+    /// past the budget.
+    fn typed(&mut self, steps: &[Step], node: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
+        let mut cost = 0;
+        let ty = types::ty(node, self.src, &mut cost);
+        if ty != Ty::Unknown {
+            out.push([steps, &[Step::Typed(ty)]].concat());
+        }
+        self.charge(cost)
+    }
+
+    /// Adds the chain of the type arguments `call` is given, unless none lists fields. `false`
+    /// past the budget.
+    fn arguments(&mut self, call: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
+        let Some(arguments) = call.child_by_field_name("type_arguments") else {
+            return true;
+        };
+        let mut cost = 0;
+        let tys: Vec<Ty> = (named(arguments))
+            .map(|t| types::ty(t, self.src, &mut cost))
+            .collect();
+        if tys.iter().any(|t| *t != Ty::Unknown) {
+            out.push(vec![Step::Argument(tys)]);
+        }
+        self.charge(cost)
+    }
+
+    /// The same for the one type argument a method call is given (`json<T>()`): with several,
+    /// which one types the result is not known.
+    fn type_argument(&mut self, call: Node<'t>, steps: &[Step], out: &mut Vec<Vec<Step>>) -> bool {
+        let arguments = call.child_by_field_name("type_arguments");
+        match arguments.map(|a| named(a).collect::<Vec<_>>()) {
+            Some(only) if only.len() == 1 => self.typed(steps, only[0], out),
+            _ => true,
+        }
     }
 
     /// Binds the value read through `steps` to `pattern` in `scope`: each field or element the
@@ -376,7 +438,7 @@ fn enclosing(node: Node) -> Node {
 
 #[cfg(test)]
 mod tests {
-    use crate::lang::{LanguagePack, Step, ts::TsJs};
+    use crate::lang::{LanguagePack, Step, Ty, ts::TsJs};
 
     fn uses(src: &str) -> Vec<Vec<Step>> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
@@ -413,6 +475,7 @@ mod tests {
                         Step::Element => "[]".into(),
                         Step::Call(m) => format!("({m})"),
                         Step::Return => "^".into(),
+                        Step::Typed(_) | Step::Argument(_) => "<T>".into(),
                     })
                     .collect()
             })
@@ -559,5 +622,112 @@ mod tests {
         assert!(uses(&chain(100)).contains(&want));
         // Each `const` copies the steps so far: the cost grows with the square of the chain.
         assert_eq!(uses(&chain(2_000)), Vec::<Vec<Step>>::new());
+    }
+
+    #[test]
+    fn casts_to_large_types_past_the_budget_read_nothing() {
+        let members: String = (0..200).map(|i| format!("f{i}: string; ")).collect();
+        let casts = |n: usize| {
+            let mut src = String::from("async function f() {\n  const r = await fetch(u);\n");
+            for i in 0..n {
+                src += &format!("  const d{i} = (await r.json()) as {{ {members} }};\n");
+            }
+            uses(&(src + "}\n"))
+        };
+        assert!(!casts(3).is_empty());
+        // Each cast reads its type again: the cost grows with the casts times the type.
+        assert_eq!(casts(4_000), Vec::<Vec<Step>>::new());
+    }
+
+    #[test]
+    fn a_declared_type_ends_a_chain_of_its_own() {
+        let typed = |name: &str| Step::Typed(Ty::Named(name.into()));
+        let (json, field) = (Step::Call("json".into()), |f: &str| Step::Field(f.into()));
+        let chains = |body: &str| {
+            uses(&format!(
+                "async function f() {{\n  const r = await fetch(u);\n{body}\n}}\n"
+            ))
+        };
+        let array = Step::Typed(Ty::Array(Box::new(Ty::Named("Row".into()))));
+        let cases = [
+            (
+                "const d = (await r.json()) as Row[];",
+                vec![json.clone(), array.clone()],
+            ),
+            (
+                "const d = (await r.json()).items as Row[];",
+                vec![json.clone(), field("items"), array],
+            ),
+            (
+                "const d: Row = await r.json();",
+                vec![json.clone(), typed("Row")],
+            ),
+            (
+                "const d = await r.json<Row>();",
+                vec![json.clone(), typed("Row")],
+            ),
+            (
+                "let d: Row = (await r.json()) as unknown as Row;",
+                vec![json.clone(), typed("Row")],
+            ),
+        ];
+        for (body, chain) in cases {
+            assert!(chains(body).contains(&chain), "{body}: {:?}", chains(body));
+        }
+        // The reads after a cast go on; a form with no fields declares nothing.
+        let after = chains("return ((await r.json()) as Row).id;");
+        assert!(
+            after.contains(&vec![json.clone(), typed("Row")]),
+            "{after:?}"
+        );
+        assert!(
+            after.contains(&vec![json.clone(), field("id"), Step::Return]),
+            "{after:?}"
+        );
+        for body in [
+            "const d = (await r.json()) as unknown;",
+            "const d = (await r.json()) as const;",
+            "const d: string | null = await r.json();",
+            "const d = await r.json<A, B>();",
+        ] {
+            assert!(
+                !chains(body)
+                    .iter()
+                    .flatten()
+                    .any(|s| matches!(s, Step::Typed(_))),
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_type_argument_of_the_call_declares_its_result() {
+        let facts = TsJs.parse("a.ts", b"async function f() { return get<Row>(u); }\nasync function g() { return get<A, B>(u); }").unwrap();
+        let get: Vec<_> = facts.calls.iter().filter(|c| c.callee == "get").collect();
+        // The type arguments are offered to the wrapper, which says whether they type the result.
+        let named = |n: &str| Ty::Named(n.into());
+        let row = Step::Argument(vec![named("Row")]);
+        assert_eq!(get[0].uses, [vec![row], vec![Step::Return]]);
+        let both = Step::Argument(vec![named("A"), named("B")]);
+        assert_eq!(get[1].uses, [vec![both], vec![Step::Return]]);
+    }
+
+    #[test]
+    fn a_cast_to_a_type_parameter_of_the_function_is_typed_by_it() {
+        let src = "async function g<T>(p) { const r = await fetch(p); return (await r.json()) as T; }
+                   async function h<T>(p) { const r = await fetch(p); const d = (await r.json()) as T[]; return d; }
+                   async function k<T>(p) { const r = await fetch(p); return r.json<T>(); }";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let param = |n: &str| Ty::Param(n.into());
+        let json = Step::Call("json".into());
+        let fetches: Vec<_> = facts.calls.iter().filter(|c| c.callee == "fetch").collect();
+        let typed = |ty: Ty| vec![json.clone(), Step::Typed(ty)];
+        assert!(fetches[0].uses.contains(&typed(param("T"))));
+        assert!(
+            fetches[1]
+                .uses
+                .contains(&typed(Ty::Array(Box::new(param("T")))))
+        );
+        assert!(fetches[2].uses.contains(&typed(param("T"))));
     }
 }

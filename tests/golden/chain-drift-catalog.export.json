@@ -26,8 +26,16 @@
       "hash": "fc112243d7c86477ef19dd4a789114daeb1179870fd562faef220175aef990a6"
     },
     {
+      "path": "app/api/labels/route.ts",
+      "hash": "c8692e7453c22404109eae4d607a4215b4e46c5fafeb678e5e84ac5a2d60550a"
+    },
+    {
       "path": "app/api/products/[id]/route.ts",
       "hash": "faa5f3dcd718e5dd3c0013b2c54f4cb5a09ef452aeb565b31841ab562b29bef1"
+    },
+    {
+      "path": "app/api/profiles/route.ts",
+      "hash": "33b6d942e658d9bf2f9e7e1e97d89d87b670c8663bc41f046072ab33e5d93ff9"
     },
     {
       "path": "app/api/stock/[sku]/route.ts",
@@ -116,11 +124,27 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 241,
+        "end": 365
+      }
+    },
+    {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "span": {
         "path": "app/api/products/[id]/route.ts",
         "start": 57,
         "end": 182
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 402,
+        "end": 480
       }
     },
     {
@@ -372,6 +396,17 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 303,
+        "end": 362
+      }
+    },
+    {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::Response.json#0",
       "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "target": null,
@@ -391,6 +426,127 @@
         "path": "app/api/products/[id]/route.ts",
         "start": 160,
         "end": 178
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 434,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::Page.parse#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 452,
+        "end": 476
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 469,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.array#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 354,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.number#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 379,
+        "end": 389
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 226,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#1",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 286,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#2",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 336,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 243,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#1",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#2",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 303,
+        "end": 313
       }
     },
     {
@@ -774,6 +930,27 @@
       "site": "example.com/chain/catalog::app/api/health/route.ts::GET"
     },
     {
+      "contract": "http::GET::/api/labels",
+      "site": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/labels/route.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.title",
+          "ok"
+        ],
+        "open": [
+          "labels"
+        ],
+        "scalars": [
+          "labels.title",
+          "ok"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "shape": {
@@ -783,6 +960,30 @@
         "fields": [],
         "open": [
           ""
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/profiles/route.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].id",
+          "items[].name",
+          "total"
+        ],
+        "scalars": [
+          "items[].address.city",
+          "items[].id",
+          "items[].name",
+          "total"
         ]
       }
     },
@@ -999,6 +1200,122 @@
       "drift": {
         "missing": {
           "total": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].address.zip": "exact",
+          "items[].nickname": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "pages": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact",
+          "items[].rank": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "data": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "contract": "http::GET::/api/labels",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "status": "inferred"
+        },
+        "unchecked": {
+          "labels.other": "labels",
+          "labels.title": "labels"
         }
       }
     },

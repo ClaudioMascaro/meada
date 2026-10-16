@@ -29,6 +29,11 @@ pub struct Shape {
     /// drift on one of them is `exact` when the provider's shape is declared too.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub declared: BTreeSet<String>,
+    /// For a consumer, the declared paths its type marks optional (`name?: string`) that no field
+    /// read makes certain, by path: drift does not report one the provider lacks, nor what lies
+    /// below it.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub optional: BTreeSet<String>,
 }
 
 impl Shape {
@@ -40,15 +45,23 @@ impl Shape {
             open: BTreeSet::new(),
             scalars: BTreeSet::new(),
             declared: BTreeSet::new(),
+            optional: BTreeSet::new(),
         }
     }
 
     /// Adds the paths of `other`, read from the same side, to this shape.
     pub fn merge(&mut self, other: &Shape) {
-        self.fields.extend(other.fields.iter().cloned());
         self.open.extend(other.open.iter().cloned());
         self.scalars.extend(other.scalars.iter().cloned());
         self.declared.extend(other.declared.iter().cloned());
+        // A path either side requires (lists, and does not mark optional) is certain.
+        let requires = |s: &Shape, p: &String| s.fields.contains(p) && !s.optional.contains(p);
+        let optional: BTreeSet<String> = (self.optional.iter().chain(&other.optional))
+            .filter(|p| !requires(self, p) && !requires(other, p))
+            .cloned()
+            .collect();
+        self.optional = optional;
+        self.fields.extend(other.fields.iter().cloned());
     }
 }
 
@@ -148,6 +161,11 @@ pub fn drift(provider: &Shape, consumer: &Shape) -> Option<Drift> {
                 break;
             }
             if !present(q) {
+                // A field the consumer's type marks optional may be absent: neither it nor
+                // what lies below it is drift.
+                if consumer.optional.contains(q) {
+                    break;
+                }
                 missing.insert(q.to_string(), level(q));
                 break;
             }
@@ -183,6 +201,7 @@ mod tests {
             open: set(open),
             scalars: set(scalars),
             declared: set(&[]),
+            optional: set(&[]),
         }
     }
 
@@ -193,6 +212,7 @@ mod tests {
             open: set(&[]),
             scalars: set(&[]),
             declared: set(&[]),
+            optional: set(&[]),
         }
     }
 
@@ -266,6 +286,41 @@ mod tests {
             let clean = missing.is_empty() && unchecked.is_empty();
             assert_eq!(found.is_none(), clean, "drift for {consumer:?}");
         }
+    }
+
+    #[test]
+    fn a_path_one_side_of_a_merge_requires_is_not_optional() {
+        let provider = document(&["id"], &[], &[]);
+        let mut declares = reads(&["id", "cursor"]);
+        declares.optional = set(&["cursor"]);
+        let reads_it = reads(&["cursor"]);
+        let mut forward = declares.clone();
+        forward.merge(&reads_it);
+        let mut backward = reads_it.clone();
+        backward.merge(&declares);
+        for merged in [forward, backward] {
+            assert!(merged.optional.is_empty());
+            let found = drift(&provider, &merged).unwrap();
+            assert_eq!(found.missing.keys().collect::<Vec<_>>(), ["cursor"]);
+        }
+        // A side that does not mention the path leaves it optional.
+        let mut merged = declares.clone();
+        merged.merge(&reads(&["id"]));
+        assert_eq!(merged.optional, set(&["cursor"]));
+    }
+
+    #[test]
+    fn an_optional_path_the_provider_lacks_is_no_drift() {
+        let provider = document(&["id", "owner"], &[], &[]);
+        let mut consumer = reads(&["id", "nick", "nick.first", "owner", "owner.zip", "req"]);
+        consumer.optional = set(&["nick", "owner.zip"]);
+        let found = drift(&provider, &consumer).unwrap();
+        let missing: Vec<&str> = found.missing.keys().map(String::as_str).collect();
+        assert_eq!(missing, ["req"]);
+        // A path the provider has is checked as ever.
+        let mut consumer = reads(&["id"]);
+        consumer.optional = set(&["id"]);
+        assert_eq!(drift(&provider, &consumer), None);
     }
 
     #[test]
