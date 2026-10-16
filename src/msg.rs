@@ -42,6 +42,8 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
+    /// The missing reads of the repository's consumers against the routes they call (spec #23).
+    Drift(usize),
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -243,6 +245,10 @@ impl Msg<'_> {
             Msg::UnlinkedResource(contract) => pick(
                 format!("{contract} is unlinked: no writer and reader in different repositories"),
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
+            ),
+            Msg::Drift(n) => pick(
+                format!("shape drift, missing reads: {n}"),
+                format!("drift de formato, leituras ausentes: {n}"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

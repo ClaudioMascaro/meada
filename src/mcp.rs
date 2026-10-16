@@ -21,8 +21,9 @@ struct SearchArgs {
     /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), `resource` (a
     /// declared one, matched by kind and id), `channel` (a queue or topic, by broker kind and
     /// name), `document` (an OpenAPI or AsyncAPI file, by path or title), `package` (by name,
-    /// with its consumers), or `ambiguous` or `unresolved` (open items, with the `meada decide`
-    /// command for each).
+    /// with its consumers), `drift` (fields consumers read that a route lacks, by route or field
+    /// path), or `ambiguous` or `unresolved` (open items, with the `meada decide` command for
+    /// each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,

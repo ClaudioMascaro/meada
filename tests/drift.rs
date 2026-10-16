@@ -4,7 +4,7 @@
 mod common;
 
 use common::{assert_golden, drift_chain};
-use meada::engine::{Direction, Engine, Start};
+use meada::engine::{self, Direction, Engine, Start};
 
 #[test]
 fn export_carries_consumer_shapes_and_drift() {
@@ -63,15 +63,45 @@ fn trace_ends_the_links_of_consumers_reading_past_a_literal_shape() {
 }
 
 #[test]
-fn context_on_a_route_names_the_literals_its_shape_comes_from() {
-    let (_, gateway, _) = drift_chain("drift_literals_context");
-    let engine = Engine::open(&gateway).unwrap();
+fn context_on_a_route_names_the_shape_source_and_the_drift_of_its_consumers() {
+    let (web, _, _) = drift_chain("drift_context");
+    let engine = Engine::open(&web).unwrap();
 
-    let answer = engine
-        .context("http::GET::/api/inventory/{}", None)
-        .unwrap();
+    // A document (its consumers with drift, with reads not checked, and with neither, which are
+    // listed too), a zod schema and returned literals; and a route whose consumer only has reads
+    // not checked.
+    let routes = [
+        ("orders", "http::GET::/api/orders"),
+        ("comments", "http::GET::/api/comments"),
+        ("inventory", "http::GET::/api/inventory/{}"),
+        ("cached", "http::GET::/api/cached"),
+    ];
+    for (name, route) in routes {
+        let answer = engine.context(route, None).unwrap();
+        assert_golden(&format!("chain-drift.context-route-{name}.txt"), &answer);
+    }
+}
 
-    assert_golden("chain-drift.context-route-inventory.txt", &answer);
+#[test]
+fn search_drift_lists_each_missing_path_with_its_consumer_and_level() {
+    let (web, _, _) = drift_chain("drift_search");
+    let engine = Engine::open(&web).unwrap();
+
+    // The query matches the route path or the field path.
+    let mut answers = Vec::new();
+    for query in ["/api/stock", "total", "nothing-like-this"] {
+        answers.push(engine.search(query, Some("drift"), None).unwrap());
+    }
+
+    assert_golden("chain-drift.search-drift.txt", &answers.join("\n"));
+}
+
+#[test]
+fn status_prints_the_drift_count_of_each_repository() {
+    let (web, _, _) = drift_chain("drift_status");
+    Engine::open(&web).unwrap().refresh().unwrap();
+
+    assert_golden("chain-drift.status.txt", &engine::status(&web).unwrap());
 }
 
 #[test]

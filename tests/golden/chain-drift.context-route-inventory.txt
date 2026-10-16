@@ -1,4 +1,7 @@
 http::GET::/api/inventory/{}
   example.com/chain/gateway provider src/inventory.ts:7 getItem
-    example.com/chain/gateway src/inventory.ts response fields: price, price.amount, price.currency, reserved, sku, warehouse
-    example.com/chain/gateway src/inventory.ts response open: sku
+    example.com/chain/gateway src/inventory.ts (literals) response fields: price, price.amount, price.currency, reserved, sku, warehouse
+    example.com/chain/gateway src/inventory.ts (literals) response open: sku
+  example.com/chain/web consumer src/stock.ts:7 item
+    drift: missing discount (inferred), error (inferred)
+    not checked: sku.length under sku

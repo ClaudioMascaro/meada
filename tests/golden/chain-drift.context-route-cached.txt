@@ -1,0 +1,6 @@
+http::GET::/api/cached
+  example.com/chain/catalog provider app/api/cached/route.ts:8 GET
+    example.com/chain/catalog app/api/cached/route.ts (literals) response fields: cached
+    example.com/chain/catalog app/api/cached/route.ts (literals) response open: (root)
+  example.com/chain/web consumer src/stock.ts:41 cached
+    not checked: cached under (root), nothing under (root), user under (root)

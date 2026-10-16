@@ -1,0 +1,15 @@
+http::GET::/api/orders
+  example.com/chain/gateway provider src/orders.ts:5 listOrders
+    example.com/chain/gateway openapi.yaml (document) response fields: [], [].id, [].product
+    example.com/chain/gateway openapi.yaml (document) response open: [].product
+  example.com/chain/web consumer src/drift.ts:7 orderTotal
+    drift: missing [].total (inferred)
+  example.com/chain/web consumer src/drift.ts:14 firstOrderId
+  example.com/chain/web consumer src/drift.ts:21 productName
+    not checked: [].product.name under [].product
+  example.com/chain/web consumer src/drift.ts:29 customerEmail
+    drift: missing [].customer (inferred)
+  example.com/chain/web consumer src/drift.ts:45 idLength
+  example.com/chain/web consumer src/drift.ts:59 page
+  example.com/chain/web consumer src/drift.ts:73 pair
+    drift: missing [].customer (inferred), [].total (inferred)

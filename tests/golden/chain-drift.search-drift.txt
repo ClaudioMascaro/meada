@@ -1,0 +1,8 @@
+example.com/chain/web src/stock.ts:22 stock http::GET::/api/stock missing weight (inferred)
+example.com/chain/web src/stock.ts:34 one http::GET::/api/stock/{} missing error (inferred)
+
+example.com/chain/web src/comments.ts:19 summary http::GET::/api/comments/summary missing total (inferred)
+example.com/chain/web src/drift.ts:7 orderTotal http::GET::/api/orders missing [].total (inferred)
+example.com/chain/web src/drift.ts:73 pair http::GET::/api/orders missing [].total (inferred)
+
+no matches for `nothing-like-this`

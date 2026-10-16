@@ -204,7 +204,7 @@ uma função importada desse pacote atravessa até o código do provedor, pelos 
 pasta de build (o `outDir` do `tsconfig.json`, mapeado de volta para o `rootDir`). O `search`
 com o tipo `package` acha o pacote pelo nome, com o repositório, a pasta, a versão e o número
 de consumidores, e o `context` de uma função exportada lista quem a chama, em qualquer
-repositório do workspace. Não lê lockfile nem consulta o registro npm. Cada ligação tem o nível `exact`,
+repositório do workspace. Não lê lockfile nem consulta o registro npm. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
 aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
 broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um

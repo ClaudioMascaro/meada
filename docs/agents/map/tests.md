@@ -43,7 +43,10 @@ modules updates it.
   package imports, with an edited package and a package that gets its name back in
   `freshness`, the views, the levels and the limits (`PACKAGE_HOPS`, `GRAFT_BUDGET`) being unit
   tests in `shape.rs`, and the surface, `kept` and `export *` collisions in `package.rs`; the rules
-  and the pattern depth limit are unit tests in `lang/ts/uses.rs`),
+  and the pattern depth limit are unit tests in `lang/ts/uses.rs`; `context` on the documented,
+  zod, literals and drift-free routes (goldens `chain-drift.context-route-*.txt`), `search` with
+  the kind `drift` (`chain-drift.search-drift.txt`) and `status` (`chain-drift.status.txt`, and
+  `cli.status-drift.*` in `cli` for pt-BR and English) show it),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

@@ -1,0 +1,13 @@
+example.com/chain/web (.) indexed, 16 files
+  shape drift, missing reads: 36
+example.com/chain/gateway (../chain-gateway) indexed, 11 files
+  broken.openapi.yaml:7: unreadable document (while parsing a flow sequence, expected ',' or ']'), ignored
+  docs/api-contract.yaml: openapi 3.0.3, routes: 1
+  generated/openapi.yaml: openapi 3.1.0, routes: 1
+  legacy.openapi.yaml: not OpenAPI 3.0 or 3.1 (swagger 2.0), ignored
+  openapi.yaml: openapi 3.1.0, routes: 2
+  orders.openapi.json: openapi 3.0.3, routes: 1
+  GET /api/shipments/{} in orders.openapi.json is also in openapi.yaml: one route
+  docs/missing.yaml: listed in `serve.documents`, not found
+example.com/chain/catalog (../chain-catalog) indexed, 23 files
+example.com/chain/worker (../chain-worker) indexed, 3 files
