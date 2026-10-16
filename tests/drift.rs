@@ -92,6 +92,18 @@ fn trace_ends_the_links_of_consumers_reading_past_a_zod_shape() {
     assert_golden("chain-drift.trace-zod.txt", &answers.join("\n"));
 }
 
+#[test]
+fn trace_ends_the_links_of_consumers_destructuring_and_iterating_the_response() {
+    let (web, _, _) = drift_chain("drift_reads_trace");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("GET /api/batches"), Direction::Up, None)
+        .unwrap();
+
+    assert_golden("chain-drift.trace-batches.txt", &answer);
+}
+
 /// The gateway's `listOrders` sends a body parsed with a zod schema.
 fn parse_the_orders(gateway: &std::path::Path) {
     let path = gateway.join("src/orders.ts");

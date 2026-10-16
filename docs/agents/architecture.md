@@ -347,9 +347,12 @@ one for the area a change touches.
 - `lang/ts/uses.rs`: following call results (`Call::uses`) charges every node it visits and
   every step it copies into a `const`'s uses to `USES_BUDGET` (2^20 per file); past it, the
   file's remaining calls have no uses, so their consumers read nothing and give no drift. A
-  value is followed only in the function making the call, through `const` bindings of a plain
-  name that nothing else in that function binds; a `let`, a destructuring, `.then(...)` and a
-  value passed to a function end it (no marker). A wrapper's caller is read only when the
+  value is followed only in the function making the call, through the names a `const`
+  declaration, a `for...of` variable or an array method's callback parameter binds (patterns
+  included), when nothing else in that function binds or assigns the name; a `let`
+  declaration, `.then(...)`, a callback given by name, `reduce` and a value passed to a
+  function end it (no marker). A destructuring pattern nested deeper than `PATTERN_DEPTH` (32)
+  reads nothing below that depth (`ponytail:`; a unit test feeds it a deeper pattern). A wrapper's caller is read only when the
   wrapper returns one thing (the response, the body or one path below it) from the function
   holding its call; whether the body was awaited is not checked (no marker).
 - `zod.rs`: reading the schemas of a file's handlers charges every schema expression examined
