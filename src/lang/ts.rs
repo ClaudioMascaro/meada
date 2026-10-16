@@ -63,10 +63,7 @@ impl LanguagePack for TsJs {
                 "call_expression" | "new_expression" => {
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
                     // used (`new SendMessageCommand(...)`, `new Worker(...)`).
-                    let function = node
-                        .child_by_field_name("function")
-                        .or_else(|| node.child_by_field_name("constructor"));
-                    if let Some(function) = function {
+                    if let Some(function) = callee_node(node) {
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
@@ -664,18 +661,15 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         }
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
-            None if kind == "call_expression" => node
-                .child_by_field_name("function")
-                .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
-            None if kind == "new_expression" => {
-                node.child_by_field_name("constructor")
-                    .map_or(Value::Unknown, |f| {
-                        let args = node.child_by_field_name("arguments");
-                        let args = args.filter(|a| a.kind() == "arguments");
-                        let args = args.map(|a| named(a).map(|arg| value(arg, src, scope)));
-                        Value::New(callee(f, src), args.into_iter().flatten().collect())
-                    })
+            None if kind == "call_expression" => {
+                callee_node(node).map_or(Value::Unknown, |f| Value::Call(callee(f, src)))
             }
+            None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
+                let args = node.child_by_field_name("arguments");
+                let args = args.filter(|a| a.kind() == "arguments");
+                let args = args.map(|a| named(a).map(|arg| value(arg, src, scope)));
+                Value::New(callee(f, src), args.into_iter().flatten().collect())
+            }),
             None => Value::Unknown,
         },
     }
@@ -756,7 +750,7 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             Some(Part::Env(name))
         }
         "call_expression" => {
-            let function = node.child_by_field_name("function")?;
+            let function = callee_node(node)?;
             let method = function.child_by_field_name("property")?;
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
@@ -800,6 +794,19 @@ fn unquote(node: Node, src: &[u8]) -> String {
         .to_string()
 }
 
+/// What a call or `new` expression calls. With type arguments under `await`, the grammar
+/// reads `await get<Row>(x)` as a call whose `function` is `await get`: the awaited call is
+/// `get<Row>(x)`, so the callee is the operand of that `await`.
+fn callee_node(node: Node) -> Option<Node> {
+    let function = node
+        .child_by_field_name("function")
+        .or_else(|| node.child_by_field_name("constructor"))?;
+    match function.kind() {
+        "await_expression" => named(function).next(),
+        _ => Some(function),
+    }
+}
+
 /// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
 /// so no source text beyond names reaches the index.
 fn callee(node: Node, src: &[u8]) -> String {
@@ -822,4 +829,42 @@ fn callee(node: Node, src: &[u8]) -> String {
 
 fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
     std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(src: &str) -> Facts {
+        TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn type_arguments_under_await_leave_the_call_intact() {
+        // The grammar reads `await get<Row>("/x")` as a call of `await get`.
+        for (typed, plain) in [
+            ("await get<Row>(\"/x\")", "await get(\"/x\")"),
+            ("await api.get<Row>(\"/x\")", "await api.get(\"/x\")"),
+            ("await new Client<Row>(\"/x\")", "await new Client(\"/x\")"),
+        ] {
+            let facts = |call: &str| parse(&format!("async function f() {{ const d = {call}; }}"));
+            let (typed, plain) = (facts(typed), facts(plain));
+            assert_eq!(typed.calls.len(), 1);
+            assert_eq!(typed.calls[0].callee, plain.calls[0].callee);
+            assert!(!typed.calls[0].callee.starts_with('('));
+            assert_eq!(typed.calls[0].args.len(), 1);
+        }
+    }
+
+    #[test]
+    fn an_awaited_typed_call_is_a_call_value() {
+        let facts = parse("async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }");
+        let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert_eq!(call.args.len(), 2);
+        assert!(
+            call.args
+                .iter()
+                .all(|a| matches!(a, Value::Call(name) if name == "get"))
+        );
+    }
 }

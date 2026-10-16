@@ -49,6 +49,12 @@ tagging.
   macOS and Windows on x86_64 and arm64 and a shell installer, published to GitHub Releases.
   The crate is ready for `cargo install meada`.
 
+### Fixed
+
+- TypeScript and JavaScript: a call with type arguments under `await`, such as `await
+  api.get<Row>("/users")`, is read as a call of `api.get` again, so it links to its target and
+  its HTTP consumer is found.
+
 ### Measured
 
 The maintainer ran this release on the private dogfood set on 2026-10-14 (ADR 0003).
