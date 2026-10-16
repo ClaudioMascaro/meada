@@ -115,6 +115,8 @@ impl Engine {
         package::consume(&mut exports, &providers);
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
+        // Shapes imported from a package fill from the shapes it keeps (issue #175).
+        package::shapes(&mut exports, &providers);
         Ok(exports)
     }
 

@@ -1,13 +1,14 @@
 //! The fields a declared type lists (spec #23, ADR 0009): what a consumer's cast, type
 //! argument or annotation says the response holds. Interfaces (with `extends`), type aliases,
 //! intersections, arrays and `z.infer<typeof S>` give fields; every other form adds none, and a
-//! name that is not declared in the repository (a type of a package, a type parameter) adds
-//! none either.
+//! name that is not declared in the repository (a type parameter) adds none either. A type or
+//! schema a package exports is an import the query fills (issue #175).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::lang::{TYPE_DEPTH, Ty};
 use crate::resolve::Code;
+use crate::shape::{Import, Shape, Source, Want, under};
 use crate::zod::Zod;
 
 /// What reading the types of one file's consumers may cost: every type examined, over all the
@@ -41,6 +42,9 @@ pub struct Declared {
     pub fields: BTreeMap<String, bool>,
     /// The paths of the objects with an index signature: anything may be there.
     pub open: BTreeSet<String>,
+    /// The types and schemas a package exports that the type names (issue #175), each at its
+    /// path, for the query to fill.
+    pub imports: BTreeSet<Import>,
 }
 
 impl Types {
@@ -76,6 +80,28 @@ impl Types {
         };
         reader.walk((path, scope), ty, "", 0)?;
         Some(reader.out)
+    }
+
+    /// The shape a consumer typed with the interface or type alias `name` of `path` reads, for
+    /// the package's index to store (issue #175): every path the type lists, declared, the
+    /// optional ones marked, and the imports it leaves to the query. `None` when `name` is no
+    /// type declaration, or past the file's budget.
+    pub fn exported<'a>(&mut self, code: &Code<'a>, path: &'a str, name: &'a str) -> Option<Shape> {
+        let (file, constant, ty) = code.declared_type(path, "", name)?;
+        let within = constant.rsplit_once('.').map_or("", |(s, _)| s);
+        let read = self.read(code, file, within, ty)?;
+        let optional = (read.fields.iter())
+            .filter(|&(_, &o)| o)
+            .map(|(p, _)| p.clone());
+        let fields: BTreeSet<String> = read.fields.keys().cloned().collect();
+        Some(Shape {
+            optional: optional.collect(),
+            declared: fields.clone(),
+            fields,
+            open: read.open,
+            imports: read.imports,
+            ..Shape::new(Source::Reads(path.to_string()))
+        })
     }
 }
 
@@ -130,6 +156,11 @@ impl<'a> Reader<'_, 'a> {
             Ty::Named(name) => {
                 let Some((file, constant, declared)) = self.code.declared_type(at.0, at.1, name)
                 else {
+                    // A type a package exports is the query's to fill.
+                    if let Some(imported) = self.code.imported(at.0, at.1, name) {
+                        let import = Import::new(prefix, at.0, imported, Want::Type);
+                        self.out.imports.insert(import);
+                    }
                     return Some(());
                 };
                 // A declaration that leads back to itself adds what it did the first time.
@@ -143,9 +174,15 @@ impl<'a> Reader<'_, 'a> {
                 done?;
             }
             Ty::Schema(name) => {
-                let fields = self.zod.inferred(self.code, at.0, at.1, name);
-                for (field, optional) in fields.into_iter().flatten() {
+                let Some((fields, imports)) = self.zod.inferred(self.code, at.0, at.1, name) else {
+                    return Some(());
+                };
+                for (field, optional) in fields {
                     self.field(&under(prefix, &field), optional);
+                }
+                for import in imports {
+                    let at = under(prefix, &import.at);
+                    self.out.imports.insert(Import { at, ..import });
                 }
             }
             Ty::Param(name) => {
@@ -174,16 +211,6 @@ impl<'a> Reader<'_, 'a> {
     }
 }
 
-/// The path `path`, written from the root of a part found at `prefix`: `items` below `a` is
-/// `a.items`, and `[].id` below `a` is `a[].id`.
-pub fn under(prefix: &str, path: &str) -> String {
-    match (prefix.is_empty(), path.starts_with('[')) {
-        (true, _) => path.to_string(),
-        (false, true) => format!("{prefix}{path}"),
-        (false, false) => format!("{prefix}.{path}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -191,6 +218,7 @@ mod tests {
     use super::{Declared, Types};
     use crate::lang::{self, LanguagePack, TYPE_DEPTH, Ty, ts::TsJs};
     use crate::resolve::{Code, Resolver};
+    use crate::shape::Want;
 
     /// The fields the type `name`, declared in `src`, lists, as `path` or `path?`, with the
     /// paths that are open.
@@ -200,7 +228,7 @@ mod tests {
         let files = BTreeMap::from([("a.ts", &facts)]);
         let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
         let code = Code::new(&resolver, &files, lang::pack(0));
-        let Declared { fields, open } = Types::default().read(&code, "a.ts", "", &ty)?;
+        let Declared { fields, open, .. } = Types::default().read(&code, "a.ts", "", &ty)?;
         let fields = (fields.into_iter())
             .map(|(p, optional)| format!("{p}{}", if optional { "?" } else { "" }))
             .collect();
@@ -323,6 +351,43 @@ mod tests {
         assert_eq!(fields(src, "A"), ["a", "b"]);
         assert_eq!(fields(src, "Tree"), ["left", "right", "value"]);
         assert_eq!(fields(src, "Loop"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_type_or_schema_a_package_exports_is_left_for_the_query() {
+        let src = "import type { Ext } from '@acme/types';\n\
+                   import { Schema } from '@acme/schemas';\n\
+                   import { z } from 'zod';\n\
+                   interface Holder { ext: Ext; list: Ext[]; inferred: z.infer<typeof Schema>; own: string }\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let code = Code::new(&resolver, &files, lang::pack(0));
+        let ty = Ty::Named("Holder".into());
+        let read = Types::default().read(&code, "a.ts", "", &ty).unwrap();
+        let imports: Vec<(&str, &str, Want)> = (read.imports.iter())
+            .map(|i| (i.at.as_str(), i.name.as_str(), i.want))
+            .collect();
+        assert_eq!(
+            imports,
+            [
+                ("ext", "Ext", Want::Type),
+                ("inferred", "Schema", Want::Infer),
+                ("list[]", "Ext", Want::Type)
+            ]
+        );
+        // A type parameter of the same name hides the import.
+        let src = "import type { Ext } from '@acme/types';\n\
+                   interface Page<Ext> { item: Ext; other: Ext2 }\n\
+                   import type { Ext2 } from '@acme/types';\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let code = Code::new(&resolver, &files, lang::pack(0));
+        let ty = Ty::Named("Page".into());
+        let read = Types::default().read(&code, "a.ts", "", &ty).unwrap();
+        let at: Vec<&str> = read.imports.iter().map(|i| i.at.as_str()).collect();
+        assert_eq!(at, ["other"]);
     }
 
     #[test]

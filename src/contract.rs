@@ -114,6 +114,11 @@ pub enum Role {
     /// exported; at query time, one that resolves into a package of the workspace becomes a
     /// consumer of that package (spec #22).
     Import,
+    /// Neither side: the shape a package's index keeps for a name a file exports (issue #175),
+    /// the module-level constant or type `method` of the file, read for the view `via` names
+    /// (`shape::Want`). Stored, never exported; at query time it fills the parts of the shapes
+    /// that import the name.
+    Shape,
 }
 
 impl Role {
@@ -125,6 +130,7 @@ impl Role {
             Role::Binding => "binding",
             Role::Publish => "publish",
             Role::Import => "import",
+            Role::Shape => "shape",
         }
     }
 }

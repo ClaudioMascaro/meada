@@ -128,6 +128,28 @@ fn trace_marks_reads_under_an_index_signature_of_the_return_type_not_checked() {
     assert_golden("chain-drift.trace-labels.txt", &answer);
 }
 
+#[test]
+fn trace_ends_the_links_of_consumers_of_shapes_shared_through_a_package() {
+    let (web, _, _) = drift_chain("drift_shared_trace");
+    let engine = Engine::open(&web).unwrap();
+
+    let mut answers = Vec::new();
+    for route in [
+        "GET /api/quotes",
+        "GET /api/shelves/{}",
+        "GET /api/shelves",
+        "GET /api/receipts",
+        "GET /api/tickets",
+        "GET /api/offers",
+        "GET /api/tags",
+    ] {
+        let start = Start::From(route);
+        answers.push(engine.trace(start, Direction::Up, None).unwrap());
+    }
+
+    assert_golden("chain-drift.trace-shared.txt", &answers.join("\n"));
+}
+
 /// The gateway's `listOrders` sends a body parsed with a zod schema.
 fn parse_the_orders(gateway: &std::path::Path) {
     let path = gateway.join("src/orders.ts");

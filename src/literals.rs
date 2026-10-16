@@ -5,10 +5,10 @@
 
 use std::collections::HashMap;
 
-use crate::declared::{self, Types};
+use crate::declared::Types;
 use crate::lang::{Call, Part, Step, Ty, Value, property};
 use crate::resolve::{Code, Target};
-use crate::shape::{Shape, Source};
+use crate::shape::{Import, Shape, Source, Want, under};
 
 /// What reading the literals of one file's handlers may cost: every call examined and every
 /// value read or constant followed, over all the handlers of the file. Past it, the file's
@@ -171,6 +171,28 @@ impl Literals {
         }
         Some(reader.shape)
     }
+
+    /// The shape the package's index stores for the module-level constant `name` of `path`
+    /// when it holds an object or array literal (issue #175): what a handler spreading or
+    /// sending it gives. `None` for any other value, or past the budget.
+    pub fn exported<'a>(&mut self, code: &Code<'a>, path: &'a str, name: &'a str) -> Option<Shape> {
+        let (_, held) = code.constant(path, "", name)?;
+        if !matches!(held, Value::Object(_) | Value::List(_)) {
+            return None;
+        }
+        let mut reader = Reader {
+            code,
+            spent: self.spent.entry(path.to_string()).or_default(),
+            types: &mut self.types,
+            seen: Vec::new(),
+            shape: Shape::new(Source::Literals(path.to_string())),
+        };
+        reader.read(path, "", held, "", 1)?;
+        if let Some(ty) = code.constant_type(path, name) {
+            reader.typed(path, "", ty, "");
+        }
+        Some(reader.shape)
+    }
 }
 
 /// Reads one handler's values into a shape.
@@ -212,7 +234,12 @@ impl<'a> Reader<'_, 'a> {
                 false => None,
             };
             let Some(((at, constant), held)) = found else {
-                return Some((path, scope, &UNKNOWN, depth));
+                // A name imported from outside the repository stays a name: the query fills it
+                // from the package that exports it (issue #175).
+                let imported =
+                    depth <= LITERALS_DEPTH && self.code.imported(path, scope, name).is_some();
+                let stop = if imported { value } else { &UNKNOWN };
+                return Some((path, scope, stop, depth));
             };
             if let Some(ty) = self.code.constant_type(at, constant) {
                 self.seen.push((at, ty));
@@ -232,10 +259,13 @@ impl<'a> Reader<'_, 'a> {
             return self.open(at);
         };
         for open in &read.open {
-            match open.is_empty() {
-                true => self.open(at),
-                false => self.open(&declared::under(at, open)),
-            }
+            self.open(&under(at, open));
+        }
+        // A type a package exports gives its index signatures from the query (issue #175).
+        for import in read.imports.into_iter().filter(|i| i.want == Want::Type) {
+            let at = under(at, &import.at);
+            let want = Want::Opens;
+            self.shape.imports.insert(Import { at, want, ..import });
         }
     }
 
@@ -288,9 +318,21 @@ impl<'a> Reader<'_, 'a> {
             Value::Str(parts) if parts.len() != 1 || matches!(parts[0], Part::Text(_)) => {
                 self.scalar(at)
             }
+            Value::Ref(name) => self.imported(path, scope, name, at),
             _ => self.open(at),
         }
         Some(())
+    }
+
+    /// The constant `name`, imported from outside the repository, at `at`: the query fills it
+    /// from the package that exports it, or opens it (issue #175).
+    fn imported(&mut self, path: &'a str, scope: &'a str, name: &'a str, at: &str) {
+        let Some(imported) = self.code.imported(path, scope, name) else {
+            return self.open(at);
+        };
+        self.field(at);
+        let import = Import::new(at, path, imported, Want::Literals);
+        self.shape.imports.insert(import);
     }
 
     /// The properties of an object literal as fields below `at`; a spread of a known object
@@ -320,6 +362,7 @@ impl<'a> Reader<'_, 'a> {
                         self.object(path, scope, inner, at, depth)?
                     }
                     (_, _, Value::Undefined, _) => {}
+                    (path, scope, Value::Ref(name), _) => self.imported(path, scope, name, at),
                     _ => self.open(at),
                 }
             } else if key.is_empty() || key.contains(['.', '[']) {
@@ -476,7 +519,7 @@ mod tests {
     use super::{Handler, LITERALS_BUDGET, LITERALS_DEPTH, Literals};
     use crate::lang::{self, LanguagePack, ts::TsJs};
     use crate::resolve::{Code, Resolver};
-    use crate::shape::Shape;
+    use crate::shape::{Shape, Want};
 
     /// The shape of the handler `name` of one file, read with `reader` (to share a budget).
     fn read_with(reader: &mut Literals, src: &str, name: &str, kind: Handler) -> Option<Shape> {
@@ -528,6 +571,53 @@ mod tests {
         assert_eq!(paths(&shape.open), ["", "got", "mapped", "none[]"]);
         let scalars = ["kind", "n", "name", "ok", "rows[].id"];
         assert_eq!(paths(&shape.scalars), scalars);
+    }
+
+    #[test]
+    fn a_constant_a_package_exports_is_left_for_the_query_unless_a_binding_hides_it() {
+        let shape = express(
+            "import { BASE, ROW } from '@acme/shared';\n\
+             export function h(req, res) {\n\
+               res.json({ ...BASE, row: ROW, ok: true });\n\
+             }\n",
+        )
+        .unwrap();
+        let at: Vec<(&str, &str)> = (shape.imports.iter())
+            .map(|i| (i.at.as_str(), i.name.as_str()))
+            .collect();
+        assert_eq!(at, [("", "BASE"), ("row", "ROW")]);
+        assert!(shape.open.is_empty());
+        // A `catch` binding of the same name is no import: its spread is open.
+        let shape = express(
+            "import { BASE } from '@acme/shared';\n\
+             export function h(req, res) {\n\
+               try { load(); } catch (BASE) { res.json({ ...BASE }); }\n\
+             }\n",
+        )
+        .unwrap();
+        assert!(shape.imports.is_empty());
+        assert_eq!(paths(&shape.open), [""]);
+    }
+
+    #[test]
+    fn a_body_typed_with_a_package_type_takes_its_open_parts_from_the_query() {
+        let shape = next(
+            "import { NextResponse } from 'next/server';\n\
+             import type { Reply, Meta } from '@acme/shared';\n\
+             const META: Meta = { a: 'b' };\n\
+             export async function h(): Promise<NextResponse<Reply>> {\n\
+               return NextResponse.json({ ok: true, meta: META });\n\
+             }\n",
+        )
+        .unwrap();
+        let imports: Vec<(&str, &str, Want)> = (shape.imports.iter())
+            .map(|i| (i.at.as_str(), i.name.as_str(), i.want))
+            .collect();
+        assert_eq!(
+            imports,
+            [("", "Reply", Want::Opens), ("meta", "Meta", Want::Opens)]
+        );
+        assert!(shape.open.is_empty());
     }
 
     #[test]
