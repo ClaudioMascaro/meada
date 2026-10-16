@@ -359,8 +359,11 @@ one for the area a change touches.
   handler sends is typed with one; otherwise the literals are read (no marker). A schema from a
   package import (zod schemas shared in a package, issue #175) is unknown, so open, never
   closed. `.passthrough`, `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy`
-  and any call Meada does not read open the part. Only a module-level constant is followed
-  (the same as `literals.rs`).
+  and any call Meada does not read open the part; so does a `pick` / `omit` with a computed
+  key and a `z.union([])`. A schema or a parse result held in a constant of the handler (a
+  function-local `const out = Schema.parse(..)`) is followed, unlike in `literals.rs`, and
+  nothing records a later write to it (`Object.assign(out, { extra: 1 })`), so it is still
+  read as the schema's shape (no marker).
 - `lang/ts.rs` (`VALUE_DEPTH`, 64): an expression nested deeper than 64 levels (calls inside
   calls, members, objects) is read as unknown from there (no marker).
 - `literals.rs`: reading a handler's returned literals charges every call examined and every

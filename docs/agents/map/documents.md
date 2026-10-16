@@ -100,7 +100,7 @@ modules updates it.
   zod schema a route handler's response passes through, in the handler's file; declared, like
   a document) are the sources yet; a later spec #23 ticket adds the declared-type consumer
   source as a variant. `zod.rs` (spec #23) reads the schema into a `Shape`:
-  `Zod::returned(code, path, handler, kind)` takes the 2xx bodies `Literals::responses` lists
+  `Zod::returned(code, responses, handler)` takes the 2xx bodies `Literals::responses` lists
   and reads each as a schema, from `schema.parse(x)`, `schema.safeParse(x).data`, or a value
   or handler return type annotated `z.infer<typeof schema>` (`lang/ts/types.rs` names the
   schema; `Def::returns` and `Value::Schema` carry it), following local and same-repository
@@ -111,7 +111,7 @@ modules updates it.
   scalar leaves, `.optional/.nullable/.nullish` and the like keep the part; `.passthrough`,
   `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable
   are open. `literals.rs` (spec #23) reads a handler's returned literals into a `Shape`:
-  `Literals::returned(code, path, handler, Handler::Express | Next)` takes the calls in the
+  `Literals::responses(code, path, handler, Handler::Express | Next)` takes the calls in the
   handler's byte range (and its inline callbacks), keeps the ones that send a response (Express:
   `<res>.json|send`, `res` being the handler's second parameter, also after `<res>.status(n)`
   in a chain; Next: `NextResponse.json` imported from `next/server` and the global
@@ -122,7 +122,7 @@ modules updates it.
   (an empty array and a spread of anything but a known object included), a string with more
   than one part, a number and a boolean are scalar leaves. `Literals::responses` lists the 2xx
   bodies (and whether the handler answers another way, which opens the root; see the Known
-  ceilings), `returned` reads them; only module-level constants are followed. `Source::at`
+  ceilings), `Literals::shape` reads them; only module-level constants are followed. `Source::at`
   names it in `context`; `Source::declared` tells a declared source (a document) from one read
   from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the
   one drift comparison: each consumer path is checked from the root one step at a time

@@ -414,10 +414,9 @@ fn provider_shape(
     name: &str,
     kind: Handler,
 ) -> Option<Shape> {
-    (readers
-        .zod
-        .returned(code, &mut readers.literals, path, name, kind))
-    .or_else(|| readers.literals.returned(code, path, name, kind))
+    let responses = readers.literals.responses(code, path, name, kind)?;
+    (readers.zod.returned(code, &responses, name))
+        .or_else(|| readers.literals.shape(code, &responses))
 }
 
 /// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on a constant

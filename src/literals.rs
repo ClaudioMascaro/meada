@@ -130,17 +130,10 @@ impl Literals {
         Some(responses)
     }
 
-    /// The shape the 2xx responses of the handler `name` of `path` give, as the union of their
-    /// body literals, the root open when the handler may answer another way; `None` when it
-    /// sends no body Meada reads, or past the budget.
-    pub fn returned<'a>(
-        &mut self,
-        code: &Code<'a>,
-        path: &str,
-        name: &str,
-        kind: Handler,
-    ) -> Option<Shape> {
-        let responses = self.responses(code, path, name, kind)?;
+    /// The shape the 2xx `responses` of a handler give, as the union of their body literals,
+    /// the root open when the handler may answer another way; `None` when it sends no body
+    /// Meada reads, or past the budget.
+    pub fn shape<'a>(&mut self, code: &Code<'a>, responses: &Responses<'a>) -> Option<Shape> {
         if responses.bodies.is_empty() {
             return None;
         }
@@ -150,7 +143,7 @@ impl Literals {
             spent: self.spent.entry(path.to_string()).or_default(),
             shape: Shape::new(Source::Literals(path.to_string())),
         };
-        for (scope, body) in responses.bodies {
+        for &(scope, body) in &responses.bodies {
             reader.read(path, scope, body, "", 0)?;
         }
         if responses.other {
@@ -441,7 +434,8 @@ mod tests {
         let files = BTreeMap::from([("a.ts", &facts)]);
         let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
         let code = Code::new(&resolver, &files, lang::pack(0));
-        reader.returned(&code, "a.ts", name, kind)
+        let responses = reader.responses(&code, "a.ts", name, kind)?;
+        reader.shape(&code, &responses)
     }
 
     fn express(src: &str) -> Option<Shape> {

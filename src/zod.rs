@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::lang::{Invocation, Value};
-use crate::literals::{Handler, Literals};
+use crate::literals::Responses;
 use crate::resolve::Code;
 use crate::shape::{Shape, Source};
 
@@ -156,12 +156,9 @@ impl Zod {
     pub fn returned<'a>(
         &mut self,
         code: &Code<'a>,
-        literals: &mut Literals,
-        path: &str,
+        responses: &Responses<'a>,
         name: &str,
-        kind: Handler,
     ) -> Option<Shape> {
-        let responses = literals.responses(code, path, name, kind)?;
         let path = responses.path;
         let def = code.files()[path].defs.iter().find(|d| d.name == name)?;
         let scope = def.name.rsplit_once('.').map_or("", |(s, _)| s);
@@ -175,7 +172,7 @@ impl Zod {
         };
         if node.is_none() && !responses.bodies.is_empty() {
             let mut all: Option<Node> = None;
-            for (scope, body) in responses.bodies {
+            for &(scope, body) in &responses.bodies {
                 let found = reader.body(path, scope, body, 0)??;
                 match &mut all {
                     Some(all) => all.union(found),
@@ -350,8 +347,9 @@ impl<'a> Reader<'_, 'a> {
             }
             "union" | "discriminatedUnion" => {
                 let members = args.get(usize::from(name == "discriminatedUnion"));
-                let Some(Value::List(members)) = members else {
-                    return Some(Some(Node::open()));
+                let members = match members {
+                    Some(Value::List(members)) if !members.is_empty() => members,
+                    _ => return Some(Some(Node::open())),
                 };
                 let mut all = Node::default();
                 for member in members {
@@ -375,7 +373,7 @@ impl<'a> Reader<'_, 'a> {
         let mut node = Node::default();
         for (key, value) in properties {
             // A spread, or a key with no spelling in a field path, may be any field.
-            if key == "..." || key.is_empty() || key.contains(['.', '[']) {
+            if key == "..." || unreadable(key) {
                 node.open = true;
                 continue;
             }
@@ -419,8 +417,13 @@ impl<'a> Reader<'_, 'a> {
             },
             "pick" | "omit" => match args.first() {
                 Some(Value::Object(keys)) if keys.iter().all(|(k, _)| k != "...") => {
+                    for _ in keys {
+                        self.charge()?;
+                    }
                     let named = |k: &String| keys.iter().any(|(key, _)| key == k);
                     on.fields.retain(|k, _| named(k) == (name == "pick"));
+                    // A computed key may name any field.
+                    on.open |= keys.iter().any(|(key, _)| unreadable(key));
                 }
                 _ => on.open = true,
             },
@@ -429,6 +432,11 @@ impl<'a> Reader<'_, 'a> {
         }
         Some(on)
     }
+}
+
+/// Whether an object key has no spelling in a field path (a computed key, `[K]`).
+fn unreadable(key: &str) -> bool {
+    key.is_empty() || key.contains(['.', '['])
 }
 
 /// The method a call calls on its receiver.
@@ -452,8 +460,8 @@ mod tests {
         let files = BTreeMap::from([("a.ts", &facts)]);
         let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
         let code = Code::new(&resolver, &files, lang::pack(0));
-        let mut literals = Literals::default();
-        Zod::default().returned(&code, &mut literals, "a.ts", "h", kind)
+        let responses = Literals::default().responses(&code, "a.ts", "h", kind)?;
+        Zod::default().returned(&code, &responses, "h")
     }
 
     fn express(src: &str) -> Option<Shape> {
@@ -568,6 +576,10 @@ mod tests {
             ("z.array(z.any())", "[]", vec!["[]"]),
             ("z.array(Ext)", "[]", vec!["[]"]),
             ("Base.superJoin()", "", vec![""]),
+            ("z.union([])", "", vec![""]),
+            ("Base.pick({ [K]: true })", "", vec![""]),
+            ("Base.omit({ [K]: true })", "id", vec![""]),
+            ("Base.pick({ id: true, [K]: true })", "id", vec![""]),
         ];
         for (schema, fields, open) in cases {
             let shape = parsed(decls, schema);
