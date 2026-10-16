@@ -64,10 +64,16 @@ impl LanguagePack for TsJs {
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
                     // used (`new SendMessageCommand(...)`, `new Worker(...)`).
                     if let Some(function) = callee_node(node) {
+                        // The artifact's `await` is outside the call: so is its span.
+                        let start = if awaited_artifact(node) {
+                            function.start_byte()
+                        } else {
+                            node.start_byte()
+                        };
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
-                            range: node.byte_range(),
+                            range: start..node.end_byte(),
                             args: node
                                 .child_by_field_name("arguments")
                                 .filter(|a| a.kind() == "arguments")
@@ -801,10 +807,21 @@ fn callee_node(node: Node) -> Option<Node> {
     let function = node
         .child_by_field_name("function")
         .or_else(|| node.child_by_field_name("constructor"))?;
-    match function.kind() {
-        "await_expression" => named(function).next(),
-        _ => Some(function),
+    if awaited_artifact(node) {
+        named(function).next()
+    } else {
+        Some(function)
     }
+}
+
+/// Whether `node` is the parse artifact `await f<T>(x)`: type arguments, and an `await` as
+/// the `function`.
+fn awaited_artifact(node: Node) -> bool {
+    node.child_by_field_name("type_arguments").is_some()
+        && node
+            .child_by_field_name("function")
+            .or_else(|| node.child_by_field_name("constructor"))
+            .is_some_and(|f| f.kind() == "await_expression")
 }
 
 /// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
@@ -853,6 +870,28 @@ mod tests {
             assert_eq!(typed.calls[0].callee, plain.calls[0].callee);
             assert!(!typed.calls[0].callee.starts_with('('));
             assert_eq!(typed.calls[0].args.len(), 1);
+        }
+    }
+
+    #[test]
+    fn a_typed_call_under_await_spans_like_the_untyped_one() {
+        let range = |call: &str| {
+            let src = format!("async function f() {{ await {call}; }}");
+            let at = src.find("await").unwrap() + "await ".len();
+            let r = parse(&src).calls[0].range.clone();
+            (r.start - at, r.end - at, call.len())
+        };
+        let (start, end, len) = range("get<Row>(\"/x\")");
+        assert_eq!((start, end), (0, len));
+        assert_eq!(range("get(\"/x\")").0, 0);
+    }
+
+    #[test]
+    fn a_parenthesized_await_is_not_unwrapped() {
+        for src in ["(await f)(x)", "(await getFn())(x)"] {
+            let facts = parse(&format!("async function f() {{ {src}; }}"));
+            let callees: Vec<_> = facts.calls.iter().map(|c| c.callee.as_str()).collect();
+            assert!(callees.contains(&"(parenthesized_expression)"), "{src}");
         }
     }
 

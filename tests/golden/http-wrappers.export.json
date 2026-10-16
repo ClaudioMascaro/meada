@@ -191,7 +191,7 @@
       "level": "exact",
       "span": {
         "path": "src/users.ts",
-        "start": 416,
+        "start": 422,
         "end": 449
       }
     }
