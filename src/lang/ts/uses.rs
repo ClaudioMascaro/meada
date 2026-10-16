@@ -98,9 +98,9 @@ impl<'t> Uses<'t> {
                     "subscript_expression" if is("object") => {
                         match parent.child_by_field_name("index") {
                             Some(i) if i.kind() == "number" => steps.push(Step::Element),
-                            // A key holding `.` or `[` has no spelling in a field path.
+                            // A key holding `.` or `[`, or none, has no spelling in a field path.
                             Some(i) if i.kind() == "string" => match unquote(i, self.src) {
-                                key if key.contains(['.', '[']) => break,
+                                key if key.is_empty() || key.contains(['.', '[']) => break,
                                 key => steps.push(Step::Field(key)),
                             },
                             _ => break,
@@ -219,6 +219,10 @@ impl<'t> Uses<'t> {
                     stack.extend(node.child_by_field_name("left").map(|l| (l, steps, depth)));
                 }
                 "object_pattern" => {
+                    // Every child copies the steps: charged before they are copied.
+                    if !self.charge((steps.len() + 1).saturating_mul(node.named_child_count())) {
+                        return false;
+                    }
                     for child in named(node) {
                         let (key, value) = match child.kind() {
                             "shorthand_property_identifier_pattern" => {
@@ -226,6 +230,7 @@ impl<'t> Uses<'t> {
                             }
                             "object_assignment_pattern" => (
                                 (child.child_by_field_name("left"))
+                                    .filter(|l| l.kind() == "shorthand_property_identifier_pattern")
                                     .map(|l| text(l, self.src).to_string()),
                                 Some(child),
                             ),
@@ -241,6 +246,9 @@ impl<'t> Uses<'t> {
                     }
                 }
                 "array_pattern" => {
+                    if !self.charge((steps.len() + 1).saturating_mul(node.named_child_count())) {
+                        return false;
+                    }
                     for child in named(node).filter(|c| c.kind() != "rest_pattern") {
                         stack.push((child, with(&steps, Step::Element), depth + 1));
                     }
@@ -255,8 +263,10 @@ impl<'t> Uses<'t> {
     fn key(&self, key: Node<'t>) -> Option<String> {
         match key.kind() {
             "property_identifier" => Some(text(key, self.src).to_string()),
-            // A key holding `.` or `[` has no spelling in a field path.
-            "string" => Some(unquote(key, self.src)).filter(|k| !k.contains(['.', '['])),
+            // A key holding `.` or `[`, or none, has no spelling in a field path.
+            "string" => {
+                Some(unquote(key, self.src)).filter(|k| !k.is_empty() && !k.contains(['.', '[']))
+            }
             _ => None,
         }
     }
@@ -386,7 +396,7 @@ mod tests {
             read("\"a\""),
             [vec![json.clone(), field("a"), field("c"), Step::Return]]
         );
-        for key in ["\"a.b\"", "\"a[0]\"", "'items[]'"] {
+        for key in ["\"a.b\"", "\"a[0]\"", "'items[]'", "\"\""] {
             assert_eq!(read(key), [vec![json.clone()]], "{key}");
         }
     }
@@ -424,6 +434,31 @@ mod tests {
         assert_eq!(
             paths("const [first, { id }] = (await r.json()).items;\n  return first.id;"),
             [".items", ".items[]", ".items[].id", ".items[].id^"]
+        );
+    }
+
+    #[test]
+    fn a_key_the_path_notation_cannot_write_reads_nothing_in_a_pattern() {
+        // An empty key, a key with `.`, and a default that is itself a pattern.
+        assert_eq!(
+            paths(
+                "const { \"\": x, \"a.b\": y, c: { \"d[0]\": z }, { \"x.y\": q } = 1 } = await r.json();\n  return [x.a, y.b, z.c];"
+            ),
+            [""]
+        );
+    }
+
+    #[test]
+    fn a_wide_pattern_over_a_long_chain_is_charged_before_it_is_copied() {
+        // Every name copies the steps so far: the product of the two is the cost.
+        let names: Vec<String> = (0..30_000).map(|i| format!("a{i}")).collect();
+        let chain = ".b".repeat(300);
+        assert_eq!(
+            paths(&format!(
+                "const {{ {} }} = (await r.json(){chain});",
+                names.join(", ")
+            )),
+            Vec::<String>::new()
         );
     }
 
