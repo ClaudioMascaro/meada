@@ -317,7 +317,10 @@ one for the area a change touches.
   namespace import) parsed with the shared schemas, `app/api/tags` (a package return type)
   and `app/api/receipts`, the gateway's `src/shelves.ts` (spreading the shared
   constants) and the web's `src/shared.ts` (casts, an annotation, a type argument and `z.infer`
-  of the package's names; golden `chain-drift.trace-shared.txt`). Later spec
+  of the package's names; golden `chain-drift.trace-shared.txt`). Error answers in other forms
+  (the gateway's `GET /api/inventory/:sku/price`, the catalog's `app/api/reviews`), a `GET
+  /api/ping` both serve (ambiguous) and the web's `src/open.ts` (a dynamic URL the decisions file
+  `chain-drift-web` links) cover the rest of the drift rules. Later spec
   #23 tickets extend this overlay, so the `chain` and
   `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
@@ -445,12 +448,16 @@ one for the area a change touches.
   and a constant chain longer is unknown. Only a body Meada reads (an object or array literal,
   a constant naming one) gives fields; a call, a `map` over rows, a parameter or a spread of
   anything but a known object is open (no marker). The handler is the function `res.json` and
-  its kin sit in or in a callback inside it. A response sent another way opens the root of the
-  shape (no marker): in Next.js, a call whose result the handler itself returns and that is no
-  `NextResponse.json` / `Response.json` (`return ok(user)`, `new Response(..)`, `redirect`); in
-  Express, `res` passed to another call, a `res` method other than `json`, `send` and the ones
-  that only set a header or the status (`end`, `render`, `redirect`, `sendFile`, ...), or a call
-  of the handler's `next`. A `res` stored in another name or a status set in a separate
+  its kin sit in or in a callback inside it. A response with a literal status outside 2xx is
+  left out whatever its form (`res.status(404).json(..)`, `res.status(404).end()`,
+  `res.sendStatus(404)`, `new Response(null, { status: 404 })`), and so is Express's error path,
+  `next(err)` (`next` called with an argument other than `'route'` or `'router'`). A response
+  sent another way opens the root of the shape (no marker): in Next.js, a call whose result the
+  handler itself returns and that is no `NextResponse.json` / `Response.json` (`return
+  ok(user)`, `new Response(..)` with no such status, `redirect`); in Express, `res` passed to
+  another call, a `res` method other than `json`, `send` and the ones that only set a header or
+  the status (`end`, `render`, `redirect`, `sendFile`, `sendStatus`, ...) with no such status,
+  or `next()`, `next('route')` and `next('router')`. A `res` stored in another name or a status set in a separate
   statement (`res.status(404);` then `res.json(...)`) is not followed, so such a send counts as
   2xx (no marker). Only a module-level constant is followed: nothing records a later write to
   a function-local one (`body.next = cursor`, `Object.assign(body, x)`), so it is unknown and

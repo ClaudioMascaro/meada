@@ -25,3 +25,11 @@ chain: inferred · 1 hops · 2 repos · 61 tokens
 example.com/chain/gateway src/inventory.ts:22 GET /api/inventory/{}/image
   →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:47 image
 chain: inferred · 1 hops · 2 repos · 66 tokens
+
+example.com/chain/gateway src/inventory.ts:31 GET /api/inventory/{}/price
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:55 price drift: missing tax
+chain: inferred · 1 hops · 2 repos · 70 tokens
+
+example.com/chain/catalog app/api/reviews/route.ts:2 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:61 reviews drift: missing votes
+chain: inferred · 1 hops · 2 repos · 67 tokens

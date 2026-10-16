@@ -28,7 +28,13 @@ modules updates it.
   return object literals, so the gateway and catalog exports carry shapes with source
   `literals`, `trace` up from those routes shows drift and not-checked reads, and `context`
   names the source, and a Next.js route answering through a helper and an Express one that may
-  redirect are open at the root; the limits of `literals.rs` are unit tests there; the catalog's
+  redirect are open at the root, while error answers in other forms (`sendStatus`, a literal
+  status before `end`, `next(err)`, `new Response(null, { status: 404 })`) are left out, so
+  the web's `price` and `reviews` show drift; the limits of `literals.rs` are unit tests there;
+  a decisions file (`chain-drift-web`) links the unresolved `src/open.ts::rate` to a route with
+  a shape (drift on a `decided` link) beside the ambiguous `ping` (none), golden
+  `chain-drift.trace-decided.txt`; `trace` down from `src/stock.ts::price` ends its link line
+  with the drift (`chain-drift.trace-down.txt`); the catalog's
   zod routes (`app/api/comments`) give shapes with source `zod`, `trace` up from them (golden
   `chain-drift.trace-zod.txt`) shows the drift of the web reads, and a document wins over a zod
   schema, which wins over literals; the reading rules and limits of `zod.rs` are unit tests
@@ -36,7 +42,8 @@ modules updates it.
   (golden `chain-drift.trace-batches.txt`) destructure, iterate and map over the response,
   with the hidden names and the values handed to a function that are not followed; the
   catalog's `app/api/profiles` route and the web's `src/declared.ts` consumers (golden
-  `chain-drift.trace-declared.txt`) read declared types, with the optional fields, the package
+  `chain-drift.trace-declared.txt`) read declared types (the removed `nickname` read through
+  an interface cast, `exact`, and with plain member access, `inferred`), with the optional fields, the package
   type and the freshness of an edited shared type in `freshness`, the limits being unit tests in
   `declared.rs` and `lang/ts/types.rs`; the catalog's shared package and the routes and
   consumers importing it (golden `chain-drift.trace-shared.txt`) cross repositories through

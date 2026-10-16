@@ -48,3 +48,17 @@ export async function image(sku: string) {
   const body = await res.json();
   return [body.url, body.size];
 }
+
+// Error answers of other forms are left out of the routes' shapes too: `tax` and `votes` are
+// missing.
+export async function price(sku: string) {
+  const res = await fetch(`${GATEWAY}/api/inventory/${sku}/price`);
+  const body = await res.json();
+  return [body.amount, body.tax];
+}
+
+export async function reviews() {
+  const res = await fetch(`${CATALOG}/api/reviews`);
+  const body = await res.json();
+  return [body.stars, body.votes];
+}
