@@ -164,13 +164,19 @@ one for the area a change touches.
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
-- New **shape source** (spec #23 tickets after #63): a provider's (zod schemas, `zod.rs`, are
-  read and sit between documents and the returned literals `literals.rs` reads) or a consumer's (destructuring, iteration, declared
-  types) is a `shape::Source` variant, never a new shape type, with an arm in `Source::at` and
-  `Source::declared`. A source that knows scalar leaves fills `Shape::scalars` (documents do,
-  from primitive `type`s); a consumer source that declares paths (a type) fills
-  `Shape::declared`, and a missing path is `exact` only when the provider's source is declared
-  and the path is in the consumer's `declared`. What a pack reads from code
+- New **shape source** (spec #23): a provider's is a `shape::Source` variant, never a new shape
+  type, with an arm in `Source::at` and `Source::declared`, in the order `http::provider_shape`
+  and `Http::declare` apply (a document, then a zod schema, `zod.rs`, then the returned
+  literals, `literals.rs`). A consumer's (field reads, destructuring, iteration, declared types)
+  adds no variant: every consumer shape is `Source::Reads`, and a source adds its paths through
+  `Shape::list`, which fills `Shape::declared` for the paths a type gives and `Shape::optional`
+  for those it marks optional, keeping both within `fields` (a path is optional only while
+  everything listing it says so). A source that knows scalar leaves fills `Shape::scalars`
+  (documents do, from primitive `type`s), and a missing path is `exact` only when the
+  provider's source is declared and the path is in the consumer's `declared`. A reader of code
+  charges its per-file limit to a `shape::Budget`, and an extraction holds one reader of each
+  source (`Literals` holds its `Types`, which hold their `Zod`), so each limit is spent once per
+  file. What a pack reads from code
   for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
   `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
   TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
@@ -180,8 +186,10 @@ one for the area a change touches.
   consumer)`, which `http::drift` runs over the workspace's links in
   `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
   (`Row::link`), the export and every other reader of links see the same value;
-  `drift_view.rs` renders it for `context` (a route's drifting consumers), `search` (kind
-  `drift`) and `status` (a count per repository) from the links alone, computing nothing.
+  `drift_view.rs` renders it for `context` (a route's consumers that read fields, with their
+  drift), `search` (kind `drift`) and `status` (a count per repository): it computes no drift
+  of its own, reading `Link::drift`, the exports' consumer shapes (which consumers read fields)
+  and their calls (where each consumer is).
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
   importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
@@ -237,8 +245,9 @@ one for the area a change touches.
   route handler returns, spec #23, with the parts a package import gives as the specifier, the
   name imported, the importing file and the view, issue #175), the shapes a repository with a
   named manifest keeps for the constants and types its files export (`contracts` rows of role
-  `shape`: field paths, open parts, scalar leaves, declared and optional paths and the imports
-  they leave to fill, issue #175; what crosses repositories is this shape of an exported name,
+  `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
+  parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
+  #175; what crosses repositories is this shape of an exported name,
   never its source text), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
@@ -403,8 +412,12 @@ one for the area a change touches.
   reads nothing below that depth (`ponytail:`; a unit test feeds it a deeper pattern). A wrapper's caller is read only when the
   wrapper returns one thing (the response, the body or one path below it) from the function
   holding its call; whether the body was awaited is not checked (no marker).
+- Shape readers (`zod.rs`, `declared.rs`, `literals.rs`): each per-file budget below is one
+  `shape::Budget` per extraction (`Http::extract`, `package::exported_shapes`), shared by every
+  reader of that extraction, so a file spends each at most once per extraction.
 - `zod.rs`: reading the schemas of a file's handlers charges every schema expression examined
-  to `ZOD_BUDGET` (2^14, over all the handlers of the file); past it, the remaining handlers
+  to `ZOD_BUDGET` (2^14, over all the handlers of the file, and the `z.infer` schemas its
+  types name); past it, the remaining handlers
   give no shape from a schema. Nesting, constants followed and methods chained count together
   against `ZOD_DEPTH` (32): a part deeper is open. A schema is read only when every 2xx body a
   handler sends is typed with one; otherwise the literals are read (no marker). A name imported
@@ -421,7 +434,7 @@ one for the area a change touches.
   `TYPE_DEPTH` (32) levels, both when it is written (`lang/mod.rs`, the nesting of an object or
   array type) and when a consumer's cast, type argument or annotation is followed through
   `extends`, aliases and intersections; a level deeper adds no fields. Reading the types of one
-  consumer file charges every type examined to `TYPES_BUDGET` (2^14); past it, the type being
+  file (its consumers' and its handlers') charges every type examined to `TYPES_BUDGET` (2^14); past it, the type being
   read adds no fields on a consumer, and opens the value on a provider. A declaration that leads
   back to itself (`interface A extends B`, `interface B extends A`) adds what it did the first
   time. A type parameter hides a declared type of its name only when it sits within
@@ -439,8 +452,8 @@ one for the area a change touches.
   inside an object literal), and a value that goes through a function, a `let` or a rebinding
   is not followed (no marker). On a provider, an index signature in the type of a returned
   constant, a cast body or the handler's return annotation opens that part of the shape.
-- `lang/ts.rs` (`VALUE_DEPTH`, 64): an expression nested deeper than 64 levels (calls inside
-  calls, members, objects) is read as unknown from there (no marker).
+- `lang/ts.rs` (`VALUE_DEPTH`, 64, `ponytail:`): an expression nested deeper than 64 levels
+  (calls inside calls, members, objects) is read as unknown from there.
 - `literals.rs`: reading a handler's returned literals charges every call examined and every
   value read or constant followed, over all the handlers of a file, to `LITERALS_BUDGET` (2^16);
   past it, the file's remaining handlers give their routes no shape. Nested literals and
@@ -499,6 +512,9 @@ one for the area a change touches.
   marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
   another one that is external is dropped without a status line (no marker).
+- `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
+  scanning the calls of every repository, once per link (no marker); an index by call id waits
+  for a workspace that makes this slow.
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by

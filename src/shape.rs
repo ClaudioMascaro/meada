@@ -10,8 +10,9 @@ use crate::contract::Level;
 
 /// The field paths a payload carries. A path is dotted, with array elements written `[]`
 /// (`items[].id`); a payload that is itself an array starts with `[]` (`[].id`). Every node
-/// below the root is a field, so `items` and `items[]` are listed with `items[].id`. Presence
-/// only: no type, format or requiredness is recorded.
+/// below the root is a field, so `items` and `items[]` are listed with `items[].id`. What is
+/// recorded is presence, the scalar leaves and a consumer's optional fields; types are never
+/// compared, and no format is kept.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Shape {
     pub source: Source,

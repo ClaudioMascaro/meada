@@ -61,16 +61,18 @@ modules updates it.
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
   enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
-  name and a definition, constant or parameter of its own scope alike (`Binding::Unknown`: a
+  name and a definition, constant or parameter of its own scope alike (`Binding::Hidden`: a
   call falls to a name match, a value is not known), the hidden names probe. `Call::uses` (spec #23, `serde(skip)`) is the pack's optional shape
-  facts: each chain of `Step`s (`Field`, `Element`, `Call(method)`, `Typed(Ty)`, `Return`) the function
+  facts: each chain of `Step`s (`Field`, `Element`, `Call(method)`, `Typed(Ty)`, `Argument(tys)`,
+  the type arguments a call is given, `Return`) the function
   making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
   `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
   of the names a `const` binds, a destructuring pattern (`PATTERN_DEPTH` deep; each field or
   element it names is a read), the variable of a `for...of` and the first parameter of an
   array method's callback written in place (`ELEMENT_METHODS`), each only when nothing else in
   the function binds or assigns the name; `Return` only from the call's own function), within
-  `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation as a `Ty` (`serde(skip)`, reparsed). Types (spec #23): `Ty` (`Object`, `Named`, `Intersection`, `Array`, `Schema`, `Unknown`) is what `lang/ts/types.rs` reads from a type; an `interface` or `type` declaration is a `Const` holding `Value::Type(Ty)` (so lexical, import and export resolution find it; `Code::held` skips it and `Code::declared_type` finds it), `Const::ty` and `Call::arg_types` hold the type a constant or argument is annotated or cast to (`serde(skip)`), and `declared.rs` (`Types`) expands a `Ty` into its field paths, optional marks and open (index signature) paths, with `TYPE_DEPTH` and `TYPES_BUDGET`. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
+  `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation as a `Ty` (`serde(skip)`, reparsed). Types (spec #23): `Ty` (`Object`, `Named`, `Intersection`, `Array`, `Schema`, `Param`, a type parameter of the
+  enclosing function, `Unknown`) is what `lang/ts/types.rs` reads from a type; an `interface` or `type` declaration is a `Const` holding `Value::Type(Ty)` (so lexical, import and export resolution find it; `Code::held` skips it and `Code::declared_type` finds it), `Const::ty` and `Call::arg_types` hold the type a constant or argument is annotated or cast to (`serde(skip)`), and `declared.rs` (`Types`) expands a `Ty` into its field paths, optional marks and open (index signature) paths, with `TYPE_DEPTH` and `TYPES_BUDGET`. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
   `Call(Invocation)` (the callee, the receiver value of a method call and its arguments, so a
   chain such as `z.object({..}).optional()` is read), `Member(object, property)` (`schema.shape`),
   `Schema(name)` (a constant annotated `z.infer<typeof name>`, from `lang/ts/types.rs`) and

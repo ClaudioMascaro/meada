@@ -1,5 +1,6 @@
-//! Shape drift as `context`, `search` and `meada status` show it (spec #23). It reads the one
-//! value `http::drift` sets on `Link::drift` and computes nothing of its own.
+//! Shape drift as `context`, `search` and `meada status` show it (spec #23). It shows the one
+//! value `http::drift` sets on `Link::drift` and computes no drift of its own; to place each
+//! consumer it reads the exports' consumer shapes and finds the consumer's call.
 
 use crate::contract::{Level, Link};
 use crate::engine::rank;
@@ -43,8 +44,7 @@ pub(crate) fn entries<'a>(
         .iter()
         .filter(|l| l.drift.is_some() || (l.level != Level::Ambiguous && reads(l)))
         .filter_map(|link| {
-            // ponytail: scans the calls of every repository per link; an index by call id waits
-            // for a workspace that makes this slow.
+            // Scans the calls of every repository per link (Known ceilings).
             let (repo, export, call) = exports
                 .iter()
                 .enumerate()
