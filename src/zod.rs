@@ -395,6 +395,14 @@ impl<'a> Reader<'_, 'a> {
         match value {
             Value::Ref(name) | Value::Schema(name) => self.named(path, scope, name, depth),
             Value::Call(call) => self.call(path, scope, call, depth),
+            // A member of a namespace import of a package (`C.Quote`).
+            Value::Member(head, member) => {
+                let imported = self.code.imported_member(path, scope, head, member);
+                Some(imported.map(|imported| Node {
+                    imports: vec![Import::new("", path, imported, Want::Zod)],
+                    ..Node::default()
+                }))
+            }
             _ => Some(None),
         }
     }
@@ -423,8 +431,11 @@ impl<'a> Reader<'_, 'a> {
         };
         // An imported name is taken for a schema only by the methods schemas have: `object` on
         // a `z` imported from another library makes it none.
-        let imported =
-            matches!(&**receiver, Value::Ref(name) if self.constant(path, scope, name).is_none());
+        let imported = match &**receiver {
+            Value::Ref(name) => self.constant(path, scope, name).is_none(),
+            Value::Member(..) => true,
+            _ => false,
+        };
         if imported && !SCHEMA_METHODS.contains(&method(call)) && !KEEPS.contains(&method(call)) {
             return Some(None);
         }
@@ -770,6 +781,16 @@ mod tests {
             assert!(named, "{schema}");
         }
         assert_eq!(paths(&parsed(decls, "Ext.pick({ id: true })").open), [""]);
+        // A namespace import's member is one too.
+        let shape = parsed("import * as C from '@acme/schemas';", "C.Ext");
+        let named: Vec<&str> = shape.imports.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(named, ["Ext"]);
+        // A parameter of the same name hides the import: no schema Meada reads.
+        let src = "import { Ext } from '@acme/schemas';\n\
+                   export function h(req, res) { [req.body].forEach((Ext) => res.json(Ext.parse(req.body))); }\n";
+        assert!(express(src).is_none_or(|s| s.imports.is_empty()));
+        let unhidden = src.replace("((Ext) =>", "((x) =>");
+        assert_eq!(express(&unhidden).unwrap().imports.len(), 1);
     }
 
     const SCHEMA: &str = "import { z } from 'zod';\n\

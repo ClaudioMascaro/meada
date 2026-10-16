@@ -587,13 +587,7 @@ impl<'e> Provided<'e> {
     ) -> Option<Resolved> {
         let tried = ways(manifest, subpath);
         let first = tried.first()?.0;
-        let followed = tried.iter().find_map(|(how, files)| {
-            if let Some(file) = files.iter().find(|f| self.owned_source(manifest, f)) {
-                return Some((file.clone(), *how, Level::Exact));
-            }
-            Some((self.mapped(manifest, files)?, How::OutDir, Level::Inferred))
-        });
-        let Some((file, how, level)) = followed else {
+        let Some((file, how, level)) = self.entry(manifest, &tried) else {
             let targets = self.candidates(repository, manifest, chain, known);
             return (!targets.is_empty()).then_some(Resolved {
                 how: first,
@@ -606,6 +600,21 @@ impl<'e> Provided<'e> {
             how,
             level,
             targets: vec![id],
+        })
+    }
+
+    /// The source file the first of the ways `tried` that leads to one names, with how and at
+    /// which level: directly `exact`, through the `outDir` mapping `inferred`.
+    fn entry(
+        &self,
+        manifest: &Manifest,
+        tried: &[(How, Vec<String>)],
+    ) -> Option<(String, How, Level)> {
+        tried.iter().find_map(|(how, files)| {
+            if let Some(file) = files.iter().find(|f| self.owned_source(manifest, f)) {
+                return Some((file.clone(), *how, Level::Exact));
+            }
+            Some((self.mapped(manifest, files)?, How::OutDir, Level::Inferred))
         })
     }
 
@@ -875,7 +884,8 @@ pub fn shapes(exports: &mut [Export], providers: &Providers) {
 /// The shape the name `import` names keeps in the package it imports from, as the repository
 /// `n` reaches it: the package the nearest manifest of the importing file depends on, resolved in
 /// each repository providing it (`Provided::resolve`, the rules of a call through an import) to
-/// a constant or type that keeps a shape for the import's view, with that repository. `None`
+/// a constant or type that keeps a shape for the import's view, with that repository and the
+/// level it resolved at (`inferred` through an `outDir` mapping). `None`
 /// when no provider resolves it, when one resolves it `ambiguous` or to several names, or when
 /// two give it different shapes.
 fn kept<'e>(
@@ -884,17 +894,18 @@ fn kept<'e>(
     provided: &'e [OnceCell<Provided<'e>>],
     n: usize,
     import: &shape::Import,
-) -> Option<(usize, &'e Shape)> {
+) -> Option<(usize, &'e Shape, Level)> {
     let (name, subpath) = split(&import.specifier)?;
     let manifest = nearest(&exports[n].manifests, &import.from)?;
     let entry = (manifest.summary.dependencies.iter()).find(|e| e.name == name)?;
-    let mut found: Option<(usize, &Shape)> = None;
+    let want = import.want.kept();
+    let mut found: Option<(usize, &Shape, Level)> = None;
     for &(m, i) in providers.of(name) {
         if !reaches(entry.range.as_deref(), m == n) {
             continue;
         }
         let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
-        let known = |id: &str| at.shapes.contains_key(&(id.to_string(), import.want));
+        let known = |id: &str| at.shapes.contains_key(&(id.to_string(), want));
         let repository = &exports[m].repository;
         let manifest = &exports[m].manifests[i];
         let Some(resolved) = at.resolve(repository, manifest, &subpath, &import.name, &known)
@@ -907,26 +918,79 @@ fn kept<'e>(
         if resolved.level == Level::Ambiguous {
             return None;
         }
-        let shape = at.shapes[&(target.clone(), import.want)];
-        if found.is_some_and(|(_, s)| s != shape) {
-            return None;
-        }
-        found = Some((m, shape));
+        let shape = at.shapes[&(target.clone(), want)];
+        found = match found {
+            None => Some((m, shape, resolved.level)),
+            Some((_, s, _)) if s != shape => return None,
+            // The same shape from two providers is as certain as the weaker resolution.
+            Some((first, s, level)) => Some((first, s, level.max(resolved.level))),
+        };
     }
     found
 }
 
-/// The shapes a repository with a named manifest keeps for what its files export (issue #175),
-/// as `Role::Shape` rows: for each module-level constant or type a file exports, the declared
+/// The files of a repository an import of one of its packages can reach (issue #175), so the
+/// ones whose exported constants and types keep a shape: for each named manifest, the entry
+/// file (`Provided::entry`, as an import resolves it) of the bare name and of each subpath its
+/// `exports` lists without a `*`, then every file the `exports` rows of those name, a definition's,
+/// a constant's or a re-exported one's, in turn.
+pub fn surface(
+    manifests: &[Manifest],
+    configs: &[Config],
+    exported: &[Exported],
+    files: &[&str],
+) -> HashSet<String> {
+    let mut by_file: HashMap<&str, Vec<&Exported>> = HashMap::new();
+    for e in exported {
+        by_file.entry(&e.path).or_default().push(e);
+    }
+    let provided = Provided {
+        files: files.iter().copied().collect(),
+        symbols: HashSet::new(),
+        exported: by_file,
+        manifests,
+        configs,
+        shapes: HashMap::new(),
+        owned: OnceCell::new(),
+    };
+    let mut queue = Vec::new();
+    for m in manifests.iter().filter(|m| m.summary.name.is_some()) {
+        let subpaths: Vec<String> = match &m.summary.exports {
+            Some(Value::Object(keys)) if keys.keys().any(|k| k.starts_with('.')) => (keys.keys())
+                .filter(|k| k.starts_with('.') && !k.contains('*'))
+                .cloned()
+                .collect(),
+            _ => vec![".".to_string()],
+        };
+        for subpath in subpaths {
+            queue.extend(provided.entry(m, &ways(m, &subpath)).map(|(file, ..)| file));
+        }
+    }
+    let mut seen = HashSet::new();
+    while let Some(file) = queue.pop() {
+        if !seen.insert(file.clone()) {
+            continue;
+        }
+        let rows = provided.exported.get(file.as_str()).into_iter().flatten();
+        queue.extend(rows.filter_map(|e| e.file.clone()));
+    }
+    seen
+}
+
+/// The shapes a repository keeps for what the files of its packages' `surface` export (issue
+/// #175), as `Role::Shape` rows: for each module-level constant or type such a file exports, the declared
 /// paths of an interface or type alias (`Want::Type`, `declared.rs`), the output and the
 /// `z.infer` paths of a zod schema (`Want::Zod` and `Want::Infer`, `zod.rs`), or else the fields
 /// of an object or array literal (`Want::Literals`, `literals.rs`). Each source's rules stay in
 /// its own module; a name none of them reads keeps nothing.
-pub fn exported_shapes(code: &Code) -> Vec<Found> {
+pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
     let (mut types, mut zod, mut literals) =
         (Types::default(), Zod::default(), Literals::default());
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
+        if !surface.contains(path) {
+            continue;
+        }
         for export in &facts.exports {
             let crate::lang::Export::Local { local, .. } = export else {
                 continue;
@@ -1571,6 +1635,62 @@ mod tests {
     }
 
     #[test]
+    fn the_surface_is_what_the_entries_of_named_packages_lead_to() {
+        let manifests = [
+            manifest("package.json", r#"{"private": true}"#),
+            manifest(
+                "pkg/package.json",
+                r#"{"name": "p", "main": "src/index.ts"}"#,
+            ),
+            manifest(
+                "sub/package.json",
+                r#"{"name": "s", "exports": {".": "./a.ts", "./extra": "./b.ts", "./*": "./c/*.ts"}}"#,
+            ),
+        ];
+        let rows = [
+            row(
+                "pkg/src/index.ts",
+                Some("A"),
+                Some("pkg/src/a.ts"),
+                Some("A"),
+            ),
+            row("pkg/src/index.ts", None, Some("pkg/src/all.ts"), None),
+            row("pkg/src/all.ts", Some("B"), Some("pkg/src/b.ts"), Some("B")),
+            row(
+                "pkg/src/hidden.ts",
+                Some("H"),
+                Some("pkg/src/hidden.ts"),
+                Some("H"),
+            ),
+            row("app.ts", Some("X"), Some("app.ts"), Some("X")),
+        ];
+        let files = [
+            "app.ts",
+            "pkg/src/index.ts",
+            "pkg/src/a.ts",
+            "pkg/src/all.ts",
+            "pkg/src/b.ts",
+            "pkg/src/hidden.ts",
+            "sub/a.ts",
+            "sub/b.ts",
+            "sub/c/d.ts",
+        ];
+        let surface = surface(&manifests, &[], &rows, &files);
+        let mut got: Vec<&str> = surface.iter().map(String::as_str).collect();
+        got.sort();
+        // A file no entry leads to, one of an unnamed package and a `*` subpath's are left out.
+        let expected = [
+            "pkg/src/a.ts",
+            "pkg/src/all.ts",
+            "pkg/src/b.ts",
+            "pkg/src/index.ts",
+            "sub/a.ts",
+            "sub/b.ts",
+        ];
+        assert_eq!(got, expected);
+    }
+
+    #[test]
     fn without_exports_the_bare_name_tries_types_then_module_then_main() {
         let at = |json: &str, subpath: &str| ways(&manifest("lib/package.json", json), subpath);
         let all = r#"{"types": "./t.ts", "module": "m.ts", "main": "./main.ts"}"#;
@@ -1781,6 +1901,106 @@ mod tests {
         }
     }
 
+    /// A repository `name` with one manifest at its root, holding `files`, each exporting the
+    /// constant `S` that keeps `fields` as its literal shape, and a `tsconfig.json` with
+    /// `outDir` `dist` when `config`.
+    fn repository(
+        name: &str,
+        manifest_json: &str,
+        files: &[(&str, &[&str])],
+        config: bool,
+    ) -> Export {
+        let shape = |fields: &[&str]| Shape {
+            fields: fields.iter().map(|f| f.to_string()).collect(),
+            ..Shape::new(shape::Source::Literals("x.ts".into()))
+        };
+        Export {
+            repository: name.into(),
+            files: (files.iter())
+                .map(|(p, _)| index::File {
+                    path: p.to_string(),
+                    hash: String::new(),
+                })
+                .collect(),
+            symbols: Vec::new(),
+            calls: Vec::new(),
+            providers: Vec::new(),
+            consumers: Vec::new(),
+            bindings: Vec::new(),
+            documents: Vec::new(),
+            publishes: Vec::new(),
+            manifests: vec![manifest("package.json", manifest_json)],
+            tsconfigs: (config.then(|| Config {
+                path: "tsconfig.json".into(),
+                tsconfig: Tsconfig {
+                    out_dir: Some("dist".into()),
+                    root_dir: None,
+                },
+            }))
+            .into_iter()
+            .collect(),
+            packages: Vec::new(),
+            dependencies: Vec::new(),
+            import_calls: Vec::new(),
+            exported: (files.iter())
+                .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
+                .collect(),
+            shapes: (files.iter())
+                .map(|(p, fields)| ExportedShape {
+                    path: p.to_string(),
+                    name: "S".into(),
+                    want: Want::Literals,
+                    shape: shape(fields),
+                })
+                .collect(),
+            imports: Vec::new(),
+            links: Vec::new(),
+            stale_decisions: Vec::new(),
+        }
+    }
+
+    /// What `kept` gives the import of `S` from `p` in `src/a.ts` of the first repository.
+    fn kept_by(exports: &[Export]) -> Option<(usize, Vec<String>, Level)> {
+        let providers = Providers::new(exports);
+        let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
+        let import = shape::Import::new("", "src/a.ts", ("p", "S".into()), Want::Literals);
+        let (m, s, level) = kept(exports, &providers, &provided, 0, &import)?;
+        Some((m, s.fields.iter().cloned().collect(), level))
+    }
+
+    #[test]
+    fn a_kept_shape_is_found_like_a_call_and_only_when_certain_of_one() {
+        let consumer = || repository("c", r#"{"dependencies": {"p": "^1.0.0"}}"#, &[], false);
+        let main = r#"{"name": "p", "version": "1.0.0", "main": "index.ts"}"#;
+        let built = r#"{"name": "p", "version": "1.0.0", "main": "dist/index.js"}"#;
+        let one = |fields: &'static [&'static str]| {
+            repository("p1", main, &[("index.ts", fields)], false)
+        };
+        let id = vec!["id".to_string()];
+        assert_eq!(
+            kept_by(&[consumer(), one(&["id"])]),
+            Some((1, id.clone(), Level::Exact))
+        );
+        // Through the `outDir` mapping: a guess, so `inferred`.
+        let mapped = repository("p1", built, &[("index.ts", &["id"])], true);
+        assert_eq!(
+            kept_by(&[consumer(), mapped]),
+            Some((1, id.clone(), Level::Inferred))
+        );
+        // No way in leads to a file: `ambiguous`, with one candidate or several.
+        let lost = repository("p1", built, &[("a.ts", &["id"])], false);
+        assert_eq!(kept_by(&[consumer(), lost]), None);
+        let lost = repository("p1", built, &[("a.ts", &["id"]), ("b.ts", &["id"])], false);
+        assert_eq!(kept_by(&[consumer(), lost]), None);
+        // Two providers of the package: one shape is kept, two different ones are none.
+        let twice = [consumer(), one(&["id"]), one(&["id"])];
+        assert_eq!(kept_by(&twice), Some((1, id, Level::Exact)));
+        assert_eq!(kept_by(&[consumer(), one(&["id"]), one(&["key"])]), None);
+        // A package the importing file's manifest does not depend on is no provider.
+        let other = repository("c", r#"{"dependencies": {"q": "1.0.0"}}"#, &[], false);
+        assert_eq!(kept_by(&[other, one(&["id"])]), None);
+    }
+
     /// A provider whose files export what `rows` say.
     fn provided<'e>(rows: &'e [Exported]) -> Provided<'e> {
         let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
@@ -1834,6 +2054,32 @@ mod tests {
         // `export *` carries no `default`, and a cycle ends the lookup.
         assert_eq!(lookup(&p, "i.ts", "default"), None);
         assert_eq!(lookup(&p, "i.ts", "missing"), None);
+    }
+
+    #[test]
+    fn a_function_and_a_constant_or_type_two_export_stars_give_collide() {
+        use crate::lang::{LanguagePack, ts::TsJs};
+        use crate::resolve::Resolver;
+        for other in [
+            "export const f = { a: 1 };",
+            "export type f = { a: string };",
+        ] {
+            let sources = [
+                ("i.ts", "export * from './a';\nexport * from './b';\n"),
+                ("a.ts", "export function f() {}\nexport function g() {}\n"),
+                ("b.ts", other),
+            ];
+            let facts: Vec<_> = (sources.iter())
+                .map(|(p, s)| (*p, TsJs.parse(p, s.as_bytes()).unwrap()))
+                .collect();
+            let files = facts.iter().map(|(p, f)| (*p, f)).collect();
+            let rows = Resolver::new(&files, TsJs.modules(&[]).unwrap()).exported();
+            let p = provided(&rows);
+            // As in ES modules, two `export *` giving `f` differently export no `f`.
+            assert_eq!(lookup(&p, "i.ts", "f"), None, "{other}");
+            let g = Some(("a.ts".to_string(), Some("g".to_string())));
+            assert_eq!(lookup(&p, "i.ts", "g"), g, "{other}");
+        }
     }
 
     #[test]

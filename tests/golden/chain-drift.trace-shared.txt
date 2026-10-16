@@ -1,16 +1,31 @@
 example.com/chain/catalog app/api/quotes/route.ts:7 GET
-  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:8 quote drift: missing discount
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:11 quote drift: missing discount
 chain: inferred · 1 hops · 2 repos · 67 tokens
 
 example.com/chain/gateway src/shelves.ts:5 GET /api/shelves/{}
-  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:15 shelf drift: missing aisle
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:18 shelf drift: missing aisle
 chain: inferred · 1 hops · 2 repos · 68 tokens
 
 example.com/chain/gateway src/shelves.ts:10 GET /api/shelves
-  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:28 shelves
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:31 shelves
 chain: inferred · 1 hops · 2 repos · 63 tokens
 
 example.com/chain/catalog app/api/receipts/route.ts:4 GET
-  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:22 receipt drift: missing paidAt
-  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:35 status
-chain: inferred · 2 hops · 2 repos · 103 tokens
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:45 annotated drift: missing paidAt
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:52 argument drift: missing paidAt
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:57 inferred drift: missing price, sku
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:25 receipt drift: missing paidAt
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:38 status
+chain: inferred · 5 hops · 2 repos · 226 tokens
+
+example.com/chain/catalog app/api/tickets/route.ts:7 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:64 ticket drift: missing row
+chain: inferred · 1 hops · 2 repos · 67 tokens
+
+example.com/chain/catalog app/api/offers/route.ts:7 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:71 offer drift: missing discount
+chain: inferred · 1 hops · 2 repos · 67 tokens
+
+example.com/chain/catalog app/api/tags/route.ts:5 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:78 tags drift: missing title
+chain: inferred · 1 hops · 2 repos · 66 tokens

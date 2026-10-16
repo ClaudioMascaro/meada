@@ -259,10 +259,13 @@ impl<'a> Reader<'_, 'a> {
             return self.open(at);
         };
         for open in &read.open {
-            match open.is_empty() {
-                true => self.open(at),
-                false => self.open(&under(at, open)),
-            }
+            self.open(&under(at, open));
+        }
+        // A type a package exports gives its index signatures from the query (issue #175).
+        for import in read.imports.into_iter().filter(|i| i.want == Want::Type) {
+            let at = under(at, &import.at);
+            let want = Want::Opens;
+            self.shape.imports.insert(Import { at, want, ..import });
         }
     }
 
@@ -516,7 +519,7 @@ mod tests {
     use super::{Handler, LITERALS_BUDGET, LITERALS_DEPTH, Literals};
     use crate::lang::{self, LanguagePack, ts::TsJs};
     use crate::resolve::{Code, Resolver};
-    use crate::shape::Shape;
+    use crate::shape::{Shape, Want};
 
     /// The shape of the handler `name` of one file, read with `reader` (to share a budget).
     fn read_with(reader: &mut Literals, src: &str, name: &str, kind: Handler) -> Option<Shape> {
@@ -594,6 +597,27 @@ mod tests {
         .unwrap();
         assert!(shape.imports.is_empty());
         assert_eq!(paths(&shape.open), [""]);
+    }
+
+    #[test]
+    fn a_body_typed_with_a_package_type_takes_its_open_parts_from_the_query() {
+        let shape = next(
+            "import { NextResponse } from 'next/server';\n\
+             import type { Reply, Meta } from '@acme/shared';\n\
+             const META: Meta = { a: 'b' };\n\
+             export async function h(): Promise<NextResponse<Reply>> {\n\
+               return NextResponse.json({ ok: true, meta: META });\n\
+             }\n",
+        )
+        .unwrap();
+        let imports: Vec<(&str, &str, Want)> = (shape.imports.iter())
+            .map(|i| (i.at.as_str(), i.name.as_str(), i.want))
+            .collect();
+        assert_eq!(
+            imports,
+            [("", "Reply", Want::Opens), ("meta", "Meta", Want::Opens)]
+        );
+        assert!(shape.open.is_empty());
     }
 
     #[test]

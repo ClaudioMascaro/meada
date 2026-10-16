@@ -526,6 +526,22 @@ impl<'a> Code<'a> {
         Some((specifier, spelled))
     }
 
+    /// The same for `head.member`, as a value writes a member of a name (`Value::Member`): a
+    /// namespace import's `C.Quote` names `Quote` of its specifier.
+    pub fn imported_member(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        head: &'a str,
+        member: &str,
+    ) -> Option<(&'a str, String)> {
+        let (specifier, spelled) = self.imported(path, scope, head)?;
+        match spelled.is_empty() {
+            true => Some((specifier, member.to_string())),
+            false => Some((specifier, format!("{spelled}.{member}"))),
+        }
+    }
+
     /// The files looked into that `full` lacks, sorted.
     pub fn misses(&self) -> Vec<&'a str> {
         self.misses.borrow().iter().copied().collect()

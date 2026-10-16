@@ -98,6 +98,7 @@ impl Types {
             optional: optional.collect(),
             declared: fields.clone(),
             fields,
+            open: read.open,
             imports: read.imports,
             ..Shape::new(Source::Reads(path.to_string()))
         })
@@ -375,6 +376,18 @@ mod tests {
                 ("list[]", "Ext", Want::Type)
             ]
         );
+        // A type parameter of the same name hides the import.
+        let src = "import type { Ext } from '@acme/types';\n\
+                   interface Page<Ext> { item: Ext; other: Ext2 }\n\
+                   import type { Ext2 } from '@acme/types';\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let code = Code::new(&resolver, &files, lang::pack(0));
+        let ty = Ty::Named("Page".into());
+        let read = Types::default().read(&code, "a.ts", "", &ty).unwrap();
+        let at: Vec<&str> = read.imports.iter().map(|i| i.at.as_str()).collect();
+        assert_eq!(at, ["other"]);
     }
 
     #[test]

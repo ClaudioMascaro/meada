@@ -74,7 +74,8 @@ one for the area a change touches.
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
-  declared, optional}`, each of the last four absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
+  declared, optional, guessed}`, each of the last five absent when empty; `guessed` lists the
+  parts a package import filled through a resolution that was not `exact`, issue #175) when a document gives its route or channel side one, or, for an HTTP route with
   no document, when its handler returns a zod schema's value (`{"source": {"zod": "<file>"}, ...}`)
   or object literals (`{"source": {"literals": "<file>"}, ...}`, spec #23); a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
@@ -180,15 +181,20 @@ one for the area a change touches.
   (`Row::link`), the export and every other reader of links see the same value.
 - **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
   says comes from outside the repository records a `shape::Import` on the shape (its path, the
-  importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals` or
-  `type`) instead of opening it or dropping it. A repository with a named manifest keeps, beside
-  its contracts, the shapes of the module-level constants and types its files export
-  (`package::exported_shapes`, a step `index::refresh` runs after the kinds' `extract`, as
+  importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
+  `type`, or `opens` for a provider typed with a package type, which takes that type's index
+  signatures alone) instead of opening it or dropping it. A repository keeps, beside its
+  contracts, the shapes of the module-level constants and types the files of its packages'
+  public surface export (`package::surface`: the entries of each named manifest, as an import
+  resolves them, and what their `exports` rows lead to; `package::exported_shapes`, a step
+  `index::refresh` runs after the kinds' `extract`, as
   `Role::Shape` rows; each source reads its own: `Types::exported`, `Zod::exported`,
   `Literals::exported`). The workspace step `package::shapes`, after `package::import` in
   `Engine::exports`, resolves each import as a call through it resolves (`Provided::resolve`,
   over the `exports` rows, which name constants and types too) and fills it with
-  `shape::fill`, the one recursion and the one place its limits live. A new source that reads
+  `shape::fill`, the one recursion and the one place its limits live, carrying the
+  resolution's level: through one that is not `exact` (an `outDir` mapping) a provider's part is
+  `guessed` and a consumer's paths are not declared, so no drift on them is `exact`. A new source that reads
   an exported name adds a `Want`, a reader's `exported` and an arm in `exported_shapes`.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
@@ -300,11 +306,15 @@ one for the area a change touches.
   `chain-drift.trace-declared.txt`; the catalog route `app/api/labels/route.ts` returns a literal
   typed by an index signature, and the web's `src/labels.ts` reads under that open part (golden
   `chain-drift.trace-labels.txt`). Shapes through packages (#175) add the catalog's package
-  `packages/contracts/` (`@chain/contracts`: a zod schema, a constant, an interface, an unreadable
-  constant and a union), a root `package.json` in the catalog, the gateway and the web app
-  depending on it, the catalog routes `app/api/quotes/route.ts` (parsed with the shared schema)
-  and `app/api/receipts/route.ts`, the gateway's `src/shelves.ts` (spreading the shared
-  constants) and the web's `src/shared.ts` (golden `chain-drift.trace-shared.txt`). Later spec
+  `packages/contracts/` (`@chain/contracts`: an entry `src/index.ts` re-exporting by name, with
+  `export *` and as types, plus a default zod schema; `quote.ts`, `shelf.ts` and `receipt.ts`
+  hold a zod schema, constants, an interface, a union and a type with an index signature), a
+  root `package.json` in the catalog, the gateway and the web app depending on it, the catalog
+  routes `app/api/quotes`, `app/api/tickets` (the default export) and `app/api/offers` (a
+  namespace import) parsed with the shared schemas, `app/api/tags` (a package return type)
+  and `app/api/receipts`, the gateway's `src/shelves.ts` (spreading the shared
+  constants) and the web's `src/shared.ts` (casts, an annotation, a type argument and `z.infer`
+  of the package's names; golden `chain-drift.trace-shared.txt`). Later spec
   #23 tickets extend this overlay, so the `chain` and
   `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
@@ -443,17 +453,26 @@ one for the area a change touches.
   a function-local one (`body.next = cursor`, `Object.assign(body, x)`), so it is unknown and
   open; a module-level object mutated after its declaration is still read as written. A constant
   held by another repository (a package import the repository's `Resolver` does not map to one
-  of its files) is filled at query time (issue #175); a cast or return type naming a package's
-  type opens nothing on a provider (no marker).
+  of its files) is filled at query time (issue #175), and so are the index signatures of a
+  package type a returned value, a cast or the return annotation names.
 - Shapes through package imports (issue #175, `shape.rs`, `package.rs`): `shape::fill` follows
   an import into the shape the package keeps, and the imports of that shape in turn, at most
   `PACKAGE_HOPS` (8) packages deep, and charges every import looked up and every path grafted
   to `GRAFT_BUDGET` (2^16) per side; past either, the import is unresolved: open on a provider,
   nothing on a consumer. So is an import that resolves nowhere, `ambiguous`, to several names,
   or in two providers to different shapes, and a name no reader keeps a shape for (a call, a
-  union type). Only a module-level constant or type a file exports itself keeps a shape (a
-  re-export reaches it through the `exports` rows); a repository with a named manifest reads
-  every one on every refresh, parsing their files again (no marker).
+  union type). Only a module-level constant or type a file of a package's public surface
+  (`package::surface`) exports itself keeps a shape (a re-export reaches it through the
+  `exports` rows): the files the entries of each named manifest (the bare name and each
+  `exports` subpath without a `*`, as an import resolves them) lead to through the `exports`
+  rows. Those are re-read, their files parsed again, on every refresh that extracts, so the
+  cost is bounded by the packages' surface, not the repository. A subpath pattern (`./x/*`) and
+  a deep import into a package without `exports` (`pkg/src/x`) reach files off the surface,
+  which keep no shape, so such an import is unresolved (no marker). An edited `package.json` or
+  `tsconfig.json` extracts again. A type through a namespace import (`C.Receipt`) is not read
+  (no marker); a schema through one (`C.Quote`) is. Since constants and types are `exports`
+  targets, two `export *` that give a name differently (a function and a constant) export
+  neither, as in ES modules.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (an object literal

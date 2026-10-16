@@ -30,6 +30,10 @@
       "hash": "c8692e7453c22404109eae4d607a4215b4e46c5fafeb678e5e84ac5a2d60550a"
     },
     {
+      "path": "app/api/offers/route.ts",
+      "hash": "63d16bdec148a7c67cd6e0237c341637c2e50ad4774f5c9ddc6ff68c98adb84b"
+    },
+    {
       "path": "app/api/products/[id]/route.ts",
       "hash": "faa5f3dcd718e5dd3c0013b2c54f4cb5a09ef452aeb565b31841ab562b29bef1"
     },
@@ -54,6 +58,14 @@
       "hash": "eb8a2eed86e7e5d569a05e84ed0c301336ac3fd5106376da14a11d0dabe9e830"
     },
     {
+      "path": "app/api/tags/route.ts",
+      "hash": "0bf53b3379efc3690ba299223b1e22e2c79b2311fd98e3511a3b224642d5ac84"
+    },
+    {
+      "path": "app/api/tickets/route.ts",
+      "hash": "13ed9327517ec0cf58d11d682feea2194a0eafb36f3cc5e13e434e2e168dd19e"
+    },
+    {
       "path": "lib/limits.ts",
       "hash": "81b1df392b965b76af52f4feeca986a8d3ea06201dd6c3e5e2c4809d804a6947"
     },
@@ -67,7 +79,19 @@
     },
     {
       "path": "packages/contracts/src/index.ts",
-      "hash": "9b5b29a63a78c4e1665e6dbadfa1e3c8c960294215c6bc03625732032c9de461"
+      "hash": "91321652fff70fc12ec7136e52f399bd52f76a9daf577a0bb8dd4df248adb3c6"
+    },
+    {
+      "path": "packages/contracts/src/quote.ts",
+      "hash": "b3c2a0b06b138ede61ea01a81b3c1208c6dc333be68e402e241a9d113df55d55"
+    },
+    {
+      "path": "packages/contracts/src/receipt.ts",
+      "hash": "bf2d0a72bd511d5f6a76b9b1e2396db6442b66c4c7af71134897563c862917ac"
+    },
+    {
+      "path": "packages/contracts/src/shelf.ts",
+      "hash": "d183b840681106fb8bc0e1193a2cb2099206dedce1e7a37366faebc8bffa8e02"
     }
   ],
   "symbols": [
@@ -144,6 +168,14 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 192,
+        "end": 273
+      }
+    },
+    {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "span": {
         "path": "app/api/products/[id]/route.ts",
@@ -197,6 +229,22 @@
         "path": "app/api/stock/route.ts",
         "start": 455,
         "end": 586
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 179,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 168,
+        "end": 248
       }
     },
     {
@@ -432,6 +480,39 @@
         "path": "app/api/labels/route.ts",
         "start": 303,
         "end": 362
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::C.Quote.parse#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 242,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 224,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 262,
+        "end": 268
       }
     },
     {
@@ -699,6 +780,50 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 242,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 200,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::Ticket.parse#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 218,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 237,
+        "end": 243
+      }
+    },
+    {
       "id": "example.com/chain/catalog::lib/products.ts::load::find#0",
       "caller": "example.com/chain/catalog::lib/products.ts::load",
       "target": "example.com/chain/catalog::lib/products.ts::find",
@@ -908,36 +1033,14 @@
       }
     },
     {
-      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::Object.freeze#0",
-      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
-      "target": null,
-      "level": null,
-      "span": {
-        "path": "packages/contracts/src/index.ts",
-        "start": 363,
-        "end": 389
-      }
-    },
-    {
-      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.number#0",
-      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
-      "target": null,
-      "level": null,
-      "span": {
-        "path": "packages/contracts/src/index.ts",
-        "start": 131,
-        "end": 141
-      }
-    },
-    {
       "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.object#0",
       "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
       "target": null,
       "level": null,
       "span": {
         "path": "packages/contracts/src/index.ts",
-        "start": 96,
-        "end": 144
+        "start": 297,
+        "end": 343
       }
     },
     {
@@ -947,8 +1050,63 @@
       "level": null,
       "span": {
         "path": "packages/contracts/src/index.ts",
+        "start": 312,
+        "end": 322
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.string#1",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 330,
+        "end": 340
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.number#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 131,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.object#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 96,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.string#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
         "start": 112,
         "end": 122
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/shelf.ts::Object.freeze#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/shelf.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/shelf.ts",
+        "start": 216,
+        "end": 242
       }
     }
   ],
@@ -1067,6 +1225,23 @@
       }
     },
     {
+      "contract": "http::GET::/api/offers",
+      "site": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/offers/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "scalars": [
+          "price",
+          "sku"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
       "shape": {
@@ -1180,6 +1355,44 @@
         ],
         "scalars": [
           "count"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tags",
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/tags/route.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.color",
+          "name"
+        ],
+        "open": [
+          "labels"
+        ],
+        "scalars": [
+          "labels.color",
+          "name"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tickets",
+      "site": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/tickets/route.ts"
+        },
+        "fields": [
+          "id",
+          "seat"
+        ],
+        "scalars": [
+          "id",
+          "seat"
         ]
       }
     },
@@ -1516,6 +1729,55 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "price": "inferred",
+          "sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::offer::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "contract": "http::GET::/api/offers",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "discount": "inferred"
+        }
+      }
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::quote::fetch#0",
       "provider": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
       "contract": "http::GET::/api/quotes",
@@ -1545,6 +1807,33 @@
       "contract": "http::GET::/api/receipts",
       "level": "inferred",
       "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::tags::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "contract": "http::GET::/api/tags",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "title": "inferred"
+        },
+        "unchecked": {
+          "labels.size": "labels"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "contract": "http::GET::/api/tickets",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "row": "inferred"
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",

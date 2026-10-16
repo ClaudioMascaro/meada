@@ -252,15 +252,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             false => Ok(serde_json::to_string(&package::read(src))?),
         },
     )?;
-    // Only a repository providing a package keeps the shapes of what it exports (issue #175).
-    let manifests: Vec<(String, String)> = tx
-        .prepare("SELECT path, summary FROM manifests")?
+    // The packages decide which files keep the shapes of what they export (issue #175).
+    let manifest_rows: Vec<(String, String)> = tx
+        .prepare("SELECT path, summary FROM manifests ORDER BY path")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let provides = manifests.iter().any(|(path, summary)| {
-        !package::is_tsconfig(path)
-            && serde_json::from_str::<package::Summary>(summary).is_ok_and(|s| s.name.is_some())
-    });
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -309,8 +305,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             }
         }
     }
-    // A manifest gaining or losing its name changes which rows the contracts give.
-    digest.update(&[u8::from(provides)]);
+    // An edited `package.json` or `tsconfig.json` changes which files keep shapes (`surface`),
+    // so it extracts again. Folding them in also forces that on an index of this version written
+    // before the `shape` rows and constant `exports` targets existed (issue #175), which the
+    // schema golden does not cover.
+    for (path, summary) in &manifest_rows {
+        digest.update(format!("{path}\0{summary}\0").as_bytes());
+    }
     let digest = digest.finalize().to_hex().to_string();
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
@@ -370,6 +371,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             ))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    // The files an import of one of the repository's packages reaches: only they keep shapes.
+    let surface = {
+        let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+        let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+        let files: Vec<&str> = all.keys().copied().collect();
+        package::surface(&manifests, &tsconfigs, &exported, &files)
+    };
 
     // Contracts, from every file. Values are not kept in the index, so the files whose
     // values a kind reads are parsed again, until no kind misses one.
@@ -389,9 +397,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code));
             }
-            // Only a package keeps the shapes of what it exports (issue #175).
-            if provides {
-                found.extend(package::exported_shapes(&code));
+            if !surface.is_empty() {
+                found.extend(package::exported_shapes(&code, &surface));
             }
             misses.extend(code.misses().into_iter().map(String::from));
         }
@@ -1160,20 +1167,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
-    for (path, summary) in rows {
-        match package::is_tsconfig(&path) {
-            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
-            true => tsconfigs.extend(
-                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
-                    .map(|tsconfig| Config { path, tsconfig }),
-            ),
-            false => manifests.push(Manifest {
-                path,
-                summary: serde_json::from_str(&summary)?,
-            }),
-        }
-    }
+    let (manifests, tsconfigs) = read_manifests(rows)?;
     // Only a repository with a manifest can import a package, and only one with a named
     // manifest provides one: the rows that resolve imports are read for those alone.
     let import_calls = match manifests.is_empty() {
@@ -1258,6 +1252,26 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         documents,
         stale_decisions: Vec::new(),
     })
+}
+
+/// The `manifests` rows, `(path, summary)`, as the `package.json` and `tsconfig.json` files they
+/// hold.
+fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Config>)> {
+    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
+    for (path, summary) in rows {
+        match package::is_tsconfig(&path) {
+            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
+            true => tsconfigs.extend(
+                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
+                    .map(|tsconfig| Config { path, tsconfig }),
+            ),
+            false => manifests.push(Manifest {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            }),
+        }
+    }
+    Ok((manifests, tsconfigs))
 }
 
 fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {

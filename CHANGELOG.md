@@ -92,7 +92,12 @@ tagging.
   fills the part at query time, so an edit to the package changes its importers' drift without
   touching them. An import that does not resolve, resolves `ambiguous` or names something Meada
   cannot read stays open on a provider and adds nothing on a consumer; shapes are followed
-  through at most 8 packages.
+  through at most 8 packages. A shape reached through a package's build output mapped back to
+  source (`outDir`) gives drift at most `inferred`. Only the files a package's entries lead to
+  keep shapes. Since exported constants and types now count as exports of a package, two
+  `export *` that give one name differently (a function in one file, a constant or type in
+  another) export neither, as in ES modules, so a call to that name through the package no
+  longer links.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

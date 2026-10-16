@@ -521,12 +521,20 @@ fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
 /// The catalog's shared package drops `price` from its zod schema and `warehouse` from its
 /// constant, which consumers in the web app read; the routes importing them are unchanged.
 fn drop_shared_fields(catalog: &Path) {
-    let path = catalog.join("packages/contracts/src/index.ts");
-    let src = fs::read_to_string(&path).unwrap();
-    let edited = (src.replace(", price: z.number()", ""))
-        .replace("{ warehouse: \"w1\", reserved: 0 }", "{ reserved: 0 }");
-    assert_ne!(src, edited);
-    fs::write(&path, edited).unwrap();
+    for (file, from, to) in [
+        ("quote.ts", ", price: z.number()", ""),
+        (
+            "shelf.ts",
+            "{ warehouse: \"w1\", reserved: 0 }",
+            "{ reserved: 0 }",
+        ),
+    ] {
+        let path = catalog.join("packages/contracts/src").join(file);
+        let src = fs::read_to_string(&path).unwrap();
+        let edited = src.replace(from, to);
+        assert_ne!(src, edited);
+        fs::write(&path, edited).unwrap();
+    }
 }
 
 #[test]
@@ -545,9 +553,18 @@ fn an_edited_shared_package_changes_its_importers_drift_like_a_cold_chain() {
 
     let (cold_web, cold_gateway, cold) = drift_chain("fresh_shared_cold");
     drop_shared_fields(&cold);
-    for missing in ["\"price\": \"inferred\"", "\"warehouse\": \"inferred\""] {
-        assert!(!before[1].contains(missing), "{missing}");
-        assert!(refreshed[1].contains(missing), "{missing}");
+    // The links of the quote's reader and the shelf's now miss what the package dropped.
+    let link = |export: &str, consumer: &str| -> String {
+        let site = format!("\"consumer\": \"example.com/chain/web::src/shared.ts::{consumer}\"");
+        let at = export.find(&site).unwrap();
+        export[at..].split("\n    }").next().unwrap().to_string()
+    };
+    for (consumer, missing) in [
+        ("quote::fetch#0", "\"price\": \"inferred\""),
+        ("shelf::fetch#0", "\"warehouse\": \"inferred\""),
+    ] {
+        assert!(!link(&before[1], consumer).contains(missing), "{missing}");
+        assert!(link(&refreshed[1], consumer).contains(missing), "{missing}");
     }
     assert_eq!(refreshed, exports([&cold_gateway, &cold_web]));
 }

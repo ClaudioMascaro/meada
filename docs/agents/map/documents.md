@@ -136,12 +136,17 @@ modules updates it.
   consumer's `declared`, else `inferred`; `None` when nothing is missing or unchecked.
   `Shape::imports` (issue #175, stored, empty once filled) holds the parts a name imported from
   outside the repository gives: `Import {at, from, specifier, name, want}`, `Want` being the view
-  the reader needs (`zod` and `literals` on a provider, `infer` and `type` on a consumer).
+  the reader needs (`zod` and `literals` on a provider, `infer` and `type` on a consumer, and
+  `opens` for a provider value typed with a package type, which reads the kept `type` shape,
+  `Want::kept`, and takes its open parts alone, `literals.rs`'s `typed`; the types inside it
+  give theirs too). `Shape::guessed` lists the provider parts filled through a resolution that
+  was not `exact`: `drift` makes a missing path at or below one `inferred`.
   `literals.rs` records one for a body or spread naming an import (`Reader::imported`), `zod.rs`
   for a schema name (`Reader::named`; `Node::imports`, rendered at the node's path, turned
   `infer` by `Node::declared`), `declared.rs` for a `Ty::Named` and a `z.infer` it cannot find
   (`Declared::imports`), which `http::response_reads` puts below the read path. `fill(shape,
-  at, find)` is the one recursion: `find` gives the kept shape and its repository, the kept
+  at, find)` is the one recursion: `find` gives the kept shape, its repository and the level the
+  import resolved at (a consumer's paths through one that is not `exact` are not declared), the kept
   shape is filled first, then grafted at the import's path in its view (`Shape::graft`: a
   provider takes fields, open parts and scalars, a consumer the declared paths, optional only
   when every type says so and never when read); unresolved, a provider's part is open and a

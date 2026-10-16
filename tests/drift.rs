@@ -139,6 +139,9 @@ fn trace_ends_the_links_of_consumers_of_shapes_shared_through_a_package() {
         "GET /api/shelves/{}",
         "GET /api/shelves",
         "GET /api/receipts",
+        "GET /api/tickets",
+        "GET /api/offers",
+        "GET /api/tags",
     ] {
         let start = Start::From(route);
         answers.push(engine.trace(start, Direction::Up, None).unwrap());

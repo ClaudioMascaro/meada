@@ -41,8 +41,8 @@ modules updates it.
   `declared.rs` and `lang/ts/types.rs`; the catalog's shared package and the routes and
   consumers importing it (golden `chain-drift.trace-shared.txt`) cross repositories through
   package imports, with an edited package and a package that gets its name back in
-  `freshness`, the views and the limits (`PACKAGE_HOPS`, `GRAFT_BUDGET`) being unit tests in
-  `shape.rs`; the rules
+  `freshness`, the views, the levels and the limits (`PACKAGE_HOPS`, `GRAFT_BUDGET`) being unit
+  tests in `shape.rs`, and the surface, `kept` and `export *` collisions in `package.rs`; the rules
   and the pattern depth limit are unit tests in `lang/ts/uses.rs`),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
