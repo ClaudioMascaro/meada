@@ -1261,6 +1261,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
       "consumer": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
       "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
       "contract": "http::GET::/api/profiles",
@@ -1269,6 +1276,30 @@
       "drift": {
         "missing": {
           "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "data": "inferred"
         }
       }
     },

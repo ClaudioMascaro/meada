@@ -181,6 +181,9 @@ pub struct Def {
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub returns: Option<Ty>,
+    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
+    #[serde(skip)]
+    pub type_params: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -259,10 +262,14 @@ pub enum Step {
     Element,
     /// A call of the method `name` on the value: `.json()`.
     Call(String),
-    /// The value is declared to have this type: by a cast, a type argument of the call or an
-    /// annotation on the variable that receives it. A chain ends here, but the reads that
+    /// The value is declared to have this type: by a cast, a type argument of the method called
+    /// or an annotation on the variable that receives it. A chain ends here, but the reads that
     /// follow the cast go on in a chain of their own.
     Typed(Ty),
+    /// The type arguments the call itself is given (`get<Row>(path)`), in order. They type the
+    /// result only if the function called says so (a cast of its result to a type parameter, or
+    /// a return type that is one): the caller cannot tell. A chain of its own, at the start.
+    Argument(Vec<Ty>),
     /// The value is returned by the function making the call.
     Return,
 }
@@ -289,8 +296,24 @@ pub enum Ty {
     Array(Box<Ty>),
     /// `z.infer<typeof S>`: the name of the schema.
     Schema(String),
-    /// Any other form: a union, a primitive, a type parameter, a mapped type.
+    /// A type parameter of the function around the use (`as T` in `get<T>`): the caller's type
+    /// argument stands for it. One of an interface or alias adds no fields.
+    Param(String),
+    /// Any other form: a union, a primitive, a mapped type.
     Unknown,
+}
+
+impl Ty {
+    /// Whether a type parameter is written in the type.
+    pub fn has_param(&self) -> bool {
+        match self {
+            Ty::Param(_) => true,
+            Ty::Array(of) => of.has_param(),
+            Ty::Intersection(parts) => parts.iter().any(Ty::has_param),
+            Ty::Object { members, .. } => members.iter().any(|m| m.ty.has_param()),
+            _ => false,
+        }
+    }
 }
 
 /// A property of an object type.

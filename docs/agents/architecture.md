@@ -74,7 +74,7 @@ one for the area a change touches.
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
-  declared}`, each of the last three absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
+  declared, optional}`, each of the last four absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
   no document, when its handler returns a zod schema's value (`{"source": {"zod": "<file>"}, ...}`)
   or object literals (`{"source": {"literals": "<file>"}, ...}`, spec #23); a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
@@ -223,8 +223,10 @@ one for the area a change touches.
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition or file they name). `Call::args`,
-  `Call::uses`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
-  back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
+  `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::type_params`, `Param::default`,
+  `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
+  back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
+  name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
@@ -384,10 +386,15 @@ one for the area a change touches.
   time. A type parameter hides a declared type of its name only when it sits within
   `HIDING_CLIMB` (64) levels of the use; one declared farther up leaves the name unknown, so
   it adds no fields. Only interfaces (with `extends`), aliases to object types, intersections,
-  arrays and `z.infer<typeof S>` give fields; a union, a mapped or conditional type, a
-  generic with arguments and a type from a package (issue #175) add none (no marker). An
-  optional field (`?`) adds no drift, nor does what lies below it. A type argument is read only
-  when the call gives exactly one. A cast or an annotation is read at the top of a value (not
+  arrays and `z.infer<typeof S>` give fields; a union, a mapped or conditional type
+  and a type from a package (issue #175) add none (no marker). A generic of the repository
+  (`Paged<Row>`) adds its own fields, its type arguments not substituted (its `T` adds none).
+  An optional field (`?`) adds no drift, nor does what lies below it; the fields of a
+  `z.infer` schema that `.optional()`, `.nullish()` or `.partial()` make may be absent are
+  optional too (`.required()` undoes it), and a schema union adds no fields. A type argument
+  given to a wrapper types the body only when the wrapper's return type is its own type
+  parameter (`Promise<T>`) or it casts the body to it (`as T`, `json<T>()`); `json<T>()` and
+  the like type their result when they have exactly one type argument. A cast or an annotation is read at the top of a value (not
   inside an object literal), and a value that goes through a function, a `let` or a rebinding
   is not followed (no marker). On a provider, an index signature in the type of a returned
   constant, a cast body or the handler's return annotation opens that part of the shape.

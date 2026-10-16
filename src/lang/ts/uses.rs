@@ -77,8 +77,9 @@ impl<'t> Uses<'t> {
         let mut out = Vec::new();
         let mut followed = HashSet::new();
         let mut pending = vec![(call, Vec::new())];
-        // A type argument of the call itself declares what it returns (`get<T>(path)`).
-        if !self.type_argument(call, &[], &mut out) {
+        // The type arguments of the call itself (`get<T>(path)`): the function called says
+        // whether they type what it returns.
+        if !self.arguments(call, &mut out) {
             return Vec::new();
         }
         while let Some((node, mut steps)) = pending.pop() {
@@ -218,8 +219,24 @@ impl<'t> Uses<'t> {
         self.charge(cost)
     }
 
-    /// The same for the one type argument `call` is given: with several, which one types the
-    /// result is not known.
+    /// Adds the chain of the type arguments `call` is given, unless none lists fields. `false`
+    /// past the budget.
+    fn arguments(&mut self, call: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
+        let Some(arguments) = call.child_by_field_name("type_arguments") else {
+            return true;
+        };
+        let mut cost = 0;
+        let tys: Vec<Ty> = (named(arguments))
+            .map(|t| types::ty(t, self.src, &mut cost))
+            .collect();
+        if tys.iter().any(|t| *t != Ty::Unknown) {
+            out.push(vec![Step::Argument(tys)]);
+        }
+        self.charge(cost)
+    }
+
+    /// The same for the one type argument a method call is given (`json<T>()`): with several,
+    /// which one types the result is not known.
     fn type_argument(&mut self, call: Node<'t>, steps: &[Step], out: &mut Vec<Vec<Step>>) -> bool {
         let arguments = call.child_by_field_name("type_arguments");
         match arguments.map(|a| named(a).collect::<Vec<_>>()) {
@@ -458,7 +475,7 @@ mod tests {
                         Step::Element => "[]".into(),
                         Step::Call(m) => format!("({m})"),
                         Step::Return => "^".into(),
-                        Step::Typed(_) => "<T>".into(),
+                        Step::Typed(_) | Step::Argument(_) => "<T>".into(),
                     })
                     .collect()
             })
@@ -687,8 +704,30 @@ mod tests {
     fn a_type_argument_of_the_call_declares_its_result() {
         let facts = TsJs.parse("a.ts", b"async function f() { return get<Row>(u); }\nasync function g() { return get<A, B>(u); }").unwrap();
         let get: Vec<_> = facts.calls.iter().filter(|c| c.callee == "get").collect();
-        let row = Step::Typed(Ty::Named("Row".into()));
-        assert_eq!(get[0].uses, [vec![row.clone()], vec![Step::Return]]);
-        assert_eq!(get[1].uses, [vec![Step::Return]]);
+        // The type arguments are offered to the wrapper, which says whether they type the result.
+        let named = |n: &str| Ty::Named(n.into());
+        let row = Step::Argument(vec![named("Row")]);
+        assert_eq!(get[0].uses, [vec![row], vec![Step::Return]]);
+        let both = Step::Argument(vec![named("A"), named("B")]);
+        assert_eq!(get[1].uses, [vec![both], vec![Step::Return]]);
+    }
+
+    #[test]
+    fn a_cast_to_a_type_parameter_of_the_function_is_typed_by_it() {
+        let src = "async function g<T>(p) { const r = await fetch(p); return (await r.json()) as T; }
+                   async function h<T>(p) { const r = await fetch(p); const d = (await r.json()) as T[]; return d; }
+                   async function k<T>(p) { const r = await fetch(p); return r.json<T>(); }";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let param = |n: &str| Ty::Param(n.into());
+        let json = Step::Call("json".into());
+        let fetches: Vec<_> = facts.calls.iter().filter(|c| c.callee == "fetch").collect();
+        let typed = |ty: Ty| vec![json.clone(), Step::Typed(ty)];
+        assert!(fetches[0].uses.contains(&typed(param("T"))));
+        assert!(
+            fetches[1]
+                .uses
+                .contains(&typed(Ty::Array(Box::new(param("T")))))
+        );
+        assert!(fetches[2].uses.contains(&typed(param("T"))));
     }
 }

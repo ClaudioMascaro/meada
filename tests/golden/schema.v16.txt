@@ -242,8 +242,8 @@ sample.ts
       "scope": "",
       "callee": "Router",
       "range": {
-        "start": 897,
-        "end": 905
+        "start": 1039,
+        "end": 1047
       }
     }
   ],
@@ -253,6 +253,12 @@ sample.ts
     },
     {
       "name": "app"
+    },
+    {
+      "name": "Row"
+    },
+    {
+      "name": "Rows"
     }
   ],
   "locals": [

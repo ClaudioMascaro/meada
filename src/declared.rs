@@ -23,6 +23,16 @@ pub struct Types {
     spent: HashMap<String, usize>,
 }
 
+/// What the type arguments of a call stand for in a type written in the function it calls: the
+/// function's type parameters, the arguments given and where they are written (a file and a
+/// scope).
+#[derive(Clone, Copy)]
+pub struct Args<'a> {
+    pub names: &'a [String],
+    pub tys: &'a [Ty],
+    pub at: (&'a str, &'a str),
+}
+
 /// The fields of a type.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Declared {
@@ -43,8 +53,22 @@ impl Types {
         scope: &'a str,
         ty: &'a Ty,
     ) -> Option<Declared> {
+        self.read_with(code, path, scope, ty, None)
+    }
+
+    /// The same for a type that writes the type parameters of a function, `args` standing for
+    /// them: the arguments of a call of that function.
+    pub fn read_with<'a>(
+        &mut self,
+        code: &Code<'a>,
+        path: &'a str,
+        scope: &'a str,
+        ty: &'a Ty,
+        args: Option<Args<'a>>,
+    ) -> Option<Declared> {
         let mut reader = Reader {
             code,
+            args,
             zod: &mut self.zod,
             spent: self.spent.entry(path.to_string()).or_default(),
             out: Declared::default(),
@@ -57,6 +81,7 @@ impl Types {
 
 struct Reader<'c, 'a> {
     code: &'c Code<'a>,
+    args: Option<Args<'a>>,
     zod: &'c mut Zod,
     spent: &'c mut usize,
     out: Declared,
@@ -119,9 +144,23 @@ impl<'a> Reader<'_, 'a> {
             }
             Ty::Schema(name) => {
                 let fields = self.zod.inferred(self.code, at.0, at.1, name);
-                for field in fields.into_iter().flatten() {
-                    self.field(&under(prefix, &field), false);
+                for (field, optional) in fields.into_iter().flatten() {
+                    self.field(&under(prefix, &field), optional);
                 }
+            }
+            Ty::Param(name) => {
+                let Some(args) = self.args else {
+                    return Some(());
+                };
+                let position = args.names.iter().position(|n| n == name);
+                let Some(ty) = position.and_then(|i| args.tys.get(i)) else {
+                    return Some(());
+                };
+                // The argument is written in the caller: its own type parameters are not ours.
+                self.args = None;
+                let done = self.walk(args.at, ty, prefix, depth + 1);
+                self.args = Some(args);
+                done?;
             }
             Ty::Unknown => {}
         }
@@ -241,6 +280,37 @@ mod tests {
                 "value.tags[].k"
             ]
         );
+    }
+
+    #[test]
+    fn a_schema_marks_optional_the_fields_that_may_be_absent_and_ignores_unions() {
+        let src = "import { z } from 'zod';\n\
+                   const O = z.object({ a: z.string(), b: z.string().optional(), c: z.string().nullish(), d: z.string().nullable(), e: z.string().default('x') });\n\
+                   const P = z.object({ a: z.string(), k: z.object({ i: z.string() }) }).partial();\n\
+                   const R = P.required();\n\
+                   const U = z.union([z.object({ x: z.string() }), z.object({ y: z.string() })]);\n\
+                   const D = z.object({ u: U, o: z.object({ k: z.string() }).or(z.object({ m: z.string() })), n: z.array(U) });\n\
+                   type TO = z.infer<typeof O>;\n\
+                   type TP = z.infer<typeof P>;\n\
+                   type TR = z.infer<typeof R>;\n\
+                   type TU = z.infer<typeof U>;\n\
+                   type TD = z.infer<typeof D>;\n";
+        assert_eq!(fields(src, "TO"), ["a", "b?", "c?", "d", "e"]);
+        assert_eq!(fields(src, "TP"), ["a?", "k?", "k.i"]);
+        assert_eq!(fields(src, "TR"), ["a", "k", "k.i"]);
+        assert_eq!(fields(src, "TU"), Vec::<String>::new());
+        assert_eq!(fields(src, "TD"), ["n", "n[]", "o", "u"]);
+    }
+
+    #[test]
+    fn a_name_two_declarations_share_is_no_declared_type() {
+        // A namespace opens no scope: both `Row` are the file's, and which one is meant is not known.
+        let src = "interface Row { a: string }\n\
+                   namespace N { export interface Row { b: string } }\n\
+                   interface Holder { row: Row; one: One }\n\
+                   interface One { c: string }\n";
+        assert_eq!(fields(src, "Row"), Vec::<String>::new());
+        assert_eq!(fields(src, "Holder"), ["one", "one.c", "row"]);
     }
 
     #[test]

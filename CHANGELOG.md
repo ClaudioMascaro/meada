@@ -78,10 +78,11 @@ tagging.
   function (a parameter, a `catch`, an assignment) is not followed, nor is a value passed to
   another function; a pattern nested past 32 levels reads nothing.
 - Shape drift (spec #23), consumer declared types: a cast (`as T`), a type argument given to a
-  client wrapper or to `json<T>()`, and an annotation on the receiving variable make every field
+  client wrapper (when the wrapper's return type is its type parameter or it casts the body to
+  it) or to `json<T>()`, and an annotation on the receiving variable make every field
   of the type a read. Interfaces (with `extends`, also from another file), aliases to object
   types, intersections, arrays and `z.infer<typeof schema>` give fields; other forms and types
-  of a package add none. An optional field (`?`) adds no drift. A missing path is `exact` when
+  of a package add none. An optional field (`?`, or `.optional()` in a schema) adds no drift. A missing path is `exact` when
   the provider's shape comes from a document or zod. An index signature in the type of a
   handler's returned value (a typed constant, a cast, the return annotation) opens that part of
   the provider's shape.

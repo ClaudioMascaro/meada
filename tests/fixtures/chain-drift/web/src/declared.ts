@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Entity } from "./api/types";
-import { getJson } from "./api/typed";
+import { enveloped, fetchAs, getJson, search } from "./api/typed";
 import type { Remote } from "some-lib";
 
 const CATALOG = process.env.CATALOG_URL;
@@ -68,4 +68,25 @@ export async function foreign() {
 export async function typedJson() {
   const res = await fetch(`${CATALOG}/api/profiles`);
   return res.json<Counts>();
+}
+
+// A type argument that types the request: it adds no fields to the response.
+interface Query {
+  term: string;
+}
+
+export async function searched() {
+  const found = search<Query>("/api/profiles", { term: "a" });
+  return (await found).total;
+}
+
+// A wrapper that returns its type parameter, whatever it holds.
+export async function viaReturn() {
+  return fetchAs<Counts>("/api/profiles");
+}
+
+// `T` is inside `Envelope`, not the body: the body has no `total` or `count` at its root.
+export async function wrapped() {
+  const body = enveloped<Counts>("/api/profiles");
+  return (await body).data;
 }

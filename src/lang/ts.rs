@@ -59,6 +59,7 @@ impl LanguagePack for TsJs {
                     params: params(node, src, &inner),
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src)),
+                    type_params: types::type_parameters(node, src),
                     name: inner.clone(),
                     kind,
                     range,
@@ -669,9 +670,9 @@ fn value_at(node: Node, src: &[u8], scope: &str, depth: usize) -> Value {
     if node.kind() == "as_expression"
         && let Some(inner) = named(node).next()
     {
-        return match named(node).nth(1).map(|t| types::ty(t, src, &mut 0)) {
-            Some(Ty::Schema(schema)) => Value::Schema(schema),
-            _ => deeper(inner),
+        return match named(node).nth(1).and_then(|t| types::inferred(t, src)) {
+            Some(schema) => Value::Schema(schema),
+            None => deeper(inner),
         };
     }
     match node.kind() {
@@ -926,6 +927,23 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 mod tests {
     use super::{TsJs, VALUE_DEPTH};
     use crate::lang::{LanguagePack, Value};
+
+    #[test]
+    fn a_cast_is_the_value_it_casts() {
+        let src = "const BASE = process.env.API;\n\
+                   const u = BASE as string;\n\
+                   fetch(url as string);\n\
+                   fetch(`${BASE as string}/x`);\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let held = facts.consts.iter().find(|c| c.name == "u").unwrap();
+        assert!(matches!(&held.value, Value::Ref(name) if name == "BASE"));
+        // A type that lists no fields is no type of the constant.
+        assert_eq!(held.ty, None);
+        let args: Vec<_> = facts.calls.iter().filter(|c| c.callee == "fetch").collect();
+        assert!(matches!(args[0].args.as_slice(), [Value::Ref(name)] if name == "url"));
+        assert_eq!(args[0].arg_types, [None]);
+        assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
+    }
 
     /// How many calls deep the first argument of `value` goes.
     fn nesting(value: &Value) -> usize {

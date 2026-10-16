@@ -44,6 +44,16 @@ pub(super) fn inferred(typed: Node, src: &[u8]) -> Option<String> {
     }
 }
 
+/// The names of the type parameters `node`, a function, declares, in order.
+pub(super) fn type_parameters(node: Node, src: &[u8]) -> Vec<String> {
+    let Some(parameters) = node.child_by_field_name("type_parameters") else {
+        return Vec::new();
+    };
+    (named(parameters))
+        .filter_map(|p| Some(text(p.child_by_field_name("name")?, src).to_string()))
+        .collect()
+}
+
 /// The type a function's return annotation `typed` declares, inside the generics a handler wraps
 /// it in (`Promise<NextResponse<..>>`); `None` when it lists nothing.
 pub(super) fn returned(typed: Node, src: &[u8]) -> Option<Ty> {
@@ -187,7 +197,13 @@ fn reference(node: Node, src: &[u8], name: &str, cost: &mut usize) -> Ty {
             })
         });
         if declares {
-            return Ty::Unknown;
+            // A function's type parameter is the caller's to give; another's adds no fields.
+            let function = super::BODIES.contains(&parent.kind());
+            return if function {
+                Ty::Param(name.to_string())
+            } else {
+                Ty::Unknown
+            };
         }
         at = parent;
     }
@@ -333,6 +349,29 @@ mod tests {
         let want = [("A", a), ("R", r), ("U", Ty::Unknown), ("S", s), ("M", m)];
         let want: Vec<_> = want.into_iter().map(|(n, t)| (n.to_string(), t)).collect();
         assert_eq!(types, want);
+    }
+
+    #[test]
+    fn a_function_lists_its_type_parameters_and_a_return_typed_by_one() {
+        let src = "function a<T, U>(): Promise<T> {}\n\
+                   const b = async <T>(): Promise<T[]> => [];\n\
+                   function c<T>(): Promise<Envelope<T>> {}\n\
+                   function d(): number {}\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let defs: Vec<_> = (facts.defs.iter())
+            .map(|d| (d.name.as_str(), d.type_params.clone(), d.returns.clone()))
+            .collect();
+        let param = || Ty::Param("T".into());
+        let strings = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            defs,
+            [
+                ("a", strings(&["T", "U"]), Some(param())),
+                ("b", strings(&["T"]), Some(Ty::Array(Box::new(param())))),
+                ("c", strings(&["T"]), Some(Ty::Named("Envelope".into()))),
+                ("d", strings(&[]), None),
+            ]
+        );
     }
 
     #[test]

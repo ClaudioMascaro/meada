@@ -569,6 +569,15 @@ impl<'a> Code<'a> {
         def.returns.as_ref()
     }
 
+    /// The names of the type parameters of the definition `name` of `path`
+    /// (`Def::type_params`).
+    pub fn type_params(&self, path: &'a str, name: &str) -> &'a [String] {
+        let def = self
+            .full(path)
+            .and_then(|f| f.defs.iter().find(|d| d.name == name));
+        def.map_or(&[], |d| d.type_params.as_slice())
+    }
+
     fn full(&self, path: &'a str) -> Option<&'a Facts> {
         let found = self.full.get(path).copied();
         if found.is_none() {
@@ -634,8 +643,10 @@ impl<'a> Code<'a> {
         else {
             return None;
         };
-        let declared = (self.full(at)?.consts.iter())
-            .find(|c| c.name == constant && matches!(c.value, Value::Type(_)))?;
+        // Namespaces open no scope: two declarations of one name leave it unknown.
+        let mut declared = (self.full(at)?.consts.iter())
+            .filter(|c| c.name == constant && matches!(c.value, Value::Type(_)));
+        let declared = declared.next().filter(|_| declared.next().is_none())?;
         match &declared.value {
             Value::Type(ty) => Some((at, constant, ty)),
             _ => None,

@@ -51,11 +51,17 @@ impl Shape {
 
     /// Adds the paths of `other`, read from the same side, to this shape.
     pub fn merge(&mut self, other: &Shape) {
-        self.fields.extend(other.fields.iter().cloned());
         self.open.extend(other.open.iter().cloned());
         self.scalars.extend(other.scalars.iter().cloned());
         self.declared.extend(other.declared.iter().cloned());
-        self.optional.extend(other.optional.iter().cloned());
+        // A path either side requires (lists, and does not mark optional) is certain.
+        let requires = |s: &Shape, p: &String| s.fields.contains(p) && !s.optional.contains(p);
+        let optional: BTreeSet<String> = (self.optional.iter().chain(&other.optional))
+            .filter(|p| !requires(self, p) && !requires(other, p))
+            .cloned()
+            .collect();
+        self.optional = optional;
+        self.fields.extend(other.fields.iter().cloned());
     }
 }
 
@@ -280,6 +286,27 @@ mod tests {
             let clean = missing.is_empty() && unchecked.is_empty();
             assert_eq!(found.is_none(), clean, "drift for {consumer:?}");
         }
+    }
+
+    #[test]
+    fn a_path_one_side_of_a_merge_requires_is_not_optional() {
+        let provider = document(&["id"], &[], &[]);
+        let mut declares = reads(&["id", "cursor"]);
+        declares.optional = set(&["cursor"]);
+        let reads_it = reads(&["cursor"]);
+        let mut forward = declares.clone();
+        forward.merge(&reads_it);
+        let mut backward = reads_it.clone();
+        backward.merge(&declares);
+        for merged in [forward, backward] {
+            assert!(merged.optional.is_empty());
+            let found = drift(&provider, &merged).unwrap();
+            assert_eq!(found.missing.keys().collect::<Vec<_>>(), ["cursor"]);
+        }
+        // A side that does not mention the path leaves it optional.
+        let mut merged = declares.clone();
+        merged.merge(&reads(&["id"]));
+        assert_eq!(merged.optional, set(&["cursor"]));
     }
 
     #[test]
