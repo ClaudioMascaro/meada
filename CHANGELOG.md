@@ -58,7 +58,9 @@ tagging.
   constant merges its fields and a spread of an unknown value, or a property that is not a
   literal (a call, `rows.map(...)`), is present with open content, so drift under it is not
   checked. Several returns give the union of their fields, and a return with a literal status
-  outside 2xx (`{ status: 404 }`, `res.status(404)`) is left out. Constants are followed through
+  outside 2xx (`{ status: 404 }`, `res.status(404)`) is left out. A response sent another way
+  (`return ok(user)`, `res.redirect(..)`, `res` handed to a function, `next()`) opens the root.
+  Module-level constants are followed through
   imports. The export names the source `literals`; a document still wins over literals.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,

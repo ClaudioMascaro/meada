@@ -657,6 +657,12 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, Value::Function(qualify(scope, &inline(property)))))
                 }
+                // A getter or method of a literal that is no options object: a key whose value
+                // Meada does not read, not a key that is absent.
+                "method_definition" => {
+                    let key = text(property.child_by_field_name("name")?, src).to_string();
+                    Some((key, Value::Unknown))
+                }
                 _ => None,
             });
             Value::Object(properties.collect())

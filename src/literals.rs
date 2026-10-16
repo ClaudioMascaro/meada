@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::lang::{Call, Part, Value, property};
+use crate::lang::{Call, Part, Step, Value, property};
 use crate::resolve::{Code, Target};
 use crate::shape::{Shape, Source};
 
@@ -38,17 +38,38 @@ pub struct Literals {
     spent: HashMap<String, usize>,
 }
 
+/// The 2xx responses a handler sends.
+pub struct Responses<'a> {
+    path: &'a str,
+    /// The body of each response Meada recognizes, with the scope it is written in.
+    bodies: Vec<(&'a str, &'a Value)>,
+    /// Whether the handler may answer another way: a call whose result it returns, `res` handed
+    /// to another function, `next()`. Any shape read from the bodies alone is then incomplete.
+    other: bool,
+}
+
+/// What a call of a handler does with the response.
+enum Sends {
+    /// Nothing.
+    No,
+    /// Sends a body, with the literal status when it can be read.
+    Body(Option<u32>),
+    /// Answers or hands the answer over in a way Meada does not read.
+    Other,
+}
+
 impl Literals {
-    /// The shape the 2xx responses of the handler `name` of `path` give, as the union of their
-    /// body literals; `None` when it sends none Meada reads, or past the budget. A response
-    /// with a literal status outside 2xx is left out; one whose status cannot be read counts.
-    pub fn returned<'a>(
+    /// The 2xx responses the handler `name` of `path` sends: the bodies of the sends Meada
+    /// recognizes, a literal status outside 2xx leaving the response out (one whose status
+    /// cannot be read counts). `None` when the handler is not there or the file's budget is
+    /// spent. The one place that lists a route's responses, for each source that reads them.
+    pub fn responses<'a>(
         &mut self,
         code: &Code<'a>,
         path: &str,
         name: &str,
         kind: Handler,
-    ) -> Option<Shape> {
+    ) -> Option<Responses<'a>> {
         let (&path, &facts) = code.files().get_key_value(path)?;
         let def = facts.defs.iter().find(|d| d.name == name)?;
         let handler = Target {
@@ -82,24 +103,60 @@ impl Literals {
                 .or_default()
                 .push(i);
         }
-        let mut sent = false;
+        let mut responses = Responses {
+            path,
+            bodies: Vec::new(),
+            other: false,
+        };
         for &i in &body {
             let call = &facts.calls[i];
-            let status = match kind {
-                Handler::Express => express(&mut reader, handler, &facts.calls, &by_start, i),
-                Handler::Next => next(&mut reader, path, call, i),
+            let sends = match kind {
+                Handler::Express => express(&mut reader, handler, &facts.calls, &by_start, i)?,
+                Handler::Next => next(&mut reader, handler, call, i)?,
             };
-            let Some(status) = status? else { continue };
-            if status.is_some_and(|s| !(200..300).contains(&s)) {
-                continue;
+            match sends {
+                Sends::No => {}
+                Sends::Other => responses.other = true,
+                Sends::Body(status) => {
+                    if status.is_some_and(|s| !(200..300).contains(&s)) {
+                        continue;
+                    }
+                    if let Some(arg) = code.args(path, i)?.first() {
+                        responses.bodies.push((&call.scope, arg));
+                    }
+                }
             }
-            let Some(arg) = code.args(path, i)?.first() else {
-                continue;
-            };
-            reader.read(path, &call.scope, arg, "", 0)?;
-            sent = true;
         }
-        sent.then_some(reader.shape)
+        Some(responses)
+    }
+
+    /// The shape the 2xx responses of the handler `name` of `path` give, as the union of their
+    /// body literals, the root open when the handler may answer another way; `None` when it
+    /// sends no body Meada reads, or past the budget.
+    pub fn returned<'a>(
+        &mut self,
+        code: &Code<'a>,
+        path: &str,
+        name: &str,
+        kind: Handler,
+    ) -> Option<Shape> {
+        let responses = self.responses(code, path, name, kind)?;
+        if responses.bodies.is_empty() {
+            return None;
+        }
+        let path = responses.path;
+        let mut reader = Reader {
+            code,
+            spent: self.spent.entry(path.to_string()).or_default(),
+            shape: Shape::new(Source::Literals(path.to_string())),
+        };
+        for (scope, body) in responses.bodies {
+            reader.read(path, scope, body, "", 0)?;
+        }
+        if responses.other {
+            reader.open("");
+        }
+        Some(reader.shape)
     }
 }
 
@@ -131,15 +188,18 @@ impl<'a> Reader<'_, 'a> {
         while let Value::Ref(name) = value {
             self.charge()?;
             depth += 1;
+            // Nothing records a later write to a function-local constant's object
+            // (`body.next = cursor`), so only a module-level one is followed.
             let found = match depth <= LITERALS_DEPTH {
-                true => self.code.constant(path, scope, name),
+                true => (self.code.constant(path, scope, name))
+                    .filter(|((_, constant), _)| !constant.contains('.')),
                 false => None,
             };
-            let Some(((at, constant), held)) = found else {
+            let Some(((at, _), held)) = found else {
                 return Some((path, scope, &UNKNOWN, depth));
             };
             path = at;
-            scope = constant.rsplit_once('.').map_or("", |(s, _)| s);
+            scope = "";
             value = held;
         }
         Some((path, scope, value, depth))
@@ -249,31 +309,56 @@ impl<'a> Reader<'_, 'a> {
     }
 }
 
-/// Whether the call `i` of an Express handler sends a response, and its literal status: the
-/// outer `None` is a call that sends none, the inner one a status that cannot be read.
-/// `res.json(body)` has none; `res.status(code).json(body)` has the `code` written in its chain.
-/// `None` overall is a spent budget.
+/// The `res` methods that set a header or the status and send nothing.
+const QUIET: [&str; 14] = [
+    "status",
+    "set",
+    "header",
+    "setHeader",
+    "type",
+    "contentType",
+    "cookie",
+    "clearCookie",
+    "append",
+    "vary",
+    "location",
+    "links",
+    "attachment",
+    "get",
+];
+
+/// What the call `i` of an Express handler does with the response. `res.json(body)` sends a
+/// body with no status; `res.status(code).json(body)` has the `code` written in its chain. Any
+/// other `res` method, `res` passed to another call and a call of the handler's `next` answer
+/// another way. `None` overall is a spent budget.
 fn express<'a>(
     reader: &mut Reader<'_, 'a>,
     handler: Target<'a>,
     calls: &'a [Call],
     by_start: &HashMap<usize, Vec<usize>>,
     i: usize,
-) -> Option<Option<Option<u32>>> {
+) -> Option<Sends> {
     let (code, path) = (reader.code, handler.path);
     let call = &calls[i];
-    let Some((receiver, method)) = call.callee.rsplit_once('.') else {
-        return Some(None);
-    };
-    if !matches!(method, "json" | "send") {
-        return Some(None);
-    }
     let is_res = |c: &'a Call, name: &'a str| code.is_param(path, &c.scope, name, handler, 1);
-    if receiver != "(call_expression)" {
-        return Some(is_res(call, receiver).then_some(None));
+    let args = code.args(path, i).unwrap_or_default();
+    let handed = args
+        .iter()
+        .any(|a| matches!(a, Value::Ref(name) if is_res(call, name)));
+    if handed || code.is_param(path, &call.scope, &call.callee, handler, 2) {
+        return Some(Sends::Other);
     }
-    // `res.status(code).json(body)`: the calls of the chain start where it does and end before
-    // this one; the first is on `res`, the last `status` call sets the status.
+    let Some((receiver, method)) = call.callee.rsplit_once('.') else {
+        return Some(Sends::No);
+    };
+    if receiver != "(call_expression)" {
+        return Some(match is_res(call, receiver) {
+            true => response(method, None),
+            false => Sends::No,
+        });
+    }
+    // The calls of the chain start where this one does and end before it; the first is on
+    // `res`, the last `status` call sets the status.
     let mut chain = Vec::new();
     for &j in &by_start[&call.range.start] {
         reader.charge()?;
@@ -287,31 +372,40 @@ fn express<'a>(
         (base.callee.split_once('.')).is_some_and(|(name, _)| is_res(base, name))
     });
     if !on_res {
-        return Some(None);
+        return Some(Sends::No);
     }
     let set = (chain.iter().rev()).find(|&&j| calls[j].callee.rsplit('.').next() == Some("status"));
-    let Some(&set) = set else {
-        return Some(Some(None));
-    };
-    let Some(arg) = code.args(path, set).and_then(|a| a.first()) else {
-        return Some(Some(None));
+    let Some((set, arg)) = set.and_then(|&j| Some((j, code.args(path, j)?.first()?))) else {
+        return Some(response(method, None));
     };
     let status = match reader.resolve(path, &calls[set].scope, arg, 0)? {
         (_, _, Value::Scalar(status), _) => *status,
         _ => None,
     };
-    Some(Some(status))
+    Some(response(method, status))
+}
+
+/// What the `res` method `method` does: `json` and `send` send a body, the rest of `QUIET`
+/// nothing, anything else (`end`, `render`, `redirect`, `sendFile`, ...) answers another way.
+fn response(method: &str, status: Option<u32>) -> Sends {
+    match method {
+        "json" | "send" => Sends::Body(status),
+        m if QUIET.contains(&m) => Sends::No,
+        _ => Sends::Other,
+    }
 }
 
 /// The same for the call `i` of a Next.js handler: `NextResponse.json` (imported from
-/// `next/server`) or the global `Response.json`, with the status of its options.
+/// `next/server`) or the global `Response.json` send a body, with the status of their options.
+/// Any other call whose result the handler itself returns (`return ok(user)`, `new
+/// Response(..)`, `NextResponse.redirect(..)`) answers another way.
 fn next<'a>(
     reader: &mut Reader<'_, 'a>,
-    path: &'a str,
+    handler: Target<'a>,
     call: &'a Call,
     i: usize,
-) -> Option<Option<Option<u32>>> {
-    let code = reader.code;
+) -> Option<Sends> {
+    let (code, path) = (reader.code, handler.path);
     let sends = match call.callee.as_str() {
         "NextResponse.json" => matches!(
             code.imported(path, &call.scope, &call.callee),
@@ -321,12 +415,15 @@ fn next<'a>(
         _ => false,
     };
     if !sends {
-        return Some(None);
+        // A callback's `return` is not the handler's response.
+        let returned = call.scope == handler.name
+            && (code.uses(path, i)).is_some_and(|u| u.iter().any(|c| c.contains(&Step::Return)));
+        return Some(if returned { Sends::Other } else { Sends::No });
     }
     let Some(init) = code.args(path, i).and_then(|a| a.get(1)) else {
-        return Some(Some(None));
+        return Some(Sends::Body(None));
     };
-    Some(Some(reader.status(path, &call.scope, init)?))
+    Some(Sends::Body(reader.status(path, &call.scope, init)?))
 }
 
 #[cfg(test)]
@@ -440,6 +537,109 @@ mod tests {
         let other = "import { NextResponse } from 'elsewhere';\n\
                      export function h() {\n  NextResponse.json({ a: 1 });\n}\n";
         assert!(next(other).is_none());
+    }
+
+    #[test]
+    fn a_next_response_sent_another_way_opens_the_shape() {
+        let read = |body: &str| {
+            let src = format!(
+                "import {{ NextResponse }} from 'next/server';\n\
+                 export function h(req) {{\n  if (c) return NextResponse.json({{ cached: true }});\n  \
+                 {body}\n}}\n"
+            );
+            next(&src).unwrap()
+        };
+        for body in [
+            "return ok({ user });",
+            "return proxy(req);",
+            "return new Response(JSON.stringify(x));",
+            "return NextResponse.redirect(url);",
+            "const r = helper(); return r;",
+        ] {
+            let shape = read(body);
+            assert_eq!(paths(&shape.fields), ["cached"], "{body}");
+            assert_eq!(paths(&shape.open), [""], "{body}");
+        }
+        // Only the handler's own returns count: a callback's return is not its response.
+        for body in [
+            "rows.map((r) => { return f(r); }); return NextResponse.json({ a: 1 });",
+            "log(x); return NextResponse.json({ a: 1 });",
+        ] {
+            let shape = read(body);
+            assert_eq!(paths(&shape.fields), ["a", "cached"], "{body}");
+            assert!(shape.open.is_empty(), "{body}");
+        }
+    }
+
+    #[test]
+    fn an_express_response_sent_another_way_opens_the_shape() {
+        let read = |body: &str| {
+            let src = format!(
+                "export function h(req, res, next) {{\n  res.json({{ a: 1 }});\n  {body}\n}}\n"
+            );
+            express(&src).unwrap()
+        };
+        for body in [
+            "proxy(req, res);",
+            "res.redirect('/x');",
+            "res.end();",
+            "res.render('v', {});",
+            "res.status(200).end();",
+            "res.status(200).sendFile(f);",
+            "next();",
+        ] {
+            assert_eq!(paths(&read(body).open), [""], "{body}");
+        }
+        for body in [
+            "res.set('x', 'y');",
+            "res.status(201);",
+            "log(req);",
+            "other.end();",
+        ] {
+            assert!(read(body).open.is_empty(), "{body}");
+        }
+    }
+
+    #[test]
+    fn a_function_local_constant_is_open() {
+        // Nothing records a later write to the object (`body.next = cursor`).
+        let shape = express(
+            "export function h(req, res) {\n  const body = { items };\n  \
+             if (more) body.next = cursor;\n  res.json(body);\n}\n",
+        )
+        .unwrap();
+        assert_eq!(paths(&shape.open), [""]);
+        let shape =
+            express("const BASE = { a: 1 };\nexport function h(req, res) { res.json(BASE); }\n")
+                .unwrap();
+        assert_eq!(paths(&shape.fields), ["a"]);
+        assert!(shape.open.is_empty());
+    }
+
+    #[test]
+    fn a_name_that_hides_res_is_no_response() {
+        for body in [
+            "try { f(); } catch (res) { res.json({ a: 1 }); }",
+            "const { res } = other; res.json({ a: 1 });",
+            "items.forEach((res) => res.json({ a: 1 }));",
+        ] {
+            let src = format!("export function h(req, res) {{\n  {body}\n}}\n");
+            assert!(express(&src).is_none(), "{body}");
+        }
+    }
+
+    #[test]
+    fn a_getter_or_method_in_a_literal_is_present_and_open() {
+        let shape = express(
+            "const BODY = { get total() { return 1; }, count() { return 2; } };\n\
+             export function h(req, res) { res.json({ inner: BODY, a: 1 }); }\n",
+        )
+        .unwrap();
+        assert_eq!(
+            paths(&shape.fields),
+            ["a", "inner", "inner.count", "inner.total"]
+        );
+        assert_eq!(paths(&shape.open), ["inner.count", "inner.total"]);
     }
 
     #[test]

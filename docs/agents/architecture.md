@@ -357,9 +357,16 @@ one for the area a change touches.
   and a constant chain longer is unknown. Only a body Meada reads (an object or array literal,
   a constant naming one) gives fields; a call, a `map` over rows, a parameter or a spread of
   anything but a known object is open (no marker). The handler is the function `res.json` and
-  its kin sit in or in a callback inside it: a helper it calls that sends the response, a
-  `res` stored in another name or a status set in a separate statement (`res.status(404);`
-  then `res.json(...)`) is not followed, so such a return counts as 2xx (no marker). A constant
+  its kin sit in or in a callback inside it. A response sent another way opens the root of the
+  shape (no marker): in Next.js, a call whose result the handler itself returns and that is no
+  `NextResponse.json` / `Response.json` (`return ok(user)`, `new Response(..)`, `redirect`); in
+  Express, `res` passed to another call, a `res` method other than `json`, `send` and the ones
+  that only set a header or the status (`end`, `render`, `redirect`, `sendFile`, ...), or a call
+  of the handler's `next`. A `res` stored in another name or a status set in a separate
+  statement (`res.status(404);` then `res.json(...)`) is not followed, so such a send counts as
+  2xx (no marker). Only a module-level constant is followed: nothing records a later write to
+  a function-local one (`body.next = cursor`, `Object.assign(body, x)`), so it is unknown and
+  open; a module-level object mutated after its declaration is still read as written. A constant
   held by another repository (a package import the repository's `Resolver` does not map to one
   of its files) is unknown, so open.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing

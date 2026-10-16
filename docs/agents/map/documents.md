@@ -108,7 +108,9 @@ modules updates it.
   included), not through `Code::value`, so `LITERALS_DEPTH` bounds nesting and constant hops
   alike and `LITERALS_BUDGET` the work of a file; a body it cannot read is open at that path
   (an empty array and a spread of anything but a known object included), a string with more
-  than one part, a number and a boolean are scalar leaves. `Source::at`
+  than one part, a number and a boolean are scalar leaves. `Literals::responses` lists the 2xx
+  bodies (and whether the handler answers another way, which opens the root; see the Known
+  ceilings), `returned` reads them; only module-level constants are followed. `Source::at`
   names it in `context`; `Source::declared` tells a declared source (a document) from one read
   from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the
   one drift comparison: each consumer path is checked from the root one step at a time

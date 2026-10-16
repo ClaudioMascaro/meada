@@ -17,3 +17,11 @@ api.get("/inventory/:sku", getItem);
 api.post("/inventory", (req: any, res: any) => {
   res.send({ ...req.body, saved: true });
 });
+
+// A branch that redirects answers another way: the shape is open at the root.
+api.get("/inventory/:sku/image", (req: any, res: any) => {
+  if (req.query.cdn) {
+    return res.redirect("/cdn");
+  }
+  res.json({ url: "u" });
+});

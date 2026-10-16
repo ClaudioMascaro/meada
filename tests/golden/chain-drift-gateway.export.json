@@ -19,7 +19,7 @@
     },
     {
       "path": "src/inventory.ts",
-      "hash": "9007b456ce37f0c40c1924402731bc39937643309b02cbcad212fdffecbd2d85"
+      "hash": "86c93c965f58cfe7d86664b17ff8bb9f6f4619f72d2cc06212f68ce902d93963"
     },
     {
       "path": "src/kafka.ts",
@@ -65,6 +65,14 @@
         "path": "src/events.ts",
         "start": 129,
         "end": 237
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 787,
+        "end": 900
       }
     },
     {
@@ -195,6 +203,28 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image::res.json#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 875,
+        "end": 897
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image::res.redirect#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 847,
+        "end": 867
+      }
+    },
+    {
       "id": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory::res.send#0",
       "caller": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
       "target": null,
@@ -214,6 +244,17 @@
         "path": "src/inventory.ts",
         "start": 451,
         "end": 486
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::api.get#1",
+      "caller": "example.com/chain/gateway::src/inventory.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 754,
+        "end": 901
       }
     },
     {
@@ -516,6 +557,24 @@
       }
     },
     {
+      "contract": "http::GET::/api/inventory/{}/image",
+      "site": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "shape": {
+        "source": {
+          "literals": "src/inventory.ts"
+        },
+        "fields": [
+          "url"
+        ],
+        "open": [
+          ""
+        ],
+        "scalars": [
+          "url"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/orders",
       "site": "example.com/chain/gateway::src/orders.ts::listOrders",
       "shape": {
@@ -778,6 +837,19 @@
       "contract": "http::GET::/api/health",
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::image::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "contract": "http::GET::/api/inventory/{}/image",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "size": "",
+          "url": ""
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/stock.ts::item::fetch#0",

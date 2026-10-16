@@ -2,6 +2,10 @@
   "repository": "example.com/chain/catalog",
   "files": [
     {
+      "path": "app/api/cached/route.ts",
+      "hash": "28715cb31c5ac0a8a141362a4b37e10ba35aac1f7e61d17692b203723b756b37"
+    },
+    {
       "path": "app/api/events/route.ts",
       "hash": "4f0ad679a8252cc48bdb12fd490508b2eec987596bd7ea1d3473bb4e7c7b205d"
     },
@@ -31,6 +35,22 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 214,
+        "end": 389
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 45,
+        "end": 108
+      }
+    },
     {
       "id": "example.com/chain/catalog::app/api/events/route.ts::POST",
       "span": {
@@ -105,6 +125,61 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::(new_expression).searchParams.has#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 259,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 318,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::URL#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 259,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::ok#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "level": "exact",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 368,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::ok::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 82,
+        "end": 105
+      }
+    },
     {
       "id": "example.com/chain/catalog::app/api/events/route.ts::POST::Response#0",
       "caller": "example.com/chain/catalog::app/api/events/route.ts::POST",
@@ -262,6 +337,24 @@
   ],
   "providers": [
     {
+      "contract": "http::GET::/api/cached",
+      "site": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/cached/route.ts"
+        },
+        "fields": [
+          "cached"
+        ],
+        "open": [
+          ""
+        ],
+        "scalars": [
+          "cached"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/health",
       "site": "example.com/chain/catalog::app/api/health/route.ts::GET"
     },
@@ -375,6 +468,20 @@
       "contract": "http::GET::/api/health",
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::cached::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "contract": "http::GET::/api/cached",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "unchecked": {
+          "cached": "",
+          "nothing": "",
+          "user": ""
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/stock.ts::one::fetch#0",

@@ -52,6 +52,8 @@ fn trace_ends_the_links_of_consumers_reading_past_a_literal_shape() {
         "GET /api/stock",
         "POST /api/stock",
         "GET /api/stock/{}",
+        "GET /api/cached",
+        "GET /api/inventory/{}/image",
     ] {
         let start = Start::From(route);
         answers.push(engine.trace(start, Direction::Up, None).unwrap());

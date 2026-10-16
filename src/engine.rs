@@ -780,10 +780,12 @@ fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
         let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
         paths.join(", ")
     };
-    let mut lines = vec![format!(
-        "{identity} {at} {what} fields: {}",
-        list(&shape.fields)
-    )];
+    let fields = list(&shape.fields);
+    let mut lines = vec![
+        format!("{identity} {at} {what} fields: {fields}")
+            .trim_end()
+            .to_string(),
+    ];
     if !shape.open.is_empty() {
         lines.push(format!(
             "{identity} {at} {what} open: {}",

@@ -35,3 +35,16 @@ export async function one(sku: string) {
   const body = await res.json();
   return [body.count, body.error];
 }
+
+// Both routes answer another way too: nothing below the root is checked.
+export async function cached() {
+  const res = await fetch(`${CATALOG}/api/cached`);
+  const body = await res.json();
+  return [body.cached, body.user, body.nothing];
+}
+
+export async function image(sku: string) {
+  const res = await fetch(`${GATEWAY}/api/inventory/${sku}/image`);
+  const body = await res.json();
+  return [body.url, body.size];
+}

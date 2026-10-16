@@ -27,7 +27,8 @@ modules updates it.
   chain is in `freshness`; the overlay's gateway Express routes and catalog Next.js routes
   return object literals, so the gateway and catalog exports carry shapes with source
   `literals`, `trace` up from those routes shows drift and not-checked reads, and `context`
-  names the source; the limits of `literals.rs` are unit tests there),
+  names the source, and a Next.js route answering through a helper and an Express one that may
+  redirect are open at the root; the limits of `literals.rs` are unit tests there),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

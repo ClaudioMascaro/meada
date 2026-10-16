@@ -395,6 +395,20 @@ fn prefixes<'a>(
     out
 }
 
+/// The shape the handler `name` of `path` gives its route from what the code returns (spec
+/// #23): the one place that picks the source of a code route's shape. The sources come in the
+/// order of ADR 0009, a document merged later in `declare`, then the zod schema the response
+/// is parsed with (not read yet), then the returned literals.
+fn provider_shape(
+    code: &Code,
+    literals: &mut Literals,
+    path: &str,
+    name: &str,
+    kind: Handler,
+) -> Option<Shape> {
+    literals.returned(code, path, name, kind)
+}
+
 /// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on a constant
 /// holding an app or a router, under every prefix of `app.use(prefix, router)` mounts,
 /// through imports and at any depth.
@@ -473,8 +487,8 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
             Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
             _ => None,
         };
-        let shape =
-            target.and_then(|(at, name)| literals.returned(code, at, name, Handler::Express));
+        let shape = target
+            .and_then(|(at, name)| provider_shape(code, literals, at, name, Handler::Express));
         for prefix in prefixes(at, &mounts, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
@@ -553,7 +567,10 @@ impl ContractKind for Http {
                         path: path.into(),
                         name: local.clone(),
                     };
-                    (site, literals.returned(code, path, local, Handler::Next))
+                    (
+                        site,
+                        provider_shape(code, &mut literals, path, local, Handler::Next),
+                    )
                 } else {
                     (Site::File(path.into()), None)
                 };
