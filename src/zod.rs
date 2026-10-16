@@ -3,12 +3,12 @@
 //! literals. `z.object` gives fields, `z.array` elements, the primitives scalars, and anything
 //! whose output Meada cannot read (`.transform`, `z.lazy`, `.passthrough()`, `z.any`) is open.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::lang::{Invocation, Ty, Value};
 use crate::literals::Responses;
 use crate::resolve::Code;
-use crate::shape::{Shape, Source};
+use crate::shape::{Import, Shape, Source, Want};
 
 /// What reading the schemas of one file's handlers may cost: every expression of a schema
 /// examined, over all the handlers of the file. Past it, the file's remaining handlers give no
@@ -51,6 +51,23 @@ const KEEPS: [&str; 24] = [
     "uuid",
 ];
 
+/// The methods besides `KEEPS` that `Reader::method` reads on a schema.
+const SCHEMA_METHODS: [&str; 13] = [
+    "optional",
+    "nullish",
+    "partial",
+    "required",
+    "array",
+    "or",
+    "extend",
+    "merge",
+    "pick",
+    "omit",
+    "passthrough",
+    "catchall",
+    "loose",
+];
+
 /// The functions of `z` that make a scalar.
 const SCALARS: [&str; 17] = [
     "string",
@@ -84,6 +101,9 @@ struct Node {
     optional: bool,
     /// A union: the parts it gives may be there or not, whichever member holds.
     mixed: bool,
+    /// The schemas a package exports that give this part (issue #175), each at the root of it,
+    /// for the query to fill.
+    imports: Vec<Import>,
 }
 
 impl Node {
@@ -117,19 +137,30 @@ impl Node {
         self.open |= other.open;
         self.optional |= other.optional;
         self.mixed |= other.mixed;
+        self.imports.extend(other.imports);
     }
 
     /// The fields of `other` added to this object, replacing those of the same name.
     fn overlay(&mut self, other: Node) {
         self.fields.extend(other.fields);
         self.open |= other.open;
+        self.imports.extend(other.imports);
     }
 
     /// Adds the paths a consumer's `z.infer` type lists below `at` to `out`, each with whether it
-    /// may be absent. A union lists no part below it: which member holds is not known.
-    fn declared(&self, at: &str, out: &mut BTreeMap<String, bool>) {
+    /// may be absent, and the imports it leaves to the query to `imports`. A union lists no part
+    /// below it: which member holds is not known.
+    fn declared(&self, at: &str, out: &mut BTreeMap<String, bool>, imports: &mut Vec<Import>) {
         if self.mixed {
             return;
+        }
+        for import in &self.imports {
+            let at = at.to_string();
+            imports.push(Import {
+                at,
+                want: Want::Infer,
+                ..import.clone()
+            });
         }
         for (key, node) in &self.fields {
             let path = match at.is_empty() {
@@ -137,12 +168,12 @@ impl Node {
                 false => format!("{at}.{key}"),
             };
             out.insert(path.clone(), node.optional);
-            node.declared(&path, out);
+            node.declared(&path, out, imports);
         }
         if let Some(element) = &self.element {
             let path = format!("{at}[]");
             out.insert(path.clone(), false);
-            element.declared(&path, out);
+            element.declared(&path, out, imports);
         }
     }
 
@@ -152,7 +183,15 @@ impl Node {
         if !at.is_empty() {
             shape.fields.insert(at.to_string());
         }
-        let structured = !self.fields.is_empty() || self.element.is_some();
+        for import in &self.imports {
+            let at = at.to_string();
+            shape.imports.insert(Import {
+                at,
+                ..import.clone()
+            });
+        }
+        let structured =
+            !self.fields.is_empty() || self.element.is_some() || !self.imports.is_empty();
         if self.open || (self.scalar && structured) {
             shape.open.insert(at.to_string());
         } else if self.scalar {
@@ -220,21 +259,57 @@ impl Zod {
 impl Zod {
     /// The field paths below the root of the output of the schema `name`, written in `path`
     /// within `scope`: what `z.infer<typeof name>` lists, each with whether the output may lack
-    /// it. `None` when it is no schema Meada reads, or past the file's budget.
+    /// it, and the schemas of a package it names (issue #175), each at its path. `None` when it is
+    /// no schema Meada reads, or past the file's budget.
     pub fn inferred<'a>(
         &mut self,
         code: &Code<'a>,
         path: &'a str,
         scope: &'a str,
         name: &'a str,
-    ) -> Option<BTreeMap<String, bool>> {
+    ) -> Option<(BTreeMap<String, bool>, Vec<Import>)> {
         let mut reader = Reader {
             code,
             spent: self.spent.entry(path.to_string()).or_default(),
         };
-        let mut out = BTreeMap::new();
-        reader.named(path, scope, name, 0)??.declared("", &mut out);
-        Some(out)
+        let (mut out, mut imports) = (BTreeMap::new(), Vec::new());
+        reader
+            .named(path, scope, name, 0)??
+            .declared("", &mut out, &mut imports);
+        Some((out, imports))
+    }
+
+    /// The two shapes the package's index stores for the schema `name` of `path` (issue #175):
+    /// the output a provider parsing with it sends (`Want::Zod`) and the paths a consumer typed
+    /// `z.infer<typeof name>` declares (`Want::Infer`). `None` when it is no schema Meada reads,
+    /// or past the file's budget.
+    pub fn exported<'a>(
+        &mut self,
+        code: &Code<'a>,
+        path: &'a str,
+        name: &'a str,
+    ) -> Option<(Shape, Shape)> {
+        let mut reader = Reader {
+            code,
+            spent: self.spent.entry(path.to_string()).or_default(),
+        };
+        let node = reader.named(path, "", name, 0)??;
+        let mut sent = Shape::new(Source::Zod(path.to_string()));
+        node.render("", &mut sent);
+        let (mut out, mut imports) = (BTreeMap::new(), Vec::new());
+        node.declared("", &mut out, &mut imports);
+        let declared: BTreeSet<String> = out.keys().cloned().collect();
+        let typed = Shape {
+            fields: declared.clone(),
+            declared,
+            optional: (out.iter())
+                .filter(|&(_, &o)| o)
+                .map(|(p, _)| p.clone())
+                .collect(),
+            imports: imports.into_iter().collect(),
+            ..Shape::new(Source::Zod(path.to_string()))
+        };
+        Some((sent, typed))
     }
 }
 
@@ -299,12 +374,16 @@ impl<'a> Reader<'_, 'a> {
         }
     }
 
-    /// The schema the constant `name` holds.
+    /// The schema the constant `name` holds. A name imported from outside the repository is a
+    /// schema the query fills from the package that exports it (issue #175).
     fn named(&mut self, path: &'a str, scope: &'a str, name: &'a str, depth: usize) -> Read {
-        match self.constant(path, scope, name) {
-            Some((at, within, held)) => self.schema(at, within, held, depth + 1),
-            None => Some(None),
+        if let Some((at, within, held)) = self.constant(path, scope, name) {
+            return self.schema(at, within, held, depth + 1);
         }
+        Some(self.code.imported(path, scope, name).map(|imported| Node {
+            imports: vec![Import::new("", path, imported, Want::Zod)],
+            ..Node::default()
+        }))
     }
 
     /// The output of the schema `value` stands for.
@@ -342,6 +421,13 @@ impl<'a> Reader<'_, 'a> {
         let Some(on) = self.schema(path, scope, receiver, depth + 1)? else {
             return Some(None);
         };
+        // An imported name is taken for a schema only by the methods schemas have: `object` on
+        // a `z` imported from another library makes it none.
+        let imported =
+            matches!(&**receiver, Value::Ref(name) if self.constant(path, scope, name).is_none());
+        if imported && !SCHEMA_METHODS.contains(&method(call)) && !KEEPS.contains(&method(call)) {
+            return Some(None);
+        }
         Some(Some(self.method(
             path,
             scope,
@@ -442,6 +528,11 @@ impl<'a> Reader<'_, 'a> {
         args: &'a [Value],
         depth: usize,
     ) -> Option<Node> {
+        // The fields of an imported schema are not known here: none can be picked, left out or
+        // made optional.
+        if !on.imports.is_empty() && ["partial", "required", "pick", "omit"].contains(&name) {
+            return Some(Node::open());
+        }
         match name {
             "optional" | "nullish" => on.optional = true,
             "partial" | "required" => {
@@ -603,8 +694,7 @@ mod tests {
 
     #[test]
     fn what_meada_cannot_read_is_open() {
-        let decls =
-            "import { Ext } from '@acme/schemas';\nconst Base = z.object({ id: z.string() });";
+        let decls = "const Base = z.object({ id: z.string() });";
         // (schema, fields, open paths)
         let cases = [
             ("Base.passthrough()", "id", vec![""]),
@@ -624,13 +714,7 @@ mod tests {
                 "l t",
                 vec!["l", "t"],
             ),
-            (
-                "z.object({ e: Ext, f: Ext.optional() })",
-                "e f",
-                vec!["e", "f"],
-            ),
             ("z.array(z.any())", "[]", vec!["[]"]),
-            ("z.array(Ext)", "[]", vec!["[]"]),
             ("Base.superJoin()", "", vec![""]),
             ("z.union([])", "", vec![""]),
             ("Base.pick({ [K]: true })", "", vec![""]),
@@ -647,7 +731,6 @@ mod tests {
     #[test]
     fn a_body_whose_schema_meada_cannot_see_gives_no_shape() {
         for decls in [
-            "import { S } from '@acme/schemas';",
             "import { z } from 'yup';\nconst S = z.object({});",
             "const S = { parse: (x) => x };",
         ] {
@@ -657,6 +740,36 @@ mod tests {
             );
             assert!(express(&src).is_none(), "{decls}");
         }
+    }
+
+    #[test]
+    fn a_schema_a_package_exports_is_left_for_the_query_to_fill() {
+        let decls = "import { Ext } from '@acme/schemas';";
+        // (schema, fields, the paths of the imports)
+        let cases = [
+            ("Ext", "", vec![""]),
+            (
+                "z.object({ e: Ext, f: Ext.optional() })",
+                "e f",
+                vec!["e", "f"],
+            ),
+            ("z.array(Ext)", "[]", vec!["[]"]),
+            ("Ext.extend({ more: z.string() })", "more", vec![""]),
+            // Its fields are not known here: none can be picked or left out.
+            ("Ext.pick({ id: true })", "", vec![]),
+        ];
+        for (schema, fields, imports) in cases {
+            let shape = parsed(decls, schema);
+            assert_eq!(super::tests::fields(&shape), fields, "{schema}");
+            let at: Vec<&str> = shape.imports.iter().map(|i| i.at.as_str()).collect();
+            assert_eq!(at, imports, "{schema}");
+            let named = shape
+                .imports
+                .iter()
+                .all(|i| i.specifier == "@acme/schemas" && i.name == "Ext" && i.from == "a.ts");
+            assert!(named, "{schema}");
+        }
+        assert_eq!(paths(&parsed(decls, "Ext.pick({ id: true })").open), [""]);
     }
 
     const SCHEMA: &str = "import { z } from 'zod';\n\

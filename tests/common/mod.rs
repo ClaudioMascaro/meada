@@ -107,7 +107,9 @@ pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
 /// gains Express routes returning literals (an imported constant spread, an error branch with
 /// a literal status, a spread of an unknown value) and the catalog Next.js routes doing the
 /// same through `NextResponse.json` and `Response.json`; the web app reaches both through
-/// `GATEWAY_URL` and `CATALOG_URL`. Each overlaid repository gets a third commit. Returns
+/// `GATEWAY_URL` and `CATALOG_URL`. For shapes through package imports (issue #175), the catalog
+/// holds the package `@chain/contracts`, which its own routes, the gateway and the web app import.
+/// Each overlaid repository gets a third commit. Returns
 /// (web, gateway, catalog).
 pub fn drift_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     let (web, gateway, catalog) = documented_chain(case);

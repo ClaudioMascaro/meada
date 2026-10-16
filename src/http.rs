@@ -11,7 +11,7 @@ use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Export, Part, Step, Ty, Value, literal, property};
 use crate::literals::{Handler, Literals};
 use crate::resolve::{Code, Frame, Target};
-use crate::shape::{self, Shape, Source};
+use crate::shape::{self, Import, Shape, Source, under};
 use crate::workspace::Repository;
 use crate::zod::Zod;
 
@@ -118,6 +118,8 @@ fn response_reads<'a>(
     let mut fields = BTreeSet::new();
     // The fields declared types list, by path, with whether the type marks each optional.
     let mut declared: BTreeMap<String, bool> = BTreeMap::new();
+    // The types and schemas of a package the declared types name, for the query to fill.
+    let mut imports: BTreeSet<Import> = BTreeSet::new();
     let (mut got, mut at) = (Got::Response, call);
     // The types the wrapper below declares for the body with its own type parameters, by path:
     // its call gives the arguments that stand for them. And that wrapper.
@@ -154,10 +156,12 @@ fn response_reads<'a>(
                     let Some(scope) = scope else { continue };
                     let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
                     for (field, optional) in listed.fields {
-                        let all = declared
-                            .entry(declared::under(&base, &field))
-                            .or_insert(optional);
+                        let all = declared.entry(under(&base, &field)).or_insert(optional);
                         *all &= optional;
+                    }
+                    for import in listed.imports {
+                        let at = under(&base, &import.at);
+                        imports.insert(Import { at, ..import });
                     }
                 }
                 // The wrapper's type parameters, given here, stand in the types it declared.
@@ -176,10 +180,12 @@ fn response_reads<'a>(
                             .read_with(code, at.0, scope, ty, Some(args))
                             .unwrap_or_default();
                         for (field, optional) in listed.fields {
-                            let all = declared
-                                .entry(declared::under(base, &field))
-                                .or_insert(optional);
+                            let all = declared.entry(under(base, &field)).or_insert(optional);
                             *all &= optional;
+                        }
+                        for import in listed.imports {
+                            let at = under(base, &import.at);
+                            imports.insert(Import { at, ..import });
                         }
                     }
                 }
@@ -215,10 +221,11 @@ fn response_reads<'a>(
     let declared: BTreeSet<String> = declared.into_keys().collect();
     fields.extend(declared.iter().cloned());
     let site = frames.last().map_or(call.0, |f| f.path);
-    (!fields.is_empty()).then(|| Shape {
+    (!fields.is_empty() || !imports.is_empty()).then(|| Shape {
         fields,
         declared,
         optional,
+        imports,
         ..Shape::new(Source::Reads(site.to_string()))
     })
 }

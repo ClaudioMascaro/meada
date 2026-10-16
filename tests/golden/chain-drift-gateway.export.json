@@ -38,6 +38,10 @@
       "hash": "2b1f1f5bf4518b5c2b7abbc7c3373edb8cef85efdf3325043ac386f076c15cea"
     },
     {
+      "path": "src/shelves.ts",
+      "hash": "705648c6f2c86cbe00ce2c9e75f45519c1a32c14fa20b36b0eb0f1188165a4dd"
+    },
+    {
       "path": "src/topics.ts",
       "hash": "c5cf5f0db74b63420f49ec1e3277d659fe8283e8949e89244f6c1e86f52bd1fb"
     }
@@ -121,6 +125,22 @@
         "path": "src/server.ts",
         "start": 196,
         "end": 225
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 369,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 200,
+        "end": 272
       }
     }
   ],
@@ -498,6 +518,50 @@
         "start": 76,
         "end": 85
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::res.json#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 228,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::res.json#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 397,
+        "end": 430
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::api.get#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 176,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::api.get#1",
+      "caller": "example.com/chain/gateway::src/shelves.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 349,
+        "end": 434
+      }
     }
   ],
   "providers": [
@@ -595,6 +659,45 @@
       }
     },
     {
+      "contract": "http::GET::/api/shelves",
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "shape": {
+        "source": {
+          "literals": "src/shelves.ts"
+        },
+        "fields": [
+          "count"
+        ],
+        "open": [
+          ""
+        ],
+        "scalars": [
+          "count"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/shelves/{}",
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "shape": {
+        "source": {
+          "literals": "src/shelves.ts"
+        },
+        "fields": [
+          "id",
+          "reserved",
+          "warehouse"
+        ],
+        "open": [
+          "id"
+        ],
+        "scalars": [
+          "reserved",
+          "warehouse"
+        ]
+      }
+    },
+    {
       "contract": "http::GET::/api/shipments/{}",
       "site": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}"
     },
@@ -630,6 +733,11 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/gateway::package.json::dependencies::@chain/contracts",
+      "via": null
+    },
     {
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
@@ -676,6 +784,14 @@
       ]
     }
   ],
+  "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@chain/contracts",
+      "range": "^1.0.0"
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/catalog",
@@ -683,6 +799,13 @@
       "contract": "resource::postgres::orders",
       "level": "declared",
       "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/gateway::package.json::dependencies::@chain/contracts",
+      "provider": "example.com/chain/catalog::packages/contracts/package.json",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0)"
     },
     {
       "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
@@ -795,6 +918,31 @@
       "contract": "http::GET::/api/orders",
       "level": "inferred",
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::shelf::fetch#0",
+      "provider": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "contract": "http::GET::/api/shelves/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "aisle": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::shelves::fetch#0",
+      "provider": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "contract": "http::GET::/api/shelves",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "count": "",
+          "max": ""
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",

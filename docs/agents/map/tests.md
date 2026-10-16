@@ -38,7 +38,11 @@ modules updates it.
   catalog's `app/api/profiles` route and the web's `src/declared.ts` consumers (golden
   `chain-drift.trace-declared.txt`) read declared types, with the optional fields, the package
   type and the freshness of an edited shared type in `freshness`, the limits being unit tests in
-  `declared.rs` and `lang/ts/types.rs`; the rules
+  `declared.rs` and `lang/ts/types.rs`; the catalog's shared package and the routes and
+  consumers importing it (golden `chain-drift.trace-shared.txt`) cross repositories through
+  package imports, with an edited package and a package that gets its name back in
+  `freshness`, the views and the limits (`PACKAGE_HOPS`, `GRAFT_BUDGET`) being unit tests in
+  `shape.rs`; the rules
   and the pattern depth limit are unit tests in `lang/ts/uses.rs`),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the

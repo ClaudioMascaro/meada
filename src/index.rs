@@ -18,7 +18,7 @@ use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
-use crate::shape::Shape;
+use crate::shape::{Shape, Want};
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
@@ -46,8 +46,11 @@ const SCHEMA_VERSION: i64 = 16;
 /// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
 /// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
 /// `package::Tsconfig` (`out_dir`, `root_dir`), or `null` when the file is invalid. An `import`
-/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
-/// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
+/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
+/// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
+/// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
+/// `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
+/// `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22).
@@ -249,6 +252,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             false => Ok(serde_json::to_string(&package::read(src))?),
         },
     )?;
+    // Only a repository providing a package keeps the shapes of what it exports (issue #175).
+    let manifests: Vec<(String, String)> = tx
+        .prepare("SELECT path, summary FROM manifests")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let provides = manifests.iter().any(|(path, summary)| {
+        !package::is_tsconfig(path)
+            && serde_json::from_str::<package::Summary>(summary).is_ok_and(|s| s.name.is_some())
+    });
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -297,6 +309,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             }
         }
     }
+    // A manifest gaining or losing its name changes which rows the contracts give.
+    digest.update(&[u8::from(provides)]);
     let digest = digest.finalize().to_hex().to_string();
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
@@ -374,6 +388,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             let code = Code::new(resolver, &full, lang::pack(pack));
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code));
+            }
+            // Only a package keeps the shapes of what it exports (issue #175).
+            if provides {
+                found.extend(package::exported_shapes(&code));
             }
             misses.extend(code.misses().into_iter().map(String::from));
         }
@@ -810,6 +828,10 @@ pub(crate) struct Export {
     /// What each file exports (the `exports` table), sorted, for `package::import`.
     #[serde(skip)]
     pub(crate) exported: Vec<Exported>,
+    /// The shapes kept for what each file exports (`shape` rows, issue #175), for
+    /// `package::shapes`.
+    #[serde(skip)]
+    pub(crate) shapes: Vec<package::ExportedShape>,
     /// The imports resolved into a package of the workspace, by call site, then target.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) imports: Vec<Import>,
@@ -1188,6 +1210,33 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
+    let shapes = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, method, via, shape FROM {schema}.contracts \
+                 WHERE role = 'shape' ORDER BY path, method, via"
+            ))?
+            .query_map([], |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                    r.get(3)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<(String, String, _, _)>>>()?
+            .into_iter()
+            .filter_map(|(path, name, want, shape)| {
+                Some(package::ExportedShape {
+                    path,
+                    name,
+                    want: Want::parse(want.as_deref()?)?,
+                    shape: stored_shape(shape)?,
+                })
+            })
+            .collect(),
+    };
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1203,6 +1252,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         dependencies: Vec::new(),
         import_calls,
         exported,
+        shapes,
         imports: Vec::new(),
         links: Vec::new(),
         documents,

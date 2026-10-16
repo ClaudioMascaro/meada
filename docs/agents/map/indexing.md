@@ -44,10 +44,13 @@ modules updates it.
   `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
   (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
   rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
-  name with the `file` and `target` definition it names, `target` NULL for a whole file and
+  name with the `file` and `target` definition, constant or type it names, `target` NULL for a whole file and
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
   row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
-  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). `sort_providers` and
+  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). When a `package.json` of
+  the repository has a name (`provides`, folded into the configs digest so a name gained or lost
+  re-extracts), the extraction loop also runs `package::exported_shapes` over each pack's `Code`,
+  whose `shape` rows `export` loads as `Export::shapes` (`serde(skip)`, issue #175). `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only

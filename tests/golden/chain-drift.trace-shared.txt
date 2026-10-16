@@ -1,0 +1,16 @@
+example.com/chain/catalog app/api/quotes/route.ts:7 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:8 quote drift: missing discount
+chain: inferred · 1 hops · 2 repos · 67 tokens
+
+example.com/chain/gateway src/shelves.ts:5 GET /api/shelves/{}
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:15 shelf drift: missing aisle
+chain: inferred · 1 hops · 2 repos · 68 tokens
+
+example.com/chain/gateway src/shelves.ts:10 GET /api/shelves
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/shared.ts:28 shelves
+chain: inferred · 1 hops · 2 repos · 63 tokens
+
+example.com/chain/catalog app/api/receipts/route.ts:4 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:22 receipt drift: missing paidAt
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/shared.ts:35 status
+chain: inferred · 2 hops · 2 repos · 103 tokens

@@ -134,3 +134,15 @@ modules updates it.
   `<path>.length` below a provider array (`<path>[]` present) is no field. Each missing path
   maps to its level: `exact` when the provider's source is declared and the path is in the
   consumer's `declared`, else `inferred`; `None` when nothing is missing or unchecked.
+  `Shape::imports` (issue #175, stored, empty once filled) holds the parts a name imported from
+  outside the repository gives: `Import {at, from, specifier, name, want}`, `Want` being the view
+  the reader needs (`zod` and `literals` on a provider, `infer` and `type` on a consumer).
+  `literals.rs` records one for a body or spread naming an import (`Reader::imported`), `zod.rs`
+  for a schema name (`Reader::named`; `Node::imports`, rendered at the node's path, turned
+  `infer` by `Node::declared`), `declared.rs` for a `Ty::Named` and a `z.infer` it cannot find
+  (`Declared::imports`), which `http::response_reads` puts below the read path. `fill(shape,
+  at, find)` is the one recursion: `find` gives the kept shape and its repository, the kept
+  shape is filled first, then grafted at the import's path in its view (`Shape::graft`: a
+  provider takes fields, open parts and scalars, a consumer the declared paths, optional only
+  when every type says so and never when read); unresolved, a provider's part is open and a
+  consumer's adds nothing. `under(prefix, path)` joins paths (the root below `a` is `a`).

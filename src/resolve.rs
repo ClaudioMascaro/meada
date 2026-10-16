@@ -303,9 +303,9 @@ impl<'a> Resolver<'a> {
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
-    /// `export` reads it: for each name a file exports, the definition or the whole file it
-    /// names, or nothing when that is outside the repository or not known (an import from
-    /// another package stops there); for each `export * from` a file of the repository, that
+    /// `export` reads it: for each name a file exports, the definition, the module-level
+    /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
+    /// the repository or not known (an import from another package stops there); for each `export * from` a file of the repository, that
     /// file. Sorted.
     pub fn exported(&self) -> Vec<Exported> {
         let mut rows = BTreeSet::new();
@@ -318,6 +318,9 @@ impl<'a> Resolver<'a> {
                                 (Some(exported.as_str()), Some(t.path), Some(t.name))
                             }
                             Binding::Module(m) => (Some(exported.as_str()), Some(m), None),
+                            // A constant or a type: the shape a package keeps of it (issue
+                            // #175) is found through it; it is no symbol a call reaches.
+                            Binding::Const(at, c) => (Some(exported.as_str()), Some(at), Some(c)),
                             _ => (Some(exported.as_str()), None, None),
                         }
                     }
@@ -358,7 +361,8 @@ pub struct Exported {
     /// The file holding what `name` names; `None` when that is not in the repository or not
     /// known, which ends the lookup of `name` in `path`.
     pub file: Option<String>,
-    /// The qualified name of the definition in `file`; `None` when `name` is the whole file.
+    /// The qualified name of the definition, constant or type in `file`; `None` when `name` is
+    /// the whole file.
     pub target: Option<String>,
 }
 

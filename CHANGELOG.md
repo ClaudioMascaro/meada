@@ -68,9 +68,8 @@ tagging.
   gives fields, `z.array` and `.array()` elements, the primitives scalar leaves, unions the union
   of their fields, and `.optional/.nullable/.nullish` keep the field; `.extend/.merge/.pick/
   .omit/.partial` change the field set as written. `.passthrough`, `.catchall`, `z.record`,
-  `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable are open, and so is a
-  schema from a package import. Schemas are followed through local and same-repository imported
-  constants. The export names the source `zod`; a document wins over zod, and zod over literals.
+  `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable are open. Schemas are
+  followed through local and same-repository imported constants. The export names the source `zod`; a document wins over zod, and zod over literals.
 - Shape drift (spec #23), consumer reads: a consumer's destructuring (nested, with defaults and
   renames; array patterns read elements), `for...of` loops and the element parameter of array
   methods (`map`, `forEach`, `filter`, `find` and the like) read fields and `[]` elements of the
@@ -81,11 +80,19 @@ tagging.
   client wrapper (when the wrapper's return type is its type parameter or it casts the body to
   it) or to `json<T>()`, and an annotation on the receiving variable make every field
   of the type a read. Interfaces (with `extends`, also from another file), aliases to object
-  types, intersections, arrays and `z.infer<typeof schema>` give fields; other forms and types
-  of a package add none. An optional field (`?`, or `.optional()` in a schema) adds no drift. A missing path is `exact` when
+  types, intersections, arrays and `z.infer<typeof schema>` give fields; other forms add none. An optional field (`?`, or `.optional()` in a schema) adds no drift. A missing path is `exact` when
   the provider's shape comes from a document or zod. An index signature in the type of a
   handler's returned value (a typed constant, a cast, the return annotation) opens that part of
   the provider's shape.
+- Shape drift (spec #23), shapes through package imports (issue #175): a zod schema a handler
+  parses with, a constant it spreads or returns, and an interface, type alias or `z.infer` a
+  consumer casts to count like local ones when they come from a package of the workspace
+  (spec #22), in the same repository or another. The package's index keeps the shape of each
+  constant, schema and type its files export (never their source), and the importing side
+  fills the part at query time, so an edit to the package changes its importers' drift without
+  touching them. An import that does not resolve, resolves `ambiguous` or names something Meada
+  cannot read stays open on a provider and adds nothing on a consumer; shapes are followed
+  through at most 8 packages.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

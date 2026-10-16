@@ -174,4 +174,17 @@ modules updates it.
   followed to a source file). The hop is derived at query time from stored facts and never stored; an import of a
   package outside the workspace, or that resolves nowhere, appears in no export. A re-export of
   another package inside the provider ends the lookup (no second hop). No lockfile is read and
-  no registry queried.
+  no registry queried. Shapes cross the same way (issue #175): `exported_shapes(code)` (run by
+  `index::refresh` for a repository with a named manifest) gives a `Role::Shape` row (`site`
+  the file, `method` the name, `via` the `shape::Want`) for each module-level constant or type
+  a file exports: `Types::exported` for an interface or alias (`type`), `Zod::exported` for a
+  schema (`zod` and `infer`), else `Literals::exported` for an object or array literal
+  (`literals`); `index::export` loads them as `Export::shapes` (`ExportedShape`). `shapes(exports,
+  providers)`, the third workspace step, fills every provider and consumer shape holding a
+  `shape::Import` through `shape::fill`, whose lookup `kept` resolves the import like a call
+  (`nearest` manifest of the importing file, its dependency entry, `reaches`, then
+  `Provided::resolve` with the chain the import names, `known` being the kept shapes of the
+  import's view instead of the symbols); none, `ambiguous`, several names or two providers
+  keeping different shapes is unresolved. A consumer left with no field has no shape.
+  `Resolver::exported` names constants and types as targets too, which no call reaches since
+  they are no symbols.

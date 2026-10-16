@@ -10,6 +10,10 @@
 //! specifier, and `import`, a workspace step after `consume`, resolves those whose package the
 //! workspace provides into the provider's symbol, through its entry fields and what its files
 //! export (`resolve::Exported`). Nothing of it is stored as a link: `link` derives the hop.
+//!
+//! Shapes cross the same way (issue #175): a repository with a named manifest keeps the shape of
+//! each constant, schema or type its files export (`exported_shapes`), never its source text, and
+//! `shapes`, a workspace step after `import`, fills the parts of the shapes that import one.
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
@@ -19,10 +23,14 @@ use serde_json::Value;
 
 use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::declared::Types;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
+use crate::literals::Literals;
 use crate::resolve::{Code, Exported};
+use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
+use crate::zod::Zod;
 
 pub struct Packages;
 
@@ -185,6 +193,15 @@ pub struct ImportCall {
     pub specifier: String,
     /// What the call names of the import: `greet`, `default`, `Client.create`.
     pub chain: String,
+}
+
+/// The shape a package's index keeps for a name one of its files exports (issue #175): the
+/// module-level constant or type `name` of the file `path`, read for the view `want`.
+pub struct ExportedShape {
+    pub path: String,
+    pub name: String,
+    pub want: Want,
+    pub shape: Shape,
 }
 
 /// What resolved an import in a provider: the declared field or rule that named the entry, or
@@ -502,6 +519,9 @@ struct Provided<'e> {
     exported: HashMap<&'e str, Vec<&'e Exported>>,
     manifests: &'e [Manifest],
     configs: &'e [Config],
+    /// The shapes the provider keeps for what its files export (issue #175), by the symbol-like
+    /// identity of the constant or type (`<repository>::<path>::<name>`) and the view.
+    shapes: HashMap<(String, Want), &'e Shape>,
     /// The source files that export something, by the path of the manifest that is their
     /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
     /// asks (`candidates`), once for all.
@@ -528,8 +548,19 @@ impl<'e> Provided<'e> {
             exported,
             manifests: &export.manifests,
             configs: &export.tsconfigs,
+            shapes: (export.shapes.iter())
+                .map(|k| {
+                    let id = format!("{}::{}::{}", export.repository, k.path, k.name);
+                    ((id, k.want), &k.shape)
+                })
+                .collect(),
             owned: OnceCell::new(),
         }
+    }
+
+    /// Whether `id` is a symbol of the provider: what a call through an import reaches.
+    fn symbol(&self, id: &str) -> bool {
+        self.symbols.contains(id)
     }
 
     /// Whether `path` is a source file the provider indexes (a declaration file is none).
@@ -552,6 +583,7 @@ impl<'e> Provided<'e> {
         manifest: &Manifest,
         subpath: &str,
         chain: &str,
+        known: &dyn Fn(&str) -> bool,
     ) -> Option<Resolved> {
         let tried = ways(manifest, subpath);
         let first = tried.first()?.0;
@@ -562,14 +594,14 @@ impl<'e> Provided<'e> {
             Some((self.mapped(manifest, files)?, How::OutDir, Level::Inferred))
         });
         let Some((file, how, level)) = followed else {
-            let targets = self.candidates(repository, manifest, chain);
+            let targets = self.candidates(repository, manifest, chain, known);
             return (!targets.is_empty()).then_some(Resolved {
                 how: first,
                 level: Level::Ambiguous,
                 targets,
             });
         };
-        let id = self.reach(repository, &file, chain)?;
+        let id = self.reach(repository, &file, chain, known)?;
         Some(Resolved {
             how,
             level,
@@ -605,7 +637,13 @@ impl<'e> Provided<'e> {
     /// nearest manifest it is, `node_modules` ones left out) that export its head, sorted,
     /// without repeats. Every one is listed: a package has as many as it has files exporting
     /// the name.
-    fn candidates(&self, repository: &str, manifest: &Manifest, chain: &str) -> Vec<String> {
+    fn candidates(
+        &self,
+        repository: &str,
+        manifest: &Manifest,
+        chain: &str,
+        known: &dyn Fn(&str) -> bool,
+    ) -> Vec<String> {
         let head = chain.split('.').next();
         let owned = self.owned.get_or_init(|| {
             let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -626,7 +664,7 @@ impl<'e> Provided<'e> {
                     .iter()
                     .any(|e| e.name.as_deref() == head)
             })
-            .filter_map(|path| self.reach(repository, path, chain))
+            .filter_map(|path| self.reach(repository, path, chain, known))
             .collect();
         ids.sort();
         ids.dedup();
@@ -635,7 +673,13 @@ impl<'e> Provided<'e> {
 
     /// The symbol `chain` names as exported by `file`: the head is what the file exports, and
     /// each further name a member of that definition or a name the whole file exports.
-    fn reach(&self, repository: &str, file: &str, chain: &str) -> Option<String> {
+    fn reach(
+        &self,
+        repository: &str,
+        file: &str,
+        chain: &str,
+        known: &dyn Fn(&str) -> bool,
+    ) -> Option<String> {
         let mut names = chain.split('.');
         let mut at = self.lookup(file, names.next()?, 0, &mut HashSet::new())?;
         for member in names {
@@ -648,7 +692,7 @@ impl<'e> Provided<'e> {
             return None;
         };
         let id = format!("{repository}::{file}::{def}");
-        self.symbols.contains(id.as_str()).then_some(id)
+        known(&id).then_some(id)
     }
 
     /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
@@ -747,7 +791,9 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
                     how,
                     level,
                     targets,
-                }) = at.resolve(repository, manifest, &subpath, &call.chain)
+                }) = at.resolve(repository, manifest, &subpath, &call.chain, &|id| {
+                    at.symbol(id)
+                })
                 else {
                     continue;
                 };
@@ -788,6 +834,130 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
         imports.sort_by(|a, b| (&a.site, &a.target).cmp(&(&b.site, &b.target)));
         export.imports = imports;
     }
+}
+
+/// The workspace step after `import` (issue #175): every provider and consumer shape with a part
+/// a package import gives has it filled (`shape::fill`) from the shape the package's index keeps
+/// for the imported name (`kept`), so an edit to the package changes its importers' drift at the
+/// next query. A part that finds none is open on a provider and adds nothing on a consumer.
+pub fn shapes(exports: &mut [Export], providers: &Providers) {
+    let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
+    let all: &[Export] = exports;
+    let mut find = |n, import: &shape::Import| kept(all, providers, &provided, n, import);
+    // (repository, provider or consumer, position, filled shape)
+    let mut filled = Vec::new();
+    for (n, export) in all.iter().enumerate() {
+        let provided = export
+            .providers
+            .iter()
+            .map(|p| (true, &p.shape))
+            .enumerate();
+        let consumed = export
+            .consumers
+            .iter()
+            .map(|c| (false, &c.shape))
+            .enumerate();
+        for (i, (provider, side)) in provided.chain(consumed) {
+            if let Some(s) = side.as_ref().filter(|s| !s.imports.is_empty()) {
+                filled.push((n, provider, i, shape::fill(s, n, &mut find)));
+            }
+        }
+    }
+    for (n, provider, i, s) in filled {
+        match provider {
+            true => exports[n].providers[i].shape = Some(s),
+            // A consumer whose imports added nothing reads nothing, as one that never had any.
+            false => exports[n].consumers[i].shape = (!s.fields.is_empty()).then_some(s),
+        }
+    }
+}
+
+/// The shape the name `import` names keeps in the package it imports from, as the repository
+/// `n` reaches it: the package the nearest manifest of the importing file depends on, resolved in
+/// each repository providing it (`Provided::resolve`, the rules of a call through an import) to
+/// a constant or type that keeps a shape for the import's view, with that repository. `None`
+/// when no provider resolves it, when one resolves it `ambiguous` or to several names, or when
+/// two give it different shapes.
+fn kept<'e>(
+    exports: &'e [Export],
+    providers: &Providers,
+    provided: &'e [OnceCell<Provided<'e>>],
+    n: usize,
+    import: &shape::Import,
+) -> Option<(usize, &'e Shape)> {
+    let (name, subpath) = split(&import.specifier)?;
+    let manifest = nearest(&exports[n].manifests, &import.from)?;
+    let entry = (manifest.summary.dependencies.iter()).find(|e| e.name == name)?;
+    let mut found: Option<(usize, &Shape)> = None;
+    for &(m, i) in providers.of(name) {
+        if !reaches(entry.range.as_deref(), m == n) {
+            continue;
+        }
+        let at = provided[m].get_or_init(|| Provided::new(&exports[m]));
+        let known = |id: &str| at.shapes.contains_key(&(id.to_string(), import.want));
+        let repository = &exports[m].repository;
+        let manifest = &exports[m].manifests[i];
+        let Some(resolved) = at.resolve(repository, manifest, &subpath, &import.name, &known)
+        else {
+            continue;
+        };
+        let [target] = resolved.targets.as_slice() else {
+            return None;
+        };
+        if resolved.level == Level::Ambiguous {
+            return None;
+        }
+        let shape = at.shapes[&(target.clone(), import.want)];
+        if found.is_some_and(|(_, s)| s != shape) {
+            return None;
+        }
+        found = Some((m, shape));
+    }
+    found
+}
+
+/// The shapes a repository with a named manifest keeps for what its files export (issue #175),
+/// as `Role::Shape` rows: for each module-level constant or type a file exports, the declared
+/// paths of an interface or type alias (`Want::Type`, `declared.rs`), the output and the
+/// `z.infer` paths of a zod schema (`Want::Zod` and `Want::Infer`, `zod.rs`), or else the fields
+/// of an object or array literal (`Want::Literals`, `literals.rs`). Each source's rules stay in
+/// its own module; a name none of them reads keeps nothing.
+pub fn exported_shapes(code: &Code) -> Vec<Found> {
+    let (mut types, mut zod, mut literals) =
+        (Types::default(), Zod::default(), Literals::default());
+    let mut found = Vec::new();
+    for (&path, facts) in code.files() {
+        for export in &facts.exports {
+            let crate::lang::Export::Local { local, .. } = export else {
+                continue;
+            };
+            if local.contains('.') || !facts.consts.iter().any(|c| c.name == *local) {
+                continue;
+            }
+            let mut kept = Vec::new();
+            kept.extend(types.exported(code, path, local).map(|s| (Want::Type, s)));
+            match zod.exported(code, path, local) {
+                Some((sent, typed)) => kept.extend([(Want::Zod, sent), (Want::Infer, typed)]),
+                None => kept.extend(
+                    literals
+                        .exported(code, path, local)
+                        .map(|s| (Want::Literals, s)),
+                ),
+            }
+            for (want, shape) in kept {
+                found.push(Found {
+                    role: Role::Shape,
+                    site: Site::File(path.to_string()),
+                    contract: None,
+                    via: Some(want.name().to_string()),
+                    method: Some(local.clone()),
+                    fragments: Vec::new(),
+                    shape: Some(shape),
+                });
+            }
+        }
+    }
+    found
 }
 
 /// The workspace step that follows every repository's `declare`: for each dependency entry
@@ -1623,6 +1793,7 @@ mod tests {
             exported,
             manifests: &[],
             configs: &[],
+            shapes: HashMap::new(),
             owned: OnceCell::new(),
         }
     }
@@ -1728,12 +1899,18 @@ mod tests {
 
         // The root package does not take the nested package's file (a directory-prefix test
         // would), a declaration file, or one under `node_modules`; the nested one neither.
-        assert_eq!(p.candidates("r", &manifests[0], "f"), ["r::src/a.ts::f"]);
         assert_eq!(
-            p.candidates("r", &manifests[1], "f"),
+            p.candidates("r", &manifests[0], "f", &|id| p.symbol(id)),
+            ["r::src/a.ts::f"]
+        );
+        assert_eq!(
+            p.candidates("r", &manifests[1], "f", &|id| p.symbol(id)),
             ["r::sealed/src/b.ts::f"]
         );
-        assert!(p.candidates("r", &manifests[0], "g").is_empty());
+        assert!(
+            p.candidates("r", &manifests[0], "g", &|id| p.symbol(id))
+                .is_empty()
+        );
     }
 
     #[test]

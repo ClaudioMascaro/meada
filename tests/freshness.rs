@@ -518,6 +518,61 @@ fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
     assert_eq!(refreshed, exports([&cold, &cold_web]));
 }
 
+/// The catalog's shared package drops `price` from its zod schema and `warehouse` from its
+/// constant, which consumers in the web app read; the routes importing them are unchanged.
+fn drop_shared_fields(catalog: &Path) {
+    let path = catalog.join("packages/contracts/src/index.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = (src.replace(", price: z.number()", ""))
+        .replace("{ warehouse: \"w1\", reserved: 0 }", "{ reserved: 0 }");
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+#[test]
+fn an_edited_shared_package_changes_its_importers_drift_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, gateway, catalog) = drift_chain("fresh_shared");
+    age(web.parent().unwrap());
+    let before = exports([&gateway, &web]);
+    drop_shared_fields(&catalog);
+
+    let refreshed = exports([&gateway, &web]);
+
+    let (cold_web, cold_gateway, cold) = drift_chain("fresh_shared_cold");
+    drop_shared_fields(&cold);
+    for missing in ["\"price\": \"inferred\"", "\"warehouse\": \"inferred\""] {
+        assert!(!before[1].contains(missing), "{missing}");
+        assert!(refreshed[1].contains(missing), "{missing}");
+    }
+    assert_eq!(refreshed, exports([&cold_gateway, &cold_web]));
+}
+
+#[test]
+fn a_package_that_gets_its_name_back_keeps_its_shapes_like_a_cold_chain() {
+    let (web, _, catalog) = drift_chain("fresh_shared_name");
+    let path = catalog.join("packages/contracts/package.json");
+    let named = fs::read_to_string(&path).unwrap();
+    let unnamed = named.replace("  \"name\": \"@chain/contracts\",\n", "");
+    assert_ne!(named, unnamed);
+    age(web.parent().unwrap());
+    fs::write(&path, unnamed).unwrap();
+    let without = Engine::open(&web).unwrap().export().unwrap();
+    age(web.parent().unwrap());
+    fs::write(&path, named).unwrap();
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_shared_name_cold");
+    assert!(!without.contains("\"aisle\": \"inferred\""));
+    assert!(refreshed.contains("\"aisle\": \"inferred\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}
+
 #[test]
 fn edited_documents_relink_like_a_cold_chain() {
     let exports = |repos: [&Path; 2]| -> Vec<String> {
