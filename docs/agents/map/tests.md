@@ -9,7 +9,7 @@ modules updates it.
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
-  `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
+  `freshness` (cold vs refreshed, also an edited zod schema dropping a field), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
   (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
@@ -28,7 +28,11 @@ modules updates it.
   return object literals, so the gateway and catalog exports carry shapes with source
   `literals`, `trace` up from those routes shows drift and not-checked reads, and `context`
   names the source, and a Next.js route answering through a helper and an Express one that may
-  redirect are open at the root; the limits of `literals.rs` are unit tests there),
+  redirect are open at the root; the limits of `literals.rs` are unit tests there; the catalog's
+  zod routes (`app/api/comments`) give shapes with source `zod`, `trace` up from them (golden
+  `chain-drift.trace-zod.txt`) shows the drift of the web reads, and a document wins over a zod
+  schema, which wins over literals; the reading rules and limits of `zod.rs` are unit tests
+  there),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

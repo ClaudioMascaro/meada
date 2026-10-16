@@ -40,12 +40,12 @@ pub struct Literals {
 
 /// The 2xx responses a handler sends.
 pub struct Responses<'a> {
-    path: &'a str,
+    pub path: &'a str,
     /// The body of each response Meada recognizes, with the scope it is written in.
-    bodies: Vec<(&'a str, &'a Value)>,
+    pub bodies: Vec<(&'a str, &'a Value)>,
     /// Whether the handler may answer another way: a call whose result it returns, `res` handed
     /// to another function, `next()`. Any shape read from the bodies alone is then incomplete.
-    other: bool,
+    pub other: bool,
 }
 
 /// What a call of a handler does with the response.

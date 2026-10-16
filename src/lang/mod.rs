@@ -176,6 +176,10 @@ pub struct Def {
     /// A function's parameters in order; a destructured one has an empty name and lists the
     /// names it binds in `fields`.
     pub params: Vec<Param>,
+    /// The schema a function's declared return type is inferred from, by the name written
+    /// (`Promise<z.infer<typeof S>>` gives `S`). Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub returns: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -263,7 +267,12 @@ pub enum Value {
     /// `undefined`, or an argument the call leaves out.
     Undefined,
     /// The result of calling the normalized callee, such as `express.Router`.
-    Call(String),
+    Call(Invocation),
+    /// A property of a named value, such as `parsed.data` (spec #23).
+    Member(String, String),
+    /// A value declared to have the type a schema infers, such as `x as z.infer<typeof S>`
+    /// (spec #23): the name of the schema.
+    Schema(String),
     /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
     /// the arguments.
     New(String, Vec<Value>),
@@ -277,6 +286,16 @@ pub enum Value {
     Function(String),
     /// Anything else.
     Unknown,
+}
+
+/// A call as written (spec #23): `receiver` is the expression a method is called on (`z` in
+/// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
+/// the callee is no member.
+#[derive(Clone)]
+pub struct Invocation {
+    pub callee: String,
+    pub receiver: Option<Box<Value>>,
+    pub args: Vec<Value>,
 }
 
 /// What a reader of evaluated values needs depends on a parameter of the enclosing function:

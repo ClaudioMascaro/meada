@@ -462,6 +462,36 @@ fn an_edited_client_wrapper_changes_its_callers_drift_like_a_cold_chain() {
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
+/// The catalog's zod schema drops `title`, which a consumer in the web app reads.
+fn drop_a_schema_field(catalog: &Path) {
+    let path = catalog.join("lib/schemas.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace("  title: z.string().min(1),\n", "");
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+#[test]
+fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, _, catalog) = drift_chain("fresh_zod");
+    age(web.parent().unwrap());
+    let before = exports([&catalog, &web]);
+    drop_a_schema_field(&catalog);
+
+    let refreshed = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_zod_cold");
+    drop_a_schema_field(&cold);
+    assert!(!before[1].contains("\"[].title\": \"inferred\""));
+    assert!(refreshed[1].contains("\"[].title\": \"inferred\""));
+    assert_eq!(refreshed, exports([&cold, &cold_web]));
+}
+
 #[test]
 fn edited_documents_relink_like_a_cold_chain() {
     let exports = |repos: [&Path; 2]| -> Vec<String> {

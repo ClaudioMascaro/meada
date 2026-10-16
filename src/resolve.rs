@@ -464,7 +464,8 @@ impl<'a> Code<'a> {
                 let (value, within) = self.held(at, constant)?;
                 let mut origin = match value {
                     Value::Ref(name) => self.trace(at, within, name, seen)?,
-                    Value::Call(callee) => {
+                    Value::Call(call) => {
+                        let callee = &call.callee;
                         let mut origin = self.trace(at, within, callee, seen)?;
                         origin.expr += "()";
                         origin
@@ -540,6 +541,13 @@ impl<'a> Code<'a> {
     /// (`Call::uses`).
     pub fn uses(&self, path: &'a str, index: usize) -> Option<&'a [Vec<Step>]> {
         Some(self.full(path)?.calls.get(index)?.uses.as_slice())
+    }
+
+    /// The schema the declared return type of the definition `name` of `path` is inferred from
+    /// (`Def::returns`).
+    pub fn returns(&self, path: &'a str, name: &str) -> Option<&'a str> {
+        let def = self.full(path)?.defs.iter().find(|d| d.name == name)?;
+        def.returns.as_deref()
     }
 
     fn full(&self, path: &'a str) -> Option<&'a Facts> {

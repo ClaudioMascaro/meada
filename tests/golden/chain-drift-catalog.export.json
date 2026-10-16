@@ -6,6 +6,14 @@
       "hash": "28715cb31c5ac0a8a141362a4b37e10ba35aac1f7e61d17692b203723b756b37"
     },
     {
+      "path": "app/api/comments/route.ts",
+      "hash": "21f771386e86c21a46598fa7a459c26e7949265ef63ea0822bb7af8262f51434"
+    },
+    {
+      "path": "app/api/comments/summary/route.ts",
+      "hash": "f13209650211ef95e6e68e160c585f887ae9d48782375a814da7046c8056f1d9"
+    },
+    {
       "path": "app/api/events/route.ts",
       "hash": "4f0ad679a8252cc48bdb12fd490508b2eec987596bd7ea1d3473bb4e7c7b205d"
     },
@@ -32,6 +40,10 @@
     {
       "path": "lib/products.ts",
       "hash": "2ede1b6743ae3a01020d1b39b8ec7d50218d4140a954f4e19959915ec59b6ce2"
+    },
+    {
+      "path": "lib/schemas.ts",
+      "hash": "f5e722312e61c2e0455419892c71c63337a8e1505e25363d5bd52c44b2f5d9c0"
     }
   ],
   "symbols": [
@@ -49,6 +61,30 @@
         "path": "app/api/cached/route.ts",
         "start": 45,
         "end": 108
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 244,
+        "end": 456
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 526,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 241,
+        "end": 360
       }
     },
     {
@@ -178,6 +214,116 @@
         "path": "app/api/cached/route.ts",
         "start": 82,
         "end": 105
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::Comments.parse#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 296,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 337,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::NextResponse.json#1",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 389,
+        "end": 449
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 317,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::Comment.safeParse#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 583,
+        "end": 622
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 660,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::NextResponse.json#1",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 742,
+        "end": 789
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::request.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 607,
+        "end": 621
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 321,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::summarize#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 345,
+        "end": 356
       }
     },
     {
@@ -333,6 +479,182 @@
         "start": 241,
         "end": 272
       }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).min#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 177,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).nullish#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 246,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).optional#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 204,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.array#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 204,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.array#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 347,
+        "end": 363
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.number#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 407,
+        "end": 417
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.number#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 428,
+        "end": 438
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 139,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 246,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#2",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 389,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.record#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 296,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 156,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 177,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#2",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 212,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#3",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#4",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 305,
+        "end": 315
+      }
     }
   ],
   "providers": [
@@ -351,6 +673,51 @@
         ],
         "scalars": [
           "cached"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments",
+      "site": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/route.ts"
+        },
+        "fields": [
+          "[]",
+          "[].author",
+          "[].author.name",
+          "[].id",
+          "[].meta",
+          "[].tags",
+          "[].tags[]",
+          "[].title"
+        ],
+        "open": [
+          "[].meta"
+        ],
+        "scalars": [
+          "[].author.name",
+          "[].id",
+          "[].tags[]",
+          "[].title"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments/summary",
+      "site": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/summary/route.ts"
+        },
+        "fields": [
+          "average",
+          "count"
+        ],
+        "scalars": [
+          "average",
+          "count"
         ]
       }
     },
@@ -418,6 +785,33 @@
       }
     },
     {
+      "contract": "http::POST::/api/comments",
+      "site": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/route.ts"
+        },
+        "fields": [
+          "author",
+          "author.name",
+          "id",
+          "meta",
+          "tags",
+          "tags[]",
+          "title"
+        ],
+        "open": [
+          "meta"
+        ],
+        "scalars": [
+          "author.name",
+          "id",
+          "tags[]",
+          "title"
+        ]
+      }
+    },
+    {
       "contract": "http::POST::/api/events",
       "site": "example.com/chain/catalog::app/api/events/route.ts::POST"
     },
@@ -461,6 +855,45 @@
       "contract": "http::GET::/api/products/{}",
       "level": "exact",
       "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "contract": "http::GET::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "[].rating": "inferred"
+        },
+        "unchecked": {
+          "[].meta.stars": "[].meta"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "contract": "http::POST::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "rating": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "contract": "http::GET::/api/comments/summary",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "total": "inferred"
+        }
+      }
     },
     {
       "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",

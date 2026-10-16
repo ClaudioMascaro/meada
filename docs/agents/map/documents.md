@@ -96,9 +96,21 @@ modules updates it.
   `Source::Literals(path)` (`{"literals": "src/orders.ts"}`, the object literals a route
   handler returns, in the file holding the handler; spec #23) and
   `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
-  file of its call site; spec #23) are the sources yet; later spec #23 tickets add the zod
-  provider source (between a document and literals) and the declared-type consumer source as
-  variants. `literals.rs` (spec #23) reads a handler's returned literals into a `Shape`:
+  file of its call site; spec #23) and `Source::Zod(path)` (`{"zod": "src/orders.ts"}`, the
+  zod schema a route handler's response passes through, in the handler's file; declared, like
+  a document) are the sources yet; a later spec #23 ticket adds the declared-type consumer
+  source as a variant. `zod.rs` (spec #23) reads the schema into a `Shape`:
+  `Zod::returned(code, path, handler, kind)` takes the 2xx bodies `Literals::responses` lists
+  and reads each as a schema, from `schema.parse(x)`, `schema.safeParse(x).data`, or a value
+  or handler return type annotated `z.infer<typeof schema>` (`lang/ts/types.rs` names the
+  schema; `Def::returns` and `Value::Schema` carry it), following local and same-repository
+  imported constants through `Code::constant`; when any body is no schema, it gives `None`
+  and the literals are read (all or nothing). A schema becomes a `Node` tree: `z.object` and
+  `.extend/.merge/.pick/.omit` give fields, `z.array` and `.array()` an element `[]`, unions
+  (`z.union`, `discriminatedUnion`, `.or`) the union of the members' fields, the primitives
+  scalar leaves, `.optional/.nullable/.nullish` and the like keep the part; `.passthrough`,
+  `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable
+  are open. `literals.rs` (spec #23) reads a handler's returned literals into a `Shape`:
   `Literals::returned(code, path, handler, Handler::Express | Next)` takes the calls in the
   handler's byte range (and its inline callbacks), keeps the ones that send a response (Express:
   `<res>.json|send`, `res` being the handler's second parameter, also after `<res>.status(n)`

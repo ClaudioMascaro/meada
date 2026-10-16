@@ -14,6 +14,10 @@
       "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
     },
     {
+      "path": "src/comments.ts",
+      "hash": "a87236f180671906c9225e8028bd4a3541633b03930f7856a8b404835b8b9506"
+    },
+    {
       "path": "src/dashboard.ts",
       "hash": "74f647de1ae0c993b4dcd83051b9d7c95034032101df53d1a017c4765287400f"
     },
@@ -53,6 +57,30 @@
         "path": "src/api/client.ts",
         "start": 127,
         "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 198,
+        "end": 395
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 404,
+        "end": 594
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 634,
+        "end": 792
       }
     },
     {
@@ -339,6 +367,72 @@
         "path": "src/api/client.ts",
         "start": 185,
         "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::comments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 246,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::comments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 301,
+        "end": 311
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::submit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 450,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::submit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 526,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::summary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 681,
+        "end": 721
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::summary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 744,
+        "end": 754
       }
     },
     {
@@ -884,6 +978,55 @@
   "providers": [],
   "consumers": [
     {
+      "contract": "http::GET::/api/comments",
+      "site": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id",
+          "[].meta",
+          "[].meta.stars",
+          "[].rating",
+          "[].title",
+          "[].title.length"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/comments",
+      "site": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "author",
+          "author.name",
+          "id",
+          "rating"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments/summary",
+      "site": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
       "contract": "http::DELETE::/api/orders/{}",
       "site": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
       "via": "env:GATEWAY_URL"
@@ -1169,6 +1312,45 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "contract": "http::GET::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "[].rating": "inferred"
+        },
+        "unchecked": {
+          "[].meta.stars": "[].meta"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "contract": "http::POST::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "rating": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "contract": "http::GET::/api/comments/summary",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "total": "inferred"
+        }
+      }
+    },
     {
       "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
       "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",

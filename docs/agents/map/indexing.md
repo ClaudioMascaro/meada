@@ -62,7 +62,10 @@ modules updates it.
   making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
   `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
   of a `const` of a plain name that nothing else in the function binds; `Return` only from the
-  call's own function), within `USES_BUDGET` per file. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal) and
+  call's own function), within `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation (`serde(skip)`, reparsed). `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
+  `Call(Invocation)` (the callee, the receiver value of a method call and its arguments, so a
+  chain such as `z.object({..}).optional()` is read), `Member(object, property)` (`schema.shape`),
+  `Schema(name)` (a constant annotated `z.infer<typeof name>`, from `lang/ts/types.rs`) and
   `Scalar(Option<u32>)` (a number or boolean literal, spec #23; a plain integer carries its value,
   a status), and `Code::is_param` and `Code::is_global` tell a name that is the handler's own
   parameter, or a global such as `Response`, from one a local binding hides;
