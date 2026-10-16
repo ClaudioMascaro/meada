@@ -1,5 +1,6 @@
 //! The TypeScript and JavaScript language pack.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
@@ -12,6 +13,14 @@ use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod messages;
+
+/// How many definitions may nest in one file, and how many levels of arguments, objects and
+/// arrays `value` reads. Names are qualified by the definitions around them and each call
+/// resolves its names up that chain, so unbounded nesting costs cubic time; a value is read
+/// again by every `new` around it. Past the limit a function is no definition (its body belongs
+/// to the one around it) and a value is `Unknown`.
+// ponytail: real code nests a few dozen levels; 128 matches the document readers.
+const MAX_NESTING: usize = 128;
 
 pub struct TsJs;
 
@@ -33,27 +42,30 @@ impl LanguagePack for TsJs {
         let tree = parser
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
+        let parents = Parents::new(tree.root_node());
         let mut facts = Facts::default();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
             node: tree.root_node(),
             scope: String::new(),
+            depth: 0,
             binding: None,
         }];
         while let Some(Visit {
             node,
             scope,
+            depth,
             binding,
         }) = stack.pop()
         {
             let mut inner = scope.clone();
-            let defined = definition(node, binding, src);
+            let defined = definition(node, binding, src, &parents).filter(|_| depth < MAX_NESTING);
             let is_def = defined.is_some();
             if let Some((name, kind, range)) = defined {
                 inner = qualify(&scope, &name);
                 facts.defs.push(Def {
-                    params: params(node, src, &inner),
+                    params: params(node, src, &inner, &parents),
                     name: inner.clone(),
                     kind,
                     range,
@@ -74,7 +86,11 @@ impl LanguagePack for TsJs {
                             args: node
                                 .child_by_field_name("arguments")
                                 .filter(|a| a.kind() == "arguments")
-                                .map(|a| named(a).map(|arg| value(arg, src, &scope)).collect())
+                                .map(|a| {
+                                    named(a)
+                                        .map(|arg| value(arg, src, &scope, &parents))
+                                        .collect()
+                                })
                                 .unwrap_or_default(),
                         });
                     }
@@ -83,7 +99,7 @@ impl LanguagePack for TsJs {
                 "export_statement" => exports(node, src, &mut facts.exports),
                 _ => {}
             }
-            let named = binds(node, src);
+            let named = binds(node, src, &parents);
             let pattern = match node.kind() {
                 kind if BODIES.contains(&kind) => node
                     .child_by_field_name("parameters")
@@ -116,7 +132,7 @@ impl LanguagePack for TsJs {
             {
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value: value(*value_node, src, &scope),
+                    value: value(*value_node, src, &scope, &parents),
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();
@@ -128,6 +144,7 @@ impl LanguagePack for TsJs {
                         .map(|(_, name, range)| (name.clone(), range.clone())),
                     node: child,
                     scope: inner.clone(),
+                    depth: depth + usize::from(is_def),
                 }
             }));
         }
@@ -299,6 +316,8 @@ fn join(dir: &str, path: &str) -> Option<String> {
 struct Visit<'t> {
     node: Node<'t>,
     scope: String,
+    /// How many definitions enclose `node`.
+    depth: usize,
     /// The name and span a binding gives an anonymous function or class: `const f = () => {}`,
     /// `export default () => {}`.
     binding: Option<(String, Range<usize>)>,
@@ -309,6 +328,7 @@ fn definition(
     node: Node,
     binding: Option<(String, Range<usize>)>,
     src: &[u8],
+    up: &Parents,
 ) -> Option<(String, Kind, Range<usize>)> {
     let own = || {
         let name = node.child_by_field_name("name")?;
@@ -319,19 +339,41 @@ fn definition(
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
         // Methods of object literals are not definitions: only those of a class body, and
         // those of an options object, which are written in place like an argument.
-        "method_definition" if node.parent()?.kind() == "class_body" => (Kind::Method, own()?),
-        "method_definition" if in_options(node) => {
+        "method_definition" if up.of(node)?.kind() == "class_body" => (Kind::Method, own()?),
+        "method_definition" if in_options(node, up) => {
             (Kind::Inline, (inline(node), node.byte_range()))
         }
         kind if FUNCTIONS.contains(&kind) => match binding {
             Some(binding) => (Kind::Function, binding),
-            None if written_in_place(node) => (Kind::Inline, (inline(node), node.byte_range())),
+            None if written_in_place(node, up) => (Kind::Inline, (inline(node), node.byte_range())),
             None => return None,
         },
         "class" => (Kind::Class, binding?),
         _ => return None,
     };
     Some((name, kind, range))
+}
+
+/// The parent of every node, read once: `Node::parent` walks down from the root, so asking it
+/// for each function in deeply nested code costs time quadratic in the file.
+struct Parents<'t>(HashMap<usize, Node<'t>>);
+
+impl<'t> Parents<'t> {
+    fn new(root: Node<'t>) -> Self {
+        let mut parents = HashMap::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            for child in children(node) {
+                parents.insert(child.id(), node);
+                stack.push(child);
+            }
+        }
+        Self(parents)
+    }
+
+    fn of(&self, node: Node) -> Option<Node<'t>> {
+        self.0.get(&node.id()).copied()
+    }
 }
 
 /// The kinds of anonymous function expressions.
@@ -382,24 +424,23 @@ fn bound(pattern: Node, src: &[u8]) -> Vec<String> {
 
 /// Whether the anonymous function `node` is written in place as an argument, or as a property
 /// of an options object given as one: `run({ eachMessage: async () => {} })`.
-fn written_in_place(node: Node) -> bool {
-    match node.parent() {
+fn written_in_place(node: Node, up: &Parents) -> bool {
+    match up.of(node) {
         Some(p) if p.kind() == "arguments" => true,
         Some(p) if p.kind() == "pair" => {
             p.child_by_field_name("value")
                 .is_some_and(|v| v.id() == node.id())
-                && in_options(p)
+                && in_options(p, up)
         }
         _ => false,
     }
 }
 
 /// Whether `property` (a pair or a method) belongs to an object literal given as an argument.
-fn in_options(property: Node) -> bool {
-    property
-        .parent()
+fn in_options(property: Node, up: &Parents) -> bool {
+    up.of(property)
         .filter(|o| o.kind() == "object")
-        .and_then(|o| o.parent())
+        .and_then(|o| up.of(o))
         .is_some_and(|a| a.kind() == "arguments")
 }
 
@@ -411,7 +452,7 @@ fn inline(node: Node) -> String {
 
 /// The parameters of a function `node`; `scope` is the function's own qualified name, where
 /// default values are read.
-fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
+fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
     let Some(list) = node
         .child_by_field_name("parameters")
         .or_else(|| node.child_by_field_name("parameter"))
@@ -444,10 +485,10 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
                     .filter(|n| n.kind() == "identifier")
                     .map_or("", |n| text(n, src))
                     .to_string(),
-                default: default.map(|d| value(d, src, scope)),
+                default: default.map(|d| value(d, src, scope, up)),
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
-                    .map_or_else(Vec::new, |n| fields(n, src, scope)),
+                    .map_or_else(Vec::new, |n| fields(n, src, scope, up)),
             }
         })
         .collect()
@@ -456,7 +497,7 @@ fn params(node: Node, src: &[u8], scope: &str) -> Vec<Param> {
 /// The names an object pattern binds: `{ a, b = 1, c: d, e: f = 2 }`.
 // ponytail: a rest (`...rest`) or nested (`{ a: { b } }`) pattern binds nothing, so a name it
 // holds stays unknown; bind them when a wrapper reads through one.
-fn fields(pattern: Node, src: &[u8], scope: &str) -> Vec<Field> {
+fn fields(pattern: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Field> {
     named(pattern)
         .filter_map(|p| {
             let (key, target, default) = match p.kind() {
@@ -487,7 +528,7 @@ fn fields(pattern: Node, src: &[u8], scope: &str) -> Vec<Field> {
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     },
-                    default: default.map(|d| value(d, src, scope)),
+                    default: default.map(|d| value(d, src, scope, up)),
                 })
         })
         .collect()
@@ -495,11 +536,11 @@ fn fields(pattern: Node, src: &[u8], scope: &str) -> Vec<Field> {
 
 /// The child of `node` that a binding names, with that name and the binding's span:
 /// the value of a `const` declarator, or of an `export default`.
-fn binds<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, String, Range<usize>)> {
+fn binds<'t>(node: Node<'t>, src: &[u8], up: &Parents) -> Option<(Node<'t>, String, Range<usize>)> {
     let value = node.child_by_field_name("value")?;
     match node.kind() {
         "variable_declarator" => {
-            let declaration = node.parent()?;
+            let declaration = up.of(node)?;
             let is_const = declaration
                 .child_by_field_name("kind")
                 .is_some_and(|k| text(k, src) == "const");
@@ -624,7 +665,15 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
 
 /// What an expression is, as far as its own syntax tells; `scope` is the qualified name of
 /// the enclosing definition.
-fn value(node: Node, src: &[u8], scope: &str) -> Value {
+fn value(node: Node, src: &[u8], scope: &str, up: &Parents) -> Value {
+    value_at(node, src, scope, up, 0)
+}
+
+/// `value` of a node `depth` levels inside the expression it started from.
+fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> Value {
+    if depth >= MAX_NESTING {
+        return Value::Unknown;
+    }
     match node.kind() {
         "object" => {
             let properties = named(node).filter_map(|property| match property.kind() {
@@ -634,7 +683,13 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     };
-                    let value = value(property.child_by_field_name("value")?, src, scope);
+                    let value = value_at(
+                        property.child_by_field_name("value")?,
+                        src,
+                        scope,
+                        up,
+                        depth + 1,
+                    );
                     Some((key, value))
                 }
                 "shorthand_property_identifier" => {
@@ -643,9 +698,9 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                 }
                 "spread_element" => {
                     let spread = named(property).next()?;
-                    Some(("...".into(), value(spread, src, scope)))
+                    Some(("...".into(), value_at(spread, src, scope, up, depth + 1)))
                 }
-                "method_definition" if in_options(property) => {
+                "method_definition" if in_options(property, up) => {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, Value::Function(qualify(scope, &inline(property)))))
                 }
@@ -653,13 +708,17 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             });
             Value::Object(properties.collect())
         }
-        "array" => Value::List(named(node).map(|item| value(item, src, scope)).collect()),
+        "array" => Value::List(
+            named(node)
+                .map(|item| value_at(item, src, scope, up, depth + 1))
+                .collect(),
+        ),
         "await_expression" => named(node)
             .next()
-            .map_or(Value::Unknown, |n| value(n, src, scope)),
+            .map_or(Value::Unknown, |n| value_at(n, src, scope, up, depth + 1)),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
-        kind if FUNCTIONS.contains(&kind) && written_in_place(node) => {
+        kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
             Value::Function(qualify(scope, &inline(node)))
         }
         kind => match parts(node, src) {
@@ -672,7 +731,8 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                     .map_or(Value::Unknown, |f| {
                         let args = node.child_by_field_name("arguments");
                         let args = args.filter(|a| a.kind() == "arguments");
-                        let args = args.map(|a| named(a).map(|arg| value(arg, src, scope)));
+                        let args = args
+                            .map(|a| named(a).map(|arg| value_at(arg, src, scope, up, depth + 1)));
                         Value::New(callee(f, src), args.into_iter().flatten().collect())
                     })
             }
@@ -707,8 +767,14 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             let right = node.child_by_field_name("right")?;
             match text(node.child_by_field_name("operator")?, src) {
                 // At least one side must be a string for `+` to concatenate.
-                "+" if parts(left, src).is_some() || parts(right, src).is_some() => {
-                    Some(inside(left).into_iter().chain(inside(right)).collect())
+                "+" => {
+                    let (left, right) = (parts(left, src), parts(right, src));
+                    if left.is_none() && right.is_none() {
+                        return None;
+                    }
+                    let hole = || vec![Part::Hole];
+                    let (left, right) = (left.unwrap_or_else(hole), right.unwrap_or_else(hole));
+                    Some(left.into_iter().chain(right).collect())
                 }
                 // A fallback keeps the environment read on its left, if it is the only one.
                 "||" | "??" => {
@@ -822,4 +888,47 @@ fn callee(node: Node, src: &[u8]) -> String {
 
 fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
     std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn facts(src: &str) -> Facts {
+        TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    fn depth(value: &Value) -> usize {
+        match value {
+            Value::New(_, args) => 1 + args.iter().map(depth).max().unwrap_or(0),
+            _ => 1,
+        }
+    }
+
+    #[test]
+    fn definitions_nest_to_a_limit() {
+        let n = 512;
+        let facts = facts(&format!("{}1{};", "f(() => ".repeat(n), ")".repeat(n)));
+        assert_eq!(facts.calls.len(), n);
+        let deepest = (facts.defs.iter()).map(|d| d.name.matches('.').count() + 1);
+        assert_eq!(deepest.max(), Some(MAX_NESTING.min(n)));
+    }
+
+    #[test]
+    fn values_nest_to_a_limit() {
+        let n = 512;
+        let facts = facts(&format!("{}{};", "new F(".repeat(n), ")".repeat(n)));
+        assert_eq!(facts.calls.len(), n);
+        let deepest = (facts.calls.iter().flat_map(|c| &c.args)).map(depth);
+        assert_eq!(deepest.max(), Some(MAX_NESTING + 1));
+    }
+
+    #[test]
+    fn concatenation_folds_once_per_term() {
+        let facts = facts(&format!("const a = '/x' + {}'y';", "b + ".repeat(64)));
+        let Value::Str(parts) = &facts.consts[0].value else {
+            panic!("a string");
+        };
+        assert_eq!(parts.len(), 66);
+    }
 }

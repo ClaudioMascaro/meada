@@ -272,7 +272,11 @@ one for the area a change touches.
   makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
-  and a `Value::New(callee, args)`.
+  and a `Value::New(callee, args)`. `MAX_NESTING` (128): definitions nested deeper are no
+  definitions (their body belongs to the one around them), and a value nested deeper in
+  arguments, objects and arrays is `Unknown`, since qualified names and `Resolver::lexical`
+  cost time cubic in the nesting. The parent of every node is read once (`Parents`), as
+  `Node::parent` is linear in the tree's depth.
 - `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
