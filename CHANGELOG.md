@@ -62,6 +62,15 @@ tagging.
   (`return ok(user)`, `res.redirect(..)`, `res` handed to a function, `next()`) opens the root.
   Module-level constants are followed through
   imports. The export names the source `literals`; a document still wins over literals.
+- Shape drift (spec #23), provider shapes from zod schemas: a route whose handler validates its
+  response with zod gets the schema as its shape, through `schema.parse(..)`, the `data` of
+  `schema.safeParse(..)` or a value or return type annotated `z.infer<typeof schema>`. `z.object`
+  gives fields, `z.array` and `.array()` elements, the primitives scalar leaves, unions the union
+  of their fields, and `.optional/.nullable/.nullish` keep the field; `.extend/.merge/.pick/
+  .omit/.partial` change the field set as written. `.passthrough`, `.catchall`, `z.record`,
+  `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable are open, and so is a
+  schema from a package import. Schemas are followed through local and same-repository imported
+  constants. The export names the source `zod`; a document wins over zod, and zod over literals.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

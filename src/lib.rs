@@ -24,6 +24,7 @@ mod resource;
 mod shape;
 mod trace;
 mod workspace;
+mod zod;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

@@ -5,13 +5,14 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Message, Modules,
-    Param, Part, Value,
+    Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind, LanguagePack,
+    Message, Modules, Param, Part, Value,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod messages;
+mod types;
 mod uses;
 
 pub struct TsJs;
@@ -56,6 +57,8 @@ impl LanguagePack for TsJs {
                 inner = qualify(&scope, &name);
                 facts.defs.push(Def {
                     params: params(node, src, &inner),
+                    returns: (node.child_by_field_name("return_type"))
+                        .and_then(|t| types::inferred(t, src)),
                     name: inner.clone(),
                     kind,
                     range,
@@ -119,7 +122,9 @@ impl LanguagePack for TsJs {
             {
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value: value(*value_node, src, &scope),
+                    value: (node.child_by_field_name("type"))
+                        .and_then(|t| types::inferred(t, src))
+                        .map_or_else(|| value(*value_node, src, &scope), Value::Schema),
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();
@@ -630,9 +635,28 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
+/// How deep `value` reads nested expressions (objects, arrays, call arguments and the
+/// receivers of method chains). A part deeper than that is `Unknown`.
+// ponytail: real code nests a handful of levels; the limit keeps generated or crafted input
+// (`f(f(f(...)))` thousands deep) from costing the stack.
+const VALUE_DEPTH: usize = 64;
+
 /// What an expression is, as far as its own syntax tells; `scope` is the qualified name of
 /// the enclosing definition.
 fn value(node: Node, src: &[u8], scope: &str) -> Value {
+    value_at(node, src, scope, 0)
+}
+
+fn value_at(node: Node, src: &[u8], scope: &str, depth: usize) -> Value {
+    if depth >= VALUE_DEPTH {
+        return Value::Unknown;
+    }
+    let deeper = |n: Node| value_at(n, src, scope, depth + 1);
+    // `x as z.infer<typeof S>` is typed by the schema, whatever `x` is.
+    let typed = (node.kind() == "as_expression").then(|| named(node).nth(1));
+    if let Some(schema) = typed.flatten().and_then(|t| types::inferred(t, src)) {
+        return Value::Schema(schema);
+    }
     match node.kind() {
         "object" => {
             let properties = named(node).filter_map(|property| match property.kind() {
@@ -642,7 +666,7 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     };
-                    let value = value(property.child_by_field_name("value")?, src, scope);
+                    let value = deeper(property.child_by_field_name("value")?);
                     Some((key, value))
                 }
                 "shorthand_property_identifier" => {
@@ -651,7 +675,7 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
                 }
                 "spread_element" => {
                     let spread = named(property).next()?;
-                    Some(("...".into(), value(spread, src, scope)))
+                    Some(("...".into(), deeper(spread)))
                 }
                 "method_definition" if in_options(property) => {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
@@ -667,10 +691,8 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
             });
             Value::Object(properties.collect())
         }
-        "array" => Value::List(named(node).map(|item| value(item, src, scope)).collect()),
-        "await_expression" => named(node)
-            .next()
-            .map_or(Value::Unknown, |n| value(n, src, scope)),
+        "array" => Value::List(named(node).map(deeper).collect()),
+        "await_expression" => named(node).next().map_or(Value::Unknown, deeper),
         "number" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
@@ -680,17 +702,40 @@ fn value(node: Node, src: &[u8], scope: &str) -> Value {
         }
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
-            None if kind == "call_expression" => node
-                .child_by_field_name("function")
-                .map_or(Value::Unknown, |f| Value::Call(callee(f, src))),
+            None if kind == "call_expression" => {
+                let args = node.child_by_field_name("arguments");
+                let args = args.filter(|a| a.kind() == "arguments");
+                node.child_by_field_name("function")
+                    .map_or(Value::Unknown, |f| {
+                        let receiver = (f.kind() == "member_expression")
+                            .then(|| f.child_by_field_name("object"))
+                            .flatten()
+                            .map(|object| Box::new(deeper(object)));
+                        Value::Call(Invocation {
+                            callee: callee(f, src),
+                            receiver,
+                            args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
+                        })
+                    })
+            }
             None if kind == "new_expression" => {
                 node.child_by_field_name("constructor")
                     .map_or(Value::Unknown, |f| {
                         let args = node.child_by_field_name("arguments");
                         let args = args.filter(|a| a.kind() == "arguments");
-                        let args = args.map(|a| named(a).map(|arg| value(arg, src, scope)));
+                        let args = args.map(|a| named(a).map(deeper));
                         Value::New(callee(f, src), args.into_iter().flatten().collect())
                     })
+            }
+            None if kind == "member_expression" => {
+                let object = node.child_by_field_name("object");
+                let property = node.child_by_field_name("property");
+                match (object, property) {
+                    (Some(o), Some(p)) if o.kind() == "identifier" => {
+                        Value::Member(text(o, src).to_string(), text(p, src).to_string())
+                    }
+                    _ => Value::Unknown,
+                }
             }
             None => Value::Unknown,
         },
@@ -838,4 +883,53 @@ fn callee(node: Node, src: &[u8]) -> String {
 
 fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
     std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TsJs, VALUE_DEPTH};
+    use crate::lang::{LanguagePack, Value};
+
+    /// How many calls deep the first argument of `value` goes.
+    fn nesting(value: &Value) -> usize {
+        let mut value = value;
+        let mut depth = 0;
+        while let Value::Call(call) = value {
+            depth += 1;
+            match call.args.first() {
+                Some(inner) => value = inner,
+                None => break,
+            }
+        }
+        depth
+    }
+
+    #[test]
+    fn expressions_nested_past_the_depth_limit_are_unknown() {
+        let n = VALUE_DEPTH * 2;
+        let src = format!("const x = {}1{};\n", "f(".repeat(n), ")".repeat(n));
+
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+
+        let depth = nesting(&facts.consts[0].value);
+        assert!((VALUE_DEPTH - 1..=VALUE_DEPTH).contains(&depth), "{depth}");
+    }
+
+    #[test]
+    fn a_method_chain_keeps_the_receiver_and_the_arguments_of_each_call() {
+        let src = "const x = z.object({ a: 1 }).optional();\n";
+
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+
+        let Value::Call(outer) = &facts.consts[0].value else {
+            unreachable!("not a call");
+        };
+        assert_eq!(outer.callee, "(call_expression).optional");
+        let Some(Value::Call(inner)) = outer.receiver.as_deref() else {
+            unreachable!("no receiver call");
+        };
+        assert_eq!(inner.callee, "z.object");
+        assert!(matches!(inner.receiver.as_deref(), Some(Value::Ref(z)) if z == "z"));
+        assert!(matches!(inner.args.as_slice(), [Value::Object(p)] if p.len() == 1));
+    }
 }

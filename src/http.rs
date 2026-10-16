@@ -12,6 +12,7 @@ use crate::literals::{Handler, Literals};
 use crate::resolve::{Code, Frame};
 use crate::shape::{self, Shape, Source};
 use crate::workspace::Repository;
+use crate::zod::Zod;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
@@ -395,18 +396,27 @@ fn prefixes<'a>(
     out
 }
 
+/// What reads a handler's shape from the code, keeping the budgets of each file.
+#[derive(Default)]
+struct Readers {
+    zod: Zod,
+    literals: Literals,
+}
+
 /// The shape the handler `name` of `path` gives its route from what the code returns (spec
 /// #23): the one place that picks the source of a code route's shape. The sources come in the
 /// order of ADR 0009, a document merged later in `declare`, then the zod schema the response
-/// is parsed with (not read yet), then the returned literals.
+/// is parsed with or typed with, then the returned literals.
 fn provider_shape(
     code: &Code,
-    literals: &mut Literals,
+    readers: &mut Readers,
     path: &str,
     name: &str,
     kind: Handler,
 ) -> Option<Shape> {
-    literals.returned(code, path, name, kind)
+    let responses = readers.literals.responses(code, path, name, kind)?;
+    (readers.zod.returned(code, &responses, name))
+        .or_else(|| readers.literals.shape(code, &responses))
 }
 
 /// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on a constant
@@ -414,10 +424,10 @@ fn provider_shape(
 /// through imports and at any depth.
 // ponytail: an app or router passed as a parameter, `router.route(path)` chains and
 // `require` are not followed.
-fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
+fn express(code: &Code, readers: &mut Readers) -> Vec<Found> {
     let router = |path, scope, name| -> Option<Router> {
         let (at, value) = code.constant(path, scope, name)?;
-        matches!(value, Value::Call(c) if ROUTERS.contains(&c.as_str())).then_some(at)
+        matches!(value, Value::Call(c) if ROUTERS.contains(&c.callee.as_str())).then_some(at)
     };
     let mut mounts: BTreeMap<Router, Vec<(Router, Option<String>)>> = BTreeMap::new();
     let mut routes = Vec::new();
@@ -487,8 +497,8 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
             Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
             _ => None,
         };
-        let shape = target
-            .and_then(|(at, name)| provider_shape(code, literals, at, name, Handler::Express));
+        let shape =
+            target.and_then(|(at, name)| provider_shape(code, readers, at, name, Handler::Express));
         for prefix in prefixes(at, &mounts, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
             let site = match handler {
@@ -527,7 +537,7 @@ impl ContractKind for Http {
 
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
-        let mut literals = Literals::default();
+        let mut readers = Readers::default();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
                 let is_fetch = call.callee == "fetch"
@@ -569,7 +579,7 @@ impl ContractKind for Http {
                     };
                     (
                         site,
-                        provider_shape(code, &mut literals, path, local, Handler::Next),
+                        provider_shape(code, &mut readers, path, local, Handler::Next),
                     )
                 } else {
                     (Site::File(path.into()), None)
@@ -585,7 +595,7 @@ impl ContractKind for Http {
                 });
             }
         }
-        found.extend(express(code, &mut literals));
+        found.extend(express(code, &mut readers));
         found
     }
 

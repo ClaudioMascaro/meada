@@ -53,13 +53,16 @@ impl Shape {
 }
 
 /// Where a shape was read from. A provider's sources, in the order the first that applies
-/// gives the route's shape: a document, then (spec #23, later) a zod schema, then the object
+/// gives the route's shape: a document, then (spec #23) a zod schema, then the object
 /// literals the handler returns. A consumer's: the field reads on the parsed response.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Source {
     /// A provider document, by its repository-relative path.
     Document(String),
+    /// The zod schema a route handler's response passes through or is typed with (spec #23), by
+    /// the repository-relative path of the file holding the handler.
+    Zod(String),
     /// The object literals a route handler returns (spec #23), by the repository-relative path
     /// of the file holding the handler.
     Literals(String),
@@ -72,7 +75,10 @@ impl Source {
     /// The document, or the place in code, the shape comes from.
     pub fn at(&self) -> &str {
         match self {
-            Source::Document(path) | Source::Literals(path) | Source::Reads(path) => path,
+            Source::Document(path)
+            | Source::Zod(path)
+            | Source::Literals(path)
+            | Source::Reads(path) => path,
         }
     }
 
@@ -81,7 +87,7 @@ impl Source {
     /// path a declared type gives (`Shape::declared`).
     fn declared(&self) -> bool {
         match self {
-            Source::Document(_) => true,
+            Source::Document(_) | Source::Zod(_) => true,
             Source::Literals(_) | Source::Reads(_) => false,
         }
     }
@@ -294,5 +300,17 @@ mod tests {
         read.source = Source::Reads("src/b.ts".into());
         let found = drift(&read, &consumer).unwrap();
         assert_eq!(found.missing["total"], Level::Inferred);
+        // A zod schema is declared like a document; the object literals of a handler are not.
+        let mut zod = document(&["id"], &[], &[]);
+        zod.source = Source::Zod("src/c.ts".into());
+        assert_eq!(
+            drift(&zod, &consumer).unwrap().missing["total"],
+            Level::Exact
+        );
+        zod.source = Source::Literals("src/c.ts".into());
+        assert_eq!(
+            drift(&zod, &consumer).unwrap().missing["total"],
+            Level::Inferred
+        );
     }
 }

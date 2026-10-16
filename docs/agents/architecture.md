@@ -34,8 +34,10 @@ one for the area a change touches.
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
   resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
   [map/contracts.md](map/contracts.md).
-- `document/`, `shape.rs`: OpenAPI and AsyncAPI provider documents and the shape a contract
-  carries. Detail: [map/documents.md](map/documents.md).
+- `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
+  shape a contract carries, and the shapes read from a handler's returned literals and zod
+  schemas (`lang/ts/types.rs` finds the schema a `z.infer` annotation names). Detail:
+  [map/documents.md](map/documents.md).
 
 ## Identities and formats
 
@@ -73,8 +75,8 @@ one for the area a change touches.
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
   declared}`, each of the last three absent when empty) when a document gives its route or channel side one, or, for an HTTP route with
-  no document, when its handler returns object literals (`{"source": {"literals": "<file>"}, ...}`,
-  spec #23); a consumer has the same
+  no document, when its handler returns a zod schema's value (`{"source": {"zod": "<file>"}, ...}`)
+  or object literals (`{"source": {"literals": "<file>"}, ...}`, spec #23); a consumer has the same
   `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
   response has `shape` `{"source": {"reads": "<file>"}, fields}` (spec #23). A link of an HTTP
   route with a shape on both sides and a single provider has `drift` (`{missing, unchecked}`,
@@ -160,8 +162,8 @@ one for the area a change touches.
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
-- New **shape source** (spec #23 tickets after #60): a provider's (zod schemas, in that order
-  between documents and the returned literals `literals.rs` reads) or a consumer's (destructuring, iteration, declared
+- New **shape source** (spec #23 tickets after #63): a provider's (zod schemas, `zod.rs`, are
+  read and sit between documents and the returned literals `literals.rs` reads) or a consumer's (destructuring, iteration, declared
   types) is a `shape::Source` variant, never a new shape type, with an arm in `Source::at` and
   `Source::declared`. A source that knows scalar leaves fills `Shape::scalars` (documents do,
   from primitive `type`s); a consumer source that declares paths (a type) fills
@@ -210,8 +212,8 @@ one for the area a change touches.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
-  consumer reads from the parsed response, and those of the object literals a route handler
-  returns, spec #23), and what a
+  consumer reads from the parsed response, and those of the zod schema or object literals a
+  route handler returns, spec #23), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the
@@ -350,6 +352,20 @@ one for the area a change touches.
   value passed to a function end it (no marker). A wrapper's caller is read only when the
   wrapper returns one thing (the response, the body or one path below it) from the function
   holding its call; whether the body was awaited is not checked (no marker).
+- `zod.rs`: reading the schemas of a file's handlers charges every schema expression examined
+  to `ZOD_BUDGET` (2^14, over all the handlers of the file); past it, the remaining handlers
+  give no shape from a schema. Nesting, constants followed and methods chained count together
+  against `ZOD_DEPTH` (32): a part deeper is open. A schema is read only when every 2xx body a
+  handler sends is typed with one; otherwise the literals are read (no marker). A schema from a
+  package import (zod schemas shared in a package, issue #175) is unknown, so open, never
+  closed. `.passthrough`, `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy`
+  and any call Meada does not read open the part; so does a `pick` / `omit` with a computed
+  key and a `z.union([])`. A schema or a parse result held in a constant of the handler (a
+  function-local `const out = Schema.parse(..)`) is followed, unlike in `literals.rs`, and
+  nothing records a later write to it (`Object.assign(out, { extra: 1 })`), so it is still
+  read as the schema's shape (no marker).
+- `lang/ts.rs` (`VALUE_DEPTH`, 64): an expression nested deeper than 64 levels (calls inside
+  calls, members, objects) is read as unknown from there (no marker).
 - `literals.rs`: reading a handler's returned literals charges every call examined and every
   value read or constant followed, over all the handlers of a file, to `LITERALS_BUDGET` (2^16);
   past it, the file's remaining handlers give their routes no shape. Nested literals and
