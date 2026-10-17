@@ -248,7 +248,8 @@ one for the area a change touches.
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
 - New **entry point kind** (spec #31): a variant of `entry::EntryKind` (its `name` and `parse`
-  arms and the list `parse` searches), a finder beside `routes`, `channels`, `programs` and
+  arms and the list `parse` searches, and its name in the `processes` kinds of the export JSON
+  above, which `tests/docs.rs` checks), a finder beside `routes`, `channels`, `programs` and
   `exports` in `entry::find`, and the `site` its process starts from (a symbol or a code file;
   `holds` checks it). The finder reads `entry::Local`: `identity`, `files` (every file's
   `Facts`), `names`, `symbols`, `called`, `exported`, `providers` and `consumers` (`entry::Side`,
@@ -263,7 +264,8 @@ one for the area a change touches.
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
   one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
-  in `Descent::follow`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
+  in `Descent::follow`, with its `Mark` (named in the `Mark` list of `map/queries.md`, which
+  `tests/docs.rs` checks) and its line in `Walk::show`. A change to what is stored bumps
   `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
