@@ -47,24 +47,32 @@ pub(crate) fn communities<'a>(
     let groups = leiden(graph);
 
     // Named after the most common parent directory, ties by lexical order; on a collision
-    // the community with the lowest smallest member keeps the bare name.
-    let mut taken: BTreeMap<String, usize> = BTreeMap::new();
-    let mut named: Vec<Community> = groups
-        .into_iter()
+    // the community with the lowest smallest member keeps the bare name and the others take
+    // the next `#n` that no community is named, so every name is unique.
+    let natural: Vec<String> = (groups.iter())
         .map(|members| {
             let mut count: BTreeMap<String, usize> = BTreeMap::new();
-            for &m in &members {
+            for &m in members {
                 *count.entry(dir(ids[m])).or_default() += 1;
             }
             let most = count.values().max().copied().unwrap_or_default();
-            let name = count.into_iter().find(|(_, n)| *n == most).unwrap().0;
-            let seen = taken.entry(name.clone()).or_default();
-            *seen += 1;
+            count.into_iter().find(|(_, n)| *n == most).unwrap().0
+        })
+        .collect();
+    let reserved: BTreeSet<&String> = natural.iter().collect();
+    let mut taken: BTreeSet<String> = BTreeSet::new();
+    let mut named: Vec<Community> = (groups.into_iter().zip(&natural))
+        .map(|(members, name)| {
+            let name = match taken.contains(name) {
+                false => name.clone(),
+                true => (2..)
+                    .map(|n| format!("{name}#{n}"))
+                    .find(|n| !taken.contains(n) && !reserved.contains(n))
+                    .unwrap(),
+            };
+            taken.insert(name.clone());
             Community {
-                name: match *seen {
-                    1 => name,
-                    n => format!("{name}#{n}"),
-                },
+                name,
                 members: members.into_iter().map(|m| ids[m].to_string()).collect(),
             }
         })
@@ -354,6 +362,20 @@ mod tests {
         // with `c` (24 - 12 against 8 - 4) and moves, and `a` follows (8 - 7 > 0).
         let path = [("a", "b"), ("b", "c"), ("b", "c"), ("c", "b"), ("c", "c")];
         assert_eq!(partition(&path), groups(&[&["a", "b", "c"]]));
+    }
+
+    #[test]
+    fn a_numbered_name_skips_a_directory_of_that_name() {
+        // `x` and `y` live in a directory named `lib#2`, so the second `lib` takes `lib#3`.
+        let dir = |s: &str| match s {
+            "x" | "y" => "lib#2".to_string(),
+            _ => "lib".to_string(),
+        };
+        let calls = [("lib/a", "lib/b"), ("lib/c", "lib/d"), ("x", "y")];
+        let names: Vec<String> = (communities(calls.iter().copied(), dir).into_iter())
+            .map(|c| format!("{} {}", c.name, c.members.join(" ")))
+            .collect();
+        assert_eq!(names, ["lib lib/a lib/b", "lib#2 x y", "lib#3 lib/c lib/d"]);
     }
 
     #[test]

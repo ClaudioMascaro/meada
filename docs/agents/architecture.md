@@ -64,8 +64,9 @@ one for the area a change touches.
   path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
   document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
 - Community: its repository identity plus its name, the most common parent directory of its
-  members' files (`src`, `.` for the root), with `#2`, `#3` for the second and later
-  communities of the repository with that name, by smallest member identity.
+  members' files (`src`, `.` for the root). The second and later communities of the
+  repository with that name, by smallest member identity, take `#2`, `#3`, skipping any `#n`
+  another community is already named (a directory `src#2`), so the name is unique.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
