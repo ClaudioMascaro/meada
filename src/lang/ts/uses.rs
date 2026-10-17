@@ -446,7 +446,7 @@ fn element_param(call: Node) -> Option<(Node, Node)> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lang::{LanguagePack, Step, Ty, ts::TsJs};
+    use crate::lang::{LanguagePack, Step, Ty, Value, ts::TsJs};
 
     fn uses(src: &str) -> Vec<Vec<Step>> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
@@ -718,6 +718,42 @@ mod tests {
         assert_eq!(get[0].uses, [vec![row], vec![Step::Return]]);
         let both = Step::Argument(vec![named("A"), named("B")]);
         assert_eq!(get[1].uses, [vec![both], vec![Step::Return]]);
+    }
+
+    #[test]
+    fn an_awaited_typed_call_is_used_like_the_untyped_await() {
+        // The grammar reads `await get<Row>(u)` as a call of `await get`.
+        let parse = |src: &str| TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let uses = |call: &str| {
+            let src = format!("async function f() {{ const d = {call}; return d.a; }}");
+            let facts = parse(&src);
+            let get = facts.calls.iter().find(|c| c.callee == "api.get").unwrap();
+            get.uses.clone()
+        };
+        let row = Step::Argument(vec![Ty::Named("Row".into())]);
+        let read = vec![Step::Field("a".into()), Step::Return];
+        assert_eq!(
+            uses("await api.get<Row>(u)"),
+            [vec![row.clone()], read.clone()]
+        );
+        assert_eq!(uses("await (api.get<Row>(u))"), [vec![row], read]);
+        // A declared type, and a method's type argument, under the same `await`.
+        let src = "async function f() { const d: Row = await get<X>(u); }
+                   async function g() { const r = await fetch(u); return await r.json<Row>(); }";
+        let facts = parse(src);
+        let typed = Step::Typed(Ty::Named("Row".into()));
+        let get = facts.calls.iter().find(|c| c.callee == "get").unwrap();
+        assert!(get.uses.contains(&vec![typed.clone()]), "{:?}", get.uses);
+        let fetch = facts.calls.iter().find(|c| c.callee == "fetch").unwrap();
+        let json = Step::Call("json".into());
+        assert!(fetch.uses.contains(&vec![json, typed]), "{:?}", fetch.uses);
+        // The receiver of the awaited call is read, as for the untyped one.
+        let facts = parse("async function f() { g(await api.get<Row>(u)); }");
+        let g = facts.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert!(
+            matches!(&g.args[..], [Value::Call(c)] if c.callee == "api.get"
+                && matches!(c.receiver.as_deref(), Some(Value::Ref(r)) if r == "api"))
+        );
     }
 
     #[test]

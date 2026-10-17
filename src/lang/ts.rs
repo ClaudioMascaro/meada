@@ -102,16 +102,19 @@ impl LanguagePack for TsJs {
                 "call_expression" | "new_expression" => {
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
                     // used (`new SendMessageCommand(...)`, `new Worker(...)`).
-                    let function = node
-                        .child_by_field_name("function")
-                        .or_else(|| node.child_by_field_name("constructor"));
                     let arguments =
                         (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
-                    if let Some(function) = function {
+                    if let Some(function) = callee_node(node) {
+                        // The artifact's `await` is outside the call: so is its span.
+                        let start = if awaited_artifact(node) {
+                            function.start_byte()
+                        } else {
+                            node.start_byte()
+                        };
                         facts.calls.push(Call {
                             scope: scope.clone(),
                             callee: callee(function, src),
-                            range: node.byte_range(),
+                            range: start..node.end_byte(),
                             args: arguments
                                 .map(|a| {
                                     named(a)
@@ -806,28 +809,24 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             None if kind == "call_expression" => {
                 let args = node.child_by_field_name("arguments");
                 let args = args.filter(|a| a.kind() == "arguments");
-                node.child_by_field_name("function")
-                    .map_or(Value::Unknown, |f| {
-                        let receiver = (f.kind() == "member_expression")
-                            .then(|| f.child_by_field_name("object"))
-                            .flatten()
-                            .map(|object| Box::new(deeper(object)));
-                        Value::Call(Invocation {
-                            callee: callee(f, src),
-                            receiver,
-                            args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
-                        })
+                callee_node(node).map_or(Value::Unknown, |f| {
+                    let receiver = (f.kind() == "member_expression")
+                        .then(|| f.child_by_field_name("object"))
+                        .flatten()
+                        .map(|object| Box::new(deeper(object)));
+                    Value::Call(Invocation {
+                        callee: callee(f, src),
+                        receiver,
+                        args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
                     })
+                })
             }
-            None if kind == "new_expression" => {
-                node.child_by_field_name("constructor")
-                    .map_or(Value::Unknown, |f| {
-                        let args = node.child_by_field_name("arguments");
-                        let args = args.filter(|a| a.kind() == "arguments");
-                        let args = args.map(|a| named(a).map(deeper));
-                        Value::New(callee(f, src), args.into_iter().flatten().collect())
-                    })
-            }
+            None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
+                let args = node.child_by_field_name("arguments");
+                let args = args.filter(|a| a.kind() == "arguments");
+                let args = args.map(|a| named(a).map(deeper));
+                Value::New(callee(f, src), args.into_iter().flatten().collect())
+            }),
             None if kind == "member_expression" => {
                 let object = node.child_by_field_name("object");
                 let property = node.child_by_field_name("property");
@@ -963,7 +962,7 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
             Some(Part::Env(name))
         }
         "call_expression" => {
-            let function = node.child_by_field_name("function")?;
+            let function = callee_node(node)?;
             let method = function.child_by_field_name("property")?;
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
@@ -1009,6 +1008,30 @@ fn unquote(node: Node, src: &[u8]) -> String {
         .get(1..quoted.len().saturating_sub(1))
         .unwrap_or("")
         .to_string()
+}
+
+/// What a call or `new` expression calls. With type arguments under `await`, the grammar
+/// reads `await get<Row>(x)` as a call whose `function` is `await get`: the awaited call is
+/// `get<Row>(x)`, so the callee is the operand of that `await`.
+fn callee_node(node: Node) -> Option<Node> {
+    let function = node
+        .child_by_field_name("function")
+        .or_else(|| node.child_by_field_name("constructor"))?;
+    if awaited_artifact(node) {
+        named(function).next()
+    } else {
+        Some(function)
+    }
+}
+
+/// Whether `node` is the parse artifact `await f<T>(x)`: type arguments, and an `await` as
+/// the `function`.
+fn awaited_artifact(node: Node) -> bool {
+    node.child_by_field_name("type_arguments").is_some()
+        && node
+            .child_by_field_name("function")
+            .or_else(|| node.child_by_field_name("constructor"))
+            .is_some_and(|f| f.kind() == "await_expression")
 }
 
 /// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
@@ -1203,5 +1226,56 @@ mod tests {
             panic!("a string");
         };
         assert_eq!(parts.len(), 66);
+    }
+
+    #[test]
+    fn type_arguments_under_await_leave_the_call_intact() {
+        // The grammar reads `await get<Row>("/x")` as a call of `await get`.
+        for (typed, plain) in [
+            ("await get<Row>(\"/x\")", "await get(\"/x\")"),
+            ("await api.get<Row>(\"/x\")", "await api.get(\"/x\")"),
+            ("await new Client<Row>(\"/x\")", "await new Client(\"/x\")"),
+        ] {
+            let facts = |call: &str| parse(&format!("async function f() {{ const d = {call}; }}"));
+            let (typed, plain) = (facts(typed), facts(plain));
+            assert_eq!(typed.calls.len(), 1);
+            assert_eq!(typed.calls[0].callee, plain.calls[0].callee);
+            assert!(!typed.calls[0].callee.starts_with('('));
+            assert_eq!(typed.calls[0].args.len(), 1);
+        }
+    }
+
+    #[test]
+    fn a_typed_call_under_await_spans_like_the_untyped_one() {
+        let range = |call: &str| {
+            let src = format!("async function f() {{ await {call}; }}");
+            let at = src.find("await").unwrap() + "await ".len();
+            let r = parse(&src).calls[0].range.clone();
+            (r.start - at, r.end - at, call.len())
+        };
+        let (start, end, len) = range("get<Row>(\"/x\")");
+        assert_eq!((start, end), (0, len));
+        assert_eq!(range("get(\"/x\")").0, 0);
+    }
+
+    #[test]
+    fn a_parenthesized_await_is_not_unwrapped() {
+        for src in ["(await f)(x)", "(await getFn())(x)"] {
+            let facts = parse(&format!("async function f() {{ {src}; }}"));
+            let callees: Vec<_> = facts.calls.iter().map(|c| c.callee.as_str()).collect();
+            assert!(callees.contains(&"(parenthesized_expression)"), "{src}");
+        }
+    }
+
+    #[test]
+    fn an_awaited_typed_call_is_a_call_value() {
+        let facts = parse("async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }");
+        let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert_eq!(call.args.len(), 2);
+        assert!(
+            call.args
+                .iter()
+                .all(|a| matches!(a, Value::Call(call) if call.callee == "get"))
+        );
     }
 }

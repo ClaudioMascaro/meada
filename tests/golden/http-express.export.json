@@ -760,6 +760,13 @@
       "contract": "http::GET::/api/users",
       "level": "inferred",
       "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsersTyped::get#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
     }
   ]
 }
