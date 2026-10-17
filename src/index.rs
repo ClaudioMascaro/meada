@@ -60,7 +60,7 @@ const SCHEMA_VERSION: i64 = 19;
 /// holds one row per member of each community (spec #31): its name and the member's symbol
 /// identity, recomputed from the `calls` rows whenever the code rows change.
 /// `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
-/// (`route` or `export`), the `label` that names its process and the `site` the process starts
+/// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
@@ -490,8 +490,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // One row per side; the shapes of the Founds of one side (a site reached through several
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
-    let mut providers: Vec<(String, String)> = Vec::new();
-    let mut consumers: Vec<(String, String)> = Vec::new();
+    let mut providers: Vec<entry::Side> = Vec::new();
+    let mut consumers: Vec<entry::Side> = Vec::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -516,10 +516,16 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         };
         let role = f.role.name();
         if let (Role::Provider, Some(contract)) = (f.role, &f.contract) {
-            providers.push((site.clone(), contract.clone()));
+            providers.push(entry::Side {
+                site: site.clone(),
+                contract: contract.clone(),
+            });
         }
         if let (Role::Consumer, Some(contract)) = (f.role, &f.contract) {
-            consumers.push((site.clone(), contract.clone()));
+            consumers.push(entry::Side {
+                site: site.clone(),
+                contract: contract.clone(),
+            });
         }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         let key = (
@@ -553,9 +559,12 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-    let programs: Vec<(String, String)> = (all.iter())
+    let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
-            (facts.programs.iter()).map(move |n| (path.to_string(), n.clone()))
+            (facts.programs.iter()).map(move |def| entry::Program {
+                file: path.to_string(),
+                def: def.clone(),
+            })
         })
         .collect();
     let local = entry::Local {
@@ -909,6 +918,7 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(Default))]
 pub(crate) struct Export {
     pub(crate) repository: String,
     pub(crate) files: Vec<File>,

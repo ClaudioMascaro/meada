@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use crate::channel::Routes;
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::entry::EntryPoint;
+use crate::entry::{self, EntryPoint};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -123,14 +123,15 @@ impl Engine {
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
         // The stored entry points are candidates: a call that reaches an export through a
-        // package import of its own repository (a monorepo) makes it no door, at any level.
+        // package import of its own repository (a monorepo) makes it no door, at any level. An
+        // entry point of another kind stays one.
         for export in &mut exports {
             let own = format!("{}::", export.repository);
             let imported: HashSet<&str> = (export.imports.iter())
                 .map(|i| i.target.as_str())
                 .filter(|t| t.starts_with(&own))
                 .collect();
-            (export.entry_points).retain(|e| !imported.contains(e.identity.as_str()));
+            entry::drop_imported_exports(&mut export.entry_points, &imported);
         }
         // Shapes imported from a package fill from the shapes it keeps (issue #175).
         package::shapes(&mut exports, &providers);
@@ -418,12 +419,7 @@ impl Engine {
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
@@ -454,12 +450,7 @@ impl Engine {
                 hits.push((r, format!("{} {}", repo.identity, doc.path), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The drift (spec #23) whose route path or missing field path matches `query`, one line
@@ -470,13 +461,8 @@ impl Engine {
         let exports = self.exports()?;
         let links = self.links(&exports);
         let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
-        let mut hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        let hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The packages (spec #22) whose name matches `query`, one line each, as `<repository>
@@ -507,12 +493,7 @@ impl Engine {
                 hits.push((r, format!("{} {}", p.repository, p.directory), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
@@ -584,12 +565,7 @@ impl Engine {
             );
             hits.push((r, item.id, line));
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The resource, channel or route `contract`: one line per provider and consumer across the
@@ -785,10 +761,11 @@ impl Engine {
         let used: usize = [&header, &community]
             .into_iter()
             .chain(&rest)
-            .map(|l| l.len() + 1)
+            .map(|l| render::line_bytes(l))
             .sum();
-        let cap = budget.unwrap_or(render::DEFAULT_BUDGET) * 4;
-        let room = cap.saturating_sub(used + 1);
+        let cap = render::bytes(budget.unwrap_or(render::DEFAULT_BUDGET));
+        // What the processes line may take, its own newline left out.
+        let room = cap.saturating_sub(used + render::line_bytes(""));
         let mut lines = vec![header, community, processes_line(&found, repos, room)];
         lines.extend(rest);
         Ok(render::budgeted(&lines, budget))

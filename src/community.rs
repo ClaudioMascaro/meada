@@ -40,7 +40,7 @@ pub(crate) fn communities<'a>(
     // Nodes are numbered in identity order, so comparing numbers compares identities.
     let ids: Vec<&str> = nodes.into_iter().collect();
     let at = |id: &str| ids.binary_search(&id).unwrap();
-    let mut graph = Graph {
+    let mut graph = Network {
         adj: vec![BTreeMap::new(); ids.len()],
         k: vec![0; ids.len()],
     };
@@ -91,7 +91,7 @@ pub(crate) fn communities<'a>(
 /// One level of the graph: undirected weighted edges without self-loops (`adj`, by node) and
 /// each node's weighted degree (`k`, which counts the edges inside an aggregated node too).
 /// Nodes are numbered in identity order: an aggregated node's identity is its smallest member's.
-struct Graph {
+struct Network {
     adj: Vec<BTreeMap<usize, i128>>,
     k: Vec<i128>,
 }
@@ -99,7 +99,7 @@ struct Graph {
 /// Leiden (Traag, Waltman and van Eck, 2019) over modularity at resolution 1.0, made
 /// deterministic as spec #31 states, in 128-bit integers only. Returns the communities as
 /// sorted lists of the original nodes, ordered by their smallest member.
-fn leiden(mut graph: Graph) -> Vec<Vec<usize>> {
+fn leiden(mut graph: Network) -> Vec<Vec<usize>> {
     let m2: i128 = graph.k.iter().sum();
     let n = graph.k.len();
     // The node of the current level each original node is in, and each node's community.
@@ -122,7 +122,7 @@ fn leiden(mut graph: Graph) -> Vec<Vec<usize>> {
             number.entry(s).or_insert(next);
         }
         let size = number.len();
-        let mut next = Graph {
+        let mut next = Network {
             adj: vec![BTreeMap::new(); size],
             k: vec![0; size],
         };
@@ -174,7 +174,7 @@ fn best(candidates: impl Iterator<Item = (usize, i128, usize)>) -> Option<usize>
 /// neighbouring community with the largest strictly positive gain `2m · w_iC − k_i · K_C`
 /// minus that quantity for its own community without it, and its neighbours outside the new
 /// community join the back of the queue in identity order. Returns whether a node moved.
-fn local_moving(graph: &Graph, m2: i128, community: &mut [usize]) -> bool {
+fn local_moving(graph: &Network, m2: i128, community: &mut [usize]) -> bool {
     let n = graph.k.len();
     let mut members: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
     let mut total = vec![0i128; n];
@@ -220,7 +220,7 @@ fn local_moving(graph: &Graph, m2: i128, community: &mut [usize]) -> bool {
 /// `2m · w_vT − k_v · K_T`, ties to the lowest smallest member. `T` is well connected when
 /// `2m · w(T, S − T) ≥ K_T · (K_S − K_T)`. Returns each node's subcommunity, labelled by a
 /// member, and whether any node merged.
-fn refine(graph: &Graph, m2: i128, community: &[usize]) -> (Vec<usize>, bool) {
+fn refine(graph: &Network, m2: i128, community: &[usize]) -> (Vec<usize>, bool) {
     let n = graph.k.len();
     let mut in_s = vec![0i128; n];
     for v in 0..n {

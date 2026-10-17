@@ -53,9 +53,9 @@ pub(crate) struct Graph<'a> {
     /// The sides only a document lists (spec #21), with the document's path.
     documented: HashMap<&'a str, &'a str>,
     /// The channel sides whose name Meada could not evaluate, by site (the producing call or
-    /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
+    /// the handler): `Produces` or `Consumes`, and the contract. They are never linked, so the
     /// chain would not otherwise show them.
-    unresolved_sides: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
+    unresolved_sides: HashMap<&'a str, Vec<(Mark, &'a str)>>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
     /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
     /// handles it: data goes from the provider (a writer, or the call that produces) to that
@@ -114,15 +114,15 @@ impl<'a> Graph<'a> {
             let produced = export.providers.iter();
             let consumed = export.consumers.iter();
             let sides = produced
-                .map(|p| ("produces", Some(&p.contract), &p.site))
-                .chain(consumed.map(|c| ("consumes", c.contract.as_ref(), &c.site)));
-            for (verb, contract, site) in sides {
+                .map(|p| (Mark::Produces, Some(&p.contract), &p.site))
+                .chain(consumed.map(|c| (Mark::Consumes, c.contract.as_ref(), &c.site)));
+            for (side, contract, site) in sides {
                 if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
                     graph
                         .unresolved_sides
                         .entry(site)
                         .or_default()
-                        .push((verb, contract));
+                        .push((side, contract));
                 }
             }
         }
@@ -576,8 +576,8 @@ impl<'a> Walk<'_, 'a> {
     /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
     fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
         let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
-        for &(verb, contract) in sides {
-            let text = format!("{place} {verb} {}", channel::shown(contract));
+        for &(side, contract) in sides {
+            let text = format!("{place} {} {}", side.verb(), channel::shown(contract));
             self.push(depth, Row::call(text, repo, None));
         }
     }
@@ -711,6 +711,16 @@ enum Mark {
     Consumes,
     /// The branch is `PROCESS_DEPTH` deep: shown, not expanded.
     DepthLimit,
+}
+
+impl Mark {
+    /// The verb of the channel side a mark stands for, `Produces` or `Consumes`.
+    fn verb(self) -> &'static str {
+        match self {
+            Mark::Produces => "produces",
+            _ => "consumes",
+        }
+    }
 }
 
 /// How deep a process walk follows one branch before it stops and says so.
@@ -923,11 +933,7 @@ impl<'a> Graph<'a> {
 
     /// The unresolved channel sides at `site`, one edge each.
     fn sides_at(&self, site: &'a str, repo: usize, edges: &mut Vec<Edge<'a>>) {
-        for &(verb, contract) in self.unresolved_sides.get(site).into_iter().flatten() {
-            let mark = match verb {
-                "produces" => Mark::Produces,
-                _ => Mark::Consumes,
-            };
+        for &(mark, contract) in self.unresolved_sides.get(site).into_iter().flatten() {
             edges.push(Edge::Side {
                 site,
                 repo,
@@ -941,11 +947,11 @@ impl<'a> Graph<'a> {
     /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
     /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
     /// links included, ambiguous calls and links not) and membership agrees with the process
-    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores. A node
-    /// below the limit is no step of the tree, and what the limit cut can hide a node above
-    /// it, through `Seen`: E reaches X at depth 255, whose callee Y is cut, and later E calls X
-    /// directly, shown as seen without expanding Y's other callee Z. Z is no step of E's tree,
-    /// yet `processes_of(Z)` lists E.
+    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores: a node
+    /// past depth 256 is no step of the tree, and the limit can hide a node shallower than
+    /// that, through `Seen`. E reaches X at depth 255, so X expands and each of its callees, Y
+    /// among them, is a `depth-limit` step at 256 whose own callee Z is no step; a later direct
+    /// E to X shows X as seen, so Y is not expanded there either, yet `processes_of(Z)` lists E.
     pub(crate) fn processes_of(&self, id: &'a str) -> Vec<(usize, &'a EntryPoint)> {
         // What reaches each node through one edge.
         let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -1148,14 +1154,10 @@ impl<'a> Walk<'_, 'a> {
                 Row::call(text, step.repo, None)
             }
             Some(side @ (Mark::Produces | Mark::Consumes)) => {
-                let verb = if side == Mark::Produces {
-                    "produces"
-                } else {
-                    "consumes"
-                };
                 let text = format!(
-                    "{} {verb} {}",
+                    "{} {} {}",
                     self.place(step.node),
+                    side.verb(),
                     channel::shown(contract)
                 );
                 Row::call(text, step.repo, None)
@@ -1179,5 +1181,71 @@ impl<'a> Walk<'_, 'a> {
             }
         };
         self.push(step.depth, row);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::decisions::Decisions;
+    use crate::entry::EntryKind;
+    use crate::index::Span;
+    use crate::workspace::Repository;
+
+    #[test]
+    fn a_chain_past_the_depth_limit_ends_at_it() {
+        let id = |n: usize| format!("r::a.ts::f{n}");
+        let span = || Span {
+            path: "a.ts".into(),
+            start: 0,
+            end: 0,
+        };
+        let length = PROCESS_DEPTH + 50;
+        let export = Export {
+            repository: "r".into(),
+            symbols: (0..=length)
+                .map(|n| Symbol {
+                    id: id(n),
+                    span: span(),
+                })
+                .collect(),
+            calls: (0..length)
+                .map(|n| CallSite {
+                    id: format!("r::a.ts::f{n}@{n}"),
+                    caller: id(n),
+                    target: Some(id(n + 1)),
+                    level: Some(Level::Exact),
+                    candidates: Vec::new(),
+                    span: span(),
+                })
+                .collect(),
+            ..Export::default()
+        };
+        let workspace = Workspace {
+            repos: vec![Repository {
+                root: "r".into(),
+                identity: "r".into(),
+                config: Config::default(),
+                decisions: Decisions::default(),
+            }],
+            missing: Vec::new(),
+        };
+        let entry = EntryPoint {
+            identity: id(0),
+            kind: EntryKind::Export,
+            label: "f0".into(),
+            site: id(0),
+        };
+        let exports = [export];
+        let graph = Graph::new(&workspace, &exports, &[]);
+
+        let steps = graph.process(&entry);
+
+        assert_eq!(steps.len(), PROCESS_DEPTH + 1);
+        let last = steps.last().unwrap();
+        assert_eq!(last.depth, PROCESS_DEPTH);
+        assert!(last.mark == Some(Mark::DepthLimit));
+        assert!(steps[..PROCESS_DEPTH].iter().all(|s| s.mark.is_none()));
     }
 }

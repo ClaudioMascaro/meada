@@ -62,6 +62,32 @@ pub struct EntryPoint {
     pub site: String,
 }
 
+impl EntryPoint {
+    /// The entry point a symbol is on its own: its identity is the symbol's, and its process
+    /// starts there.
+    fn of_symbol(id: String, kind: EntryKind, label: String) -> Self {
+        Self {
+            identity: id.clone(),
+            kind,
+            label,
+            site: id,
+        }
+    }
+}
+
+/// A contract side the code gives: the `site` it sits at (a symbol or a code file of the
+/// repository, as an identity) and its `contract`.
+pub struct Side {
+    pub site: String,
+    pub contract: String,
+}
+
+/// A program entry point a language pack declares: the `file` and the definition's name.
+pub struct Program {
+    pub file: String,
+    pub def: String,
+}
+
 /// What `find` reads, all of one repository.
 pub struct Local<'a> {
     pub identity: &'a str,
@@ -72,13 +98,23 @@ pub struct Local<'a> {
     /// Every symbol some call reaches, an ambiguous candidate included.
     pub called: &'a HashSet<String>,
     pub exported: &'a [Exported],
-    /// `(site, contract)` of each provider the code gives.
-    pub providers: &'a [(String, String)],
-    /// `(site, contract)` of each consumer the code gives.
-    pub consumers: &'a [(String, String)],
-    /// `(file, definition name)` of each program entry point the language packs declare. A name
-    /// with no symbol is dropped silently: each pack's conformance golden catches a wrong one.
-    pub programs: &'a [(String, String)],
+    /// Each provider the code gives.
+    pub providers: &'a [Side],
+    /// Each consumer the code gives.
+    pub consumers: &'a [Side],
+    /// Each program entry point the language packs declare. A name with no symbol is dropped
+    /// silently: each pack's conformance golden catches a wrong one.
+    pub programs: &'a [Program],
+}
+
+impl Local<'_> {
+    /// Whether `site` is a symbol or a code file of the repository.
+    fn holds(&self, site: &str) -> bool {
+        let file = site
+            .strip_prefix(self.identity)
+            .and_then(|s| s.strip_prefix("::"));
+        self.symbols.contains(site) || file.is_some_and(|path| self.files.contains_key(path))
+    }
 }
 
 /// The entry points of a repository, sorted by identity.
@@ -97,10 +133,18 @@ pub fn find(local: &Local) -> Vec<EntryPoint> {
     found
 }
 
+/// Drops the export entry points whose identity is in `imported`, the symbols a call reaches
+/// through a package import of their own repository (a monorepo). Another kind stays a door
+/// even when called: a program is started from outside, a route or a channel by a request or a
+/// message.
+pub fn drop_imported_exports(found: &mut Vec<EntryPoint>, imported: &HashSet<&str>) {
+    found.retain(|e| e.kind != EntryKind::Export || !imported.contains(e.identity.as_str()));
+}
+
 /// One entry point per program entry point a pack declares, whether or not anything calls it.
 fn programs(local: &Local) -> Vec<EntryPoint> {
     let mut found = Vec::new();
-    for (file, def) in local.programs {
+    for Program { file, def } in local.programs {
         let Some(name) = local.names.def(file, def) else {
             continue;
         };
@@ -108,12 +152,7 @@ fn programs(local: &Local) -> Vec<EntryPoint> {
         if !local.symbols.contains(&id) {
             continue;
         }
-        found.push(EntryPoint {
-            identity: id.clone(),
-            kind: EntryKind::Program,
-            label: name,
-            site: id,
-        });
+        found.push(EntryPoint::of_symbol(id, EntryKind::Program, name));
     }
     found
 }
@@ -122,15 +161,12 @@ fn programs(local: &Local) -> Vec<EntryPoint> {
 /// own serves it (its process starts from the file's top-level calls). A route only a document
 /// lists is no entry point.
 fn routes(local: &Local) -> Vec<EntryPoint> {
-    let files: HashSet<String> = (local.files.keys())
-        .map(|path| format!("{}::{path}", local.identity))
-        .collect();
     let mut found = Vec::new();
-    for (site, contract) in local.providers {
+    for Side { site, contract } in local.providers {
         let Some((method, path)) = http::route(contract) else {
             continue;
         };
-        if !local.symbols.contains(site) && !files.contains(site) {
+        if !local.holds(site) {
             continue;
         }
         found.push(EntryPoint {
@@ -148,15 +184,9 @@ fn routes(local: &Local) -> Vec<EntryPoint> {
 /// from somewhere, and without its entry point it would show up nowhere (it would also be an
 /// export entry point otherwise), so it is labelled as `channel::shown` prints it.
 fn channels(local: &Local) -> Vec<EntryPoint> {
-    let files: HashSet<String> = (local.files.keys())
-        .map(|path| format!("{}::{path}", local.identity))
-        .collect();
     let mut found = Vec::new();
-    for (site, contract) in local.consumers {
-        if channel::parse(contract).is_none() {
-            continue;
-        }
-        if !local.symbols.contains(site) && !files.contains(site) {
+    for Side { site, contract } in local.consumers {
+        if channel::parse(contract).is_none() || !local.holds(site) {
             continue;
         }
         found.push(EntryPoint {
@@ -202,12 +232,7 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         if local.called.contains(&id) || served.contains(id.as_str()) {
             continue;
         }
-        found.push(EntryPoint {
-            identity: id.clone(),
-            kind: EntryKind::Export,
-            label: name,
-            site: id,
-        });
+        found.push(EntryPoint::of_symbol(id, EntryKind::Export, name));
     }
     found
 }
@@ -216,14 +241,38 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn an_import_drops_an_export_entry_point_and_no_other_kind() {
+        let entry = |id: &str, kind| EntryPoint {
+            identity: id.into(),
+            kind,
+            label: id.into(),
+            site: id.into(),
+        };
+        let mut found = vec![
+            entry("r::lib.ts::helper", EntryKind::Export),
+            entry("r::cmd.ts::main", EntryKind::Program),
+            entry("r::a.ts::open", EntryKind::Export),
+        ];
+        let imported: HashSet<&str> = ["r::lib.ts::helper", "r::cmd.ts::main"].into();
+
+        drop_imported_exports(&mut found, &imported);
+
+        let kept: Vec<_> = found.iter().map(|e| e.identity.as_str()).collect();
+        assert_eq!(kept, ["r::cmd.ts::main", "r::a.ts::open"]);
+    }
+
     /// The `(label, kind)` of the entry points of a file with the symbols `main`, `run`
     /// (exported) and `__main__`.
     fn found(programs: &[&str], called: &[&str]) -> Vec<(String, &'static str)> {
         let id = |n: &str| format!("r::cmd.py::{n}");
         let symbols: HashSet<String> = ["main", "run", "__main__"].map(id).into();
         let called: HashSet<String> = called.iter().map(|n| id(n)).collect();
-        let programs: Vec<(String, String)> = (programs.iter())
-            .map(|d| ("cmd.py".to_string(), d.to_string()))
+        let programs: Vec<Program> = (programs.iter())
+            .map(|d| Program {
+                file: "cmd.py".to_string(),
+                def: d.to_string(),
+            })
             .collect();
         let exported = [Exported {
             path: "cmd.py".into(),
@@ -264,7 +313,7 @@ mod tests {
         let symbols: HashSet<String> = ["r::a.ts::handle"].map(String::from).into();
         let facts = Facts::default();
         let files = BTreeMap::from([("a.ts", &facts), ("b.ts", &facts)]);
-        let consumers: Vec<(String, String)> = [
+        let consumers: Vec<Side> = [
             ("r::a.ts::handle", "channel::kafka::orders.created"),
             ("r::a.ts::handle", "channel::kafka::orders.paid"),
             ("r::a.ts::handle", "channel::kafka"),
@@ -272,7 +321,10 @@ mod tests {
             ("r::a.ts::handle", "http::GET::/x"),
             ("r::a.ts::gone", "channel::kafka::ghost"),
         ]
-        .map(|(s, c)| (s.to_string(), c.to_string()))
+        .map(|(s, c)| Side {
+            site: s.to_string(),
+            contract: c.to_string(),
+        })
         .into();
         let local = Local {
             identity: "r",
