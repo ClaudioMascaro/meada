@@ -26,6 +26,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 
 sample.ts
 {

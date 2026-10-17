@@ -93,6 +93,11 @@ tagging.
     status` prints each repository's number of missing reads when there is any, in Portuguese
     and English; `meada export` carries every shape and each link's drift. The MCP server still
     has three tools.
+- Communities (spec #31): each repository's index holds groups of symbols that call each other
+  more than they call the rest, over its calls at `exact` or `inferred`, found with Leiden made
+  deterministic (fixed visit order and tie breaking, 128-bit integer arithmetic, no iteration
+  cap) and named after the most common directory of their members (`src`, `src#2`). `meada
+  export` carries them per repository, each with its sorted members. No model names them.
 - Community files in Portuguese, English and Spanish: README, CONTRIBUTING, code of conduct,
   security policy and issue and PR templates; a CI workflow running `cargo fmt --check`,
   `cargo clippy` and `cargo test`.

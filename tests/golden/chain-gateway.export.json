@@ -436,6 +436,22 @@
       "via": "host:catalog.example.com"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/chain/gateway::src/catalog.ts::productOf",
+        "example.com/chain/gateway::src/orders.ts::listOrders"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/chain/gateway::src/checkout.ts::createOrder",
+        "example.com/chain/gateway::src/events.ts::publish"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/catalog",
