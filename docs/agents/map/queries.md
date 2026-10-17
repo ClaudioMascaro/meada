@@ -97,9 +97,10 @@ modules updates it.
   and not them: `community: <name>` (or `none`, read from `Export::communities`) and
   `processes: <label> (<repository>), ...` (or `none`), sorted by entry point identity.
   `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
-  node, so membership is the reachability the process walk follows; the line takes at most
-  `PROCESSES_SHARE` (a quarter) of the budget and ends `+<n> more` for the entries left out
-  (`processes_line`).
+  node, so membership is the reachability the process walk follows. The line gets the room the
+  rest of the answer leaves under the budget (`processes_line`): the entries that fit, then
+  `+<n> more` for the rest, which alone is the least it holds. Two processes of one repository
+  with the same label show as their `process::<identity>`.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
   variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
   repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a

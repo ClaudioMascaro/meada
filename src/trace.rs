@@ -941,7 +941,11 @@ impl<'a> Graph<'a> {
     /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
     /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
     /// links included, ambiguous calls and links not) and membership agrees with the process
-    /// tree. Only `PROCESS_DEPTH` can differ: a node deeper than that is no step of the tree.
+    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores. A node
+    /// below the limit is no step of the tree, and what the limit cut can hide a node above
+    /// it, through `Seen`: E reaches X at depth 255, whose callee Y is cut, and later E calls X
+    /// directly, shown as seen without expanding Y's other callee Z. Z is no step of E's tree,
+    /// yet `processes_of(Z)` lists E.
     pub(crate) fn processes_of(&self, id: &'a str) -> Vec<(usize, &'a EntryPoint)> {
         // What reaches each node through one edge.
         let mut up: HashMap<&str, Vec<&str>> = HashMap::new();

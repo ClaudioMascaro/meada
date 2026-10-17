@@ -9,6 +9,7 @@ use rusqlite::Connection;
 use crate::channel::Routes;
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
+use crate::entry::EntryPoint;
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -685,10 +686,13 @@ impl Engine {
         lines
     }
 
-    /// One symbol of the workspace: its span text read from disk (only while the file still
-    /// has the indexed hash), its callers and its callees. `symbol` is an identity,
-    /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
-    /// guessed. The answer is cut at `budget` tokens.
+    /// One symbol of the workspace: its community (`community: <name>` or `none`) and the
+    /// processes it belongs to (`processes: <label> (<repository>), ...` or `none`, found by
+    /// walking upstream, the entries that do not fit in the room the rest of the answer leaves
+    /// replaced by `+<n> more`), both right after its first line; then its span text read from
+    /// disk (only while the file still has the indexed hash), its callers and its callees.
+    /// `symbol` is an identity, `<path>::<name>` or a name; when it fits several symbols, they
+    /// are listed instead of guessed. The answer is cut at `budget` tokens.
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -751,37 +755,42 @@ impl Engine {
         let mut files = Files::new(&repo.root);
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
-        let mut lines = vec![line(identity, &mut files, symbol_found, name)];
+        let header = line(identity, &mut files, symbol_found, name);
         let links = self.links(&exports);
-        // The community and the processes come first: they are short, and the budget cuts the
-        // end of the answer.
         let community = (export.communities.iter())
             .find(|c| c.members.contains(&symbol_found.id))
             .map_or("none", |c| c.name.as_str());
-        lines.push(format!("community: {community}"));
-        let graph = trace::Graph::new(&self.workspace, &exports, &links);
-        let processes: Vec<String> = (graph.processes_of(&symbol_found.id).into_iter())
-            .map(|(n, e)| format!("{} ({})", e.label, repos[n].identity))
-            .collect();
-        let room = budget.unwrap_or(render::DEFAULT_BUDGET) * 4 / PROCESSES_SHARE;
-        lines.push(processes_line(&processes, room));
-        lines.extend(text.unwrap_or_else(|| {
+        let community = format!("community: {community}");
+        let mut rest = text.unwrap_or_else(|| {
             vec![format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
             )]
-        }));
-        lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        lines.extend(consumers(&exports, repos, &links, &symbol_found.id));
+        });
+        rest.extend(relations(identity, export, &mut files, &symbol_found.id));
+        rest.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
-        lines.extend(contracts(
+        rest.extend(contracts(
             identity,
             export,
             workspace,
             &mut files,
             symbol_found,
         ));
+        // The processes come right after the header, which the budget never cuts before the
+        // rest: the line gets the room everything else leaves.
+        let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        let found = graph.processes_of(&symbol_found.id);
+        let used: usize = [&header, &community]
+            .into_iter()
+            .chain(&rest)
+            .map(|l| l.len() + 1)
+            .sum();
+        let cap = budget.unwrap_or(render::DEFAULT_BUDGET) * 4;
+        let room = cap.saturating_sub(used + 1);
+        let mut lines = vec![header, community, processes_line(&found, repos, room)];
+        lines.extend(rest);
         Ok(render::budgeted(&lines, budget))
     }
 }
@@ -1118,26 +1127,45 @@ fn relative(from: &Path, to: &Path) -> String {
     }
 }
 
-/// The processes line of `context` takes at most this share of the budget (one over it), so the
-/// rest of the answer keeps room.
-const PROCESSES_SHARE: usize = 4;
-
-/// `processes: <a>, <b>, +<n> more`: the entries that fit in `room` bytes and a count of the
-/// rest, or `processes: none`.
-fn processes_line(entries: &[String], room: usize) -> String {
-    if entries.is_empty() {
+/// `processes: <a>, <b>, +<n> more` for the processes `found`, or `processes: none`: the entries
+/// that fit in `room` bytes, in order, and a count of the rest, which is all the line holds when
+/// not even the first entry fits. An entry is `<label> (<repository>)`, or its `process::`
+/// identity when another process of the same repository has the same label.
+fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: usize) -> String {
+    if found.is_empty() {
         return "processes: none".into();
     }
-    let line = |kept: usize| {
-        let mut line = format!("processes: {}", entries[..kept].join(", "));
-        let rest = entries.len() - kept;
-        if rest > 0 {
-            line += &format!("{} +{rest} more", if kept > 0 { "," } else { "" });
+    let entries: Vec<String> = (found.iter())
+        .map(|&(n, e)| {
+            let same = found.iter().filter(|(m, o)| *m == n && o.label == e.label);
+            match same.count() {
+                1 => format!("{} ({})", e.label, repos[n].identity),
+                _ => format!("process::{}", e.identity),
+            }
+        })
+        .collect();
+    let mut kept = Vec::new();
+    // The length of `processes: ` and the entries kept, joined.
+    let mut used = "processes: ".len();
+    for (i, entry) in entries.iter().enumerate() {
+        let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();
+        let rest = entries.len() - i - 1;
+        let more = if rest > 0 {
+            format!(", +{rest} more").len()
+        } else {
+            0
+        };
+        if len + more > room {
+            break;
         }
-        line
-    };
-    let kept = (0..=entries.len()).rev().find(|&k| line(k).len() <= room);
-    line(kept.unwrap_or(0))
+        kept.push(entry.clone());
+        used = len;
+    }
+    let rest = entries.len() - kept.len();
+    if rest > 0 {
+        kept.push(format!("+{rest} more"));
+    }
+    format!("processes: {}", kept.join(", "))
 }
 
 /// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.

@@ -92,9 +92,48 @@ fn the_processes_line_is_cut_under_the_budget_with_a_count_of_the_rest() {
     let (_, _, catalog) = chain("community_queries_cut");
     let engine = Engine::open(&catalog).unwrap();
 
-    let answer = engine.context("lib/products.ts::find", Some(150)).unwrap();
+    let answer = engine.context("lib/products.ts::find", Some(90)).unwrap();
 
     assert_golden("chain.context-processes-cut.txt", &answer);
+}
+
+#[test]
+fn the_processes_line_is_only_a_count_when_no_entry_fits() {
+    let (_, _, catalog) = chain("community_queries_none_fit");
+    let engine = Engine::open(&catalog).unwrap();
+
+    let answer = engine.context("lib/products.ts::find", Some(60)).unwrap();
+
+    assert!(answer.contains("\nprocesses: +5 more\n"), "{answer}");
+}
+
+#[test]
+fn two_processes_of_one_repository_with_the_same_label_show_their_identity() {
+    let (_, _, catalog) = chain("community_queries_same_label");
+    for file in ["a", "b"] {
+        fs::write(
+            catalog.join(format!("lib/{file}.ts")),
+            "import { shared } from \"./shared\";\n\nexport function handler() {\n  \
+               return shared();\n}\n",
+        )
+        .unwrap();
+    }
+    fs::write(
+        catalog.join("lib/shared.ts"),
+        "export function shared() {\n  return 1;\n}\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&catalog).unwrap();
+
+    let answer = engine.context("lib/shared.ts::shared", None).unwrap();
+
+    assert!(
+        answer.contains(
+            "\nprocesses: process::example.com/chain/catalog::lib/a.ts::handler, \
+             process::example.com/chain/catalog::lib/b.ts::handler\n"
+        ),
+        "{answer}"
+    );
 }
 
 #[test]
