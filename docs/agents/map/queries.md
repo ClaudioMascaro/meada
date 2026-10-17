@@ -104,7 +104,8 @@ modules updates it.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
   variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
   repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
-  `Mark` (cycle, seen, ambiguous, unresolved, no provider, an unresolved channel side).
+  `Mark` (cycle, seen, ambiguous, unresolved, no provider, an unresolved channel side, depth
+  limit).
   `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
   found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
   `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.

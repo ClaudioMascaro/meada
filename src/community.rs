@@ -14,26 +14,33 @@ pub(crate) struct Community {
 }
 
 /// The communities of one repository, by name. Each `(caller, target)` of `calls` is one call
-/// site at `exact` or `inferred` between two symbols; `dir` gives a symbol's parent directory,
-/// repository-relative (`.` for the root).
+/// site at `exact` or `inferred`; `dir` gives a symbol's parent directory, repository-relative
+/// (`.` for the root), and `None` for a caller that is no symbol (a file: top-level code).
+/// Every symbol in a call is a node, even a call to itself; edges join distinct symbols only,
+/// so a node with none is a community of its own.
 pub(crate) fn communities<'a>(
     calls: impl IntoIterator<Item = (&'a str, &'a str)>,
-    dir: impl Fn(&str) -> String,
+    dir: impl Fn(&str) -> Option<String>,
 ) -> Vec<Community> {
-    // Undirected edges, weighted by call sites; a call of a symbol to itself is no edge.
+    let mut nodes: BTreeSet<&str> = BTreeSet::new();
     let mut weights: BTreeMap<(&str, &str), i128> = BTreeMap::new();
     for (a, b) in calls {
-        if a != b {
+        let (a_is, b_is) = (dir(a).is_some(), dir(b).is_some());
+        nodes.extend(
+            [(a, a_is), (b, b_is)]
+                .into_iter()
+                .filter(|p| p.1)
+                .map(|p| p.0),
+        );
+        // Undirected edges, weighted by call sites.
+        if a != b && a_is && b_is {
             *weights.entry((a.min(b), a.max(b))).or_default() += 1;
         }
     }
     // Nodes are numbered in identity order, so comparing numbers compares identities.
-    let ids: Vec<&str> = (weights.keys().flat_map(|&(a, b)| [a, b]))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
+    let ids: Vec<&str> = nodes.into_iter().collect();
     let at = |id: &str| ids.binary_search(&id).unwrap();
-    let mut graph = Graph {
+    let mut graph = Network {
         adj: vec![BTreeMap::new(); ids.len()],
         k: vec![0; ids.len()],
     };
@@ -53,7 +60,7 @@ pub(crate) fn communities<'a>(
         .map(|members| {
             let mut count: BTreeMap<String, usize> = BTreeMap::new();
             for &m in members {
-                *count.entry(dir(ids[m])).or_default() += 1;
+                *count.entry(dir(ids[m]).unwrap()).or_default() += 1;
             }
             let most = count.values().max().copied().unwrap_or_default();
             count.into_iter().find(|(_, n)| *n == most).unwrap().0
@@ -84,7 +91,7 @@ pub(crate) fn communities<'a>(
 /// One level of the graph: undirected weighted edges without self-loops (`adj`, by node) and
 /// each node's weighted degree (`k`, which counts the edges inside an aggregated node too).
 /// Nodes are numbered in identity order: an aggregated node's identity is its smallest member's.
-struct Graph {
+struct Network {
     adj: Vec<BTreeMap<usize, i128>>,
     k: Vec<i128>,
 }
@@ -92,7 +99,7 @@ struct Graph {
 /// Leiden (Traag, Waltman and van Eck, 2019) over modularity at resolution 1.0, made
 /// deterministic as spec #31 states, in 128-bit integers only. Returns the communities as
 /// sorted lists of the original nodes, ordered by their smallest member.
-fn leiden(mut graph: Graph) -> Vec<Vec<usize>> {
+fn leiden(mut graph: Network) -> Vec<Vec<usize>> {
     let m2: i128 = graph.k.iter().sum();
     let n = graph.k.len();
     // The node of the current level each original node is in, and each node's community.
@@ -115,7 +122,7 @@ fn leiden(mut graph: Graph) -> Vec<Vec<usize>> {
             number.entry(s).or_insert(next);
         }
         let size = number.len();
-        let mut next = Graph {
+        let mut next = Network {
             adj: vec![BTreeMap::new(); size],
             k: vec![0; size],
         };
@@ -167,7 +174,7 @@ fn best(candidates: impl Iterator<Item = (usize, i128, usize)>) -> Option<usize>
 /// neighbouring community with the largest strictly positive gain `2m · w_iC − k_i · K_C`
 /// minus that quantity for its own community without it, and its neighbours outside the new
 /// community join the back of the queue in identity order. Returns whether a node moved.
-fn local_moving(graph: &Graph, m2: i128, community: &mut [usize]) -> bool {
+fn local_moving(graph: &Network, m2: i128, community: &mut [usize]) -> bool {
     let n = graph.k.len();
     let mut members: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
     let mut total = vec![0i128; n];
@@ -213,7 +220,7 @@ fn local_moving(graph: &Graph, m2: i128, community: &mut [usize]) -> bool {
 /// `2m · w_vT − k_v · K_T`, ties to the lowest smallest member. `T` is well connected when
 /// `2m · w(T, S − T) ≥ K_T · (K_S − K_T)`. Returns each node's subcommunity, labelled by a
 /// member, and whether any node merged.
-fn refine(graph: &Graph, m2: i128, community: &[usize]) -> (Vec<usize>, bool) {
+fn refine(graph: &Network, m2: i128, community: &[usize]) -> (Vec<usize>, bool) {
     let n = graph.k.len();
     let mut in_s = vec![0i128; n];
     for v in 0..n {
@@ -272,7 +279,7 @@ mod tests {
 
     /// Every member in the root directory, so the tests read the partition alone.
     fn partition(calls: &[(&str, &str)]) -> Vec<Vec<String>> {
-        let mut groups: Vec<Vec<String>> = communities(calls.iter().copied(), |_| ".".into())
+        let mut groups: Vec<Vec<String>> = communities(calls.iter().copied(), |_| Some(".".into()))
             .into_iter()
             .map(|c| c.members)
             .collect();
@@ -356,8 +363,21 @@ mod tests {
     }
 
     #[test]
+    fn a_symbol_with_no_edge_is_a_singleton_and_a_file_is_no_node() {
+        // A call to itself is no edge, yet `a` takes part in it.
+        assert_eq!(partition(&[("a", "a")]), groups(&[&["a"]]));
+        // A call from top-level code (`f.ts` is a file) makes its callee a node, not the file.
+        let dir = |s: &str| (s != "f.ts").then(|| ".".to_string());
+        let calls = [("f.ts", "b"), ("f.ts", "f.ts"), ("c", "d")];
+        let found: Vec<Vec<String>> = communities(calls.iter().copied(), dir)
+            .into_iter()
+            .map(|c| c.members)
+            .collect();
+        assert_eq!(found, groups(&[&["b"], &["c", "d"]]));
+    }
+
+    #[test]
     fn call_sites_weigh_and_calls_to_self_are_no_edges() {
-        assert_eq!(partition(&[("a", "a")]), groups(&[]));
         // A path a - b - c of weights 1 and 3, worked by hand: `a` joins `b`, `b` gains more
         // with `c` (24 - 12 against 8 - 4) and moves, and `a` follows (8 - 7 > 0).
         let path = [("a", "b"), ("b", "c"), ("b", "c"), ("c", "b"), ("c", "c")];
@@ -368,8 +388,8 @@ mod tests {
     fn a_numbered_name_skips_a_directory_of_that_name() {
         // `x` and `y` live in a directory named `lib#2`, so the second `lib` takes `lib#3`.
         let dir = |s: &str| match s {
-            "x" | "y" => "lib#2".to_string(),
-            _ => "lib".to_string(),
+            "x" | "y" => Some("lib#2".to_string()),
+            _ => Some("lib".to_string()),
         };
         let calls = [("lib/a", "lib/b"), ("lib/c", "lib/d"), ("x", "y")];
         let names: Vec<String> = (communities(calls.iter().copied(), dir).into_iter())
@@ -380,7 +400,7 @@ mod tests {
 
     #[test]
     fn names_are_the_most_common_directory_with_collisions_numbered() {
-        let dir = |s: &str| s.rsplit_once('/').map_or(".", |(d, _)| d).to_string();
+        let dir = |s: &str| Some(s.rsplit_once('/').map_or(".", |(d, _)| d).to_string());
         let calls = [
             // One community, mostly in `src`, one member at the root.
             ("src/a", "src/b"),

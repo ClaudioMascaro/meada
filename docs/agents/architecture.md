@@ -96,7 +96,7 @@ one for the area a change touches.
   `communities` (absent when empty) lists each community as `{name, members}`, by name, with
   its sorted member identities; `processes` (absent when
   empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
-  `kind` being `route` or `export`, each step `{depth, level, repository, via, node, ...}`: `via`
+  `kind` being `route`, `export`, `channel` or `program`, each step `{depth, level, repository, via, node, ...}`: `via`
   is `entry`, `call` or `link` (a link step has the link's `reason`), `node` the symbol, file
   or side reached (a note's call site), and `mark` (`cycle`, `seen`, `depth-limit`, `ambiguous` with its
   `candidates`, `unresolved`, `no-provider` with its `contract`, `produces` or `consumes` of an
@@ -247,9 +247,18 @@ one for the area a change touches.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
-- New **entry point kind** (spec #31): a variant of `entry::EntryKind` (`name`, `parse`), a finder
-  beside `routes` and `exports` in `entry::find`, which reads the repository's own facts
-  (`entry::Local`), and the `site` symbol its process starts from. The walk (`Graph::process`),
+- New **entry point kind** (spec #31): a variant of `entry::EntryKind` (its `name` and `parse`
+  arms and the list `parse` searches), a finder beside `routes`, `channels`, `programs` and
+  `exports` in `entry::find`, and the `site` its process starts from (a symbol or a code file;
+  `holds` checks it). The finder reads `entry::Local`: `identity`, `files` (every file's
+  `Facts`), `names`, `symbols`, `called`, `exported`, `providers` and `consumers` (`entry::Side`,
+  a `site` and a `contract`) and `programs` (`entry::Program`, a `file` and a definition name). A
+  kind that needs a fact not there adds a field to `Local` and fills it in `index::refresh`,
+  where `Local` is built after the contracts and the `exports` rows are written, just before
+  `entry::find` stores its result; a new fact a pack declares is a `Facts` field first (as
+  `programs` is). A kind the stored rows already name needs no schema change; a new column does
+  (`SCHEMA_VERSION`). Export entry points are filtered again at query time
+  (`entry::drop_imported_exports`): only `export` is dropped, never another kind. The walk (`Graph::process`),
   `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
@@ -269,7 +278,7 @@ one for the area a change touches.
   belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
   golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
   which names a function of another file) needs a repository-level step that the pack adds in
-  its own ticket, feeding `entry::Local::programs` with `(file, def)` pairs. The forms per language are spec #31 "Program entry points per language
+  its own ticket, feeding `entry::Local::programs` with `entry::Program`s. The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
@@ -601,10 +610,21 @@ one for the area a change touches.
   up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
   branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
   expanded, so a longer call chain is cut. `Graph::processes_of` (the processes `context` lists)
-  walks upstream with no depth limit, so on chains deeper than 254 membership and trees can
-  disagree: a symbol below the limit still names the process, and so can one the limit hid
-  above it through `Seen` (E reaches X at depth 255 and Y, X's callee, is cut; a later direct
-  E to X shows X as seen, so X's other callee Z is no step of E's tree, yet Z lists E).
+  walks upstream with no depth limit, so on chains deeper than `PROCESS_DEPTH` membership and
+  trees can disagree: a node past depth 256 is no step of the tree, and the limit can hide a
+  node shallower than that, through `Seen`. E reaches X at depth 255, so X expands and each of
+  its callees, Y among them, is a `depth-limit` step at 256 whose own callee Z is no step; a
+  later direct E to X shows X as seen, so Y is not expanded there either, yet `processes_of(Z)`
+  lists E.
+- `community.rs`: Leiden has no iteration cap (spec #31 asks for none). Each pass that changes
+  anything either moves a node to a community with a strictly positive modularity gain, which
+  raises the modularity, an integer here (`i128`, no floating point), so no partition repeats,
+  or merges subcommunities and shrinks the graph, which cannot happen forever; so the loop ends.
+  The work grows with the repository's calls and passes (no marker).
+- `engine.rs`: `context` builds `trace::Graph` and calls `Graph::processes_of` for every symbol
+  it answers about: a reverse map of every edge of the workspace (every call and link) is built
+  per call, with no cache, so the cost follows the workspace's size, not the symbol's (no
+  marker).
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

@@ -292,7 +292,10 @@ fn a_channel_handler_is_a_channel_entry_point_and_no_export() {
     assert_golden("chain-worker.processes.json", &found);
     assert!(found.contains("\"kind\": \"channel\""));
     assert!(found.contains("\"label\": \"channel::kafka::orders.created\""));
-    assert!(!found.contains("src/consumer.ts::onOrderCreated\","));
+    // No export entry point has the handler as its identity (its channel one ends in `::`).
+    assert!(!found.contains(
+        "\"entry_point\": \"example.com/chain/worker::src/consumer.ts::onOrderCreated\""
+    ));
 }
 
 #[test]

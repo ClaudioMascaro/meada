@@ -168,9 +168,9 @@
   ],
   "processes": [
     {
-      "entry_point": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
-      "kind": "export",
-      "label": "onOrderCreated",
+      "entry_point": "example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
       "steps": [
         {
           "depth": 0,
