@@ -61,6 +61,22 @@ modules updates it.
   of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
   plain: a consumer through one always shows `range unchecked`, even inside its own repository,
   which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
+- `drift_view.rs`: shape drift (spec #23) as `context`, `search` and `status` show it, with no
+  drift computed of its own: `entries` takes every link with a `Link::drift` or, but for an
+  ambiguous one, whose consumer has a shape in the exports, and finds its consumer call by
+  scanning every repository's calls (Known ceilings); `consumers`, `matches` and `counts`
+  render. `context` on an HTTP route appends, after the providers, one
+  `<repository> consumer <path>:<line> <caller>` per linked consumer that read fields of the
+  response (ambiguous links apart), sorted by repository, file and numeric line, with `drift:
+  missing <path> (<level>), ...` and `not checked: <path> under <open path>, ...` lines when it
+  has any. The provider's shape lines name the source: `<file> (document)`, `(zod)` or
+  `(literals)` (`Source::at`). `search` kind `drift`
+  (`search_drift`, an early branch) gives one line per missing path, `<repository>
+  <path>:<line> <caller> <contract> missing <path> (<level>)`, matched by the route path or the
+  field path; the reads not checked are never listed. `status` prints `Msg::Drift(n)` under a
+  repository whose consumers have `n` > 0 missing reads, link and path pairs
+  (`Engine::status_report`), nothing
+  otherwise, so no repository without drift changes.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
@@ -87,7 +103,9 @@ modules updates it.
   from `Export::document_of` over providers and consumers) as `<repository> <document> GET /x
   (documented only)` or `<repository> <document> kafka send orders.created (documented only)`;
   both end their branch (`Graph::ends`): `Walk::reach`, the one way a link crossing writes its
-  row, pushes them and enters anything else. Starts take only HTTP routes, symbols and call
+  row, pushes them and enters anything else. A line reached through a link with drift ends
+  with ` drift: missing <paths>` (comma-separated, after any `(cycle)` or `(see above)`):
+  `Row::link` reads `Link::drift` and `Walk::push` appends it. Starts take only HTTP routes, symbols and call
   sites; a start in a kind with `ContractKind::sides` (`resource::...`, `channel::...`) gets an
   answer pointing to `context`. A package hop is a call-site consumer linked to a symbol, like an
   HTTP call: `call_down` crosses it from the call into the provider's function and on through its

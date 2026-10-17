@@ -6,13 +6,15 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Kind, LanguagePack, Message, Modules,
-    Param, Part, Value,
+    Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind, LanguagePack,
+    Message, Modules, Param, Part, Ty, Value,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod messages;
+mod types;
+mod uses;
 
 /// How many definitions may nest in one file. Names are qualified by the definitions around
 /// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
@@ -22,8 +24,9 @@ mod messages;
 // (`MAX_DEPTH`).
 const DEFINITION_DEPTH: usize = 128;
 
-/// How many levels of arguments, objects and arrays `value` reads; deeper is `Unknown`. A
-/// value is read again by every `new` around it, and the recursion must stay shallow.
+/// How many levels of arguments, objects, arrays and receivers of method chains `value` reads;
+/// deeper is `Unknown`. A value is read again by every call or `new` around it, and the
+/// recursion must stay shallow.
 // ponytail: real code nests a few levels of options; 64 is far past any.
 const VALUE_DEPTH: usize = 64;
 
@@ -55,18 +58,21 @@ impl LanguagePack for TsJs {
             .ok_or("tree-sitter returned no tree")?;
         let parents = Parents::new(tree.root_node());
         let mut facts = Facts::default();
+        let mut uses = uses::Uses::new(src, &parents);
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
             node: tree.root_node(),
             scope: String::new(),
             depth: 0,
+            body: tree.root_node(),
             binding: None,
         }];
         while let Some(Visit {
             node,
             scope,
             depth,
+            body,
             binding,
         }) = stack.pop()
         {
@@ -84,6 +90,9 @@ impl LanguagePack for TsJs {
                 inner = qualify(&scope, &name);
                 facts.defs.push(Def {
                     params: params(node, src, &inner, &parents),
+                    returns: (node.child_by_field_name("return_type"))
+                        .and_then(|t| types::returned(t, src, &parents)),
+                    type_params: types::type_parameters(node, src),
                     name: inner.clone(),
                     kind,
                     range,
@@ -93,6 +102,8 @@ impl LanguagePack for TsJs {
                 "call_expression" | "new_expression" => {
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
                     // used (`new SendMessageCommand(...)`, `new Worker(...)`).
+                    let arguments =
+                        (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
                     if let Some(function) = callee_node(node) {
                         // The artifact's `await` is outside the call: so is its span.
                         let start = if awaited_artifact(node) {
@@ -104,15 +115,26 @@ impl LanguagePack for TsJs {
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: start..node.end_byte(),
-                            args: node
-                                .child_by_field_name("arguments")
-                                .filter(|a| a.kind() == "arguments")
+                            args: arguments
                                 .map(|a| {
                                     named(a)
                                         .map(|arg| value(arg, src, &scope, &parents))
                                         .collect()
                                 })
                                 .unwrap_or_default(),
+                            arg_types: arguments
+                                .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
+                                .unwrap_or_default(),
+                            uses: uses.of(node, body),
+                        });
+                    }
+                }
+                "interface_declaration" | "type_alias_declaration" => {
+                    if let Some(name) = node.child_by_field_name("name") {
+                        facts.consts.push(Const {
+                            name: qualify(&scope, text(name, src)),
+                            value: Value::Type(types::declaration(node, src, &parents, &mut 0)),
+                            ty: None,
                         });
                     }
                 }
@@ -151,9 +173,17 @@ impl LanguagePack for TsJs {
                 && !FUNCTIONS.contains(&value_node.kind())
                 && !matches!(value_node.kind(), "class")
             {
+                let (value, ty) = declared(
+                    node.child_by_field_name("type"),
+                    *value_node,
+                    src,
+                    &scope,
+                    &parents,
+                );
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value: value(*value_node, src, &scope, &parents),
+                    value,
+                    ty,
                 });
             }
             let children: Vec<Node> = node.children(&mut node.walk()).collect();
@@ -166,6 +196,11 @@ impl LanguagePack for TsJs {
                     node: child,
                     scope: inner.clone(),
                     depth: depth + usize::from(is_def),
+                    body: if BODIES.contains(&node.kind()) {
+                        node
+                    } else {
+                        body
+                    },
                 }
             }));
         }
@@ -339,6 +374,8 @@ struct Visit<'t> {
     scope: String,
     /// How many definitions enclose `node`.
     depth: usize,
+    /// The function whose body holds `node`, or the root at the top level.
+    body: Node<'t>,
     /// The name and span a binding gives an anonymous function or class: `const f = () => {}`,
     /// `export default () => {}`.
     binding: Option<(String, Range<usize>)>,
@@ -419,14 +456,19 @@ const BODIES: &[&str] = &[
 /// The names a binding pattern binds: an identifier, or each name an object, array, rest or
 /// default pattern (or a parameter list) holds, never a key or a default value.
 fn bound(pattern: Node, src: &[u8]) -> Vec<String> {
+    (bound_nodes(pattern).into_iter())
+        .map(|n| text(n, src).to_string())
+        .collect()
+}
+
+/// The identifier nodes `bound` reads the names of.
+fn bound_nodes(pattern: Node) -> Vec<Node> {
     let mut out = Vec::new();
     // Explicit stack: a pattern can nest deeper than the call stack.
     let mut stack = vec![pattern];
     while let Some(node) = stack.pop() {
         match node.kind() {
-            "identifier" | "shorthand_property_identifier_pattern" => {
-                out.push(text(node, src).to_string())
-            }
+            "identifier" | "shorthand_property_identifier_pattern" => out.push(node),
             "pair_pattern" => stack.extend(node.child_by_field_name("value")),
             "assignment_pattern" | "object_assignment_pattern" => {
                 stack.extend(node.child_by_field_name("left"))
@@ -709,6 +751,16 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
     if depth >= VALUE_DEPTH {
         return Value::Unknown;
     }
+    let deeper = |n: Node| value_at(n, src, scope, up, depth + 1);
+    // `x as T` is `x`, or the schema `T` infers; the type of a cast is `cast`'s.
+    if node.kind() == "as_expression"
+        && let Some(inner) = named(node).next()
+    {
+        return match named(node).nth(1).and_then(|t| types::inferred(t, src)) {
+            Some(schema) => Value::Schema(schema),
+            None => deeper(inner),
+        };
+    }
     match node.kind() {
         "object" => {
             let properties = named(node).filter_map(|property| match property.kind() {
@@ -718,13 +770,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     };
-                    let value = value_at(
-                        property.child_by_field_name("value")?,
-                        src,
-                        scope,
-                        up,
-                        depth + 1,
-                    );
+                    let value = deeper(property.child_by_field_name("value")?);
                     Some((key, value))
                 }
                 "shorthand_property_identifier" => {
@@ -733,24 +779,26 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                 }
                 "spread_element" => {
                     let spread = named(property).next()?;
-                    Some(("...".into(), value_at(spread, src, scope, up, depth + 1)))
+                    Some(("...".into(), deeper(spread)))
                 }
                 "method_definition" if in_options(property, up) => {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, function(scope, &inline(property))))
                 }
+                // A getter or method of a literal that is no options object: a key whose value
+                // Meada does not read, not a key that is absent.
+                "method_definition" => {
+                    let key = text(property.child_by_field_name("name")?, src).to_string();
+                    Some((key, Value::Unknown))
+                }
                 _ => None,
             });
             Value::Object(properties.collect())
         }
-        "array" => Value::List(
-            named(node)
-                .map(|item| value_at(item, src, scope, up, depth + 1))
-                .collect(),
-        ),
-        "await_expression" => named(node)
-            .next()
-            .map_or(Value::Unknown, |n| value_at(n, src, scope, up, depth + 1)),
+        "array" => Value::List(named(node).map(deeper).collect()),
+        "await_expression" => named(node).next().map_or(Value::Unknown, deeper),
+        "number" => Value::Scalar(text(node, src).parse().ok()),
+        "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
@@ -759,18 +807,68 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
         kind => match parts(node, src) {
             Some(parts) => Value::Str(parts),
             None if kind == "call_expression" => {
-                callee_node(node).map_or(Value::Unknown, |f| Value::Call(callee(f, src)))
+                let args = node.child_by_field_name("arguments");
+                let args = args.filter(|a| a.kind() == "arguments");
+                callee_node(node).map_or(Value::Unknown, |f| {
+                    let receiver = (f.kind() == "member_expression")
+                        .then(|| f.child_by_field_name("object"))
+                        .flatten()
+                        .map(|object| Box::new(deeper(object)));
+                    Value::Call(Invocation {
+                        callee: callee(f, src),
+                        receiver,
+                        args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
+                    })
+                })
             }
             None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
                 let args = node.child_by_field_name("arguments");
                 let args = args.filter(|a| a.kind() == "arguments");
-                let args =
-                    args.map(|a| named(a).map(|arg| value_at(arg, src, scope, up, depth + 1)));
+                let args = args.map(|a| named(a).map(deeper));
                 Value::New(callee(f, src), args.into_iter().flatten().collect())
             }),
+            None if kind == "member_expression" => {
+                let object = node.child_by_field_name("object");
+                let property = node.child_by_field_name("property");
+                match (object, property) {
+                    (Some(o), Some(p)) if o.kind() == "identifier" => {
+                        Value::Member(text(o, src).to_string(), text(p, src).to_string())
+                    }
+                    _ => Value::Unknown,
+                }
+            }
             None => Value::Unknown,
         },
     }
+}
+
+/// The type a cast `node` (`x as T`) declares, when it lists fields (`z.infer` types are the
+/// value's, see `value_at`).
+fn cast(node: Node, src: &[u8], up: &Parents) -> Option<Ty> {
+    let declared = named(node)
+        .nth(1)
+        .filter(|_| node.kind() == "as_expression")?;
+    Some(types::ty(declared, src, up, &mut 0)).filter(|t| !matches!(t, Ty::Unknown | Ty::Schema(_)))
+}
+
+/// What a `const` holds and the type it is declared to have: by the annotation of the variable
+/// or by a cast of its initializer. A `z.infer` type gives the value the schema it names.
+fn declared(
+    annotation: Option<Node>,
+    init: Node,
+    src: &[u8],
+    scope: &str,
+    up: &Parents,
+) -> (Value, Option<Ty>) {
+    let annotated = annotation.map(|t| types::ty(t, src, up, &mut 0));
+    if let Some(Ty::Schema(schema)) = annotated {
+        return (Value::Schema(schema), None);
+    }
+    let ty = annotated.or_else(|| cast(init, src, up));
+    (
+        value(init, src, scope, up),
+        ty.filter(|t| *t != Ty::Unknown),
+    )
 }
 
 /// A string expression folded into literal text, environment reads and holes; `None` when
@@ -976,6 +1074,66 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_cast_is_the_value_it_casts() {
+        let src = "const BASE = process.env.API;\n\
+                   const u = BASE as string;\n\
+                   fetch(url as string);\n\
+                   fetch(`${BASE as string}/x`);\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let held = facts.consts.iter().find(|c| c.name == "u").unwrap();
+        assert!(matches!(&held.value, Value::Ref(name) if name == "BASE"));
+        // A type that lists no fields is no type of the constant.
+        assert_eq!(held.ty, None);
+        let args: Vec<_> = facts.calls.iter().filter(|c| c.callee == "fetch").collect();
+        assert!(matches!(args[0].args.as_slice(), [Value::Ref(name)] if name == "url"));
+        assert_eq!(args[0].arg_types, [None]);
+        assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
+    }
+
+    /// How many calls deep the first argument of `value` goes.
+    fn nesting(value: &Value) -> usize {
+        let mut value = value;
+        let mut depth = 0;
+        while let Value::Call(call) = value {
+            depth += 1;
+            match call.args.first() {
+                Some(inner) => value = inner,
+                None => break,
+            }
+        }
+        depth
+    }
+
+    #[test]
+    fn expressions_nested_past_the_depth_limit_are_unknown() {
+        let n = VALUE_DEPTH * 2;
+        let src = format!("const x = {}1{};\n", "f(".repeat(n), ")".repeat(n));
+
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+
+        let depth = nesting(&facts.consts[0].value);
+        assert!((VALUE_DEPTH - 1..=VALUE_DEPTH).contains(&depth), "{depth}");
+    }
+
+    #[test]
+    fn a_method_chain_keeps_the_receiver_and_the_arguments_of_each_call() {
+        let src = "const x = z.object({ a: 1 }).optional();\n";
+
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+
+        let Value::Call(outer) = &facts.consts[0].value else {
+            unreachable!("not a call");
+        };
+        assert_eq!(outer.callee, "(call_expression).optional");
+        let Some(Value::Call(inner)) = outer.receiver.as_deref() else {
+            unreachable!("no receiver call");
+        };
+        assert_eq!(inner.callee, "z.object");
+        assert!(matches!(inner.receiver.as_deref(), Some(Value::Ref(z)) if z == "z"));
+        assert!(matches!(inner.args.as_slice(), [Value::Object(p)] if p.len() == 1));
+    }
+
     fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
     }
@@ -1117,7 +1275,7 @@ mod tests {
         assert!(
             call.args
                 .iter()
-                .all(|a| matches!(a, Value::Call(name) if name == "get"))
+                .all(|a| matches!(a, Value::Call(call) if call.callee == "get"))
         );
     }
 }

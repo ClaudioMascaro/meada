@@ -99,6 +99,29 @@ pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     (web, gateway, catalog)
 }
 
+/// The documented chain with the shape drift cases of spec #23 laid over it
+/// (`tests/fixtures/chain-drift/`): the web app gains consumers of the gateway's documented
+/// `GET /api/orders` reading a field the document lacks, a present field, a field under its
+/// open part, a field through a client wrapper that returns the parsed body, and a name the
+/// function rebinds. For the provider shapes the object literals of a handler give, the gateway
+/// gains Express routes returning literals (an imported constant spread, an error branch with
+/// a literal status, a spread of an unknown value) and the catalog Next.js routes doing the
+/// same through `NextResponse.json` and `Response.json`; the web app reaches both through
+/// `GATEWAY_URL` and `CATALOG_URL`. For shapes through package imports (issue #175), the catalog
+/// holds the package `@chain/contracts`, which its own routes, the gateway and the web app import.
+/// Each overlaid repository gets a third commit. Returns
+/// (web, gateway, catalog).
+pub fn drift_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let (web, gateway, catalog) = documented_chain(case);
+    let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-drift");
+    for (repo, dir) in [(&web, "web"), (&gateway, "gateway"), (&catalog, "catalog")] {
+        copy_dir(&overlay.join(dir), repo);
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "drift"]);
+    }
+    (web, gateway, catalog)
+}
+
 /// The chain's worker, next to any repository of the chain.
 pub fn worker(sibling: &Path) -> PathBuf {
     sibling.with_file_name("chain-worker")

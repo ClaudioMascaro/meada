@@ -17,8 +17,8 @@ use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
 use crate::{
-    Result, channel, decisions, document, http, index, items, package, render, repo, resource,
-    trace,
+    Result, channel, decisions, document, drift_view, http, index, items, package, render, repo,
+    resource, trace,
 };
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -115,6 +115,8 @@ impl Engine {
         package::consume(&mut exports, &providers);
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
+        // Shapes imported from a package fill from the shapes it keeps (issue #175).
+        package::shapes(&mut exports, &providers);
         Ok(exports)
     }
 
@@ -123,10 +125,14 @@ impl Engine {
         self.links_and_decisions(exports).0
     }
 
-    /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
-    /// each repository that did not apply, in workspace order.
+    /// Every link of the workspace, sorted, with the decisions replayed and the drift of each
+    /// HTTP link (`http::drift`), and the decisions of each repository that did not apply, in
+    /// workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
-        decisions::replay(self.core_links(exports), &self.workspace, exports)
+        let (mut links, evaluations) =
+            decisions::replay(self.core_links(exports), &self.workspace, exports);
+        http::drift(&mut links, exports);
+        (links, evaluations)
     }
 
     /// Every link of the workspace as the core derives it from the stored contracts, before
@@ -165,12 +171,16 @@ impl Engine {
         self.refresh()?;
         let exports = self.exports()?;
         let (links, evaluations) = self.links_and_decisions(&exports);
-        let repos = self.workspace.repos.iter();
-        let lines = repos
-            .zip(&exports)
-            .map(|(repo, export)| {
+        let repos = &self.workspace.repos;
+        let entries = drift_view::entries(repos, &exports, &links);
+        let drift = drift_view::counts(repos, &entries);
+        let lines = (repos.iter().zip(&exports).zip(drift))
+            .map(|((repo, export), drift)| {
                 let mut lines = resource::report(repo, export, &links);
                 lines.extend(document::report(repo, export));
+                if drift > 0 {
+                    lines.push(Msg::Drift(drift).text());
+                }
                 lines
             })
             .collect();
@@ -269,7 +279,8 @@ impl Engine {
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
     /// by broker kind and name) matches; `document` lists the documents read, matched by path
     /// or title (see `search_documents`); `package` lists the packages, matched by name (see
-    /// `search_packages`); `ambiguous` and `unresolved` list the open items whose enclosing
+    /// `search_packages`); `drift` lists the fields consumers read that a route lacks (see
+    /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -282,6 +293,9 @@ impl Engine {
         if kind == Some("package") {
             return self.search_packages(query, budget);
         }
+        if kind == Some("drift") {
+            return self.search_drift(query, budget);
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
             None => (true, Some("")),
@@ -292,7 +306,7 @@ impl Engine {
             Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
                 let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
-                             `ambiguous` or `unresolved`";
+                             `drift`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -415,6 +429,23 @@ impl Engine {
                 hits.push((r, format!("{} {}", repo.identity, doc.path), line));
             }
         }
+        hits.sort();
+        if hits.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+        Ok(render::budgeted(&lines, budget))
+    }
+
+    /// The drift (spec #23) whose route path or missing field path matches `query`, one line
+    /// per missing path, as `<repository> <path>:<line> <caller> <route> missing <path>
+    /// (<level>)`.
+    fn search_drift(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
+        let mut hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
         hits.sort();
         if hits.is_empty() {
             return Ok(format!("no matches for `{query}`\n"));
@@ -611,7 +642,12 @@ impl Engine {
                 (None, None) => None,
             };
             if let Some(roles) = roles {
-                let lines = self.contract_sides(&exports, contract, roles, kind.prefix());
+                let mut lines = self.contract_sides(&exports, contract, roles, kind.prefix());
+                if http::route(contract).is_some() {
+                    let links = self.links(&exports);
+                    let entries = drift_view::entries(repos, &exports, &links);
+                    lines.extend(drift_view::consumers(repos, &entries, contract));
+                }
                 return Ok(render::budgeted(&lines, budget));
             }
         }
@@ -776,10 +812,12 @@ fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
         let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
         paths.join(", ")
     };
-    let mut lines = vec![format!(
-        "{identity} {at} {what} fields: {}",
-        list(&shape.fields)
-    )];
+    let fields = list(&shape.fields);
+    let mut lines = vec![
+        format!("{identity} {at} {what} fields: {fields}")
+            .trim_end()
+            .to_string(),
+    ];
     if !shape.open.is_empty() {
         lines.push(format!(
             "{identity} {at} {what} open: {}",
@@ -968,7 +1006,7 @@ pub fn status(dir: &Path) -> Result<String> {
 }
 
 /// 0 when `name` is `needle`, 1 when it starts with it, 2 when it contains it.
-fn rank(name: &str, needle: &str) -> Option<u8> {
+pub(crate) fn rank(name: &str, needle: &str) -> Option<u8> {
     match () {
         _ if name == needle => Some(0),
         _ if name.starts_with(needle) => Some(1),

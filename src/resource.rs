@@ -149,6 +149,7 @@ impl ContractKind for Resource {
                 reason: contract.clone(),
                 by: None,
                 p: None,
+                drift: None,
             })
             .collect()
     }

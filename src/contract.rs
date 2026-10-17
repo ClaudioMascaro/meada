@@ -13,6 +13,7 @@ use crate::index::{Consumer, Export, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
 use crate::resource::Resource;
+use crate::shape::{Drift, Shape};
 use crate::workspace::Repository;
 
 /// How well a link is established. The order is the strength, strongest first: exact >
@@ -71,6 +72,9 @@ pub struct Link {
     /// The probability a model stated for a `decided` link.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p: Option<f64>,
+    /// The drift of an HTTP link with a shape on both sides (spec #23, `http::drift`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drift: Option<Drift>,
 }
 
 /// A contract the repository holds, before the index gives its site an identity.
@@ -88,6 +92,9 @@ pub struct Found {
     /// For an unresolved consumer, the literal fragments of its URL path Meada could
     /// evaluate, in order.
     pub fragments: Vec<String>,
+    /// The shape the code gives the side (spec #23): for an HTTP consumer, the fields it reads
+    /// from the parsed response.
+    pub shape: Option<Shape>,
 }
 
 /// Which side of a contract a site holds.
@@ -107,6 +114,11 @@ pub enum Role {
     /// exported; at query time, one that resolves into a package of the workspace becomes a
     /// consumer of that package (spec #22).
     Import,
+    /// Neither side: the shape a package's index keeps for a name a file exports (issue #175),
+    /// the module-level constant or type `method` of the file, read for the view `via` names
+    /// (`shape::Want`). Stored, never exported; at query time it fills the parts of the shapes
+    /// that import the name.
+    Shape,
 }
 
 impl Role {
@@ -118,6 +130,7 @@ impl Role {
             Role::Binding => "binding",
             Role::Publish => "publish",
             Role::Import => "import",
+            Role::Shape => "shape",
         }
     }
 }

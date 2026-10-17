@@ -25,7 +25,9 @@ modules updates it.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository. `refresh(db, root,
+  `resolved` digest changed, re-extract contracts for the whole repository (one row per side, the
+  `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
+  `Consumer::shape`). `refresh(db, root,
   identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
   from the code rows: a document edit re-extracts no code. Without `serve.declared` the
@@ -42,10 +44,15 @@ modules updates it.
   `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
   (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
   rewrites the `exports` table (`Resolver::exported` of every pack: per file, each exported
-  name with the `file` and `target` definition it names, `target` NULL for a whole file and
+  name with the `file` and `target` definition, constant or type it names, `target` NULL for a whole file and
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
   row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
-  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). `sort_providers` and
+  `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). Before extracting,
+  `refresh` computes the packages' public surface (`package::surface`, from the `manifests` rows
+  read by `read_manifests`, the `exports` rows of every pack and the files), and the extraction
+  loop runs `package::exported_shapes` over each pack's `Code` for its files, whose `shape` rows
+  `export` loads as `Export::shapes` (`serde(skip)`, issue #175). Every `manifests` row is folded
+  into the configs digest, so an edited `package.json` or `tsconfig.json` extracts again. `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
@@ -54,8 +61,24 @@ modules updates it.
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
   enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
-  name and a definition, constant or parameter of its own scope alike (`Binding::Unknown`: a
-  call falls to a name match, a value is not known), the hidden names probe. `Value` has `New(callee, args)` (`new X(...)` as a value) and `List` (an array literal);
+  name and a definition, constant or parameter of its own scope alike (`Binding::Hidden`: a
+  call falls to a name match, a value is not known), the hidden names probe. `Call::uses` (spec #23, `serde(skip)`) is the pack's optional shape
+  facts: each chain of `Step`s (`Field`, `Element`, `Call(method)`, `Typed(Ty)`, `Argument(tys)`,
+  the type arguments a call is given, `Return`) the function
+  making the call applies to its result; the TS/JS pack fills it in `lang/ts/uses.rs` (through
+  `await`, parentheses, casts, member and literal element accesses, method calls, and the uses
+  of the names a `const` binds, a destructuring pattern (`PATTERN_DEPTH` deep; each field or
+  element it names is a read), the variable of a `for...of` and the first parameter of an
+  array method's callback written in place (`ELEMENT_METHODS`), each only when nothing else in
+  the function binds or assigns the name; `Return` only from the call's own function), within
+  `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation as a `Ty` (`serde(skip)`, reparsed). Types (spec #23): `Ty` (`Object`, `Named`, `Intersection`, `Array`, `Schema`, `Param`, a type parameter of the
+  enclosing function, `Unknown`) is what `lang/ts/types.rs` reads from a type; an `interface` or `type` declaration is a `Const` holding `Value::Type(Ty)` (so lexical, import and export resolution find it; `Code::held` skips it and `Code::declared_type` finds it), `Const::ty` and `Call::arg_types` hold the type a constant or argument is annotated or cast to (`serde(skip)`), and `declared.rs` (`Types`) expands a `Ty` into its field paths, optional marks and open (index signature) paths, with `TYPE_DEPTH` and `TYPES_BUDGET`. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
+  `Call(Invocation)` (the callee, the receiver value of a method call and its arguments, so a
+  chain such as `z.object({..}).optional()` is read), `Member(object, property)` (`schema.shape`),
+  `Schema(name)` (a constant annotated `z.infer<typeof name>`, from `lang/ts/types.rs`) and
+  `Scalar(Option<u32>)` (a number or boolean literal, spec #23; a plain integer carries its value,
+  a status), and `Code::is_param` and `Code::is_global` tell a name that is the handler's own
+  parameter, or a global such as `Response`, from one a local binding hides;
   `property(object, key)` (the last key, through spreads; `Err(Depends)` when a spread of a
   parameter may set it) and `literal(parts)` are shared by kinds and packs. An anonymous function
   written as a property of an options object passed as an argument (`run({ eachMessage: () =>
@@ -97,6 +120,9 @@ modules updates it.
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  `Code::expand_frames` is `expand` that also returns, for each site, the wrapper calls it
+  climbed (`Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
+  `Call::uses` like `args` (a file without full facts is a miss).
   `Code::expand` climbs only callers that resolved exact: a call found only by a name match
   (`Caller::by_name`: `data.get(...)` matched to a wrapper method, or a bare name no import
   binds) may be on any object or reach another function, so a wrapper with no exact caller is

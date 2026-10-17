@@ -176,6 +176,14 @@ pub struct Def {
     /// A function's parameters in order; a destructured one has an empty name and lists the
     /// names it binds in `fields`.
     pub params: Vec<Param>,
+    /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
+    /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
+    /// the index (see `Call::args`).
+    #[serde(skip)]
+    pub returns: Option<Ty>,
+    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
+    #[serde(skip)]
+    pub type_params: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -207,6 +215,11 @@ pub struct Const {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip, default = "unknown")]
     pub value: Value,
+    /// The type the constant is declared to have, by an annotation or a cast (spec #23), when
+    /// it lists fields: the value as written may lack what the type has, an index signature.
+    /// Not kept in the index, like `value`.
+    #[serde(skip)]
+    pub ty: Option<Ty>,
 }
 
 fn unknown() -> Value {
@@ -226,6 +239,89 @@ pub struct Call {
     /// parses a file again when a contract needs them.
     #[serde(skip)]
     pub args: Vec<Value>,
+    /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
+    /// (spec #23). Not kept in the index, like `args`.
+    #[serde(skip)]
+    pub arg_types: Vec<Option<Ty>>,
+    /// Shape facts (spec #23), an optional part of a pack's output: what the function making
+    /// the call does with its result, one chain of steps per use, such as `res.json()` then
+    /// `.items`, `[0]` and `.id`. A pack that leaves it empty gives its consumers no shape.
+    /// Not kept in the index, like `args`.
+    #[serde(skip)]
+    pub uses: Vec<Vec<Step>>,
+}
+
+/// One step of what code does with a value (spec #23): the value read through a chain of
+/// member and element accesses and method calls, then maybe returned. A chain ends where the
+/// pack cannot follow the value (passed to a function, stored, rebound).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// `.name`, `?.name` or `["name"]`.
+    Field(String),
+    /// An element: `[0]`, an index with a literal number.
+    Element,
+    /// A call of the method `name` on the value: `.json()`.
+    Call(String),
+    /// The value is declared to have this type: by a cast, a type argument of the method called
+    /// or an annotation on the variable that receives it. A chain ends here, but the reads that
+    /// follow the cast go on in a chain of their own.
+    Typed(Ty),
+    /// The type arguments the call itself is given (`get<Row>(path)`), in order. They type the
+    /// result only if the function called says so (a cast of its result to a type parameter, or
+    /// a return type that is one): the caller cannot tell. A chain of its own, at the start.
+    Argument(Vec<Ty>),
+    /// The value is returned by the function making the call.
+    Return,
+}
+
+/// How deep a pack reads a type, and the shared side follows one (spec #23): the nesting of
+/// the type as written, and the names it follows on the way. A part deeper than that adds no
+/// fields.
+// ponytail: real types nest a handful of levels; the limit keeps a crafted chain of `extends`
+// or aliases, or a type nested thousands of levels, from costing the stack.
+pub const TYPE_DEPTH: usize = 32;
+
+/// A type as written (spec #23), as far as drift reads it: the fields it lists. A form that
+/// lists none is `Unknown`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Ty {
+    /// `{ a: A; b?: B }`, or an interface body. `open` when it has an index signature.
+    Object { members: Vec<Member>, open: bool },
+    /// A name: an interface, an alias, a class or an import; the shared side resolves it.
+    /// Type arguments are not substituted.
+    Named(String),
+    /// `A & B`, and an interface with the types it extends.
+    Intersection(Vec<Ty>),
+    /// `T[]` and `Array<T>`.
+    Array(Box<Ty>),
+    /// `z.infer<typeof S>`: the name of the schema.
+    Schema(String),
+    /// A type parameter of the function around the use (`as T` in `get<T>`): the caller's type
+    /// argument stands for it. One of an interface or alias adds no fields.
+    Param(String),
+    /// Any other form: a union, a primitive, a mapped type.
+    Unknown,
+}
+
+impl Ty {
+    /// Whether a type parameter is written in the type.
+    pub fn has_param(&self) -> bool {
+        match self {
+            Ty::Param(_) => true,
+            Ty::Array(of) => of.has_param(),
+            Ty::Intersection(parts) => parts.iter().any(Ty::has_param),
+            Ty::Object { members, .. } => members.iter().any(|m| m.ty.has_param()),
+            _ => false,
+        }
+    }
+}
+
+/// A property of an object type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Member {
+    pub name: String,
+    pub optional: bool,
+    pub ty: Ty,
 }
 
 /// An expression as written. The pack does not follow names: the shared side folds
@@ -242,17 +338,38 @@ pub enum Value {
     /// `undefined`, or an argument the call leaves out.
     Undefined,
     /// The result of calling the normalized callee, such as `express.Router`.
-    Call(String),
+    Call(Invocation),
+    /// A property of a named value, such as `parsed.data` (spec #23).
+    Member(String, String),
+    /// A value declared to have the type a schema infers, such as `x as z.infer<typeof S>`
+    /// (spec #23): the name of the schema.
+    Schema(String),
     /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
     /// the arguments.
     New(String, Vec<Value>),
     /// An array literal's elements.
     List(Vec<Value>),
+    /// An `interface` or `type` declaration (spec #23), held by a `Const` of the name it
+    /// declares: the type namespace shares the name of a `const` of the same spelling.
+    Type(Ty),
+    /// A number or a boolean literal (spec #23): a scalar. A number written as a plain integer
+    /// carries it (an HTTP status).
+    Scalar(Option<u32>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
     /// Anything else.
     Unknown,
+}
+
+/// A call as written (spec #23): `receiver` is the expression a method is called on (`z` in
+/// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
+/// the callee is no member.
+#[derive(Clone)]
+pub struct Invocation {
+    pub callee: String,
+    pub receiver: Option<Box<Value>>,
+    pub args: Vec<Value>,
 }
 
 /// What a reader of evaluated values needs depends on a parameter of the enclosing function:

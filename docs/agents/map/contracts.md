@@ -10,8 +10,21 @@ modules updates it.
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`), Next.js app-router and Express providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). An Express route path or mount prefix with a part that cannot
+  `fetch`; each with `Found::shape` from `response_reads`, spec #23: over the frames
+  `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
+  function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
+  response, the body or a path below it when it returns that one thing from the function its
+  caller reaches), Next.js app-router and Express providers (each with a `Found::shape` from
+  `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
+  first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
+  lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
+  `Zod`, which `response_reads` and `provider_shape` reach through it), holding the budgets of
+  each file; Express reads a handler once for every prefix it is mounted under),
+  `normalize_path`, and the link rules (host,
+  `base_url_env`, unique provider). `http::drift(links, exports)` sets `Link::drift` on every
+  HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site
+  alone for an unresolved one; several of one contract count only when their shapes agree) and
+  provider (by site, serving the link's contract) both have a shape, through `shape::drift`. An Express route path or mount prefix with a part that cannot
   be read (a template-literal hole, a parameter, an environment read) adds no route: a router
   mounted only under such a prefix is served under no prefix, never at the root; a literal `:id`
   stays a parameter. `declare` first adds the routes of the repository's
@@ -19,7 +32,8 @@ modules updates it.
   into it (one provider, the code's handler site); any other becomes a provider of its own at
   `<repository>::<document path>::<METHOD> <path>` (no handler), and a route an earlier
   document by path listed adds nothing. Each provider of a documented contract, merged or not,
-  takes `Provider::shape` from the first document by path that lists it (none when that
+  takes `Provider::shape` from the first document by path that lists it, when that
+  document's route has one (else the provider keeps the shape its code gives, if any; none when that
   document's route has no shape). A document provider is a written contract: it lowers
   no level (a host match is `exact`). A route also matches by its gateway paths: `declare`
   fills `Provider::gateways` (`Gateway {path, reason}`, not exported; the `[serve]` form, which
@@ -161,4 +175,21 @@ modules updates it.
   followed to a source file). The hop is derived at query time from stored facts and never stored; an import of a
   package outside the workspace, or that resolves nowhere, appears in no export. A re-export of
   another package inside the provider ends the lookup (no second hop). No lockfile is read and
-  no registry queried.
+  no registry queried. Shapes cross the same way (issue #175): `surface(manifests, configs,
+  exported, files)` is the public surface, the entry files of each named manifest's bare name
+  and `exports` subpaths without a `*` (`Provided::entry`, the part of `resolve` that follows
+  the ways in) and every file their `exports` rows name, in turn; `exported_shapes(code,
+  surface)` (run by `index::refresh`) gives, for the files of the surface, a `Role::Shape` row (`site`
+  the file, `method` the name, `via` the `shape::Want`) for each module-level constant or type
+  a file exports: `Types::exported` for an interface or alias (`type`), `Zod::exported` for a
+  schema (`zod` and `infer`), else `Literals::exported` for an object or array literal
+  (`literals`); `index::export` loads them as `Export::shapes` (`ExportedShape`). `shapes(exports,
+  providers)`, the third workspace step, fills every provider and consumer shape holding a
+  `shape::Import` through `shape::fill`, whose lookup `kept` resolves the import like a call
+  (`nearest` manifest of the importing file, its dependency entry, `reaches`, then
+  `Provided::resolve` with the chain the import names, `known` being the kept shapes of the
+  import's view instead of the symbols) and gives the resolution's level (the weaker of two
+  providers keeping the same shape); none, `ambiguous`, several names or two providers keeping
+  different shapes is unresolved. A consumer left with no field has no shape.
+  `Resolver::exported` names constants and types as targets too, which no call reaches since
+  they are no symbols.

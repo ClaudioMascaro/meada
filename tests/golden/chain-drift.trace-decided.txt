@@ -1,0 +1,10 @@
+example.com/chain/catalog app/api/reviews/route.ts:2 GET
+  →[decided: decided by human] example.com/chain/web src/open.ts:4 rate drift: missing votes
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:61 reviews drift: missing votes
+chain: decided · 2 hops · 2 repos · 91 tokens
+
+example.com/chain/catalog app/api/ping/route.ts:2 GET
+  →[ambiguous: 2 providers fit; host unresolved; served by example.com/chain/catalog] example.com/chain/web src/open.ts:12 ping
+example.com/chain/gateway src/ping.ts:4 GET /api/ping
+  →[ambiguous: 2 providers fit; host unresolved; served by example.com/chain/gateway] example.com/chain/web src/open.ts:12 ping (see above)
+chain: ambiguous · 2 hops · 3 repos · 108 tokens

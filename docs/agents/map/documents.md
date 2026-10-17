@@ -80,12 +80,82 @@ modules updates it.
   quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
   included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
   document is unreadable). Readers only see `serde_json::Value`.
-- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open}`, the one form of what a
+- `shape.rs` (spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
+  imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without
   caring about their source. `fields` and `open` are sorted sets of field paths: dotted, `[]`
   for array elements (`items[].id`), `[]` first for a payload that is an array (`[].id`); every
   node below the root is a field (`items`, `items[]`, `items[].id`); the empty path is the root
   (`shape::shown` prints it `(root)`). An open path is a part whose fields Meada cannot list:
-  anything below it may be present. Presence only: no types, formats, `required` or
-  `nullable`. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) is the only
-  source yet; spec #23 adds its code sources as variants. `Source::at` names it in `context`.
+  anything below it may be present. What is recorded is presence, the scalar leaves and the
+  optional fields, never types compared: no types, formats, `required` or `nullable`; `scalars`
+  are the paths known to hold a string, number or boolean (nothing below them); on a consumer,
+  `declared` are the paths a declared type gives rather than a field read and `optional` those
+  it marks optional (`Shape::list` is the one place either grows, keeping them within
+  `fields`); `imports` are the parts a package import leaves for the query to fill (stored,
+  never exported) and `guessed`, on a provider, the parts one filled through a resolution that
+  was not `exact` (issue #175). `Shape::merge` adds another shape's paths (one side reached by
+  several Founds). `shape::Budget` is the per-file budget the code readers (`zod.rs`,
+  `declared.rs`, `literals.rs`) charge, one per extraction. `schema::read` marks a part scalar when its `type` is only
+  `string`, `number`, `integer` or `boolean` (with `null` or not) and no other structure keyword
+  is there, and drops the mark where another member gives the part fields or leaves it open. `Source::Document(path)` (exported `{"document": "openapi.yaml"}`) and
+  `Source::Literals(path)` (`{"literals": "src/orders.ts"}`, the object literals a route
+  handler returns, in the file holding the handler; spec #23) and
+  `Source::Reads(path)` (`{"reads": "src/a.ts"}`, the field reads of an HTTP consumer, in the
+  file of its call site; spec #23) and `Source::Zod(path)` (`{"zod": "src/orders.ts"}`, the
+  zod schema a route handler's response passes through, in the handler's file; declared, like
+  a document) are the sources yet; the declared types of a consumer
+  (`declared.rs`, spec #23) fill `Shape::declared` and `Shape::optional` of a `Reads` shape. `zod.rs` (spec #23) reads the schema into a `Shape`:
+  `Zod::returned(code, responses, handler)` takes the 2xx bodies `Literals::responses` lists
+  and reads each as a schema, from `schema.parse(x)`, `schema.safeParse(x).data`, or a value
+  or handler return type annotated `z.infer<typeof schema>` (`lang/ts/types.rs` names the
+  schema; `Def::returns` and `Value::Schema` carry it), following local and same-repository
+  imported constants through `Code::constant`; when any body is no schema, it gives `None`
+  and the literals are read (all or nothing). A schema becomes a `Node` tree: `z.object` and
+  `.extend/.merge/.pick/.omit` give fields, `z.array` and `.array()` an element `[]`, unions
+  (`z.union`, `discriminatedUnion`, `.or`) the union of the members' fields, the primitives
+  scalar leaves, `.optional/.nullable/.nullish` and the like keep the part; `.passthrough`,
+  `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy` and anything unreadable
+  are open. `literals.rs` (spec #23) reads a handler's returned literals into a `Shape`:
+  `Literals::responses(code, path, handler, Handler::Express | Next)` takes the calls in the
+  handler's byte range (and its inline callbacks), keeps the ones that send a response (Express:
+  `<res>.json|send`, `res` being the handler's second parameter, also after `<res>.status(n)`
+  in a chain; Next: `NextResponse.json` imported from `next/server` and the global
+  `Response.json`, status from the options' `status`), drops any response with a literal
+  status outside 2xx whatever its form (also `res.sendStatus(n)`, a status chained before
+  `end` or `render`, `new Response(body, { status })`) and Express's `next(err)`, and
+  unions the bodies. It follows constants one at a time through `Code::constant` (imports
+  included), not through `Code::value`, so `LITERALS_DEPTH` bounds nesting and constant hops
+  alike and `LITERALS_BUDGET` the work of a file; a body it cannot read is open at that path
+  (an empty array and a spread of anything but a known object included), a string with more
+  than one part, a number and a boolean are scalar leaves. `Literals::responses` lists the 2xx
+  bodies (with the type each is cast to and the handler's return type, whose index signatures
+  open the part they type, as do those of a typed constant it follows; and whether the handler answers another way, which opens the root; see the Known
+  ceilings), `Literals::shape` reads them; only module-level constants are followed. `Source::at`
+  names it in `context`; `Source::declared` tells a declared source (a document) from one read
+  from code. `drift(provider, consumer) -> Option<Drift {missing, unchecked}>` is the
+  one drift comparison: each consumer path is checked from the root one step at a time
+  (`prefixes`), the first step below an open path of the provider is not checked
+  (`unchecked`, mapped to that open path), the first step the provider's fields and open paths
+  lack is `missing` (so only the shallowest missing path of a branch is listed), nothing past
+  a provider scalar is checked (`name.length`; a scalar root checks nothing), and
+  `<path>.length` below a provider array (`<path>[]` present) is no field. Each missing path
+  maps to its level: `exact` when the provider's source is declared and the path is in the
+  consumer's `declared`, else `inferred`; `None` when nothing is missing or unchecked.
+  `Shape::imports` (issue #175, stored, empty once filled) holds the parts a name imported from
+  outside the repository gives: `Import {at, from, specifier, name, want}`, `Want` being the view
+  the reader needs (`zod` and `literals` on a provider, `infer` and `type` on a consumer, and
+  `opens` for a provider value typed with a package type, which reads the kept `type` shape,
+  `Want::kept`, and takes its open parts alone, `literals.rs`'s `typed`; the types inside it
+  give theirs too). `Shape::guessed` lists the provider parts filled through a resolution that
+  was not `exact`: `drift` makes a missing path at or below one `inferred`.
+  `literals.rs` records one for a body or spread naming an import (`Reader::imported`), `zod.rs`
+  for a schema name (`Reader::named`; `Node::imports`, rendered at the node's path, turned
+  `infer` by `Node::declared`), `declared.rs` for a `Ty::Named` and a `z.infer` it cannot find
+  (`Declared::imports`), which `http::response_reads` puts below the read path. `fill(shape,
+  at, find)` is the one recursion: `find` gives the kept shape, its repository and the level the
+  import resolved at (a consumer's paths through one that is not `exact` are not declared), the kept
+  shape is filled first, then grafted at the import's path in its view (`Shape::graft`: a
+  provider takes fields, open parts and scalars, a consumer the declared paths, optional only
+  when every type says so and never when read); unresolved, a provider's part is open and a
+  consumer's adds nothing. `under(prefix, path)` joins paths (the root below `a` is `a`).

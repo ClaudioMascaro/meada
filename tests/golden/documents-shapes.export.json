@@ -17,6 +17,9 @@
         ],
         "open": [
           "parent"
+        ],
+        "scalars": [
+          "name"
         ]
       }
     },
@@ -42,6 +45,13 @@
         "open": [
           "[].customer",
           "[].metadata"
+        ],
+        "scalars": [
+          "[].createdAt",
+          "[].id",
+          "[].items[].quantity",
+          "[].items[].sku",
+          "[].total"
         ]
       }
     },
@@ -66,6 +76,13 @@
         "open": [
           "customer",
           "metadata"
+        ],
+        "scalars": [
+          "createdAt",
+          "id",
+          "items[].quantity",
+          "items[].sku",
+          "total"
         ]
       }
     },
@@ -77,6 +94,11 @@
           "document": "openapi.json"
         },
         "fields": [
+          "brand",
+          "iban",
+          "last4"
+        ],
+        "scalars": [
           "brand",
           "iban",
           "last4"

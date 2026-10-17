@@ -1,0 +1,100 @@
+import { z } from "zod";
+import type { Entity } from "./api/types";
+import { enveloped, fetchAs, getJson, search } from "./api/typed";
+import type { Remote } from "some-lib";
+
+const CATALOG = process.env.CATALOG_URL;
+
+// The profile mirrors the response by hand and extends an imported type. `nickname` and
+// `address.zip` are not returned: exact drift. `phone` is optional, so it adds none.
+interface Profile extends Entity {
+  name: string;
+  nickname: string;
+  address: { city: string; zip: string };
+  phone?: string;
+}
+
+interface Page {
+  items: Profile[];
+  total: number;
+  cursor?: string;
+}
+
+// A cast to an interface.
+export async function cast() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  return (await res.json()) as Page;
+}
+
+// A type argument given to the client wrapper that returns the parsed body.
+interface Counts {
+  total: number;
+  count: number;
+}
+
+export async function counts() {
+  return getJson<Counts>("/api/profiles");
+}
+
+// An annotation on the variable, with an intersection through an alias and `Array<T>`.
+type Ranked = Counts & { items: Array<{ id: string; rank: number }> };
+
+export async function ranked() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  const page: Ranked = await res.json();
+  return page;
+}
+
+// `z.infer` of a schema written here: `pages` is not returned.
+const Pages = z.object({ total: z.number(), pages: z.number() });
+
+export async function pages() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  const page: z.infer<typeof Pages> = await res.json();
+  return page;
+}
+
+// A type of a package adds no fields, and nor does a union.
+type Maybe = { total: number } | { missing: number };
+
+export async function foreign() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  const remote = (await res.json()) as Remote;
+  const either = (await res.json()) as Maybe;
+  return [remote, either];
+}
+
+// A type argument given to the `json` of a client.
+export async function typedJson() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  return res.json<Counts>();
+}
+
+// A type argument that types the request: it adds no fields to the response.
+interface Query {
+  term: string;
+}
+
+export async function searched() {
+  const found = search<Query>("/api/profiles", { term: "a" });
+  return (await found).total;
+}
+
+// A wrapper that returns its type parameter, whatever it holds.
+export async function viaReturn() {
+  return fetchAs<Counts>("/api/profiles");
+}
+
+// `T` is inside `Envelope`, not the body: the body has no `total` or `count` at its root.
+export async function wrapped() {
+  const body = enveloped<Counts>("/api/profiles");
+  return (await body).data;
+}
+
+// The same removed `nickname` as `cast` reads, with plain member access: `inferred` drift
+// where the cast's is `exact`.
+export async function plain() {
+  const res = await fetch(`${CATALOG}/api/profiles`);
+  const page = await res.json();
+  return page.items[0].nickname;
+}

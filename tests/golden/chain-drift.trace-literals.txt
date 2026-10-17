@@ -1,0 +1,35 @@
+example.com/chain/gateway src/inventory.ts:7 getItem
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:7 item drift: missing discount, error
+chain: inferred · 1 hops · 2 repos · 68 tokens
+
+example.com/chain/gateway src/inventory.ts:17 POST /api/inventory
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:14 save
+chain: inferred · 1 hops · 2 repos · 63 tokens
+
+example.com/chain/catalog app/api/stock/route.ts:7 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:22 stock drift: missing weight
+chain: inferred · 1 hops · 2 repos · 66 tokens
+
+example.com/chain/catalog app/api/stock/route.ts:18 POST
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:28 restock
+chain: inferred · 1 hops · 2 repos · 62 tokens
+
+example.com/chain/catalog app/api/stock/[sku]/route.ts:3 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:34 one drift: missing error
+chain: inferred · 1 hops · 2 repos · 67 tokens
+
+example.com/chain/catalog app/api/cached/route.ts:8 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:41 cached
+chain: inferred · 1 hops · 2 repos · 61 tokens
+
+example.com/chain/gateway src/inventory.ts:22 GET /api/inventory/{}/image
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:47 image
+chain: inferred · 1 hops · 2 repos · 66 tokens
+
+example.com/chain/gateway src/inventory.ts:31 GET /api/inventory/{}/price
+  →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/stock.ts:55 price drift: missing tax
+chain: inferred · 1 hops · 2 repos · 70 tokens
+
+example.com/chain/catalog app/api/reviews/route.ts:2 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/stock.ts:61 reviews drift: missing votes
+chain: inferred · 1 hops · 2 repos · 67 tokens

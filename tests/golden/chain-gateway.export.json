@@ -380,11 +380,36 @@
     },
     {
       "contract": "http::GET::/api/health",
-      "site": "example.com/chain/gateway::src/server.ts::GET /api/health"
+      "site": "example.com/chain/gateway::src/server.ts::GET /api/health",
+      "shape": {
+        "source": {
+          "literals": "src/server.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/orders",
-      "site": "example.com/chain/gateway::src/orders.ts::listOrders"
+      "site": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "shape": {
+        "source": {
+          "literals": "src/orders.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id",
+          "[].product"
+        ],
+        "open": [
+          "[].product"
+        ],
+        "scalars": [
+          "[].id"
+        ]
+      }
     },
     {
       "contract": "http::POST::/api/events",

@@ -18,11 +18,11 @@ use crate::document::{self, Format, Summary};
 use crate::lang::{self, Facts};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
-use crate::shape::Shape;
+use crate::shape::{Shape, Want};
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 15;
+const SCHEMA_VERSION: i64 = 16;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -32,7 +32,9 @@ const SCHEMA_VERSION: i64 = 15;
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach. A RabbitMQ `binding` row
+/// none); they let `Engine::open_items` list the routes it may reach. `contracts.shape` is the
+/// shape the code gives a side (`shape::Shape` as JSON: its source and field paths, spec #23),
+/// such as the fields an HTTP consumer reads from the parsed response; NULL when none. A RabbitMQ `binding` row
 /// keeps the queue's channel in `contract`, the exchange in `via` and the pattern in `method`;
 /// a `publish` row (a publish to a named exchange) has no `contract`, the exchange in `via` and
 /// the routing key in `method`. `documents` holds each provider document (spec #21) with the
@@ -44,8 +46,11 @@ const SCHEMA_VERSION: i64 = 15;
 /// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
 /// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
 /// `package::Tsconfig` (`out_dir`, `root_dir`), or `null` when the file is invalid. An `import`
-/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. `exports` holds what each file exports
-/// (`resolve::Exported`): a `name` with the `file` and `target` definition it names (`target`
+/// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
+/// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
+/// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
+/// `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
+/// `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22).
@@ -66,7 +71,7 @@ CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT
+    method TEXT, fragments TEXT, shape TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -247,6 +252,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             false => Ok(serde_json::to_string(&package::read(src))?),
         },
     )?;
+    // The packages decide which files keep the shapes of what they export (issue #175).
+    let manifest_rows: Vec<(String, String)> = tx
+        .prepare("SELECT path, summary FROM manifests ORDER BY path")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
@@ -294,6 +304,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 found.push((name, src));
             }
         }
+    }
+    // An edited `package.json` or `tsconfig.json` changes which files keep shapes (`surface`),
+    // so it extracts again. Folding them in also forces that on an index of this version written
+    // before the `shape` rows and constant `exports` targets existed (issue #175), which the
+    // schema golden does not cover.
+    for (path, summary) in &manifest_rows {
+        digest.update(format!("{path}\0{summary}\0").as_bytes());
     }
     let digest = digest.finalize().to_hex().to_string();
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
@@ -354,6 +371,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             ))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    // The files an import of one of the repository's packages reaches: only they keep shapes.
+    let surface = {
+        let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+        let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+        let files: Vec<&str> = all.keys().copied().collect();
+        package::surface(&manifests, &tsconfigs, &exported, &files)
+    };
 
     // Contracts, from every file. Values are not kept in the index, so the files whose
     // values a kind reads are parsed again, until no kind misses one.
@@ -372,6 +396,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             let code = Code::new(resolver, &full, lang::pack(pack));
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code));
+            }
+            if !surface.is_empty() {
+                found.extend(package::exported_shapes(&code, &surface));
             }
             misses.extend(code.misses().into_iter().map(String::from));
         }
@@ -436,7 +463,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
 
     tx.execute("DELETE FROM contracts", [])?;
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
-    let mut rows = BTreeSet::new();
+    // One row per side; the shapes of the Founds of one side (a site reached through several
+    // wrapper paths) merge into it.
+    let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -461,7 +490,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         };
         let role = f.role.name();
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
-        rows.insert((
+        let key = (
             role,
             site,
             &f.contract,
@@ -469,12 +498,19 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             path,
             &f.method,
             fragments.transpose()?,
-        ));
+        );
+        let shape = rows.entry(key).or_default();
+        match (shape.as_mut(), &f.shape) {
+            (Some(shape), Some(more)) => shape.merge(more),
+            (None, more) => *shape = more.clone(),
+            (_, None) => {}
+        }
     }
-    for (role, site, contract, via, path, method, fragments) in rows {
+    for ((role, site, contract, via, path, method, fragments), shape) in rows {
+        let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![role, contract, site, via, path, method, fragments],
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![role, contract, site, via, path, method, fragments, shape],
         )?;
     }
     tx.execute("DELETE FROM exports", [])?;
@@ -799,6 +835,10 @@ pub(crate) struct Export {
     /// What each file exports (the `exports` table), sorted, for `package::import`.
     #[serde(skip)]
     pub(crate) exported: Vec<Exported>,
+    /// The shapes kept for what each file exports (`shape` rows, issue #175), for
+    /// `package::shapes`.
+    #[serde(skip)]
+    pub(crate) shapes: Vec<package::ExportedShape>,
     /// The imports resolved into a package of the workspace, by call site, then target.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) imports: Vec<Import>,
@@ -911,7 +951,8 @@ pub(crate) struct Provider {
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) gateway: Option<String>,
-    /// What the route's response or the channel's messages carry, from the first document by path.
+    /// What the route's response or the channel's messages carry: from the first document by
+    /// path that gives one, else from the code (`contracts.shape`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     /// Every path a gateway serves the route at, with the reason for the rewrite: the
@@ -969,7 +1010,8 @@ pub(crate) struct Consumer {
     pub(crate) site: String,
     pub(crate) via: Option<String>,
     /// What the messages a channel handler receives carry, from the first document by path
-    /// that lists the side (`Channel::declare`).
+    /// that lists the side (`Channel::declare`); for an HTTP call, the fields it reads from
+    /// the parsed response (`contracts.shape`, spec #23).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) shape: Option<Shape>,
     #[serde(skip)]
@@ -980,6 +1022,12 @@ pub(crate) struct Consumer {
     /// (`package::import`); `Packages::link` turns them into links.
     #[serde(skip)]
     pub(crate) hops: Vec<Hop>,
+}
+
+/// A `contracts.shape` value; one that does not parse reads as no shape.
+fn stored_shape(json: Option<String>) -> Option<Shape> {
+    // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
+    serde_json::from_str(&json?).ok()
 }
 
 /// The index content of the repository attached as `schema`, every list sorted. Links are
@@ -1039,20 +1087,21 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let providers = db
         .prepare(&format!(
-            "SELECT contract, site FROM {schema}.contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape FROM {schema}.contracts WHERE role = 'provider' \
              ORDER BY contract, site"
         ))?
         .query_map([], |r| {
             Ok(Provider {
                 contract: r.get(0)?,
                 site: r.get(1)?,
+                shape: stored_shape(r.get(2)?),
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(&format!(
-            "SELECT contract, site, via, method, fragments FROM {schema}.contracts \
+            "SELECT contract, site, via, method, fragments, shape FROM {schema}.contracts \
              WHERE role = 'consumer' ORDER BY site, contract, via"
         ))?
         .query_map([], |r| {
@@ -1061,7 +1110,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
-                shape: None,
+                shape: stored_shape(r.get(5)?),
                 method: r.get(3)?,
                 // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
                 fragments: fragments
@@ -1118,20 +1167,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         ))?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
-    for (path, summary) in rows {
-        match package::is_tsconfig(&path) {
-            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
-            true => tsconfigs.extend(
-                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
-                    .map(|tsconfig| Config { path, tsconfig }),
-            ),
-            false => manifests.push(Manifest {
-                path,
-                summary: serde_json::from_str(&summary)?,
-            }),
-        }
-    }
+    let (manifests, tsconfigs) = read_manifests(rows)?;
     // Only a repository with a manifest can import a package, and only one with a named
     // manifest provides one: the rows that resolve imports are read for those alone.
     let import_calls = match manifests.is_empty() {
@@ -1168,6 +1204,33 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })?
             .collect::<rusqlite::Result<_>>()?,
     };
+    let shapes = match manifests.iter().any(|m| m.summary.name.is_some()) {
+        false => Vec::new(),
+        true => db
+            .prepare(&format!(
+                "SELECT path, method, via, shape FROM {schema}.contracts \
+                 WHERE role = 'shape' ORDER BY path, method, via"
+            ))?
+            .query_map([], |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                    r.get(3)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<(String, String, _, _)>>>()?
+            .into_iter()
+            .filter_map(|(path, name, want, shape)| {
+                Some(package::ExportedShape {
+                    path,
+                    name,
+                    want: Want::parse(want.as_deref()?)?,
+                    shape: stored_shape(shape)?,
+                })
+            })
+            .collect(),
+    };
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1183,11 +1246,32 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         dependencies: Vec::new(),
         import_calls,
         exported,
+        shapes,
         imports: Vec::new(),
         links: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
     })
+}
+
+/// The `manifests` rows, `(path, summary)`, as the `package.json` and `tsconfig.json` files they
+/// hold.
+fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Config>)> {
+    let (mut manifests, mut tsconfigs) = (Vec::new(), Vec::new());
+    for (path, summary) in rows {
+        match package::is_tsconfig(&path) {
+            // An invalid `tsconfig.json` is stored as `null` and counts as absent.
+            true => tsconfigs.extend(
+                serde_json::from_str::<Option<package::Tsconfig>>(&summary)?
+                    .map(|tsconfig| Config { path, tsconfig }),
+            ),
+            false => manifests.push(Manifest {
+                path,
+                summary: serde_json::from_str(&summary)?,
+            }),
+        }
+    }
+    Ok((manifests, tsconfigs))
 }
 
 fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {

@@ -1,0 +1,3807 @@
+{
+  "repository": "example.com/chain/web",
+  "files": [
+    {
+      "path": "src/api/body.ts",
+      "hash": "1c1654807580e3a4de4188878f548a7d811444dec2d5fc4efbf1edcfb6579efc"
+    },
+    {
+      "path": "src/api/client.ts",
+      "hash": "59ac1e664f20160e491431efbc9923888aebb2744958e6704b0f67c6ba868562"
+    },
+    {
+      "path": "src/api/paths.ts",
+      "hash": "ffe7b3727c3a2fab80116e797ea91a965066d888dca72118b139324bc8fd0449"
+    },
+    {
+      "path": "src/api/typed.ts",
+      "hash": "c707f05c5684ca98d11b6b1149a467710fb8085d6a8028007e242dcdf8b185ae"
+    },
+    {
+      "path": "src/api/types.ts",
+      "hash": "7d1634392281fc28dbde5c380e4d469fb5fd890e8599f0cea50b25c830ecf9b9"
+    },
+    {
+      "path": "src/batches.ts",
+      "hash": "dbb17762eb8fde12b610a04540ca8f40d563a86f2c3758c603ea2c127f8626b4"
+    },
+    {
+      "path": "src/comments.ts",
+      "hash": "a87236f180671906c9225e8028bd4a3541633b03930f7856a8b404835b8b9506"
+    },
+    {
+      "path": "src/dashboard.ts",
+      "hash": "74f647de1ae0c993b4dcd83051b9d7c95034032101df53d1a017c4765287400f"
+    },
+    {
+      "path": "src/declared.ts",
+      "hash": "ddc817915f24780b310a45de8d4e45533c5b6bf5df00c44bfef34264b7848995"
+    },
+    {
+      "path": "src/drift.ts",
+      "hash": "082f1cb20bac614e56a893e19874fee607ee1d1603500809406c7f9da3a1abb4"
+    },
+    {
+      "path": "src/labels.ts",
+      "hash": "7845adace481ad3a72feb4318a9bb126f2cc5fa6730a3214634f8fd515a8033f"
+    },
+    {
+      "path": "src/open.ts",
+      "hash": "f7358354d72fa7b80dd72033645e839b912044d8edd959c0874b20d3d9f3c4b4"
+    },
+    {
+      "path": "src/orders.ts",
+      "hash": "10cae4a1d0e91138874c148de586a3eac0bd91d1a584bf29b1d725619ac0fa93"
+    },
+    {
+      "path": "src/shared.ts",
+      "hash": "a2fb264936aa27ed7776651b3895b5959bffda636686fad6ddb6d0a329b205d6"
+    },
+    {
+      "path": "src/shipments.ts",
+      "hash": "1f462c453a41a02c3730287a7418c13cd96e6829d94eff553e7b55d413164432"
+    },
+    {
+      "path": "src/status.ts",
+      "hash": "d61eae8aa32a8e362600e4a936827570905950aa0e42340010ebfe6aa64c6d75"
+    },
+    {
+      "path": "src/stock.ts",
+      "hash": "5c60038ed1fdb24094c23954e6849ec2bb8c8fb79783279e380f514cf6315cbe"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get",
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 137,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 127,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 923,
+        "end": 1056
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::fetchAs",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 663,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 125,
+        "end": 259
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::search",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 407,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2157,
+        "end": 2400
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 592,
+        "end": 897
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 203,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 997,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1381,
+        "end": 1609
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1766,
+        "end": 2065
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed.inner",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2001,
+        "end": 2027
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 198,
+        "end": 395
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 404,
+        "end": 594
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 634,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 221,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 102,
+        "end": 212
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 637,
+        "end": 753
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::counts",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 895,
+        "end": 965
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1687,
+        "end": 1889
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1411,
+        "end": 1562
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::plain",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2795,
+        "end": 2941
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1134,
+        "end": 1271
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::searched",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2187,
+        "end": 2309
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1950,
+        "end": 2063
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::viaReturn",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2383,
+        "end": 2456
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::wrapped",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2556,
+        "end": 2663
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::both",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2111,
+        "end": 2263
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::customerEmail",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 880,
+        "end": 992
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 372,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::idLength",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1330,
+        "end": 1432
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1617,
+        "end": 1836
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 154,
+        "end": 295
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::page",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1845,
+        "end": 1957
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::pair",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2272,
+        "end": 2370
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 614,
+        "end": 790
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::rebound",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1079,
+        "end": 1235
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels",
+      "span": {
+        "path": "src/labels.ts",
+        "start": 164,
+        "end": 347
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping",
+      "span": {
+        "path": "src/open.ts",
+        "start": 492,
+        "end": 623
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate",
+      "span": {
+        "path": "src/open.ts",
+        "start": 181,
+        "end": 334
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 247,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 344,
+        "end": 429
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 182,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::annotated",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1419,
+        "end": 1554
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::argument",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1642,
+        "end": 1715
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1796,
+        "end": 1944
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::offer",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2216,
+        "end": 2354
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::quote",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 332,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::receipt",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 791,
+        "end": 913
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelf",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 552,
+        "end": 716
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelves",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 981,
+        "end": 1125
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::status",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1197,
+        "end": 1335
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::tags",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2456,
+        "end": 2604
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::ticket",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2005,
+        "end": 2141
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 507,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 684,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::publicShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 310,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 858,
+        "end": 953
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::shipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 129,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1028,
+        "end": 1131
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::health",
+      "span": {
+        "path": "src/status.ts",
+        "start": 90,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::track",
+      "span": {
+        "path": "src/status.ts",
+        "start": 201,
+        "end": 290
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::cached",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1569,
+        "end": 1730
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::image",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1739,
+        "end": 1909
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::item",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 282,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::one",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1325,
+        "end": 1486
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::price",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2024,
+        "end": 2196
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::restock",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1109,
+        "end": 1246
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2205,
+        "end": 2354
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::save",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 610,
+        "end": 769
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::stock",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 908,
+        "end": 1100
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::Error#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 244,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::fetch#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 192,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/body.ts::get::res.json#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 284,
+        "end": 294
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::request::fetch#0",
+      "caller": "example.com/chain/web::src/api/client.ts::request",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 185,
+        "end": 220
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::enveloped::fetch#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 1009,
+        "end": 1032
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::enveloped::res.json#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 1043,
+        "end": 1053
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::fetchAs::fetch#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::fetchAs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 737,
+        "end": 760
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::fetchAs::res.json#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::fetchAs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 771,
+        "end": 781
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson::fetch#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::getJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 199,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson::res.json#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::getJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 240,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::search::JSON.stringify#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::search",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 522,
+        "end": 543
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::search::fetch#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::search",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 496,
+        "end": 546
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::search::res.json#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::search",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 557,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2203,
+        "end": 2234
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::items.forEach#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2337,
+        "end": 2356
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2367,
+        "end": 2397
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2268,
+        "end": 2278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2308,
+        "end": 2319
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#1",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2323,
+        "end": 2333
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::show#2",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2389,
+        "end": 2396
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 635,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::out.push#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 758,
+        "end": 788
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::out.push#1",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 855,
+        "end": 876
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::ids::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 689,
+        "end": 699
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::pageOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 249,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::pageOf::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::pageOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 343,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::(call_expression).concat#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1228,
+        "end": 1274
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.filter#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1128,
+        "end": 1164
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.forEach#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1168,
+        "end": 1217
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::body.items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1228,
+        "end": 1261
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1047,
+        "end": 1078
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1101,
+        "end": 1111
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1206,
+        "end": 1216
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1428,
+        "end": 1459
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1518,
+        "end": 1547
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::rebound::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1487,
+        "end": 1497
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1814,
+        "end": 1845
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::inner#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": "example.com/chain/web::src/batches.ts::shadowed.inner",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2041,
+        "end": 2049
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::items.map#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1967,
+        "end": 2062
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::other#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1924,
+        "end": 1931
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::res.json#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1873,
+        "end": 1883
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::show#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1937,
+        "end": 1952
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::comments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 246,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::comments::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::comments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 301,
+        "end": 311
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::submit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 450,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::submit::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::submit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 526,
+        "end": 536
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "caller": "example.com/chain/web::src/comments.ts::summary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 681,
+        "end": 721
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary::res.json#0",
+      "caller": "example.com/chain/web::src/comments.ts::summary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/comments.ts",
+        "start": 744,
+        "end": 754
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::cancel",
+      "target": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 260,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::health#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/status.ts::health",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 139,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::listOrders#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/orders.ts::listOrders",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 197,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/dashboard.ts::dashboard::track#0",
+      "caller": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "target": "example.com/chain/web::src/status.ts::track",
+      "level": "exact",
+      "span": {
+        "path": "src/dashboard.ts",
+        "start": 157,
+        "end": 186
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 681,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 731,
+        "end": 741
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "caller": "example.com/chain/web::src/declared.ts::counts",
+      "target": "example.com/chain/web::src/api/typed.ts::getJson",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 930,
+        "end": 962
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1734,
+        "end": 1766
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1792,
+        "end": 1802
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::res.json#1",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1839,
+        "end": 1849
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1456,
+        "end": 1488
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1534,
+        "end": 1544
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::plain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2840,
+        "end": 2872
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::plain::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::plain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2895,
+        "end": 2905
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1180,
+        "end": 1212
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1243,
+        "end": 1253
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "caller": "example.com/chain/web::src/declared.ts::searched",
+      "target": "example.com/chain/web::src/api/typed.ts::search",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2231,
+        "end": 2276
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1999,
+        "end": 2031
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::res.json#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2042,
+        "end": 2060
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "caller": "example.com/chain/web::src/declared.ts::viaReturn",
+      "target": "example.com/chain/web::src/api/typed.ts::fetchAs",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2421,
+        "end": 2453
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "caller": "example.com/chain/web::src/declared.ts::wrapped",
+      "target": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2598,
+        "end": 2632
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.number#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1369,
+        "end": 1379
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.number#1",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1388,
+        "end": 1398
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::z.object#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1351,
+        "end": 1401
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::both::console.log#0",
+      "caller": "example.com/chain/web::src/drift.ts::both",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2216,
+        "end": 2244
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::both::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::both",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2169,
+        "end": 2178
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::both::get#1",
+      "caller": "example.com/chain/web::src/drift.ts::both",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2203,
+        "end": 2212
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::customerEmail",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 936,
+        "end": 954
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::(subscript_expression).id.toUpperCase#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 497,
+        "end": 524
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 424,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 476,
+        "end": 486
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::idLength::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::idLength",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1381,
+        "end": 1399
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::console.log#0",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1772,
+        "end": 1811
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1694,
+        "end": 1719
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::fetch#1",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1741,
+        "end": 1768
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::list.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1822,
+        "end": 1833
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::one.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1791,
+        "end": 1801
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::orderTotal",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 204,
+        "end": 231
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::orderTotal",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 256,
+        "end": 266
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::page::load#0",
+      "caller": "example.com/chain/web::src/drift.ts::page",
+      "target": "example.com/chain/web::src/drift.ts::load",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1892,
+        "end": 1931
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::pair::both#0",
+      "caller": "example.com/chain/web::src/drift.ts::pair",
+      "target": "example.com/chain/web::src/drift.ts::both",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 2319,
+        "end": 2338
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "caller": "example.com/chain/web::src/drift.ts::productName",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 665,
+        "end": 692
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::productName::res.json#0",
+      "caller": "example.com/chain/web::src/drift.ts::productName",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/drift.ts",
+        "start": 712,
+        "end": 722
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "caller": "example.com/chain/web::src/drift.ts::rebound",
+      "target": "example.com/chain/web::src/api/body.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1129,
+        "end": 1147
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "caller": "example.com/chain/web::src/labels.ts::labels",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/labels.ts",
+        "start": 210,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels::res.json#0",
+      "caller": "example.com/chain/web::src/labels.ts::labels",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/labels.ts",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "caller": "example.com/chain/web::src/open.ts::ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 536,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::ping::res.json#0",
+      "caller": "example.com/chain/web::src/open.ts::ping",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 577,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate::fetch#0",
+      "caller": "example.com/chain/web::src/open.ts::rate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 247,
+        "end": 263
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/open.ts::rate::res.json#0",
+      "caller": "example.com/chain/web::src/open.ts::rate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/open.ts",
+        "start": 286,
+        "end": 296
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 291,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::createOrder",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 388,
+        "end": 426
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "caller": "example.com/chain/web::src/orders.ts::listOrders",
+      "target": "example.com/chain/web::src/api/client.ts::request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 215,
+        "end": 235
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::annotated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1468,
+        "end": 1500
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::annotated::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::annotated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1529,
+        "end": 1539
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::argument::getJson#0",
+      "caller": "example.com/chain/web::src/shared.ts::argument",
+      "target": "example.com/chain/web::src/api/typed.ts::getJson",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1679,
+        "end": 1712
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::inferred",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1844,
+        "end": 1876
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::inferred",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1919,
+        "end": 1929
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::offer::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::offer",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2261,
+        "end": 2291
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::offer::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::offer",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2311,
+        "end": 2321
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::quote::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::quote",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 377,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::quote::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::quote",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 427,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::receipt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 838,
+        "end": 870
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::receipt::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::receipt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 888,
+        "end": 898
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelf::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 607,
+        "end": 644
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelf::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 664,
+        "end": 674
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelves::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelves",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1028,
+        "end": 1059
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelves::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelves",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1081,
+        "end": 1091
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::status::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::status",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1243,
+        "end": 1275
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::status::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::status",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1296,
+        "end": 1306
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::tags::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::tags",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2500,
+        "end": 2528
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::tags::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::tags",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2548,
+        "end": 2558
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
+      "caller": "example.com/chain/web::src/shared.ts::ticket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2051,
+        "end": 2082
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::ticket::res.json#0",
+      "caller": "example.com/chain/web::src/shared.ts::ticket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2102,
+        "end": 2112
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 552,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::euShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 727,
+        "end": 781
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::publicShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 357,
+        "end": 413
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 907,
+        "end": 950
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::shipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 170,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "caller": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 1074,
+        "end": 1128
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "caller": "example.com/chain/web::src/status.ts::health",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/status.ts",
+        "start": 119,
+        "end": 139
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "caller": "example.com/chain/web::src/status.ts::track",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/status.ts",
+        "start": 251,
+        "end": 287
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::cached::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::cached",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1615,
+        "end": 1645
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::cached::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::cached",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1668,
+        "end": 1678
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::image::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::image",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1795,
+        "end": 1841
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::image::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::image",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1864,
+        "end": 1874
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::item::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 337,
+        "end": 377
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::item::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 401,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::one::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::one",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1379,
+        "end": 1415
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::one::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::one",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1438,
+        "end": 1448
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2080,
+        "end": 2126
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::price::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::price",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2149,
+        "end": 2159
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::restock::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1156,
+        "end": 1205
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::restock::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1223,
+        "end": 1233
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::reviews",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2252,
+        "end": 2283
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::reviews::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::reviews",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2306,
+        "end": 2316
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::save::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::save",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 654,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::save::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::save",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 731,
+        "end": 741
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::stock::fetch#0",
+      "caller": "example.com/chain/web::src/stock.ts::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 953,
+        "end": 982
+      }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::stock::res.json#0",
+      "caller": "example.com/chain/web::src/stock.ts::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1005,
+        "end": 1015
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::package.json::dependencies::@chain/contracts",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "page"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].owner",
+          "items[].owner.email",
+          "items[].owner.name",
+          "items[].weight"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items.length",
+          "page",
+          "page.number",
+          "page.size"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].note",
+          "items[].qty",
+          "items[].sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/batches.ts"
+        },
+        "fields": [
+          "items",
+          "items[]"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments",
+      "site": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id",
+          "[].meta",
+          "[].meta.stars",
+          "[].rating",
+          "[].title",
+          "[].title.length"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/comments",
+      "site": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "author",
+          "author.name",
+          "id",
+          "rating"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments/summary",
+      "site": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/comments.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::DELETE::/api/orders/{}",
+      "site": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "cursor",
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].address.zip",
+          "items[].id",
+          "items[].name",
+          "items[].nickname",
+          "items[].phone",
+          "total"
+        ],
+        "declared": [
+          "cursor",
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].address.zip",
+          "items[].id",
+          "items[].name",
+          "items[].nickname",
+          "items[].phone",
+          "total"
+        ],
+        "optional": [
+          "cursor",
+          "items[].phone"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "via": "env:CATALOG_URL"
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "pages",
+          "total"
+        ],
+        "declared": [
+          "pages",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].nickname"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].rank",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].rank",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "count",
+          "total"
+        ],
+        "declared": [
+          "count",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/declared.ts"
+        },
+        "fields": [
+          "data"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].customer",
+          "[].customer.email"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::idLength::get#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id",
+          "[].id.length"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::page::load#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/shipments/1",
+      "site": "example.com/chain/web::src/drift.ts::page::load#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "carrier"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::pair::both#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].customer",
+          "[].total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/drift.ts"
+        },
+        "fields": [
+          "[]",
+          "[].product",
+          "[].product.name"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/labels",
+      "site": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/labels.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.other",
+          "labels.title",
+          "ok",
+          "status"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/ping",
+      "site": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "via": null,
+      "shape": {
+        "source": {
+          "reads": "src/open.ts"
+        },
+        "fields": [
+          "ok",
+          "uptime"
+        ]
+      }
+    },
+    {
+      "contract": null,
+      "site": "example.com/chain/web::src/open.ts::rate::fetch#0",
+      "via": null,
+      "shape": {
+        "source": {
+          "reads": "src/open.ts"
+        },
+        "fields": [
+          "stars",
+          "votes"
+        ]
+      }
+    },
+    {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/orders",
+      "site": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "id",
+          "paidAt",
+          "total"
+        ],
+        "declared": [
+          "id",
+          "paidAt",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/web::src/shared.ts::argument::getJson#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "id",
+          "paidAt",
+          "total"
+        ],
+        "declared": [
+          "id",
+          "paidAt",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "declared": [
+          "price",
+          "sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/offers",
+      "site": "example.com/chain/web::src/shared.ts::offer::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "discount",
+          "sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/quotes",
+      "site": "example.com/chain/web::src/shared.ts::quote::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "discount",
+          "price",
+          "sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "id",
+          "paidAt",
+          "total"
+        ],
+        "declared": [
+          "id",
+          "paidAt",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/shelves/{}",
+      "site": "example.com/chain/web::src/shared.ts::shelf::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "aisle",
+          "id",
+          "warehouse"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/shelves",
+      "site": "example.com/chain/web::src/shared.ts::shelves::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "count",
+          "max"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/web::src/shared.ts::status::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "id"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tags",
+      "site": "example.com/chain/web::src/shared.ts::tags::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.size",
+          "name",
+          "title"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tickets",
+      "site": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/shared.ts"
+        },
+        "fields": [
+          "row",
+          "seat"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "via": "host:eu.example.com"
+    },
+    {
+      "contract": "http::GET::/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "via": "host:gateway.example.com"
+    },
+    {
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "via": "env:GATEWAY_URL"
+    },
+    {
+      "contract": "http::GET::/v9/api/shipments/{}",
+      "site": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+      "via": "host:qa.example.com"
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/cached",
+      "site": "example.com/chain/web::src/stock.ts::cached::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "cached",
+          "nothing",
+          "user"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/inventory/{}/image",
+      "site": "example.com/chain/web::src/stock.ts::image::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "size",
+          "url"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/inventory/{}",
+      "site": "example.com/chain/web::src/stock.ts::item::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "discount",
+          "error",
+          "price",
+          "price.currency",
+          "sku",
+          "sku.length",
+          "warehouse"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock/{}",
+      "site": "example.com/chain/web::src/stock.ts::one::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "count",
+          "error"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/inventory/{}/price",
+      "site": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "amount",
+          "tax"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/stock",
+      "site": "example.com/chain/web::src/stock.ts::restock::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "whatever"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/reviews",
+      "site": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "stars",
+          "votes"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/inventory",
+      "site": "example.com/chain/web::src/stock.ts::save::fetch#0",
+      "via": "env:GATEWAY_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "anything"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/chain/web::src/stock.ts::stock::fetch#0",
+      "via": "env:CATALOG_URL",
+      "shape": {
+        "source": {
+          "reads": "src/stock.ts"
+        },
+        "fields": [
+          "history",
+          "history[]",
+          "history[].at",
+          "name",
+          "name.length",
+          "tags",
+          "tags[]",
+          "tags[].label",
+          "weight"
+        ]
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@chain/contracts",
+      "range": "^1.0.0"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/chain/web::package.json::dependencies::@chain/contracts",
+      "provider": "example.com/chain/catalog::packages/contracts/package.json",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].owner.email": "inferred",
+          "items[].weight": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "page.size": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].note": "inferred",
+          "items[].sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "contract": "http::GET::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "[].rating": "inferred"
+        },
+        "unchecked": {
+          "[].meta.stars": "[].meta"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "contract": "http::POST::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "rating": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "contract": "http::GET::/api/comments/summary",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "total": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "contract": "http::DELETE::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].address.zip": "exact",
+          "items[].nickname": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "pages": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].nickname": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact",
+          "items[].rank": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "data": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::customerEmail::get#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "[].customer": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::idLength::get#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "[].total": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::page::load#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::pair::both#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "[].customer": "inferred",
+          "[].total": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::productName::fetch#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "[].product.name": "[].product"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/drift.ts::rebound::get#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "contract": "http::GET::/api/labels",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "status": "inferred"
+        },
+        "unchecked": {
+          "labels.other": "labels",
+          "labels.title": "labels"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "contract": "http::PUT::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/orders.ts::listOrders::request#0",
+      "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "contract": "http::GET::/api/orders",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "price": "inferred",
+          "sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::offer::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "contract": "http::GET::/api/offers",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "discount": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::quote::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "contract": "http::GET::/api/quotes",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "discount": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::shelf::fetch#0",
+      "provider": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "contract": "http::GET::/api/shelves/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "aisle": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::shelves::fetch#0",
+      "provider": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "contract": "http::GET::/api/shelves",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "count": "",
+          "max": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::tags::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "contract": "http::GET::/api/tags",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "title": "inferred"
+        },
+        "unchecked": {
+          "labels.size": "labels"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "contract": "http::GET::/api/tickets",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "row": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::edgeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/gw/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /gw"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::euShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/v3/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /v3"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::publicShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/api/shipments/{}",
+      "level": "exact",
+      "reason": "host gateway.example.com is served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::relativeShipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/relative/base/api/shipments/{}",
+      "level": "inferred",
+      "reason": "gateway prefix /relative/base"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
+      "provider": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+      "contract": "http::GET::/api/shipments/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/gateway::src/server.ts::GET /api/health",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::cached::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "contract": "http::GET::/api/cached",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "unchecked": {
+          "cached": "",
+          "nothing": "",
+          "user": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::image::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+      "contract": "http::GET::/api/inventory/{}/image",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "size": "",
+          "url": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::item::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::getItem",
+      "contract": "http::GET::/api/inventory/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "discount": "inferred",
+          "error": "inferred"
+        },
+        "unchecked": {
+          "sku.length": "sku"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::one::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/stock/{}",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "error": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::price::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "contract": "http::GET::/api/inventory/{}/price",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "missing": {
+          "tax": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::restock::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "contract": "http::POST::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "unchecked": {
+          "whatever": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "contract": "http::GET::/api/reviews",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "votes": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::save::fetch#0",
+      "provider": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
+      "contract": "http::POST::/api/inventory",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway",
+      "drift": {
+        "unchecked": {
+          "anything": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::stock::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "weight": "inferred"
+        },
+        "unchecked": {
+          "history[]": "history"
+        }
+      }
+    }
+  ]
+}

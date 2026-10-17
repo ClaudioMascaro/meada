@@ -100,12 +100,23 @@ _Avoid_: virtual route, phantom side
 **Shape**:
 What a contract carries in its payload, recorded as a set of field paths: dotted, with array
 elements written `[]` (`items[].id`), and `[]` first for a payload that is itself an array
-(`[].id`). Only presence is recorded, never types. A part of a shape can be **open**, meaning
+(`[].id`). What is recorded is presence, the fields known to be scalars and, for a consumer,
+the fields its type marks optional; types are never compared. A part of a shape can be **open**, meaning
 Meada cannot list its fields, such as an object that allows any extra property or a schema
 behind an external reference; anything below an open part may be present. A shape names its
 source, such as the provider document it was read from, and has one form whatever that source
 is.
 _Avoid_: schema, payload type, body
+
+**Drift**:
+A field path in a consumer's shape that the shape of the provider it links to does not contain:
+a field the consumer reads that the provider no longer returns. Paths are compared from the
+root; one that reaches an open part of the provider's shape is not checked and never drift.
+Each drifting path carries its own level, `exact` when the provider's shape and the consumer's
+path are both declared (a document, a schema, a type) and `inferred` when either comes from
+what code does (field reads, returned literals), while the link keeps its level. `trace`,
+`context`, `search` and `meada status` show it.
+_Avoid_: breaking change, mismatch, schema diff
 
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content
