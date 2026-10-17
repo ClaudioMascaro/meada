@@ -15,6 +15,8 @@ pub mod engine;
 mod entry;
 mod http;
 mod index;
+#[doc(hidden)]
+pub use index::with_reversed_walk;
 mod items;
 mod lang;
 mod literals;

@@ -748,7 +748,24 @@ fn stat(abs: &Path, now: SystemTime) -> Result<(i64, Option<i64>, bool)> {
     Ok((stat.len() as i64, mtime, modified + RACY < now))
 }
 
-/// Every file under `root` but what `.gitignore` excludes, sorted.
+thread_local! {
+    static REVERSED_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` with every file walk on this thread handing its files over in reverse path order
+/// (determinism test, spec #31). Indexing runs on one thread, so there is no worker count to
+/// change; what must not depend on the order is everything after the walk. Test-only: no
+/// command, option or setting reaches it.
+#[doc(hidden)]
+pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
+    REVERSED_WALK.set(true);
+    let out = f();
+    REVERSED_WALK.set(false);
+    out
+}
+
+/// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
+/// [`with_reversed_walk`]).
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
@@ -760,6 +777,9 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
         .filter_map(|entry| Some((relative(root, entry.path())?, entry.into_path())))
         .collect();
     files.sort();
+    if REVERSED_WALK.get() {
+        files.reverse();
+    }
     files
 }
 

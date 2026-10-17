@@ -691,3 +691,24 @@ fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
         assert_eq!(*refreshed, cold, "repository {n}");
     }
 }
+
+/// Every repository of the chain, the worker included, exported by one engine each.
+fn export_chain(web: &Path) -> Vec<String> {
+    let gateway = web.with_file_name("chain-gateway");
+    let catalog = web.with_file_name("chain-catalog");
+    [web.to_path_buf(), gateway, catalog, worker(web)]
+        .iter()
+        .map(|r| Engine::open(r).unwrap().export().unwrap())
+        .collect()
+}
+
+#[test]
+fn the_export_does_not_depend_on_the_order_files_are_found() {
+    let (web, _, _) = chain("fresh_order");
+    let normal = export_chain(&web);
+
+    let (web, _, _) = chain("fresh_order_reversed");
+    let reversed = meada::with_reversed_walk(|| export_chain(&web));
+
+    assert_eq!(reversed, normal);
+}
