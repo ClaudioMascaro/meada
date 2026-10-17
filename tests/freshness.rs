@@ -616,3 +616,78 @@ fn edited_documents_relink_like_a_cold_chain() {
         assert_eq!(refreshed, exports([&cold, &cold_web]), "{case}");
     }
 }
+
+/// Edits that change calls, so the partition and the entry points of every repository move
+/// (spec #31): the web's dashboard now calls `createOrder` (no longer an entry point), a new
+/// file adds an entry point that reaches two communities, and `status.ts` is deleted; the
+/// gateway loses the file of one route handler; the catalog's route stops calling into its cycle.
+fn edit_calls((web, gateway, catalog): &Chain) {
+    let replace = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    replace(
+        web.join("src/dashboard.ts"),
+        "return cancelOrder(id);",
+        "createOrder(id);\n  return cancelOrder(id);",
+    );
+    replace(
+        web.join("src/dashboard.ts"),
+        "import { cancelOrder, listOrders }",
+        "import { cancelOrder, createOrder, listOrders }",
+    );
+    fs::write(
+        web.join("src/audit.ts"),
+        "import { cancelOrder } from \"./orders\";\nimport { health } from \"./status\";\n\n\
+         export function audit(id: string) {\n  health();\n  return cancelOrder(id);\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(web.join("src/status.ts")).unwrap();
+    fs::remove_file(gateway.join("src/checkout.ts")).unwrap();
+    replace(
+        catalog.join("app/api/products/[id]/route.ts"),
+        "load(params.id, 2)",
+        "params.id",
+    );
+}
+
+/// The `communities` and `processes` of an export.
+fn views(export: &str) -> (serde_json::Value, serde_json::Value) {
+    let export: serde_json::Value = serde_json::from_str(export).unwrap();
+    (export["communities"].clone(), export["processes"].clone())
+}
+
+#[test]
+fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
+    let exports = |(web, gateway, catalog): &Chain| -> Vec<String> {
+        [web, gateway, catalog]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = chain("fresh_calls");
+    [&repos.0, &repos.1, &repos.2].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_calls(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = chain("fresh_calls_cold");
+    edit_calls(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        let (communities, processes) = views(refreshed);
+        let (was_communities, was_processes) = views(before);
+        assert_ne!(
+            communities, was_communities,
+            "communities of repository {n}"
+        );
+        assert_ne!(processes, was_processes, "processes of repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
