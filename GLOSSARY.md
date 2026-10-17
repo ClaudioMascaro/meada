@@ -192,9 +192,11 @@ _Avoid_: step, jump
 
 **Entry point**:
 A door into a repository: each route an HTTP handler serves (kind `route`, the handler a
-function or a file), each channel a consumer handler consumes (kind `channel`) and each exported function or method that nothing in its repository calls,
-directly or through a package import of the same repository, an ambiguous candidate counting as
-a caller and a self-call not (kind `export`). It has an identity (the handler's identity plus, for a route or a channel, the
+function or a file), each channel a consumer handler consumes (kind `channel`), each program
+start a language pack declares (kind `program`, a door even when called) and each exported
+function or method that nothing in its repository calls, directly or through a package import
+of the same repository, an ambiguous candidate counting as a caller and a self-call not (kind
+`export`). It has an identity (the handler's identity plus, for a route or a channel, the
 contract), a kind and a label (`GET /users/{}`, or the qualified name). No score or threshold
 picks entry points: every one has its process.
 _Avoid_: root, entrypoint, main
