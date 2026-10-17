@@ -22,6 +22,8 @@ pub enum EntryKind {
     Route,
     /// An exported function or method nothing in its repository calls.
     Export,
+    /// A program's start, as its language pack declares it (`Facts::programs`).
+    Program,
 }
 
 impl EntryKind {
@@ -30,11 +32,12 @@ impl EntryKind {
         match self {
             EntryKind::Route => "route",
             EntryKind::Export => "export",
+            EntryKind::Program => "program",
         }
     }
 
     pub fn parse(name: &str) -> Option<Self> {
-        [EntryKind::Route, EntryKind::Export]
+        [EntryKind::Route, EntryKind::Export, EntryKind::Program]
             .into_iter()
             .find(|k| k.name() == name)
     }
@@ -62,17 +65,44 @@ pub struct Local<'a> {
     pub exported: &'a [Exported],
     /// `(site, contract)` of each provider the code gives.
     pub providers: &'a [(String, String)],
+    /// `(file, definition name)` of each program entry point the language packs declare. A name
+    /// with no symbol is dropped silently: each pack's conformance golden catches a wrong one.
+    pub programs: &'a [(String, String)],
 }
 
 /// The entry points of a repository, sorted by identity.
 pub fn find(local: &Local) -> Vec<EntryPoint> {
     let routes = routes(local);
-    let served: HashSet<&str> = routes.iter().map(|e| e.site.as_str()).collect();
-    let mut found = routes.clone();
-    found.extend(exports(local, &served));
+    // A program entry point comes first: dedup keeps it over an export of the same symbol.
+    let mut found = programs(local);
+    found.extend(routes);
+    let served: HashSet<&str> = found.iter().map(|e| e.site.as_str()).collect();
+    let exports = exports(local, &served);
+    found.extend(exports);
     found.sort_by(|a, b| a.identity.cmp(&b.identity));
     // The same handler can be registered twice on one full path.
     found.dedup_by(|a, b| a.identity == b.identity);
+    found
+}
+
+/// One entry point per program entry point a pack declares, whether or not anything calls it.
+fn programs(local: &Local) -> Vec<EntryPoint> {
+    let mut found = Vec::new();
+    for (file, def) in local.programs {
+        let Some(name) = local.names.def(file, def) else {
+            continue;
+        };
+        let id = format!("{}::{file}::{name}", local.identity);
+        if !local.symbols.contains(&id) {
+            continue;
+        }
+        found.push(EntryPoint {
+            identity: id.clone(),
+            kind: EntryKind::Program,
+            label: name,
+            site: id,
+        });
+    }
     found
 }
 
@@ -142,4 +172,80 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         });
     }
     found
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The `(label, kind)` of the entry points of a file with the symbols `main`, `run`
+    /// (exported) and `__main__`.
+    fn found(programs: &[&str], called: &[&str]) -> Vec<(String, &'static str)> {
+        let id = |n: &str| format!("r::cmd.py::{n}");
+        let symbols: HashSet<String> = ["main", "run", "__main__"].map(id).into();
+        let called: HashSet<String> = called.iter().map(|n| id(n)).collect();
+        let programs: Vec<(String, String)> = (programs.iter())
+            .map(|d| ("cmd.py".to_string(), d.to_string()))
+            .collect();
+        let exported = [Exported {
+            path: "cmd.py".into(),
+            name: Some("run".into()),
+            file: Some("cmd.py".into()),
+            target: Some("run".into()),
+        }];
+        let mut facts = Facts::default();
+        for name in ["main", "run", "__main__"] {
+            facts.defs.push(crate::lang::Def {
+                name: name.into(),
+                kind: Kind::Function,
+                range: 0..0,
+                params: Vec::new(),
+                returns: None,
+                type_params: Vec::new(),
+            });
+        }
+        let files = BTreeMap::from([("cmd.py", &facts)]);
+        let local = Local {
+            identity: "r",
+            files: &files,
+            names: &Names::new(&[]),
+            symbols: &symbols,
+            called: &called,
+            exported: &exported,
+            providers: &[],
+            programs: &programs,
+        };
+        (find(&local).into_iter())
+            .map(|e| (e.label, e.kind.name()))
+            .collect()
+    }
+
+    #[test]
+    fn a_declared_program_entry_is_a_door_even_when_called() {
+        let got = found(&["main", "__main__"], &["main"]);
+        let program = |l: &str| (l.to_string(), "program");
+        assert_eq!(
+            got,
+            [
+                program("__main__"),
+                program("main"),
+                ("run".into(), "export")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_program_that_is_also_an_export_is_one_program_entry() {
+        assert_eq!(found(&["run"], &[]), [("run".into(), "program")]);
+    }
+
+    #[test]
+    fn a_declared_name_without_a_symbol_is_no_entry() {
+        assert_eq!(found(&["gone"], &[]), [("run".into(), "export")]);
+    }
+
+    #[test]
+    fn no_declared_program_adds_nothing() {
+        assert_eq!(found(&[], &[]), [("run".into(), "export")]);
+    }
 }

@@ -60,7 +60,9 @@ one for the area a change touches.
   identity, then the contract identifier; an inline handler keeps its synthetic symbol, as in
   `example.com/chain/gateway::src/server.ts::GET /api/health::http::GET::/api/health`); an export
   is the exported function or method's own symbol identity. Its label is `<METHOD> <path>` for a
-  route and the qualified name for an export. A process is addressed as `process::<entry point
+  route and the qualified name for an export or a program entry point (kind `program`, the
+  symbol's own identity too, declared by the language pack and a door even when called; it wins
+  over an export of the same symbol). A process is addressed as `process::<entry point
   identity>` and named by the label. A route whose handler is a file with no function of its own
   (`export const GET = withAuth(...)`) is a route entry point at the file's identity
   (`<repository>::<path>`), its process starting from the file's top-level calls; a side only
@@ -255,7 +257,20 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
-  A pack is done when that suite passes.
+  A pack is done when that suite passes. A pack that has program entry points fills
+  `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
+  `Def::name` of each definition that starts a program; each becomes an entry point of kind
+  `program`, labelled by its qualified name, and the conformance test lists them. Where the
+  entry point is top-level code, `parse` yields a definition for that code (the calls it makes
+  belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
+  golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
+  which names a function of another file) needs a repository-level step that the pack adds in
+  its own ticket, feeding `entry::Local::programs` with `(file, def)` pairs. The forms per language are spec #31 "Program entry points per language
+  pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
+  target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
+  top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
+  an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
+  `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
