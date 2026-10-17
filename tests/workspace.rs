@@ -3,7 +3,7 @@ mod common;
 use std::fs;
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{self, Engine};
 
 /// The two-repository fixture as siblings in one case directory: `http-web` consumes from
@@ -21,7 +21,7 @@ fn consumer_export_links_fetch_calls_to_peer_routes() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_golden("http-web.export.json", &export);
+    assert_golden("http-web.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn provider_export_shows_links_from_sibling_consumers() {
 
     let export = Engine::open(&api).unwrap().export().unwrap();
 
-    assert_golden("http-api.export.json", &export);
+    assert_golden("http-api.export.json", &without_processes(&export));
 }
 
 #[test]

@@ -6,7 +6,7 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, fixture_repo};
+use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
 /// The package fixtures as siblings in one case directory. `web`, `api` and `mono` name
@@ -41,9 +41,12 @@ fn export(repo: &Path) -> String {
 fn a_dependency_on_a_workspace_package_links_to_its_manifest() {
     let p = packages("packages_links");
 
-    assert_golden("pkg-web.export.json", &export(&p.web));
-    assert_golden("pkg-api.export.json", &export(&p.api));
-    assert_golden("pkg-shared.export.json", &export(&p.shared));
+    assert_golden("pkg-web.export.json", &without_processes(&export(&p.web)));
+    assert_golden("pkg-api.export.json", &without_processes(&export(&p.api)));
+    assert_golden(
+        "pkg-shared.export.json",
+        &without_processes(&export(&p.shared)),
+    );
 }
 
 #[test]
@@ -52,8 +55,8 @@ fn workspace_ranges_stay_in_their_repository_and_the_same_name_elsewhere_is_ambi
 
     // `b` depends on `a` through `workspace:*`: exact, though `fork` also provides `@example/a`.
     // `c` names `a` with a plain range: both providers fit. `ignored/` is in `.gitignore`.
-    assert_golden("pkg-mono.export.json", &export(&p.mono));
-    assert_golden("pkg-fork.export.json", &export(&p.fork));
+    assert_golden("pkg-mono.export.json", &without_processes(&export(&p.mono)));
+    assert_golden("pkg-fork.export.json", &without_processes(&export(&p.fork)));
 }
 
 #[test]

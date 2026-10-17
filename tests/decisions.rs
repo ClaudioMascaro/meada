@@ -6,7 +6,7 @@ mod common;
 
 use std::fs;
 
-use common::{assert_golden, chain, decisions, fixture_repo};
+use common::{assert_golden, chain, decisions, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -16,7 +16,7 @@ fn decisions_link_the_ambiguous_path_and_the_dynamic_url_at_the_level_decided() 
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_golden("chain-web.decided.export.json", &export);
+    assert_golden("chain-web.decided.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -26,7 +26,10 @@ fn a_decision_applies_from_a_peer_that_queries_the_workspace() {
 
     let export = Engine::open(&catalog).unwrap().export().unwrap();
 
-    assert_golden("chain-catalog.decided.export.json", &export);
+    assert_golden(
+        "chain-catalog.decided.export.json",
+        &without_processes(&export),
+    );
 }
 
 #[test]
@@ -128,7 +131,7 @@ fn a_decision_that_no_longer_fits_is_ignored() {
     // Every decision is stale, so the rest of the export is the core's.
     let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
     assert_golden("chain-web.export.json", &format!("{core}\n}}\n"));
-    assert_golden("chain-web.unfit.export.json", &export);
+    assert_golden("chain-web.unfit.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -138,7 +141,10 @@ fn a_decision_of_the_wrong_kind_for_its_call_is_ignored() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_golden("chain-web.unfit-kind.export.json", &export);
+    assert_golden(
+        "chain-web.unfit-kind.export.json",
+        &without_processes(&export),
+    );
 }
 
 #[test]

@@ -6,7 +6,7 @@ mod common;
 
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
 /// The channels fixture as siblings in one case directory; returns `api`, whose workspace
@@ -118,7 +118,7 @@ fn the_export_keeps_the_unresolved_sides_and_links_none_of_them() {
         .unwrap()
         .export()
         .unwrap();
-    assert_golden("channels-worker.export.json", &export);
+    assert_golden("channels-worker.export.json", &without_processes(&export));
 }
 
 #[test]

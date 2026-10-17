@@ -7,7 +7,7 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{assert_golden, documented_chain, fixture_repo, git};
+use common::{assert_golden, documented_chain, fixture_repo, git, without_processes};
 use meada::engine::{self, Direction, Engine, Start};
 
 #[test]
@@ -16,7 +16,10 @@ fn document_routes_are_providers_and_merge_with_code_routes() {
 
     for (repo, name) in [(gateway, "gateway"), (web, "web")] {
         let export = Engine::open(&repo).unwrap().export().unwrap();
-        assert_golden(&format!("chain-documents-{name}.export.json"), &export);
+        assert_golden(
+            &format!("chain-documents-{name}.export.json"),
+            &without_processes(&export),
+        );
     }
 }
 
@@ -69,7 +72,7 @@ fn response_schemas_are_exported_as_shapes() {
 
     let export = Engine::open(&repo).unwrap().export().unwrap();
 
-    assert_golden("documents-shapes.export.json", &export);
+    assert_golden("documents-shapes.export.json", &without_processes(&export));
 }
 
 #[test]

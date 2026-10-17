@@ -8,7 +8,7 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{assert_golden, chain, fixture_repo, worker};
+use common::{assert_golden, chain, fixture_repo, without_processes, worker};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -113,7 +113,10 @@ fn every_writer_links_to_every_reader_of_another_repository() {
 
     let export = Engine::open(&worker).unwrap().export().unwrap();
 
-    assert_golden("chain-worker.resources.export.json", &export);
+    assert_golden(
+        "chain-worker.resources.export.json",
+        &without_processes(&export),
+    );
 }
 
 #[test]

@@ -6,7 +6,7 @@ mod common;
 
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 use serde_json::Value;
 
@@ -99,7 +99,7 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
             "channel::kafka::orders.shipped",
         ]
     );
-    assert_golden("channels-api.export.json", &export);
+    assert_golden("channels-api.export.json", &without_processes(&export));
 }
 
 /// The queue and subject fixtures as siblings in one case directory; returns the producer side.
@@ -198,7 +198,10 @@ fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
     ];
     expected.sort();
     assert_eq!(links, expected);
-    assert_golden("channels-queues-api.export.json", &export);
+    assert_golden(
+        "channels-queues-api.export.json",
+        &without_processes(&export),
+    );
 }
 
 /// `context` on a subject lists the wildcard subscribers that match it, and on a pattern the

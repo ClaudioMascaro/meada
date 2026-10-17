@@ -295,57 +295,5 @@
       "level": "exact",
       "reason": "channel::amqp::invoices.issued"
     }
-  ],
-  "processes": [
-    {
-      "entry_point": "example.com/asyncapi/events::src/emit.ts::announceUpdate",
-      "kind": "export",
-      "label": "announceUpdate",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/asyncapi/events",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/asyncapi/events::src/emit.ts::announceUpdate"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/asyncapi/services",
-          "level": "exact",
-          "via": "link",
-          "node": "example.com/asyncapi/services::src/kafka.ts::onOrder",
-          "reason": "channel::kafka::orders.updated"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/asyncapi/events::src/emit.ts::onCancellation::channel::amqp::shipments.cancelled",
-      "kind": "channel",
-      "label": "channel::amqp::shipments.cancelled",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/asyncapi/events",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/asyncapi/events::src/emit.ts::onCancellation"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/asyncapi/events::src/emit.ts::work",
-      "kind": "export",
-      "label": "work",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/asyncapi/events",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/asyncapi/events::src/emit.ts::work"
-        }
-      ]
-    }
   ]
 }

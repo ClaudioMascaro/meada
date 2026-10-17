@@ -226,6 +226,19 @@ pub fn assert_golden(name: &str, actual: &str) {
     );
 }
 
+/// `export` without its `processes`, for an export golden whose test is about something else:
+/// the steps repeat the calls and links, so each change to the walk or to what it crosses would
+/// re-bless every export golden. The chain's own exports (spec #31), the conformance export and
+/// the `*.processes.json` goldens keep them.
+pub fn without_processes(export: &str) -> String {
+    let Some(start) = export.find(",\n  \"processes\": [") else {
+        return export.to_string();
+    };
+    // The array ends at the first line that is `  ]`: the arrays inside it are indented deeper.
+    let end = start + export[start..].find("\n  ]").unwrap() + "\n  ]".len();
+    format!("{}{}", &export[..start], &export[end..])
+}
+
 fn copy_dir(from: &Path, to: &Path) {
     fs::create_dir_all(to).unwrap();
     for entry in fs::read_dir(from).unwrap() {
