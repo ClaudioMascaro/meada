@@ -34,16 +34,6 @@ pub trait LanguagePack {
     fn messages(&self, _code: &Code) -> Vec<Message> {
         Vec::new()
     }
-
-    /// The program entry points of one file (spec #31): the qualified names (`Def::name`) of
-    /// its definitions that start a program, such as `func main`. Where the entry point is
-    /// top-level code rather than a function (`if __name__ == "__main__":`, top-level
-    /// statements), `parse` yields a definition for that code, with the calls it makes, and
-    /// this names it. Each becomes an entry point of kind `program`, labelled by its qualified
-    /// name. A pack with none keeps the default.
-    fn program_entries(&self, _facts: &Facts) -> Vec<String> {
-        Vec::new()
-    }
 }
 
 /// A call that produces to or consumes from a channel: a queue or topic of one broker kind.
@@ -131,6 +121,15 @@ pub struct Facts {
     /// outer name, and a definition, constant or parameter of its own scope.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub locals: Vec<String>,
+    /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
+    /// the source: the qualified names (`Def::name`) of the definitions that start a program,
+    /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point
+    /// is top-level code rather than a function (`if __name__ == "__main__":`), `parse` yields a
+    /// definition for that code, with the calls it makes, and names it here. Each becomes an
+    /// entry point of kind `program`, labelled by its qualified name. A name with no symbol is
+    /// dropped without a word: each pack's conformance golden is what catches a wrong one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub programs: Vec<String>,
 }
 
 /// A file-level binding to what another module exports: `import { name as local } from

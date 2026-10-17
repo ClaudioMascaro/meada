@@ -547,8 +547,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     let programs: Vec<(String, String)> = (all.iter())
         .flat_map(|(&path, &facts)| {
-            let names = lang::pack(packs[path]).program_entries(facts);
-            names.into_iter().map(move |n| (path.to_string(), n))
+            (facts.programs.iter()).map(move |n| (path.to_string(), n.clone()))
         })
         .collect();
     let local = entry::Local {

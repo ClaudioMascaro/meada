@@ -257,12 +257,15 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
-  A pack is done when that suite passes. A pack that has program entry points overrides
-  `LanguagePack::program_entries(&Facts)` (default: none), which names the definitions that
-  start a program by `Def::name`; each becomes an entry point of kind `program`, labelled by
-  its qualified name, and the conformance test lists them. Where the entry point is top-level
-  code, `parse` yields a definition for that code (the calls it makes belong to it) and the
-  method names it. The forms per language are spec #31 "Program entry points per language
+  A pack is done when that suite passes. A pack that has program entry points fills
+  `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
+  `Def::name` of each definition that starts a program; each becomes an entry point of kind
+  `program`, labelled by its qualified name, and the conformance test lists them. Where the
+  entry point is top-level code, `parse` yields a definition for that code (the calls it makes
+  belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
+  golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
+  which names a function of another file) needs a repository-level step that the pack adds in
+  its own ticket, feeding `entry::Local::programs` with `(file, def)` pairs. The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift

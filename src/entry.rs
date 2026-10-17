@@ -22,7 +22,7 @@ pub enum EntryKind {
     Route,
     /// An exported function or method nothing in its repository calls.
     Export,
-    /// A program's start, as its language pack declares it (`LanguagePack::program_entries`).
+    /// A program's start, as its language pack declares it (`Facts::programs`).
     Program,
 }
 
@@ -65,7 +65,8 @@ pub struct Local<'a> {
     pub exported: &'a [Exported],
     /// `(site, contract)` of each provider the code gives.
     pub providers: &'a [(String, String)],
-    /// `(file, definition name)` of each program entry point the language packs declare.
+    /// `(file, definition name)` of each program entry point the language packs declare. A name
+    /// with no symbol is dropped silently: each pack's conformance golden catches a wrong one.
     pub programs: &'a [(String, String)],
 }
 
