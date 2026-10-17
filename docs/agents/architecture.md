@@ -22,7 +22,9 @@ one for the area a change touches.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
-  items, derived in one place. `trace.rs`: the `Graph`, the walk and the chain footer.
+  items, derived in one place. `trace.rs`: the `Graph`, the walk, the chain footer and the
+  process walk (`Graph::process`, the step list `trace` renders and the export carries).
+  `entry.rs`: entry points (spec #31), found when an index is written.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
@@ -53,6 +55,19 @@ one for the area a change touches.
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Entry point (spec #31, `entry.rs`): a route is `<handler symbol>::<contract>`, such as
+  `example.com/chain/gateway::src/orders.ts::listOrders::http::GET::/api/orders` (the handler's
+  identity, then the contract identifier; an inline handler keeps its synthetic symbol, as in
+  `example.com/chain/gateway::src/server.ts::GET /api/health::http::GET::/api/health`); an export
+  is the exported function or method's own symbol identity. Its label is `<METHOD> <path>` for a
+  route and the qualified name for an export. A process is addressed as `process::<entry point
+  identity>` and named by the label. A route whose handler is a file with no function of its own
+  (`export const GET = withAuth(...)`) is a route entry point at the file's identity
+  (`<repository>::<path>`), its process starting from the file's top-level calls; a side only
+  a document lists has none. A handler serving several routes has an entry point per contract,
+  and entry points are unique by identity. The stored export entry points are candidates:
+  `Engine::exports` drops, after `package::import`, each one that is the target of an import
+  from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
   `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
   path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
@@ -71,8 +86,16 @@ one for the area a change touches.
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
-  publishes, packages, dependencies, imports, communities, links}`; `communities` (absent when
-  empty) lists each community as `{name, members}`, by name, with its sorted member identities; `imports` (absent when empty) lists each
+  publishes, packages, dependencies, imports, communities, links, processes}`;
+  `communities` (absent when empty) lists each community as `{name, members}`, by name, with
+  its sorted member identities; `processes` (absent when
+  empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
+  `kind` being `route` or `export`, each step `{depth, level, repository, via, node, ...}`: `via`
+  is `entry`, `call` or `link` (a link step has the link's `reason`), `node` the symbol, file
+  or side reached (a note's call site), and `mark` (`cycle`, `seen`, `depth-limit`, `ambiguous` with its
+  `candidates`, `unresolved`, `no-provider` with its `contract`, `produces` or `consumes` of an
+  unresolved channel) when the step is not a plain node; steps are in walk order and cross
+  repositories; `imports` (absent when empty) lists each
   call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
   target, where `level` is the import's own level (how certain the entry and the name were), not
   the hop's: the link from that call carries the hop's level, the weaker of it and the package
@@ -218,6 +241,15 @@ one for the area a change touches.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
+- New **entry point kind** (spec #31): a variant of `entry::EntryKind` (`name`, `parse`), a finder
+  beside `routes` and `exports` in `entry::find`, which reads the repository's own facts
+  (`entry::Local`), and the `site` symbol its process starts from. The walk (`Graph::process`),
+  `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
+  stored entry points. A process is walked on demand from the stored calls and the links of the
+  query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
+  one place that says which edges a step expands, which an upstream walk inverts) and its arm
+  in `Descent::follow`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
+  `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
@@ -263,8 +295,9 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
-  the definition, constant, type or file they name), and each community's name and member
-  identities (`communities`, spec #31). `Call::args`,
+  the definition, constant, type or file they name), the `entry_points` table (spec #31:
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
+  each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
@@ -530,6 +563,19 @@ one for the area a change touches.
   for a workspace that makes this slow.
 - `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
   `require` are not followed.
+- `entry.rs`: an export entry point is a function, or a method of an exported class (a
+  constructor excepted), that the `exports` rows name and no call reaches in its repository,
+  an ambiguous candidate counting as a caller and a self-call not; a call through a package
+  import of its own repository counts too, but only at query time (`Engine::exports`), so the
+  stored rows over-list in a monorepo. A method of a class that is not exported, a
+  default-exported anonymous function and an export the resolver cannot place are not found (no
+  marker). A route handler Meada could not find (an Express handler passed as a parameter) has
+  no entry point.
+- `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
+  candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
+  up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
+  branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
+  expanded, so a longer call chain is cut.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

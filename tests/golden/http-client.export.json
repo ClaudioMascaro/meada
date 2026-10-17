@@ -107,5 +107,77 @@
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/acme/backend"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::dynamic",
+      "kind": "export",
+      "label": "dynamic",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::dynamic"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/client::src/client.ts::dynamic::fetch#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::health",
+      "kind": "export",
+      "label": "health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::health"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/backend::src/server.ts::GET /health",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/backend"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::users",
+      "kind": "export",
+      "label": "users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::users"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/client",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/client::src/client.ts::users::fetch#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/api::app/api/users/route.ts::GET",
+            "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+          ]
+        }
+      ]
+    }
   ]
 }

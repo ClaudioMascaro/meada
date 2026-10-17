@@ -87,11 +87,17 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let (links, mut evaluations) = self.links_and_decisions(&exports);
-        let links = links.into_iter();
+        let (all, mut evaluations) = self.links_and_decisions(&exports);
+        // The processes cross repositories: they walk every link, not only the local ones.
+        let graph = trace::Graph::new(&self.workspace, &exports, &all);
+        let processes = (exports[0].entry_points.iter())
+            .map(|e| graph.export_process(e))
+            .collect();
+        let links = all.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
+        export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
@@ -115,6 +121,16 @@ impl Engine {
         package::consume(&mut exports, &providers);
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
+        // The stored entry points are candidates: a call that reaches an export through a
+        // package import of its own repository (a monorepo) makes it no door, at any level.
+        for export in &mut exports {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            (export.entry_points).retain(|e| !imported.contains(e.identity.as_str()));
+        }
         // Shapes imported from a package fill from the shapes it keeps (issue #175).
         package::shapes(&mut exports, &providers);
         Ok(exports)

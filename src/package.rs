@@ -1959,6 +1959,8 @@ mod tests {
             bindings: Vec::new(),
             documents: Vec::new(),
             publishes: Vec::new(),
+            entry_points: Vec::new(),
+            processes: Vec::new(),
             manifests: vec![manifest("package.json", manifest_json)],
             tsconfigs: (config.then(|| Config {
                 path: "tsconfig.json".into(),

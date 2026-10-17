@@ -582,5 +582,285 @@
       "level": "inferred",
       "reason": "channel::amqp::shipments binding events *.shipped"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/channels/api::src/amqp.ts::announce",
+      "kind": "export",
+      "label": "announce",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/amqp.ts::announce"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/worker::src/queues.ts::onAudit",
+          "reason": "channel::amqp::audit binding events order.created"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/channels/worker::src/queues.ts::onShipment",
+          "reason": "channel::amqp::shipments binding events *.shipped"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/amqp.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/amqp.ts::dispatch"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/worker::src/queues.ts::onJob",
+          "reason": "channel::amqp::jobs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/amqp.ts::kafkaOrder",
+      "kind": "export",
+      "label": "kafkaOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/amqp.ts::kafkaOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/amqp.ts::queueOrder",
+      "kind": "export",
+      "label": "queueOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/amqp.ts::queueOrder"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/worker::src/queues.ts::onOrder",
+          "reason": "channel::amqp::orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/audit.ts::auditLog",
+      "kind": "export",
+      "label": "auditLog",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/audit.ts::auditLog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/dynamic.ts::announce",
+      "kind": "export",
+      "label": "announce",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/dynamic.ts::announce"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "call",
+          "node": "example.com/channels/api::src/dynamic.ts::announce::producer.send#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/channels/api::src/dynamic.ts::currentRegion"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/dynamic.ts::replay",
+      "kind": "export",
+      "label": "replay",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/dynamic.ts::replay"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "call",
+          "node": "example.com/channels/api::src/dynamic.ts::replay::producer.send#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/orders.ts::audit",
+      "kind": "export",
+      "label": "audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/orders.ts::audit"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/api",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
+          "reason": "channel::kafka::audit.log"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/channels/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/channels/api::src/audit.ts::store"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/orders.ts::createOrder",
+      "kind": "export",
+      "label": "createOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/orders.ts::createOrder"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/billing",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/billing::src/listen.ts::listen.kafka orders.created billing.invoices",
+          "reason": "channel::kafka::orders.created"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/channels/billing",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/channels/billing::src/listen.ts::charge"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/worker::src/consumer.ts::handleOrder",
+          "reason": "channel::kafka::orders.created"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/orders.ts::invoice",
+      "kind": "export",
+      "label": "invoice",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/orders.ts::invoice"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/billing",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/channels/billing::src/listen.ts::listen.kafka orders.created billing.invoices",
+          "reason": "channel::kafka::billing.invoices"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/channels/billing",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/channels/billing::src/listen.ts::charge"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/orders.ts::mail",
+      "kind": "export",
+      "label": "mail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/orders.ts::mail"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/api::src/orders.ts::ship",
+      "kind": "export",
+      "label": "ship",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/orders.ts::ship"
+        }
+      ]
+    }
   ]
 }

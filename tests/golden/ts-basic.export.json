@@ -209,5 +209,49 @@
       ]
     }
   ],
-  "links": []
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/web::src/math.ts::sum",
+      "kind": "export",
+      "label": "sum",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/web::src/math.ts::sum"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/web::src/math.ts::add"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/web::src/view.tsx::Badge",
+      "kind": "export",
+      "label": "Badge",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/web::src/view.tsx::Badge"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/web::src/view.tsx::label"
+        }
+      ]
+    }
+  ]
 }

@@ -205,5 +205,147 @@
       ]
     }
   ],
-  "links": []
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::bare",
+      "kind": "export",
+      "label": "bare",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::bare"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::getOne",
+      "kind": "export",
+      "label": "getOne",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::getOne"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/client.ts::getItem"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/client.ts::getOne::getItem#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/items/1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::listReports",
+      "kind": "export",
+      "label": "listReports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::listReports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/client.ts::listReports::request#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::mirrors",
+      "kind": "export",
+      "label": "mirrors",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::mirrors"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/client.ts::mirrors::fetch#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::other",
+      "kind": "export",
+      "label": "other",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::other"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::pushReport",
+      "kind": "export",
+      "label": "pushReport",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::pushReport"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/client.ts::pushReport::fetchImpl#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/client.ts::retry",
+      "kind": "export",
+      "label": "retry",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/client.ts::retry"
+        }
+      ]
+    }
+  ]
 }

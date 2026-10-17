@@ -274,5 +274,194 @@
       "level": "inferred",
       "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/admin::src/users.ts::deleteUser",
+      "kind": "export",
+      "label": "deleteUser",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/admin",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/admin::src/users.ts::deleteUser"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::remove"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/backend::src/handlers.ts::removeUser",
+          "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/admin::src/users.ts::listUsers",
+      "kind": "export",
+      "label": "listUsers",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/admin",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/admin::src/users.ts::listUsers"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::get"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+          "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/admin::src/users.ts::listUsersPatiently",
+      "kind": "export",
+      "label": "listUsersPatiently",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/admin",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/admin::src/users.ts::listUsersPatiently"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::retry"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::backoff"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::retry",
+          "mark": "cycle"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::get"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+          "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/admin::src/users.ts::listUsersTyped",
+      "kind": "export",
+      "label": "listUsersTyped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/admin",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/admin::src/users.ts::listUsersTyped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::get"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/admin",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/admin::src/http.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+          "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::list"
+        }
+      ]
+    }
   ]
 }

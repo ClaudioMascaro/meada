@@ -6,7 +6,10 @@ modules updates it.
 
 - Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
-  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `decisions`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
+  (entry points and `trace` from `process::...` over the chain: the processes each export
+  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a cycle, an
+  export process, an ambiguous call, a missing peer, a budget cut), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field), `items` (open items and their `search` goldens, fixtures

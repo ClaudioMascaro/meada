@@ -188,6 +188,22 @@ _Avoid_: path, flow
 One link in a chain.
 _Avoid_: step, jump
 
+**Entry point**:
+A door into a repository: each route an HTTP handler serves (kind `route`, the handler a
+function or a file) and each exported function or method that nothing in its repository calls,
+directly or through a package import of the same repository, an ambiguous candidate counting as
+a caller and a self-call not (kind `export`). It has an identity (the handler's identity plus, for a route, the
+contract), a kind and a label (`GET /users/{}`, or the qualified name). No score or threshold
+picks entry points: every one has its process.
+_Avoid_: root, entrypoint, main
+
+**Process**:
+The ordered call tree one entry point sets in motion: its calls inside a repository at every
+level and its links to other repositories, ending at leaves, an ambiguous call or link (one
+step listing its candidates), an unresolved consumer, a cycle or a missing peer. It is addressed as `process::<entry point identity>`, named by its entry
+point's label, and walked on demand from the stored calls and links, never stored.
+_Avoid_: flow, workflow, execution path
+
 ### Decisions
 
 **Open item**:

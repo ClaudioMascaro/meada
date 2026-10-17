@@ -366,5 +366,140 @@
       "level": "inferred",
       "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/api::app/(admin)/api/reports/[...slug]/route.ts::GET::http::GET::/api/reports/{}",
+      "kind": "route",
+      "label": "GET /api/reports/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/(admin)/api/reports/[...slug]/route.ts::GET"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/api/health/route.js::http::GET::/api/health",
+      "kind": "route",
+      "label": "GET /api/health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/health/route.js"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/api::lib/log.js::withLogging"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE::http::DELETE::/api/users/{}",
+      "kind": "route",
+      "label": "DELETE /api/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/api/users/[id]/route.ts::GET::http::GET::/api/users/{}",
+      "kind": "route",
+      "label": "GET /api/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/users/[id]/route.ts::GET"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/api::lib/db.ts::query"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/api/users/route.ts::GET::http::GET::/api/users",
+      "kind": "route",
+      "label": "GET /api/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/users/route.ts::GET"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/api::lib/db.ts::query"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/api/users/route.ts::POST::http::POST::/api/users",
+      "kind": "route",
+      "label": "POST /api/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/users/route.ts::POST"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/page.tsx::GET",
+      "kind": "export",
+      "label": "GET",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/page.tsx::GET"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/api::app/page.tsx::Home",
+      "kind": "export",
+      "label": "Home",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/page.tsx::Home"
+        }
+      ]
+    }
   ]
 }

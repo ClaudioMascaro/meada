@@ -12,6 +12,7 @@ mod declared;
 mod document;
 mod drift_view;
 pub mod engine;
+mod entry;
 mod http;
 mod index;
 mod items;

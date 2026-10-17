@@ -397,5 +397,114 @@
       "level": "inferred",
       "reason": "channel::amqp::shipments binding events *.shipped"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "kind": "export",
+      "label": "handleOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/consumer.ts::handleOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/consumer.ts::start",
+      "kind": "export",
+      "label": "start",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/consumer.ts::start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/pattern.ts::seen",
+      "kind": "export",
+      "label": "seen",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/pattern.ts::seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "call",
+          "node": "example.com/channels/worker::src/pattern.ts::seen",
+          "mark": "consumes",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "kind": "export",
+      "label": "watchOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/pattern.ts::watchOrders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::bind",
+      "kind": "export",
+      "label": "bind",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::bind"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "kind": "export",
+      "label": "lookalikes",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::lookalikes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::work",
+      "kind": "export",
+      "label": "work",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::work"
+        }
+      ]
+    }
   ]
 }
