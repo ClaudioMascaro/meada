@@ -21,7 +21,9 @@ const EXACT: Option<&str> = Some("exact");
 const INFERRED: Option<&str> = Some("inferred");
 const AMBIGUOUS: Option<&str> = Some("ambiguous");
 
-fn conform(fixture: &str, symbols: &[&str], calls: &[ExpectedCall]) {
+/// `programs` are the program entry points the pack declares (spec #31), as identities relative
+/// to the repository, sorted; a pack with none passes an empty list.
+fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[ExpectedCall]) {
     let repo = fixture_repo(&format!("conformance_{fixture}"), fixture, Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
@@ -36,6 +38,13 @@ fn conform(fixture: &str, symbols: &[&str], calls: &[ExpectedCall]) {
     let mut expected: Vec<String> = symbols.iter().map(|s| id(s)).collect();
     expected.sort();
     assert_eq!(actual, expected, "definitions of {fixture}");
+
+    let actual: Vec<&str> = (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "program")
+        .map(|p| p["entry_point"].as_str().unwrap())
+        .collect();
+    let expected: Vec<String> = programs.iter().map(|s| id(s)).collect();
+    assert_eq!(actual, expected, "program entry points of {fixture}");
 
     for (call, level, targets) in calls {
         let site = json["calls"]
@@ -165,6 +174,8 @@ fn typescript_and_javascript() {
             "src/view.tsx::render",
             "src/widget.jsx::render",
         ],
+        // TS/JS declares no program entry points.
+        &[],
         &[
             // In-file scope: top level, nested function, `this.method` inside a class.
             ("src/math.ts::double::add#0", EXACT, &["src/math.ts::add"]),

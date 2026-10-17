@@ -23,7 +23,8 @@ modules updates it.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
-  symbols, the targets of every call, the `exports` rows, the providers the code gives) and
+  symbols, the targets of every call, the `exports` rows, the providers the code gives, the
+  `Facts::programs` the packs set) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
