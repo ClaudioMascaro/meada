@@ -281,7 +281,13 @@ one for the area a change touches.
 ## Invariants the code relies on
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
-  an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
+  an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`),
+  communities and processes included: `refresh` recomputes both at its end from the stored calls
+  whenever anything changed. The test-only `with_reversed_walk` (`index.rs`, hidden from the
+  docs, no CLI flag or setting) reverses the walk order, the parse order and the insertion order
+  of the `symbols`, `calls` and `candidates` rows, and the chain's export must stay
+  byte-identical. The in-memory order is normalized by path (`BTreeMap`s), so the switch covers
+  nothing beyond that. Indexing runs on one thread, so there is no worker count to vary.
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
   a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
   `tests/golden/schema.v<version>.txt` (the facts of each pack's

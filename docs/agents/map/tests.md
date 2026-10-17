@@ -12,7 +12,9 @@ modules updates it.
   export process, an ambiguous call, a missing peer, a budget cut), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
-  `freshness` (cold vs refreshed, also an edited zod schema dropping a field), `items` (open items and their `search` goldens, fixtures
+  `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
+  every repository's communities and processes, and the chain's export byte-identical under
+  `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
   (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
   over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
