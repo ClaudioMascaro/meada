@@ -600,13 +600,15 @@ fn write_communities(tx: &Transaction) -> Result<()> {
         )?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
-    // A top-level caller is a file, not a symbol: no node.
-    let calls = (calls.iter())
-        .filter(|(a, b)| dirs.contains_key(a) && dirs.contains_key(b))
-        .map(|(a, b)| (a.as_str(), b.as_str()));
-    let dir = |id: &str| match dirs[id].rsplit_once('/') {
-        Some((dir, _)) => dir.to_string(),
-        None => ".".to_string(),
+    // A top-level caller is a file, not a symbol: no directory, no node.
+    let calls = calls.iter().map(|(a, b)| (a.as_str(), b.as_str()));
+    let dir = |id: &str| {
+        let path = dirs.get(id)?;
+        Some(
+            path.rsplit_once('/')
+                .map_or(".", |(dir, _)| dir)
+                .to_string(),
+        )
     };
     tx.execute("DELETE FROM communities", [])?;
     for c in community::communities(calls, dir) {
