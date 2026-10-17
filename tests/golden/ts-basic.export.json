@@ -190,19 +190,25 @@
     {
       "name": "src",
       "members": [
+        "example.com/acme/web::src/draft.ts::draft"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
         "example.com/acme/web::src/math.ts::add",
         "example.com/acme/web::src/math.ts::sum"
       ]
     },
     {
-      "name": "src#2",
+      "name": "src#3",
       "members": [
         "example.com/acme/web::src/math.ts::outer",
         "example.com/acme/web::src/math.ts::outer.inner"
       ]
     },
     {
-      "name": "src#3",
+      "name": "src#4",
       "members": [
         "example.com/acme/web::src/view.tsx::Badge",
         "example.com/acme/web::src/view.tsx::label"
