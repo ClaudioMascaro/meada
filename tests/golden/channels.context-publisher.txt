@@ -1,4 +1,6 @@
 example.com/channels/api src/amqp.ts:17 announce
+community: none
+processes: announce (example.com/channels/api)
 async function announce(id: string) {
   channel.publish("events", "order.created", Buffer.from(id));
   channel.publish("events", "order.shipped", Buffer.from(id));

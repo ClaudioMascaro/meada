@@ -1,0 +1,1 @@
+example.com/chain/web dashboard process::example.com/chain/web::src/dashboard.ts::dashboard (export)

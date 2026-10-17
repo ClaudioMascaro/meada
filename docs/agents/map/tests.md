@@ -9,7 +9,10 @@ modules updates it.
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a cycle, an
-  export process, an ambiguous call, a missing peer, a budget cut), `decisions`
+  export process, an ambiguous call, a missing peer, a budget cut), `community_queries`
+  (`search` kinds `community` and `process`, and the community and processes lines of `context`
+  over the chain: processes in three repositories, `community: none`, a decided link that counts
+  and an ambiguous call that does not, the processes line cut under the budget), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
