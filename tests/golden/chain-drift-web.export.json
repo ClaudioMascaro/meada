@@ -3803,5 +3803,2378 @@
         }
       }
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::handed",
+      "kind": "export",
+      "label": "handed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::handed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::ids",
+      "kind": "export",
+      "label": "ids",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::ids"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::pageOf",
+      "kind": "export",
+      "label": "pageOf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::pageOf"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::quantities",
+      "kind": "export",
+      "label": "quantities",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::quantities"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::rebound",
+      "kind": "export",
+      "label": "rebound",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::rebound"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/batches.ts::shadowed",
+      "kind": "export",
+      "label": "shadowed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/batches.ts::shadowed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/batches.ts::shadowed.inner"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/comments.ts::comments",
+      "kind": "export",
+      "label": "comments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/comments.ts::comments"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/comments.ts::submit",
+      "kind": "export",
+      "label": "submit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/comments.ts::submit"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/comments.ts::summary",
+      "kind": "export",
+      "label": "summary",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/comments.ts::summary"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/dashboard.ts::cancel",
+      "kind": "export",
+      "label": "cancel",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/dashboard.ts::cancel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/orders.ts::cancelOrder"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "declared",
+          "via": "link",
+          "node": "example.com/chain/catalog",
+          "reason": "resource::postgres::orders"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/worker",
+          "level": "declared",
+          "via": "link",
+          "node": "example.com/chain/worker::src/jobs.ts::settleOrders",
+          "reason": "resource::postgres::orders"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "kind": "export",
+      "label": "dashboard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/dashboard.ts::dashboard"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::health"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/health/route.ts::GET",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/server.ts::GET /api/health",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::track"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::track::fetch#0",
+          "mark": "unresolved"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/orders.ts::listOrders"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 6,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::cast",
+      "kind": "export",
+      "label": "cast",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::cast"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::counts",
+      "kind": "export",
+      "label": "counts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::counts"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/typed.ts::getJson"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::foreign",
+      "kind": "export",
+      "label": "foreign",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::foreign"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::pages",
+      "kind": "export",
+      "label": "pages",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::pages"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::plain",
+      "kind": "export",
+      "label": "plain",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::plain"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::ranked",
+      "kind": "export",
+      "label": "ranked",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::ranked"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::searched",
+      "kind": "export",
+      "label": "searched",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::searched"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/typed.ts::search"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::typedJson",
+      "kind": "export",
+      "label": "typedJson",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::typedJson"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::viaReturn",
+      "kind": "export",
+      "label": "viaReturn",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::viaReturn"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/typed.ts::fetchAs"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/declared.ts::wrapped",
+      "kind": "export",
+      "label": "wrapped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/declared.ts::wrapped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/typed.ts::enveloped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::customerEmail",
+      "kind": "export",
+      "label": "customerEmail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::customerEmail"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/body.ts::get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "kind": "export",
+      "label": "firstOrderId",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::firstOrderId"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::idLength",
+      "kind": "export",
+      "label": "idLength",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::idLength"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/body.ts::get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::orderTotal",
+      "kind": "export",
+      "label": "orderTotal",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::orderTotal"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::page",
+      "kind": "export",
+      "label": "page",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::page"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/drift.ts::load"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "call",
+          "node": "example.com/chain/web::src/drift.ts::page::load#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/shipments/1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::pair",
+      "kind": "export",
+      "label": "pair",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::pair"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/drift.ts::both"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/body.ts::get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::productName",
+      "kind": "export",
+      "label": "productName",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::productName"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/drift.ts::rebound",
+      "kind": "export",
+      "label": "rebound",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/drift.ts::rebound"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/body.ts::get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/labels.ts::labels",
+      "kind": "export",
+      "label": "labels",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/labels.ts::labels"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/open.ts::ping",
+      "kind": "export",
+      "label": "ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/open.ts::ping"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/open.ts::rate",
+      "kind": "export",
+      "label": "rate",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/open.ts::rate"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "call",
+          "node": "example.com/chain/web::src/open.ts::rate::fetch#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/orders.ts::createOrder",
+      "kind": "export",
+      "label": "createOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/orders.ts::createOrder"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/checkout.ts::createOrder",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/events.ts::publish"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+          "reason": "channel::kafka::orders.created"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::annotated",
+      "kind": "export",
+      "label": "annotated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::annotated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::argument",
+      "kind": "export",
+      "label": "argument",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::argument"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/typed.ts::getJson"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::inferred",
+      "kind": "export",
+      "label": "inferred",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::inferred"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::offer",
+      "kind": "export",
+      "label": "offer",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::offer"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::quote",
+      "kind": "export",
+      "label": "quote",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::quote"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::receipt",
+      "kind": "export",
+      "label": "receipt",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::receipt"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::shelf",
+      "kind": "export",
+      "label": "shelf",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::shelf"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::shelves",
+      "kind": "export",
+      "label": "shelves",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::shelves"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::status",
+      "kind": "export",
+      "label": "status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::status"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::tags",
+      "kind": "export",
+      "label": "tags",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::tags"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shared.ts::ticket",
+      "kind": "export",
+      "label": "ticket",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shared.ts::ticket"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::edgeShipment",
+      "kind": "export",
+      "label": "edgeShipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::edgeShipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+          "reason": "gateway prefix /gw"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::euShipment",
+      "kind": "export",
+      "label": "euShipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::euShipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+          "reason": "gateway prefix /v3"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::publicShipment",
+      "kind": "export",
+      "label": "publicShipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::publicShipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+          "reason": "host gateway.example.com is served by example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::relativeShipment",
+      "kind": "export",
+      "label": "relativeShipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::relativeShipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+          "reason": "gateway prefix /relative/base"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::shipment",
+      "kind": "export",
+      "label": "shipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::shipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/shipments.ts::unsetShipment",
+      "kind": "export",
+      "label": "unsetShipment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/shipments.ts::unsetShipment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "call",
+          "node": "example.com/chain/web::src/shipments.ts::unsetShipment::fetch#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/v9/api/shipments/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::cached",
+      "kind": "export",
+      "label": "cached",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::cached"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::app/api/cached/route.ts::ok"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::image",
+      "kind": "export",
+      "label": "image",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::image"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::item",
+      "kind": "export",
+      "label": "item",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::item"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/inventory.ts::getItem",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::one",
+      "kind": "export",
+      "label": "one",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::one"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::price",
+      "kind": "export",
+      "label": "price",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::price"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::restock",
+      "kind": "export",
+      "label": "restock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::restock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::reviews",
+      "kind": "export",
+      "label": "reviews",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::reviews"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::save",
+      "kind": "export",
+      "label": "save",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::save"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/stock.ts::stock",
+      "kind": "export",
+      "label": "stock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/stock.ts::stock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+          "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+        }
+      ]
+    }
   ]
 }

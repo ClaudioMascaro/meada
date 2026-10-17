@@ -1,0 +1,6 @@
+process GET /api/orders
+example.com/chain/gateway src/orders.ts:5 listOrders
+  example.com/chain/gateway src/catalog.ts:2 productOf
+  →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/catalog app/api/products/[id]/route.ts:3 GET
+… cut after 4 of 8 lines (budget 100 tokens); raise budget for more
+chain: exact · 1 hops · 2 repos · 98 tokens

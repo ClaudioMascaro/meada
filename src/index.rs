@@ -12,17 +12,19 @@ use serde::{Serialize, Serializer};
 
 use crate::Result;
 use crate::config::Serve;
-use crate::contract::{self, Level, Link, Names, Site};
+use crate::contract::{self, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
+use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
+use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 16;
+const SCHEMA_VERSION: i64 = 17;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -54,6 +56,9 @@ const SCHEMA_VERSION: i64 = 16;
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22).
+/// `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
+/// (`route` or `export`), the `label` that names its process and the `site` the process starts
+/// from; rewritten with the contracts.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -83,6 +88,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -214,7 +220,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             tx.execute_batch(
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
-                 DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports;",
+                 DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
+                 DELETE FROM entry_points;",
             )?;
             None
         }
@@ -416,8 +423,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // ponytail: every file's calls are resolved again on any change, in memory; only the
     // rows that differ are written. A reverse-import graph can narrow the set if resolution
     // shows up in profiles.
+    // The symbols and the targets of every call, for the entry points.
+    let mut symbols: HashSet<String> = HashSet::new();
+    let mut called: HashSet<String> = HashSet::new();
     for (&path, &facts) in &all {
         let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]], &names);
+        symbols.extend(rows.symbols.iter().map(|(id, ..)| id.clone()));
+        for call in &rows.calls {
+            called.extend(call.target.iter().chain(&call.candidates).cloned());
+        }
         let resolved = blake3::hash(&serde_json::to_vec(&rows)?)
             .to_hex()
             .to_string();
@@ -466,6 +480,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // One row per side; the shapes of the Founds of one side (a site reached through several
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
+    let mut providers: Vec<(String, String)> = Vec::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -489,6 +504,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             }
         };
         let role = f.role.name();
+        if let (Role::Provider, Some(contract)) = (f.role, &f.contract) {
+            providers.push((site.clone(), contract.clone()));
+        }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         let key = (
             role,
@@ -518,6 +536,23 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         tx.execute(
             "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
             params![e.path, e.name, e.file, e.target],
+        )?;
+    }
+    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    let local = entry::Local {
+        identity,
+        files: &all,
+        names: &names,
+        symbols: &symbols,
+        called: &called,
+        exported: &exported,
+        providers: &providers,
+    };
+    tx.execute("DELETE FROM entry_points", [])?;
+    for e in entry::find(&local) {
+        tx.execute(
+            "INSERT INTO entry_points VALUES (?1, ?2, ?3, ?4)",
+            params![e.identity, e.kind.name(), e.label, e.site],
         )?;
     }
     tx.execute("DELETE FROM meta", [])?;
@@ -843,6 +878,13 @@ pub(crate) struct Export {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) imports: Vec<Import>,
     pub(crate) links: Vec<Link>,
+    /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
+    /// `processes` is what the export shows.
+    #[serde(skip)]
+    pub(crate) entry_points: Vec<EntryPoint>,
+    /// The process of each entry point, in entry point order (`meada export` only).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) processes: Vec<Process>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) stale_decisions: Vec<Stale>,
@@ -1231,6 +1273,26 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
             .collect(),
     };
+    let entry_points = db
+        .prepare(&format!(
+            "SELECT identity, kind, label, site FROM {schema}.entry_points ORDER BY identity"
+        ))?
+        .query_map([], |r| {
+            Ok((r.get(0)?, r.get::<_, String>(1)?, r.get(2)?, r.get(3)?))
+        })?
+        .collect::<rusqlite::Result<Vec<(String, String, String, String)>>>()?
+        .into_iter()
+        // ponytail: written by `refresh` only, so an unknown kind is an index to rebuild.
+        .filter_map(|(identity, kind, label, site)| {
+            let kind = EntryKind::parse(&kind)?;
+            Some(EntryPoint {
+                identity,
+                kind,
+                label,
+                site,
+            })
+        })
+        .collect();
     Ok(Export {
         repository: identity.to_string(),
         files,
@@ -1249,6 +1311,8 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         shapes,
         imports: Vec::new(),
         links: Vec::new(),
+        entry_points,
+        processes: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
     })

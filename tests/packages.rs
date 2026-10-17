@@ -112,8 +112,14 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     // Bumping `shared` to 1.3.0 flips `web`'s `~1.2.0`, and the edit narrowing `^1.0.0` to
     // `^2.0.0` flips the other: both entries now say `range mismatch`, and so do the links of
     // the two calls into `shared` (`clean` and `squash`).
-    assert!(!before[0].contains("range mismatch"));
-    assert_eq!(refreshed[0].matches("range mismatch").count(), 4);
+    // The processes repeat the reasons of the links they cross: count the entries and links.
+    let mismatches = |export: &str| {
+        let mut json: serde_json::Value = serde_json::from_str(export).unwrap();
+        json.as_object_mut().unwrap().remove("processes");
+        json.to_string().matches("range mismatch").count()
+    };
+    assert_eq!(mismatches(&before[0]), 0);
+    assert_eq!(mismatches(&refreshed[0]), 4);
     // The calls through the renamed export and subpath no longer cross: no consumer, link or
     // import names them.
     let fixed = "example.com/pkg/web::src/app.ts::main::fixed#0";

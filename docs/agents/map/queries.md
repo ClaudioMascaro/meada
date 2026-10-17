@@ -89,6 +89,17 @@ modules updates it.
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
   `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
   package name are no call for a person to decide.
+- `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
+  variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
+  repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
+  `Mark` (cycle, seen, ambiguous, unresolved, no provider, an unresolved channel side).
+  `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
+  found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
+  `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.
+  Children of a step: its calls in source order (then identity), then what each call reaches;
+  an ambiguous call is one step listing its candidates; a symbol is expanded at its first
+  occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
+  points themselves are in `entry.rs`.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,

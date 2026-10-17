@@ -265,6 +265,280 @@
       "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
     }
   ],
+  "processes": [
+    {
+      "entry_point": "example.com/chain/web::src/dashboard.ts::cancel",
+      "kind": "export",
+      "label": "cancel",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/dashboard.ts::cancel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/orders.ts::cancelOrder"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "declared",
+          "via": "link",
+          "node": "example.com/chain/catalog",
+          "reason": "resource::postgres::orders"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/worker",
+          "level": "declared",
+          "via": "link",
+          "node": "example.com/chain/worker::src/jobs.ts::settleOrders",
+          "reason": "resource::postgres::orders"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/dashboard.ts::dashboard",
+      "kind": "export",
+      "label": "dashboard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/dashboard.ts::dashboard"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::health"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/health/route.ts::GET",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/server.ts::GET /api/health",
+          "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::track"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::track::fetch#0",
+          "mark": "unresolved"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/orders.ts::listOrders"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 6,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/web::src/orders.ts::createOrder",
+      "kind": "export",
+      "label": "createOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/web::src/orders.ts::createOrder"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/web::src/api/client.ts::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/gateway",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/chain/gateway::src/checkout.ts::createOrder",
+          "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/catalog.ts::productOf"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+          "reason": "host catalog.example.com is served by example.com/chain/catalog"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 5,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/gateway",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/gateway::src/events.ts::publish"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+          "reason": "channel::kafka::orders.created"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
+    }
+  ],
   "stale_decisions": [
     {
       "call": "example.com/chain/web::src/status.ts::health::fetch#0",

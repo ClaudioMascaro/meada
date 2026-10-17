@@ -22,6 +22,10 @@ modules updates it.
   `decisions`, loaded together at discovery.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
+- `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
+  symbols, the targets of every call, the `exports` rows, the providers the code gives) and
+  returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
+  `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's

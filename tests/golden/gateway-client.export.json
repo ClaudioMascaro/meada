@@ -328,5 +328,236 @@
       "level": "inferred",
       "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::audit",
+      "kind": "export",
+      "label": "audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::audit"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/billing",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/acme/billing::app/audit/route.ts::GET",
+          "reason": "2 providers fit; gateway prefix /billing"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/orders",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/acme/orders::app/billing/audit/route.ts::GET",
+          "reason": "2 providers fit; host unresolved; served by example.com/acme/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::direct",
+      "kind": "export",
+      "label": "direct",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::direct"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/orders",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/orders::app/orders/route.ts::GET",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::hosted",
+      "kind": "export",
+      "label": "hosted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::hosted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/billing",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+          "reason": "gateway prefix /billing, gateway strip /v1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::invoices",
+      "kind": "export",
+      "label": "invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::invoices"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/billing",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+          "reason": "gateway prefix /billing, gateway strip /v1"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::ledger",
+      "kind": "export",
+      "label": "ledger",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::ledger"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/ledger",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/ledger::app/ledger/route.ts::GET",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/ledger"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::order",
+      "kind": "export",
+      "label": "order",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/client::src/client.ts::order::fetch#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::staleVersion",
+      "kind": "export",
+      "label": "staleVersion",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::staleVersion"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/client::src/client.ts::staleVersion::fetch#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/billing/v1/invoices"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::status",
+      "kind": "export",
+      "label": "status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::status"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/billing",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/billing::app/status/route.ts::GET",
+          "reason": "gateway prefix /billing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::throughGateway",
+      "kind": "export",
+      "label": "throughGateway",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::throughGateway"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/orders",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/orders::app/orders/route.ts::GET",
+          "reason": "gateway prefix /shop"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/client::src/client.ts::versioned",
+      "kind": "export",
+      "label": "versioned",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/client::src/client.ts::versioned"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/billing",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
+          "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
+        }
+      ]
+    }
   ]
 }

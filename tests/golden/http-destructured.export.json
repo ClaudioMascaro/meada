@@ -209,5 +209,170 @@
       "via": "env:SERVICE_URL"
     }
   ],
-  "links": []
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/portal::src/call.ts::createReport",
+      "kind": "export",
+      "label": "createReport",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/call.ts::createReport"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::post"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::createReport::post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/call.ts::forward",
+      "kind": "export",
+      "label": "forward",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/call.ts::forward"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::forward::call#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/call.ts::listAll",
+      "kind": "export",
+      "label": "listAll",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/call.ts::listAll"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::fetchAll"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::listAll::fetchAll#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/all"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/call.ts::listReports",
+      "kind": "export",
+      "label": "listReports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/call.ts::listReports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::listReports::call#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/portal::src/call.ts::putReport",
+      "kind": "export",
+      "label": "putReport",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/portal::src/call.ts::putReport"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/portal",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/portal::src/call.ts::putReport::send#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/reports"
+        }
+      ]
+    }
+  ]
 }

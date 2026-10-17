@@ -87,11 +87,17 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let (links, mut evaluations) = self.links_and_decisions(&exports);
-        let links = links.into_iter();
+        let (all, mut evaluations) = self.links_and_decisions(&exports);
+        // The processes cross repositories: they walk every link, not only the local ones.
+        let graph = trace::Graph::new(&self.workspace, &exports, &all);
+        let processes = (exports[0].entry_points.iter())
+            .map(|e| graph.export_process(e))
+            .collect();
+        let links = all.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
+        export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")

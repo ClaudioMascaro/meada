@@ -1087,5 +1087,369 @@
       "level": "inferred",
       "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/pkg/web::e2e/smoke.ts::smoke",
+      "kind": "export",
+      "label": "smoke",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::e2e/smoke.ts::smoke"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/greet.ts::greet",
+          "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/shared::kit/src/greet.ts::shout"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/app.ts::caught",
+      "kind": "export",
+      "label": "caught",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/app.ts::caught"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/web",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/web::src/app.ts::welcome"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/greet.ts::greet",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/shared::kit/src/greet.ts::shout"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/app.ts::destructured",
+      "kind": "export",
+      "label": "destructured",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/app.ts::destructured"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/app.ts::hidden",
+      "kind": "export",
+      "label": "hidden",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/app.ts::hidden"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/app.ts::main",
+      "kind": "export",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/app.ts::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/index.ts::kit",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/more.ts::farewell",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/format.ts::format",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+          "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/shared::kit/src/more.ts::Client"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/app.ts::shadowed",
+      "kind": "export",
+      "label": "shadowed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/app.ts::shadowed"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/entries.ts::entries",
+      "kind": "export",
+      "label": "entries",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/entries.ts::entries"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::typed/src/index.ts::typed",
+          "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::esm/src/index.mjs::esm",
+          "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import module"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+          "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+          "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::dts/index.js::dts",
+          "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0); import main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/pkg/shared::plain/index.ts::plain",
+          "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0); import path"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/pkg/shared::bare/src/thing.ts::thing",
+          "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0); import path"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/nest.ts::nest",
+      "kind": "export",
+      "label": "nest",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/nest.ts::nest"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/pkg/shared::prec/index.ts::prec",
+          "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0); import outDir"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/text.ts::clean",
+      "kind": "export",
+      "label": "clean",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/text.ts::clean"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/pkg/shared::src/text.ts::normalize",
+          "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/shared::src/utils/collapse.ts::collapse"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/pkg/shared",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/pkg/shared::src/utils/trim.ts::trim"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/text.ts::lock",
+      "kind": "export",
+      "label": "lock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/text.ts::lock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/pkg/shared::sealed/src/one.ts::seal",
+          "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "ambiguous",
+          "via": "link",
+          "node": "example.com/pkg/shared::sealed/src/two.ts::seal",
+          "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::src/text.ts::squash",
+      "kind": "export",
+      "label": "squash",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::src/text.ts::squash"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/pkg/shared",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+          "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/pkg/web::tools/run.ts::run",
+      "kind": "export",
+      "label": "run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/pkg/web",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/pkg/web::tools/run.ts::run"
+        }
+      ]
+    }
   ]
 }

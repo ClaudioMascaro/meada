@@ -39,7 +39,8 @@ struct ContextArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct TraceArgs {
-    /// Start: a symbol, a route (`GET /users/{}` or its contract) or a call site.
+    /// Start: a symbol, a route (`GET /users/{}` or its contract), a call site, or a process
+    /// (`process::<entry point identity>`, down only).
     from: Option<String>,
     /// `uncommitted`: start from the symbols the working-tree diff touches instead.
     changes: Option<String>,

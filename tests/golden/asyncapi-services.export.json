@@ -298,5 +298,115 @@
       "level": "exact",
       "reason": "channel::amqp::invoices.issued"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "kind": "export",
+      "label": "listen",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/kafka.ts::listen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "kind": "export",
+      "label": "onOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/kafka.ts::onOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
+      "kind": "export",
+      "label": "requestPayment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/kafka.ts::requestPayment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/asyncapi/events",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/asyncapi/events::asyncapi.yaml::kafka receive payments.requested",
+          "reason": "channel::kafka::payments.requested"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/queues.ts::cancel",
+      "kind": "export",
+      "label": "cancel",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/queues.ts::cancel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/asyncapi/events",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+          "reason": "channel::amqp::shipments.cancelled"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/queues.ts::ship",
+      "kind": "export",
+      "label": "ship",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/queues.ts::ship"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/asyncapi/events",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp receive shipments.requested",
+          "reason": "channel::amqp::shipments.requested"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/queues.ts::work",
+      "kind": "export",
+      "label": "work",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/queues.ts::work"
+        }
+      ]
+    }
   ]
 }
