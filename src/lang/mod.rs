@@ -34,6 +34,16 @@ pub trait LanguagePack {
     fn messages(&self, _code: &Code) -> Vec<Message> {
         Vec::new()
     }
+
+    /// The program entry points of one file (spec #31): the qualified names (`Def::name`) of
+    /// its definitions that start a program, such as `func main`. Where the entry point is
+    /// top-level code rather than a function (`if __name__ == "__main__":`, top-level
+    /// statements), `parse` yields a definition for that code, with the calls it makes, and
+    /// this names it. Each becomes an entry point of kind `program`, labelled by its qualified
+    /// name. A pack with none keeps the default.
+    fn program_entries(&self, _facts: &Facts) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// A call that produces to or consumes from a channel: a queue or topic of one broker kind.

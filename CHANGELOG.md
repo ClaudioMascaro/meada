@@ -110,7 +110,8 @@ tagging.
   the index. `trace` from `process::<entry point identity>` renders the call tree that entry
   point sets in motion, across repositories, under the token budget; an ambiguous call is one
   step listing its candidates, and a symbol is expanded once. `meada export` carries each
-  repository's `processes`.
+  repository's `processes`. A language pack can declare program entry points (kind `program`);
+  the TypeScript and JavaScript pack declares none.
 
 ### Fixed
 

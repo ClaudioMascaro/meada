@@ -23,7 +23,8 @@ modules updates it.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
-  symbols, the targets of every call, the `exports` rows, the providers the code gives) and
+  symbols, the targets of every call, the `exports` rows, the providers the code gives, the
+  packs' `program_entries`) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -70,7 +71,7 @@ modules updates it.
   subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
   and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
+  `config_files`, `modules`, `messages`, `program_entries`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
   the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest

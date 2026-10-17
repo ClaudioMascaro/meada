@@ -545,6 +545,12 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    let programs: Vec<(String, String)> = (all.iter())
+        .flat_map(|(&path, &facts)| {
+            let names = lang::pack(packs[path]).program_entries(facts);
+            names.into_iter().map(move |n| (path.to_string(), n))
+        })
+        .collect();
     let local = entry::Local {
         identity,
         files: &all,
@@ -553,6 +559,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         called: &called,
         exported: &exported,
         providers: &providers,
+        programs: &programs,
     };
     tx.execute("DELETE FROM entry_points", [])?;
     for e in entry::find(&local) {
