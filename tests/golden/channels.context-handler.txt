@@ -1,6 +1,6 @@
 example.com/channels/worker src/consumer.ts:11 handleOrder
 community: none
-processes: createOrder (example.com/channels/api), handleOrder (example.com/channels/worker)
+processes: createOrder (example.com/channels/api), channel::kafka::orders.created (example.com/channels/worker)
 async function handleOrder({ message }: { message: { value: string } }) {
   return message.value;
 }

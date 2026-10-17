@@ -278,3 +278,42 @@ fn a_process_stops_at_the_depth_limit_and_says_so() {
     assert_eq!(last["depth"], 256);
     assert_eq!(steps.len(), 257);
 }
+
+const ORDER_CREATED: &str = "process::example.com/chain/worker::src/consumer.ts::onOrderCreated\
+                             ::channel::kafka::orders.created";
+
+#[test]
+fn a_channel_handler_is_a_channel_entry_point_and_no_export() {
+    let (_, _, catalog) = chain("processes_channel_export");
+    let worker = common::worker(&catalog);
+
+    let found = processes(&worker);
+
+    assert_golden("chain-worker.processes.json", &found);
+    assert!(found.contains("\"kind\": \"channel\""));
+    assert!(found.contains("\"label\": \"channel::kafka::orders.created\""));
+    assert!(!found.contains("src/consumer.ts::onOrderCreated\","));
+}
+
+#[test]
+fn search_finds_a_channel_process_by_its_channel_identifier() {
+    let (_, _, catalog) = chain("processes_channel_search");
+    let worker = common::worker(&catalog);
+    let engine = Engine::open(&worker).unwrap();
+
+    let found = engine
+        .search("channel::kafka::orders.created", Some("process"), None)
+        .unwrap();
+
+    assert_golden("chain.search-process-channel.txt", &found);
+}
+
+#[test]
+fn trace_from_a_channel_process_shows_its_tree_and_the_links_it_reaches() {
+    let (_, _, catalog) = chain("processes_channel_trace");
+    let worker = common::worker(&catalog);
+
+    let answer = trace(&worker, ORDER_CREATED, Direction::Down, None);
+
+    assert_golden("chain.trace-process-channel.txt", &answer);
+}

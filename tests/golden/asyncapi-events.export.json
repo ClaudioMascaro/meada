@@ -320,6 +320,20 @@
       ]
     },
     {
+      "entry_point": "example.com/asyncapi/events::src/emit.ts::onCancellation::channel::amqp::shipments.cancelled",
+      "kind": "channel",
+      "label": "channel::amqp::shipments.cancelled",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/events",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/events::src/emit.ts::onCancellation"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/asyncapi/events::src/emit.ts::work",
       "kind": "export",
       "label": "work",

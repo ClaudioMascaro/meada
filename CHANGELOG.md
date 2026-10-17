@@ -105,8 +105,10 @@ tagging.
   macOS and Windows on x86_64 and arm64 and a shell installer, published to GitHub Releases.
   The crate is ready for `cargo install meada`.
 
-- Entry points and processes: each route a handler serves and each exported function or method
-  that nothing in its repository calls is an entry point (kind `route` or `export`), stored in
+- Entry points and processes: each route a handler serves, each channel a consumer handler
+  consumes (kind `channel`, labelled `channel::kafka::orders.created`; an unresolved side too,
+  labelled `channel::kafka (unresolved)`) and each exported function or method
+  that nothing in its repository calls is an entry point (kind `route`, `channel` or `export`), stored in
   the index. `trace` from `process::<entry point identity>` renders the call tree that entry
   point sets in motion, across repositories, under the token budget; an ambiguous call is one
   step listing its candidates, and a symbol is expanded once. `meada export` carries each

@@ -400,9 +400,9 @@
   ],
   "processes": [
     {
-      "entry_point": "example.com/channels/worker::src/consumer.ts::handleOrder",
-      "kind": "export",
-      "label": "handleOrder",
+      "entry_point": "example.com/channels/worker::src/consumer.ts::handleOrder::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
       "steps": [
         {
           "depth": 0,
@@ -428,9 +428,9 @@
       ]
     },
     {
-      "entry_point": "example.com/channels/worker::src/pattern.ts::seen",
-      "kind": "export",
-      "label": "seen",
+      "entry_point": "example.com/channels/worker::src/pattern.ts::seen::channel::kafka",
+      "kind": "channel",
+      "label": "channel::kafka (unresolved)",
       "steps": [
         {
           "depth": 0,
@@ -479,9 +479,9 @@
       ]
     },
     {
-      "entry_point": "example.com/channels/worker::src/queues.ts::lookalikes",
-      "kind": "export",
-      "label": "lookalikes",
+      "entry_point": "example.com/channels/worker::src/queues.ts::lookalikes::channel::amqp::events",
+      "kind": "channel",
+      "label": "channel::amqp::events",
       "steps": [
         {
           "depth": 0,
@@ -489,6 +489,76 @@
           "level": null,
           "via": "entry",
           "node": "example.com/channels/worker::src/queues.ts::lookalikes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::lookalikes::channel::amqp::order.refunded",
+      "kind": "channel",
+      "label": "channel::amqp::order.refunded",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::lookalikes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::onAudit::channel::amqp::audit",
+      "kind": "channel",
+      "label": "channel::amqp::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::onJob::channel::amqp::jobs",
+      "kind": "channel",
+      "label": "channel::amqp::jobs",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::onJob"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::onOrder::channel::amqp::orders",
+      "kind": "channel",
+      "label": "channel::amqp::orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::onOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/channels/worker::src/queues.ts::onShipment::channel::amqp::shipments",
+      "kind": "channel",
+      "label": "channel::amqp::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/worker::src/queues.ts::onShipment"
         }
       ]
     },

@@ -8,7 +8,7 @@ modules updates it.
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
-  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a cycle, an
+  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
   export process, an ambiguous call, a missing peer, a budget cut), `community_queries`
   (`search` kinds `community` and `process`, and the community and processes lines of `context`
   over the chain: processes in three repositories, `community: none`, a decided link that counts
