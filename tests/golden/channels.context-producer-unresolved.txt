@@ -1,4 +1,6 @@
 example.com/channels/api src/dynamic.ts:4 replay
+community: none
+processes: replay (example.com/channels/api)
 async function replay(id: string) {
   await producer.send({ topic: process.env.REPLAY_TOPIC, messages: [{ value: id }] });
 }

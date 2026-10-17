@@ -253,7 +253,7 @@ one for the area a change touches.
   `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
-  one place that says which edges a step expands, which an upstream walk inverts) and its arm
+  one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
   in `Descent::follow`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
   `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
@@ -600,7 +600,11 @@ one for the area a change touches.
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
   up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
   branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
-  expanded, so a longer call chain is cut.
+  expanded, so a longer call chain is cut. `Graph::processes_of` (the processes `context` lists)
+  walks upstream with no depth limit, so on chains deeper than 254 membership and trees can
+  disagree: a symbol below the limit still names the process, and so can one the limit hid
+  above it through `Seen` (E reaches X at depth 255 and Y, X's callee, is cut; a later direct
+  E to X shows X as seen, so X's other callee Z is no step of E's tree, yet Z lists E).
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

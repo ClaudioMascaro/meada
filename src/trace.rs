@@ -937,6 +937,45 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// The entry points whose process reaches the symbol `id`, sorted by identity, each with the
+    /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
+    /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
+    /// links included, ambiguous calls and links not) and membership agrees with the process
+    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores. A node
+    /// below the limit is no step of the tree, and what the limit cut can hide a node above
+    /// it, through `Seen`: E reaches X at depth 255, whose callee Y is cut, and later E calls X
+    /// directly, shown as seen without expanding Y's other callee Z. Z is no step of E's tree,
+    /// yet `processes_of(Z)` lists E.
+    pub(crate) fn processes_of(&self, id: &'a str) -> Vec<(usize, &'a EntryPoint)> {
+        // What reaches each node through one edge.
+        let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
+        let nodes: HashSet<&str> = (self.symbols.keys().chain(self.callees.keys()))
+            .copied()
+            .collect();
+        for from in nodes {
+            for edge in self.edges(from) {
+                if let Edge::Call { to, .. } | Edge::Link { to, .. } = edge {
+                    up.entry(to).or_default().push(from);
+                }
+            }
+        }
+        let mut reached = HashSet::from([id]);
+        let mut todo = vec![id];
+        while let Some(node) = todo.pop() {
+            for &caller in up.get(node).into_iter().flatten() {
+                if reached.insert(caller) {
+                    todo.push(caller);
+                }
+            }
+        }
+        let mut found: Vec<_> = (self.entry_points.values())
+            .filter(|(_, e)| reached.contains(e.site.as_str()))
+            .copied()
+            .collect();
+        found.sort_by(|(_, a), (_, b)| a.identity.cmp(&b.identity));
+        found
+    }
+
     /// The steps of the process `entry` starts, depth first: a step's children are its
     /// `edges`. The walk follows what `trace` down follows, but an ambiguous call or link is
     /// one step that is not expanded, and a symbol is expanded once

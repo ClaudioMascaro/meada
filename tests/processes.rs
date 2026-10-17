@@ -296,6 +296,19 @@ fn a_channel_handler_is_a_channel_entry_point_and_no_export() {
 }
 
 #[test]
+fn search_finds_a_channel_process_by_its_channel_identifier() {
+    let (_, _, catalog) = chain("processes_channel_search");
+    let worker = common::worker(&catalog);
+    let engine = Engine::open(&worker).unwrap();
+
+    let found = engine
+        .search("channel::kafka::orders.created", Some("process"), None)
+        .unwrap();
+
+    assert_golden("chain.search-process-channel.txt", &found);
+}
+
+#[test]
 fn trace_from_a_channel_process_shows_its_tree_and_the_links_it_reaches() {
     let (_, _, catalog) = chain("processes_channel_trace");
     let worker = common::worker(&catalog);

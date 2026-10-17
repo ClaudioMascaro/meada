@@ -44,8 +44,8 @@ impl EntryKind {
         [
             EntryKind::Route,
             EntryKind::Export,
-            EntryKind::Program,
             EntryKind::Channel,
+            EntryKind::Program,
         ]
         .into_iter()
         .find(|k| k.name() == name)
@@ -257,6 +257,61 @@ mod tests {
         (find(&local).into_iter())
             .map(|e| (e.label, e.kind.name()))
             .collect()
+    }
+
+    #[test]
+    fn a_handler_of_two_channels_has_one_entry_each() {
+        let symbols: HashSet<String> = ["r::a.ts::handle"].map(String::from).into();
+        let facts = Facts::default();
+        let files = BTreeMap::from([("a.ts", &facts), ("b.ts", &facts)]);
+        let consumers: Vec<(String, String)> = [
+            ("r::a.ts::handle", "channel::kafka::orders.created"),
+            ("r::a.ts::handle", "channel::kafka::orders.paid"),
+            ("r::a.ts::handle", "channel::kafka"),
+            ("r::b.ts", "channel::rabbitmq::jobs"),
+            ("r::a.ts::handle", "http::GET::/x"),
+            ("r::a.ts::gone", "channel::kafka::ghost"),
+        ]
+        .map(|(s, c)| (s.to_string(), c.to_string()))
+        .into();
+        let local = Local {
+            identity: "r",
+            files: &files,
+            names: &Names::new(&[]),
+            symbols: &symbols,
+            called: &HashSet::new(),
+            exported: &[],
+            providers: &[],
+            consumers: &consumers,
+            programs: &[],
+        };
+
+        let got: Vec<(String, String)> = (channels(&local).into_iter())
+            .map(|e| (e.identity, e.label))
+            .collect();
+
+        let pair = |i: &str, l: &str| (i.to_string(), l.to_string());
+        assert_eq!(
+            got,
+            [
+                pair(
+                    "r::a.ts::handle::channel::kafka::orders.created",
+                    "channel::kafka::orders.created"
+                ),
+                pair(
+                    "r::a.ts::handle::channel::kafka::orders.paid",
+                    "channel::kafka::orders.paid"
+                ),
+                pair(
+                    "r::a.ts::handle::channel::kafka",
+                    "channel::kafka (unresolved)"
+                ),
+                pair(
+                    "r::b.ts::channel::rabbitmq::jobs",
+                    "channel::rabbitmq::jobs"
+                ),
+            ]
+        );
     }
 
     #[test]
