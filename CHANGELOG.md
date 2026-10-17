@@ -111,6 +111,12 @@ tagging.
   point sets in motion, across repositories, under the token budget; an ambiguous call is one
   step listing its candidates, and a symbol is expanded once. `meada export` carries each
   repository's `processes`.
+- Communities and processes in `search` and `context`: `search` takes the kinds `community`
+  (name, repository and member count) and `process` (matched by the entry point's label: name,
+  `process::` identity, entry point kind and repository). `context` on a symbol adds its
+  community, or `community: none`, and the processes it belongs to, found by walking upstream
+  over the same calls and links a process expands (decided links count, ambiguous ones do not),
+  cut under the budget with a count of the rest.
 
 ### Fixed
 

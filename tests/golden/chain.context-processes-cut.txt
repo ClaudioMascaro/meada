@@ -1,0 +1,9 @@
+example.com/chain/catalog lib/products.ts:10 find
+community: lib
+processes: GET /api/products/{} (example.com/chain/catalog), PUT /api/orders/{} (example.com/chain/gateway), +3 more
+function find(id: string) {
+  return { id };
+}
+callers:
+example.com/chain/catalog lib/products.ts:3 load
+callees: none

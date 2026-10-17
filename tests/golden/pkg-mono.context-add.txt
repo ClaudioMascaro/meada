@@ -1,4 +1,6 @@
 example.com/pkg/mono packages/a/src/index.js:1 add
+community: none
+processes: total (example.com/pkg/mono)
 function add(a, b) {
   return a + b;
 }

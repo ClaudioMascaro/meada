@@ -1,4 +1,6 @@
 example.com/acme/web src/math.ts:13 outer
+community: src#2
+processes: none
 function outer(): number {
   function inner(): number {
     return add(1, 2);

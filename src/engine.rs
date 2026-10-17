@@ -295,7 +295,9 @@ impl Engine {
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
     /// by broker kind and name) matches; `document` lists the documents read, matched by path
     /// or title (see `search_documents`); `package` lists the packages, matched by name (see
-    /// `search_packages`); `drift` lists the fields consumers read that a route lacks (see
+    /// `search_packages`); `community` lists the communities, matched by name, and `process`
+    /// the processes, matched by their entry point's label (`search_communities`,
+    /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
     /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
@@ -750,6 +752,19 @@ impl Engine {
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
         let mut lines = vec![line(identity, &mut files, symbol_found, name)];
+        let links = self.links(&exports);
+        // The community and the processes come first: they are short, and the budget cuts the
+        // end of the answer.
+        let community = (export.communities.iter())
+            .find(|c| c.members.contains(&symbol_found.id))
+            .map_or("none", |c| c.name.as_str());
+        lines.push(format!("community: {community}"));
+        let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        let processes: Vec<String> = (graph.processes_of(&symbol_found.id).into_iter())
+            .map(|(n, e)| format!("{} ({})", e.label, repos[n].identity))
+            .collect();
+        let room = budget.unwrap_or(render::DEFAULT_BUDGET) * 4 / PROCESSES_SHARE;
+        lines.push(processes_line(&processes, room));
         lines.extend(text.unwrap_or_else(|| {
             vec![format!(
                 "(span text unavailable: {} changed since indexing)",
@@ -757,7 +772,6 @@ impl Engine {
             )]
         }));
         lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        let links = self.links(&exports);
         lines.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
@@ -1102,6 +1116,28 @@ fn relative(from: &Path, to: &Path) -> String {
     } else {
         parts.join("/")
     }
+}
+
+/// The processes line of `context` takes at most this share of the budget (one over it), so the
+/// rest of the answer keeps room.
+const PROCESSES_SHARE: usize = 4;
+
+/// `processes: <a>, <b>, +<n> more`: the entries that fit in `room` bytes and a count of the
+/// rest, or `processes: none`.
+fn processes_line(entries: &[String], room: usize) -> String {
+    if entries.is_empty() {
+        return "processes: none".into();
+    }
+    let line = |kept: usize| {
+        let mut line = format!("processes: {}", entries[..kept].join(", "));
+        let rest = entries.len() - kept;
+        if rest > 0 {
+            line += &format!("{} +{rest} more", if kept > 0 { "," } else { "" });
+        }
+        line
+    };
+    let kept = (0..=entries.len()).rev().find(|&k| line(k).len() <= room);
+    line(kept.unwrap_or(0))
 }
 
 /// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.

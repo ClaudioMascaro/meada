@@ -89,6 +89,17 @@ modules updates it.
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
   `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
   package name are no call for a person to decide.
+- Communities and processes in `search` and `context` (spec #31): `search` kind `community`
+  (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
+  name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>
+  (<kind>)`, matched by the entry point's label, the identity being what `trace` starts from.
+  `context` on a symbol puts two lines right after its first line, so the budget cuts the tail
+  and not them: `community: <name>` (or `none`, read from `Export::communities`) and
+  `processes: <label> (<repository>), ...` (or `none`), sorted by entry point identity.
+  `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
+  node, so membership is the reachability the process walk follows; the line takes at most
+  `PROCESSES_SHARE` (a quarter) of the budget and ends `+<n> more` for the entries left out
+  (`processes_line`).
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
   variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
   repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
