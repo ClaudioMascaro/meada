@@ -96,8 +96,8 @@ modules updates it.
   `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
   found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
   `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.
-  Children of a step: its calls in source order (then identity), then what each call reaches;
-  an ambiguous call is one step listing its candidates; a symbol is expanded at its first
+  Children of a step are `Graph::edges` (calls in source order, then identity, then what each
+  call reaches); an ambiguous call or link is one step listing its candidates; a symbol is expanded at its first
   occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
   points themselves are in `entry.rs`.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link

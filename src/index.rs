@@ -434,7 +434,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let rows = resolve_file(identity, path, facts, &resolvers[&packs[path]], &names);
         symbols.extend(rows.symbols.iter().map(|(id, ..)| id.clone()));
         for call in &rows.calls {
-            called.extend(call.target.iter().chain(&call.candidates).cloned());
+            // A self-call is no caller: recursion keeps an exported function a door.
+            let reached = call.target.iter().chain(&call.candidates);
+            called.extend(reached.filter(|t| **t != call.caller).cloned());
         }
         let resolved = blake3::hash(&serde_json::to_vec(&rows)?)
             .to_hex()

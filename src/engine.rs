@@ -121,6 +121,16 @@ impl Engine {
         package::consume(&mut exports, &providers);
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
+        // The stored entry points are candidates: a call that reaches an export through a
+        // package import of its own repository (a monorepo) makes it no door, at any level.
+        for export in &mut exports {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            (export.entry_points).retain(|e| !imported.contains(e.identity.as_str()));
+        }
         // Shapes imported from a package fill from the shapes it keeps (issue #175).
         package::shapes(&mut exports, &providers);
         Ok(exports)

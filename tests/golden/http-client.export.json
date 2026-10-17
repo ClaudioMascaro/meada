@@ -167,33 +167,15 @@
         },
         {
           "depth": 1,
-          "repository": "example.com/acme/api",
+          "repository": "example.com/acme/client",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/acme/api::app/api/users/route.ts::GET",
-          "reason": "2 providers fit; host unresolved; served by example.com/acme/api"
-        },
-        {
-          "depth": 2,
-          "repository": "example.com/acme/api",
-          "level": "exact",
           "via": "call",
-          "node": "example.com/acme/api::lib/db.ts::query"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/backend",
-          "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
-          "reason": "2 providers fit; host unresolved; served by example.com/acme/backend"
-        },
-        {
-          "depth": 2,
-          "repository": "example.com/acme/backend",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/backend::src/routes/users.ts::list"
+          "node": "example.com/acme/client::src/client.ts::users::fetch#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/api::app/api/users/route.ts::GET",
+            "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+          ]
         }
       ]
     }

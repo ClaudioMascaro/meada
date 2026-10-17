@@ -78,20 +78,16 @@
         "via": "call"
       },
       {
+        "candidates": [
+          "example.com/chain/catalog::app/api/health/route.ts::GET",
+          "example.com/chain/gateway::src/server.ts::GET /api/health"
+        ],
         "depth": 2,
         "level": "ambiguous",
-        "node": "example.com/chain/catalog::app/api/health/route.ts::GET",
-        "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog",
-        "repository": "example.com/chain/catalog",
-        "via": "link"
-      },
-      {
-        "depth": 2,
-        "level": "ambiguous",
-        "node": "example.com/chain/gateway::src/server.ts::GET /api/health",
-        "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway",
-        "repository": "example.com/chain/gateway",
-        "via": "link"
+        "mark": "ambiguous",
+        "node": "example.com/chain/web::src/status.ts::health::fetch#0",
+        "repository": "example.com/chain/web",
+        "via": "call"
       },
       {
         "depth": 1,

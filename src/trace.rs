@@ -700,7 +700,7 @@ enum Mark {
     Cycle,
     /// The node was expanded earlier in the process: shown as a reference.
     Seen,
-    /// An ambiguous call: one step listing its candidates, not expanded.
+    /// An ambiguous call or link: one step listing its candidates, not expanded.
     Ambiguous,
     /// A consumer whose contract Meada could not read (`node` is its call site).
     Unresolved,
@@ -709,7 +709,14 @@ enum Mark {
     /// A channel side Meada could not name, which links to nothing (`node` is its site).
     Produces,
     Consumes,
+    /// The branch is `PROCESS_DEPTH` deep: shown, not expanded.
+    DepthLimit,
 }
+
+/// How deep a process walk follows one branch before it stops and says so.
+// ponytail: a fixed depth keeps the recursion off the stack limit however long a call chain is;
+// a walk with its own stack lifts it.
+const PROCESS_DEPTH: usize = 256;
 
 /// One step of a process: the structured list `trace` renders and the export carries.
 pub(crate) struct Step<'a> {
@@ -723,8 +730,8 @@ pub(crate) struct Step<'a> {
     /// for a note, the call site or symbol it is about.
     node: &'a str,
     mark: Option<Mark>,
-    /// The candidates of an ambiguous call.
-    candidates: &'a [String],
+    /// The candidates of an ambiguous call or link.
+    candidates: Vec<&'a str>,
     contract: Option<&'a str>,
 }
 
@@ -737,7 +744,7 @@ impl<'a> Step<'a> {
             level,
             node,
             mark: None,
-            candidates: &[],
+            candidates: Vec::new(),
             contract: None,
         }
     }
@@ -781,11 +788,158 @@ struct ProcessStep {
     contract: Option<String>,
 }
 
+/// What a step of a process goes on to.
+enum Edge<'a> {
+    /// An unresolved channel side at `site`, `Produces` or `Consumes` `contract`.
+    Side {
+        site: &'a str,
+        repo: usize,
+        mark: Mark,
+        contract: &'a str,
+    },
+    /// A call to the symbol `to`.
+    Call { to: &'a str, level: Option<Level> },
+    /// An ambiguous call or link: a guess, so one step listing `candidates`, not followed.
+    /// `at` is the call site.
+    Guess {
+        at: &'a str,
+        repo: usize,
+        level: Option<Level>,
+        candidates: Vec<&'a str>,
+    },
+    /// A consumer at `at` that nothing serves: `contract` is `None` when Meada could not read it.
+    Dead {
+        at: &'a str,
+        repo: usize,
+        contract: Option<&'a str>,
+    },
+    /// A link followed to its far end `to`.
+    Link { to: &'a str, link: &'a Link },
+}
+
 impl<'a> Graph<'a> {
+    /// The edges the symbol or file `id` expands into, in order: its unresolved channel sides,
+    /// then each outgoing call in source order of its call site (then identity) with what it
+    /// reaches, then, for a writer or producer, the readers of what it writes. The one place
+    /// that says which edges a step has.
+    fn edges(&self, id: &'a str) -> Vec<Edge<'a>> {
+        let mut edges = Vec::new();
+        self.sides_at(id, self.repo(id), &mut edges);
+        let mut shown = HashSet::new();
+        for &call in self.callees.get(id).into_iter().flatten() {
+            self.call_edges(call, &mut shown, &mut edges);
+        }
+        // A writer goes on to the readers of what it writes; a repository-level reader ends
+        // the branch.
+        for link in self.into.get(id).into_iter().flatten() {
+            let reader = link.consumer.as_str();
+            let reaches = self.ends(reader) || self.symbols.contains_key(reader);
+            if reaches && shown.insert((reader, true)) {
+                edges.push(Edge::Link { to: reader, link });
+            }
+        }
+        edges
+    }
+
+    /// What one call reaches, as `Walk::call_down` finds it, but an ambiguous call or link is
+    /// one guess.
+    fn call_edges(
+        &self,
+        (n, c): Call<'a>,
+        shown: &mut HashSet<(&'a str, bool)>,
+        edges: &mut Vec<Edge<'a>>,
+    ) {
+        if c.target.is_none() && !c.candidates.is_empty() && shown.insert((&c.id, false)) {
+            edges.push(Edge::Guess {
+                at: &c.id,
+                repo: n,
+                level: c.level,
+                candidates: c.candidates.iter().map(String::as_str).collect(),
+            });
+        }
+        if let Some(t) = &c.target
+            && let Some(&(_, s)) = self.symbols.get(t.as_str())
+            && shown.insert((&s.id, false))
+        {
+            edges.push(Edge::Call {
+                to: &s.id,
+                level: c.level,
+            });
+        }
+        let consumers = self.consumers.get(c.id.as_str());
+        for consumer in consumers.into_iter().flatten() {
+            let out = self.out.get(c.id.as_str()).into_iter().flatten();
+            let links: Vec<&Link> = match &consumer.contract {
+                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
+                // An unresolved consumer has links only through a decision, on a contract no
+                // other consumer of the site has.
+                None => {
+                    let others = |l: &&&Link| {
+                        let mut all = consumers.into_iter().flatten();
+                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
+                    };
+                    out.filter(|l| !others(l)).copied().collect()
+                }
+            };
+            if links.is_empty() {
+                edges.push(Edge::Dead {
+                    at: &c.id,
+                    repo: n,
+                    contract: consumer.contract.as_deref(),
+                });
+            }
+            let (guesses, links): (Vec<&Link>, Vec<&Link>) =
+                links.into_iter().partition(|l| l.level == Level::Ambiguous);
+            let candidates: Vec<&str> = (guesses.iter())
+                .map(|l| l.provider.as_str())
+                .filter(|p| shown.insert((p, true)))
+                .collect();
+            if !candidates.is_empty() {
+                edges.push(Edge::Guess {
+                    at: &c.id,
+                    repo: n,
+                    level: Some(Level::Ambiguous),
+                    candidates,
+                });
+            }
+            for link in links {
+                if shown.insert((&link.provider, true)) {
+                    edges.push(Edge::Link {
+                        to: &link.provider,
+                        link,
+                    });
+                }
+            }
+        }
+        self.sides_at(&c.id, n, edges);
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in self.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if shown.insert((handler, true)) {
+                edges.push(Edge::Link { to: handler, link });
+            }
+        }
+    }
+
+    /// The unresolved channel sides at `site`, one edge each.
+    fn sides_at(&self, site: &'a str, repo: usize, edges: &mut Vec<Edge<'a>>) {
+        for &(verb, contract) in self.unresolved_sides.get(site).into_iter().flatten() {
+            let mark = match verb {
+                "produces" => Mark::Produces,
+                _ => Mark::Consumes,
+            };
+            edges.push(Edge::Side {
+                site,
+                repo,
+                mark,
+                contract,
+            });
+        }
+    }
+
     /// The steps of the process `entry` starts, depth first: a step's children are its
-    /// outgoing calls in source order of their call sites, then by identity, each followed
-    /// through the links it consumes or produces. The walk follows what `trace` down follows,
-    /// but an ambiguous call is one step that is not expanded, and a symbol is expanded once
+    /// `edges`. The walk follows what `trace` down follows, but an ambiguous call or link is
+    /// one step that is not expanded, and a symbol is expanded once
     /// per process, at its first occurrence.
     pub(crate) fn process(&self, entry: &'a EntryPoint) -> Vec<Step<'a>> {
         let mut descent = Descent {
@@ -815,7 +969,7 @@ impl<'a> Graph<'a> {
                 _ => None,
             },
             mark: s.mark,
-            candidates: s.candidates.to_vec(),
+            candidates: s.candidates.iter().map(|c| c.to_string()).collect(),
             contract: s.contract.map(String::from),
         });
         Process {
@@ -838,15 +992,15 @@ struct Descent<'g, 'a> {
 }
 
 impl<'a> Descent<'_, 'a> {
-    /// Writes the step at `id`, then follows `id` unless that closes a cycle or repeats a node
-    /// already followed.
+    /// Writes the step at `id`, then follows `id` unless that closes a cycle, repeats a node
+    /// already followed or is `PROCESS_DEPTH` deep.
     fn enter(&mut self, id: &'a str, depth: usize, via: Via<'a>, level: Option<Level>) {
         let graph = self.graph;
-        let repo = graph.repo(id);
-        let mut step = Step::new(depth, repo, via, level, id);
+        let mut step = Step::new(depth, graph.repo(id), via, level, id);
         match () {
             _ if self.ancestors.contains(&id) => step = step.marked(Mark::Cycle),
             _ if self.expanded.contains(id) => step = step.marked(Mark::Seen),
+            _ if depth >= PROCESS_DEPTH => step = step.marked(Mark::DepthLimit),
             _ => {}
         }
         let seen = step.mark.is_some();
@@ -856,73 +1010,43 @@ impl<'a> Descent<'_, 'a> {
         }
         self.expanded.insert(id);
         self.ancestors.push(id);
-        self.sides(id, depth + 1, repo);
-        let mut shown = HashSet::new();
-        for &call in graph.callees.get(id).into_iter().flatten() {
-            self.call(call, depth + 1, &mut shown);
-        }
-        // A writer goes on to the readers of what it writes; a repository-level reader ends
-        // the branch.
-        for link in graph.into.get(id).into_iter().flatten() {
-            let reader = link.consumer.as_str();
-            let reaches = graph.ends(reader) || graph.symbols.contains_key(reader);
-            if reaches && shown.insert((reader, true)) {
-                self.reach(reader, depth + 1, link);
-            }
+        for edge in graph.edges(id) {
+            self.follow(edge, depth + 1);
         }
         self.ancestors.pop();
     }
 
-    /// What one call reaches, as `Walk::call_down` finds it, but an ambiguous call stays one
-    /// step.
-    fn call(&mut self, (n, c): Call<'a>, depth: usize, shown: &mut HashSet<(&'a str, bool)>) {
-        let graph = self.graph;
-        if c.target.is_none() && !c.candidates.is_empty() && shown.insert((&c.id, false)) {
-            let mut step = Step::new(depth, n, Via::Call, c.level, &c.id).marked(Mark::Ambiguous);
-            step.candidates = &c.candidates;
-            self.steps.push(step);
-        }
-        if let Some(t) = &c.target
-            && let Some(&(_, s)) = graph.symbols.get(t.as_str())
-            && shown.insert((&s.id, false))
-        {
-            self.enter(&s.id, depth, Via::Call, c.level);
-        }
-        let consumers = graph.consumers.get(c.id.as_str());
-        for consumer in consumers.into_iter().flatten() {
-            let out = graph.out.get(c.id.as_str()).into_iter().flatten();
-            let links: Vec<&Link> = match &consumer.contract {
-                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
-                // An unresolved consumer has links only through a decision, on a contract no
-                // other consumer of the site has.
-                None => {
-                    let others = |l: &&&Link| {
-                        let mut all = consumers.into_iter().flatten();
-                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
-                    };
-                    out.filter(|l| !others(l)).copied().collect()
-                }
-            };
-            if links.is_empty() {
-                let step = Step::new(depth, n, Via::Call, None, &c.id);
-                self.steps.push(match &consumer.contract {
+    /// The step or steps `edge` makes at `depth`.
+    fn follow(&mut self, edge: Edge<'a>, depth: usize) {
+        match edge {
+            Edge::Side {
+                site,
+                repo,
+                mark,
+                contract,
+            } => {
+                let step = Step::new(depth, repo, Via::Call, None, site);
+                self.steps.push(step.marked(mark).about(contract));
+            }
+            Edge::Call { to, level } => self.enter(to, depth, Via::Call, level),
+            Edge::Guess {
+                at,
+                repo,
+                level,
+                candidates,
+            } => {
+                let mut step = Step::new(depth, repo, Via::Call, level, at);
+                step.candidates = candidates;
+                self.steps.push(step.marked(Mark::Ambiguous));
+            }
+            Edge::Dead { at, repo, contract } => {
+                let step = Step::new(depth, repo, Via::Call, None, at);
+                self.steps.push(match contract {
                     Some(contract) => step.marked(Mark::NoProvider).about(contract),
                     None => step.marked(Mark::Unresolved),
                 });
             }
-            for link in links {
-                if shown.insert((&link.provider, true)) {
-                    self.reach(&link.provider, depth, link);
-                }
-            }
-        }
-        self.sides(&c.id, depth, n);
-        // A call that produces to a channel goes on to the handlers of its consumers.
-        for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
-            let handler = link.consumer.as_str();
-            if shown.insert((handler, true)) {
-                self.reach(handler, depth, link);
-            }
+            Edge::Link { to, link } => self.reach(to, depth, link),
         }
     }
 
@@ -935,19 +1059,6 @@ impl<'a> Descent<'_, 'a> {
                 self.steps.push(step);
             }
             false => self.enter(id, depth, Via::Link(link), level),
-        }
-    }
-
-    /// The unresolved channel sides at `site`, one step each.
-    fn sides(&mut self, site: &'a str, depth: usize, repo: usize) {
-        let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
-        for &(verb, contract) in sides {
-            let mark = match verb {
-                "produces" => Mark::Produces,
-                _ => Mark::Consumes,
-            };
-            let step = Step::new(depth, repo, Via::Call, None, site);
-            self.steps.push(step.marked(mark).about(contract));
         }
     }
 }
@@ -1021,6 +1132,7 @@ impl<'a> Walk<'_, 'a> {
                 };
                 row.text += match seen {
                     Some(Mark::Cycle) => " (cycle)",
+                    Some(Mark::DepthLimit) => " (depth limit)",
                     Some(_) => " (see above)",
                     None => "",
                 };

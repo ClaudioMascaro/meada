@@ -1328,11 +1328,14 @@
         },
         {
           "depth": 1,
-          "repository": "example.com/pkg/shared",
+          "repository": "example.com/pkg/web",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/pkg/shared::bare/src/thing.ts::thing",
-          "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0); import path"
+          "via": "call",
+          "node": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/pkg/shared::bare/src/thing.ts::thing"
+          ]
         }
       ]
     },
@@ -1408,19 +1411,15 @@
         },
         {
           "depth": 1,
-          "repository": "example.com/pkg/shared",
+          "repository": "example.com/pkg/web",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/pkg/shared::sealed/src/one.ts::seal",
-          "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/pkg/shared",
-          "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/pkg/shared::sealed/src/two.ts::seal",
-          "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+          "via": "call",
+          "node": "example.com/pkg/web::src/text.ts::lock::seal#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/pkg/shared::sealed/src/one.ts::seal",
+            "example.com/pkg/shared::sealed/src/two.ts::seal"
+          ]
         }
       ]
     },

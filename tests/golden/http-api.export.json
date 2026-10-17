@@ -383,6 +383,27 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/api::app/api/health/route.js::http::GET::/api/health",
+      "kind": "route",
+      "label": "GET /api/health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/api::app/api/health/route.js"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/api::lib/log.js::withLogging"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE::http::DELETE::/api/users/{}",
       "kind": "route",
       "label": "DELETE /api/users/{}",

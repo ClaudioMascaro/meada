@@ -41,7 +41,7 @@ impl EntryKind {
 }
 
 /// One entry point: its identity, kind and label (what names its process), and the `site`
-/// the process starts from, a symbol of the repository.
+/// the process starts from, a symbol or a code file of the repository.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntryPoint {
     pub identity: String,
@@ -71,17 +71,24 @@ pub fn find(local: &Local) -> Vec<EntryPoint> {
     let mut found = routes.clone();
     found.extend(exports(local, &served));
     found.sort_by(|a, b| a.identity.cmp(&b.identity));
+    // The same handler can be registered twice on one full path.
+    found.dedup_by(|a, b| a.identity == b.identity);
     found
 }
 
-/// One entry point per route a handler (a symbol, not a file) serves.
+/// One entry point per route a handler serves: a symbol, or a code file when no function of its
+/// own serves it (its process starts from the file's top-level calls). A route only a document
+/// lists is no entry point.
 fn routes(local: &Local) -> Vec<EntryPoint> {
+    let files: HashSet<String> = (local.files.keys())
+        .map(|path| format!("{}::{path}", local.identity))
+        .collect();
     let mut found = Vec::new();
     for (site, contract) in local.providers {
         let Some((method, path)) = http::route(contract) else {
             continue;
         };
-        if !local.symbols.contains(site) {
+        if !local.symbols.contains(site) && !files.contains(site) {
             continue;
         }
         found.push(EntryPoint {

@@ -4193,19 +4193,15 @@
         },
         {
           "depth": 2,
-          "repository": "example.com/chain/catalog",
+          "repository": "example.com/chain/web",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/chain/catalog::app/api/health/route.ts::GET",
-          "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
-        },
-        {
-          "depth": 2,
-          "repository": "example.com/chain/gateway",
-          "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/chain/gateway::src/server.ts::GET /api/health",
-          "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+          "via": "call",
+          "node": "example.com/chain/web::src/status.ts::health::fetch#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/chain/catalog::app/api/health/route.ts::GET",
+            "example.com/chain/gateway::src/server.ts::GET /api/health"
+          ]
         },
         {
           "depth": 1,
@@ -5443,19 +5439,15 @@
         },
         {
           "depth": 1,
-          "repository": "example.com/chain/catalog",
+          "repository": "example.com/chain/web",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/chain/catalog::app/api/ping/route.ts::GET",
-          "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/chain/gateway",
-          "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
-          "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+          "via": "call",
+          "node": "example.com/chain/web::src/open.ts::ping::fetch#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/chain/catalog::app/api/ping/route.ts::GET",
+            "example.com/chain/gateway::src/ping.ts::GET /api/ping"
+          ]
         }
       ]
     },

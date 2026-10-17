@@ -217,20 +217,6 @@
   ],
   "processes": [
     {
-      "entry_point": "example.com/pkg/mono::packages/a/src/index.js::add",
-      "kind": "export",
-      "label": "add",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/pkg/mono",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/pkg/mono::packages/a/src/index.js::add"
-        }
-      ]
-    },
-    {
       "entry_point": "example.com/pkg/mono::packages/b/src/app.ts::total",
       "kind": "export",
       "label": "total",
@@ -268,9 +254,12 @@
           "depth": 1,
           "repository": "example.com/pkg/mono",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/pkg/mono::packages/a/src/index.js::add",
-          "reason": "2 providers fit; package::npm::@example/a ^1.0.0 (local 1.0.0); import main"
+          "via": "call",
+          "node": "example.com/pkg/mono::packages/c/src/use.js::sum::add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/pkg/mono::packages/a/src/index.js::add"
+          ]
         }
       ]
     }

@@ -61,9 +61,13 @@ one for the area a change touches.
   `example.com/chain/gateway::src/server.ts::GET /api/health::http::GET::/api/health`); an export
   is the exported function or method's own symbol identity. Its label is `<METHOD> <path>` for a
   route and the qualified name for an export. A process is addressed as `process::<entry point
-  identity>` and named by the label; only a handler that is a symbol is a route entry point (a
-  route served by a file has none). A handler serving several routes has an entry point per
-  contract.
+  identity>` and named by the label. A route whose handler is a file with no function of its own
+  (`export const GET = withAuth(...)`) is a route entry point at the file's identity
+  (`<repository>::<path>`), its process starting from the file's top-level calls; a side only
+  a document lists has none. A handler serving several routes has an entry point per contract,
+  and entry points are unique by identity. The stored export entry points are candidates:
+  `Engine::exports` drops, after `package::import`, each one that is the target of an import
+  from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
   `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
   path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
@@ -88,7 +92,7 @@ one for the area a change touches.
   empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
   `kind` being `route` or `export`, each step `{depth, level, repository, via, node, ...}`: `via`
   is `entry`, `call` or `link` (a link step has the link's `reason`), `node` the symbol, file
-  or side reached (a note's call site), and `mark` (`cycle`, `seen`, `ambiguous` with its
+  or side reached (a note's call site), and `mark` (`cycle`, `seen`, `depth-limit`, `ambiguous` with its
   `candidates`, `unresolved`, `no-provider` with its `contract`, `produces` or `consumes` of an
   unresolved channel) when the step is not a plain node; steps are in walk order and cross
   repositories; `imports` (absent when empty) lists each
@@ -242,8 +246,9 @@ one for the area a change touches.
   (`entry::Local`), and the `site` symbol its process starts from. The walk (`Graph::process`),
   `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
   stored entry points. A process is walked on demand from the stored calls and the links of the
-  query, never stored; a new thing the walk must follow is one more arm in `Descent::enter` or
-  `Descent::call`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
+  query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
+  one place that says which edges a step expands, which an upstream walk inverts) and its arm
+  in `Descent::follow`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
   `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
@@ -560,13 +565,17 @@ one for the area a change touches.
   `require` are not followed.
 - `entry.rs`: an export entry point is a function, or a method of an exported class (a
   constructor excepted), that the `exports` rows name and no call reaches in its repository,
-  an ambiguous candidate counting as a caller; a method of a class that is not exported, a
+  an ambiguous candidate counting as a caller and a self-call not; a call through a package
+  import of its own repository counts too, but only at query time (`Engine::exports`), so the
+  stored rows over-list in a monorepo. A method of a class that is not exported, a
   default-exported anonymous function and an export the resolver cannot place are not found (no
-  marker). A route handler that is a file, not a symbol (`export const GET = withAuth(...)`,
-  an Express handler Meada could not find), has no entry point.
-- `trace.rs` (process walk): a link at the `ambiguous` level is followed as `trace` down
-  follows it (each provider a step, expanded); only an ambiguous call is one unexpanded step.
-  A process is walked down only; `trace` up from `process::...` answers with a note.
+  marker). A route handler Meada could not find (an Express handler passed as a parameter) has
+  no entry point.
+- `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
+  candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
+  up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
+  branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
+  expanded, so a longer call chain is cut.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

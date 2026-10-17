@@ -344,19 +344,15 @@
         },
         {
           "depth": 1,
-          "repository": "example.com/acme/billing",
+          "repository": "example.com/acme/client",
           "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/acme/billing::app/audit/route.ts::GET",
-          "reason": "2 providers fit; gateway prefix /billing"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/orders",
-          "level": "ambiguous",
-          "via": "link",
-          "node": "example.com/acme/orders::app/billing/audit/route.ts::GET",
-          "reason": "2 providers fit; host unresolved; served by example.com/acme/orders"
+          "via": "call",
+          "node": "example.com/acme/client::src/client.ts::audit::fetch#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/billing::app/audit/route.ts::GET",
+            "example.com/acme/orders::app/billing/audit/route.ts::GET"
+          ]
         }
       ]
     },
