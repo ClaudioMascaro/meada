@@ -3158,6 +3158,80 @@
       "range": "^1.0.0"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/chain/web::src/api/body.ts::get",
+        "example.com/chain/web::src/drift.ts::both",
+        "example.com/chain/web::src/drift.ts::customerEmail",
+        "example.com/chain/web::src/drift.ts::idLength",
+        "example.com/chain/web::src/drift.ts::pair",
+        "example.com/chain/web::src/drift.ts::rebound"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/chain/web::src/api/client.ts::request",
+        "example.com/chain/web::src/dashboard.ts::cancel",
+        "example.com/chain/web::src/orders.ts::cancelOrder",
+        "example.com/chain/web::src/orders.ts::createOrder",
+        "example.com/chain/web::src/orders.ts::listOrders"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/chain/web::src/api/typed.ts::enveloped",
+        "example.com/chain/web::src/declared.ts::wrapped"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/chain/web::src/api/typed.ts::fetchAs",
+        "example.com/chain/web::src/declared.ts::viaReturn"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/chain/web::src/api/typed.ts::getJson",
+        "example.com/chain/web::src/declared.ts::counts",
+        "example.com/chain/web::src/shared.ts::argument"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/chain/web::src/api/typed.ts::search",
+        "example.com/chain/web::src/declared.ts::searched"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/chain/web::src/batches.ts::shadowed",
+        "example.com/chain/web::src/batches.ts::shadowed.inner"
+      ]
+    },
+    {
+      "name": "src#8",
+      "members": [
+        "example.com/chain/web::src/dashboard.ts::dashboard",
+        "example.com/chain/web::src/status.ts::health",
+        "example.com/chain/web::src/status.ts::track"
+      ]
+    },
+    {
+      "name": "src#9",
+      "members": [
+        "example.com/chain/web::src/drift.ts::load",
+        "example.com/chain/web::src/drift.ts::page"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/web::package.json::dependencies::@chain/contracts",

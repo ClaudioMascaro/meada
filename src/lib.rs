@@ -2,6 +2,7 @@
 //! server and the tests share.
 
 mod channel;
+mod community;
 mod config;
 mod contract;
 pub mod decide;

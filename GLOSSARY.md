@@ -31,6 +31,13 @@ The seam between a language pack and Meada's shared scope and import resolution,
 connects each call to the definitions it reaches and gives the call a level.
 _Avoid_: driver, frontend, bridge
 
+**Community**:
+A group of symbols in one repository that call each other more than they call the rest, found
+deterministically from the calls at `exact` or `inferred` and named after their most common
+directory (`src`, `src#2` when another community of the repository has that name too). A
+symbol with no such call to or from another symbol belongs to none.
+_Avoid_: cluster, module, component
+
 ### Across repositories
 
 **Peer**:

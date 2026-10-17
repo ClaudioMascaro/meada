@@ -3042,6 +3042,147 @@
       "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#3"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/conformance::src/app.ts::main",
+        "example.com/acme/conformance::src/legacy.cjs::legacy",
+        "example.com/acme/conformance::src/math.ts::add",
+        "example.com/acme/conformance::src/math.ts::double",
+        "example.com/acme/conformance::src/math.ts::scale",
+        "example.com/acme/conformance::src/math.ts::scale.times",
+        "example.com/acme/conformance::src/math.ts::square",
+        "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+        "example.com/acme/conformance::src/util/log.js::default"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/conformance::src/shadow.ts::again",
+        "example.com/acme/conformance::src/shadow.ts::caught",
+        "example.com/acme/conformance::src/shadow.ts::helper",
+        "example.com/acme/conformance::src/shadow.ts::hoisted",
+        "example.com/acme/conformance::src/shadow.ts::listed",
+        "example.com/acme/conformance::src/shadow.ts::looped",
+        "example.com/acme/conformance::src/shadow.ts::nested",
+        "example.com/acme/conformance::src/shadow.ts::plain",
+        "example.com/acme/conformance::src/shadow.ts::rebound",
+        "example.com/acme/conformance::src/shadow.ts::twice",
+        "example.com/acme/conformance::src/shadow.ts::unparenthesized"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/conformance::src/util/format.mjs::format",
+        "example.com/acme/conformance::src/view.tsx::render"
+      ]
+    },
+    {
+      "name": "src/messages",
+      "members": [
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice"
+      ]
+    },
+    {
+      "name": "src/messages#10",
+      "members": [
+        "example.com/acme/conformance::src/messages/redis.ts::append",
+        "example.com/acme/conformance::src/messages/redis.ts::appendBilling"
+      ]
+    },
+    {
+      "name": "src/messages#11",
+      "members": [
+        "example.com/acme/conformance::src/messages/redis.ts::read",
+        "example.com/acme/conformance::src/messages/redis.ts::readBilling"
+      ]
+    },
+    {
+      "name": "src/messages#12",
+      "members": [
+        "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+        "example.com/acme/conformance::src/messages/sqs.ts::record"
+      ]
+    },
+    {
+      "name": "src/messages#13",
+      "members": [
+        "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+        "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling"
+      ]
+    },
+    {
+      "name": "src/messages#2",
+      "members": [
+        "example.com/acme/conformance::src/messages/bullmq.ts::record",
+        "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu"
+      ]
+    },
+    {
+      "name": "src/messages#3",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+        "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+        "example.com/acme/conformance::src/messages/consume.ts::record"
+      ]
+    },
+    {
+      "name": "src/messages#4",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::listen",
+        "example.com/acme/conformance::src/messages/consume.ts::listenRetries"
+      ]
+    },
+    {
+      "name": "src/messages#5",
+      "members": [
+        "example.com/acme/conformance::src/messages/nats.ts::record",
+        "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
+      ]
+    },
+    {
+      "name": "src/messages#6",
+      "members": [
+        "example.com/acme/conformance::src/messages/produce.ts::deliver",
+        "example.com/acme/conformance::src/messages/produce.ts::emit",
+        "example.com/acme/conformance::src/messages/produce.ts::emitRefund"
+      ]
+    },
+    {
+      "name": "src/messages#7",
+      "members": [
+        "example.com/acme/conformance::src/messages/produce.ts::relay",
+        "example.com/acme/conformance::src/messages/produce.ts::retry"
+      ]
+    },
+    {
+      "name": "src/messages#8",
+      "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+        "example.com/acme/conformance::src/messages/queues.ts::queue"
+      ]
+    },
+    {
+      "name": "src/messages#9",
+      "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::record",
+        "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
+      ]
+    },
+    {
+      "name": "src/shapes",
+      "members": [
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
