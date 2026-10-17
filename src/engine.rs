@@ -312,6 +312,12 @@ impl Engine {
         if kind == Some("drift") {
             return self.search_drift(query, budget);
         }
+        if kind == Some("community") {
+            return self.search_communities(query, budget);
+        }
+        if kind == Some("process") {
+            return self.search_processes(query, budget);
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
             None => (true, Some("")),
@@ -322,7 +328,7 @@ impl Engine {
             Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
                 let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
-                             `drift`, `ambiguous` or `unresolved`";
+                             `drift`, `community`, `process`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -504,6 +510,46 @@ impl Engine {
         }
         let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
         Ok(render::budgeted(&lines, budget))
+    }
+
+    /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
+    /// <name> (members: <n>)`.
+    fn search_communities(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, repository and name to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for c in &export.communities {
+                let Some(r) = rank(&c.name.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, n) = (&export.repository, c.members.len());
+                let line = format!("{repository} {} (members: {n})", c.name);
+                hits.push((r, format!("{repository} {}", c.name), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The processes (spec #31) whose entry point's label matches `query`, one line each, as
+    /// `<repository> <label> process::<identity> (<kind>)`: the identity `trace` starts from.
+    fn search_processes(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, identity to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for e in &export.entry_points {
+                let Some(r) = rank(&e.label.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, kind) = (&export.repository, e.kind.name());
+                let line = format!("{repository} {} process::{} ({kind})", e.label, e.identity);
+                hits.push((r, e.identity.clone(), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -1056,6 +1102,16 @@ fn relative(from: &Path, to: &Path) -> String {
     } else {
         parts.join("/")
     }
+}
+
+/// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.
+fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<usize>) -> String {
+    hits.sort();
+    if hits.is_empty() {
+        return format!("no matches for `{query}`\n");
+    }
+    let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+    render::budgeted(&lines, budget)
 }
 
 /// `name:` followed by the items, or `name: none`.
