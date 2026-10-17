@@ -661,7 +661,7 @@ fn views(export: &str) -> (serde_json::Value, serde_json::Value) {
 #[test]
 fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
     let exports = |(web, gateway, catalog): &Chain| -> Vec<String> {
-        [web, gateway, catalog]
+        [web, gateway, catalog, &worker(web)]
             .iter()
             .map(|r| Engine::open(r).unwrap().export().unwrap())
             .collect()
@@ -681,13 +681,16 @@ fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
         .zip(exports(&cold))
         .enumerate()
     {
-        let (communities, processes) = views(refreshed);
-        let (was_communities, was_processes) = views(before);
-        assert_ne!(
-            communities, was_communities,
-            "communities of repository {n}"
-        );
-        assert_ne!(processes, was_processes, "processes of repository {n}");
+        // The worker (n = 3) is not edited: its views stay, and still equal a cold export.
+        if n < 3 {
+            let (communities, processes) = views(refreshed);
+            let (was_communities, was_processes) = views(before);
+            assert_ne!(
+                communities, was_communities,
+                "communities of repository {n}"
+            );
+            assert_ne!(processes, was_processes, "processes of repository {n}");
+        }
         assert_eq!(*refreshed, cold, "repository {n}");
     }
 }
