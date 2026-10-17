@@ -21,12 +21,22 @@ pub fn tokens(text: &str) -> usize {
     text.len().div_ceil(4)
 }
 
+/// The bytes `tokens` estimated tokens allow, the reverse of `tokens`.
+pub fn bytes(tokens: usize) -> usize {
+    tokens * 4
+}
+
+/// The bytes a line takes in an answer: its text and its newline.
+pub fn line_bytes(line: &str) -> usize {
+    line.len() + 1
+}
+
 /// `lines` within `room` tokens, cut as `budgeted` cuts them, with the cut note naming
 /// `budget`, and how many lines it kept. `room` is below `budget` when the caller appends
 /// lines of its own.
 pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
-    let cap = room * 4;
-    let all: usize = lines.iter().map(|l| l.len() + 1).sum();
+    let cap = bytes(room);
+    let all: usize = lines.iter().map(|l| line_bytes(l)).sum();
     let note = |shown: usize| {
         format!(
             "… cut after {shown} of {} lines (budget {budget} tokens); raise budget for more\n",
@@ -41,7 +51,7 @@ pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
         shown = lines
             .iter()
             .take_while(|l| {
-                used += l.len() + 1;
+                used += line_bytes(l);
                 used <= room
             })
             .count();

@@ -2,6 +2,7 @@
 //! server and the tests share.
 
 mod channel;
+mod community;
 mod config;
 mod contract;
 pub mod decide;
@@ -11,8 +12,11 @@ mod declared;
 mod document;
 mod drift_view;
 pub mod engine;
+mod entry;
 mod http;
 mod index;
+#[doc(hidden)]
+pub use index::with_reversed_walk;
 mod items;
 mod lang;
 mod literals;

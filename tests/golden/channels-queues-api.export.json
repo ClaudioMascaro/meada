@@ -187,6 +187,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/queues/api::src/sqs.ts::enqueue",
+        "example.com/queues/api::src/sqs.ts::enqueueRefund"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/queues/worker::src/nats.ts::literal",
@@ -236,6 +245,127 @@
       "contract": "channel::sqs::refunds",
       "level": "exact",
       "reason": "channel::sqs::refunds"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/queues/api::src/nats.ts::invoicePaid",
+      "kind": "export",
+      "label": "invoicePaid",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/queues/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/queues/api::src/nats.ts::invoicePaid"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/queues/worker::src/nats.ts::literal",
+          "reason": "channel::nats::billing.invoice.paid"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/queues/api::src/nats.ts::orderCreated",
+      "kind": "export",
+      "label": "orderCreated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/queues/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/queues/api::src/nats.ts::orderCreated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/queues/worker::src/nats.ts::onOrder",
+          "reason": "channel::nats::orders.created wildcard orders.>"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/queues/worker::src/nats.ts::oneToken",
+          "reason": "channel::nats::orders.created wildcard orders.*"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/queues/worker::src/nats.ts::middle.nats orders.*.created",
+          "reason": "channel::nats::orders.eu.created wildcard orders.*.created"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/queues/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/queues/worker::src/nats.ts::onOrder",
+          "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "kind": "export",
+      "label": "enqueueOrder",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/queues/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/queues/api::src/sqs.ts::enqueueOrder"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/queues/worker::src/sqs.ts::drain",
+          "reason": "channel::sqs::orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/queues/api::src/sqs.ts::enqueueRefund",
+      "kind": "export",
+      "label": "enqueueRefund",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/queues/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/queues/api::src/sqs.ts::enqueueRefund"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/queues/api::src/sqs.ts::enqueue"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/queues/worker",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/queues/worker::src/sqs.ts::handleRefund",
+          "reason": "channel::sqs::refunds"
+        }
+      ]
     }
   ]
 }

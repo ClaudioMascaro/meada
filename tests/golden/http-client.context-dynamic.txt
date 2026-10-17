@@ -1,4 +1,6 @@
 example.com/acme/client src/client.ts:12 dynamic
+community: none
+processes: dynamic (example.com/acme/client)
 async function dynamic(endpoint: URL) {
   return fetch(endpoint.href);
 }

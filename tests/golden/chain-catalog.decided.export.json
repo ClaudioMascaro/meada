@@ -177,6 +177,17 @@
       "via": null
     }
   ],
+  "communities": [
+    {
+      "name": "lib",
+      "members": [
+        "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "example.com/chain/catalog::lib/products.ts::find",
+        "example.com/chain/catalog::lib/products.ts::load",
+        "example.com/chain/catalog::lib/products.ts::parent"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
@@ -200,6 +211,79 @@
       "reason": "decided by openrouter/jev (p=0.62)",
       "by": "openrouter/jev",
       "p": 0.62
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/chain/catalog::app/api/events/route.ts::POST::http::POST::/api/events",
+      "kind": "route",
+      "label": "POST /api/events",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/catalog",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/catalog::app/api/events/route.ts::POST"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/catalog::app/api/health/route.ts::GET::http::GET::/api/health",
+      "kind": "route",
+      "label": "GET /api/health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/catalog",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/catalog::app/api/health/route.ts::GET"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::http::GET::/api/products/{}",
+      "kind": "route",
+      "label": "GET /api/products/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/catalog",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::parent"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::load",
+          "mark": "cycle"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/chain/catalog",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/catalog::lib/products.ts::find"
+        }
+      ]
     }
   ]
 }

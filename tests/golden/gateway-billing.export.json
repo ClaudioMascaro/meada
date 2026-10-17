@@ -147,5 +147,49 @@
       "level": "inferred",
       "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
     }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/billing::app/audit/route.ts::GET::http::GET::/audit",
+      "kind": "route",
+      "label": "GET /audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/billing",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/billing::app/audit/route.ts::GET"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/billing::app/status/route.ts::GET::http::GET::/status",
+      "kind": "route",
+      "label": "GET /status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/billing",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/billing::app/status/route.ts::GET"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/billing::app/v1/invoices/route.ts::GET::http::GET::/v1/invoices",
+      "kind": "route",
+      "label": "GET /v1/invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/billing",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/billing::app/v1/invoices/route.ts::GET"
+        }
+      ]
+    }
   ]
 }

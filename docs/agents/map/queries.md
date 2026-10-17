@@ -89,6 +89,30 @@ modules updates it.
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
   `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
   package name are no call for a person to decide.
+- Communities and processes in `search` and `context` (spec #31): `search` kind `community`
+  (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
+  name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>
+  (<kind>)`, matched by the entry point's label, the identity being what `trace` starts from.
+  `context` on a symbol puts two lines right after its first line, so the budget cuts the tail
+  and not them: `community: <name>` (or `none`, read from `Export::communities`) and
+  `processes: <label> (<repository>), ...` (or `none`), sorted by entry point identity.
+  `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
+  node, so membership is the reachability the process walk follows. The line gets the room the
+  rest of the answer leaves under the budget (`processes_line`): the entries that fit, then
+  `+<n> more` for the rest, which alone is the least it holds. Two processes of one repository
+  with the same label show as their `process::<identity>`.
+- `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
+  variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
+  repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
+  `Mark` (cycle, seen, ambiguous, unresolved, no provider, an unresolved channel side, depth
+  limit).
+  `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
+  found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
+  `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.
+  Children of a step are `Graph::edges` (calls in source order, then identity, then what each
+  call reaches); an ambiguous call or link is one step listing its candidates; a symbol is expanded at its first
+  occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
+  points themselves are in `entry.rs`.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,

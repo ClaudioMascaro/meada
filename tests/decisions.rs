@@ -151,8 +151,13 @@ fn inserting_a_line_above_a_decided_call_leaves_the_decision_applied() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_eq!(export.matches("\"level\": \"decided\"").count(), 2);
-    assert!(!export.contains("\"level\": \"ambiguous\""));
+    // The links alone: the processes show levels too.
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let levels: Vec<&str> = (export["links"].as_array().unwrap().iter())
+        .map(|l| l["level"].as_str().unwrap())
+        .collect();
+    assert_eq!(levels.iter().filter(|l| **l == "decided").count(), 2);
+    assert!(!levels.contains(&"ambiguous"));
 }
 
 #[test]

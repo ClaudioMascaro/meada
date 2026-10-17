@@ -22,6 +22,11 @@ modules updates it.
   `decisions`, loaded together at discovery.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
   shelling out to `git`.
+- `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
+  symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
+  `Facts::programs` the packs set) and
+  returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
+  `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's
@@ -54,6 +59,18 @@ modules updates it.
   `export` loads as `Export::shapes` (`serde(skip)`, issue #175). Every `manifests` row is folded
   into the configs digest, so an edited `package.json` or `tsconfig.json` extracts again. `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
+- `community.rs`: communities (spec #31). Last in `refresh`, after the code rows,
+  `write_communities` rewrites the `communities` table (name, member) from the `calls` rows at
+  `exact` or `inferred`: each symbol in one is a node (a top-level caller is a file, no node),
+  so an unchanged repository keeps its rows through the early exit and a
+  changed one recomputes them from scratch. `communities(calls, dir)` builds the undirected
+  graph (a call site adds 1 to the edge between two distinct symbols, a call to self none, so a
+  node with no edge is a singleton community) and runs Leiden as spec #31 fixes
+  it, in `i128` only: `local_moving` (identity-order queue, largest strictly positive gain
+  `2m · w_iC − k_i · K_C` minus the stay quantity, ties to the lowest smallest member),
+  `refine` (best choice over singletons in identity order, into a well-connected
+  subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
+  and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches

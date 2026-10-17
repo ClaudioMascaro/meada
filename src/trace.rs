@@ -4,7 +4,10 @@
 
 use std::collections::{HashMap, HashSet};
 
+use serde::Serialize;
+
 use crate::contract::{self, Level, Link};
+use crate::entry::EntryPoint;
 use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, unresolved};
 use crate::repo::Change;
@@ -22,7 +25,8 @@ pub enum Direction {
 
 #[derive(Clone, Copy, Debug)]
 pub enum Start<'a> {
-    /// A symbol, a route or a call site, by identity or by name.
+    /// A symbol, a route or a call site, by identity or by name; or a process, as
+    /// `process::<entry point identity>` (walked down only).
     From(&'a str),
     /// The symbols of the repository where Meada runs whose spans overlap the working-tree
     /// diff against `HEAD`, untracked files included.
@@ -49,15 +53,17 @@ pub(crate) struct Graph<'a> {
     /// The sides only a document lists (spec #21), with the document's path.
     documented: HashMap<&'a str, &'a str>,
     /// The channel sides whose name Meada could not evaluate, by site (the producing call or
-    /// the handler): `produces` or `consumes`, and the contract. They are never linked, so the
+    /// the handler): `Produces` or `Consumes`, and the contract. They are never linked, so the
     /// chain would not otherwise show them.
-    unresolved_sides: HashMap<&'a str, Vec<(&'static str, &'a str)>>,
+    unresolved_sides: HashMap<&'a str, Vec<(Mark, &'a str)>>,
     /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
     /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
     /// handles it: data goes from the provider (a writer, or the call that produces) to that
     /// consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
+    /// The entry points of every repository by identity, with the position of its repository.
+    entry_points: HashMap<&'a str, (usize, &'a EntryPoint)>,
 }
 
 impl<'a> Graph<'a> {
@@ -75,8 +81,12 @@ impl<'a> Graph<'a> {
             unresolved_sides: HashMap::new(),
             out: HashMap::new(),
             into: HashMap::new(),
+            entry_points: HashMap::new(),
         };
         for (n, export) in exports.iter().enumerate() {
+            for e in &export.entry_points {
+                graph.entry_points.insert(&e.identity, (n, e));
+            }
             for s in &export.symbols {
                 graph.symbols.insert(&s.id, (n, s));
             }
@@ -104,15 +114,15 @@ impl<'a> Graph<'a> {
             let produced = export.providers.iter();
             let consumed = export.consumers.iter();
             let sides = produced
-                .map(|p| ("produces", Some(&p.contract), &p.site))
-                .chain(consumed.map(|c| ("consumes", c.contract.as_ref(), &c.site)));
-            for (verb, contract, site) in sides {
+                .map(|p| (Mark::Produces, Some(&p.contract), &p.site))
+                .chain(consumed.map(|c| (Mark::Consumes, c.contract.as_ref(), &c.site)));
+            for (side, contract, site) in sides {
                 if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
                     graph
                         .unresolved_sides
                         .entry(site)
                         .or_default()
-                        .push((verb, contract));
+                        .push((side, contract));
                 }
             }
         }
@@ -162,6 +172,16 @@ impl<'a> Graph<'a> {
             Start::From(from) => match self.find(from, &mut walk) {
                 Lookup::Nodes(ids) => ids.into_iter().for_each(|id| walk.root(id)),
                 Lookup::Call(call) => walk.root_call(call),
+                Lookup::Process(n, entry) => match direction {
+                    Direction::Down => walk.process(n, entry),
+                    Direction::Up => {
+                        let lines = [
+                            "a process is what its entry point sets in motion: trace it down"
+                                .to_string(),
+                        ];
+                        return render::budgeted(&lines, budget);
+                    }
+                },
                 Lookup::Answer(lines) => return render::budgeted(&lines, budget),
             },
         }
@@ -171,6 +191,15 @@ impl<'a> Graph<'a> {
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
+        // A process, by its entry point's identity, and only in this form.
+        if let Some(identity) = from.strip_prefix("process::") {
+            return match self.entry_points.get(identity) {
+                Some(&(n, entry)) => Lookup::Process(n, entry),
+                None => Lookup::Answer(vec![format!(
+                    "no process `{from}`: pass `process::<entry point identity>`"
+                )]),
+            };
+        }
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
         if let Some(kind) = contract::kind_of(from)
             && let Some((provider, consumer)) = kind.sides()
@@ -303,6 +332,8 @@ enum Lookup<'a> {
     /// Symbols, or files serving a route, to start from.
     Nodes(Vec<&'a str>),
     Call(Call<'a>),
+    /// The process of an entry point of the repository at that position.
+    Process(usize, &'a EntryPoint),
     /// No start: the answer says why.
     Answer(Vec<String>),
 }
@@ -545,8 +576,8 @@ impl<'a> Walk<'_, 'a> {
     /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
     fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
         let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
-        for &(verb, contract) in sides {
-            let text = format!("{place} {verb} {}", channel::shown(contract));
+        for &(side, contract) in sides {
+            let text = format!("{place} {} {}", side.verb(), channel::shown(contract));
             self.push(depth, Row::call(text, repo, None));
         }
     }
@@ -649,4 +680,572 @@ fn mark(level: Option<Level>) -> String {
 /// `→[<level>: <reason>]`.
 fn arrow(link: &Link) -> String {
     format!("→[{}: {}]", link.level.name(), link.reason)
+}
+
+/// How a step of a process was reached.
+#[derive(Clone, Copy)]
+enum Via<'a> {
+    /// It is the entry point itself.
+    Entry,
+    /// A call inside a repository, or a note under one.
+    Call,
+    Link(&'a Link),
+}
+
+/// What sets a step apart from a plain node followed once.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum Mark {
+    /// The node is already on the current branch: shown, not expanded.
+    Cycle,
+    /// The node was expanded earlier in the process: shown as a reference.
+    Seen,
+    /// An ambiguous call or link: one step listing its candidates, not expanded.
+    Ambiguous,
+    /// A consumer whose contract Meada could not read (`node` is its call site).
+    Unresolved,
+    /// A consumer of `contract` that no provider serves (`node` is its call site).
+    NoProvider,
+    /// A channel side Meada could not name, which links to nothing (`node` is its site).
+    Produces,
+    Consumes,
+    /// The branch is `PROCESS_DEPTH` deep: shown, not expanded.
+    DepthLimit,
+}
+
+impl Mark {
+    /// The verb of the channel side a mark stands for, `Produces` or `Consumes`.
+    fn verb(self) -> &'static str {
+        match self {
+            Mark::Produces => "produces",
+            _ => "consumes",
+        }
+    }
+}
+
+/// How deep a process walk follows one branch before it stops and says so.
+// ponytail: a fixed depth keeps the recursion off the stack limit however long a call chain is;
+// a walk with its own stack lifts it.
+const PROCESS_DEPTH: usize = 256;
+
+/// One step of a process: the structured list `trace` renders and the export carries.
+pub(crate) struct Step<'a> {
+    depth: usize,
+    /// The position of the repository holding `node`.
+    repo: usize,
+    via: Via<'a>,
+    /// The level of the call or link that reached it.
+    level: Option<Level>,
+    /// What the step is at: a symbol, a file, a repository or a side only a document lists, or
+    /// for a note, the call site or symbol it is about.
+    node: &'a str,
+    mark: Option<Mark>,
+    /// The candidates of an ambiguous call or link.
+    candidates: Vec<&'a str>,
+    contract: Option<&'a str>,
+}
+
+impl<'a> Step<'a> {
+    fn new(depth: usize, repo: usize, via: Via<'a>, level: Option<Level>, node: &'a str) -> Self {
+        Self {
+            depth,
+            repo,
+            via,
+            level,
+            node,
+            mark: None,
+            candidates: Vec::new(),
+            contract: None,
+        }
+    }
+
+    fn marked(mut self, mark: Mark) -> Self {
+        self.mark = Some(mark);
+        self
+    }
+
+    fn about(mut self, contract: &'a str) -> Self {
+        self.contract = Some(contract);
+        self
+    }
+}
+
+/// The process of one entry point as `meada export` shows it.
+#[derive(Serialize)]
+pub(crate) struct Process {
+    entry_point: String,
+    kind: &'static str,
+    label: String,
+    steps: Vec<ProcessStep>,
+}
+
+#[derive(Serialize)]
+struct ProcessStep {
+    depth: usize,
+    repository: String,
+    level: Option<Level>,
+    /// `entry`, `call` or `link`.
+    via: &'static str,
+    node: String,
+    /// The reason of the link that reached the step.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mark: Option<Mark>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    candidates: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract: Option<String>,
+}
+
+/// What a step of a process goes on to.
+enum Edge<'a> {
+    /// An unresolved channel side at `site`, `Produces` or `Consumes` `contract`.
+    Side {
+        site: &'a str,
+        repo: usize,
+        mark: Mark,
+        contract: &'a str,
+    },
+    /// A call to the symbol `to`.
+    Call { to: &'a str, level: Option<Level> },
+    /// An ambiguous call or link: a guess, so one step listing `candidates`, not followed.
+    /// `at` is the call site.
+    Guess {
+        at: &'a str,
+        repo: usize,
+        level: Option<Level>,
+        candidates: Vec<&'a str>,
+    },
+    /// A consumer at `at` that nothing serves: `contract` is `None` when Meada could not read it.
+    Dead {
+        at: &'a str,
+        repo: usize,
+        contract: Option<&'a str>,
+    },
+    /// A link followed to its far end `to`.
+    Link { to: &'a str, link: &'a Link },
+}
+
+impl<'a> Graph<'a> {
+    /// The edges the symbol or file `id` expands into, in order: its unresolved channel sides,
+    /// then each outgoing call in source order of its call site (then identity) with what it
+    /// reaches, then, for a writer or producer, the readers of what it writes. The one place
+    /// that says which edges a step has.
+    fn edges(&self, id: &'a str) -> Vec<Edge<'a>> {
+        let mut edges = Vec::new();
+        self.sides_at(id, self.repo(id), &mut edges);
+        let mut shown = HashSet::new();
+        for &call in self.callees.get(id).into_iter().flatten() {
+            self.call_edges(call, &mut shown, &mut edges);
+        }
+        // A writer goes on to the readers of what it writes; a repository-level reader ends
+        // the branch.
+        for link in self.into.get(id).into_iter().flatten() {
+            let reader = link.consumer.as_str();
+            let reaches = self.ends(reader) || self.symbols.contains_key(reader);
+            if reaches && shown.insert((reader, true)) {
+                edges.push(Edge::Link { to: reader, link });
+            }
+        }
+        edges
+    }
+
+    /// What one call reaches, as `Walk::call_down` finds it, but an ambiguous call or link is
+    /// one guess.
+    fn call_edges(
+        &self,
+        (n, c): Call<'a>,
+        shown: &mut HashSet<(&'a str, bool)>,
+        edges: &mut Vec<Edge<'a>>,
+    ) {
+        if c.target.is_none() && !c.candidates.is_empty() && shown.insert((&c.id, false)) {
+            edges.push(Edge::Guess {
+                at: &c.id,
+                repo: n,
+                level: c.level,
+                candidates: c.candidates.iter().map(String::as_str).collect(),
+            });
+        }
+        if let Some(t) = &c.target
+            && let Some(&(_, s)) = self.symbols.get(t.as_str())
+            && shown.insert((&s.id, false))
+        {
+            edges.push(Edge::Call {
+                to: &s.id,
+                level: c.level,
+            });
+        }
+        let consumers = self.consumers.get(c.id.as_str());
+        for consumer in consumers.into_iter().flatten() {
+            let out = self.out.get(c.id.as_str()).into_iter().flatten();
+            let links: Vec<&Link> = match &consumer.contract {
+                Some(contract) => out.filter(|l| l.contract == *contract).copied().collect(),
+                // An unresolved consumer has links only through a decision, on a contract no
+                // other consumer of the site has.
+                None => {
+                    let others = |l: &&&Link| {
+                        let mut all = consumers.into_iter().flatten();
+                        all.any(|o| o.contract.as_deref() == Some(l.contract.as_str()))
+                    };
+                    out.filter(|l| !others(l)).copied().collect()
+                }
+            };
+            if links.is_empty() {
+                edges.push(Edge::Dead {
+                    at: &c.id,
+                    repo: n,
+                    contract: consumer.contract.as_deref(),
+                });
+            }
+            let (guesses, links): (Vec<&Link>, Vec<&Link>) =
+                links.into_iter().partition(|l| l.level == Level::Ambiguous);
+            let candidates: Vec<&str> = (guesses.iter())
+                .map(|l| l.provider.as_str())
+                .filter(|p| shown.insert((p, true)))
+                .collect();
+            if !candidates.is_empty() {
+                edges.push(Edge::Guess {
+                    at: &c.id,
+                    repo: n,
+                    level: Some(Level::Ambiguous),
+                    candidates,
+                });
+            }
+            for link in links {
+                if shown.insert((&link.provider, true)) {
+                    edges.push(Edge::Link {
+                        to: &link.provider,
+                        link,
+                    });
+                }
+            }
+        }
+        self.sides_at(&c.id, n, edges);
+        // A call that produces to a channel goes on to the handlers of its consumers.
+        for link in self.into.get(c.id.as_str()).into_iter().flatten() {
+            let handler = link.consumer.as_str();
+            if shown.insert((handler, true)) {
+                edges.push(Edge::Link { to: handler, link });
+            }
+        }
+    }
+
+    /// The unresolved channel sides at `site`, one edge each.
+    fn sides_at(&self, site: &'a str, repo: usize, edges: &mut Vec<Edge<'a>>) {
+        for &(mark, contract) in self.unresolved_sides.get(site).into_iter().flatten() {
+            edges.push(Edge::Side {
+                site,
+                repo,
+                mark,
+                contract,
+            });
+        }
+    }
+
+    /// The entry points whose process reaches the symbol `id`, sorted by identity, each with the
+    /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
+    /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
+    /// links included, ambiguous calls and links not) and membership agrees with the process
+    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores: a node
+    /// past depth 256 is no step of the tree, and the limit can hide a node shallower than
+    /// that, through `Seen`. E reaches X at depth 255, so X expands and each of its callees, Y
+    /// among them, is a `depth-limit` step at 256 whose own callee Z is no step; a later direct
+    /// E to X shows X as seen, so Y is not expanded there either, yet `processes_of(Z)` lists E.
+    pub(crate) fn processes_of(&self, id: &'a str) -> Vec<(usize, &'a EntryPoint)> {
+        // What reaches each node through one edge.
+        let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
+        let nodes: HashSet<&str> = (self.symbols.keys().chain(self.callees.keys()))
+            .copied()
+            .collect();
+        for from in nodes {
+            for edge in self.edges(from) {
+                if let Edge::Call { to, .. } | Edge::Link { to, .. } = edge {
+                    up.entry(to).or_default().push(from);
+                }
+            }
+        }
+        let mut reached = HashSet::from([id]);
+        let mut todo = vec![id];
+        while let Some(node) = todo.pop() {
+            for &caller in up.get(node).into_iter().flatten() {
+                if reached.insert(caller) {
+                    todo.push(caller);
+                }
+            }
+        }
+        let mut found: Vec<_> = (self.entry_points.values())
+            .filter(|(_, e)| reached.contains(e.site.as_str()))
+            .copied()
+            .collect();
+        found.sort_by(|(_, a), (_, b)| a.identity.cmp(&b.identity));
+        found
+    }
+
+    /// The steps of the process `entry` starts, depth first: a step's children are its
+    /// `edges`. The walk follows what `trace` down follows, but an ambiguous call or link is
+    /// one step that is not expanded, and a symbol is expanded once
+    /// per process, at its first occurrence.
+    pub(crate) fn process(&self, entry: &'a EntryPoint) -> Vec<Step<'a>> {
+        let mut descent = Descent {
+            graph: self,
+            steps: Vec::new(),
+            ancestors: Vec::new(),
+            expanded: HashSet::new(),
+        };
+        descent.enter(&entry.site, 0, Via::Entry, None);
+        descent.steps
+    }
+
+    /// `entry`'s process as the export carries it.
+    pub(crate) fn export_process(&self, entry: &'a EntryPoint) -> Process {
+        let steps = self.process(entry).into_iter().map(|s| ProcessStep {
+            depth: s.depth,
+            repository: self.workspace.repos[s.repo].identity.clone(),
+            level: s.level,
+            via: match s.via {
+                Via::Entry => "entry",
+                Via::Call => "call",
+                Via::Link(_) => "link",
+            },
+            node: s.node.to_string(),
+            reason: match s.via {
+                Via::Link(link) => Some(link.reason.clone()),
+                _ => None,
+            },
+            mark: s.mark,
+            candidates: s.candidates.iter().map(|c| c.to_string()).collect(),
+            contract: s.contract.map(String::from),
+        });
+        Process {
+            entry_point: entry.identity.clone(),
+            kind: entry.kind.name(),
+            label: entry.label.clone(),
+            steps: steps.collect(),
+        }
+    }
+}
+
+/// The depth-first walk of one process.
+struct Descent<'g, 'a> {
+    graph: &'g Graph<'a>,
+    steps: Vec<Step<'a>>,
+    /// The nodes from the entry point down to the one being followed.
+    ancestors: Vec<&'a str>,
+    /// Nodes already followed once.
+    expanded: HashSet<&'a str>,
+}
+
+impl<'a> Descent<'_, 'a> {
+    /// Writes the step at `id`, then follows `id` unless that closes a cycle, repeats a node
+    /// already followed or is `PROCESS_DEPTH` deep.
+    fn enter(&mut self, id: &'a str, depth: usize, via: Via<'a>, level: Option<Level>) {
+        let graph = self.graph;
+        let mut step = Step::new(depth, graph.repo(id), via, level, id);
+        match () {
+            _ if self.ancestors.contains(&id) => step = step.marked(Mark::Cycle),
+            _ if self.expanded.contains(id) => step = step.marked(Mark::Seen),
+            _ if depth >= PROCESS_DEPTH => step = step.marked(Mark::DepthLimit),
+            _ => {}
+        }
+        let seen = step.mark.is_some();
+        self.steps.push(step);
+        if seen {
+            return;
+        }
+        self.expanded.insert(id);
+        self.ancestors.push(id);
+        for edge in graph.edges(id) {
+            self.follow(edge, depth + 1);
+        }
+        self.ancestors.pop();
+    }
+
+    /// The step or steps `edge` makes at `depth`.
+    fn follow(&mut self, edge: Edge<'a>, depth: usize) {
+        match edge {
+            Edge::Side {
+                site,
+                repo,
+                mark,
+                contract,
+            } => {
+                let step = Step::new(depth, repo, Via::Call, None, site);
+                self.steps.push(step.marked(mark).about(contract));
+            }
+            Edge::Call { to, level } => self.enter(to, depth, Via::Call, level),
+            Edge::Guess {
+                at,
+                repo,
+                level,
+                candidates,
+            } => {
+                let mut step = Step::new(depth, repo, Via::Call, level, at);
+                step.candidates = candidates;
+                self.steps.push(step.marked(Mark::Ambiguous));
+            }
+            Edge::Dead { at, repo, contract } => {
+                let step = Step::new(depth, repo, Via::Call, None, at);
+                self.steps.push(match contract {
+                    Some(contract) => step.marked(Mark::NoProvider).about(contract),
+                    None => step.marked(Mark::Unresolved),
+                });
+            }
+            Edge::Link { to, link } => self.reach(to, depth, link),
+        }
+    }
+
+    /// The step `link` reaches `id` by, then `id` followed, unless the chain ends there.
+    fn reach(&mut self, id: &'a str, depth: usize, link: &'a Link) {
+        let level = Some(link.level);
+        match self.graph.ends(id) {
+            true => {
+                let step = Step::new(depth, self.graph.repo(id), Via::Link(link), level, id);
+                self.steps.push(step);
+            }
+            false => self.enter(id, depth, Via::Link(link), level),
+        }
+    }
+}
+
+impl<'a> Walk<'_, 'a> {
+    /// The process of `entry`, whose repository is at `n`: its label first, then its steps as
+    /// the chain shows them.
+    fn process(&mut self, n: usize, entry: &'a EntryPoint) {
+        self.push(0, Row::call(format!("process {}", entry.label), n, None));
+        for step in self.graph.process(entry) {
+            self.show(&step);
+        }
+    }
+
+    /// `<repository> <path>:<line>` of the call site or symbol a note is about.
+    fn place(&mut self, id: &str) -> String {
+        let graph = self.graph;
+        match (graph.calls.get(id), graph.symbols.get(id)) {
+            (Some(&call), _) => self.site(call),
+            (None, Some(&(n, s))) => {
+                let at = self.files[n].at(&s.span.path, s.span.start);
+                format!("{} {at}", graph.workspace.repos[n].identity)
+            }
+            (None, None) => self.node(id).1,
+        }
+    }
+
+    /// Writes `step` in the chain's line grammar.
+    fn show(&mut self, step: &Step<'a>) {
+        let contract = step.contract.unwrap_or_default();
+        let row = match step.mark {
+            Some(Mark::Ambiguous) => {
+                let candidates = step.candidates.join(", ");
+                let text = format!(
+                    "{} {}{}: {candidates}",
+                    self.place(step.node),
+                    callee(step.node),
+                    mark(step.level)
+                );
+                Row::call(text, step.repo, step.level)
+            }
+            Some(Mark::Unresolved) => {
+                let text = format!("{} {}", self.place(step.node), unresolved(step.node));
+                Row::call(text, step.repo, None)
+            }
+            Some(Mark::NoProvider) => {
+                let text = format!("{} consumes {contract}, no provider", self.place(step.node));
+                Row::call(text, step.repo, None)
+            }
+            Some(side @ (Mark::Produces | Mark::Consumes)) => {
+                let text = format!(
+                    "{} {} {}",
+                    self.place(step.node),
+                    side.verb(),
+                    channel::shown(contract)
+                );
+                Row::call(text, step.repo, None)
+            }
+            seen => {
+                let text = self.node(step.node).1;
+                let mut row = match step.via {
+                    Via::Entry => Row::call(text, step.repo, None),
+                    Via::Call => Row::call(text + &mark(step.level), step.repo, step.level),
+                    Via::Link(link) => {
+                        Row::link(format!("{} {text}", arrow(link)), step.repo, link)
+                    }
+                };
+                row.text += match seen {
+                    Some(Mark::Cycle) => " (cycle)",
+                    Some(Mark::DepthLimit) => " (depth limit)",
+                    Some(_) => " (see above)",
+                    None => "",
+                };
+                row
+            }
+        };
+        self.push(step.depth, row);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::decisions::Decisions;
+    use crate::entry::EntryKind;
+    use crate::index::Span;
+    use crate::workspace::Repository;
+
+    #[test]
+    fn a_chain_past_the_depth_limit_ends_at_it() {
+        let id = |n: usize| format!("r::a.ts::f{n}");
+        let span = || Span {
+            path: "a.ts".into(),
+            start: 0,
+            end: 0,
+        };
+        let length = PROCESS_DEPTH + 50;
+        let export = Export {
+            repository: "r".into(),
+            symbols: (0..=length)
+                .map(|n| Symbol {
+                    id: id(n),
+                    span: span(),
+                })
+                .collect(),
+            calls: (0..length)
+                .map(|n| CallSite {
+                    id: format!("r::a.ts::f{n}@{n}"),
+                    caller: id(n),
+                    target: Some(id(n + 1)),
+                    level: Some(Level::Exact),
+                    candidates: Vec::new(),
+                    span: span(),
+                })
+                .collect(),
+            ..Export::default()
+        };
+        let workspace = Workspace {
+            repos: vec![Repository {
+                root: "r".into(),
+                identity: "r".into(),
+                config: Config::default(),
+                decisions: Decisions::default(),
+            }],
+            missing: Vec::new(),
+        };
+        let entry = EntryPoint {
+            identity: id(0),
+            kind: EntryKind::Export,
+            label: "f0".into(),
+            site: id(0),
+        };
+        let exports = [export];
+        let graph = Graph::new(&workspace, &exports, &[]);
+
+        let steps = graph.process(&entry);
+
+        assert_eq!(steps.len(), PROCESS_DEPTH + 1);
+        let last = steps.last().unwrap();
+        assert_eq!(last.depth, PROCESS_DEPTH);
+        assert!(last.mark == Some(Mark::DepthLimit));
+        assert!(steps[..PROCESS_DEPTH].iter().all(|s| s.mark.is_none()));
+    }
 }

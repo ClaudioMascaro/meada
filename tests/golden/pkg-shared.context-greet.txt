@@ -1,4 +1,6 @@
 example.com/pkg/shared kit/src/greet.ts:1 greet
+community: kit/src
+processes: report (example.com/pkg/api), greet (example.com/pkg/shared), smoke (example.com/pkg/web), caught (example.com/pkg/web)
 function greet(name: string): string {
   return shout(`hello ${name}`);
 }

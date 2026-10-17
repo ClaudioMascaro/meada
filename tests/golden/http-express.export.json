@@ -739,6 +739,23 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "src/routes",
+      "members": [
+        "example.com/acme/backend::src/routes/users.ts::find",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1"
+      ]
+    },
+    {
+      "name": "src/routes#2",
+      "members": [
+        "example.com/acme/backend::src/routes/users.ts::list",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
@@ -767,6 +784,197 @@
       "contract": "http::GET::/api/users",
       "level": "inferred",
       "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/backend::src/handlers.ts::removeUser::http::DELETE::/api/users/{}",
+      "kind": "route",
+      "label": "DELETE /api/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/handlers.ts::removeUser"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/routes/users.ts::register",
+      "kind": "export",
+      "label": "register",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/routes/users.ts::register"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1::http::GET::/api/users/{}",
+      "kind": "route",
+      "label": "GET /api/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}::http::GET::/api/users/{}",
+      "kind": "route",
+      "label": "GET /api/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::find"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users::http::GET::/api/users",
+      "kind": "route",
+      "label": "GET /api/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/backend",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/backend::src/routes/users.ts::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/server.ts::GET /health::http::GET::/health",
+      "kind": "route",
+      "label": "GET /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/server.ts::GET /health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::GET /guarded::http::GET::/guarded",
+      "kind": "route",
+      "label": "GET /guarded",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::GET /guarded"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}::http::GET::/orders/{}",
+      "kind": "route",
+      "label": "GET /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::GET /v1/old::http::GET::/v1/old",
+      "kind": "route",
+      "label": "GET /v1/old",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::GET /v1/old"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::mountAt",
+      "kind": "export",
+      "label": "mountAt",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::mountAt"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
+      "kind": "export",
+      "label": "mountLegacy",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::mountLegacy"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/backend::src/unreadable.ts::mountPlugin",
+      "kind": "export",
+      "label": "mountPlugin",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/backend",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/backend::src/unreadable.ts::mountPlugin"
+        }
+      ]
     }
   ]
 }

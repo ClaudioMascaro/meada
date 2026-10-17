@@ -1,0 +1,7 @@
+process root
+example.com/chain/catalog lib/diamond.ts:1 root
+  example.com/chain/catalog lib/diamond.ts:5 left
+    example.com/chain/catalog lib/diamond.ts:13 shared
+  example.com/chain/catalog lib/diamond.ts:9 right
+    example.com/chain/catalog lib/diamond.ts:13 shared (see above)
+chain: exact · 0 hops · 1 repos · 83 tokens

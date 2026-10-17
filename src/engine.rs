@@ -9,6 +9,7 @@ use rusqlite::Connection;
 use crate::channel::Routes;
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
+use crate::entry::{self, EntryPoint};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -87,11 +88,17 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let (links, mut evaluations) = self.links_and_decisions(&exports);
-        let links = links.into_iter();
+        let (all, mut evaluations) = self.links_and_decisions(&exports);
+        // The processes cross repositories: they walk every link, not only the local ones.
+        let graph = trace::Graph::new(&self.workspace, &exports, &all);
+        let processes = (exports[0].entry_points.iter())
+            .map(|e| graph.export_process(e))
+            .collect();
+        let links = all.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
+        export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
@@ -115,6 +122,17 @@ impl Engine {
         package::consume(&mut exports, &providers);
         // Imports of a package resolve into its provider, wherever it lives.
         package::import(&mut exports, &providers);
+        // The stored entry points are candidates: a call that reaches an export through a
+        // package import of its own repository (a monorepo) makes it no door, at any level. An
+        // entry point of another kind stays one.
+        for export in &mut exports {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            entry::drop_imported_exports(&mut export.entry_points, &imported);
+        }
         // Shapes imported from a package fill from the shapes it keeps (issue #175).
         package::shapes(&mut exports, &providers);
         Ok(exports)
@@ -279,7 +297,9 @@ impl Engine {
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
     /// by broker kind and name) matches; `document` lists the documents read, matched by path
     /// or title (see `search_documents`); `package` lists the packages, matched by name (see
-    /// `search_packages`); `drift` lists the fields consumers read that a route lacks (see
+    /// `search_packages`); `community` lists the communities, matched by name, and `process`
+    /// the processes, matched by their entry point's label (`search_communities`,
+    /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
     /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
@@ -296,6 +316,12 @@ impl Engine {
         if kind == Some("drift") {
             return self.search_drift(query, budget);
         }
+        if kind == Some("community") {
+            return self.search_communities(query, budget);
+        }
+        if kind == Some("process") {
+            return self.search_processes(query, budget);
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
             None => (true, Some("")),
@@ -306,7 +332,7 @@ impl Engine {
             Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
                 let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
-                             `drift`, `ambiguous` or `unresolved`";
+                             `drift`, `community`, `process`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -393,12 +419,7 @@ impl Engine {
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
@@ -429,12 +450,7 @@ impl Engine {
                 hits.push((r, format!("{} {}", repo.identity, doc.path), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The drift (spec #23) whose route path or missing field path matches `query`, one line
@@ -445,13 +461,8 @@ impl Engine {
         let exports = self.exports()?;
         let links = self.links(&exports);
         let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
-        let mut hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        let hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The packages (spec #22) whose name matches `query`, one line each, as `<repository>
@@ -482,12 +493,47 @@ impl Engine {
                 hits.push((r, format!("{} {}", p.repository, p.directory), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
+    /// <name> (members: <n>)`.
+    fn search_communities(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, repository and name to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for c in &export.communities {
+                let Some(r) = rank(&c.name.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, n) = (&export.repository, c.members.len());
+                let line = format!("{repository} {} (members: {n})", c.name);
+                hits.push((r, format!("{repository} {}", c.name), line));
+            }
         }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The processes (spec #31) whose entry point's label matches `query`, one line each, as
+    /// `<repository> <label> process::<identity> (<kind>)`: the identity `trace` starts from.
+    fn search_processes(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, identity to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for e in &export.entry_points {
+                let Some(r) = rank(&e.label.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, kind) = (&export.repository, e.kind.name());
+                let line = format!("{repository} {} process::{} ({kind})", e.label, e.identity);
+                hits.push((r, e.identity.clone(), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -519,12 +565,7 @@ impl Engine {
             );
             hits.push((r, item.id, line));
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The resource, channel or route `contract`: one line per provider and consumer across the
@@ -621,10 +662,13 @@ impl Engine {
         lines
     }
 
-    /// One symbol of the workspace: its span text read from disk (only while the file still
-    /// has the indexed hash), its callers and its callees. `symbol` is an identity,
-    /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
-    /// guessed. The answer is cut at `budget` tokens.
+    /// One symbol of the workspace: its community (`community: <name>` or `none`) and the
+    /// processes it belongs to (`processes: <label> (<repository>), ...` or `none`, found by
+    /// walking upstream, the entries that do not fit in the room the rest of the answer leaves
+    /// replaced by `+<n> more`), both right after its first line; then its span text read from
+    /// disk (only while the file still has the indexed hash), its callers and its callees.
+    /// `symbol` is an identity, `<path>::<name>` or a name; when it fits several symbols, they
+    /// are listed instead of guessed. The answer is cut at `budget` tokens.
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -687,25 +731,43 @@ impl Engine {
         let mut files = Files::new(&repo.root);
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
-        let mut lines = vec![line(identity, &mut files, symbol_found, name)];
-        lines.extend(text.unwrap_or_else(|| {
+        let header = line(identity, &mut files, symbol_found, name);
+        let links = self.links(&exports);
+        let community = (export.communities.iter())
+            .find(|c| c.members.contains(&symbol_found.id))
+            .map_or("none", |c| c.name.as_str());
+        let community = format!("community: {community}");
+        let mut rest = text.unwrap_or_else(|| {
             vec![format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
             )]
-        }));
-        lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        let links = self.links(&exports);
-        lines.extend(consumers(&exports, repos, &links, &symbol_found.id));
+        });
+        rest.extend(relations(identity, export, &mut files, &symbol_found.id));
+        rest.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
-        lines.extend(contracts(
+        rest.extend(contracts(
             identity,
             export,
             workspace,
             &mut files,
             symbol_found,
         ));
+        // The processes come right after the header, which the budget never cuts before the
+        // rest: the line gets the room everything else leaves.
+        let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        let found = graph.processes_of(&symbol_found.id);
+        let used: usize = [&header, &community]
+            .into_iter()
+            .chain(&rest)
+            .map(|l| render::line_bytes(l))
+            .sum();
+        let cap = render::bytes(budget.unwrap_or(render::DEFAULT_BUDGET));
+        // What the processes line may take, its own newline left out.
+        let room = cap.saturating_sub(used + render::line_bytes(""));
+        let mut lines = vec![header, community, processes_line(&found, repos, room)];
+        lines.extend(rest);
         Ok(render::budgeted(&lines, budget))
     }
 }
@@ -1040,6 +1102,57 @@ fn relative(from: &Path, to: &Path) -> String {
     } else {
         parts.join("/")
     }
+}
+
+/// `processes: <a>, <b>, +<n> more` for the processes `found`, or `processes: none`: the entries
+/// that fit in `room` bytes, in order, and a count of the rest, which is all the line holds when
+/// not even the first entry fits. An entry is `<label> (<repository>)`, or its `process::`
+/// identity when another process of the same repository has the same label.
+fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: usize) -> String {
+    if found.is_empty() {
+        return "processes: none".into();
+    }
+    let entries: Vec<String> = (found.iter())
+        .map(|&(n, e)| {
+            let same = found.iter().filter(|(m, o)| *m == n && o.label == e.label);
+            match same.count() {
+                1 => format!("{} ({})", e.label, repos[n].identity),
+                _ => format!("process::{}", e.identity),
+            }
+        })
+        .collect();
+    let mut kept = Vec::new();
+    // The length of `processes: ` and the entries kept, joined.
+    let mut used = "processes: ".len();
+    for (i, entry) in entries.iter().enumerate() {
+        let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();
+        let rest = entries.len() - i - 1;
+        let more = if rest > 0 {
+            format!(", +{rest} more").len()
+        } else {
+            0
+        };
+        if len + more > room {
+            break;
+        }
+        kept.push(entry.clone());
+        used = len;
+    }
+    let rest = entries.len() - kept.len();
+    if rest > 0 {
+        kept.push(format!("+{rest} more"));
+    }
+    format!("processes: {}", kept.join(", "))
+}
+
+/// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.
+fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<usize>) -> String {
+    hits.sort();
+    if hits.is_empty() {
+        return format!("no matches for `{query}`\n");
+    }
+    let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+    render::budgeted(&lines, budget)
 }
 
 /// `name:` followed by the items, or `name: none`.

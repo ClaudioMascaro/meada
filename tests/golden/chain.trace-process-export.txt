@@ -1,0 +1,16 @@
+process dashboard
+example.com/chain/web src/dashboard.ts:4 dashboard
+  example.com/chain/web src/status.ts:2 health
+    example.com/chain/web src/status.ts:3 fetch [ambiguous]: example.com/chain/catalog::app/api/health/route.ts::GET, example.com/chain/gateway::src/server.ts::GET /api/health
+  example.com/chain/web src/status.ts:7 track
+    example.com/chain/web src/status.ts:8 (unresolved) fetch
+  example.com/chain/web src/orders.ts:5 listOrders
+    example.com/chain/web src/api/client.ts:4 request
+    →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/gateway src/orders.ts:5 listOrders
+      example.com/chain/gateway src/catalog.ts:2 productOf
+      →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/catalog app/api/products/[id]/route.ts:3 GET
+        example.com/chain/catalog lib/products.ts:2 load
+          example.com/chain/catalog lib/products.ts:6 parent
+            example.com/chain/catalog lib/products.ts:2 load (cycle)
+          example.com/chain/catalog lib/products.ts:10 find
+chain: ambiguous · 2 hops · 3 repos · 289 tokens

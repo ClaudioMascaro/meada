@@ -1,0 +1,4 @@
+process channel::kafka::orders.created
+example.com/chain/worker src/consumer.ts:13 onOrderCreated
+  example.com/chain/worker src/notify.ts:1 notify
+chain: exact · 0 hops · 1 repos · 49 tokens
