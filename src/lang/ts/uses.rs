@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
-use super::{BODIES, bound_nodes, named, text, types, unquote};
+use super::{BODIES, Parents, bound_nodes, named, text, types, unquote};
 use crate::lang::{Step, Ty};
 
 /// What following values may cost in one file: every node visited, by the climb from a call or
@@ -43,6 +43,7 @@ const ELEMENT_METHODS: &[&str] = &[
 /// The uses of the calls of one file, sharing one budget.
 pub(super) struct Uses<'t> {
     src: &'t [u8],
+    up: &'t Parents<'t>,
     /// The names bound and used in each function (or the whole file), by node id, built when
     /// a value is first followed into a `const` there.
     scopes: HashMap<usize, Scope<'t>>,
@@ -58,9 +59,10 @@ struct Scope<'t> {
 }
 
 impl<'t> Uses<'t> {
-    pub(super) fn new(src: &'t [u8]) -> Self {
+    pub(super) fn new(src: &'t [u8], up: &'t Parents<'t>) -> Self {
         Self {
             src,
+            up,
             scopes: HashMap::new(),
             spent: 0,
         }
@@ -71,9 +73,9 @@ impl<'t> Uses<'t> {
         self.spent <= USES_BUDGET
     }
 
-    /// What the function enclosing `call` does with its result, one chain of steps per use.
-    pub(super) fn of(&mut self, call: Node<'t>) -> Vec<Vec<Step>> {
-        let function = enclosing(call);
+    /// What `function`, the function whose body holds `call` (or the whole file at the top
+    /// level), does with its result, one chain of steps per use.
+    pub(super) fn of(&mut self, call: Node<'t>, function: Node<'t>) -> Vec<Vec<Step>> {
         let mut out = Vec::new();
         let mut followed = HashSet::new();
         let mut pending = vec![(call, Vec::new())];
@@ -84,7 +86,7 @@ impl<'t> Uses<'t> {
         }
         while let Some((node, mut steps)) = pending.pop() {
             let mut at = node;
-            while let Some(parent) = at.parent() {
+            while let Some(parent) = self.up.of(at) {
                 if !self.charge(1) {
                     return Vec::new();
                 }
@@ -161,7 +163,7 @@ impl<'t> Uses<'t> {
                             return Vec::new();
                         }
                         if followed.insert(parent.id())
-                            && is_const(parent, self.src)
+                            && is_const(parent, self.src, self.up)
                             && let Some(name) = parent.child_by_field_name("name")
                             && !self.bind(name, steps.clone(), function, &mut out, &mut pending)
                         {
@@ -186,8 +188,10 @@ impl<'t> Uses<'t> {
                         break;
                     }
                     "return_statement" => {
-                        if enclosing(parent).id() == function.id() {
-                            steps.push(Step::Return);
+                        match self.enclosing(parent) {
+                            None => return Vec::new(),
+                            Some(f) if f.id() == function.id() => steps.push(Step::Return),
+                            Some(_) => {}
                         }
                         break;
                     }
@@ -208,11 +212,27 @@ impl<'t> Uses<'t> {
         out
     }
 
+    /// The function whose body holds `node`, or the whole file at the top level; `None` past
+    /// the budget.
+    fn enclosing(&mut self, node: Node<'t>) -> Option<Node<'t>> {
+        let mut at = node;
+        while let Some(parent) = self.up.of(at) {
+            if !self.charge(1) {
+                return None;
+            }
+            if BODIES.contains(&parent.kind()) {
+                return Some(parent);
+            }
+            at = parent;
+        }
+        Some(at)
+    }
+
     /// Adds the chain `steps` then the type `node` writes, unless it lists no fields. `false`
     /// past the budget.
     fn typed(&mut self, steps: &[Step], node: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
         let mut cost = 0;
-        let ty = types::ty(node, self.src, &mut cost);
+        let ty = types::ty(node, self.src, self.up, &mut cost);
         if ty != Ty::Unknown {
             out.push([steps, &[Step::Typed(ty)]].concat());
         }
@@ -227,7 +247,7 @@ impl<'t> Uses<'t> {
         };
         let mut cost = 0;
         let tys: Vec<Ty> = (named(arguments))
-            .map(|t| types::ty(t, self.src, &mut cost))
+            .map(|t| types::ty(t, self.src, self.up, &mut cost))
             .collect();
         if tys.iter().any(|t| *t != Ty::Unknown) {
             out.push(vec![Step::Argument(tys)]);
@@ -404,8 +424,8 @@ impl<'t> Uses<'t> {
 }
 
 /// Whether `declarator` is part of a `const` declaration.
-fn is_const(declarator: Node, src: &[u8]) -> bool {
-    (declarator.parent())
+fn is_const(declarator: Node, src: &[u8], up: &Parents) -> bool {
+    (up.of(declarator))
         .and_then(|d| d.child_by_field_name("kind"))
         .is_some_and(|k| text(k, src) == "const")
 }
@@ -422,18 +442,6 @@ fn element_param(call: Node) -> Option<(Node, Node)> {
         Some(first.child_by_field_name("pattern").unwrap_or(first))
     })?;
     Some((callback, param))
-}
-
-/// The function whose body holds `node`, or the whole file at the top level.
-fn enclosing(node: Node) -> Node {
-    let mut at = node;
-    while let Some(parent) = at.parent() {
-        if BODIES.contains(&parent.kind()) {
-            return parent;
-        }
-        at = parent;
-    }
-    at
 }
 
 #[cfg(test)]

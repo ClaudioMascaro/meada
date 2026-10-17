@@ -2,7 +2,7 @@
 
 use tree_sitter::Node;
 
-use super::{children, named, text, unquote};
+use super::{Parents, children, named, text, unquote};
 use crate::lang::{Member, TYPE_DEPTH, Ty};
 
 /// How many levels above a name a type parameter hiding it is looked for. A type parameter
@@ -56,7 +56,7 @@ pub(super) fn type_parameters(node: Node, src: &[u8]) -> Vec<String> {
 
 /// The type a function's return annotation `typed` declares, inside the generics a handler wraps
 /// it in (`Promise<NextResponse<..>>`); `None` when it lists nothing.
-pub(super) fn returned(typed: Node, src: &[u8]) -> Option<Ty> {
+pub(super) fn returned(typed: Node, src: &[u8], up: &Parents) -> Option<Ty> {
     if let Some(schema) = inferred(typed, src) {
         return Some(Ty::Schema(schema));
     }
@@ -76,18 +76,22 @@ pub(super) fn returned(typed: Node, src: &[u8]) -> Option<Ty> {
             _ => break,
         }
     }
-    Some(ty(node, src, &mut 0)).filter(|t| *t != Ty::Unknown)
+    Some(ty(node, src, up, &mut 0)).filter(|t| *t != Ty::Unknown)
 }
 
 /// The type an `interface` or `type` declaration writes: an interface is its body together with
 /// the types it extends. `cost` counts the nodes read.
-pub(super) fn declaration(node: Node, src: &[u8], cost: &mut usize) -> Ty {
+pub(super) fn declaration(node: Node, src: &[u8], up: &Parents, cost: &mut usize) -> Ty {
     if node.kind() == "type_alias_declaration" {
-        return (node.child_by_field_name("value")).map_or(Ty::Unknown, |v| ty(v, src, cost));
+        return (node.child_by_field_name("value")).map_or(Ty::Unknown, |v| ty(v, src, up, cost));
     }
-    let body = (node.child_by_field_name("body")).map_or(Ty::Unknown, |b| ty(b, src, cost));
+    let body = (node.child_by_field_name("body")).map_or(Ty::Unknown, |b| ty(b, src, up, cost));
     let extends = (children(node).find(|c| c.kind() == "extends_type_clause"))
-        .map(|clause| named(clause).map(|t| ty(t, src, cost)).collect::<Vec<_>>())
+        .map(|clause| {
+            named(clause)
+                .map(|t| ty(t, src, up, cost))
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
     match extends.is_empty() {
         true => body,
@@ -96,11 +100,11 @@ pub(super) fn declaration(node: Node, src: &[u8], cost: &mut usize) -> Ty {
 }
 
 /// The type `node` writes, as far as drift reads it. `cost` counts the nodes read.
-pub(super) fn ty(node: Node, src: &[u8], cost: &mut usize) -> Ty {
-    read(node, src, 0, cost)
+pub(super) fn ty(node: Node, src: &[u8], up: &Parents, cost: &mut usize) -> Ty {
+    read(node, src, up, 0, cost)
 }
 
-fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
+fn read(node: Node, src: &[u8], up: &Parents, depth: usize, cost: &mut usize) -> Ty {
     *cost += 1;
     if depth >= TYPE_DEPTH {
         return Ty::Unknown;
@@ -108,12 +112,12 @@ fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
     let first = || named(node).next();
     match node.kind() {
         "type_annotation" | "parenthesized_type" | "readonly_type" => {
-            first().map_or(Ty::Unknown, |t| read(t, src, depth + 1, cost))
+            first().map_or(Ty::Unknown, |t| read(t, src, up, depth + 1, cost))
         }
         "array_type" => first().map_or(Ty::Unknown, |t| {
-            Ty::Array(Box::new(read(t, src, depth + 1, cost)))
+            Ty::Array(Box::new(read(t, src, up, depth + 1, cost)))
         }),
-        "type_identifier" => reference(node, src, text(node, src), cost),
+        "type_identifier" => reference(node, src, up, text(node, src), cost),
         "generic_type" => {
             if let Some(schema) = inferred(node, src) {
                 return Ty::Schema(schema);
@@ -125,9 +129,9 @@ fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
                 (node.child_by_field_name("type_arguments")).and_then(|a| named(a).next());
             match (name.kind(), text(name, src), argument) {
                 ("type_identifier", "Array" | "ReadonlyArray", Some(of)) => {
-                    Ty::Array(Box::new(read(of, src, depth + 1, cost)))
+                    Ty::Array(Box::new(read(of, src, up, depth + 1, cost)))
                 }
-                ("type_identifier", name, _) => reference(node, src, name, cost),
+                ("type_identifier", name, _) => reference(node, src, up, name, cost),
                 _ => Ty::Unknown,
             }
         }
@@ -140,7 +144,7 @@ fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
                     "intersection_type" => {
                         stack.extend(named(at).collect::<Vec<_>>().into_iter().rev())
                     }
-                    _ => parts.push(read(at, src, depth + 1, cost)),
+                    _ => parts.push(read(at, src, up, depth + 1, cost)),
                 }
             }
             Ty::Intersection(parts)
@@ -152,7 +156,7 @@ fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
                 *cost += 1;
                 match member.kind() {
                     "index_signature" => open = true,
-                    "property_signature" => members.extend(property(member, src, depth, cost)),
+                    "property_signature" => members.extend(property(member, src, up, depth, cost)),
                     _ => {}
                 }
             }
@@ -163,7 +167,13 @@ fn read(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Ty {
 }
 
 /// A property of an object type, unless its name has no spelling in a field path.
-fn property(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Option<Member> {
+fn property(
+    node: Node,
+    src: &[u8],
+    up: &Parents,
+    depth: usize,
+    cost: &mut usize,
+) -> Option<Member> {
     let key = node.child_by_field_name("name")?;
     let name = match key.kind() {
         "property_identifier" => text(key, src).to_string(),
@@ -177,17 +187,17 @@ fn property(node: Node, src: &[u8], depth: usize, cost: &mut usize) -> Option<Me
         name,
         optional: children(node).any(|c| c.kind() == "?"),
         ty: (node.child_by_field_name("type"))
-            .map_or(Ty::Unknown, |t| read(t, src, depth + 1, cost)),
+            .map_or(Ty::Unknown, |t| read(t, src, up, depth + 1, cost)),
     })
 }
 
 /// The name `name`, used at `node`, unless a type parameter of a function, class, interface or
 /// alias around it hides it.
-fn reference(node: Node, src: &[u8], name: &str, cost: &mut usize) -> Ty {
+fn reference<'t>(node: Node<'t>, src: &[u8], up: &Parents<'t>, name: &str, cost: &mut usize) -> Ty {
     let mut at = node;
     for _ in 0..HIDING_CLIMB {
         *cost += 1;
-        let Some(parent) = at.parent() else {
+        let Some(parent) = up.of(at) else {
             return Ty::Named(name.to_string());
         };
         let declares = (parent.child_by_field_name("type_parameters")).is_some_and(|ps| {

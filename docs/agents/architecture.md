@@ -365,7 +365,15 @@ one for the area a change touches.
   makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
-  and a `Value::New(callee, args)`.
+  and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
+  is not a definition (its body belongs to the one around it, and its name is a local that hides outer
+  ones), since qualified names and `Resolver::lexical` cost time cubic in the nesting; a function
+  written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
+  arguments, objects, arrays and the receivers of method chains is `Unknown` from there.
+  `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
+  rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
+  `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
+  tree's depth.
 - `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
@@ -452,8 +460,6 @@ one for the area a change touches.
   inside an object literal), and a value that goes through a function, a `let` or a rebinding
   is not followed (no marker). On a provider, an index signature in the type of a returned
   constant, a cast body or the handler's return annotation opens that part of the shape.
-- `lang/ts.rs` (`VALUE_DEPTH`, 64, `ponytail:`): an expression nested deeper than 64 levels
-  (calls inside calls, members, objects) is read as unknown from there.
 - `literals.rs`: reading a handler's returned literals charges every call examined and every
   value read or constant followed, over all the handlers of a file, to `LITERALS_BUDGET` (2^16);
   past it, the file's remaining handlers give their routes no shape. Nested literals and
