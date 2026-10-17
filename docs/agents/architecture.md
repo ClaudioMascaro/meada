@@ -66,7 +66,11 @@ one for the area a change touches.
   identity>` and named by the label. A route whose handler is a file with no function of its own
   (`export const GET = withAuth(...)`) is a route entry point at the file's identity
   (`<repository>::<path>`), its process starting from the file's top-level calls; a side only
-  a document lists has none. A handler serving several routes has an entry point per contract,
+  a document lists has none. A channel is `<handler symbol>::<channel contract>`
+  (`example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created`),
+  labelled by the channel identifier (an unresolved side as `channel::kafka (unresolved)`), kind
+  `channel`; a channel handler is no export entry point. A handler serving several routes or
+  channels has an entry point per contract,
   and entry points are unique by identity. The stored export entry points are candidates:
   `Engine::exports` drops, after `package::import`, each one that is the target of an import
   from its own repository (a monorepo), at any level.

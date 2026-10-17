@@ -3,12 +3,13 @@
 //! index is written and stored in `entry_points`; the process itself is walked on demand
 //! (`trace::Graph::process`), never stored.
 //!
-//! An entry point's identity is its handler's identity plus, for a route, the contract
+//! An entry point's identity is its handler's identity plus, for a route or a channel, the contract
 //! identifier: `<repository>::<path>::<handler>::http::GET::/users/{}`. An export's is the
 //! symbol's own identity. No score or threshold picks them: every one gets its process.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use crate::channel;
 use crate::contract::Names;
 use crate::http;
 use crate::lang::{Facts, Kind};
@@ -22,6 +23,8 @@ pub enum EntryKind {
     Route,
     /// An exported function or method nothing in its repository calls.
     Export,
+    /// A channel a consumer handler consumes, one entry point per channel.
+    Channel,
     /// A program's start, as its language pack declares it (`Facts::programs`).
     Program,
 }
@@ -32,14 +35,20 @@ impl EntryKind {
         match self {
             EntryKind::Route => "route",
             EntryKind::Export => "export",
+            EntryKind::Channel => "channel",
             EntryKind::Program => "program",
         }
     }
 
     pub fn parse(name: &str) -> Option<Self> {
-        [EntryKind::Route, EntryKind::Export, EntryKind::Program]
-            .into_iter()
-            .find(|k| k.name() == name)
+        [
+            EntryKind::Route,
+            EntryKind::Export,
+            EntryKind::Program,
+            EntryKind::Channel,
+        ]
+        .into_iter()
+        .find(|k| k.name() == name)
     }
 }
 
@@ -65,6 +74,8 @@ pub struct Local<'a> {
     pub exported: &'a [Exported],
     /// `(site, contract)` of each provider the code gives.
     pub providers: &'a [(String, String)],
+    /// `(site, contract)` of each consumer the code gives.
+    pub consumers: &'a [(String, String)],
     /// `(file, definition name)` of each program entry point the language packs declare. A name
     /// with no symbol is dropped silently: each pack's conformance golden catches a wrong one.
     pub programs: &'a [(String, String)],
@@ -76,6 +87,7 @@ pub fn find(local: &Local) -> Vec<EntryPoint> {
     // A program entry point comes first: dedup keeps it over an export of the same symbol.
     let mut found = programs(local);
     found.extend(routes);
+    found.extend(channels(local));
     let served: HashSet<&str> = found.iter().map(|e| e.site.as_str()).collect();
     let exports = exports(local, &served);
     found.extend(exports);
@@ -125,6 +137,32 @@ fn routes(local: &Local) -> Vec<EntryPoint> {
             identity: format!("{site}::{contract}"),
             kind: EntryKind::Route,
             label: format!("{method} {path}"),
+            site: site.clone(),
+        });
+    }
+    found
+}
+
+/// One entry point per channel a consumer handler consumes, a symbol or a code file like a
+/// route handler. An unresolved side (`channel::kafka`) is one too: the handler still consumes
+/// from somewhere, and without its entry point it would show up nowhere (it would also be an
+/// export entry point otherwise), so it is labelled as `channel::shown` prints it.
+fn channels(local: &Local) -> Vec<EntryPoint> {
+    let files: HashSet<String> = (local.files.keys())
+        .map(|path| format!("{}::{path}", local.identity))
+        .collect();
+    let mut found = Vec::new();
+    for (site, contract) in local.consumers {
+        if channel::parse(contract).is_none() {
+            continue;
+        }
+        if !local.symbols.contains(site) && !files.contains(site) {
+            continue;
+        }
+        found.push(EntryPoint {
+            identity: format!("{site}::{contract}"),
+            kind: EntryKind::Channel,
+            label: channel::shown(contract),
             site: site.clone(),
         });
     }
@@ -213,6 +251,7 @@ mod tests {
             called: &called,
             exported: &exported,
             providers: &[],
+            consumers: &[],
             programs: &programs,
         };
         (find(&local).into_iter())

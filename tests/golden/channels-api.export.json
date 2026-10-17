@@ -687,6 +687,27 @@
       ]
     },
     {
+      "entry_point": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log::channel::kafka::audit.log",
+      "kind": "channel",
+      "label": "channel::kafka::audit.log",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/channels/api",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/channels/api",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/channels/api::src/audit.ts::store"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/channels/api::src/dynamic.ts::announce",
       "kind": "export",
       "label": "announce",

@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 18;
+const SCHEMA_VERSION: i64 = 19;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -491,6 +491,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
     let mut providers: Vec<(String, String)> = Vec::new();
+    let mut consumers: Vec<(String, String)> = Vec::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -516,6 +517,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let role = f.role.name();
         if let (Role::Provider, Some(contract)) = (f.role, &f.contract) {
             providers.push((site.clone(), contract.clone()));
+        }
+        if let (Role::Consumer, Some(contract)) = (f.role, &f.contract) {
+            consumers.push((site.clone(), contract.clone()));
         }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         let key = (
@@ -562,6 +566,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         called: &called,
         exported: &exported,
         providers: &providers,
+        consumers: &consumers,
         programs: &programs,
     };
     tx.execute("DELETE FROM entry_points", [])?;

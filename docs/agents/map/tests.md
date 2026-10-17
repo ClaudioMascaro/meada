@@ -8,7 +8,7 @@ modules updates it.
   `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
-  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a cycle, an
+  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
   export process, an ambiguous call, a missing peer, a budget cut), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
   (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),

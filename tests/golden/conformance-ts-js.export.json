@@ -3677,6 +3677,52 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::runJob::channel::bullmq",
+      "kind": "channel",
+      "label": "channel::bullmq (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::runJob::channel::bullmq::jobs",
+      "kind": "channel",
+      "label": "channel::bullmq::jobs",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
       "kind": "export",
       "label": "startDynamic",
@@ -3719,6 +3765,27 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu::channel::bullmq::mail-eu",
+      "kind": "channel",
+      "label": "channel::bullmq::mail-eu",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::record"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
       "kind": "export",
       "label": "consumeOrders",
@@ -3729,6 +3796,48 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::channel::kafka::orders.shipped",
+      "kind": "channel",
+      "label": "channel::kafka::orders.shipped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
         }
       ]
     },
@@ -3761,9 +3870,30 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
-      "kind": "export",
-      "label": "listenRetries",
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds::channel::kafka::refunds",
+      "kind": "channel",
+      "label": "channel::kafka::refunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::listenRetries::channel::kafka::retries",
+      "kind": "channel",
+      "label": "channel::kafka::retries",
       "steps": [
         {
           "depth": 0,
@@ -3863,9 +3993,65 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
-      "kind": "export",
-      "label": "onPayment",
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert::channel::amqp::alerts",
+      "kind": "channel",
+      "label": "channel::amqp::alerts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit::channel::amqp::audit",
+      "kind": "channel",
+      "label": "channel::amqp::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment::channel::amqp::shipments",
+      "kind": "channel",
+      "label": "channel::amqp::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/handlers.ts::onPayment::channel::amqp::invoices",
+      "kind": "channel",
+      "label": "channel::amqp::invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/handlers.ts::onPayment"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/handlers.ts::onPayment::channel::kafka::payments",
+      "kind": "channel",
+      "label": "channel::kafka::payments",
       "steps": [
         {
           "depth": 0,
@@ -3887,6 +4073,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/nats.ts::notPublished"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::onAudit::channel::nats::jobs.audit.>",
+      "kind": "channel",
+      "label": "channel::nats::jobs.audit.>",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::onAudit"
         }
       ]
     },
@@ -3944,9 +4144,9 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
-      "kind": "export",
-      "label": "subscribeMiddle",
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::channel::nats::jobs.*.created",
+      "kind": "channel",
+      "label": "channel::nats::jobs.*.created",
       "steps": [
         {
           "depth": 0,
@@ -3958,9 +4158,23 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
-      "kind": "export",
-      "label": "subscribeOne",
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::channel::nats::jobs.created",
+      "kind": "channel",
+      "label": "channel::nats::jobs.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne::channel::nats::jobs.*",
+      "kind": "channel",
+      "label": "channel::nats::jobs.*",
       "steps": [
         {
           "depth": 0,
@@ -3982,6 +4196,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>::channel::nats::jobs.>",
+      "kind": "channel",
+      "label": "channel::nats::jobs.>",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::record"
         }
       ]
     },
@@ -4204,9 +4439,30 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::workReports",
-      "kind": "export",
-      "label": "workReports",
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks::channel::amqp::tasks",
+      "kind": "channel",
+      "label": "channel::amqp::tasks",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::workReports::channel::amqp::reports",
+      "kind": "channel",
+      "label": "channel::amqp::reports",
       "steps": [
         {
           "depth": 0,
@@ -4359,9 +4615,9 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
-      "kind": "export",
-      "label": "readBilling",
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readBilling::channel::redis::billing",
+      "kind": "channel",
+      "label": "channel::redis::billing",
       "steps": [
         {
           "depth": 0,
@@ -4380,9 +4636,9 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
-      "kind": "export",
-      "label": "readIoredis",
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::channel::redis::events.audit",
+      "kind": "channel",
+      "label": "channel::redis::events.audit",
       "steps": [
         {
           "depth": 0,
@@ -4394,9 +4650,23 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readMany",
-      "kind": "export",
-      "label": "readMany",
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::channel::redis::orders",
+      "kind": "channel",
+      "label": "channel::redis::orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readIoredis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readMany::channel::redis::orders",
+      "kind": "channel",
+      "label": "channel::redis::orders",
       "steps": [
         {
           "depth": 0,
@@ -4408,9 +4678,23 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
-      "kind": "export",
-      "label": "readNamed",
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readMany::channel::redis::returns",
+      "kind": "channel",
+      "label": "channel::redis::returns",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readMany"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNamed::channel::redis::billing",
+      "kind": "channel",
+      "label": "channel::redis::billing",
       "steps": [
         {
           "depth": 0,
@@ -4422,9 +4706,9 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
-      "kind": "export",
-      "label": "readNodeRedis",
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis::channel::redis::shipments",
+      "kind": "channel",
+      "label": "channel::redis::shipments",
       "steps": [
         {
           "depth": 0,
@@ -4460,6 +4744,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail::channel::sqs::mail",
+      "kind": "channel",
+      "label": "channel::sqs::mail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::record"
         }
       ]
     },
@@ -4507,9 +4812,23 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
-      "kind": "export",
-      "label": "receiveBilling",
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::onAudit::channel::sqs::audit",
+      "kind": "channel",
+      "label": "channel::sqs::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::channel::sqs::billing",
+      "kind": "channel",
+      "label": "channel::sqs::billing",
       "steps": [
         {
           "depth": 0,
@@ -4521,9 +4840,9 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
-      "kind": "export",
-      "label": "receiveJobs",
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::channel::sqs::jobs",
+      "kind": "channel",
+      "label": "channel::sqs::jobs",
       "steps": [
         {
           "depth": 0,

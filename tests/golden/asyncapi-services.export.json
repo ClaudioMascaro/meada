@@ -315,9 +315,23 @@
       ]
     },
     {
-      "entry_point": "example.com/asyncapi/services::src/kafka.ts::onOrder",
-      "kind": "export",
-      "label": "onOrder",
+      "entry_point": "example.com/asyncapi/services::src/kafka.ts::onOrder::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/kafka.ts::onOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/kafka.ts::onOrder::channel::kafka::orders.updated",
+      "kind": "channel",
+      "label": "channel::kafka::orders.updated",
       "steps": [
         {
           "depth": 0,
@@ -369,6 +383,20 @@
           "via": "link",
           "node": "example.com/asyncapi/events::src/emit.ts::onCancellation",
           "reason": "channel::amqp::shipments.cancelled"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/asyncapi/services::src/queues.ts::onInvoice::channel::amqp::invoices.issued",
+      "kind": "channel",
+      "label": "channel::amqp::invoices.issued",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/asyncapi/services",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/asyncapi/services::src/queues.ts::onInvoice"
         }
       ]
     },
