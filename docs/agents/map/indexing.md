@@ -58,6 +58,17 @@ modules updates it.
   `export` loads as `Export::shapes` (`serde(skip)`, issue #175). Every `manifests` row is folded
   into the configs digest, so an edited `package.json` or `tsconfig.json` extracts again. `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
+- `community.rs`: communities (spec #31). Last in `refresh`, after the code rows,
+  `write_communities` rewrites the `communities` table (name, member) from the `calls` rows at
+  `exact` or `inferred` whose caller and target are both symbols (a top-level caller is a
+  file, no node), so an unchanged repository keeps its rows through the early exit and a
+  changed one recomputes them from scratch. `communities(calls, dir)` builds the undirected
+  graph (a call site adds 1 to its edge, a call to self none) and runs Leiden as spec #31 fixes
+  it, in `i128` only: `local_moving` (identity-order queue, largest strictly positive gain
+  `2m · w_iC − k_i · K_C` minus the stay quantity, ties to the lowest smallest member),
+  `refine` (best choice over singletons in identity order, into a well-connected
+  subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
+  and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
   `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
   pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches

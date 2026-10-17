@@ -869,6 +869,15 @@
       "target": "example.com/pkg/shared::src/utils/collapse.ts::collapse"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/pkg/web::src/app.ts::caught",
+        "example.com/pkg/web::src/app.ts::welcome"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/pkg/web::e2e/package.json::devDependencies::@example/kit",

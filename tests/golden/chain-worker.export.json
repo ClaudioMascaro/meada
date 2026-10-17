@@ -140,6 +140,16 @@
       "via": null
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+        "example.com/chain/worker::src/jobs.ts::settleOrders",
+        "example.com/chain/worker::src/notify.ts::notify"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/worker::src/consumer.ts::onOrderCreated",

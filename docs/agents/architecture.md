@@ -33,7 +33,8 @@ one for the area a change touches.
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
   language adapter and the TS/JS pack. `resolve.rs`: calls to definitions (`Resolver`), values
-  and receivers (`Code`). Detail: [map/indexing.md](map/indexing.md).
+  and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
+  #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
   resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
   [map/contracts.md](map/contracts.md).
@@ -73,11 +74,17 @@ one for the area a change touches.
   (`Export::document_of` recognises it). Document channel side: `<repository>::<document
   path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
   document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
+- Community: its repository identity plus its name, the most common parent directory of its
+  members' files (`src`, `.` for the root). The second and later communities of the
+  repository with that name, by smallest member identity, take `#2`, `#3`, skipping any `#n`
+  another community is already named (a directory `src#2`), so the name is unique.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling is `{}`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
-  publishes, packages, dependencies, imports, links, processes}`; `processes` (absent when
+  publishes, packages, dependencies, imports, communities, links, processes}`;
+  `communities` (absent when empty) lists each community as `{name, members}`, by name, with
+  its sorted member identities; `processes` (absent when
   empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
   `kind` being `route` or `export`, each step `{depth, level, repository, via, node, ...}`: `via`
   is `entry`, `call` or `link` (a link step has the link's `reason`), `node` the symbol, file
@@ -283,9 +290,9 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
-  the definition, constant, type or file they name), and the `entry_points` table (spec #31:
-  each entry point's identity, kind, label and start symbol, rewritten with the contracts).
-  `Call::args`,
+  the definition, constant, type or file they name), the `entry_points` table (spec #31:
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
+  each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its

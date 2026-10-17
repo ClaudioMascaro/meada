@@ -292,6 +292,16 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "app/api/users",
+      "members": [
+        "example.com/acme/api::app/api/users/[id]/route.ts::GET",
+        "example.com/acme/api::app/api/users/route.ts::GET",
+        "example.com/acme/api::lib/db.ts::query"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/web::src/unlinked.ts::local::fetch#0",

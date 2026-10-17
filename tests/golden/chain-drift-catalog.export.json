@@ -1578,6 +1578,29 @@
       "range": "workspace:*"
     }
   ],
+  "communities": [
+    {
+      "name": "app/api/cached",
+      "members": [
+        "example.com/chain/catalog::app/api/cached/route.ts::GET",
+        "example.com/chain/catalog::app/api/cached/route.ts::ok"
+      ]
+    },
+    {
+      "name": "lib",
+      "members": [
+        "example.com/chain/catalog::app/api/comments/route.ts::GET",
+        "example.com/chain/catalog::app/api/offers/route.ts::GET",
+        "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+        "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+        "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+        "example.com/chain/catalog::lib/products.ts::find",
+        "example.com/chain/catalog::lib/products.ts::load",
+        "example.com/chain/catalog::lib/products.ts::parent"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",

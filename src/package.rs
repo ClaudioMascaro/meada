@@ -1974,6 +1974,7 @@ mod tests {
             packages: Vec::new(),
             dependencies: Vec::new(),
             import_calls: Vec::new(),
+            communities: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),

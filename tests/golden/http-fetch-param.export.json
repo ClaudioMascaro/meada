@@ -196,6 +196,15 @@
       "via": "env:SERVICE_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/portal::src/client.ts::getItem",
+        "example.com/acme/portal::src/client.ts::getOne"
+      ]
+    }
+  ],
   "links": [],
   "processes": [
     {

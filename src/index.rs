@@ -11,6 +11,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Serialize, Serializer};
 
 use crate::Result;
+use crate::community::{self, Community};
 use crate::config::Serve;
 use crate::contract::{self, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
@@ -24,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 17;
+const SCHEMA_VERSION: i64 = 18;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -55,7 +56,9 @@ const SCHEMA_VERSION: i64 = 17;
 /// `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
-/// time to resolve imports of a package into another repository (spec #22).
+/// time to resolve imports of a package into another repository (spec #22). `communities`
+/// holds one row per member of each community (spec #31): its name and the member's symbol
+/// identity, recomputed from the `calls` rows whenever the code rows change.
 /// `entry_points` holds the repository's doors (spec #31, `entry`): the `identity`, the `kind`
 /// (`route` or `export`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts.
@@ -89,6 +92,7 @@ CREATE TABLE manifests (
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
+CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -221,7 +225,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 "DELETE FROM meta; DELETE FROM files; DELETE FROM symbols; \
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
-                 DELETE FROM entry_points;",
+                 DELETE FROM entry_points; DELETE FROM communities;",
             )?;
             None
         }
@@ -555,12 +559,47 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             params![e.identity, e.kind.name(), e.label, e.site],
         )?;
     }
+    write_communities(&tx)?;
     tx.execute("DELETE FROM meta", [])?;
     tx.execute(
         "INSERT INTO meta VALUES (?1, ?2)",
         params![identity, digest],
     )?;
     tx.commit()?;
+    Ok(())
+}
+
+/// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
+/// symbols, each named after its members' parent directories.
+fn write_communities(tx: &Transaction) -> Result<()> {
+    let dirs: HashMap<String, String> = tx
+        .prepare("SELECT id, path FROM symbols")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let calls: Vec<(String, String)> = tx
+        .prepare(
+            "SELECT caller, target FROM calls WHERE level IN ('exact', 'inferred') \
+             AND target IS NOT NULL",
+        )?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    // A top-level caller is a file, not a symbol: no node.
+    let calls = (calls.iter())
+        .filter(|(a, b)| dirs.contains_key(a) && dirs.contains_key(b))
+        .map(|(a, b)| (a.as_str(), b.as_str()));
+    let dir = |id: &str| match dirs[id].rsplit_once('/') {
+        Some((dir, _)) => dir.to_string(),
+        None => ".".to_string(),
+    };
+    tx.execute("DELETE FROM communities", [])?;
+    for c in community::communities(calls, dir) {
+        for member in &c.members {
+            tx.execute(
+                "INSERT INTO communities VALUES (?1, ?2)",
+                params![c.name, member],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -877,6 +916,9 @@ pub(crate) struct Export {
     /// The imports resolved into a package of the workspace, by call site, then target.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) imports: Vec<Import>,
+    /// The repository's communities (spec #31), by name, each with its sorted members.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
     /// `processes` is what the export shows.
@@ -1273,6 +1315,22 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
             .collect(),
     };
+    let mut communities: Vec<Community> = Vec::new();
+    for row in db
+        .prepare(&format!(
+            "SELECT name, member FROM {schema}.communities ORDER BY name, member"
+        ))?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?
+    {
+        let (name, member) = row?;
+        match communities.last_mut() {
+            Some(c) if c.name == name => c.members.push(member),
+            _ => communities.push(Community {
+                name,
+                members: vec![member],
+            }),
+        }
+    }
     let entry_points = db
         .prepare(&format!(
             "SELECT identity, kind, label, site FROM {schema}.entry_points ORDER BY identity"
@@ -1310,6 +1368,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         exported,
         shapes,
         imports: Vec::new(),
+        communities,
         links: Vec::new(),
         entry_points,
         processes: Vec::new(),

@@ -187,6 +187,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/queues/api::src/sqs.ts::enqueue",
+        "example.com/queues/api::src/sqs.ts::enqueueRefund"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/queues/worker::src/nats.ts::literal",

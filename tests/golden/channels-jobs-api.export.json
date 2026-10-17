@@ -263,6 +263,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/jobs/api::src/bullmq.ts::enqueue",
+        "example.com/jobs/api::src/bullmq.ts::sendInvoice"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/jobs/worker::src/bullmq.ts::sendEmail",

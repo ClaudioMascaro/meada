@@ -533,6 +533,30 @@
       "directory": "typed"
     }
   ],
+  "communities": [
+    {
+      "name": "kit/src",
+      "members": [
+        "example.com/pkg/shared::kit/src/greet.ts::greet",
+        "example.com/pkg/shared::kit/src/greet.ts::shout"
+      ]
+    },
+    {
+      "name": "kit/src#2",
+      "members": [
+        "example.com/pkg/shared::kit/src/more.ts::Client",
+        "example.com/pkg/shared::kit/src/more.ts::Client.create"
+      ]
+    },
+    {
+      "name": "src/utils",
+      "members": [
+        "example.com/pkg/shared::src/text.ts::normalize",
+        "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+        "example.com/pkg/shared::src/utils/trim.ts::trim"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/pkg/api::package.json::dependencies::@example/kit",
