@@ -147,7 +147,7 @@
     },
     {
       "path": "crates/web/src/lib.rs",
-      "hash": "3c9d623601f102280504bbad321d605201f8b508a5c16977b31f72450a413534"
+      "hash": "240ed72a3216c8f71d90ec90dd2c0b261323a102709791c0250bfe4916a3d25f"
     },
     {
       "path": "crates/web/src/local.rs",
@@ -1859,16 +1859,16 @@
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::orphans",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 3649,
-        "end": 3818
+        "start": 3950,
+        "end": 4119
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::orphans.router",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 3718,
-        "end": 3816
+        "start": 4019,
+        "end": 4117
       }
     },
     {
@@ -1901,6 +1901,14 @@
         "path": "crates/web/src/lib.rs",
         "start": 3245,
         "end": 3347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3649,
+        "end": 3948
       }
     },
     {
@@ -4252,8 +4260,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 3754,
-        "end": 3810
+        "start": 4055,
+        "end": 4111
       }
     },
     {
@@ -4263,8 +4271,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 3754,
-        "end": 3767
+        "start": 4055,
+        "end": 4068
       }
     },
     {
@@ -4274,8 +4282,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 3784,
-        "end": 3809
+        "start": 4085,
+        "end": 4110
       }
     },
     {
@@ -4386,6 +4394,61 @@
         "path": "crates/web/src/lib.rs",
         "start": 3315,
         "end": 3340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt::(call_expression).nest#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3902,
+        "end": 3937
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3845,
+        "end": 3890
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3845,
+        "end": 3858
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt::Router.new#1",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3902,
+        "end": 3915
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3871,
+        "end": 3889
       }
     },
     {
@@ -6199,6 +6262,20 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt",
+      "kind": "export",
+      "label": "rebuilt",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::rebuilt"
         }
       ]
     },

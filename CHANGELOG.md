@@ -81,8 +81,8 @@ All notable changes to Meada are recorded here. The format follows
   arguments, constants, return values and closures as values, and a call in a builder chain
   keeps its receiver (`Call::receiver`), so the value flow follows `Router::new().route(..)`.
   A router handed to a call Meada does not read (`route_service`, `fallback_service`, an
-  outside function wrapping it, a method found only by name) is served nowhere, a `let mut` or
-  a name assigned again holds no known value, `{{` and `}}` stay literal braces, and the method
+  outside function wrapping it, a method found only by name) is served nowhere, a router held by a `let mut`
+  or a name bound or assigned again is served nowhere too, `{{` and `}}` stay literal braces, and the method
   of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
   nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
   once (schema version 30).

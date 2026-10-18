@@ -813,7 +813,12 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     ty: None,
                 });
             }
-            Put::Let(_) => {}
+            Put::Let(name) => {
+                let value = reader.value(&at, node);
+                facts
+                    .rebound
+                    .push((crate::parent(&name).to_string(), value));
+            }
             Put::Item(name) => {
                 let value = reader.value(&at, node);
                 facts.consts.push(Const {

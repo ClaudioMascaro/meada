@@ -1633,6 +1633,12 @@ impl<'a> Code<'a> {
         out
     }
 
+    /// The scope and value of each `let` of `path` whose name is bound again or assigned again
+    /// (`Facts::rebound`).
+    pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {
+        self.full(path).map_or(&[], |f| f.rebound.as_slice())
+    }
+
     /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).
     pub fn call_index(&self, path: &'a str, range: &std::ops::Range<usize>) -> Option<usize> {
         call_at(&self.resolver.files[path].calls, range)

@@ -832,10 +832,10 @@ one for the area a change touches.
   memoized per call, linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
   `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
-  rather than under part of its prefixes. A router held by `let mut` or assigned again holds
-  no known value (what is built on it is not followed, and the router it started from, if
-  nothing else mounts that, is served at its root); `on(MethodFilter, h)` and a method router
-  held in a variable are not followed. A router nothing mounts is served at its root. A router
+  rather than under part of its prefixes. A name bound again in its scope (`let mut`,
+  shadowing) or assigned again holds no known value, and the routers its `let` holds
+  (`Facts::rebound`) are served nowhere; `on(MethodFilter, h)` and a method router held in a
+  variable are not followed. A router nothing mounts is served at its root. A router
   given to a call Meada does not read (`route_service`, `fallback_service`, an outside
   function wrapping it, a method only a name match found) is mounted nowhere, so it is not
   served at the root; so is one whose `nest` prefix cannot be read, or that is mounted on a

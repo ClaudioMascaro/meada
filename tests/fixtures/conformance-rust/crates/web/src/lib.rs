@@ -141,6 +141,14 @@ pub fn reassigned(legacy: bool) -> Router {
         .merge(app)
 }
 
+pub fn rebuilt() -> Router {
+    // The first router is nested in the second, which is assigned over it: neither is served
+    // at the root, and `/a` is not `/a` but `/api/a`.
+    let mut app = Router::new().route("/a", get(health::check));
+    app = Router::new().nest("/api-mut", app);
+    app
+}
+
 mod orphans {
     use axum::Router;
     use axum::routing::get;

@@ -787,12 +787,12 @@ fn axum_routers<'a>(
 fn axum_unread<'a>(
     code: &Code<'a>,
     path: &'a str,
-    call: &'a Call,
+    scope: &'a str,
     value: &'a Value,
 ) -> BTreeSet<CallAt<'a>> {
     let mut found = BTreeSet::new();
     let mut seen = HashSet::new();
-    let mut work = vec![(path, call.scope.as_str(), value)];
+    let mut work = vec![(path, scope, value)];
     while let Some((path, scope, value)) = work.pop() {
         if !seen.insert(std::ptr::from_ref(value)) {
             continue;
@@ -863,6 +863,7 @@ fn axum(code: &Code) -> Vec<Found> {
     let mut mounts = Mounts::new();
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
+        let mut touched = false;
         for (n, call) in facts.calls.iter().enumerate() {
             let member = call.callee.rsplit('.').next().unwrap_or_default();
             if !matches!(
@@ -871,6 +872,7 @@ fn axum(code: &Code) -> Vec<Found> {
             ) {
                 continue;
             }
+            touched = true;
             let Some(call) = code.call(path, n) else {
                 continue;
             };
@@ -911,18 +913,30 @@ fn axum(code: &Code) -> Vec<Found> {
                     // A child Meada cannot read is a call it does not follow: the routers
                     // given to it are mounted there, so served nowhere.
                     if children.is_empty() {
-                        for unread in axum_unread(code, path, call, child) {
+                        for unread in axum_unread(code, path, &call.scope, child) {
                             mounts.entry(unread).or_default();
                         }
                     }
                 }
                 // A service Meada does not read: the routers given to it are served there.
                 ("route_service" | "fallback_service", args) => {
-                    for unread in args.iter().flat_map(|a| axum_unread(code, path, call, a)) {
+                    for unread in args
+                        .iter()
+                        .flat_map(|a| axum_unread(code, path, &call.scope, a))
+                    {
                         mounts.entry(unread).or_default();
                     }
                 }
                 _ => {}
+            }
+        }
+        // A router a `let` holds, when the name is bound again or assigned again, goes where
+        // Meada cannot follow it: it is served nowhere.
+        if touched {
+            for (scope, value) in code.rebound(path) {
+                for unread in axum_unread(code, path, scope, value) {
+                    mounts.entry(unread).or_default();
+                }
             }
         }
     }
