@@ -656,7 +656,10 @@ one for the area a change touches.
   for a workspace that makes this slow.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
-  stack. For imports inside the repository only the root `pyproject.toml` is read
+  stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
+  defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
+  chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
+  of nested calls costs up to `FOLD_DEPTH` steps per call. For imports inside the repository only the root `pyproject.toml` is read
   (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
   Poetry root declarations; one that does not parse fails the refresh with its name. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever

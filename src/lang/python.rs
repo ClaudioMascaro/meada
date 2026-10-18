@@ -22,6 +22,13 @@ pub mod pyproject;
 // ponytail: real code nests a few levels of options; 64 is far past any.
 const VALUE_DEPTH: usize = 64;
 
+/// How deep `parts`, `env_read` and `callee` follow a `+` or `or` chain, a chain of string
+/// method calls or `getenv` defaults, nested f-strings or an attribute chain; the cut side is a
+/// hole (`parts`) or its node kind (`callee`).
+// ponytail: real code concatenates and chains a few dozen terms; the recursion must stay
+// shallow, whatever the file.
+const FOLD_DEPTH: usize = 256;
+
 /// The symbol of an `if __name__ == "__main__":` block, the program entry point of its file.
 const MAIN: &str = "__main__";
 
@@ -1042,14 +1049,24 @@ fn pair(node: Node, src: &[u8], depth: usize) -> Option<(String, Value)> {
 /// A string expression folded into literal text, names and holes: string literals, f-strings,
 /// implicit and `+` concatenation; `None` when `node` is not one.
 fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
-    let inside = |n: Node| parts(n, src).unwrap_or_else(|| vec![Part::Hole]);
+    parts_at(node, src, 0)
+}
+
+/// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
+/// the rest is a hole.
+fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
+    if depth >= FOLD_DEPTH {
+        return Some(vec![Part::Hole]);
+    }
+    let parts = |n: Node| parts_at(n, src, depth + 1);
+    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
     match node.kind() {
         "string" => Some(
             children(node)
                 .filter_map(|part| match part.kind() {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
-                        Some(e) => (name(e, src).or_else(|| parts(e, src).and_then(single_env)))
+                        Some(e) => (name(e, src).or_else(|| parts(e).and_then(single_env)))
                             .unwrap_or(Part::Hole),
                         None => Part::Hole,
                     }),
@@ -1061,9 +1078,17 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
         "binary_operator" => {
             let left = node.child_by_field_name("left")?;
             let right = node.child_by_field_name("right")?;
-            let plus = text(node.child_by_field_name("operator")?, src) == "+";
-            (plus && (parts(left, src).is_some() || parts(right, src).is_some()))
-                .then(|| inside(left).into_iter().chain(inside(right)).collect())
+            if text(node.child_by_field_name("operator")?, src) != "+" {
+                return None;
+            }
+            // Each side once: a left-associated chain would cost twice per term otherwise.
+            let (left, right) = (parts(left), parts(right));
+            if left.is_none() && right.is_none() {
+                return None;
+            }
+            let hole = || vec![Part::Hole];
+            let (left, right) = (left.unwrap_or_else(hole), right.unwrap_or_else(hole));
+            Some(left.into_iter().chain(right).collect())
         }
         // A fallback keeps the environment read on its left, if it is the only one.
         "boolean_operator" => {
@@ -1072,13 +1097,13 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             if text(node.child_by_field_name("operator")?, src) != "or" {
                 return None;
             }
-            let env = single_env(parts(left, src)?)?;
+            let env = single_env(parts(left)?)?;
             let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
             Some(vec![if more { Part::Hole } else { env }])
         }
         "identifier" | "attribute" => name(node, src).map(|name| vec![name]),
-        "parenthesized_expression" => parts(named(node).next()?, src),
-        "subscript" | "call" => env_read(node, src).map(|env| vec![env]),
+        "parenthesized_expression" => parts(named(node).next()?),
+        "subscript" | "call" => env_read(node, src, depth).map(|env| vec![env]),
         _ => None,
     }
 }
@@ -1096,10 +1121,10 @@ fn name(node: Node, src: &[u8]) -> Option<Part> {
 /// `os.environ["X"]`, `os.environ.get("X")` or `os.getenv("X")` (also `environ` and `getenv`
 /// imported from `os`), with or without a default, also through string method calls such as
 /// `.rstrip("/")`. Meada never reads the value, so a default is ignored; one that reads
-/// another variable makes the whole read a hole.
+/// another variable makes the whole read a hole. `depth` is the level of `node` in `parts`.
 // ponytail: the names are matched as written, not through the file's imports, so `import os
 // as o` is not read and a local `getenv` function is.
-fn env_read(node: Node, src: &[u8]) -> Option<Part> {
+fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "strip",
         "lstrip",
@@ -1120,15 +1145,25 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             if let "os.getenv" | "getenv" | "os.environ.get" | "environ.get" =
                 callee(function, src).as_str()
             {
-                let (args, kwargs) = arguments(node, src);
-                let name = string(named(node.child_by_field_name("arguments")?).next()?, src)?;
-                let default = args
-                    .get(1)
-                    .or(kwargs.iter().find(|(k, _)| k == "default").map(|(_, v)| v));
-                return Some(match default {
-                    Some(Value::Str(p)) if p.iter().any(|p| matches!(p, Part::Env(_))) => {
-                        Part::Hole
-                    }
+                let list = node.child_by_field_name("arguments")?;
+                let name = string(named(list).next()?, src)?;
+                // The second positional argument, else the `default` keyword, read as `parts`
+                // at the next level rather than as a whole value.
+                let mut positional = named(list).filter(|a| {
+                    !matches!(
+                        a.kind(),
+                        "keyword_argument" | "comment" | "dictionary_splat"
+                    )
+                });
+                let keyword = named(list).find(|a| {
+                    a.kind() == "keyword_argument"
+                        && (a.child_by_field_name("name"))
+                            .is_some_and(|n| text(n, src) == "default")
+                });
+                let default = (positional.nth(1)).or_else(|| keyword?.child_by_field_name("value"));
+                let reads = default.and_then(|d| parts_at(d, src, depth + 1));
+                return Some(match reads {
+                    Some(p) if p.iter().any(|p| matches!(p, Part::Env(_))) => Part::Hole,
                     _ => Part::Env(name),
                 });
             }
@@ -1136,7 +1171,11 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
             }
-            single_env(parts(function.child_by_field_name("object")?, src)?)
+            single_env(parts_at(
+                function.child_by_field_name("object")?,
+                src,
+                depth + 1,
+            )?)
         }
         _ => None,
     }
@@ -1153,19 +1192,26 @@ fn single_env(parts: Vec<Part>) -> Option<Part> {
 /// `a.b.c` for identifier and attribute chains; any other expression becomes `(<node kind>)`,
 /// so no source text beyond names reaches the index.
 fn callee(node: Node, src: &[u8]) -> String {
-    match node.kind() {
-        "identifier" => text(node, src).to_string(),
-        "attribute" => match (
-            node.child_by_field_name("object"),
-            node.child_by_field_name("attribute"),
-        ) {
-            (Some(object), Some(attribute)) => {
-                format!("{}.{}", callee(object, src), text(attribute, src))
-            }
-            _ => format!("({})", node.kind()),
-        },
-        kind => format!("({kind})"),
-    }
+    // The attributes of the chain, outermost first; a chain longer than `FOLD_DEPTH` ends in
+    // the kind of the node where it is cut.
+    let (mut node, mut names) = (node, Vec::new());
+    let base = loop {
+        match node.kind() {
+            "identifier" => break text(node, src).to_string(),
+            "attribute" if names.len() < FOLD_DEPTH => match (
+                node.child_by_field_name("object"),
+                node.child_by_field_name("attribute"),
+            ) {
+                (Some(object), Some(attribute)) => {
+                    names.push(text(attribute, src));
+                    node = object;
+                }
+                _ => break format!("({})", node.kind()),
+            },
+            kind => break format!("({kind})"),
+        }
+    };
+    (names.iter().rev()).fold(base, |path, name| path + "." + name)
 }
 
 #[cfg(test)]
@@ -1344,6 +1390,51 @@ mod tests {
             let depth = nesting(&held(&consts(&src), name));
             assert!(depth <= VALUE_DEPTH, "{depth} levels in `{}`", &src[..20]);
         }
+    }
+
+    #[test]
+    fn concatenation_folds_once_per_term() {
+        // Left-associated: reading each side twice would take 2^64 steps.
+        let src = format!("x = \"/x\" + {}\"y\"\n", "b + ".repeat(64));
+
+        let Value::Str(parts) = held(&consts(&src), "x") else {
+            unreachable!("not a string");
+        };
+
+        assert_eq!(parts.len(), 66);
+    }
+
+    #[test]
+    fn long_chains_are_cut() {
+        // Far past the limit: a recursion that does not stop overflows the stack.
+        let n = 30_000;
+        let sum = consts(&format!("a = '' + {}b\n", "b + ".repeat(n)));
+        let Value::Str(parts) = held(&sum, "a") else {
+            unreachable!("not a string");
+        };
+        assert!(parts.len() <= FOLD_DEPTH + 2, "{}", parts.len());
+
+        let fallbacks = format!("a = {}os.getenv(\"X\")\n", "os.getenv(\"X\") or ".repeat(n));
+        // Every call's arguments are folded again, up to `FOLD_DEPTH` each: fewer levels keep
+        // the test fast.
+        let defaults = format!(
+            "a = {}\"/\"{}\n",
+            "os.getenv(\"X\", ".repeat(4 * FOLD_DEPTH),
+            ")".repeat(4 * FOLD_DEPTH)
+        );
+        let methods = format!("a = os.environ[\"X\"]{}\n", ".strip()".repeat(n));
+        for src in [fallbacks, defaults, methods] {
+            let value = held(&consts(&src), "a");
+            assert!(
+                matches!(value, Value::Str(_) | Value::Call(_) | Value::Unknown),
+                "{}",
+                &src[..20]
+            );
+        }
+
+        let member = facts(&format!("a{}.f()\n", ".b".repeat(n)));
+        assert_eq!(member.calls.len(), 1);
+        assert!(member.calls[0].callee.len() < 10 * FOLD_DEPTH);
     }
 
     #[test]
