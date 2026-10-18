@@ -199,7 +199,7 @@ escritas como ruta (`crate::a::f()`, `Tipo::new()`, `Self::f()`), también por `
 renombres, globs, `pub use` y los otros crates del workspace por nombre; las de método (`x.m()`) por el tipo del receptor cuando el código lo escribe (`let`, parámetro, campo, `self`, retorno de función; un `dyn Trait` o genérico con trait va al método del trait), si no por el nombre; las de dentro de macros
 no se indexan, y contratos Rust además de los paquetes aún no; solo entra la configuración por defecto de cada crate, para un destino fijo x86_64 Linux: un ítem bajo un `#[cfg(..)]` falso, o bajo una feature fuera del `default` del `Cargo.toml`, queda fuera, y los módulos `#[cfg(test)]` entran), y enlaza repositorios, también de un
 lenguaje al otro,
-por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` del lado que consume;
+por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` y, en Rust, `reqwest` y `ureq` del lado que consume;
 Next.js (app router) y Express y, en Python, FastAPI, Flask y Django y, en Rust, axum del lado que sirve, también
 detrás de un gateway), por los
 recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python`), colas RabbitMQ

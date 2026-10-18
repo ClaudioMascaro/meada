@@ -1538,6 +1538,56 @@ fn rust() {
             "crates/billing/src/invoice.rs::tax",
             // A package the workspace's `exclude` lists is still a crate of the repository.
             "crates/scratch/src/lib.rs::ignored",
+            "crates/worker/src/agents.rs::agents",
+            "crates/worker/src/agents.rs::module_functions",
+            "crates/worker/src/clients.rs::blocking",
+            "crates/worker/src/clients.rs::built",
+            "crates/worker/src/clients.rs::inline",
+            "crates/worker/src/clients.rs::requested",
+            "crates/worker/src/clients.rs::verbs",
+            "crates/worker/src/derived.rs::ApiExt",
+            "crates/worker/src/derived.rs::ApiExt.api",
+            "crates/worker/src/derived.rs::Client.ApiExt.api",
+            "crates/worker/src/derived.rs::Factory",
+            "crates/worker/src/derived.rs::Factory.fetch_named",
+            "crates/worker/src/derived.rs::Factory.make",
+            "crates/worker/src/derived.rs::Sender",
+            "crates/worker/src/derived.rs::Sender.send_named",
+            "crates/worker/src/derived.rs::by_name",
+            "crates/worker/src/derived.rs::derived",
+            "crates/worker/src/derived.rs::send_named",
+            "crates/worker/src/derived.rs::shadowed",
+            "crates/worker/src/lib.rs::derived",
+            "crates/worker/src/wrappers.rs::recurse",
+            "crates/worker/src/wrappers.rs::recursive",
+            "crates/worker/src/dynamic.rs::looped",
+            "crates/worker/src/dynamic.rs::pick",
+            "crates/worker/src/dynamic.rs::spec",
+            "crates/worker/src/dynamic.rs::unresolved",
+            "crates/worker/src/lib.rs::agents",
+            "crates/worker/src/lib.rs::clients",
+            "crates/worker/src/lib.rs::dynamic",
+            "crates/worker/src/lib.rs::modules",
+            "crates/worker/src/lib.rs::settings",
+            "crates/worker/src/lib.rs::urls",
+            "crates/worker/src/lib.rs::wrappers",
+            "crates/worker/src/modules.rs::Cache",
+            "crates/worker/src/modules.rs::Cache.get",
+            "crates/worker/src/modules.rs::blocking_health",
+            "crates/worker/src/modules.rs::health",
+            "crates/worker/src/modules.rs::items",
+            "crates/worker/src/modules.rs::lookalikes",
+            "crates/worker/src/urls.rs::consts",
+            "crates/worker/src/urls.rs::formats",
+            "crates/worker/src/urls.rs::strings",
+            "crates/worker/src/wrappers.rs::Api",
+            "crates/worker/src/wrappers.rs::Api.ping",
+            "crates/worker/src/wrappers.rs::send",
+            "crates/worker/src/wrappers.rs::through_a_parameter",
+            "crates/worker/src/wrappers.rs::api_get",
+            "crates/worker/src/wrappers.rs::open_ended",
+            "crates/worker/src/wrappers.rs::resource",
+            "crates/worker/src/wrappers.rs::wrapped",
             "crates/web/src/admin.rs::mount",
             "crates/web/src/admin.rs::reset",
             "crates/web/src/admin.rs::router",
@@ -2326,6 +2376,311 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(export.contains("http::GET::/r10\""));
     assert!(!export.contains("http::GET::/r2999\""));
+}
+
+/// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.
+fn rust_clients(case: &str, file: &str) -> Vec<Consumer> {
+    let repo = fixture_repo(case, "conformance-rust", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    consumers(&json, &format!("crates/worker/src/{file}"))
+}
+
+#[test]
+fn rust_reqwest_functions_are_consumers_and_get_on_other_objects_is_not() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/modules.rs::{function}::{call}");
+    let expected = triples(&[
+        // A function of the crate, of its `blocking` module imported and written in full.
+        ("http::GET::/health", host, &site("health", "reqwest.get#0")),
+        (
+            "http::GET::/blocking/health",
+            host,
+            &site("blocking_health", "blocking.get#0"),
+        ),
+        (
+            "http::GET::/blocking/ping",
+            host,
+            &site("blocking_health", "reqwest.blocking.get#0"),
+        ),
+        ("http::GET::/items", host, &site("items", "client.get#0")),
+    ]);
+    // `get` on a type of the crate and on a map is no consumer.
+    assert_eq!(rust_clients("rust_http_modules", "modules.rs"), expected);
+}
+
+#[test]
+fn rust_reqwest_clients_send_with_their_method_name_or_request() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/clients.rs::{function}::{call}");
+    let expected = triples(&[
+        (
+            "http::GET::/verbs/get",
+            host,
+            &site("verbs", "client.get#0"),
+        ),
+        (
+            "http::POST::/verbs/post",
+            host,
+            &site("verbs", "client.post#0"),
+        ),
+        (
+            "http::PUT::/verbs/put",
+            host,
+            &site("verbs", "client.put#0"),
+        ),
+        (
+            "http::PATCH::/verbs/patch",
+            host,
+            &site("verbs", "client.patch#0"),
+        ),
+        (
+            "http::DELETE::/verbs/delete",
+            host,
+            &site("verbs", "client.delete#0"),
+        ),
+        (
+            "http::HEAD::/verbs/head",
+            host,
+            &site("verbs", "client.head#0"),
+        ),
+        // `Client::builder()...build()?` is a client.
+        ("http::GET::/built", host, &site("built", "client.get#0")),
+        // `request(Method::X, url)`: the method written in full, through a `use` and a `let`.
+        (
+            "http::PUT::/requested/put",
+            host,
+            &site("requested", "client.request#0"),
+        ),
+        (
+            "http::DELETE::/requested/delete",
+            host,
+            &site("requested", "client.request#1"),
+        ),
+        (
+            "http::PATCH::/requested/patch",
+            host,
+            &site("requested", "client.request#2"),
+        ),
+        // A client that is never named, built in the expression.
+        (
+            "http::GET::/inline",
+            host,
+            &site("inline", "(call_expression).get#0"),
+        ),
+        (
+            "http::POST::/inline/path",
+            host,
+            &site("inline", "(call_expression).post#0"),
+        ),
+        // The blocking client, `use ... as`, and a builder chain called on in place.
+        (
+            "http::GET::/blocking/get",
+            host,
+            &site("blocking", "client.get#0"),
+        ),
+        (
+            "http::PATCH::/blocking/request",
+            host,
+            &site("blocking", "client.request#0"),
+        ),
+        (
+            "http::DELETE::/blocking/built",
+            host,
+            &site("blocking", "(try_expression).delete#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_clients", "clients.rs"), expected);
+}
+
+#[test]
+fn rust_ureq_functions_and_agents_are_consumers_with_their_method() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/agents.rs::{function}::{call}");
+    let expected = triples(&[
+        (
+            "http::GET::/u/get",
+            host,
+            &site("module_functions", "ureq.get#0"),
+        ),
+        (
+            "http::POST::/u/post",
+            host,
+            &site("module_functions", "ureq.post#0"),
+        ),
+        (
+            "http::PUT::/u/put",
+            host,
+            &site("module_functions", "ureq.put#0"),
+        ),
+        (
+            "http::PATCH::/u/patch",
+            host,
+            &site("module_functions", "ureq.patch#0"),
+        ),
+        (
+            "http::DELETE::/u/delete",
+            host,
+            &site("module_functions", "ureq.delete#0"),
+        ),
+        (
+            "http::HEAD::/u/head",
+            host,
+            &site("module_functions", "ureq.head#0"),
+        ),
+        (
+            "http::OPTIONS::/u/request",
+            host,
+            &site("module_functions", "ureq.request#0"),
+        ),
+        // An `Agent` from `agent()`, from a builder and from `Agent::new()`.
+        (
+            "http::GET::/agent/get",
+            host,
+            &site("agents", "agent.get#0"),
+        ),
+        (
+            "http::DELETE::/agent/request",
+            host,
+            &site("agents", "agent.request#0"),
+        ),
+        (
+            "http::POST::/agent/built",
+            host,
+            &site("agents", "built.post#0"),
+        ),
+        (
+            "http::PUT::/agent/new",
+            host,
+            &site("agents", "named.put#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_agents", "agents.rs"), expected);
+}
+
+#[test]
+fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/wrappers.rs::{function}::{call}");
+    let expected = triples(&[
+        // One level, and two: `resource` calls `api_get` with a path of its own parameter.
+        (
+            "http::GET::/wrapped/one",
+            host,
+            &site("wrapped", "api_get#0"),
+        ),
+        (
+            "http::GET::/resources/tags",
+            host,
+            &site("wrapped", "resource#0"),
+        ),
+        (
+            "http::GET::/resources/users",
+            host,
+            &site("wrapped", "resource#1"),
+        ),
+        // The client is a parameter too: the caller's constructor is the client. One held by a
+        // struct (`Api.ping`) is no consumer.
+        (
+            "http::POST::/param/one",
+            host,
+            &site("through_a_parameter", "send#0"),
+        ),
+        // A wrapper that calls itself: the cycle is cut, the outside caller's path is read.
+        (
+            "http::GET::/recursive/one",
+            host,
+            &site("recursive", "recurse#0"),
+        ),
+        // A public function with no caller here keeps the parameter as a hole.
+        (
+            "http::GET::/open/{}",
+            host,
+            &site("open_ended", "reqwest.get#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_wrappers", "wrappers.rs"), expected);
+}
+
+#[test]
+fn rust_values_derived_from_a_client_and_name_matches_are_no_consumers() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/derived.rs::{function}::{call}");
+    let expected = triples(&[
+        // `headers().get(..)` of a response, `get` on a JSON value and on `client.api()` (a method
+        // of a trait the crate defines) are not.
+        (
+            "http::GET::/derived/real",
+            host,
+            &site("derived", "client.get#0"),
+        ),
+        // A client from `factory.make()`, found by name, is not one; a wrapper reached only by
+        // a name match keeps its parameter as a hole (the call `sender.send_named("called")` is
+        // not its caller).
+        (
+            "http::GET::/by-name/{}",
+            host,
+            &site("send_named", "reqwest.get#0"),
+        ),
+        // A `{base}` that a loop or a closure parameter binds is not the `let base` around it.
+        ("http::GET::/loop", "", &site("shadowed", "reqwest.get#0")),
+        (
+            "http::GET::/closure",
+            "",
+            &site("shadowed", "reqwest.get#1"),
+        ),
+        ("http::GET::/outer", "", &site("shadowed", "reqwest.get#2")),
+    ]);
+    assert_eq!(rust_clients("rust_http_derived", "derived.rs"), expected);
+}
+
+#[test]
+fn rust_urls_fold_consts_format_concat_and_strings_built_in_the_function() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/urls.rs::{function}::{call}");
+    let get = |function: &str, n: usize| site(function, &format!("reqwest.get#{n}"));
+    let expected = triples(&[
+        // A const of the file, one imported through `use`, one through a path, a `concat!` const,
+        // and a static captured in a format string.
+        ("http::GET::/local", host, &get("consts", 0)),
+        ("http::GET::/users", host, &get("consts", 1)),
+        ("http::GET::/", host, &get("consts", 2)),
+        ("http::GET::/tags", host, &get("consts", 3)),
+        ("http::GET::/base/items", host, &get("consts", 4)),
+        // `{base}`, `{}`, `{0}`, `{b}` with `b = base`, `{{` and `concat!`.
+        ("http::GET::/fmt/inline", host, &get("formats", 0)),
+        ("http::GET::/fmt/positional/1", host, &get("formats", 1)),
+        ("http::GET::/fmt/index", host, &get("formats", 2)),
+        ("http::GET::/fmt/named", host, &get("formats", 3)),
+        ("http::GET::/fmt/escaped/{}", host, &get("formats", 4)),
+        ("http::GET::/concat/7", host, &get("formats", 5)),
+        // `push_str`, `push` and `+=`, `+`, and a read before a push sees the String as it was.
+        ("http::GET::/strings/push/tail", host, &get("strings", 0)),
+        ("http::GET::/strings/sum/chain", host, &get("strings", 1)),
+        ("http::GET::/early", host, &get("strings", 2)),
+        ("http::GET::/early/late", host, &get("strings", 3)),
+    ]);
+    assert_eq!(rust_clients("rust_http_urls", "urls.rs"), expected);
+}
+
+#[test]
+fn rust_urls_that_do_not_fold_are_holes_or_unresolved() {
+    let host = "host:api.example.com";
+    let site = |function: &str| format!("crates/worker/src/dynamic.rs::{function}::reqwest.get#0");
+    let expected = triples(&[
+        // A call's result, and a String a loop grows, are unreadable: the consumer has no
+        // contract. A format spec prints something else than the value: a hole.
+        ("unresolved", "", &site("unresolved")),
+        ("unresolved", "", &site("looped")),
+        ("http::GET::/spec/{}", host, &site("spec")),
+    ]);
+    assert_eq!(rust_clients("rust_http_dynamic", "dynamic.rs"), expected);
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and

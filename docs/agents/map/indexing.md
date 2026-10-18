@@ -300,6 +300,11 @@ modules updates it.
   `Value::Function`, a `const`, `static` and a `let` bound once in its scope as a `Const`, and a
   function's `return_values` (its tail expression and `return`s); `Put` queues each until the
   file's `use`s are known, so a path normalizes like a call's. Depth is bounded by `VALUE_DEPTH`.
+  Strings fold (spec #30 #131): `+`, `format!`/`concat!`, `String::from` and the conversions
+  that keep the text, `Method::GET` of the HTTP crates (`Scan::targets` holds what each `use`
+  imports), and a `let mut` String that `lang/rust/builders.rs` finds a plain builder
+  (`parse` collects them per scope and name; the Reader substitutes the text the pushes before
+  the read position hold, memoized per push).
   `args`, `receiver` and `return_values` are not stored (the constants arrived with schema version 28).
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be

@@ -160,6 +160,11 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
         "conformance-rust.context-reset.txt",
         &engine.context("Counter.reset", None).unwrap(),
     );
+    // A `reqwest::get` whose URL a function computes: the consumer shows with no contract.
+    assert_golden(
+        "conformance-rust.context-unresolved.txt",
+        &engine.context("unresolved", None).unwrap(),
+    );
 }
 
 #[test]

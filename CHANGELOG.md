@@ -86,6 +86,18 @@ All notable changes to Meada are recorded here. The format follows
   of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
   nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
   once (schema version 30).
+- Rust HTTP consumers (spec #30): `reqwest::get`, `reqwest::blocking::get`, a `Client` (from
+  `Client::new()`, `Client::builder()...build()?`, the `blocking` ones, a parameter the callers
+  pass one to) with `get`, `post`, `put`, `patch`, `delete`, `head` or `request(Method::X, url)`,
+  and `ureq` (`get` and the rest, `request("X", url)`, an `Agent`) are `http` consumers, with
+  the client wrappers followed through their callers as the Python ones are. The URL folds
+  from literals, `const` and `static` items (also imported through `use`), `+`, `String::from`,
+  `.to_string()`, `format!` and `concat!` (`{}`, `{0}`, `{name}`, inline captures; a format
+  spec is a hole) and from a `let mut` String the function only grows with `push_str`, `push`
+  and `+=`. A URL that does not fold is an unresolved consumer. A value a client hands back
+  (a response, a JSON value, a method of a trait the crate defines) is no client: only the
+  library's own builder methods pass the object on. The index is rebuilt once (schema
+  version 32).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.
