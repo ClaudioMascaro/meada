@@ -2,7 +2,10 @@
 //! client that traces back to the library's constructor (`Code::origins`), imported from the
 //! library's package: a `produce` on anything else is no producer.
 
-use crate::lang::{Call, Handler, Message, Role, Value, channel_name as name, literal, queue_name};
+use crate::lang::{
+    Call, Handler, Message, Role, Value, channel_name as name, consume, literal, produce,
+    publication, queue_name, topic, topics,
+};
 use crate::resolve::{Code, Keywords};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
@@ -46,9 +49,6 @@ const METHODS: [&str; 12] = [
 const FACTORIES: [&str; 2] = ["channel", "client"];
 /// The callee of a call made on the result of another call, `pika.BlockingConnection(p).channel()`.
 const CALL: &str = "(call)";
-
-/// What a form reads of a call's arguments: the channel names, see `names`.
-type Read<'a> = &'a dyn Fn(&[Value], &Keywords) -> Option<Vec<Option<String>>>;
 
 #[derive(Clone, Copy)]
 enum Client {
@@ -141,11 +141,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     for (site, at, (exchange, key)) in code.expand(path, n, &read) {
                         // The empty exchange is the queue named by the key; one that cannot
                         // be evaluated leaves the producer unresolved.
-                        let (name, role) = match exchange {
-                            Some(e) if e.is_empty() => (key, Role::Producer),
-                            Some(exchange) => (key, Role::Publish { exchange }),
-                            None => (None, Role::Producer),
-                        };
+                        let (name, role) = publication(exchange, key);
                         let (path, call) = (site.into(), at);
                         out.push(Message {
                             broker: "amqp",
@@ -264,54 +260,6 @@ fn is_sqs(call: &Call) -> bool {
     matches!(service, Some(Value::Str(parts)) if literal(parts).as_deref() == Some("sqs"))
 }
 
-/// A producer per name read at each site an expansion found.
-fn produce<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    n: usize,
-    broker: &'static str,
-    read: Read,
-) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .flat_map(|(site, at, names)| {
-            names.into_iter().map(move |name| Message {
-                broker,
-                name,
-                path: site.into(),
-                call: at,
-                role: Role::Producer,
-            })
-        })
-        .collect()
-}
-
-/// A consumer per name read at each site an expansion found: the call's own `handler`, else
-/// the function the site is in (a polling client).
-fn consume<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    n: usize,
-    broker: &'static str,
-    read: Read,
-    handler: Option<Handler>,
-) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .flat_map(|(site, at, names)| {
-            let handler = handler.clone().unwrap_or_else(|| Handler::Def {
-                path: site.into(),
-                name: code.files()[site].calls[at].scope.clone(),
-            });
-            names.into_iter().map(move |name| Message {
-                broker,
-                name,
-                path: site.into(),
-                call: at,
-                role: Role::Consumer(handler.clone()),
-            })
-        })
-        .collect()
-}
-
 /// The definition of the repository that the callback argument `at` (or the keyword `key`) of
 /// the call is; a lambda and a callable that is no definition give none.
 fn callback<'a>(code: &Code<'a>, path: &'a str, n: usize, at: usize, key: &str) -> Option<Handler> {
@@ -341,22 +289,6 @@ fn arg_name(args: &[Value], kwargs: &Keywords, at: usize, key: &str) -> Option<O
 /// The one channel name an argument gives, as `read` answers it.
 fn one(args: &[Value], kwargs: &Keywords, at: usize, key: &str) -> Option<Vec<Option<String>>> {
     Some(vec![arg_name(args, kwargs, at, key)?])
-}
-
-/// A Kafka topic name (see `channel_name`). A name that starts with `^` is a regular expression
-/// that picks topics at run time, so it names none.
-fn topic(value: &Value) -> Option<Option<String>> {
-    Some(name(value)?.filter(|t| !t.starts_with('^')))
-}
-
-/// The topics of a list of them, or of the one a value gives. `None` when one depends on a
-/// parameter (a client wrapper); a name that is not a literal string is unresolved (`None` in
-/// the list).
-fn topics(value: &Value) -> Option<Vec<Option<String>>> {
-    match value {
-        Value::List(items) => items.iter().map(topic).collect(),
-        value => Some(vec![topic(value)?]),
-    }
 }
 
 /// The SQS queue the `QueueUrl` keyword names.

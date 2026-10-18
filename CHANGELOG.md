@@ -8,6 +8,146 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Rust channels (spec #30): producers and consumers of the common broker clients, on a client
+  that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
+  or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),
+  lapin (`basic_publish`, `basic_consume` and `queue_bind` on a channel of
+  `Connection::connect`, with the routing rules of the other languages), aws-sdk-sqs (the
+  `queue_url` of a `send_message`, `send_message_batch` or `receive_message` builder; the queue
+  is the last URL segment), async-nats (`publish`, `subscribe`, `queue_subscribe`; wildcards link
+  as `inferred`) and the redis crate (`xadd`, and the keys of an `xread_options` whose options
+  set a `group`). Names are evaluated like URLs, `format!` included; one that cannot be is an
+  unresolved side. A polling or stream client's handler is the function that holds the call. A
+  `let mut` that nothing else binds or assigns now keeps the object its call made, for the
+  client's flow only (a redis connection is held by one). The cross-language fixture gains a
+  topic a TypeScript kafkajs producer sends and a Rust consumer reads, with a golden `trace`
+  down. A queue URL built from two literals the evaluation folds (`.../{queue}` given a literal)
+  now names its last segment in every language. A Rust method called on a call chain whose root is
+  an outside type (`client.get(u).send()` on a `reqwest::Client`) resolves to nothing, never to a
+  repository method of the same name. The index is rebuilt once (schema version 36).
+
+- Rust base URLs read from the environment (spec #30): `std::env::var("X")`, `env::var("X")`
+  after `use std::env` (or `use std::env::var`), `dotenvy::var("X")` and `env!("X")`, also inside
+  `concat!`, through `unwrap`, `unwrap_or`, `unwrap_or_else`, `unwrap_or_default`, `expect`, `?`
+  and string methods such as `trim_end_matches`. A leading URL term that comes from exactly one
+  such read is the base URL variable `X`, linked through `base_url_env` like the TypeScript and
+  Python ones; Meada never reads the value. `option_env!` is not read, an `env` the file defines
+  or one with no `use std::env` is no read, and a second read in a fallback leaves a hole. A
+  cross-language fixture (a TypeScript `fetch` reaches an axum handler, a reqwest call reaches a
+  Next.js route, through a variable and through a declared host) covers `trace` down, up and
+  from uncommitted changes. The index is rebuilt once (schema version 33).
+- Cargo packages (spec #30): each `Cargo.toml` with a `[package] name` provides
+  `package::cargo::<name>` (every workspace member is its own provider), and each entry of
+  `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` (also under `[target.*]`,
+  `workspace = true` read from `[workspace.dependencies]`, `package =` naming a renamed crate)
+  links to the provider: by `path` to the crate at that path, in its own repository or, when the
+  path leaves it (`../other`), in another repository of the workspace (resolved from the text
+  and the repositories' roots, reading nothing outside them), by `git` to the repository whose
+  identity is the normalized URL, by version to the workspace provider of the name. The link is
+  `exact`, the reason `package::cargo::<name> <range> (local <version>), range unchecked`;
+  `version.workspace = true` reads `[workspace.package]`. A `use` of the crate (hyphens as
+  underscores; the `[lib] name`, or the renamed key) reaches the provider's public items through
+  its `pub use` re-exports, `exact`, the reason ending `; import crate name`. A dependency
+  outside the workspace adds nothing, and so does one whose `path`, `git` or `package` is empty
+  or mistyped; `Cargo.lock` and crates.io are never read. The index is rebuilt once (schema
+  version 26).
+- Rust conditional compilation (spec #30): only the default configuration of a crate is
+  indexed, for a fixed `x86_64` Linux target (`unix`, `target_os = "linux"`,
+  `target_family = "unix"`, `target_arch = "x86_64"`, `target_pointer_width = "64"`,
+  `target_endian = "little"`, `target_env = "gnu"`, `debug_assertions`, `test`; any other
+  predicate is false), so the result never depends on the machine. An item under a
+  `#[cfg(..)]` that is false is left out, `all`, `any` and `not` included; `feature = "x"` holds
+  for the features in the crate's `[features] default`, followed through features that enable
+  others (`x/feat` also enables an optional dependency `x`). A `mod x;` that is cfg-false does
+  not read its file, and neither does one whose file opens with a false `#![cfg(..)]`.
+  `test` is false (`cfg(not(test))` items are indexed), but a `mod` under exactly `#[cfg(test)]`
+  is indexed too; `#[cfg_attr(..)]` leaves the item in. Toggling a default
+  feature in `Cargo.toml` parses the crate's files again. The index is rebuilt once (schema
+  version 29).
+- A Rust language pack (`.rs`, spec #30, first ticket): the repository's crates (each
+  `Cargo.toml` with a `[package]`, at any depth, a workspace's members included), each built
+  from its roots (`src/lib.rs` or `[lib] path`, `src/main.rs`, `src/bin/`, `[[bin]] path`)
+  through its `mod` declarations (`x.rs`, `x/mod.rs`, `#[path]`, inline modules); a file no
+  `mod` reaches is not indexed. Functions, structs, enums, traits, modules and `impl` methods
+  (`Type.method`, `Type.Trait.method`, `Trait.method`) are symbols, and calls written as paths
+  (`crate::`, `super::`, `self::`, `Type::new()`, `Self::helper()`) resolve `exact` through the
+  module tree, an `impl` in another file than its type included; a path that does not resolve
+  matches functions and methods by name, and one that fits several `impl` blocks is
+  `ambiguous`. The `fn main` of each binary target (`src/main.rs`, `src/bin/`, `[[bin]] path`)
+  is a program entry point with its process; a `main` elsewhere is not. Calls inside macro
+  invocations are not indexed. No Rust toolchain is run. A
+  config file of any pack (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`) larger than 1 MiB
+  is not read.
+- Rust `use` declarations (spec #30): paths from `crate::`, `super::`, `self::`, a module in
+  scope or a crate name, groups, renames, globs (`use super::*` takes the private items too,
+  any other glob the public ones) and `pub use` re-exports at any depth, with cycles cut; a
+  `use` in a module written in place or in a function binds and hides there alone, and a call
+  through a `use`d name, a renamed one or a glob is `exact` when one definition is found. A
+  crate outside the repository (`std`, `serde`) is external, never name-matched, and another
+  crate of the repository is reached by its name with hyphens as underscores, from a crate whose
+  `Cargo.toml` lists it as a dependency (by key or `package =`). A library's exports are its
+  `pub` items reachable from `src/lib.rs` (or `[lib] path`) through `pub` modules and `pub use`;
+  `pub(crate)` and narrower items stay inside the crate, and a binary crate exports nothing.
+  The index is rebuilt once (schema version 24).
+- Rust method calls (spec #30): `x.m()` reaches the method in the `impl` blocks of the
+  receiver's type, `exact` when one fits, when the type is written in the source: a `let` with
+  a type or holding a call of a function whose return type is written (`Self` included), a
+  parameter (`&T`, `&mut T`), a field through `self.field`, or `self`. A method of `impl Trait
+  for Type` is found through the type; a `dyn Trait`, an `impl Trait` or a generic bounded by
+  one trait stops at the trait's method (required methods of a trait are symbols now) and never
+  searches the implementations. A receiver whose type is not written goes by name, `inferred`
+  with one candidate and `ambiguous` with every one; a type from outside the repository (`std`,
+  another crate) is opaque, and its methods are not matched by name. A type of the repository
+  whose `impl` blocks lack the method (a `derive`, a blanket or outside trait), written on the
+  receiver or as a path (`Store::default()`), resolves to nothing rather than by name. The index
+  is rebuilt once (schema version 25).
+- Rust actix-web and Rocket providers (spec #30): a function with a route attribute
+  (`#[get("/x")]`, actix-web's `#[route("/x", method = "GET")]`) or one named by
+  `.route(path, web::get().to(h))` provides `http::<METHOD>::<path>`, served under the prefixes of
+  what registers it: `App::new().service(h)`, nested `web::scope(prefix)`, `web::resource(path)`,
+  a `.configure(f)` function, and Rocket's `build().mount(prefix, routes![a, b])`. They go
+  through the same mounts and prefixes as axum. A handler no code of its crate refers to (of any
+  crate, when its file is public in a library) is served at its own path: a name only bound (a
+  `let`, a parameter, a field) or a reference a local of the name hides does not count. One
+  that code Meada does not read refers to (`services![..]`, `vec![..]`, `concat()`, `cfg_if!`,
+  an alias, a use before a `let` of the name) may be registered there, and is served nowhere,
+  as it is under a scope or mount prefix Meada cannot read; a file too large to tell what it
+  refers to does so for the handlers of its own crate alone. `.route(path, web::get().to(h))`
+  with a handler Meada cannot resolve is still a provider, at the file site: the path and the
+  method are certain, the handler is unknown. A `ServiceConfig` passed on to another function
+  is followed; `#[macro_use] extern crate rocket;` in the crate's root (wherever `[lib] path`
+  puts it) brings Rocket's attributes into every module of the crate. A route attribute is no
+  call: it never links to a function of the repository, by name or by path. `{id}`, `{tail:.*}`, `<id>`, `<path..>` and `?<q>` are params. The Rust pack
+  now emits route attributes as calls that decorate their function, and reads `routes![..]`. A
+  crate path (`rocket::build()`) is no longer hidden by a function of the file with the same
+  name. The index is rebuilt once (schema version 35).
+- Rust axum providers (spec #30): a route of a `Router::new()` chain (`route`, `nest`, `merge`)
+  provides `http::<METHOD>::<path>`; `get(a).post(b)` gives one provider per method, `any` gives
+  `ANY`, and a closure handler is an inline route. A router is served under every prefix it is
+  nested under (one router under two prefixes is two providers), through functions in other
+  modules, constants and `let`s, as the Express ones are; `:id`, `{id}`, `*rest` and `{*rest}`
+  are params. A router nested under a prefix Meada cannot read, or mounted on a field, is served
+  nowhere; a router nothing nests is served at its root. The Rust pack now emits call
+  arguments, constants, return values and closures as values, and a call in a builder chain
+  keeps its receiver (`Call::receiver`), so the value flow follows `Router::new().route(..)`.
+  A router handed to a call Meada does not read (`route_service`, `fallback_service`, an
+  outside function wrapping it, a method found only by name) is served nowhere, a router held by a `let mut`
+  or a name bound or assigned again is served nowhere too, `{{` and `}}` stay literal braces, and the method
+  of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
+  nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
+  once (schema version 30).
+- Rust HTTP consumers (spec #30): `reqwest::get`, `reqwest::blocking::get`, a `Client` (from
+  `Client::new()`, `Client::builder()...build()?`, the `blocking` ones, a parameter the callers
+  pass one to) with `get`, `post`, `put`, `patch`, `delete`, `head` or `request(Method::X, url)`,
+  and `ureq` (`get` and the rest, `request("X", url)`, an `Agent`) are `http` consumers, with
+  the client wrappers followed through their callers as the Python ones are. The URL folds
+  from literals, `const` and `static` items (also imported through `use`), `+`, `String::from`,
+  `.to_string()`, `format!` and `concat!` (`{}`, `{0}`, `{name}`, inline captures; a format
+  spec is a hole) and from a `let mut` String the function only grows with `push_str`, `push`
+  and `+=`. A URL that does not fold is an unresolved consumer. A value a client hands back
+  (a response, a JSON value, a method of a trait the crate defines) is no client: only the
+  library's own builder methods pass the object on. The index is rebuilt once (schema
+  version 32).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

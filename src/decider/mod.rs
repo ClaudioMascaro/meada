@@ -190,7 +190,7 @@ impl Question {
         let enclosing = match &item.enclosing {
             Some(symbol) => {
                 let source = fs::read(root.join(&item.path))?;
-                function_like(&item.path, &source, &symbol.span).then(|| {
+                function_like(root, &item.path, &source, &symbol.span).then(|| {
                     let text = source.get(symbol.span.clone()).unwrap_or_default();
                     String::from_utf8_lossy(text).into_owned()
                 })
@@ -235,16 +235,50 @@ impl Question {
     }
 }
 
+/// The `LanguagePack::settings` of the file at `path`, from the config files of the pack in
+/// the directories above it (the nearest one decides, as in the index).
+fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> String {
+    let mut dirs = vec![String::new()];
+    let mut walked = String::new();
+    for part in path
+        .split('/')
+        .rev()
+        .skip(1)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        walked = format!("{walked}{part}/");
+        dirs.push(walked.clone());
+    }
+    let mut found: Vec<(String, Vec<u8>)> = Vec::new();
+    for name in pack.config_files() {
+        let name = name.strip_prefix("**/").unwrap_or(name);
+        for dir in &dirs {
+            let config = format!("{dir}{name}");
+            if let Some(src) = crate::index::read_config(root, &config) {
+                found.push((config, src));
+            }
+        }
+    }
+    let configs: Vec<(&str, &[u8])> = found
+        .iter()
+        .map(|(n, c)| (n.as_str(), c.as_slice()))
+        .collect();
+    pack.settings(&configs)(path)
+}
+
 /// Whether the definition at `span` of the file at `path` is a function, a method or an inline
 /// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
 /// the file is parsed again; anything else, or a file no pack parses, is not.
-fn function_like(path: &str, source: &[u8], span: &Range<usize>) -> bool {
+fn function_like(root: &Path, path: &str, source: &[u8], span: &Range<usize>) -> bool {
     use lang::Kind::{Function, Inline, Method};
     let Some(pack) = lang::pack_for(path).map(lang::pack) else {
         return false;
     };
     // An allowlist: a kind added later sends its span only once it is listed here.
-    (pack.parse(path, source)).is_ok_and(|facts| {
+    let setting = setting_on_disk(pack, root, path);
+    (pack.parse_with(path, source, &setting)).is_ok_and(|facts| {
         (facts.defs.iter())
             .any(|d| d.range == *span && matches!(d.kind, Function | Method | Inline))
     })

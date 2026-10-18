@@ -130,6 +130,60 @@ fn python_functions_are_found_by_name_and_list_callers_and_callees() {
 }
 
 #[test]
+fn rust_items_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_rust",
+        "conformance-rust",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // A struct and its methods, in a crate whose root `[lib] path` names.
+    assert_golden(
+        "conformance-rust.search-invoice.txt",
+        &engine.search("Invoice", None, None).unwrap(),
+    );
+    // Callers from another module of the crate; callees through `mod` declarations, `super::`
+    // and a method matched by name.
+    assert_golden(
+        "conformance-rust.context-serve.txt",
+        &engine.context("serve", None).unwrap(),
+    );
+    // A method's callers by the receiver's type (a `let`, a parameter, a field, `self`, a
+    // function's return type) at `exact`, and by name alone at `ambiguous`.
+    assert_golden(
+        "conformance-rust.context-bump.txt",
+        &engine.context("Counter.bump", None).unwrap(),
+    );
+    // A method with one name in the repository: `exact` by the type, `inferred` by name alone.
+    assert_golden(
+        "conformance-rust.context-reset.txt",
+        &engine.context("Counter.reset", None).unwrap(),
+    );
+    // A `reqwest::get` whose URL a function computes: the consumer shows with no contract.
+    assert_golden(
+        "conformance-rust.context-unresolved.txt",
+        &engine.context("unresolved", None).unwrap(),
+    );
+}
+
+#[test]
+fn rust_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "search_rust_programs",
+        "conformance-rust",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // `src/main.rs`, `src/bin/` and a `[[bin]] path`, each with its own process.
+    assert_golden(
+        "conformance-rust.search-process-main.txt",
+        &engine.search("main", Some("process"), None).unwrap(),
+    );
+}
+
+#[test]
 fn python_programs_are_found_as_processes_and_shown_with_their_range() {
     let repo = fixture_repo(
         "context_python_programs",

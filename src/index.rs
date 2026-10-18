@@ -26,13 +26,14 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 23;
+const SCHEMA_VERSION: i64 = 36;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
 /// is NULL when it was too recent to trust. `files.facts` is what the pack parsed, as JSON
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
-/// file's resolved symbol and call rows. `calls.target` holds the one definition an `exact` or
+/// file's resolved symbol and call rows, empty for a file its pack leaves out (`Layout::members`: a
+/// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
@@ -68,7 +69,7 @@ const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    facts TEXT NOT NULL, resolved TEXT NOT NULL
+    facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
@@ -126,7 +127,9 @@ pub fn state(root: &Path) -> State {
     if version.ok() != Some(SCHEMA_VERSION) {
         return State::OtherSchema;
     }
-    match db.query_row("SELECT count(*) FROM files", [], |r| r.get(0)) {
+    match db.query_row("SELECT count(*) FROM files WHERE resolved != ''", [], |r| {
+        r.get(0)
+    }) {
         Ok(files) => State::Indexed { files },
         Err(_) => State::OtherSchema,
     }
@@ -160,6 +163,8 @@ struct Stored {
     mtime: Option<i64>,
     size: i64,
     resolved: String,
+    /// `files.setting`: `Facts::setting` of the stored facts.
+    setting: String,
 }
 
 /// What the index knows of a document: its hash and the stat seen when it was hashed.
@@ -233,7 +238,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
     };
     let stored: HashMap<String, Stored> = tx
-        .prepare("SELECT path, hash, mtime, size, resolved FROM files")?
+        .prepare("SELECT path, hash, mtime, size, resolved, setting FROM files")?
         .query_map([], |r| {
             Ok((
                 r.get(0)?,
@@ -242,6 +247,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                     mtime: r.get(2)?,
                     size: r.get(3)?,
                     resolved: r.get(4)?,
+                    setting: r.get(5)?,
                 },
             ))
         })?
@@ -276,24 +282,58 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
+    // Config files, read on every refresh (`read_config`): they are few and small. A `**/` name
+    // takes every file of that name the walk found, in path order.
+    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
+        packs.values().map(|&pack| (pack, Vec::new())).collect();
+    let mut digest = blake3::Hasher::new();
+    for (&pack, found) in &mut configs {
+        for &name in lang::pack(pack).config_files() {
+            let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
+                Some(file) => (all.iter())
+                    .map(|(path, _)| path.as_str())
+                    .filter(|path| path.rsplit('/').next() == Some(file))
+                    .collect(),
+                None => BTreeSet::from([name]),
+            };
+            for path in paths {
+                if let Some(src) = read_config(root, path) {
+                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
+                    digest.update(&src);
+                    found.push((path, src));
+                }
+            }
+        }
+    }
+    // What the configs make of each file's facts (`LanguagePack::settings`): a file parsed
+    // under another setting is parsed again, whatever its content.
+    let settings: BTreeMap<usize, _> = (configs.iter())
+        .map(|(&pack, found)| {
+            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
+            (pack, lang::pack(pack).settings(&found))
+        })
+        .collect();
     let mut changed = Vec::new();
     for &(path, abs, pack) in &walked {
+        let setting = settings[&pack](path);
         let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
-        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
+        let current = known.is_some_and(|k| k.setting == setting);
+        if current && known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size)
+        {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
-        if known.is_some_and(|k| k.hash == hash) {
+        if current && known.is_some_and(|k| k.hash == hash) {
             tx.execute(
                 "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
                 params![path, mtime, size],
             )?;
             continue;
         }
-        let facts = lang::pack(pack).parse(path, &src)?;
+        let facts = lang::pack(pack).parse_with(path, &src, &setting)?;
         changed.push(Parsed {
             path: path.clone(),
             hash,
@@ -307,19 +347,6 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|p| !packs.contains_key(p.as_str()))
         .collect();
 
-    // Config files, read on every refresh: they are few and small.
-    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
-        packs.values().map(|&pack| (pack, Vec::new())).collect();
-    let mut digest = blake3::Hasher::new();
-    for (&pack, found) in &mut configs {
-        for &name in lang::pack(pack).config_files() {
-            if let Some(src) = read_config(root, name) {
-                digest.update(format!("{pack}\0{name}\0{}\0", src.len()).as_bytes());
-                digest.update(&src);
-                found.push((name, src));
-            }
-        }
-    }
     // An edited `package.json` or `tsconfig.json` changes which files keep shapes (`surface`),
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
@@ -362,29 +389,53 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         db.execute("DELETE FROM meta", [])?;
         return refresh(db, root, identity, serve);
     };
-    let all: BTreeMap<&str, &Facts> = changed
+    let parsed: BTreeMap<&str, &Facts> = changed
         .iter()
         .map(|p| (p.path.as_str(), &p.facts))
         .chain(kept.iter().map(|(path, facts)| (path.as_str(), facts)))
         .collect();
 
-    // Calls resolve among the files of their own pack.
+    // Calls resolve among the files of their own pack, those the pack builds.
     let mut groups: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
-    for (&path, &facts) in &all {
+    for (&path, &facts) in &parsed {
         groups.entry(packs[path]).or_default().insert(path, facts);
     }
-    let resolvers = groups
-        .iter()
-        .map(|(&pack, files)| {
-            let found: Vec<(&str, &[u8])> = configs[&pack]
-                .iter()
-                .map(|(n, c)| (*n, c.as_slice()))
-                .collect();
-            let language = lang::pack(pack);
-            let modules = language.modules(&found)?;
-            Ok((pack, Resolver::new(files, modules, language)))
-        })
-        .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
+        (configs[&pack].iter())
+            .map(|(n, c)| (*n, c.as_slice()))
+            .collect()
+    };
+    // What each pack makes of the whole repository, once (`LanguagePack::layout`).
+    let mut layouts = BTreeMap::new();
+    for (&pack, files) in &mut groups {
+        let layout = lang::pack(pack).layout(&found_configs(pack), files)?;
+        if let Some(keep) = &layout.members {
+            files.retain(|path, _| keep.contains(*path));
+        }
+        layouts.insert(pack, layout);
+    }
+    let all: BTreeMap<&str, &Facts> = groups.values().flatten().map(|(p, f)| (*p, *f)).collect();
+    // A file its pack leaves out keeps its facts, for when a change brings it in, but no rows:
+    // an empty `resolved` both marks it and makes the rows be written again then.
+    for path in parsed.keys().filter(|p| !all.contains_key(*p)) {
+        if stored.get(*path).is_some_and(|s| s.resolved.is_empty()) {
+            continue;
+        }
+        forget_calls(&tx, path)?;
+        tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
+        tx.execute(
+            "UPDATE files SET resolved = '' WHERE path = ?1",
+            params![path],
+        )?;
+    }
+    let mut roots: Vec<(String, String)> = Vec::new();
+    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
+    for (&pack, files) in &groups {
+        let layout = layouts.remove(&pack).expect("a layout per pack");
+        roots.extend(layout.programs);
+        let resolver = Resolver::new(files, layout.modules, lang::pack(pack));
+        resolvers.insert(pack, resolver.publishing(layout.published));
+    }
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
     // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -421,7 +472,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
         for path in misses {
             let src = fs::read(root.join(&path))?;
-            let facts = lang::pack(packs[path.as_str()]).parse(&path, &src)?;
+            let pack = packs[path.as_str()];
+            let facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
             reparsed.insert(path, facts);
         }
     };
@@ -569,6 +621,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))
         })
         .chain(scripts)
+        .chain(roots)
         .map(|(file, def)| entry::Program { file, def })
         .collect();
     let local = entry::Local {
@@ -687,10 +740,11 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The pack config file `name` at the repository root, read as a manifest is (`read_up_to`).
-/// Like the walk, the read goes through no symbolic link.
-fn read_config(root: &Path, name: &str) -> Option<Vec<u8>> {
-    read_up_to(&plain_file(root, name)?, package::MAX_BYTES).ok()
+/// The pack config file at `path` under `root` (`tsconfig.json`, `pyproject.toml`, each
+/// `Cargo.toml`), read as a manifest is (`read_up_to`): the pack's reader takes one past
+/// `package::MAX_BYTES` as invalid. Like the walk, the read goes through no symbolic link.
+pub(crate) fn read_config(root: &Path, path: &str) -> Option<Vec<u8>> {
+    read_up_to(&plain_file(root, path)?, package::MAX_BYTES).ok()
 }
 
 /// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
@@ -705,7 +759,8 @@ fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {
     Ok(src)
 }
 
-/// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
+/// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`,
+/// `Cargo.toml`) and its
 /// `tsconfig.json` files (path and absolute path), but those under a `node_modules` directory,
 /// which the walk finds when `.gitignore` does not list it.
 fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
@@ -832,13 +887,14 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
 /// its contracts with the repository's, and links are derived from contracts when queried.
 fn write_file(tx: &Transaction, p: &Parsed) -> Result<()> {
     tx.execute(
-        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '')",
+        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '', ?6)",
         params![
             p.path,
             p.hash,
             p.mtime,
             p.size,
-            serde_json::to_string(&p.facts)?
+            serde_json::to_string(&p.facts)?,
+            p.facts.setting
         ],
     )?;
     Ok(())
@@ -941,6 +997,9 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
 #[cfg_attr(test, derive(Default))]
 pub(crate) struct Export {
     pub(crate) repository: String,
+    /// Where the repository stands in the workspace; set by the engine, never stored or shown.
+    #[serde(skip)]
+    pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
@@ -1019,6 +1078,11 @@ pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
 }
 
 impl Export {
+    /// The repository by identity and root, as `Ecosystem::reaches` takes it.
+    pub(crate) fn place(&self) -> (&str, &Path) {
+        (&self.repository, &self.root)
+    }
+
     /// The document whose route `site` is, when `site` is a route only a document of this
     /// repository lists: `<repository>::<document path>::<METHOD> <path>`.
     pub(crate) fn document_of(&self, site: &str) -> Option<&str> {
@@ -1193,7 +1257,7 @@ fn stored_shape(json: Option<String>) -> Option<Shape> {
 pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let files = db
         .prepare(&format!(
-            "SELECT path, hash FROM {schema}.files ORDER BY path"
+            "SELECT path, hash FROM {schema}.files WHERE resolved != '' ORDER BY path"
         ))?
         .query_map([], |r| {
             Ok(File {
@@ -1427,6 +1491,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect();
     Ok(Export {
         repository: identity.to_string(),
+        root: PathBuf::new(),
         files,
         symbols,
         calls,
@@ -1468,6 +1533,8 @@ fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Con
             }),
         }
     }
+    // A Cargo member's `workspace = true` entries read from a manifest above it.
+    package::cargo::inherit(&mut manifests);
     Ok((manifests, tsconfigs))
 }
 
@@ -1571,6 +1638,7 @@ mod tests {
         let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
         for (name, path) in [
+            ("sample.Cargo.toml", "Cargo.toml"),
             ("sample.pyproject.toml", "pyproject.toml"),
             ("sample.requirements.txt", "requirements.txt"),
         ] {

@@ -8,8 +8,28 @@ modules updates it.
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
-  `python-django`), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
+  (`src/main.rs` with `mod.rs`, `<name>.rs` and `#[path]` modules, inline modules holding a
+  `mod x;` and a `#[path]` one, `self::`, `super::` past a module's own name and `crate::`, a
+  `let` named like the module a path names, `src/bin/tool.rs`, `src/bin/sync/main.rs`, a
+  `[[bin]]` at `tools/admin.rs`, an inherent `impl` in another file than its struct, a trait's
+  `impl` and a default body, two traits giving `label` and two `impl From<_>` blocks
+  (`ambiguous`), a `#[cfg(test)] mod tests` that sees the file's `Store` only through a
+  `use`, a `println!` whose call is not indexed, a closure, and `orphan.rs`, which no `mod`
+  reaches; every `use` form (`crate::`, `self::`, a group, a rename, a crate name, a glob,
+  `use super::*` taking a private item), a `use` that binds in an inline module or a function
+  alone, a `pub use` chain (`ring/c.rs` to `d.rs` to `e.rs`), a re-export cycle
+  (`ring/x.rs`, `ring/y.rs`), mutual aliases, a glob beaten by an explicit import or a local item, a parameter hiding a
+  `used` name, a top-level `use` unseen in an inline module, a module and an item of one name
+  (`launch`); the `exports` table read back over `rusqlite`: a binary crate has no row), `crates/billing` (`[lib] path`, a `pub use`,
+  a call to another member) and `crates/ledger-core` (a library reached by its name with an
+  underscore from a crate that lists it as a dependency, a `pub(crate)` item that stays inside
+  it, a `pub` module holding `pub` and private items and a `pub use` of a private module's
+  item, a private module and an item of one name, `mod meter; pub use meter::meter;`), and `crates/scratch`, which the workspace's `exclude` names and is a crate all the same (a call to a crate it does not list stays external);
+  `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
+  `pub use`, moves an item between files and renames a package, and
+  exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -164,6 +184,23 @@ modules updates it.
   root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
   (PEP 503 names, requirement lines and continuations, both readers, the limits) and
   `lang/python/pyproject.rs`.
+- `tests/it/cargo.rs` (spec #30): the Cargo fixtures `cargo-lib` and `cargo-web` as siblings
+  (`web` names `lib` as its peer). `lib` is a workspace of `shared-core` (`pub use text::{greet,
+  shout}` of a private module, `pub mod api` with `Client::create`), `shared-extras` and
+  `inner-app`, which depends on both by path. `web` depends on `shared-core` by version (`app`),
+  through `workspace = true` and a renamed key (`worker`), on `shared-extras` by a renamed `git`
+  key, on a `path` that lands in `lib` (`../../cargo-lib/extras`, linked) and one that lands in
+  no workspace repository (`ghost`, not linked), and on `serde` (no link). The tests check each
+  form's link and reason, every `use` into `lib` (`exact`, `; import crate name`), the path
+  dependency that stays inside `lib`, a `git` URL of another repository that links to nothing,
+  a private module that is not reached until it is made `pub`, a `[lib] name` and a
+  `version.workspace = true` written into copies of `lib`, and the `cargo-fork` fixture (a second
+  provider of `shared-core`, added as a peer) that makes the version dependency `ambiguous`.
+  Goldens `cargo-{web,lib}.export.json`, `cargo-lib.context-greet.txt` and
+  `cargo-web.trace-down.txt`; the freshness test edits the library's version, `app`'s
+  requirement, the workspace requirement and a dependency key. Unit tests in `package/cargo.rs`
+  (the reader, unreadable sources, the dedup, `workspace = true`, hostile manifests) and
+  `package.rs` (`reaches`).
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

@@ -187,7 +187,7 @@
     },
     {
       "path": "messages/sqs_boto.py",
-      "hash": "814ffd7e35751c85d5d1aec0271a1f8dd9f6d0e92dd9f048d9d751679aaeede1"
+      "hash": "c84201de11adadbd0d5475a8205b259fbe8024ba8d18ecc2c3626008e69cec42"
     },
     {
       "path": "messages/topics.py",
@@ -2595,80 +2595,80 @@
       "id": "example.com/acme/conformance::messages/sqs_boto.py::enqueue",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 880,
-        "end": 969
+        "start": 1046,
+        "end": 1135
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::enqueue_billing",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 972,
-        "end": 1038
+        "start": 1138,
+        "end": 1204
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::not_queued",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2221,
-        "end": 2443
+        "start": 2387,
+        "end": 2609
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_billing",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1870,
-        "end": 1957
+        "start": 2036,
+        "end": 2123
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_jobs",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1652,
-        "end": 1783
+        "start": 1818,
+        "end": 1949
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_mail",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1786,
-        "end": 1867
+        "start": 1952,
+        "end": 2033
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_session",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1960,
-        "end": 2050
+        "start": 2126,
+        "end": 2216
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_unknown",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2053,
-        "end": 2218
+        "start": 2219,
+        "end": 2384
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_batch",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 717,
-        "end": 805
+        "start": 883,
+        "end": 971
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_chained",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1139,
-        "end": 1649
+        "start": 1305,
+        "end": 1815
       }
     },
     {
@@ -2680,11 +2680,19 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sqs_boto.py::send_joined",
+      "span": {
+        "path": "messages/sqs_boto.py",
+        "start": 717,
+        "end": 880
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_session",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1041,
-        "end": 1136
+        "start": 1207,
+        "end": 1302
       }
     },
     {
@@ -7644,8 +7652,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 915,
-        "end": 969
+        "start": 1081,
+        "end": 1135
       }
     },
     {
@@ -7655,8 +7663,8 @@
       "level": "exact",
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1006,
-        "end": 1038
+        "start": 1172,
+        "end": 1204
       }
     },
     {
@@ -7677,8 +7685,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2376,
-        "end": 2408
+        "start": 2542,
+        "end": 2574
       }
     },
     {
@@ -7688,8 +7696,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2413,
-        "end": 2443
+        "start": 2579,
+        "end": 2609
       }
     },
     {
@@ -7699,8 +7707,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2336,
-        "end": 2371
+        "start": 2502,
+        "end": 2537
       }
     },
     {
@@ -7710,8 +7718,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1904,
-        "end": 1957
+        "start": 2070,
+        "end": 2123
       }
     },
     {
@@ -7721,8 +7729,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1725,
-        "end": 1783
+        "start": 1891,
+        "end": 1949
       }
     },
     {
@@ -7732,8 +7740,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1817,
-        "end": 1867
+        "start": 1983,
+        "end": 2033
       }
     },
     {
@@ -7743,8 +7751,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1994,
-        "end": 2050
+        "start": 2160,
+        "end": 2216
       }
     },
     {
@@ -7754,8 +7762,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 2165,
-        "end": 2218
+        "start": 2331,
+        "end": 2384
       }
     },
     {
@@ -7765,8 +7773,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 739,
-        "end": 805
+        "start": 905,
+        "end": 971
       }
     },
     {
@@ -7776,8 +7784,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1346,
-        "end": 1398
+        "start": 1512,
+        "end": 1564
       }
     },
     {
@@ -7787,8 +7795,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1480,
-        "end": 1563
+        "start": 1646,
+        "end": 1729
       }
     },
     {
@@ -7798,8 +7806,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1568,
-        "end": 1649
+        "start": 1734,
+        "end": 1815
       }
     },
     {
@@ -7809,8 +7817,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1346,
-        "end": 1384
+        "start": 1512,
+        "end": 1550
       }
     },
     {
@@ -7820,8 +7828,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1480,
-        "end": 1499
+        "start": 1646,
+        "end": 1665
       }
     },
     {
@@ -7831,8 +7839,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1568,
-        "end": 1586
+        "start": 1734,
+        "end": 1752
       }
     },
     {
@@ -7842,8 +7850,8 @@
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1403,
-        "end": 1475
+        "start": 1569,
+        "end": 1641
       }
     },
     {
@@ -7869,14 +7877,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sqs_boto.py::send_joined::sqs.send_message#0",
+      "caller": "example.com/acme/conformance::messages/sqs_boto.py::send_joined",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/sqs_boto.py",
+        "start": 822,
+        "end": 880
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_session::queues.send_message#0",
       "caller": "example.com/acme/conformance::messages/sqs_boto.py::send_session",
       "target": null,
       "level": null,
       "span": {
         "path": "messages/sqs_boto.py",
-        "start": 1065,
-        "end": 1136
+        "start": 1231,
+        "end": 1302
       }
     },
     {
@@ -9334,6 +9353,10 @@
     {
       "contract": "channel::sqs::jobs",
       "site": "example.com/acme/conformance::messages/sqs_boto.py::send_job::sqs.send_message#0"
+    },
+    {
+      "contract": "channel::sqs::jobs-dlq",
+      "site": "example.com/acme/conformance::messages/sqs_boto.py::send_joined::sqs.send_message#0"
     },
     {
       "contract": "channel::sqs::mail",
@@ -15267,6 +15290,20 @@
           "via": "link",
           "node": "example.com/acme/conformance::messages/sqs_boto.py::receive_mail",
           "reason": "channel::sqs::mail"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::messages/sqs_boto.py::send_joined",
+      "kind": "export",
+      "label": "send_joined",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/sqs_boto.py::send_joined"
         }
       ]
     },

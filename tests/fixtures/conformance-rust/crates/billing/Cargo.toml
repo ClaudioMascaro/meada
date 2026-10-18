@@ -1,0 +1,10 @@
+[package]
+name = "billing"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+path = "src/billing.rs"
+
+[dependencies]
+ledger-core = { path = "../ledger-core" }

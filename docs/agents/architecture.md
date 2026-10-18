@@ -32,12 +32,12 @@ one for the area a change touches.
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
-  language adapter and the TS/JS and Python packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python and Rust packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
-  resource and channel kinds. `package.rs`: npm and PyPI packages as contracts (specs #22 and
-  #24). Detail:
+- `contract.rs`, `http.rs`, `http/rust.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers), resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
+  #24 and #30). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -51,7 +51,14 @@ one for the area a change touches.
 - Symbol: `<repository>::<path>::<qualified name>` (`Class.method`, `outer.inner`).
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
-  other expression becomes `(<node kind>)`.
+  other expression becomes `(<node kind>)`. A Rust path is dotted like a chain (`crate::a::f`
+  is `crate.a.f`, `Type::new` is `Type.new`); its `self::` and a `super::` that stays in the
+  file are read from the file's top under the keyword `mod` (`self::f` in `inner` is
+  `mod.inner.f`, `super::f` out of `inner` is `mod.f`).
+- Rust qualified names use `.` as well: `Type.method` (an inherent `impl`), `Type.Trait.method`
+  (a trait's `impl`), `Trait.method` (a default body), `inner.helper` (an inline module); a
+  later block that gives a name already given a method is `Type.Trait#2.method` (`impl From<A>`
+  then `impl From<B>`). A module, inline or declared with `mod x;`, is a symbol of its file.
 - Inline handlers: a pack emits anonymous function arguments (and functions written in an
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
@@ -75,7 +82,9 @@ one for the area a change touches.
   and entry points are unique by identity. The stored export entry points are candidates:
   `Engine::exports` drops, after `package::import`, each one that is the target of an import
   from its own repository (a monorepo), at any level.
-- Package: `package::npm::<name>` or `package::pypi::<name>` (the PEP 503 normalized name),
+- Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
+  `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
+  a renamed crate has its own site),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -169,6 +178,25 @@ one for the area a change touches.
   a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
   calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
   of the contract itself, with the roles `sides` names.
+- A **builder** language (spec #30 #129: a call whose method returns its receiver, such as
+  `Router::new().route(..)`): the pack sets `LanguagePack::fluent` and gives each call its
+  `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
+  `Code::origins` then walks a chain down its receivers, by `call_at` (a call found by its byte
+  range; `Code::call_index` for a kind) and `Code::receiver` (the value a call is made on).
+  `Code::chain` is that walk, memoized by `chain_tail`: the calls from one down to where the
+  flow stops (a call a function of the repository answers, or one made on no call). A kind
+  that reads a chain step by step (an axum method router, an actix-web `ServiceConfig`, a
+  Kafka record, an SQS request, redis read options) goes through it, never its own walk.
+  A step no function of the repository answers passes the receiver on; one only a name match
+  found does when the chain starts at a constructor of an outside crate (whose method it then
+  is), else the flow ends. Which methods pass the object on is listed per object, with its
+  constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
+  clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
+  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
+  `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
+  `routes![..]` the Rust pack reads as a list of the handlers' paths).
+  `Code::returned` and `Code::constant` give a kind the values a call may return and a
+  constant holds, for what it must not leave unmounted.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -179,13 +207,21 @@ one for the area a change touches.
   routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
   keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
   (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
-  `flag`; PyPI's is never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
+  `flag`; PyPI's and Cargo's are never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
   range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
-  its file's (`Ecosystem::of_source`), and resolving the import into the provider is the
+  its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file), and resolving the import into the provider is the
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
-  `pypi_resolutions`, `Provided::module`). A change to what is stored bumps `SCHEMA_VERSION`.
+  `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
+  the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
+  `Provided::resolve` from the crate's library root, `How::CrateName`). A step outside
+  `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in
+  `index::read_manifests` over the whole manifest list after the reads, fills the `workspace =
+  true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
+  so a refresh equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set by
+  `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
+  paths, never opening one, so a symlink changes nothing. A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
+  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
   `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
@@ -282,7 +318,10 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
-  A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
+  A pack is done when that suite passes. A pack whose facts depend on its config files
+  (Rust's default features) also gives `settings` (a string per file path, stored as
+  `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
+  changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
@@ -290,7 +329,46 @@ one for the area a change touches.
   Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
   argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
-  would have resolved. A pack that has program entry points fills
+  would have resolved. A language whose files are not all built, or whose imports name files by
+  a tree spread over several files (Rust's crates and `mod` declarations), says so through
+  three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
+  path order, each read as a root config is (`read_config`) and folded into the configs digest on
+  every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
+  and every file the pack parsed, and which answers four things from one build (Rust's crate
+  `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
+  files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
+  and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
+  and `Layout::programs` (both below). A language whose imports name a path rather than a file (Rust's
+  `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
+  from the scope of the import's own `local`, which a pack qualifies by the scope that holds
+  it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
+  `inside` it, the module's private items too; `public`, a `pub use` also re-exports them),
+  both found by `Resolver::lexical` at each enclosing scope (`imported_at`) and, for the file
+  itself, by `imported` and `export`; explicit imports beat globs, and an alias or a glob
+  that reaches itself gives nothing (`Seen`: the names being resolved, the globs by file, import
+  and name, and the depth of links followed, bounded by `LINK_DEPTH`). A call name is never read
+  as a `Kind::Module` (`Reading::Value`); a use path is (`Reading::Alias`). `Facts::externs` names the first segments of
+  paths that nothing in the file binds (the crates outside it), resolved last in `imported`:
+  a glob beats them, another crate of the repository answers through `Modules` and the rest
+  is `Binding::External`. `Facts::private` lists the `exports` names `Resolver::exported`
+  leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
+  crate), and `Layout::published` (default: none) the files whose exports a pack counts
+  at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
+  library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
+  `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
+  (`block_member`, before the class's own names: the inherent blocks' definitions, else the
+  trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
+  an `ambiguous` call with exactly those candidates) and `Resolver::class` (`Self` inside a
+  block) read. A module is `Kind::Module`: its functions are name-match candidates like
+  top-level ones, a `Kind::Module` that an import of its own name binds to a file (Rust's `mod
+  store;`) has that file's exports as members, and `Resolver::lexical` does not climb past
+  one (the names around a module are not its own; the file's imports still are). A call
+  written as a path sets `Call::by_path`: its head is read among types and modules alone
+  (`lexical_as`, no local or parameter hides it), and a failed resolution matches functions as
+  well as methods by name. A pack whose types are closed (`LanguagePack::strict`, Rust) has a
+  member its blocks lack on a type the receiver or the path head writes resolve to nothing
+  (`Resolver::lacks`: a derive, a blanket or outside trait), not by name, and its attribute
+  calls (`Call::decorates`) resolve to nothing, read only through `Code::external_of`. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -300,7 +378,10 @@ one for the area a change touches.
   which names a function of another file) needs a repository-level step feeding
   `entry::Local::programs` with `entry::Program`s: for Python, `package::python_programs` maps the
   `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
-  edit re-extract) to files through `python_roots`. The forms per language are spec #31 "Program entry points per language
+  edit re-extract) to files through `python_roots`. A form only the whole repository tells
+  (Rust `fn main`, a program only in a binary target's root, which one file's `parse` cannot
+  see) is `Layout::programs`, which `refresh` takes from each pack's `layout` beside
+  `python_programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
@@ -342,7 +423,8 @@ one for the area a change touches.
   `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
-  never its source text), and what a
+  never its source text), the names of the Cargo features a Rust crate enables by default
+  (`files.setting`, a comma-separated list per file, from `[features] default`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the
@@ -351,7 +433,13 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
   `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
-  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
+  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), of
+  each `Cargo.toml` (spec #30: name, version or the flag that it inherits one, the library root
+  as a path of the repository and the `[lib] name` when it differs from the package's, the
+  entries with the version requirement as written, the `alias` when the key renames the crate
+  and the `via`: a `path` folded from the manifest's directory, which keeps its leading `../`
+  when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
+  `[workspace.dependencies]` entries; the `[workspace.package]` version), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
@@ -373,7 +461,8 @@ one for the area a change touches.
 - `context` shows span text only while the file's BLAKE3 still equals the indexed hash; on a
   mismatch it forgets the file's mtime, refreshes and retries once.
 - Facts resolve only among files of the same pack, and inference runs only when resolution
-  fails; an import from outside the repository is never inferred.
+  fails; an import from outside the repository is never inferred. A file its pack leaves out
+  (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
 ## Tests (`tests/`)
 
@@ -457,11 +546,12 @@ one for the area a change touches.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
-  `pyproject.toml`, `requirements*.txt`, `tsconfig.json`, `jsconfig.json`) is read up to one
+  `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `package::MAX_BYTES`, and a provider document up to one byte past
   `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
-  holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A root
-  pack config is read through no symbolic link (`read_config`), as the walk follows none.
+  holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A
+  pack config, at the root or at any depth (`**/`), is read through no symbolic link
+  (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
@@ -482,9 +572,10 @@ one for the area a change touches.
   unknown (a name match at most), and the linearization recurses no deeper down the bases. The
   bases count from where the walk started, a family looked up for a member a base names
   (`class Z(K.D)` linearizes `K`'s) included.
-  `REEXPORT_DEPTH` (64): a name followed through more files than that, each re-exporting it from
-  the next (`export { x } from`, `export * from`, a Python `from m import x` or `import *`), is
-  unknown (a name match at most), and no other import, `export *` or submodule binds it in its
+  `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
+  re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
+  or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
+  (a name match at most), and no other import, `export *`, glob or submodule binds it in its
   place. A star import from outside the repository (`from numpy import *`) is taken to bind
   nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
   import or definition before it, as with the standard library's accelerator modules (`from
@@ -493,10 +584,16 @@ one for the area a change touches.
   the module loads (its top level, a class body there, its main guard) gets the name unknown, as
   it may run before the star import, and a function's code gets the star import's, as for every
   binding a function reads. `RECEIVER_DEPTH` (64): a receiver whose class is named through
-  more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
+  more receivers than that, each through the next (`x: y.C`, `x = y.C()`, or a Rust `let` that
+  takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
+  unknown class.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when
   asked for, and does not depend on the walk that first reached it.
+- `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
+  declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
+  ancestors); past it a type names nothing and a parameter is taken as declared with no bound,
+  so no repository type is guessed.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
@@ -536,6 +633,27 @@ one for the area a change touches.
   (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
   constant folded to one); a dict built otherwise is an unresolved stream.
+- `lang/rust/messages.rs`: a client is recognized when its receiver traces back to the library's
+  constructor (`Code::value_origins`, then `Code::external`, one constructor per `LIBRARIES`
+  entry); a client held in a struct field, passed as `&mut con` to a parameter, or rebound by
+  assignment is not followed. `lapin` `set_delegate` closures are not followed (the function
+  that holds `basic_consume` handles). A Kafka topic starting with `^` is unresolved; an
+  `queue_bind` that cannot be fully evaluated is dropped; an SQS `queue_url` on a builder held
+  in a `let` is not recognized. `Code::mutable` takes the value of a `let mut` bound once and
+  never assigned (`Facts::mutable`, keyed by qualified name); a closure parameter, a `let` in a
+  closure given to a call, a nested function's parameter or an assignment in such a closure hides it.
+  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
+  redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
+  bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
+- `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
+  (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
+  be external, and so does one on a chain that starts at a call (`rocket::build().mount(..)`,
+  `Client::new().get(u)`, no `Call::root`) when that first call, the innermost one starting
+  where the chain does, is external (`Resolver::rooted_outside`, Rust only); a root that is a
+  repository type, a parameter, or a local with no written class (a client a repository
+  function returns) is name-matched as before. `self` and `Self` in an `impl` of a type from
+  outside the repository (`impl ApiExt for reqwest::Client`) are opaque too
+  (`Resolver::outside`): `self.clone()` there resolves to nothing.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
@@ -555,7 +673,23 @@ one for the area a change touches.
   the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
   `pyproject.toml` declares, or `src`); a namespace package (a directory without
   `__init__.py`) exposes nothing, and an import several distributions expose is `ambiguous` for
-  each, its reason naming none of the others (no marker). Import resolution: `exported` follows at most
+  each, its reason naming none of the others (no marker). Cargo (`package/cargo.rs`, spec #30):
+  `MAX_NAME` and `MAX_BYTES` hold for `Cargo.toml` too (a file past it, not UTF-8 or not TOML
+  reads as empty); a name outside Cargo's alphabet makes no provider and no entry; an entry that
+  is neither a version nor a table, or whose `path`, `git` or `package` is empty or not a string,
+  or that gives both `path` and `git`, or whose `path` is absolute, is dropped, never read as a
+  version dependency; of two entries of one table and key (a plain one and a `[target.*]` one) the
+  first stays (a set keyed by table and key, no quadratic scan). A range is never evaluated,
+  `registry`, `optional` and features are not read, and neither `Cargo.lock` nor a registry is
+  opened (no marker). A `path` is folded lexically from the manifest's directory: one that
+  leaves its repository (`../`) links only to the workspace repository whose root, joined with
+  the manifest of a provider, folds to the same location, and one that lands in no workspace
+  repository adds nothing; nothing outside a repository is read and no symlink is followed, so
+  a symlinked checkout is matched by the paths as they are written (no marker). `[lib] name` is
+  followed (a `use` writes it, unless the key renames the crate); `version.workspace = true`
+  reads the nearest `[workspace.package] version`, and no other inherited field is read. A `use`
+  follows `pub mod` and `pub use` rows alone, so an item behind a private module is not
+  reached (no marker). Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
@@ -712,6 +846,130 @@ one for the area a change touches.
   scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
   module's global of that name; only the first `__main__` of a file (a guard or a
   `def __main__()`) counts.
+- `lang/rust/cfg.rs` (spec #30): `PREDICATE_DEPTH` (64): a `cfg` predicate nesting `all`,
+  `any` and `not` deeper is false; `FEATURES` (4096): the default features of a crate followed
+  through features that enable others (a cycle ends sooner, by the visited set), the rest is
+  not followed.
+- `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
+  (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
+  member chain in a callee is its node kind, and an `impl` type behind more references names
+  no type; `USE_BINDINGS` (4096): the names the `use` declarations of a file bind, the rest
+  bind nothing; `VALUE_DEPTH` (64): a value nested deeper in wrappers (`(x)`, `&x`, `x?`) and
+  arrays is `Unknown` from there. A call inside a value is a stub (its callee and span), so a
+  builder chain costs one value per call. A closure written as an argument of a call is a
+  `Kind::Inline` definition; any other closure is not, and neither is a `let mut`, a name bound
+  twice in its scope or assigned again, or a destructuring a constant. A string literal with an escape sequence is
+  `Unknown`. A `Cargo.toml` past `package::MAX_BYTES` (read up to one byte past it, as every
+  pack config is), not UTF-8 or not TOML declares no crate, with no status line. Every `Cargo.toml` with
+  a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
+  none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
+  `benches/` and `build.rs` are no crate roots (no marker). The default features a file is
+  parsed with (`settings`) are those of the nearest `Cargo.toml` with a `[package]` above it,
+  read before any module tree exists, so a file another package's `#[path]` reaches is parsed
+  with its nearest package's features, not those of the crate that builds it (no marker). A file two crates reach (`mod
+  util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
+  first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
+  is not read, and `super::` out of a file declared inside a module written in place of its
+  parent reaches nothing (no marker). The `mod` imports and the synthetic ones (`crate`,
+  `super`, `mod`) bind for the whole file, so they are seen inside every inline module too;
+  a `use` binds in the scope that holds it, and the `mod` import of a declared module is not
+  seen inside a module written in place. A `use` path whose first segment nothing in the
+  file binds is a crate outside it (`Facts::externs`, no marker, never name-matched), also when
+  the file holds a glob that brings no such name. A glob of a module written in place from
+  outside it, and of an enum or a type, bring nothing (the visibility of the items of a module
+  written in place is not kept; no marker), and a glob takes `pub` items alone, so a
+  `pub(crate)` item reached through one falls to a name match. `pub use` names are `pub`;
+  a crate in the workspace is reached only from a crate whose `Cargo.toml` lists it in
+  `[dependencies]`, `[dev-dependencies]` or `[build-dependencies]` (by key, or by `package =`;
+  `workspace = true` through `[workspace.dependencies]`), a binary naming the library of its own
+  package; the same tables under `[target.*]` count, and `optional` and features are not read
+  (a listed dependency counts as present; no marker). Any other crate name is external. A module declared inside a module
+  written in place is not followed for exports (no marker). A chain of `use` aliases, globs and
+  `pub use` longer than `LINK_DEPTH` (see `resolve.rs` above) is unknown, and no other glob
+  binds the name in its place.
+  `self::` and `super::` read inside a module that sits in a function are
+  `(scoped_identifier)`, unresolved, and a `use` there binds nothing. A file's exports table
+  rows are its `pub` items, `pub use` names, `pub` modules and, inside `pub` modules written
+  in place, the dotted names of their `pub` items (`entries.add`), and a `pub use` glob of a
+  file gives that file's public names; whether the file itself is reachable from the crate's
+  root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
+  are not indexed.
+- `lang/rust.rs` (spec #30, actix-web and Rocket): `ROUTES_PER_FUNCTION` (16): a function with
+  more route attributes (`#[get("/x")]`, `#[route(..)]`) than that has the first ones as calls
+  that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
+  a `routes![..]` listing more handlers is `Unknown`; `ROUTE_METHODS` (16): the `method = ".."`
+  of a `#[route]` past that are `Unknown`, so the attribute gives no provider. `MENTIONS`
+  (16384, `lang/rust/mentions.rs`): a file referring to more distinct names has no
+  `Facts::mentions`, so none of the handlers of its crate is taken as unmentioned.
+  `Facts::mentions` is not kept in the index (see `Call::args`); the providers read it from the
+  files parsed again, all of the pack's when a handler is registered by no call they read. A
+  mention is a name in a reference position (an expression, a receiver, a path, a `use`, a
+  macro's tokens); a pattern, a parameter or a field declaring it is none, and a local hides a
+  reference from the end of its `let` to the end of the block, a parameter in its function's
+  or closure's body, a `match`, `if let`, `while let` or `for` binding in its arm or block (an
+  `else` sees none). An item declared in a block (`const`, `static`, `fn` inside a function)
+  hides nothing, and a pattern deeper than `BINDING_DEPTH` binds nothing, so the reference
+  still counts (no marker).
+- `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
+  returned lists adds, over the whole repository, to the handlers a call names; a list past it
+  is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate
+  of a bare route attribute is read from the `#[macro_use] extern crate x;` of its crate's root
+  (the `Tree`'s `crate`, wherever `[lib] path` puts it), and it needs exactly one such crate
+  (actix-web or Rocket). A handler is served at its own path only when no file of its crate
+  mentions its name (`mentions.rs` above), or of any crate when its file is one another crate
+  may import (`Code::published`, a library's `pub mod` files); any other mention Meada does not
+  read as a registration (`services![..]`, `vec![..]`, `concat()`, `cfg_if!`, an alias, a use
+  before a `let` of the name) means it may be registered where Meada cannot tell, and then it is
+  served nowhere. A file two crates reach belongs to the first (see above), so a mention in the
+  second, of a handler not published, is not counted (no marker). A service configuration is followed into the functions of the
+  repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
+- `http.rs` (axum): `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
+  to that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
+  `resolve.rs`): a builder chain (`Router::new().route(..)`, an actix-web `ServiceConfig`'s
+  `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
+  and a call past it has no origin, so its route is no provider (the walk is memoized per call,
+  linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket), reads a router
+  nested deeper than the first, or through more mounts than the second, as served nowhere
+  rather than under part of its prefixes. A name bound again in its scope (`let mut`,
+  shadowing) or assigned again holds no known value, and the routers its `let` holds
+  (`Facts::rebound`) are served nowhere; `on(MethodFilter, h)` and a method router held in a
+  variable are not followed. A router nothing mounts is served at its root. A router
+  given to a call Meada does not read (`route_service`, `fallback_service`, an outside
+  function wrapping it, a method only a name match found) is mounted nowhere, so it is not
+  served at the root; so is one whose `nest` prefix cannot be read, or that is mounted on a
+  router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
+  of one in its arguments (a router put in a struct, a closure capture) is not told from one
+  nothing mounts.
+- Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
+  (2^20 syntax nodes per file, over every `let mut`), `BUILDER_DEPTH` (64 builders read within
+  one another), `BUILDER_SIZE` (4096, bytes of text plus parts) and `BUILDER_WORK` (2^22 size
+  units per file, over every prefix folded and every read): a `let mut` String past the budget
+  is unknown, and one read past the depth, the size or the work is a hole (`push_str(&s)` of
+  itself doubles). `FORMAT_ARGS` (64), `FORMAT_PLACEHOLDERS` (256) and the size above bound
+  one `format!` or `concat!`; past any the value is unknown. A `let mut` String is a builder
+  only when its block reads it, `push_str`s, `push`es and `+=`s it in statements of that block
+  (a statement `#[cfg]` leaves out, decided where the block is read, is not there); a push in
+  a branch or a loop, `&mut s`, `write!(s, ..)`, an index or deref use (`s[..]`, `*s`), another
+  binding of the name, a method that changes it (`insert`, `clear`) or a second builder of
+  that name in the scope leave it unknown. `format!` and `concat!` read
+  a literal format string and arguments that are a literal or a plain name; a spec such as
+  `{:.*}` or `{:1$}`, a count that does not match or a `{`/`}` left alone are unknown; a macro
+  of another name or one the file defines (`macro_rules!`, in this file only) is not read.
+  `Method::GET` is text only through a `use` of one name from `reqwest`, `http`, `hyper`,
+  `axum` or `actix_web`, or written in full from one of them; a glob import or an alias is not
+  followed. `a + b` is a string only when one side is a string literal or a conversion: two
+  names may add numbers. Rust clients: a client held in a field of a struct (`self.client`), in
+  a `static` or a `OnceLock`, and a client from a crate other than `reqwest` and `ureq`
+  (`hyper`, `surf`, `isahc`, `attohttpc`) are not read; a client parameter is followed through
+  the callers that pass a constructor, as in Python; `reqwest::Request::new` and
+  `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
+  A value derived from a client (a response, a header map, a JSON value, the result of an
+  extension trait's method) is no client: a method passes the object on only when the
+  object's entry lists it (`FRAMEWORKS` in `lang/rust/frameworks.rs`, the constructors named
+  exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
+  setter missing from the list ends the chain and its client (or its router, app, scope,
+  resource or Rocket instance) is not read.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

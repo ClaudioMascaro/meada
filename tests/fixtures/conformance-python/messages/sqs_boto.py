@@ -21,6 +21,11 @@ def send_job():
     sqs.send_message(QueueUrl=f"{REGION_URL}/mail", MessageBody="{}")
 
 
+def send_joined():
+    # Two literals side by side after the folding: the queue name straddles them.
+    sqs.send_message(QueueUrl=JOBS + "-dlq", MessageBody="{}")
+
+
 def send_batch():
     sqs.send_message_batch(QueueUrl=f"{REGION_URL}/audit", Entries=[])
 

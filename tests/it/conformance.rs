@@ -654,6 +654,7 @@ fn python() {
             "messages/sqs_boto.py::receive_unknown",
             "messages/sqs_boto.py::send_batch",
             "messages/sqs_boto.py::send_chained",
+            "messages/sqs_boto.py::send_joined",
             "messages/sqs_boto.py::send_job",
             "messages/sqs_boto.py::send_session",
             "methods.py::Base",
@@ -1347,6 +1348,1891 @@ fn python() {
             ),
         ],
     );
+}
+
+#[test]
+fn rust() {
+    const MAIN: &str = "api/src/main.rs";
+    conform(
+        "conformance-rust",
+        &[
+            "crates/actix/src/admin.rs::extra",
+            "crates/actix/src/admin.rs::extras",
+            "crates/actix/src/admin.rs::more",
+            "crates/actix/src/lib.rs::macros",
+            "crates/actix/src/macros.rs::conditional",
+            "crates/actix/src/macros.rs::listed",
+            "crates/actix/src/macros.rs::scoped",
+            "crates/actix/src/macros.rs::via_cfg_if",
+            "crates/actix/src/macros.rs::via_services",
+            "crates/actix/src/macros.rs::via_vec",
+            "crates/greeter/src/main.rs::index",
+            "crates/greeter/src/main.rs::names",
+            "crates/greeter/src/main.rs::rocket",
+            "crates/greeter/src/names.rs::named",
+            "crates/rocket/src/hiding.rs::rocket",
+            "crates/rocket/src/hiding.rs::rocket.Builder",
+            "crates/rocket/src/hiding.rs::rocket.Builder.mount",
+            "crates/rocket/src/hiding.rs::rocket.build",
+            "crates/rocket/src/hiding.rs::serve",
+            "crates/rocket/src/joined.rs::documented",
+            "crates/rocket/src/joined.rs::joined_a",
+            "crates/rocket/src/joined.rs::joined_b",
+            "crates/rocket/src/lib.rs::hiding",
+            "crates/rocket/src/lib.rs::joined",
+            "crates/rocket/src/stray.rs::local",
+            "crates/rocket/src/stray.rs::three",
+            "crates/actix/src/accounts.rs::api",
+            "crates/actix/src/accounts.rs::create",
+            "crates/actix/src/accounts.rs::files",
+            "crates/actix/src/accounts.rs::list",
+            "crates/actix/src/accounts.rs::remove",
+            "crates/actix/src/accounts.rs::show",
+            "crates/actix/src/accounts.rs::sync",
+            "crates/actix/src/admin.rs::audit",
+            "crates/actix/src/admin.rs::dashboard",
+            "crates/actix/src/admin.rs::prefix",
+            "crates/actix/src/admin.rs::routes",
+            "crates/actix/src/admin.rs::status",
+            "crates/actix/src/admin.rs::tools",
+            "crates/actix/src/admin.rs::unreadable",
+            "crates/actix/src/lib.rs::accounts",
+            "crates/actix/src/lib.rs::admin",
+            "crates/actix/src/lib.rs::orders",
+            "crates/actix/src/lib.rs::serve_catalog",
+            "crates/actix/src/lib.rs::serve_catalog.PUT /inline",
+            "crates/actix/src/lib.rs::stray",
+            "crates/actix/src/orders.rs::collection",
+            "crates/actix/src/orders.rs::create",
+            "crates/actix/src/orders.rs::echo",
+            "crates/actix/src/orders.rs::item",
+            "crates/actix/src/orders.rs::item.DELETE /orders/{}",
+            "crates/actix/src/orders.rs::list",
+            "crates/actix/src/orders.rs::ping",
+            "crates/actix/src/orders.rs::show",
+            "crates/actix/src/orders.rs::update",
+            "crates/actix/src/stray.rs::Bounds",
+            "crates/actix/src/stray.rs::binding",
+            "crates/actix/src/stray.rs::bound",
+            "crates/actix/src/stray.rs::early",
+            "crates/actix/src/stray.rs::early_then_bound",
+            "crates/actix/src/stray.rs::Holder",
+            "crates/flat/lib.rs::pages",
+            "crates/flat/lib.rs::serve",
+            "crates/flat/pages.rs::page",
+            "crates/rocket/src/stray.rs::elsewhere",
+            "crates/actix/src/stray.rs::elsewhere",
+            "crates/actix/src/stray.rs::elsewhere.get",
+            "crates/actix/src/stray.rs::held",
+            "crates/actix/src/stray.rs::lonely",
+            "crates/actix/src/stray.rs::plain",
+            "crates/actix/src/stray.rs::plug",
+            "crates/actix/src/stray.rs::rebind",
+            "crates/actix/src/stray.rs::shadowed",
+            "crates/rocket/src/lib.rs::pages",
+            "crates/rocket/src/lib.rs::posts",
+            "crates/rocket/src/lib.rs::rocket",
+            "crates/rocket/src/lib.rs::stray",
+            "crates/rocket/src/pages.rs::about",
+            "crates/rocket/src/pages.rs::index",
+            "crates/rocket/src/posts.rs::create",
+            "crates/rocket/src/posts.rs::files",
+            "crates/rocket/src/posts.rs::legacy",
+            "crates/rocket/src/posts.rs::list",
+            "crates/rocket/src/posts.rs::old",
+            "crates/rocket/src/posts.rs::search",
+            "crates/rocket/src/posts.rs::show",
+            "crates/rocket/src/stray.rs::base",
+            "crates/rocket/src/stray.rs::lonely",
+            "crates/rocket/src/stray.rs::moved",
+            "api/extra/legacy_util.rs::Store",
+            "api/extra/legacy_util.rs::Store.new",
+            "api/extra/legacy_util.rs::legacy",
+            "api/src/bin/sync/main.rs::main",
+            "api/src/bin/sync/main.rs::step",
+            "api/src/bin/sync/step.rs::tick",
+            "api/src/bin/tool.rs::helper",
+            "api/src/bin/tool.rs::helper.go",
+            "api/src/bin/tool.rs::main",
+            "api/src/main.rs::below",
+            "api/src/main.rs::below.go",
+            "api/src/main.rs::elsewhere",
+            "api/src/main.rs::extras",
+            "api/src/main.rs::gated",
+            "api/src/main.rs::imp",
+            "api/src/main.rs::mock",
+            "api/src/main.rs::native",
+            "api/src/main.rs::real",
+            "api/src/mock.rs::client",
+            "api/src/native.rs::counter",
+            "api/src/real.rs::client",
+            "api/src/gated.rs::connect",
+            "api/src/gated.rs::outside_tests",
+            "api/src/gated.rs::Gauge",
+            "api/src/gated.rs::Gauge.plain",
+            "api/src/gated.rs::Gauge.unix_method",
+            "api/src/gated.rs::always",
+            "api/src/gated.rs::on_linux",
+            "api/src/gated.rs::through_net",
+            "api/src/gated.rs::tests",
+            "api/src/gated.rs::tests.helper",
+            "api/src/gated.rs::unix_without_metrics",
+            "api/src/main.rs::hidden",
+            "api/src/main.rs::isolated",
+            "api/src/main.rs::isolated.far",
+            "api/src/main.rs::isolated.go",
+            "api/src/main.rs::launch",
+            "api/src/main.rs::local_wins",
+            "api/src/main.rs::local_wins.compute",
+            "api/src/main.rs::local_wins.go",
+            "api/src/main.rs::with_param",
+            "api/src/launch.rs::launch",
+            "crates/ledger-core/src/lib.rs::meter",
+            "crates/ledger-core/src/meter.rs::meter",
+            "crates/scratch/src/lib.rs::reach",
+            "api/src/main.rs::loops",
+            "api/src/main.rs::loops.f",
+            "api/src/main.rs::outside",
+            "api/src/main.rs::prelude",
+            "api/src/main.rs::ring",
+            "api/src/main.rs::scoped",
+            "api/src/main.rs::scoped.go",
+            "api/src/main.rs::within",
+            "api/src/extras.rs::dup",
+            "api/src/prelude.rs::dup",
+            "api/src/prelude.rs::greet",
+            "api/src/ring.rs::c",
+            "api/src/ring.rs::d",
+            "api/src/ring.rs::e",
+            "api/src/ring.rs::x",
+            "api/src/ring.rs::y",
+            "api/src/ring/c.rs::Gear",
+            "api/src/ring/c.rs::Gear.spin",
+            "api/src/ring/c.rs::hidden",
+            "api/src/ring/c.rs::internal",
+            "api/src/store.rs::private_helper",
+            "crates/billing/src/billing.rs::settle",
+            "crates/ledger-core/src/lib.rs::audit",
+            "crates/ledger-core/src/lib.rs::entries",
+            "crates/ledger-core/src/lib.rs::entries.add",
+            "crates/ledger-core/src/lib.rs::entries.seal",
+            "crates/ledger-core/src/lib.rs::internal",
+            "crates/ledger-core/src/lib.rs::internal.secret",
+            "crates/ledger-core/src/lib.rs::post",
+            "api/src/main.rs::checks",
+            "api/src/main.rs::checks.compute",
+            "api/src/main.rs::checks.run_checks",
+            "api/src/main.rs::checks.verify",
+            "api/src/main.rs::compute",
+            "api/src/main.rs::inner",
+            "api/src/main.rs::inner.helper",
+            "api/src/main.rs::inner.twice",
+            "api/src/main.rs::main",
+            "api/src/main.rs::methods",
+            "api/src/methods.rs::Counter",
+            "api/src/methods.rs::Counter.Probe.probe",
+            "api/src/methods.rs::Counter.bump",
+            "api/src/methods.rs::Counter.new",
+            "api/src/methods.rs::Counter.read",
+            "api/src/methods.rs::Counter.reset",
+            "api/src/methods.rs::Counter.twice",
+            "api/src/methods.rs::Dash",
+            "api/src/methods.rs::Dash.mark",
+            "api/src/methods.rs::Dash.tick",
+            "api/src/methods.rs::Gauge",
+            "api/src/methods.rs::Gauge.Probe.probe",
+            "api/src/methods.rs::Gauge.bump",
+            "api/src/methods.rs::Gauge.insert",
+            "api/src/methods.rs::Gauge.new",
+            "api/src/methods.rs::Gauge.read",
+            "api/src/methods.rs::Probe",
+            "api/src/methods.rs::Probe.probe",
+            "api/src/methods.rs::Probe.summary",
+            "api/src/methods.rs::annotated",
+            "api/src/methods.rs::blocks",
+            "api/src/methods.rs::bounded",
+            "api/src/methods.rs::built",
+            "api/src/methods.rs::dynamic",
+            "api/src/methods.rs::exclusive",
+            "api/src/methods.rs::fresh",
+            "api/src/methods.rs::generic",
+            "api/src/methods.rs::named",
+            "api/src/methods.rs::opaque_impl",
+            "api/src/methods.rs::outside",
+            "api/src/methods.rs::pick",
+            "api/src/methods.rs::probed",
+            "api/src/methods.rs::retyped",
+            "api/src/methods.rs::shadowed",
+            "api/src/methods.rs::shared",
+            "api/src/methods.rs::Build",
+            "api/src/methods.rs::Build.make",
+            "api/src/methods.rs::Build.run",
+            "api/src/methods.rs::Build.seed",
+            "api/src/methods.rs::Counter.Build.run",
+            "api/src/methods.rs::Counter.Build.seed",
+            "api/src/methods.rs::wrap",
+            "api/src/methods.rs::opened",
+            "api/src/methods.rs::modular",
+            "api/src/methods.rs::reopened",
+            "api/src/methods.rs::built_by_default",
+            "api/src/methods.rs::wrapped",
+            "api/src/methods.rs::sliced",
+            "api/src/methods.rs::cleared",
+            "api/src/methods.rs::Config",
+            "api/src/methods.rs::Config.Clone.clone",
+            "api/src/methods.rs::Config.Default.default",
+            "api/src/methods.rs::Plain",
+            "api/src/methods.rs::derived",
+            "api/src/methods.rs::marked",
+            "api/src/methods.rs::marked_impl",
+            "api/src/store.rs::Persist.persist",
+            "api/src/main.rs::nested",
+            "api/src/main.rs::nested.deep",
+            "api/src/main.rs::nested.plain",
+            "api/src/main.rs::routes",
+            "api/src/main.rs::run",
+            "api/src/main.rs::start",
+            "api/src/main.rs::store",
+            "api/src/main.rs::util",
+            "api/src/nested/deep.rs::dive",
+            "api/src/nested/plain.rs::walk",
+            "api/src/routes/health.rs::check",
+            "api/src/routes/mod.rs::health",
+            "api/src/routes/mod.rs::serve",
+            "api/src/store.rs::Mode",
+            "api/src/store.rs::Named",
+            "api/src/store.rs::Named.label",
+            "api/src/store.rs::Persist",
+            "api/src/store.rs::Persist.describe",
+            "api/src/store.rs::Store",
+            "api/src/store.rs::Store.From#2.from",
+            "api/src/store.rs::Store.From.from",
+            "api/src/store.rs::Store.Persist.persist",
+            "api/src/store.rs::Store.empty",
+            "api/src/store.rs::Store.new",
+            "api/src/store.rs::Store.save",
+            "api/src/store.rs::Tagged",
+            "api/src/store.rs::Tagged.label",
+            "api/src/store.rs::disk",
+            "api/src/store.rs::reset",
+            "api/src/store.rs::tests",
+            "api/src/store.rs::tests.t",
+            "api/src/store/disk.rs::Store.check",
+            "api/src/store/disk.rs::Store.reload",
+            "api/src/store/disk.rs::open",
+            "api/tools/admin.rs::main",
+            "api/tools/admin.rs::shared",
+            "api/tools/shared.rs::ping",
+            "crates/billing/src/billing.rs::invoice",
+            "crates/billing/src/billing.rs::total",
+            "crates/billing/src/billing.rs::util",
+            "crates/billing/src/billing.rs::util.round",
+            "crates/billing/src/invoice.rs::Invoice",
+            "crates/billing/src/invoice.rs::Invoice.amount",
+            "crates/billing/src/invoice.rs::Invoice.new",
+            "crates/billing/src/invoice.rs::tax",
+            // A package the workspace's `exclude` lists is still a crate of the repository.
+            "crates/scratch/src/lib.rs::ignored",
+            "crates/worker/src/agents.rs::agents",
+            "crates/worker/src/agents.rs::module_functions",
+            "crates/worker/src/clients.rs::blocking",
+            "crates/worker/src/clients.rs::built",
+            "crates/worker/src/clients.rs::inline",
+            "crates/worker/src/clients.rs::requested",
+            "crates/worker/src/clients.rs::verbs",
+            "crates/worker/src/derived.rs::ApiExt",
+            "crates/worker/src/derived.rs::ApiExt.api",
+            "crates/worker/src/derived.rs::Client.ApiExt.api",
+            "crates/worker/src/derived.rs::Factory",
+            "crates/worker/src/derived.rs::Factory.fetch_named",
+            "crates/worker/src/derived.rs::Factory.make",
+            "crates/worker/src/derived.rs::Sender",
+            "crates/worker/src/derived.rs::Sender.send_named",
+            "crates/worker/src/derived.rs::by_name",
+            "crates/worker/src/derived.rs::derived",
+            "crates/worker/src/derived.rs::send_named",
+            "crates/worker/src/derived.rs::shadowed",
+            "crates/worker/src/lib.rs::derived",
+            "crates/worker/src/wrappers.rs::recurse",
+            "crates/worker/src/wrappers.rs::recursive",
+            "crates/worker/src/dynamic.rs::looped",
+            "crates/worker/src/dynamic.rs::pick",
+            "crates/worker/src/dynamic.rs::spec",
+            "crates/worker/src/dynamic.rs::unresolved",
+            "crates/worker/src/env.rs::dotenv",
+            "crates/worker/src/env.rs::fallbacks",
+            "crates/worker/src/env.rs::full_path",
+            "crates/worker/src/env.rs::function_import",
+            "crates/worker/src/env.rs::imported",
+            "crates/worker/src/env.rs::macros",
+            "crates/worker/src/env.rs::mid_url",
+            "crates/worker/src/env.rs::optional",
+            "crates/worker/src/env.rs::two_reads",
+            "crates/worker/src/lib.rs::agents",
+            "crates/worker/src/lib.rs::clients",
+            "crates/worker/src/lib.rs::dynamic",
+            "crates/worker/src/lib.rs::env",
+            "crates/worker/src/lib.rs::modules",
+            "crates/worker/src/lib.rs::not_env",
+            "crates/worker/src/lib.rs::settings",
+            "crates/worker/src/lib.rs::urls",
+            "crates/worker/src/lib.rs::wrappers",
+            "crates/worker/src/modules.rs::Cache",
+            "crates/worker/src/modules.rs::Cache.get",
+            "crates/worker/src/modules.rs::blocking_health",
+            "crates/worker/src/modules.rs::health",
+            "crates/worker/src/modules.rs::items",
+            "crates/worker/src/modules.rs::lookalikes",
+            "crates/worker/src/not_env.rs::env",
+            "crates/worker/src/not_env.rs::env.var",
+            "crates/worker/src/not_env.rs::foreign",
+            "crates/worker/src/not_env.rs::foreign.read",
+            "crates/worker/src/not_env.rs::hidden",
+            "crates/worker/src/not_env.rs::hidden.closure",
+            "crates/worker/src/not_env.rs::hidden.parameter",
+            "crates/worker/src/not_env.rs::other",
+            "crates/worker/src/not_env.rs::other.bare",
+            "crates/worker/src/not_env.rs::own_module",
+            "crates/worker/src/urls.rs::consts",
+            "crates/worker/src/urls.rs::formats",
+            "crates/worker/src/urls.rs::strings",
+            "crates/worker/src/wrappers.rs::Api",
+            "crates/worker/src/wrappers.rs::Api.ping",
+            "crates/worker/src/wrappers.rs::send",
+            "crates/worker/src/wrappers.rs::through_a_parameter",
+            "crates/worker/src/wrappers.rs::api_get",
+            "crates/worker/src/wrappers.rs::open_ended",
+            "crates/worker/src/wrappers.rs::resource",
+            "crates/worker/src/wrappers.rs::wrapped",
+            "crates/worker/src/lib.rs::kafka",
+            "crates/worker/src/lib.rs::mq_shadowed",
+            "crates/worker/src/lib.rs::queues",
+            "crates/worker/src/lib.rs::rabbit",
+            "crates/worker/src/lib.rs::streams",
+            "crates/worker/src/lib.rs::subjects",
+            "crates/worker/src/kafka.rs::make_producer",
+            "crates/worker/src/kafka.rs::produce_all",
+            "crates/worker/src/kafka.rs::base_produce",
+            "crates/worker/src/kafka.rs::emit",
+            "crates/worker/src/kafka.rs::emit_refund",
+            "crates/worker/src/kafka.rs::produce_unknown",
+            "crates/worker/src/kafka.rs::consume_orders",
+            "crates/worker/src/kafka.rs::consume_refunds",
+            "crates/worker/src/kafka.rs::consume_pattern",
+            "crates/worker/src/kafka.rs::Transport",
+            "crates/worker/src/kafka.rs::Transport.send",
+            "crates/worker/src/kafka.rs::not_rdkafka",
+            "crates/worker/src/rabbit.rs::publish_all",
+            "crates/worker/src/rabbit.rs::bind_all",
+            "crates/worker/src/rabbit.rs::work_jobs",
+            "crates/worker/src/rabbit.rs::audit",
+            "crates/worker/src/rabbit.rs::publish_unknown",
+            "crates/worker/src/queues.rs::sqs_client",
+            "crates/worker/src/queues.rs::send_all",
+            "crates/worker/src/queues.rs::enqueue",
+            "crates/worker/src/queues.rs::enqueue_audit",
+            "crates/worker/src/queues.rs::send_prefixed",
+            "crates/worker/src/queues.rs::send_unknown",
+            "crates/worker/src/queues.rs::receive_jobs",
+            "crates/worker/src/queues.rs::receive_many",
+            "crates/worker/src/queues.rs::other_calls",
+            "crates/worker/src/queues.rs::Mailer",
+            "crates/worker/src/queues.rs::Mailer.send_message",
+            "crates/worker/src/queues.rs::Mailer.queue_url",
+            "crates/worker/src/queues.rs::not_sqs",
+            "crates/worker/src/subjects.rs::publish_all",
+            "crates/worker/src/subjects.rs::publish_with_options",
+            "crates/worker/src/subjects.rs::listen_orders",
+            "crates/worker/src/subjects.rs::listen_queue",
+            "crates/worker/src/subjects.rs::not_nats",
+            "crates/worker/src/subjects.rs::Bus",
+            "crates/worker/src/subjects.rs::Bus.publish",
+            "crates/worker/src/subjects.rs::Bus.subscribe",
+            "crates/worker/src/streams.rs::append_all",
+            "crates/worker/src/streams.rs::read_group",
+            "crates/worker/src/streams.rs::read_inline",
+            "crates/worker/src/streams.rs::read_unknown",
+            "crates/worker/src/streams.rs::read_plain",
+            "crates/worker/src/streams.rs::hidden_names",
+            "crates/worker/src/streams.rs::hidden_names.nested",
+            "crates/worker/src/streams.rs::reassigned",
+            "crates/worker/src/streams.rs::Log",
+            "crates/worker/src/streams.rs::Log.xadd",
+            "crates/worker/src/streams.rs::not_redis",
+            "crates/worker/src/mq_shadowed.rs::shadowed",
+            "crates/worker/src/mq_shadowed.rs::Outbox",
+            "crates/worker/src/mq_shadowed.rs::Outbox.send",
+            "crates/worker/src/mq_shadowed.rs::unreached",
+            "crates/web/src/admin.rs::mount",
+            "crates/web/src/admin.rs::reset",
+            "crates/web/src/admin.rs::router",
+            "crates/web/src/admin.rs::stats",
+            "crates/web/src/files.rs::read",
+            "crates/web/src/files.rs::router",
+            "crates/web/src/health.rs::check",
+            "crates/web/src/health.rs::echo",
+            "crates/web/src/items.rs::create",
+            "crates/web/src/items.rs::list",
+            "crates/web/src/items.rs::remove",
+            "crates/web/src/items.rs::router",
+            "crates/web/src/items.rs::show",
+            "crates/web/src/items.rs::update",
+            "crates/web/src/lib.rs::Holder",
+            "crates/web/src/lib.rs::Holder.mount",
+            "crates/web/src/lib.rs::admin",
+            "crates/web/src/lib.rs::app",
+            "crates/web/src/lib.rs::app.GET /api/ping",
+            "crates/web/src/lib.rs::files",
+            "crates/web/src/lib.rs::health",
+            "crates/web/src/lib.rs::items",
+            "crates/web/src/lib.rs::legacy",
+            "crates/web/src/lib.rs::legacy.router",
+            "crates/web/src/lib.rs::Builder",
+            "crates/web/src/lib.rs::Builder.routes",
+            "crates/web/src/lib.rs::hop",
+            "crates/web/src/lib.rs::reassigned",
+            "crates/web/src/lib.rs::rebuilt",
+            "crates/web/src/lib.rs::reassigned_items",
+            "crates/web/src/lib.rs::reassigned_items.router",
+            "crates/web/src/lib.rs::renamed",
+            "crates/web/src/lib.rs::renamed.router",
+            "crates/web/src/lib.rs::served",
+            "crates/web/src/lib.rs::services",
+            "crates/web/src/lib.rs::services.fallback",
+            "crates/web/src/lib.rs::services.router",
+            "crates/web/src/lib.rs::services.wrapped",
+            "crates/web/src/lib.rs::wrapper",
+            "crates/web/src/lib.rs::late",
+            "crates/web/src/lib.rs::late.router",
+            "crates/web/src/lib.rs::local",
+            "crates/web/src/lib.rs::orphans",
+            "crates/web/src/lib.rs::orphans.router",
+            "crates/web/src/lib.rs::prefix",
+            "crates/web/src/lib.rs::unread",
+            "crates/web/src/local.rs::Router",
+            "crates/web/src/local.rs::Router.get",
+            "crates/web/src/local.rs::wire",
+        ],
+        // `fn main` of each binary target: `src/main.rs`, `src/bin/`, a `[[bin]] path`.
+        &[
+            "api/src/bin/sync/main.rs::main",
+            "api/src/bin/tool.rs::main",
+            "api/src/main.rs::main",
+            "api/tools/admin.rs::main",
+        ],
+        &[
+            // An inline module, by its path and through `self::`.
+            (
+                "api/src/main.rs::inner.twice::helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::inner.twice::mod.inner.helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::main::inner.helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            // `super::` out of an inline module is read from the file's top, past the
+            // module's own `compute`.
+            // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
+            (
+                "api/src/gated.rs::connect::client#0",
+                EXACT,
+                &["api/src/real.rs::client"],
+            ),
+            (
+                "api/src/main.rs::checks.verify::mod.start#0",
+                EXACT,
+                &["api/src/main.rs::start"],
+            ),
+            (
+                "api/src/main.rs::checks.run_checks::mod.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            (
+                "api/src/main.rs::checks.run_checks::compute#0",
+                EXACT,
+                &["api/src/main.rs::checks.compute"],
+            ),
+            // `<name>.rs`, `mod.rs` and `#[path]` modules, those declared inside an inline
+            // module, and `crate::`; a `let` of a module's name does not hide it.
+            (
+                "api/src/main.rs::main::store.Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/main.rs::main::routes.serve#0",
+                EXACT,
+                &["api/src/routes/mod.rs::serve"],
+            ),
+            (
+                "api/src/main.rs::main::util.legacy#0",
+                EXACT,
+                &["api/extra/legacy_util.rs::legacy"],
+            ),
+            (
+                "api/src/main.rs::main::crate.store.reset#0",
+                EXACT,
+                &["api/src/store.rs::reset"],
+            ),
+            (
+                "api/src/main.rs::main::nested.deep.dive#0",
+                EXACT,
+                &["api/src/nested/deep.rs::dive"],
+            ),
+            (
+                "api/src/main.rs::main::nested.plain.walk#0",
+                EXACT,
+                &["api/src/nested/plain.rs::walk"],
+            ),
+            // A closure's call belongs to the function around it; the closure's binding hides
+            // the function of its name.
+            (
+                "api/src/main.rs::main::start#0",
+                EXACT,
+                &["api/src/main.rs::start"],
+            ),
+            (
+                "api/src/main.rs::main::run#0",
+                INFERRED,
+                &["api/src/main.rs::run"],
+            ),
+            // Paths into crates outside the repository.
+            ("api/src/main.rs::main::String.new#0", None, &[]),
+            ("api/src/main.rs::main::std.mem.drop#0", None, &[]),
+            (
+                "api/src/routes/mod.rs::serve::health.check#0",
+                EXACT,
+                &["api/src/routes/health.rs::check"],
+            ),
+            (
+                "api/src/routes/mod.rs::serve::super.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            (
+                "api/src/routes/mod.rs::serve::store.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/routes/health.rs::check::crate.inner.helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/routes/health.rs::check::super.super.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            // `Self::`, `Type::` and `Trait::` calls, inherent and trait `impl`s, and an
+            // `impl` in another file than the type.
+            (
+                "api/src/store.rs::Store.new::Self.empty#0",
+                EXACT,
+                &["api/src/store.rs::Store.empty"],
+            ),
+            (
+                "api/src/store.rs::Store.empty::disk.open#0",
+                EXACT,
+                &["api/src/store/disk.rs::open"],
+            ),
+            (
+                "api/src/store.rs::Store.empty::Store.reload#0",
+                EXACT,
+                &["api/src/store/disk.rs::Store.reload"],
+            ),
+            (
+                "api/src/store.rs::Store.Persist.persist::Self.describe#0",
+                EXACT,
+                &["api/src/store.rs::Persist.describe"],
+            ),
+            (
+                "api/src/store.rs::reset::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/store.rs::reset::Persist.describe#0",
+                EXACT,
+                &["api/src/store.rs::Persist.describe"],
+            ),
+            // Two traits' default bodies, two blocks of one trait: each one fits.
+            (
+                "api/src/store.rs::reset::Store.label#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/store.rs::Named.label",
+                    "api/src/store.rs::Tagged.label",
+                ],
+            ),
+            (
+                "api/src/store.rs::reset::Store.from#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/store.rs::Store.From#2.from",
+                    "api/src/store.rs::Store.From.from",
+                ],
+            ),
+            // An inline module does not see the file's own `Store`: `use crate::util::Store`
+            // names another one, which a `use super::*` glob does not override; the glob takes
+            // the file's private items.
+            (
+                "api/src/store.rs::tests.t::Store.new#0",
+                EXACT,
+                &["api/extra/legacy_util.rs::Store.new"],
+            ),
+            (
+                "api/src/store.rs::tests.t::private_helper#0",
+                EXACT,
+                &["api/src/store.rs::private_helper"],
+            ),
+            (
+                "api/src/store/disk.rs::Store.reload::open#0",
+                EXACT,
+                &["api/src/store/disk.rs::open"],
+            ),
+            (
+                "api/src/store/disk.rs::Store.reload::Self.check#0",
+                EXACT,
+                &["api/src/store/disk.rs::Store.check"],
+            ),
+            // Crate roots from `src/bin/`, `src/bin/<name>/main.rs` and `[[bin]]`.
+            (
+                "api/src/bin/tool.rs::main::helper.go#0",
+                EXACT,
+                &["api/src/bin/tool.rs::helper.go"],
+            ),
+            (
+                "api/src/bin/sync/main.rs::main::step.tick#0",
+                EXACT,
+                &["api/src/bin/sync/step.rs::tick"],
+            ),
+            (
+                "api/tools/admin.rs::main::shared.ping#0",
+                EXACT,
+                &["api/tools/shared.rs::ping"],
+            ),
+            // The second member, its root named by `[lib] path`.
+            (
+                "crates/billing/src/billing.rs::total::invoice.Invoice.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "crates/billing/src/billing.rs::total::invoice.tax#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::tax"],
+            ),
+            (
+                "crates/billing/src/billing.rs::total::(call_expression).amount#0",
+                INFERRED,
+                &["crates/billing/src/invoice.rs::Invoice.amount"],
+            ),
+            // `use crate::util as u` renames a module written in place.
+            (
+                "crates/billing/src/invoice.rs::tax::u.round#0",
+                EXACT,
+                &["crates/billing/src/billing.rs::util.round"],
+            ),
+            // The other workspace member, by its name with the hyphen turned into an
+            // underscore, through a `use` of its module.
+            (
+                "crates/billing/src/billing.rs::settle::ledger_core.post#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::post"],
+            ),
+            (
+                "crates/billing/src/billing.rs::settle::entries.add#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::entries.add"],
+            ),
+            // `use`s and `pub use`s, from the first member into the others.
+            (
+                "api/src/main.rs::main::aid#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::main::dive#0",
+                EXACT,
+                &["api/src/nested/deep.rs::dive"],
+            ),
+            (
+                "api/src/main.rs::main::Repo.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/main.rs::main::stores.reset#0",
+                EXACT,
+                &["api/src/store.rs::reset"],
+            ),
+            (
+                "api/src/main.rs::main::total#0",
+                EXACT,
+                &["crates/billing/src/billing.rs::total"],
+            ),
+            (
+                "api/src/main.rs::main::Bill.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "api/src/main.rs::main::billing.invoice.tax#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::tax"],
+            ),
+            (
+                "api/src/main.rs::main::billing.Invoice.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "api/src/main.rs::main::ledger_core.post#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::post"],
+            ),
+            (
+                "api/src/main.rs::main::books.add#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::entries.add"],
+            ),
+            // A crate outside the repository is external: `new` is not matched by name.
+            ("api/src/main.rs::main::HashMap.new#0", None, &[]),
+            // Globs: the public items of a module, not its private `dup`.
+            (
+                "api/src/main.rs::main::dup#0",
+                EXACT,
+                &["api/src/extras.rs::dup"],
+            ),
+            (
+                "api/src/main.rs::main::greet#0",
+                EXACT,
+                &["api/src/prelude.rs::greet"],
+            ),
+            // `pub use` renames three files deep, and a cycle of re-exports.
+            (
+                "api/src/main.rs::main::ring.e.Wheel.spin#0",
+                EXACT,
+                &["api/src/ring/c.rs::Gear.spin"],
+            ),
+            (
+                "api/src/main.rs::main::ring.Gear.spin#0",
+                EXACT,
+                &["api/src/ring/c.rs::Gear.spin"],
+            ),
+            ("api/src/main.rs::main::ring.x.Loop.unheard#0", None, &[]),
+            // A `use` in a module binds there alone, hides the file's name of it and is not in
+            // scope outside; `use super::*` takes the private `compute`.
+            (
+                "api/src/main.rs::scoped.go::aid#0",
+                EXACT,
+                &["api/src/main.rs::checks.run_checks"],
+            ),
+            (
+                "api/src/main.rs::scoped.go::twice#0",
+                EXACT,
+                &["api/src/main.rs::inner.twice"],
+            ),
+            (
+                "api/src/main.rs::outside::twice#0",
+                INFERRED,
+                &["api/src/main.rs::inner.twice"],
+            ),
+            (
+                "api/src/main.rs::below.go::compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            // A function's `use` binds in it alone, and a `let` hides a `use`d name.
+            (
+                "api/src/main.rs::within::local_aid#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            ("api/src/main.rs::elsewhere::local_aid#0", None, &[]),
+            ("api/src/main.rs::loops.f::a#0", None, &[]),
+            ("api/src/main.rs::hidden::aid#0", None, &[]),
+            // A parameter hides the `use` that spells its name.
+            ("api/src/main.rs::with_param::aid#0", None, &[]),
+            // The file's `use`s and modules are not in scope in a module written in place: the
+            // names are crates outside the file there, never name-matched.
+            ("api/src/main.rs::isolated.go::aid#0", None, &[]),
+            ("api/src/main.rs::isolated.far::inner.helper#0", None, &[]),
+            (
+                "api/src/main.rs::main::isolated.go#0",
+                EXACT,
+                &["api/src/main.rs::isolated.go"],
+            ),
+            (
+                "api/src/main.rs::main::isolated.far#0",
+                EXACT,
+                &["api/src/main.rs::isolated.far"],
+            ),
+            // An item of the module beats what a glob gives.
+            (
+                "api/src/main.rs::local_wins.go::compute#0",
+                EXACT,
+                &["api/src/main.rs::local_wins.compute"],
+            ),
+            (
+                "api/src/main.rs::main::local_wins.go#0",
+                EXACT,
+                &["api/src/main.rs::local_wins.go"],
+            ),
+            // `mod launch; use launch::launch;`: a module is no value.
+            (
+                "api/src/main.rs::main::launch#0",
+                EXACT,
+                &["api/src/launch.rs::launch"],
+            ),
+            (
+                "api/src/main.rs::main::launch.launch#0",
+                EXACT,
+                &["api/src/launch.rs::launch"],
+            ),
+            // `mod meter; pub use meter::meter;` and a `pub use` in a `pub` module written in
+            // place, called from the other crate.
+            (
+                "api/src/main.rs::main::ledger_core.meter#0",
+                EXACT,
+                &["crates/ledger-core/src/meter.rs::meter"],
+            ),
+            (
+                "api/src/main.rs::main::ledger_core.entries.secret#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::internal.secret"],
+            ),
+            // `scratch` lists no dependency: `ledger_core` is outside the repository to it.
+            (
+                "crates/scratch/src/lib.rs::reach::ledger_core.post#0",
+                None,
+                &[],
+            ),
+            // Method calls: the receiver's type is written on a `let`, a parameter (`&T`, `&mut T`),
+            // a field through `self`, or `self` itself; one fit is `exact`.
+            (
+                "api/src/methods.rs::annotated::c.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::shared::c.read#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.read"],
+            ),
+            (
+                "api/src/methods.rs::exclusive::g.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.counter.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.gauge.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.counter.twice#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.twice"],
+            ),
+            (
+                "api/src/methods.rs::Counter.twice::self.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::Counter.twice::self.bump#1",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            // `self` in a trait's block, and in the default body of a trait.
+            (
+                "api/src/methods.rs::Counter.Probe.probe::self.read#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.read"],
+            ),
+            (
+                "api/src/methods.rs::Probe.summary::self.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            // The type is the declared return type of the function the `let` calls, `Self` included.
+            (
+                "api/src/methods.rs::built::c.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::built::g.read#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.read"],
+            ),
+            // Methods of `impl Trait for Type` are found through the type, with the trait's defaults.
+            (
+                "api/src/methods.rs::probed::c.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::probed::c.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            // A `dyn Trait`, a bounded generic and an `impl Trait` stop at the trait's method: no
+            // implementation is searched.
+            (
+                "api/src/methods.rs::dynamic::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::generic::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::bounded::p.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            (
+                "api/src/methods.rs::opaque_impl::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            // The type is not written (a `for` binding): the call goes by name.
+            (
+                "api/src/methods.rs::named::c.reset#0",
+                INFERRED,
+                &["api/src/methods.rs::Counter.reset"],
+            ),
+            (
+                "api/src/methods.rs::named::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
+            ),
+            (
+                "api/src/methods.rs::blocks::c.read#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.read",
+                    "api/src/methods.rs::Gauge.read",
+                ],
+            ),
+            // A type from outside the repository is opaque: `insert` is not `Gauge.insert`.
+            ("api/src/methods.rs::outside::m.insert#0", None, &[]),
+            ("api/src/methods.rs::outside::made.insert#0", None, &[]),
+            (
+                "api/src/methods.rs::Dash.mark::self.marks.insert#0",
+                None,
+                &[],
+            ),
+            (
+                "api/src/methods.rs::Gauge.insert::self.marks.insert#0",
+                None,
+                &[],
+            ),
+            // A binding of the name that disagrees with the typed one leaves it to the name match.
+            (
+                "api/src/methods.rs::shadowed::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
+            ),
+            (
+                "api/src/methods.rs::retyped::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
+            ),
+            // `Self` of a trait's default body is the type the call named, not the trait; a type
+            // parameter as a result names no class; a parameter whose type names no item hides a `let`.
+            (
+                "api/src/methods.rs::Build.make::Self.seed#0",
+                EXACT,
+                &["api/src/methods.rs::Build.seed"],
+            ),
+            (
+                "api/src/methods.rs::Counter.Build.seed::Counter.new#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.new"],
+            ),
+            (
+                "api/src/methods.rs::built_by_default::Counter.make#0",
+                EXACT,
+                &["api/src/methods.rs::Build.make"],
+            ),
+            (
+                "api/src/methods.rs::built_by_default::c.run#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.Build.run"],
+            ),
+            (
+                "api/src/methods.rs::wrapped::w.probe#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.Probe.probe",
+                    "api/src/methods.rs::Gauge.Probe.probe",
+                    "api/src/methods.rs::Probe.probe",
+                ],
+            ),
+            (
+                "api/src/methods.rs::sliced::c.read#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.read",
+                    "api/src/methods.rs::Gauge.read",
+                ],
+            ),
+            // A type is read among types and modules: a parameter named like the module does not hide it.
+            (
+                "api/src/methods.rs::modular::store.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/methods.rs::reopened::client.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/methods.rs::reopened::again.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            // Marker traits (`Send`, `Sync`, `Unpin`, `Sized`) and lifetimes are not a second bound.
+            (
+                "api/src/methods.rs::marked::p.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            (
+                "api/src/methods.rs::marked_impl::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::cleared::c.reset#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.reset"],
+            ),
+            // A written type whose blocks lack the member: nothing, never another type's.
+            ("api/src/methods.rs::derived::Plain.default#0", None, &[]),
+            ("api/src/methods.rs::derived::q.clone#0", None, &[]),
+            // `self` of a block of a type from outside the repository is opaque.
+            (
+                "crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
+                None,
+                &[],
+            ),
+            // A chain that starts at a call of an outside crate is that crate's, whatever
+            // function of the file shares the crate's name.
+            (
+                "crates/greeter/src/main.rs::rocket::(call_expression).mount#0",
+                None,
+                &[],
+            ),
+            (
+                "crates/flat/lib.rs::serve::(call_expression).mount#0",
+                None,
+                &[],
+            ),
+            // An attribute is no call of a function: neither by name nor through a path.
+            ("crates/greeter/src/main.rs::get#0", None, &[]),
+            ("crates/greeter/src/names.rs::get#0", None, &[]),
+            ("crates/actix/src/stray.rs::elsewhere.get#0", None, &[]),
+        ],
+    );
+    // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.
+    let repo = fixture_repo("conformance_rust_absent", "conformance-rust", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(!export.contains(&format!("{MAIN}::main::compute#")));
+    assert!(!export.contains("orphan.rs"));
+}
+
+/// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
+/// built in another module, one router under two prefixes, chained method routers, `any`, a
+/// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot
+/// read, or on a router held in a field, is served nowhere, and an Express-spelled `Router` of
+/// the crate's own is no provider.
+#[test]
+fn rust_axum_routes_are_providers_under_every_prefix() {
+    let (_, actual) = providers("rust_axum", "conformance-rust", "crates/web/src/");
+    let items = |prefix: &str| {
+        let at = |path: &str, m: &str, handler: &str| {
+            (
+                format!("http::{m}::{prefix}{path}"),
+                format!("crates/web/src/items.rs::{handler}"),
+            )
+        };
+        vec![
+            at("/items", "GET", "list"),
+            at("/items", "POST", "create"),
+            at("/items/{}", "GET", "show"),
+            at("/items/{}", "PUT", "update"),
+            at("/items/{}", "PATCH", "update"),
+            at("/items/{}", "DELETE", "remove"),
+            at("/items/{}/tags", "POST", "create"),
+            at("/items/{}/tags", "HEAD", "show"),
+            at("/items/{}/tags", "OPTIONS", "show"),
+        ]
+    };
+    let mut expected: Vec<(String, String)> = [
+        // `nest(API, api)` reads the constant from another module; the closure is named for
+        // its route.
+        (
+            "http::GET::/api/ping",
+            "crates/web/src/lib.rs::app.GET /api/ping",
+        ),
+        // `merge` adds no prefix; `any` serves every method.
+        ("http::GET::/health", "crates/web/src/health.rs::check"),
+        ("http::ANY::/echo", "crates/web/src/health.rs::echo"),
+        ("http::GET::/files/{}", "crates/web/src/files.rs::read"),
+        ("http::GET::/blobs/{}", "crates/web/src/files.rs::read"),
+        // A router a function receives and returns, mounted under a literal.
+        ("http::GET::/admin/stats", "crates/web/src/admin.rs::stats"),
+        ("http::GET::/legacy/old", "crates/web/src/health.rs::check"),
+        // `{{raw}}` is the literal `{raw}`, not a parameter.
+        ("http::GET::/{raw}", "crates/web/src/health.rs::check"),
+        // The method is axum's name for the function, not the file's.
+        (
+            "http::GET::/alias/renamed",
+            "crates/web/src/health.rs::check",
+        ),
+        (
+            "http::ANY::/alias/renamed-any",
+            "crates/web/src/health.rs::echo",
+        ),
+        ("http::POST::/admin/reset", "crates/web/src/admin.rs::reset"),
+        // `orphans::router` is nested under a prefix that is a parameter: no provider at
+        // `/never`, under any prefix.
+    ]
+    .into_iter()
+    .map(|(c, s)| (c.to_string(), s.to_string()))
+    .collect();
+    expected.extend(items("/api/v1"));
+    expected.extend(items("/api/v2"));
+    expected.sort();
+    assert_eq!(actual, expected);
+}
+
+/// The actix-web service of the Rust fixture (spec #30): attribute routes (`route` with several
+/// methods included) registered bare, in a tuple, in nested scopes and through a function that
+/// returns a scope; route builders on the app, resources and the service configurations
+/// `.configure` takes. A prefix read at run time serves nothing, a handler no call names is
+/// served at its own path, one a call names on a receiver Meada cannot read is served nowhere,
+/// and another crate's `get` attribute is no route.
+#[test]
+fn rust_actix_routes_are_providers_under_every_mount() {
+    let (_, actual) = providers("rust_actix", "conformance-rust", "crates/actix/src/");
+    let expected = pairs(&[
+        // Attributes registered bare and in a tuple.
+        ("http::GET::/accounts", "crates/actix/src/accounts.rs::list"),
+        (
+            "http::POST::/accounts",
+            "crates/actix/src/accounts.rs::create",
+        ),
+        (
+            "http::DELETE::/accounts/{}",
+            "crates/actix/src/accounts.rs::remove",
+        ),
+        // A scope nested in a scope; the handler is not served at the root as well.
+        (
+            "http::GET::/v1/admin/accounts/{}",
+            "crates/actix/src/accounts.rs::show",
+        ),
+        // A function that returns a scope, `#[route]` with two methods, `{tail:.*}`.
+        (
+            "http::PUT::/api/accounts/{}/sync",
+            "crates/actix/src/accounts.rs::sync",
+        ),
+        (
+            "http::PATCH::/api/accounts/{}/sync",
+            "crates/actix/src/accounts.rs::sync",
+        ),
+        (
+            "http::GET::/api/files/{}",
+            "crates/actix/src/accounts.rs::files",
+        ),
+        // Route builders on the app.
+        ("http::GET::/ping", "crates/actix/src/orders.rs::ping"),
+        ("http::ANY::/echo", "crates/actix/src/orders.rs::echo"),
+        (
+            "http::PUT::/inline",
+            "crates/actix/src/lib.rs::serve_catalog.PUT /inline",
+        ),
+        // Resources.
+        ("http::GET::/orders", "crates/actix/src/orders.rs::list"),
+        ("http::POST::/orders", "crates/actix/src/orders.rs::create"),
+        (
+            "http::PATCH::/orders/{}",
+            "crates/actix/src/orders.rs::update",
+        ),
+        ("http::HEAD::/orders/{}", "crates/actix/src/orders.rs::show"),
+        (
+            "http::DELETE::/orders/{}",
+            "crates/actix/src/orders.rs::item.DELETE /orders/{}",
+        ),
+        // `.configure(f)`: what `f` registers, with and without a scope around the call.
+        ("http::GET::/status", "crates/actix/src/admin.rs::status"),
+        (
+            "http::GET::/admin/dashboard",
+            "crates/actix/src/admin.rs::dashboard",
+        ),
+        (
+            "http::GET::/tools/audit",
+            "crates/actix/src/admin.rs::audit",
+        ),
+        // Written nowhere in its crate but where it is defined: its own path, no prefix. Its
+        // name bound (a `let`, a parameter, a field), a reference a local of the name hides and
+        // a mention in another crate register nothing. Handlers that code Meada does not read
+        // (`services!`, `vec!`, `cfg_if!`, a reference before a `let` of the name) mentions are
+        // possibly registered there: served nowhere.
+        ("http::GET::/stray/{}", "crates/actix/src/stray.rs::lonely"),
+        ("http::GET::/bound", "crates/actix/src/stray.rs::bound"),
+        (
+            "http::GET::/shadowed",
+            "crates/actix/src/stray.rs::shadowed",
+        ),
+        // A configuration passed on to the function a function calls.
+        (
+            "http::GET::/more/extras",
+            "crates/actix/src/admin.rs::extra",
+        ),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// The Rocket service of the Rust fixture (spec #30): attribute routes listed by `routes!` under
+/// each `mount` prefix, a function that returns the list, `<id>`, `<path..>` and a query part.
+/// A prefix read at run time serves nothing, and an unmounted handler is served at its own path.
+#[test]
+fn rust_rocket_routes_are_providers_under_their_mount() {
+    let (_, actual) = providers("rust_rocket", "conformance-rust", "crates/rocket/src/");
+    let expected = pairs(&[
+        ("http::GET::/", "crates/rocket/src/pages.rs::index"),
+        ("http::GET::/about", "crates/rocket/src/pages.rs::about"),
+        ("http::GET::/posts", "crates/rocket/src/posts.rs::list"),
+        ("http::GET::/posts/{}", "crates/rocket/src/posts.rs::show"),
+        ("http::POST::/posts", "crates/rocket/src/posts.rs::create"),
+        (
+            "http::GET::/posts/search",
+            "crates/rocket/src/posts.rs::search",
+        ),
+        (
+            "http::GET::/posts/files/{}",
+            "crates/rocket/src/posts.rs::files",
+        ),
+        (
+            "http::GET::/legacy/old/{}",
+            "crates/rocket/src/posts.rs::old",
+        ),
+        ("http::GET::/stray", "crates/rocket/src/stray.rs::lonely"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// Rocket's canonical form (spec #30): `#[macro_use] extern crate rocket;` brings its attributes
+/// into every module of the crate, bare.
+#[test]
+fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
+    let (_, actual) = providers("rust_greeter", "conformance-rust", "crates/greeter/src/");
+    let expected = pairs(&[
+        ("http::GET::/hello", "crates/greeter/src/main.rs::index"),
+        ("http::GET::/hello/{}", "crates/greeter/src/names.rs::named"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// A library whose root is not under `src/` (`[lib] path = "lib.rs"`) reads `#[macro_use]` from
+/// that root, as its crate's module tree says.
+#[test]
+fn rust_macro_use_follows_the_crate_root_wherever_it_is() {
+    let (_, actual) = providers("rust_flat", "conformance-rust", "crates/flat/");
+    let expected = pairs(&[
+        ("http::GET::/flat/page", "crates/flat/pages.rs::page"),
+        ("package::cargo::flat", "crates/flat/Cargo.toml"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// A file writing more names than `Facts::mentions` keeps makes only its own crate's handlers
+/// possibly registered: one in another crate leaves the unregistered handler at its own path.
+#[test]
+fn a_file_past_the_mentions_limit_hides_only_its_own_crate() {
+    let many: String = (0..20_000).map(|i| format!("    n{i};\n")).collect();
+    let big = format!("pub fn big() {{\n{many}}}\n");
+    let lonely = "\"http::GET::/stray/{}\"";
+    for (krate, served) in [("rocket", true), ("actix", false)] {
+        let repo = fixture_repo(
+            &format!("rust_mentions_{krate}"),
+            "conformance-rust",
+            Some(ORIGIN),
+        );
+        let src = repo.join(format!("crates/{krate}/src"));
+        let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+        std::fs::write(src.join("lib.rs"), format!("mod big;\n{lib}")).unwrap();
+        std::fs::write(src.join("big.rs"), &big).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_eq!(export.contains(lonely), served, "a big file in {krate}");
+    }
+}
+
+/// The constants and returns the handlers of a call are expanded from share one budget: a list
+/// that fits is served under its scope, the same list past the budget is read no further.
+#[test]
+fn an_actix_list_expanded_past_the_work_budget_is_not_read() {
+    let repo = fixture_repo("rust_actix_work", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/actix/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod big;\n{lib}")).unwrap();
+    let n = 5000;
+    let handlers: String = (0..n)
+        .map(|i| format!("#[get(\"/h{i}\")]\nasync fn h{i}() {{}}\n"))
+        .collect();
+    let names: Vec<String> = (0..n).map(|i| format!("h{i}")).collect();
+    let big = format!(
+        "use actix_web::{{get, web, App}};\n{handlers}const ALL: [u8; {n}] = [{}];\n\
+         pub fn a() -> App<()> {{ App::new().service(web::scope(\"/a\").service(ALL)) }}\n\
+         pub fn b() -> App<()> {{ App::new().service(web::scope(\"/b\").service(ALL)) }}\n",
+        names.join(", ")
+    );
+    std::fs::write(src.join("big.rs"), big).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/a/h0\""));
+    assert!(!export.contains("http::GET::/b/h0\""));
+}
+
+/// A method router chain longer than the limit read is no provider; the same router with a
+/// short chain is.
+#[test]
+fn an_axum_method_router_chain_past_the_limit_is_not_read() {
+    let repo = fixture_repo("rust_axum_chain", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/web/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod chain;\n{lib}")).unwrap();
+    let layers = ".layer(())".repeat(70);
+    let chain = format!(
+        "use axum::Router;\nuse axum::routing::get;\n\
+         pub fn router() -> Router {{\n    Router::new()\n        .route(\"/short\", get(h).layer(()))\n        \
+         .route(\"/long\", get(h){layers})\n}}\nfn h() {{}}\n"
+    );
+    std::fs::write(src.join("chain.rs"), chain).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/short"));
+    assert!(!export.contains("http::GET::/long"));
+}
+
+/// A chain of thousands of `route` calls is read in one pass and only as far as the limit: the
+/// routes near its start are providers, the ones past it are not.
+#[test]
+fn a_long_axum_chain_is_read_up_to_its_limit() {
+    let repo = fixture_repo("rust_axum_long", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/web/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod long;\n{lib}")).unwrap();
+    let routes: String = (0..3000)
+        .map(|i| format!("        .route(\"/r{i}\", get(h))\n"))
+        .collect();
+    let long = format!(
+        "use axum::Router;\nuse axum::routing::get;\n\
+         pub fn router() -> Router {{\n    Router::new()\n{routes}}}\nfn h() {{}}\n"
+    );
+    std::fs::write(src.join("long.rs"), long).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/r10\""));
+    assert!(!export.contains("http::GET::/r2999\""));
+}
+
+/// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.
+fn rust_clients(case: &str, file: &str) -> Vec<Consumer> {
+    let repo = fixture_repo(case, "conformance-rust", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    consumers(&json, &format!("crates/worker/src/{file}"))
+}
+
+#[test]
+fn rust_reqwest_functions_are_consumers_and_get_on_other_objects_is_not() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/modules.rs::{function}::{call}");
+    let expected = triples(&[
+        // A function of the crate, of its `blocking` module imported and written in full.
+        ("http::GET::/health", host, &site("health", "reqwest.get#0")),
+        (
+            "http::GET::/blocking/health",
+            host,
+            &site("blocking_health", "blocking.get#0"),
+        ),
+        (
+            "http::GET::/blocking/ping",
+            host,
+            &site("blocking_health", "reqwest.blocking.get#0"),
+        ),
+        ("http::GET::/items", host, &site("items", "client.get#0")),
+    ]);
+    // `get` on a type of the crate and on a map is no consumer.
+    assert_eq!(rust_clients("rust_http_modules", "modules.rs"), expected);
+}
+
+#[test]
+fn rust_reqwest_clients_send_with_their_method_name_or_request() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/clients.rs::{function}::{call}");
+    let expected = triples(&[
+        (
+            "http::GET::/verbs/get",
+            host,
+            &site("verbs", "client.get#0"),
+        ),
+        (
+            "http::POST::/verbs/post",
+            host,
+            &site("verbs", "client.post#0"),
+        ),
+        (
+            "http::PUT::/verbs/put",
+            host,
+            &site("verbs", "client.put#0"),
+        ),
+        (
+            "http::PATCH::/verbs/patch",
+            host,
+            &site("verbs", "client.patch#0"),
+        ),
+        (
+            "http::DELETE::/verbs/delete",
+            host,
+            &site("verbs", "client.delete#0"),
+        ),
+        (
+            "http::HEAD::/verbs/head",
+            host,
+            &site("verbs", "client.head#0"),
+        ),
+        // `Client::builder()...build()?` is a client.
+        ("http::GET::/built", host, &site("built", "client.get#0")),
+        // `request(Method::X, url)`: the method written in full, through a `use` and a `let`.
+        (
+            "http::PUT::/requested/put",
+            host,
+            &site("requested", "client.request#0"),
+        ),
+        (
+            "http::DELETE::/requested/delete",
+            host,
+            &site("requested", "client.request#1"),
+        ),
+        (
+            "http::PATCH::/requested/patch",
+            host,
+            &site("requested", "client.request#2"),
+        ),
+        // A client that is never named, built in the expression.
+        (
+            "http::GET::/inline",
+            host,
+            &site("inline", "(call_expression).get#0"),
+        ),
+        (
+            "http::POST::/inline/path",
+            host,
+            &site("inline", "(call_expression).post#0"),
+        ),
+        // The blocking client, `use ... as`, and a builder chain called on in place.
+        (
+            "http::GET::/blocking/get",
+            host,
+            &site("blocking", "client.get#0"),
+        ),
+        (
+            "http::PATCH::/blocking/request",
+            host,
+            &site("blocking", "client.request#0"),
+        ),
+        (
+            "http::DELETE::/blocking/built",
+            host,
+            &site("blocking", "(try_expression).delete#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_clients", "clients.rs"), expected);
+}
+
+#[test]
+fn rust_ureq_functions_and_agents_are_consumers_with_their_method() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/agents.rs::{function}::{call}");
+    let expected = triples(&[
+        (
+            "http::GET::/u/get",
+            host,
+            &site("module_functions", "ureq.get#0"),
+        ),
+        (
+            "http::POST::/u/post",
+            host,
+            &site("module_functions", "ureq.post#0"),
+        ),
+        (
+            "http::PUT::/u/put",
+            host,
+            &site("module_functions", "ureq.put#0"),
+        ),
+        (
+            "http::PATCH::/u/patch",
+            host,
+            &site("module_functions", "ureq.patch#0"),
+        ),
+        (
+            "http::DELETE::/u/delete",
+            host,
+            &site("module_functions", "ureq.delete#0"),
+        ),
+        (
+            "http::HEAD::/u/head",
+            host,
+            &site("module_functions", "ureq.head#0"),
+        ),
+        (
+            "http::OPTIONS::/u/request",
+            host,
+            &site("module_functions", "ureq.request#0"),
+        ),
+        // An `Agent` from `agent()`, from a builder and from `Agent::new()`.
+        (
+            "http::GET::/agent/get",
+            host,
+            &site("agents", "agent.get#0"),
+        ),
+        (
+            "http::DELETE::/agent/request",
+            host,
+            &site("agents", "agent.request#0"),
+        ),
+        (
+            "http::POST::/agent/built",
+            host,
+            &site("agents", "built.post#0"),
+        ),
+        (
+            "http::PUT::/agent/new",
+            host,
+            &site("agents", "named.put#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_agents", "agents.rs"), expected);
+}
+
+#[test]
+fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/wrappers.rs::{function}::{call}");
+    let expected = triples(&[
+        // One level, and two: `resource` calls `api_get` with a path of its own parameter.
+        (
+            "http::GET::/wrapped/one",
+            host,
+            &site("wrapped", "api_get#0"),
+        ),
+        (
+            "http::GET::/resources/tags",
+            host,
+            &site("wrapped", "resource#0"),
+        ),
+        (
+            "http::GET::/resources/users",
+            host,
+            &site("wrapped", "resource#1"),
+        ),
+        // The client is a parameter too: the caller's constructor is the client. One held by a
+        // struct (`Api.ping`) is no consumer.
+        (
+            "http::POST::/param/one",
+            host,
+            &site("through_a_parameter", "send#0"),
+        ),
+        // A wrapper that calls itself: the cycle is cut, the outside caller's path is read.
+        (
+            "http::GET::/recursive/one",
+            host,
+            &site("recursive", "recurse#0"),
+        ),
+        // A public function with no caller here keeps the parameter as a hole.
+        (
+            "http::GET::/open/{}",
+            host,
+            &site("open_ended", "reqwest.get#0"),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_wrappers", "wrappers.rs"), expected);
+}
+
+#[test]
+fn rust_values_derived_from_a_client_and_name_matches_are_no_consumers() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/derived.rs::{function}::{call}");
+    let expected = triples(&[
+        // `headers().get(..)` of a response, `get` on a JSON value and on `client.api()` (a method
+        // of a trait the crate defines) are not.
+        (
+            "http::GET::/derived/real",
+            host,
+            &site("derived", "client.get#0"),
+        ),
+        // A client from `factory.make()`, found by name, is not one; a wrapper reached only by
+        // a name match keeps its parameter as a hole (the call `sender.send_named("called")` is
+        // not its caller).
+        (
+            "http::GET::/by-name/{}",
+            host,
+            &site("send_named", "reqwest.get#0"),
+        ),
+        // A `{base}` that a loop or a closure parameter binds is not the `let base` around it.
+        ("http::GET::/loop", "", &site("shadowed", "reqwest.get#0")),
+        (
+            "http::GET::/closure",
+            "",
+            &site("shadowed", "reqwest.get#1"),
+        ),
+        ("http::GET::/outer", "", &site("shadowed", "reqwest.get#2")),
+    ]);
+    assert_eq!(rust_clients("rust_http_derived", "derived.rs"), expected);
+}
+
+#[test]
+fn rust_urls_fold_consts_format_concat_and_strings_built_in_the_function() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/urls.rs::{function}::{call}");
+    let get = |function: &str, n: usize| site(function, &format!("reqwest.get#{n}"));
+    let expected = triples(&[
+        // A const of the file, one imported through `use`, one through a path, a `concat!` const,
+        // and a static captured in a format string.
+        ("http::GET::/local", host, &get("consts", 0)),
+        ("http::GET::/users", host, &get("consts", 1)),
+        ("http::GET::/", host, &get("consts", 2)),
+        ("http::GET::/tags", host, &get("consts", 3)),
+        ("http::GET::/base/items", host, &get("consts", 4)),
+        // `{base}`, `{}`, `{0}`, `{b}` with `b = base`, `{{` and `concat!`.
+        ("http::GET::/fmt/inline", host, &get("formats", 0)),
+        ("http::GET::/fmt/positional/1", host, &get("formats", 1)),
+        ("http::GET::/fmt/index", host, &get("formats", 2)),
+        ("http::GET::/fmt/named", host, &get("formats", 3)),
+        ("http::GET::/fmt/escaped/{}", host, &get("formats", 4)),
+        ("http::GET::/concat/7", host, &get("formats", 5)),
+        // `push_str`, `push` and `+=`, `+`, and a read before a push sees the String as it was.
+        ("http::GET::/strings/push/tail", host, &get("strings", 0)),
+        ("http::GET::/strings/sum/chain", host, &get("strings", 1)),
+        ("http::GET::/early", host, &get("strings", 2)),
+        ("http::GET::/early/late", host, &get("strings", 3)),
+    ]);
+    assert_eq!(rust_clients("rust_http_urls", "urls.rs"), expected);
+}
+
+#[test]
+fn rust_urls_that_do_not_fold_are_holes_or_unresolved() {
+    let host = "host:api.example.com";
+    let site = |function: &str| format!("crates/worker/src/dynamic.rs::{function}::reqwest.get#0");
+    let expected = triples(&[
+        // A call's result, and a String a loop grows, are unreadable: the consumer has no
+        // contract. A format spec prints something else than the value: a hole.
+        ("unresolved", "", &site("unresolved")),
+        ("unresolved", "", &site("looped")),
+        ("http::GET::/spec/{}", host, &site("spec")),
+    ]);
+    assert_eq!(rust_clients("rust_http_dynamic", "dynamic.rs"), expected);
+}
+
+#[test]
+fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
+    let site =
+        |function: &str, n: usize| format!("crates/worker/src/env.rs::{function}::reqwest.get#{n}");
+    let expected = triples(&[
+        // `std::env::var` in full, `use std::env`, `use std::env::var` inside a function.
+        ("http::GET::/std", "env:STD_URL", &site("full_path", 0)),
+        (
+            "http::GET::/imported",
+            "env:IMPORTED_URL",
+            &site("imported", 0),
+        ),
+        (
+            "http::GET::/function",
+            "env:FUNCTION_URL",
+            &site("function_import", 0),
+        ),
+        // `env!` bound to a name and inside `concat!`, and `dotenvy::var` with `?`.
+        ("http::GET::/macro", "env:MACRO_URL", &site("macros", 0)),
+        ("http::GET::/concat", "env:CONCAT_URL", &site("macros", 1)),
+        ("http::GET::/dotenv", "env:DOTENV_URL", &site("dotenv", 0)),
+        // A fallback and string methods keep the one read.
+        ("http::GET::/or", "env:OR_URL", &site("fallbacks", 0)),
+        ("http::GET::/else", "env:ELSE_URL", &site("fallbacks", 1)),
+        ("http::GET::/trim", "env:TRIM_URL", &site("fallbacks", 2)),
+        // A second read in the fallback leaves a hole, and `option_env!` is not read.
+        ("http::GET::/two", "", &site("two_reads", 0)),
+        ("http::GET::/macro-fallback", "", &site("two_reads", 1)),
+        ("http::GET::/optional", "", &site("optional", 0)),
+        // A read in the middle of the URL is a hole in the path, not the base.
+        (
+            "http::GET::/{}/mid",
+            "host:api.example.com",
+            &site("mid_url", 0),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_env", "env.rs"), expected);
+}
+
+#[test]
+fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
+    let site2 = |function: &str, n: usize| {
+        format!("crates/worker/src/not_env.rs::{function}::reqwest.get#{n}")
+    };
+    let site = |function: &str| site2(function, 0);
+    let expected = triples(&[
+        // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
+        // hole, not a variable.
+        ("http::GET::/own", "", &site("own_module")),
+        ("http::GET::/bare", "", &site("other.bare")),
+        // A parameter or a closure named `var` hides `use std::env::var`.
+        ("http::GET::/parameter", "", &site("hidden.parameter")),
+        ("http::GET::/closure", "", &site("hidden.closure")),
+        // A `var`, an `env!` and a `format!` imported from a path outside `std`.
+        ("http::GET::/foreign", "", &site("foreign.read")),
+        ("http::GET::/macro", "", &site2("foreign.read", 1)),
+        ("unresolved", "", &site2("foreign.read", 2)),
+    ]);
+    assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
+}
+
+/// A read under hundreds of string methods is read only as far as `VALUE_DEPTH`, and a read with
+/// hundreds of fallbacks nested in it is a hole: the base is no variable, and indexing carries on.
+#[test]
+fn an_environment_read_under_a_deep_chain_is_a_hole() {
+    let repo = fixture_repo("rust_env_long", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/worker/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod long_env;\n{lib}")).unwrap();
+    let trims = ".trim()".repeat(200);
+    let nested = format!(
+        "{}\"/x\"{}",
+        "std::env::var(\"A\").unwrap_or(".repeat(200),
+        ")".repeat(200)
+    );
+    let long = format!(
+        "pub async fn chain() {{\n    let a = std::env::var(\"LONG_URL\").unwrap(){trims}.to_string();\n    \
+         let _ = reqwest::get(a + \"/long\").await;\n    \
+         let b = {nested};\n    let _ = reqwest::get(b + \"/nested\").await;\n}}\n"
+    );
+    std::fs::write(src.join("long_env.rs"), long).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let found = consumers(&json, "crates/worker/src/long_env.rs");
+    let reads: Vec<_> = found
+        .iter()
+        .map(|(c, v, _)| (c.as_str(), v.as_str()))
+        .collect();
+    assert_eq!(
+        reads,
+        [("http::GET::/long", ""), ("http::GET::/nested", "")]
+    );
+}
+
+/// A crate's exports are the `pub` items reachable from its root through `pub` modules and
+/// `pub use`; `pub(crate)` and narrower items stay inside it (the `exports` table, read as the
+/// next ticket's cross-repository imports do).
+#[test]
+fn rust_exports_are_the_public_items_reachable_from_the_root() {
+    let repo = fixture_repo("conformance_rust_exports", "conformance-rust", Some(ORIGIN));
+    Engine::open(&repo).unwrap().export().unwrap();
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    let mut rows = db
+        .prepare(
+            "SELECT path, name, file, target FROM exports WHERE path LIKE 'crates/%' \
+             OR path LIKE 'api/%' ORDER BY path, name",
+        )
+        .unwrap();
+    let found: Vec<String> = rows
+        .query_map([], |row| {
+            let col = |n| {
+                row.get::<_, Option<String>>(n)
+                    .map(|v| v.unwrap_or("-".into()))
+            };
+            Ok(format!("{} {} {} {}", col(0)?, col(1)?, col(2)?, col(3)?))
+        })
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    // `api` has binaries alone (`src/main.rs`, `src/bin/`, a `[[bin]]`): no other crate can
+    // import them, so nothing in it is exported, whatever its `pub`s and modules say.
+    let expected = [
+        // `pub use` at the root, `pub` modules and the items of a `pub` module written in
+        // place; a private module and what it holds are not.
+        "crates/actix/src/lib.rs serve_catalog crates/actix/src/lib.rs serve_catalog",
+        "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
+        "crates/billing/src/billing.rs invoice crates/billing/src/invoice.rs -",
+        "crates/billing/src/billing.rs settle crates/billing/src/billing.rs settle",
+        "crates/billing/src/billing.rs total crates/billing/src/billing.rs total",
+        "crates/billing/src/invoice.rs Invoice crates/billing/src/invoice.rs Invoice",
+        "crates/billing/src/invoice.rs tax crates/billing/src/invoice.rs tax",
+        "crates/flat/lib.rs serve crates/flat/lib.rs serve",
+        "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
+        "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
+        // A `pub use` in a `pub` module written in place is one of its members.
+        "crates/ledger-core/src/lib.rs entries.secret crates/ledger-core/src/lib.rs internal.secret",
+        // `mod meter; pub use meter::meter;`: the private module's file exports nothing, and
+        // the root gives the item.
+        "crates/ledger-core/src/lib.rs meter crates/ledger-core/src/meter.rs meter",
+        "crates/ledger-core/src/lib.rs post crates/ledger-core/src/lib.rs post",
+        "crates/scratch/src/lib.rs ignored crates/scratch/src/lib.rs ignored",
+        "crates/scratch/src/lib.rs reach crates/scratch/src/lib.rs reach",
+        "crates/web/src/admin.rs router crates/web/src/admin.rs router",
+        "crates/web/src/items.rs create crates/web/src/items.rs create",
+        "crates/web/src/items.rs list crates/web/src/items.rs list",
+        "crates/web/src/items.rs remove crates/web/src/items.rs remove",
+        "crates/web/src/items.rs router crates/web/src/items.rs router",
+        "crates/web/src/items.rs show crates/web/src/items.rs show",
+        "crates/web/src/items.rs update crates/web/src/items.rs update",
+        "crates/web/src/lib.rs Builder crates/web/src/lib.rs Builder",
+        "crates/web/src/lib.rs Holder crates/web/src/lib.rs Holder",
+        "crates/web/src/lib.rs admin crates/web/src/admin.rs -",
+        "crates/web/src/lib.rs app crates/web/src/lib.rs app",
+        "crates/web/src/lib.rs hop crates/web/src/lib.rs hop",
+        "crates/web/src/lib.rs items crates/web/src/items.rs -",
+        "crates/web/src/lib.rs reassigned crates/web/src/lib.rs reassigned",
+        "crates/web/src/lib.rs rebuilt crates/web/src/lib.rs rebuilt",
+        "crates/web/src/lib.rs served crates/web/src/lib.rs served",
+        "crates/web/src/lib.rs unread crates/web/src/lib.rs unread",
+        "crates/web/src/lib.rs wrapper crates/web/src/lib.rs wrapper",
+    ];
+    assert_eq!(found, expected);
 }
 
 /// The Python conformance fixture's export, and its providers (contract, site) whose site is
@@ -2658,6 +4544,10 @@ fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
             ("channel::sqs::jobs", &sqs("send_job::sqs.send_message#0")),
             ("channel::sqs::mail", &sqs("send_job::sqs.send_message#1")),
             (
+                "channel::sqs::jobs-dlq",
+                &sqs("send_joined::sqs.send_message#0")
+            ),
+            (
                 "channel::sqs::audit",
                 &sqs("send_batch::sqs.send_message_batch#0")
             ),
@@ -2899,6 +4789,407 @@ fn python_redis_streams_are_channel_producers_and_consumers() {
         stream("read_orders", "append_all::client.xadd#0", "orders"),
         stream("read_many", "append_all::client.xadd#0", "orders"),
         stream("read_many", "append_all::pool.xadd#0", "shipments.eu"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::redis::"), expected);
+}
+
+/// The channel sides of `file` in the Rust fixture's worker crate: the export, its producers as
+/// `(contract, site)` and its consumers as `(contract, via, site)`, sorted, with
+/// repository-relative sites. An unresolved side has the contract `channel::<broker>`.
+fn rust_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
+    let dir = format!("crates/worker/src/{file}::");
+    let (json, producers) = providers(case, "conformance-rust", &dir);
+    let consumers = consumers(&json, &dir);
+    (json, producers, consumers)
+}
+
+/// The rdkafka forms of the Rust pack (spec #30): `send` of a `FutureRecord` or `BaseRecord`
+/// on a producer, and `subscribe` on a consumer, both made by `ClientConfig`, whichever way the
+/// client and the record reach the call. A channel's `send` and a transport of the repository
+/// produce nothing; a topic from the environment is unresolved, and so is a regular expression.
+#[test]
+fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
+    let kafka = |rest: &str| format!("crates/worker/src/kafka.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_kafka", "kafka.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &kafka("produce_all::FutureRecord.to#0")
+            ),
+            (
+                "channel::kafka::payments",
+                &kafka("produce_all::FutureRecord.to#1")
+            ),
+            (
+                "channel::kafka::refunds.eu",
+                &kafka("produce_all::FutureRecord.to#2")
+            ),
+            (
+                "channel::kafka::invoices",
+                &kafka("produce_all::FutureRecord.to#3")
+            ),
+            (
+                "channel::kafka::audits",
+                &kafka("base_produce::BaseRecord.to#0")
+            ),
+            ("channel::kafka::retries", &kafka("emit_refund::emit#0")),
+            (
+                "channel::kafka",
+                &kafka("produce_unknown::FutureRecord.to#0")
+            ),
+        ])
+    );
+    // A polling client: the function that subscribes handles.
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::orders", "", &kafka("consume_orders")),
+            ("channel::kafka::payments", "", &kafka("consume_orders")),
+            ("channel::kafka::refunds.eu", "", &kafka("consume_refunds")),
+            ("channel::kafka::retries", "", &kafka("consume_refunds")),
+            ("channel::kafka::invoices", "", &kafka("consume_refunds")),
+            ("channel::kafka::audits", "", &kafka("consume_refunds")),
+            ("channel::kafka", "", &kafka("consume_pattern")),
+        ])
+    );
+
+    let topic = |handler: &str, producer: &str, name: &str| {
+        link(
+            kafka(handler),
+            kafka(producer),
+            &format!("channel::kafka::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        topic("consume_orders", "produce_all::FutureRecord.to#0", "orders"),
+        topic(
+            "consume_orders",
+            "produce_all::FutureRecord.to#1",
+            "payments",
+        ),
+        topic(
+            "consume_refunds",
+            "produce_all::FutureRecord.to#2",
+            "refunds.eu",
+        ),
+        topic(
+            "consume_refunds",
+            "produce_all::FutureRecord.to#3",
+            "invoices",
+        ),
+        topic("consume_refunds", "base_produce::BaseRecord.to#0", "audits"),
+        topic("consume_refunds", "emit_refund::emit#0", "retries"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::kafka::"), expected);
+
+    // A parameter of the repository's own type, and a producer no caller passes, are no clients.
+    let (_, producers, consumers) = rust_channels("rust_kafka_shadowed", "mq_shadowed.rs");
+    assert_eq!((producers, consumers), (vec![], vec![]));
+}
+
+/// A builder chain is read to 64 calls (`CHAIN` in `lang/rust/messages.rs`): a record or an SQS
+/// request with more setters than that is no producer, and one with fewer is.
+#[test]
+fn rust_builder_chains_past_the_bound_are_not_read() {
+    let repo = fixture_repo("rust_chain_bound", "conformance-rust", Some(ORIGIN));
+    let setters = |call: &str, n: usize| call.repeat(n);
+    let src = format!(
+        r#"use aws_sdk_sqs::Client;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{{FutureProducer, FutureRecord}};
+use std::time::Duration;
+
+pub async fn bounded() {{
+    let client = Client::new(&aws_config::load_from_env().await);
+    let producer: FutureProducer = ClientConfig::new().create().expect("producer");
+    let wait = Duration::from_secs(0);
+    let _ = producer.send(FutureRecord::to("short.record"){}, wait).await;
+    let _ = producer.send(FutureRecord::to("long.record"){}, wait).await;
+    let _ = client.send_message(){}.queue_url("https://sqs.eu-west-1.amazonaws.com/1/short").send().await;
+    let _ = client.send_message(){}.queue_url("https://sqs.eu-west-1.amazonaws.com/1/long").send().await;
+}}
+"#,
+        setters(".payload(\"p\")", 10),
+        setters(".payload(\"p\")", 100),
+        setters(".message_body(\"b\")", 10),
+        setters(".message_body(\"b\")", 100),
+    );
+    let worker = repo.join("crates/worker/src");
+    std::fs::write(worker.join("bounded.rs"), src).unwrap();
+    let lib = std::fs::read_to_string(worker.join("lib.rs")).unwrap();
+    std::fs::write(worker.join("lib.rs"), format!("{lib}\nmod bounded;\n")).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let mut names: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+        .filter(|p| {
+            p["site"]
+                .as_str()
+                .unwrap()
+                .contains("worker/src/bounded.rs")
+        })
+        .map(|p| p["contract"].as_str().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["channel::kafka::short.record", "channel::sqs::short"]
+    );
+}
+
+/// The lapin forms of the Rust pack (spec #30): `basic_publish`, `basic_consume` and
+/// `queue_bind` on a channel that traces back to `Connection::connect`, as sides and links. A
+/// publish to the default exchange is the queue its key names; one to `events` reaches the
+/// queues bound to it, `inferred` for a wildcard pattern. A binding that cannot be evaluated is
+/// dropped, and an exchange that cannot makes an unresolved producer.
+#[test]
+fn rust_lapin_channels_are_amqp_producers_consumers_and_bindings() {
+    let rabbit = |rest: &str| format!("crates/worker/src/rabbit.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_lapin", "rabbit.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::amqp::jobs",
+                &rabbit("publish_all::channel.basic_publish#0")
+            ),
+            (
+                "channel::amqp",
+                &rabbit("publish_unknown::channel.basic_publish#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::amqp::jobs", "", &rabbit("work_jobs")),
+            ("channel::amqp::audit", "", &rabbit("audit")),
+            ("channel::amqp", "", &rabbit("audit")),
+        ])
+    );
+
+    let mut expected = vec![
+        link(
+            rabbit("work_jobs"),
+            rabbit("publish_all::channel.basic_publish#0"),
+            "channel::amqp::jobs",
+            "exact",
+        ),
+        link(
+            rabbit("audit"),
+            rabbit("publish_all::channel.basic_publish#1"),
+            "channel::amqp::audit binding events order.#",
+            "inferred",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::amqp::"), expected);
+}
+
+/// The aws-sdk-sqs forms of the Rust pack (spec #30): the `queue_url` of a `send_message`,
+/// `send_message_batch` or `receive_message` builder on a client from `Client::new`, the queue
+/// being the last segment of the URL. Another call on the queue and a builder of the repository
+/// produce nothing; a URL read from the environment is an unresolved producer.
+#[test]
+fn rust_aws_sdk_sqs_clients_are_channel_producers_and_consumers() {
+    let sqs = |rest: &str| format!("crates/worker/src/queues.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_sqs", "queues.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::sqs::jobs",
+                &sqs("send_all::(call_expression).queue_url#0")
+            ),
+            (
+                "channel::sqs::billing",
+                &sqs("send_all::(call_expression).queue_url#1")
+            ),
+            (
+                "channel::sqs::mail",
+                &sqs("send_all::(call_expression).queue_url#2")
+            ),
+            ("channel::sqs::audit", &sqs("enqueue_audit::enqueue#0")),
+            (
+                "channel::sqs::prefixed",
+                &sqs("send_prefixed::(call_expression).queue_url#0")
+            ),
+            (
+                "channel::sqs",
+                &sqs("send_unknown::(call_expression).queue_url#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::sqs::jobs", "", &sqs("receive_jobs")),
+            ("channel::sqs::billing", "", &sqs("receive_many")),
+        ])
+    );
+
+    let mut expected = vec![
+        link(
+            sqs("receive_jobs"),
+            sqs("send_all::(call_expression).queue_url#0"),
+            "channel::sqs::jobs",
+            "exact",
+        ),
+        link(
+            sqs("receive_many"),
+            sqs("send_all::(call_expression).queue_url#1"),
+            "channel::sqs::billing",
+            "exact",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::sqs::"), expected);
+}
+
+/// The async-nats forms of the Rust pack (spec #30): `publish`, `subscribe` and
+/// `queue_subscribe` on a client from `async_nats::connect` or `ConnectOptions`, whichever way
+/// the crate is named. A wildcard subject links at `inferred`; a bus of the repository produces
+/// nothing and a subject from the environment is an unresolved producer.
+#[test]
+fn rust_async_nats_clients_are_channel_producers_and_consumers() {
+    let nats = |rest: &str| format!("crates/worker/src/subjects.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_nats", "subjects.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::nats::orders.created",
+                &nats("publish_all::client.publish#0")
+            ),
+            (
+                "channel::nats::orders.shipped",
+                &nats("publish_all::client.publish#1")
+            ),
+            (
+                "channel::nats::audit.login",
+                &nats("publish_all::client.publish#2")
+            ),
+            (
+                "channel::nats::mail.sent",
+                &nats("publish_with_options::client.publish#0")
+            ),
+            (
+                "channel::nats",
+                &nats("publish_with_options::client.publish#1")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::nats::orders.created", "", &nats("listen_orders")),
+            ("channel::nats::orders.*", "", &nats("listen_orders")),
+            ("channel::nats::audit.>", "", &nats("listen_queue")),
+            ("channel::nats::mail.sent", "", &nats("listen_queue")),
+        ])
+    );
+
+    let exact = |handler: &str, producer: &str, subject: &str| {
+        link(
+            nats(handler),
+            nats(producer),
+            &format!("channel::nats::{subject}"),
+            "exact",
+        )
+    };
+    let wild = |handler: &str, producer: &str, subject: &str, pattern: &str| {
+        link(
+            nats(handler),
+            nats(producer),
+            &format!("channel::nats::{subject} wildcard {pattern}"),
+            "inferred",
+        )
+    };
+    let mut expected = vec![
+        exact(
+            "listen_orders",
+            "publish_all::client.publish#0",
+            "orders.created",
+        ),
+        wild(
+            "listen_orders",
+            "publish_all::client.publish#0",
+            "orders.created",
+            "orders.*",
+        ),
+        wild(
+            "listen_orders",
+            "publish_all::client.publish#1",
+            "orders.shipped",
+            "orders.*",
+        ),
+        wild(
+            "listen_queue",
+            "publish_all::client.publish#2",
+            "audit.login",
+            "audit.>",
+        ),
+        exact(
+            "listen_queue",
+            "publish_with_options::client.publish#0",
+            "mail.sent",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::nats::"), expected);
+}
+
+/// The redis forms of the Rust pack (spec #30): `xadd` and the keys of `xread_options` whose
+/// options carry a group, on a connection that traces back to `Client::open`. A read without a
+/// group, and an `xadd` of the repository's own type, produce nothing; a key from the
+/// environment is an unresolved side.
+#[test]
+fn rust_redis_streams_are_channel_producers_and_consumers() {
+    let redis = |rest: &str| format!("crates/worker/src/streams.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_redis", "streams.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            ("channel::redis::orders", &redis("append_all::con.xadd#0")),
+            (
+                "channel::redis::shipments",
+                &redis("append_all::con.xadd#1")
+            ),
+            (
+                "channel::redis::events.audit",
+                &redis("append_all::con.xadd#2")
+            ),
+            ("channel::redis", &redis("append_all::con.xadd#3")),
+            ("channel::redis::kept", &redis("hidden_names::con.xadd#2")),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::redis::orders", "", &redis("read_group")),
+            ("channel::redis::shipments", "", &redis("read_group")),
+            ("channel::redis::events.audit", "", &redis("read_inline")),
+            ("channel::redis", "", &redis("read_unknown")),
+        ])
+    );
+
+    let stream = |handler: &str, producer: &str, name: &str| {
+        link(
+            redis(handler),
+            redis(producer),
+            &format!("channel::redis::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        stream("read_group", "append_all::con.xadd#0", "orders"),
+        stream("read_group", "append_all::con.xadd#1", "shipments"),
+        stream("read_inline", "append_all::con.xadd#2", "events.audit"),
     ];
     expected.sort();
     assert_eq!(channel_links(&json, "channel::redis::"), expected);

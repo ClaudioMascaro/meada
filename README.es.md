@@ -191,15 +191,22 @@ Constantes fijas:
 ## Estado
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) y Python (`.py`) y enlaza repositorios, también de un lenguaje al otro,
-por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` del lado que consume;
-Next.js (app router) y Express y, en Python, FastAPI, Flask y Django del lado que sirve, también
-detrás de un gateway), por los
-recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python`), colas RabbitMQ
-(`amqplib` y, en Python, `pika`, con el `publish` a un exchange llegando a las colas que los
-bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3`), subjects
-NATS (`nats` y, en Python, `nats-py`, con los comodines `*` y `>`), jobs BullMQ y streams Redis
-(`ioredis`, `node-redis` y, en Python, `redis-py`), con el productor enlazado al handler de cada
+`.jsx`, `.mjs`, `.cjs`) y Python (`.py`), lee el código Rust (`.rs`) de los crates del
+repositorio (cada `Cargo.toml` con `[package]`, en cualquier carpeta, cada crate
+por el árbol de módulos que arman sus `mod`, sin toolchain Rust: un archivo al que ningún `mod`
+llega queda fuera) con sus funciones, tipos, traits, módulos y métodos de `impl` y las llamadas
+escritas como ruta (`crate::a::f()`, `Tipo::new()`, `Self::f()`), también por `use` (grupos,
+renombres, globs, `pub use` y los otros crates del workspace por nombre; las de método (`x.m()`) por el tipo del receptor cuando el código lo escribe (`let`, parámetro, campo, `self`, retorno de función; un `dyn Trait` o genérico con trait va al método del trait; un método que los `impl` de un tipo del repositorio no tienen, de un `derive` o de un trait de fuera, no se liga a nada, y un atributo de ruta nunca se liga a una función), si no por el nombre; las de dentro de macros
+no se indexan, y los contratos Rust son los paquetes, el HTTP y los canales (abajo); solo entra la configuración por defecto de cada crate, para un destino fijo x86_64 Linux: un ítem bajo un `#[cfg(..)]` falso, o bajo una feature fuera del `default` del `Cargo.toml`, queda fuera, y los módulos `#[cfg(test)]` entran), y enlaza repositorios, también de un
+lenguaje al otro,
+por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` y, en Rust, `reqwest` y `ureq` del lado que consume;
+Next.js (app router) y Express y, en Python, FastAPI, Flask y Django y, en Rust, axum, actix-web y Rocket del lado que sirve, también
+detrás de un gateway; en Rust, una URL base leída del entorno con `std::env::var`, `env!` o `dotenvy::var` enlaza por `base_url_env`), por los
+recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python` y, en Rust, `rdkafka`), colas RabbitMQ
+(`amqplib` y, en Python, `pika` y, en Rust, `lapin`, con el `publish` a un exchange llegando a las colas que los
+bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3` y, en Rust, `aws-sdk-sqs`), subjects
+NATS (`nats` y, en Python, `nats-py` y, en Rust, `async-nats`, con los comodines `*` y `>`), jobs BullMQ y streams Redis
+(`ioredis`, `node-redis` y, en Python, `redis-py` y, en Rust, el crate `redis`), con el productor enlazado al handler de cada
 consumidor, también en el mismo repositorio. Un repositorio con la tabla `[serve]` también lee
 sus documentos OpenAPI (3.0 y 3.1) y AsyncAPI (2.x y 3.0), encontrados por el nombre o listados
 en `[serve] documents`: las rutas y los canales que describen se vuelven contratos, con los
@@ -221,12 +228,25 @@ un paquete del workspace se enlaza a él, con el rango tal como está escrito y 
 (los rangos de PyPI no se comprueban); un `import` de un módulo de ese paquete cruza hasta el
 código del proveedor, `exact` cuando el módulo lleva el nombre de la distribución, `inferred`
 cuando es solo uno de sus módulos de nivel superior y `ambiguous` cuando varias lo exponen. Un
-paquete npm y uno de PyPI con el mismo nombre nunca se enlazan. No lee lockfile ni consulta el
-registro npm ni PyPI. Meada también señala el *drift* de forma: los campos que un consumidor `fetch` lee de la respuesta ya interpretada y que la ruta que llama no devuelve, comparados con la forma de la ruta (un documento OpenAPI, un schema zod o los objetos literales de su handler). `trace` termina la línea del enlace con `drift: missing <camino>`, `context` de una ruta dice de dónde viene su forma y lista cada consumidor que lee campos de la respuesta, con su drift y nivel y las lecturas no comprobadas bajo una parte abierta cuando las hay, `search` con el tipo `drift` lista todo el drift, y `meada status` cuenta las lecturas ausentes de los consumidores de cada repositorio (las cuenta el repositorio del consumidor; el del proveedor no muestra nada). `meada export` trae las comunidades de cada repositorio: grupos de símbolos que se llaman más entre sí que con el resto, hallados con el algoritmo de Leiden sin nada aleatorio y solo con aritmética entera, y nombrados por la carpeta donde vive la mayoría de sus miembros (`src`, `src#2`), iguales en cada máquina. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
+paquete npm y uno de PyPI con el mismo nombre nunca se enlazan. En Rust, cada `Cargo.toml` con
+`[package] name` (cada miembro de un workspace Cargo es un proveedor) se vuelve el contrato
+`package::cargo::<nombre>`, y cada entrada de `[dependencies]`, `[dev-dependencies]` y
+`[build-dependencies]` se enlaza a él: por `path`, al crate de esa carpeta, en el mismo repositorio
+o, si la ruta sale de él (`../otro`), en otro repositorio del workspace (la ruta se resuelve solo
+por el texto, desde las raíces de los repositorios, sin leer nada fuera de ellos ni seguir enlaces
+simbólicos; una ruta que no cae en ningún repositorio del workspace no aparece); por `git`, al
+repositorio cuya identidad es la URL normalizada; por versión, al proveedor del mismo nombre en el
+workspace; `package =` da el nombre real de una dependencia renombrada, `workspace = true` lee
+`[workspace.dependencies]` y `version.workspace = true` lee `[workspace.package]`. El enlace es
+`exact`, con el rango como está escrito y `range unchecked` (los rangos Cargo no se comprueban), y
+un `use` del crate (por el `[lib] name`, si lo hay, o por la clave de una dependencia renombrada)
+llega a los ítems públicos del proveedor por sus `pub use`, también `exact`, con `; import crate
+name` al final de la razón. Una dependencia fuera del workspace no aparece. No lee lockfile
+(`Cargo.lock` incluido) ni consulta el registro npm, PyPI ni crates.io. Meada también señala el *drift* de forma: los campos que un consumidor `fetch` lee de la respuesta ya interpretada y que la ruta que llama no devuelve, comparados con la forma de la ruta (un documento OpenAPI, un schema zod o los objetos literales de su handler). `trace` termina la línea del enlace con `drift: missing <camino>`, `context` de una ruta dice de dónde viene su forma y lista cada consumidor que lee campos de la respuesta, con su drift y nivel y las lecturas no comprobadas bajo una parte abierta cuando las hay, `search` con el tipo `drift` lista todo el drift, y `meada status` cuenta las lecturas ausentes de los consumidores de cada repositorio (las cuenta el repositorio del consumidor; el del proveedor no muestra nada). `meada export` trae las comunidades de cada repositorio: grupos de símbolos que se llaman más entre sí que con el resto, hallados con el algoritmo de Leiden sin nada aleatorio y solo con aritmética entera, y nombrados por la carpeta donde vive la mayoría de sus miembros (`src`, `src#2`), iguales en cada máquina. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
 se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
 `decided`, y una ruta que Meada no sabe dónde se sirve queda fuera del mapa en vez de ser
 adivinada. Los clústeres de broker no se modelan: dos clústeres que tienen un tópico con el
-mismo nombre se enlazan como si fueran uno solo. Cada ruta que sirve un handler, cada canal que consume un handler consumidor y cada función o método exportado que nada llama en su propio repositorio es un punto de entrada, con su proceso: `trace` con `process::<identidad del punto de entrada>` lee el árbol de llamadas que dispara, a través de los repositorios, y `meada export` trae el proceso de cada punto de entrada. En Python, el bloque `if __name__ == "__main__":` de un archivo (el símbolo `__main__`) y cada función que nombra un `[project.scripts]` del `pyproject.toml` (`módulo:función`) también son puntos de entrada, y solo los nombres públicos (sin `_` al inicio, o los del `__all__` literal) cuentan como exportados. `search` con el tipo `community` halla una comunidad por su nombre y con el tipo `process` halla un proceso por la etiqueta de su punto de entrada, y `context` de un símbolo dice su comunidad (o `community: none`) y los procesos a los que pertenece, hallados subiendo por las mismas llamadas y enlaces que recorre el proceso. Aún no hay: otros lenguajes, otros clientes HTTP
+mismo nombre se enlazan como si fueran uno solo. Cada ruta que sirve un handler, cada canal que consume un handler consumidor y cada función o método exportado que nada llama en su propio repositorio es un punto de entrada, con su proceso: `trace` con `process::<identidad del punto de entrada>` lee el árbol de llamadas que dispara, a través de los repositorios, y `meada export` trae el proceso de cada punto de entrada. En Python, el bloque `if __name__ == "__main__":` de un archivo (el símbolo `__main__`) y cada función que nombra un `[project.scripts]` del `pyproject.toml` (`módulo:función`) también son puntos de entrada, y solo los nombres públicos (sin `_` al inicio, o los del `__all__` literal) cuentan como exportados. En Rust, el `fn main` de cada binario (`src/main.rs`, `src/bin/`, `[[bin]] path`) también lo es. `search` con el tipo `community` halla una comunidad por su nombre y con el tipo `process` halla un proceso por la etiqueta de su punto de entrada, y `context` de un símbolo dice su comunidad (o `community: none`) y los procesos a los que pertenece, hallados subiendo por las mismas llamadas y enlaces que recorre el proceso. Aún no hay: otros lenguajes, otros clientes HTTP
 además de esos, otros clientes de mensajería además de estos, ni el paquete npm de Meada. El alcance y el orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
