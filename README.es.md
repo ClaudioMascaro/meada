@@ -231,11 +231,15 @@ cuando es solo uno de sus módulos de nivel superior y `ambiguous` cuando varias
 paquete npm y uno de PyPI con el mismo nombre nunca se enlazan. En Rust, cada `Cargo.toml` con
 `[package] name` (cada miembro de un workspace Cargo es un proveedor) se vuelve el contrato
 `package::cargo::<nombre>`, y cada entrada de `[dependencies]`, `[dev-dependencies]` y
-`[build-dependencies]` se enlaza a él: por `path`, al crate de esa carpeta del mismo repositorio
-(nunca a otro); por `git`, al repositorio cuya identidad es la URL normalizada; por versión, al
-proveedor del mismo nombre en el workspace; `package =` da el nombre real de una dependencia
-renombrada y `workspace = true` lee `[workspace.dependencies]`. El enlace es `exact`, con el rango
-como está escrito y `range unchecked` (los rangos Cargo no se comprueban), y un `use` del crate
+`[build-dependencies]` se enlaza a él: por `path`, al crate de esa carpeta, en el mismo repositorio
+o, si la ruta sale de él (`../otro`), en otro repositorio del workspace (la ruta se resuelve solo
+por el texto, desde las raíces de los repositorios, sin leer nada fuera de ellos ni seguir enlaces
+simbólicos; una ruta que no cae en ningún repositorio del workspace no aparece); por `git`, al
+repositorio cuya identidad es la URL normalizada; por versión, al proveedor del mismo nombre en el
+workspace; `package =` da el nombre real de una dependencia renombrada, `workspace = true` lee
+`[workspace.dependencies]` y `version.workspace = true` lee `[workspace.package]`. El enlace es
+`exact`, con el rango como está escrito y `range unchecked` (los rangos Cargo no se comprueban), y
+un `use` del crate (por el `[lib] name`, si lo hay, o por la clave de una dependencia renombrada)
 llega a los ítems públicos del proveedor por sus `pub use`, también `exact`, con `; import crate
 name` al final de la razón. Una dependencia fuera del workspace no aparece. No lee lockfile
 (`Cargo.lock` incluido) ni consulta el registro npm, PyPI ni crates.io. Meada también señala el *drift* de forma: los campos que un consumidor `fetch` lee de la respuesta ya interpretada y que la ruta que llama no devuelve, comparados con la forma de la ruta (un documento OpenAPI, un schema zod o los objetos literales de su handler). `trace` termina la línea del enlace con `drift: missing <camino>`, `context` de una ruta dice de dónde viene su forma y lista cada consumidor que lee campos de la respuesta, con su drift y nivel y las lecturas no comprobadas bajo una parte abierta cuando las hay, `search` con el tipo `drift` lista todo el drift, y `meada status` cuenta las lecturas ausentes de los consumidores de cada repositorio (las cuenta el repositorio del consumidor; el del proveedor no muestra nada). `meada export` trae las comunidades de cada repositorio: grupos de símbolos que se llaman más entre sí que con el resto, hallados con el algoritmo de Leiden sin nada aleatorio y solo con aritmética entera, y nombrados por la carpeta donde vive la mayoría de sus miembros (`src`, `src#2`), iguales en cada máquina. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no

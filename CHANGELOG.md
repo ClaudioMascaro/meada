@@ -12,13 +12,17 @@ All notable changes to Meada are recorded here. The format follows
   `package::cargo::<name>` (every workspace member is its own provider), and each entry of
   `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` (also under `[target.*]`,
   `workspace = true` read from `[workspace.dependencies]`, `package =` naming a renamed crate)
-  links to the provider: by `path` to the crate at that path of its own repository, by `git` to
-  the repository whose identity is the normalized URL, by version to the workspace provider of
-  the name. The link is `exact`, the reason `package::cargo::<name> <range> (local <version>),
-  range unchecked`. A `use` of the crate (hyphens as underscores, or the renamed key) reaches the
-  provider's public items through its `pub use` re-exports, `exact`, the reason ending `; import
-  crate name`. A dependency outside the workspace adds nothing; `Cargo.lock` and crates.io are
-  never read. The index is rebuilt once (schema version 25).
+  links to the provider: by `path` to the crate at that path, in its own repository or, when the
+  path leaves it (`../other`), in another repository of the workspace (resolved from the text
+  and the repositories' roots, reading nothing outside them), by `git` to the repository whose
+  identity is the normalized URL, by version to the workspace provider of the name. The link is
+  `exact`, the reason `package::cargo::<name> <range> (local <version>), range unchecked`;
+  `version.workspace = true` reads `[workspace.package]`. A `use` of the crate (hyphens as
+  underscores; the `[lib] name`, or the renamed key) reaches the provider's public items through
+  its `pub use` re-exports, `exact`, the reason ending `; import crate name`. A dependency
+  outside the workspace adds nothing, and so does one whose `path`, `git` or `package` is empty
+  or mistyped; `Cargo.lock` and crates.io are never read. The index is rebuilt once (schema
+  version 26).
 - A Rust language pack (`.rs`, spec #30, first ticket): the repository's crates (each
   `Cargo.toml` with a `[package]`, at any depth, a workspace's members included), each built
   from its roots (`src/lib.rs` or `[lib] path`, `src/main.rs`, `src/bin/`, `[[bin]] path`)

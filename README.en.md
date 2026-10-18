@@ -225,13 +225,17 @@ top-level modules and `ambiguous` when several expose it. An npm and a PyPI pack
 name never link. In Rust, each `Cargo.toml` with a `[package] name` (every member of a Cargo
 workspace is a provider) becomes the contract `package::cargo::<name>`, and each entry of
 `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` links to it: by `path`, to the
-crate in that directory of the same repository (never to another one); by `git`, to the
-repository whose identity is the normalized URL; by version, to the provider of the same name in
-the workspace; `package =` gives the real name of a renamed dependency and `workspace = true`
-reads `[workspace.dependencies]`. The link is `exact`, with the range as written and `range
-unchecked` (Cargo ranges are not checked), and a `use` of the crate reaches the provider's public
-items through its `pub use` re-exports, also `exact`, with `; import crate name` ending the
-reason. A dependency outside the workspace appears nowhere. It reads no lockfile (`Cargo.lock`
+crate in that directory, in the same repository or, when the path leaves it (`../other`), in
+another repository of the workspace (the path is resolved from the text alone, against the
+repositories' roots, reading nothing outside them and following no symlink; a path that lands in
+no workspace repository appears nowhere); by `git`, to the repository whose identity is the
+normalized URL; by version, to the provider of the same name in the workspace; `package =` gives
+the real name of a renamed dependency, `workspace = true` reads `[workspace.dependencies]` and
+`version.workspace = true` reads `[workspace.package]`. The link is `exact`, with the range as
+written and `range unchecked` (Cargo ranges are not checked), and a `use` of the crate (by its
+`[lib] name`, if any, or by the key of a renamed dependency) reaches the provider's public items
+through its `pub use` re-exports, also `exact`, with `; import crate name` ending the reason. A
+dependency outside the workspace appears nowhere. It reads no lockfile (`Cargo.lock`
 included) and queries neither the npm registry, PyPI nor crates.io. Meada also reports shape drift: the fields a `fetch` consumer reads from the parsed response that the route it calls does not return, compared with the route's shape (an OpenAPI document, a zod schema or the object literals of its handler). `trace` ends the link line with `drift: missing <path>`, `context` on a route names where its shape comes from and lists each consumer that reads fields of the response, with its drift and level and the reads not checked under an open part when there are any, `search` with the kind `drift` lists all the drift, and `meada status` counts the missing reads of each repository's consumers (the consumer's repository counts them; the provider's shows nothing). `meada export` carries each repository's communities: groups of symbols that call each other more than they call the rest, found with the Leiden algorithm with nothing random and integer arithmetic only, and named after the directory most of their members live in (`src`, `src#2`), the same on every machine. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
 `decided`, and a route Meada cannot place stays out of the map rather than being guessed. Broker

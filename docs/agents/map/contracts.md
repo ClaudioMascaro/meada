@@ -295,25 +295,35 @@ modules updates it.
   PyPI package.
   Cargo (spec #30): `Ecosystem::Cargo` names `Cargo.toml`. `package/cargo.rs` reads one through
   the Rust pack's walker (`lang::rust::crates::entries`, also what the module trees use): `name`
-  and `version` of `[package]`, `main` the library root (`[lib] path`, else `src/lib.rs`, relative
-  to the manifest), and the entries of `[dependencies]`, `[dev-dependencies]` and
+  and `version` of `[package]`, `main` the library root as a path of the repository (`crates::lib_root`:
+  `[lib] path`, else `src/lib.rs`, folded from the manifest's directory), `lib_name` the `[lib]
+  name` when a `use` writes something other than the package name (`crates::lib_name`, also what
+  the module trees use), and the entries of `[dependencies]`, `[dev-dependencies]` and
   `[build-dependencies]`, also under `[target.*]`, as `Entry` with `name` the real crate
   (`package =`), `alias` the key when renamed, `range` the version requirement and `via` where it
-  comes from: `path <manifest>` (`path` joined to the manifest's directory; one that leaves the
-  repository drops the entry), `git <identity>` (`repo::normalize_remote`) or none. A
-  `workspace = true` entry is kept as `inherits` and `[workspace.dependencies]` as
-  `Summary::workspace`; `cargo::inherit`, run by `index::read_manifests` over the whole list,
-  fills each from the nearest manifest above it, so a refresh equals a cold export. The consumer
-  site names the key (`<repository>::<path>::<field>::<key>`) and `Consumer::via` carries
-  `Entry::via`, which `Ecosystem::reaches` checks against the provider: `path` only the manifest
-  at that path of the same repository, `git` only the repository of that identity, a version
-  every repository. The range is never evaluated (`range unchecked`). A `use` (`Packages::extract`
-  stores the call when `Code::imported` names a crate head, `cargo::names_crate`: not `std`,
-  `core` or `alloc`) resolves in `resolutions` through the file's nearest named `Cargo.toml`:
-  the head, hyphens as underscores, must equal a dependency's key, and `Provided::resolve` then
-  follows the chain from the provider's library root through the `exported` rows of the Rust
-  pack (`pub mod`, `pub use`), `exact` with `How::CrateName` (`; import crate name`) and no
-  `ambiguous` fallback. A crate of the repository itself is reached through the module tree
-  instead, so a path or version dependency inside the repository links at the manifest only.
-  Limits: a `[lib] name` that differs from the package name is not matched by a `use`, and
-  `version.workspace = true` leaves the provider's version `none`.
+  comes from: `path <manifest>` (`path` folded lexically from the manifest's directory: a path of
+  the repository, or one that starts with `../` when it leaves it), `git <identity>`
+  (`repo::normalize_remote`) or none. An entry whose declared source cannot be read (an empty or
+  mistyped `path`, `git` or `package`, an absolute `path`, both `path` and `git`) is dropped, not
+  read as a version dependency. A `workspace = true` entry is kept as `inherits`,
+  `[workspace.dependencies]` as `Summary::workspace`, `version.workspace = true` as
+  `inherits_version` and `[workspace.package] version` as `workspace_version`; `cargo::inherit`,
+  run by `index::read_manifests` over the whole list, fills each from the nearest manifest above
+  it, so a refresh equals a cold export. The consumer site names the key
+  (`<repository>::<path>::<field>::<key>`) and `Consumer::via` carries `Entry::via`, which
+  `Ecosystem::reaches` checks against the provider: a `path` of the repository only the manifest
+  at that path of the same repository, a `path` that starts with `../` only the manifest whose
+  location, `Export::root` (set by `Engine::exports`, or `Repository::root` in `link`) joined with
+  its path, folds to the same absolute location (lexical, nothing is read outside a repository,
+  no symlink is followed; a path landing in no workspace repository links to nothing), `git` only
+  the repository of that identity, a version every repository. The range is never evaluated
+  (`range unchecked`). A `use` (`Packages::extract` stores the call when `Code::imported` names a
+  crate head, `cargo::names_crate`: not `std`, `core` or `alloc`) resolves in `resolutions`
+  through the file's nearest named `Cargo.toml`: the head, hyphens as underscores, must equal the
+  key of a renamed dependency or, for one that is not renamed, the provider's library name
+  (`cargo::lib_head`: `[lib] name`, else the package name), and `Provided::resolve` then follows
+  the chain from the provider's library root through the `exported` rows of the Rust pack (`pub
+  mod`, `pub use`; an item behind a private module is not reached), `exact` with `How::CrateName`
+  (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
+  reached through the module tree instead, so a path or version dependency inside the repository
+  links at the manifest only.

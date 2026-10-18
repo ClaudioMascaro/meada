@@ -192,8 +192,15 @@ one for the area a change touches.
   range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
   its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file), and resolving the import into the provider is the
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
-  `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to a
-  dependency key, then `Provided::resolve` from the crate's library root, `How::CrateName`). A change to what is stored bumps `SCHEMA_VERSION`.
+  `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
+  the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
+  `Provided::resolve` from the crate's library root, `How::CrateName`). A step outside
+  `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in
+  `index::read_manifests` over the whole manifest list after the reads, fills the `workspace =
+  true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
+  so a refresh equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set by
+  `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
+  paths, never opening one, so a symlink changes nothing. A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
@@ -395,7 +402,13 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
   `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
-  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
+  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), of
+  each `Cargo.toml` (spec #30: name, version or the flag that it inherits one, the library root
+  as a path of the repository and the `[lib] name` when it differs from the package's, the
+  entries with the version requirement as written, the `alias` when the key renames the crate
+  and the `via`: a `path` folded from the manifest's directory, which keeps its leading `../`
+  when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
+  `[workspace.dependencies]` entries; the `[workspace.package]` version), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
@@ -574,7 +587,23 @@ one for the area a change touches.
   the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
   `pyproject.toml` declares, or `src`); a namespace package (a directory without
   `__init__.py`) exposes nothing, and an import several distributions expose is `ambiguous` for
-  each, its reason naming none of the others (no marker). Import resolution: `exported` follows at most
+  each, its reason naming none of the others (no marker). Cargo (`package/cargo.rs`, spec #30):
+  `MAX_NAME` and `MAX_BYTES` hold for `Cargo.toml` too (a file past it, not UTF-8 or not TOML
+  reads as empty); a name outside Cargo's alphabet makes no provider and no entry; an entry that
+  is neither a version nor a table, or whose `path`, `git` or `package` is empty or not a string,
+  or that gives both `path` and `git`, or whose `path` is absolute, is dropped, never read as a
+  version dependency; of two entries of one table and key (a plain one and a `[target.*]` one) the
+  first stays (a set keyed by table and key, no quadratic scan). A range is never evaluated,
+  `registry`, `optional` and features are not read, and neither `Cargo.lock` nor a registry is
+  opened (no marker). A `path` is folded lexically from the manifest's directory: one that
+  leaves its repository (`../`) links only to the workspace repository whose root, joined with
+  the manifest of a provider, folds to the same location, and one that lands in no workspace
+  repository adds nothing; nothing outside a repository is read and no symlink is followed, so
+  a symlinked checkout is matched by the paths as they are written (no marker). `[lib] name` is
+  followed (a `use` writes it, unless the key renames the crate); `version.workspace = true`
+  reads the nearest `[workspace.package] version`, and no other inherited field is read. A `use`
+  follows `pub mod` and `pub use` rows alone, so an item behind a private module is not
+  reached (no marker). Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads

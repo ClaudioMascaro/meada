@@ -725,7 +725,8 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
+/// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`,
+/// `Cargo.toml`) and its
 /// `tsconfig.json` files (path and absolute path), but those under a `node_modules` directory,
 /// which the walk finds when `.gitignore` does not list it.
 fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
