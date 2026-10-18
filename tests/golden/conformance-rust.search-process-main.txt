@@ -1,0 +1,4 @@
+example.com/acme/conformance main process::example.com/acme/conformance::api/src/bin/sync/main.rs::main (program)
+example.com/acme/conformance main process::example.com/acme/conformance::api/src/bin/tool.rs::main (program)
+example.com/acme/conformance main process::example.com/acme/conformance::api/src/main.rs::main (program)
+example.com/acme/conformance main process::example.com/acme/conformance::api/tools/admin.rs::main (program)

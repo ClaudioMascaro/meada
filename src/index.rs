@@ -594,11 +594,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     // The programs the packs declare per file, and the console scripts of the manifests.
     let scripts = package::python_programs(&manifests, &files);
+    let roots: Vec<(String, String)> = (groups.iter())
+        .flat_map(|(&pack, files)| lang::pack(pack).programs(&found_configs(pack), files))
+        .collect();
     let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
             (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))
         })
         .chain(scripts)
+        .chain(roots)
         .map(|(file, def)| entry::Program { file, def })
         .collect();
     let local = entry::Local {

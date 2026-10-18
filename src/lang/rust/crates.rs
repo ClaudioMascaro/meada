@@ -26,6 +26,8 @@ struct Node {
 
 pub struct Tree {
     nodes: BTreeMap<String, Node>,
+    /// The roots of binary targets: every root but a library's.
+    bins: BTreeSet<String>,
     /// The file each `mod` declaration names, by declaring file and specifier.
     children: HashMap<(String, String), String>,
 }
@@ -36,10 +38,14 @@ impl Tree {
     pub fn new(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Tree {
         let mut tree = Tree {
             nodes: BTreeMap::new(),
+            bins: BTreeSet::new(),
             children: HashMap::new(),
         };
         let mut queue = VecDeque::new();
-        for root in roots(configs, files) {
+        for (root, bin) in roots(configs, files) {
+            if bin {
+                tree.bins.insert(root.clone());
+            }
             let node = Node {
                 root: root.clone(),
                 parent: None,
@@ -76,6 +82,11 @@ impl Tree {
     /// Every file a crate builds.
     pub fn members(&self) -> BTreeSet<String> {
         self.nodes.keys().cloned().collect()
+    }
+
+    /// The roots of the binary targets: the files whose `fn main` starts a program.
+    pub fn bins(&self) -> impl Iterator<Item = &str> {
+        self.bins.iter().map(String::as_str)
     }
 
     /// The file `specifier` names from `from`: `crate` its crate root, `self` itself, `super`
@@ -160,9 +171,10 @@ fn join(dir: &str, rel: &str) -> Option<String> {
 
 /// The crate roots, in order: per `Cargo.toml` with a `[package]` table, at any depth, by
 /// path, its library (`[lib] path`, else `src/lib.rs`), `src/main.rs`, each `[[bin]] path`,
-/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found. A workspace's
+/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found. Each comes with
+/// whether it is a binary target (every root but the library). A workspace's
 /// members are such manifests too, so `[workspace] members` adds none.
-fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<String> {
+fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(String, bool)> {
     let mut manifests: Vec<(&str, toml::Table)> = configs
         .iter()
         .filter_map(|(path, src)| {
@@ -191,13 +203,13 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Strin
                 Some((_, file)) => file == "main.rs",
             }
         });
-        let candidates = (lib.into_iter())
-            .chain(at("src/main.rs"))
+        let bins = (at("src/main.rs").into_iter())
             .chain(declared)
             .chain(found.map(|f| f.to_string()));
-        for file in candidates {
+        let candidates = (lib.into_iter().map(|f| (f, false))).chain(bins.map(|f| (f, true)));
+        for (file, bin) in candidates {
             if files.contains_key(file.as_str()) && seen.insert(file.clone()) {
-                out.push(file);
+                out.push((file, bin));
             }
         }
     }
@@ -217,6 +229,18 @@ mod tests {
         assert_eq!(join("api/src", "./x.rs").as_deref(), Some("api/src/x.rs"));
         assert_eq!(join("api", "../../x.rs"), None);
         assert_eq!(join("api", "/etc/x.rs"), None);
+    }
+
+    #[test]
+    fn a_bin_path_outside_the_repository_or_missing_is_no_root() {
+        let facts = Facts::default();
+        let files = BTreeMap::from([("api/src/lib.rs", &facts)]);
+        let configs: [(&str, &[u8]); 1] = [(
+            "api/Cargo.toml",
+            b"[package]\nname = \"a\"\n[[bin]]\npath = \"../../x.rs\"\n[[bin]]\npath = \"gone.rs\"\n",
+        )];
+        let tree = Tree::new(&configs, &files);
+        assert_eq!(tree.bins().count(), 0);
     }
 
     #[test]
@@ -243,11 +267,11 @@ mod tests {
         assert_eq!(
             roots(&configs, &files),
             [
-                "backend/src/lib.rs",
-                "backend/src/main.rs",
-                "backend/src/bin/sync/main.rs",
-                "backend/src/bin/tool.rs",
-                "src-tauri/src/main.rs",
+                ("backend/src/lib.rs".to_string(), false),
+                ("backend/src/main.rs".to_string(), true),
+                ("backend/src/bin/sync/main.rs".to_string(), true),
+                ("backend/src/bin/tool.rs".to_string(), true),
+                ("src-tauri/src/main.rs".to_string(), true),
             ]
         );
     }

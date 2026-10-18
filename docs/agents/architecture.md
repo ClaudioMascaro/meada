@@ -323,7 +323,10 @@ one for the area a change touches.
   which names a function of another file) needs a repository-level step feeding
   `entry::Local::programs` with `entry::Program`s: for Python, `package::python_programs` maps the
   `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
-  edit re-extract) to files through `python_roots`. The forms per language are spec #31 "Program entry points per language
+  edit re-extract) to files through `python_roots`. A form only the whole repository tells
+  (Rust `fn main`, a program only in a binary target's root, which one file's `parse` cannot
+  see) is `LanguagePack::programs(configs, files)`, which `refresh` calls per pack beside
+  `python_programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift

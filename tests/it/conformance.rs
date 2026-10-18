@@ -1421,7 +1421,13 @@ fn rust() {
             // A package the workspace's `exclude` lists is still a crate of the repository.
             "crates/scratch/src/lib.rs::ignored",
         ],
-        &[],
+        // `fn main` of each binary target: `src/main.rs`, `src/bin/`, a `[[bin]] path`.
+        &[
+            "api/src/bin/sync/main.rs::main",
+            "api/src/bin/tool.rs::main",
+            "api/src/main.rs::main",
+            "api/tools/admin.rs::main",
+        ],
         &[
             // An inline module, by its path and through `self::`.
             (
