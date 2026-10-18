@@ -51,6 +51,9 @@ change touches, then read the files it names.
 - Install the binary once per machine with `cargo install --path . --locked`, and again after a
   change to a language pack or a contract kind: the server runs the installed binary, while the
   index follows the working tree on every query.
+- In a worktree under `.claude/worktrees/`, the Claude desktop app starts the server in the main
+  checkout and subagents share their parent's server, so answers (`trace` with `changes`
+  included) describe the main checkout: read your worktree's own edits from the files (#192).
 - Read its answers as Meada's own levels say: `exact` is certain, `inferred` and `ambiguous` are
   name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
   `format!`, `vec!`) are not indexed.
