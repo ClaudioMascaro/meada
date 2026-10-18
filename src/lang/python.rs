@@ -135,9 +135,10 @@ impl LanguagePack for Python {
                     if let Some(name) = node.child_by_field_name("name") {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
+                        let in_place = in_place(node, &scope, src);
                         match scope.is_empty() {
-                            true => module.def(name),
-                            false => locals.def(&scope, name),
+                            true => module.def(name, in_place),
+                            false => locals.def(&scope, name, in_place),
                         }
                         if defined.insert(inner.clone()) {
                             if !is_class {
@@ -420,11 +421,19 @@ struct Module {
 }
 
 impl Module {
-    /// A top-level `def` or `class`.
-    fn def(&mut self, name: &str) {
+    /// A top-level `def` or `class`; one not `in_place` (under `if`, `try`, a loop) may not run,
+    /// so a name bound before it, a star import included, stays hidden.
+    fn def(&mut self, name: &str, in_place: bool) {
+        let bound = self.bindings.iter().any(|b| match b {
+            Export::Local { exported, .. } => exported == name,
+            _ => true,
+        });
         self.name(name);
         self.defs.insert(name.to_string());
-        self.hidden.remove(name);
+        match in_place || !bound {
+            true => self.hidden.remove(name),
+            false => self.hidden.insert(name.to_string()),
+        };
     }
 
     /// `del name` at the top level: the name is bound to nothing.
@@ -573,6 +582,30 @@ fn is_main_guard(node: Node, src: &[u8]) -> bool {
         )
 }
 
+/// Whether the definition `node` is a statement of its scope's own body (the module, a function,
+/// a class, the main guard `scope` is), which runs whenever that body does: not one under `if`,
+/// `try`, a loop, `with` or `match`.
+fn in_place(node: Node, scope: &str, src: &[u8]) -> bool {
+    let mut parent = node.parent();
+    if let Some(p) = parent.filter(|p| p.kind() == "decorated_definition") {
+        parent = p.parent();
+    }
+    let Some(parent) = parent else {
+        return false;
+    };
+    let owner = parent.parent().filter(|_| parent.kind() == "block");
+    parent.kind() == "module"
+        || owner.is_some_and(|o| match o.kind() {
+            "function_definition" | "class_definition" => true,
+            "if_statement" => {
+                scope == MAIN
+                    && o.parent().is_some_and(|m| m.kind() == "module")
+                    && is_main_guard(o, src)
+            }
+            _ => false,
+        })
+}
+
 /// How many definitions the qualified name `scope` nests: none at the top level.
 fn levels(scope: &str) -> usize {
     match scope {
@@ -689,8 +722,9 @@ struct Locals {
     /// The scopes that are class bodies.
     classes: HashSet<String>,
     /// Every `def` and `class` in a function or class body, in source order: the position in
-    /// `written` it comes at, its scope and name.
-    defs: Vec<(usize, String, String)>,
+    /// `written` it comes at, its scope and name, and whether it may not run (not in place)
+    /// after a binding of the name in its scope, which then stays the name's.
+    defs: Vec<(usize, String, String, bool)>,
     /// The value each `name = value` assigns, by the position of its binding in `written`.
     values: Vec<(usize, Value)>,
 }
@@ -700,9 +734,14 @@ impl Locals {
         (self.written).push((scope.to_string(), name.to_string(), class, how));
     }
 
-    /// A `def` or `class` of `name` in the function or class body `scope`.
-    fn def(&mut self, scope: &str, name: &str) {
-        (self.defs).push((self.written.len(), scope.to_string(), name.to_string()));
+    /// A `def` or `class` of `name` in the function or class body `scope`, `in_place` or under
+    /// `if`, `try`, a loop.
+    fn def(&mut self, scope: &str, name: &str, in_place: bool) {
+        let same = |s: &String, n: &String| s == scope && n == name;
+        let bound = self.written.iter().any(|(s, n, ..)| same(s, n))
+            || self.defs.iter().any(|(_, s, n, _)| same(s, n));
+        let at = self.written.len();
+        (self.defs).push((at, scope.to_string(), name.to_string(), !in_place && bound));
     }
 
     /// Binds a target: a name in `scope`, or `self.x` as the attribute `x` of the class whose
@@ -872,7 +911,7 @@ impl Locals {
     /// scope binds once, by `name = value`, is also a constant holding that value. Last, the
     /// definitions in a function whose name its last binding there is not (`Facts::locals`).
     fn finish(self) -> (Vec<Receiver>, Vec<Const>, Vec<String>) {
-        let defs = (self.defs.iter()).map(|(_, scope, name)| (scope.as_str(), name.as_str()));
+        let defs = (self.defs.iter()).map(|(_, scope, name, _)| (scope.as_str(), name.as_str()));
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
             .chain(defs)
@@ -917,14 +956,14 @@ impl Locals {
             let latest = last.entry((home.as_str(), name.as_str())).or_default();
             *latest = (*latest).max(at);
         }
-        let mut defined: BTreeMap<(&str, &str), usize> = BTreeMap::new();
-        for (at, scope, name) in &self.defs {
+        let mut defined: BTreeMap<(&str, &str), (usize, bool)> = BTreeMap::new();
+        for (at, scope, name, kept) in &self.defs {
             if !self.classes.contains(scope) {
-                defined.insert((scope.as_str(), name.as_str()), *at);
+                defined.insert((scope.as_str(), name.as_str()), (*at, *kept));
             }
         }
         let hidden = (defined.into_iter())
-            .filter(|(key, at)| last.get(key).is_some_and(|latest| latest >= at))
+            .filter(|(key, (at, kept))| *kept || last.get(key).is_some_and(|latest| latest >= at))
             .map(|((scope, name), _)| qualify(scope, name))
             .collect();
         let consts = (self.values.into_iter())

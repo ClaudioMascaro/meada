@@ -3381,6 +3381,48 @@ mod tests {
     }
 
     #[test]
+    fn a_conditional_definition_after_a_binding_hides_it() {
+        // A `def` or `class` under `if`, `try` or a loop may not run: when the name was bound
+        // before it, the name may still be that binding, at the top level or in a function.
+        let fallback = "try:\n    from collections import OrderedDict\nexcept ImportError:\n    \
+                        class OrderedDict(dict):\n        pass\n";
+        let def = "def x():\n    pass\n";
+        let branches = "if c:\n    def x():\n        pass\nelse:\n    def x():\n        pass\n";
+        let indent = |code: &str| {
+            code.lines()
+                .map(|l| format!("    {l}\n"))
+                .collect::<String>()
+        };
+        for (code, name) in [
+            (fallback.to_string(), "OrderedDict"),
+            (branches.to_string(), "x"),
+            (format!("x = 1\nfor _ in xs:\n{}", indent(def)), "x"),
+        ] {
+            let call = format!("{name}()\n");
+            for main in [
+                format!("{code}{call}"),
+                format!("def f():\n{}", indent(&format!("{code}{call}"))),
+            ] {
+                let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", name);
+                assert_eq!(found, None, "{main}");
+            }
+        }
+        // With no binding before it, the definition is the name's.
+        for code in [
+            format!("if c:\n{}", indent(def)),
+            format!("try:\n{}except E:\n    pass\n", indent(def)),
+        ] {
+            for main in [
+                format!("{code}x()\n"),
+                format!("def f():\n{}", indent(&format!("{code}x()\n"))),
+            ] {
+                let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", "x");
+                assert_eq!(found.as_deref(), Some("main.py"), "{main}");
+            }
+        }
+    }
+
+    #[test]
     fn a_grown_all_decides_what_a_star_import_takes() {
         // `pkg`'s literal `__all__` grows by literal names at its top level: a star import of it
         // after `def x()` rebinds `x` to `pkg`'s once `x` is added.

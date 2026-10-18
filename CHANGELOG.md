@@ -208,10 +208,13 @@ All notable changes to Meada are recorded here. The format follows
   import of `x` or any other binding, a function's `global x` included) is no longer linked
   `exact` to that definition: the last binding decides, and a call reaches the definition by
   name match at most. So is a function's nested `def` or `class` bound again in that function,
-  or by a nested function's `nonlocal`. After `del x` the name reaches nothing it was bound to
-  before, at the top level or in a function. A module's `__all__` grown by literal names (`+=`,
-  `.extend`, `.append` at its top level) gives a star import the names it adds, and one changed
-  any other way is read as computed, so a star import of it no longer takes a stale set of names.
+  or by a nested function's `nonlocal`. A definition under `if`, `try`, a loop, `with` or
+  `match` may not run, so after another binding of its name (`try: from collections import
+  OrderedDict`, `except ImportError: class OrderedDict(dict): ...`) it leaves the name to no
+  `exact` link either. After `del x` the name reaches nothing it was bound to before, at the top
+  level or in a function. A module's `__all__` grown by literal names (`+=`, `.extend`,
+  `.append` at its top level) gives a star import the names it adds, and one changed any other
+  way is read as computed, so a star import of it no longer takes a stale set of names.
   The index is rebuilt once (schema version 37).
 - A name two `export *` of one module give differently is no longer linked `exact` to the first
   one's: as in ES modules, the module exports neither. Two that lead to the same definition
