@@ -480,6 +480,9 @@ one for the area a change touches.
   unknown (a name match at most), and no other import, `export *` or submodule binds it in its
   place. `RECEIVER_DEPTH` (64): a receiver whose class is named through
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
+  The receivers count from where the walk started, so the families being linearized when one is
+  cut give up and none is kept: each is linearized again when asked for, and does not depend on
+  the walk that first reached it.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or

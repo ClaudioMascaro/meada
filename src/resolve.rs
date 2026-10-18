@@ -105,12 +105,15 @@ enum Busy<'a> {
 // chain of thousands of parameters from overflowing the stack.
 const RECEIVER_DEPTH: usize = 64;
 
-/// What resolving one name carries along: what is being resolved, and the families
-/// linearized so far (while `Resolver::new` linearizes them all).
+/// What resolving one name carries along: what is being resolved, the families linearized so
+/// far (while `Resolver::new` linearizes them all), and whether a receiver was cut at
+/// `RECEIVER_DEPTH` since the outermost family began. The cut counts the receivers of the walk
+/// that reached a family, so every family then being linearized gives up (`Cut`).
 #[derive(Default)]
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
+    cut: bool,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -135,8 +138,8 @@ type Family<'a> = Option<Vec<Ancestor<'a>>>;
 const FAMILY_DEPTH: usize = 128;
 
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
-/// families being resolved: no family is kept on the way up, since the cut depends on where
-/// the walk started.
+/// families being resolved, or a receiver was cut at `RECEIVER_DEPTH` (`Work::cut`): no family
+/// is kept on the way up, since the cut depends on where the walk started.
 struct Cut;
 
 /// The files of one language pack, resolved together.
@@ -344,7 +347,11 @@ impl<'a> Resolver<'a> {
         let depth = (work.busy.iter())
             .filter(|b| matches!(b, Busy::Local(..)))
             .count();
-        if depth >= RECEIVER_DEPTH || work.busy.contains(&key) {
+        if depth >= RECEIVER_DEPTH {
+            work.cut = true;
+            return Binding::Unknown;
+        }
+        if work.busy.contains(&key) {
             return Binding::Unknown;
         }
         work.busy.push(key);
@@ -387,9 +394,14 @@ impl<'a> Resolver<'a> {
     /// method resolution order. Without written bases (TypeScript) it is `class` alone.
     fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
         let first = !(work.busy.iter()).any(|b| matches!(b, Busy::Family(_)));
+        if first {
+            work.cut = false;
+        }
         self.lineage(class, work).unwrap_or_else(|Cut| {
-            // From no other family, the cut is the class's own: longer than the limit.
-            if first {
+            // From no other family, a cut of the bases is the class's own: longer than the
+            // limit. A receiver cut depends on the families linearized before, so the family is
+            // linearized again when asked for.
+            if first && !work.cut {
                 work.families.insert(class, None);
             }
             None
@@ -397,7 +409,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// `family`, or `Cut` when the bases nest deeper than `FAMILY_DEPTH` below the families
-    /// `work` is resolving.
+    /// `work` is resolving, or a receiver was cut on the way (`Work::cut`).
     fn lineage(&self, class: Target<'a>, work: &mut Work<'a>) -> Result<Family<'a>, Cut> {
         if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
             return Ok(family.clone());
@@ -406,15 +418,20 @@ impl<'a> Resolver<'a> {
         if work.busy.contains(&key) {
             return Ok(None);
         }
-        if (work.busy.iter())
-            .filter(|b| matches!(b, Busy::Family(_)))
-            .count()
-            >= FAMILY_DEPTH
+        if work.cut
+            || (work.busy.iter())
+                .filter(|b| matches!(b, Busy::Family(_)))
+                .count()
+                >= FAMILY_DEPTH
         {
             return Err(Cut);
         }
         work.busy.push(key);
         let bases = self.bases(class, work);
+        if work.cut {
+            work.busy.pop();
+            return Err(Cut);
+        }
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {
@@ -1901,6 +1918,43 @@ mod tests {
             assert!(exact(RECEIVER_DEPTH, quoted), "quoted: {quoted}");
             assert!(!exact(RECEIVER_DEPTH + 1, quoted), "quoted: {quoted}");
             assert!(!exact(far, quoted), "quoted: {quoted}");
+        }
+    }
+
+    #[test]
+    fn a_family_does_not_depend_on_the_receivers_of_the_walk_that_reaches_it() {
+        // `K` derives from `L.D`, named through two receivers (`y = w.D()`). `Z` derives from
+        // `K.C`, named through `RECEIVER_DEPTH` receivers (`x0 = x1.C()`, ..., `x63 = K()`), so
+        // `K`'s family, linearized on the way from `Z`, is two receivers past the limit; from
+        // `K` itself it is not.
+        let n = RECEIVER_DEPTH;
+        let mut head =
+            "class L:\n    class D(L):\n        pass\n\n    def m(self):\n        pass\n\n\
+                        w = L()\ny = w.D()\n\n\
+                        class K(y.D):\n    class C(K):\n        pass\n"
+                .to_string();
+        for i in 0..n - 1 {
+            head.push_str(&format!("x{i} = x{}.C()\n", i + 1));
+        }
+        head.push_str(&format!("x{} = K()\n", n - 1));
+        let z = "class Z(x0.C):\n    pass\n";
+        let go = "def go(k: K, z: Z):\n    k.m()\n    z.m()\n";
+        for z_first in [false, true] {
+            let src = match z_first {
+                true => format!("{z}\n{head}\n{go}"),
+                false => format!("{head}\n{z}\n{go}"),
+            };
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            for callee in ["k.m", "z.m"] {
+                let call = facts.calls.iter().find(|c| c.callee == callee).unwrap();
+                let found = resolver.call("a.py", call);
+                assert!(
+                    matches!(found, Resolution::Exact(t) if t.name == "L.m"),
+                    "{callee}, z first: {z_first}"
+                );
+            }
         }
     }
 }
