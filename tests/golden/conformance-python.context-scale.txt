@@ -1,4 +1,4 @@
-example.com/acme/conformance geometry/shapes.py:4 scale
+example.com/acme/conformance geometry/shapes.py:4-5 scale
 community: stars
 processes: 2 (2 export; 1 repository): lazy (example.com/acme/conformance), main (example.com/acme/conformance)
 def scale(value):
