@@ -33,6 +33,7 @@ pub fn scope_of(name: &str) -> &str {
 }
 
 /// What a name or a member chain refers to.
+#[derive(Clone, Copy)]
 enum Binding<'a> {
     Def(Target<'a>),
     /// What a receiver whose class the source writes holds: an instance of this class, or
@@ -67,13 +68,15 @@ struct Caller<'a> {
     by_name: bool,
 }
 
-/// What resolving one name follows through exports: the `(file, exported name)` pairs seen, as
-/// re-exports may form cycles, how many exports deep it is now, and whether an export was cut
-/// at `REEXPORT_DEPTH`. A cut export is unknown, not absent (`Resolver::exports`): a module
-/// that may export the name leaves it unknown rather than let another import or module bind it.
+/// What resolving one name follows through exports: what each `(file, exported name)` pair
+/// seen exports, as re-exports may form cycles (a pair met again while it is resolved exports
+/// nothing) and diamonds (one met again once resolved exports what it did), how many exports
+/// deep it is now, and whether an export was cut at `REEXPORT_DEPTH`. A cut export is unknown,
+/// not absent (`Resolver::exports`): a module that may export the name leaves it unknown rather
+/// than let another import or module bind it.
 #[derive(Default)]
 struct Seen<'a> {
-    pairs: HashSet<(&'a str, &'a str)>,
+    pairs: HashMap<(&'a str, &'a str), Option<Binding<'a>>>,
     depth: usize,
     cut: bool,
 }
@@ -716,18 +719,22 @@ impl<'a> Resolver<'a> {
             seen.cut = true;
             return Some(Binding::Unknown);
         }
-        if !seen.pairs.insert((path, name)) {
-            return None;
+        if let Some(&found) = seen.pairs.get(&(path, name)) {
+            return found;
         }
+        seen.pairs.insert((path, name), None);
         seen.depth += 1;
         let found = self.own_export(path, name, seen);
         seen.depth -= 1;
+        seen.pairs.insert((path, name), found);
         found
     }
 
     /// `exports`, once `path` and `name` are seen. Where stars bind (`stars_bind`), the exports
     /// are listed last binding first, and the first that gives `name` exports it. Otherwise
-    /// the module's own export of the name decides, else the first `export *` that exports it.
+    /// the module's own export of the name decides, else its `export *`: the binding they give
+    /// it when they all give the same one, as in ES modules; two that differ leave the name
+    /// unknown, still the module's, so that no other star binds it.
     fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
         if self.stars_bind {
@@ -738,7 +745,13 @@ impl<'a> Resolver<'a> {
         if let Some(found) = own.find_map(|export| self.gives(path, export, name, seen)) {
             return Some(found);
         }
-        (exports.iter().filter(star)).find_map(|export| self.gives(path, export, name, seen))
+        let mut given =
+            (exports.iter().filter(star)).filter_map(|export| self.gives(path, export, name, seen));
+        let first = given.next()?;
+        match given.all(|other| same(first, other)) {
+            true => Some(first),
+            false => Some(Binding::Unknown),
+        }
     }
 
     /// What one export of `path` gives `name`, if it gives it.
@@ -818,6 +831,25 @@ impl<'a> Resolver<'a> {
             .iter()
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
+    }
+}
+
+/// Whether two bindings are the same one, as two `export *` must give a name for a module to
+/// export it. What is not known is the same as nothing else.
+fn same(a: Binding, b: Binding) -> bool {
+    match (a, b) {
+        (Binding::Def(x), Binding::Def(y)) => x == y,
+        (Binding::Module(x), Binding::Module(y)) => x == y,
+        (Binding::Const(p, x), Binding::Const(q, y)) => (p, x) == (q, y),
+        (Binding::External(p, x), Binding::External(q, y)) => {
+            p == q
+                && match (x, y) {
+                    (Imported::Namespace, Imported::Namespace) => true,
+                    (Imported::Name(x), Imported::Name(y)) => x == y,
+                    _ => false,
+                }
+        }
+        _ => false,
     }
 }
 
@@ -1899,10 +1931,11 @@ mod tests {
         let ts = |n: usize| {
             let link = |p| format!("export {{ x }} from './f{p}';\n");
             let mut sources = reexports("ts", n, "export function x() {}\n", link);
+            // `b` re-exports `f0`'s `x` itself: both `export *` give the same `x` below the
+            // limit; past it, `a`'s `x` is unknown, and so is `m`'s, never `b`'s.
             sources.extend([
                 ("a.ts".into(), link(n - 1)),
-                ("b.ts".into(), "export function x() {}\n".into()),
-                // The first `export *` that has `x` exports it.
+                ("b.ts".into(), link(0)),
                 (
                     "m.ts".into(),
                     "export * from './a';\nexport * from './b';\n".into(),
@@ -1957,7 +1990,7 @@ mod tests {
             ]);
             assert_eq!(exact_in(&Python, &exported, "main.py", "x"), None, "{a}");
         }
-        // The first `export *` that has `x` exports it.
+        // Two `export *` that give `x` differently export neither.
         for a in ["export const x = 1;\n", "export { x } from 'ext';\n"] {
             let sources = src(&[
                 ("a.ts", a),
@@ -2053,6 +2086,32 @@ mod tests {
             let found = exact_in(&Python, &sources, "main.py", "x");
             assert_eq!(found.as_deref(), Some("main.py"), "{main}");
         }
+    }
+
+    #[test]
+    fn two_export_stars_that_give_a_name_differently_export_neither() {
+        use crate::lang::ts::TsJs;
+
+        // As in ES modules: `a` and `b` each export their own `x`, so `m` exports no `x`.
+        let m = ("m.ts", "export * from './a';\nexport * from './b';\n");
+        let main = ("main.ts", "import { x } from './m';\nx();\n");
+        let def = "export function x() {}\n";
+        let sources = owned(&[("a.ts", def), ("b.ts", def), m, main]);
+        assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None);
+        // Both lead to the same definition, which is `m`'s `x`.
+        let sources = owned(&[
+            ("a.ts", "export * from './c';\n"),
+            ("b.ts", "export { x } from './c';\n"),
+            ("c.ts", def),
+            m,
+            main,
+        ]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("c.ts"));
+        // Only one of them exports `x`.
+        let sources = owned(&[("a.ts", def), ("b.ts", "export function y() {}\n"), m, main]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("a.ts"));
     }
 
     #[test]

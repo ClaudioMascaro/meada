@@ -59,6 +59,9 @@ All notable changes to Meada are recorded here. The format follows
 - A Python name defined or assigned before a star import of a module of the repository that
   exports it (`def x(): ...`, then `from a import *`) is linked to that module's, as Python
   rebinds it, and no longer to the earlier definition.
+- A name two `export *` of one module give differently is no longer linked `exact` to the first
+  one's: as in ES modules, the module exports neither. Two that lead to the same definition
+  still export it.
 - A class whose base is named through a member of a class with a family close to 128 classes
   long (`class Z(K.D)`) no longer resolves its members differently depending on which class was
   read first.
