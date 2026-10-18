@@ -230,12 +230,17 @@ impl LanguagePack for Python {
                     }
                 }
                 "assignment" | "augmented_assignment" => {
-                    if scope.is_empty() && node.kind() == "assignment" {
+                    if scope.is_empty() {
                         module.assign(node, src);
                     }
                     locals.assign(node, &scope, src);
                 }
                 "as_pattern" if node.parent().is_some_and(|p| p.kind() == "with_item") => {
+                    if let Some(alias) = node.child_by_field_name("alias")
+                        && scope.is_empty()
+                    {
+                        module.targets(alias, src);
+                    }
                     locals.with_item(node, &scope, src);
                 }
                 // Other bindings say nothing of a class, but hide an outer binding of the name.
@@ -249,6 +254,13 @@ impl LanguagePack for Python {
                         _ => "alias",
                     };
                     let target = node.child_by_field_name(field);
+                    // A comprehension's variables are its own, not the module's.
+                    if let Some(target) = target
+                        && scope.is_empty()
+                        && node.kind() != "for_in_clause"
+                    {
+                        module.targets(target, src);
+                    }
                     for target in target.map(targets).unwrap_or_default() {
                         locals.target(target, &scope, Class::Unknown, Evidence::Assigned, src);
                     }
@@ -259,7 +271,11 @@ impl LanguagePack for Python {
                         captures(pattern, 0, &mut found);
                     }
                     for name in found {
-                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
+                        let name = text(name, src);
+                        if scope.is_empty() {
+                            module.name(name);
+                        }
+                        locals.bind(&scope, name, Class::Unknown, Evidence::Assigned);
                     }
                 }
                 // A lambda's calls belong to the enclosing scope, which its parameters bind.
@@ -294,6 +310,13 @@ impl LanguagePack for Python {
                 in_class: inner_class,
                 flat: inner_flat,
             }));
+        }
+        // A function's `global x` may run at any time after the module's own bindings: it is
+        // bound last, after every star import.
+        for (scope, name, ..) in &locals.written {
+            if locals.declared.get(&(scope.clone(), name.clone())) == Some(&true) {
+                module.name(name);
+            }
         }
         (facts.exports, facts.star) = module.exports();
         (facts.receivers, facts.consts) = locals.finish();
@@ -380,12 +403,23 @@ impl Module {
         });
     }
 
+    /// The names an unpacking or `as` target binds; `self.x` binds none at the top level.
+    fn targets(&mut self, node: Node, src: &[u8]) {
+        for target in targets(node)
+            .into_iter()
+            .filter(|t| t.kind() == "identifier")
+        {
+            self.name(text(target, src));
+        }
+    }
+
+    /// A top-level assignment, `x += ...` and `a, b = ...` included, and a literal `__all__`.
     fn assign(&mut self, node: Node, src: &[u8]) {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
-        if left.kind() != "identifier" {
-            return;
+        if left.kind() != "identifier" || node.kind() != "assignment" {
+            return self.targets(left, src);
         }
         let name = text(left, src);
         self.name(name);

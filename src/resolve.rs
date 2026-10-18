@@ -582,11 +582,6 @@ impl<'a> Resolver<'a> {
             if class_body {
                 continue;
             }
-            if s.is_empty()
-                && let Some(found) = self.rebound(path, name, seen)
-            {
-                return found;
-            }
             let candidate = if s.is_empty() {
                 name.to_string()
             } else {
@@ -597,6 +592,11 @@ impl<'a> Resolver<'a> {
             // definition, constant or parameter it may shadow in a block alike).
             if self.locals[path].contains(candidate.as_str()) {
                 return Binding::Hidden;
+            }
+            if s.is_empty()
+                && let Some(found) = self.rebound(path, name, seen)
+            {
+                return found;
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
@@ -2112,6 +2112,37 @@ mod tests {
         let sources = owned(&[("a.ts", def), ("b.ts", "export function y() {}\n"), m, main]);
         let found = exact_in(&TsJs, &sources, "main.ts", "x");
         assert_eq!(found.as_deref(), Some("a.ts"));
+    }
+
+    #[test]
+    fn a_top_level_binding_after_a_star_import_rebinds_its_name() {
+        // `x` is `b`'s, then `a`'s through the star import, then the binding's, which no call
+        // reaches exactly: never `a`'s or `b`'s. A function's `global x` may run at any time.
+        let def = "def x():\n    pass\n";
+        let global = "def f():\n    global x\n    x = 1\n";
+        for binding in [
+            "with open(p) as x:\n    pass\n",
+            "for x in xs:\n    pass\n",
+            "try:\n    pass\nexcept E as x:\n    pass\n",
+            "(x := g())\n",
+            "match v:\n    case x:\n        pass\n",
+            "y, x = g()\n",
+            "x += 1\n",
+            global,
+        ] {
+            let main = format!("from b import x\nfrom a import *\n{binding}x()\n");
+            let sources = owned(&[("a.py", def), ("b.py", def), ("main.py", &main)]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            // The same through a module that binds them all and is imported by name.
+            let m = format!("from b import x\nfrom a import *\n{binding}");
+            let main = ("main.py", "from m import x\nx()\n");
+            let sources = owned(&[("a.py", def), ("b.py", def), ("m.py", &m), main]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{m}");
+        }
+        // A `global x` written before the star import may run after it.
+        let main = format!("{global}from a import *\nx()\n");
+        let sources = owned(&[("a.py", def), ("main.py", &main)]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
     }
 
     #[test]
