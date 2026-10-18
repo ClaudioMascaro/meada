@@ -2,7 +2,7 @@
 //! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
 //! A pack never touches the index or other files.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -226,7 +226,7 @@ pub struct Facts {
     /// `String` is pushed to), but an object it holds is still the one its call made: the flow
     /// of a client reads it (`Code::mutable`). Not kept in the index (see `Call::args`).
     #[serde(skip)]
-    pub mutable: Vec<(String, Value)>,
+    pub mutable: HashMap<String, Value>,
     /// Every other name a binding makes, qualified like `Const::name` by the definition whose
     /// body or parameters hold it (a function that is no definition lends its names to the
     /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`

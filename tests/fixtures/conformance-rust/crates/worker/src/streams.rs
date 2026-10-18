@@ -55,6 +55,35 @@ pub async fn read_plain() -> redis::RedisResult<()> {
     Ok(())
 }
 
+/// A name an inner scope binds again hides the connection: a closure's parameter, a `let` in a
+/// closure given to a call, a nested function's parameter.
+pub async fn hidden_names(logs: Vec<Log>) -> redis::RedisResult<()> {
+    let client = redis::Client::open("redis://localhost")?;
+    let mut con = client.get_multiplexed_async_connection().await?;
+    logs.iter().for_each(|con| con.xadd("never.param"));
+    logs.iter().for_each(|l| {
+        let con = l;
+        con.xadd("never.let");
+    });
+    fn nested(con: &Log) {
+        con.xadd("never.nested");
+    }
+    let _: String = con.xadd("kept", "*", &[("id", "5")]).await?;
+    Ok(())
+}
+
+/// An assignment in a closure given to a call changes the connection: it is no longer the one
+/// the constructor made.
+pub async fn reassigned(logs: Vec<Log>, other: redis::aio::MultiplexedConnection) -> redis::RedisResult<()> {
+    let client = redis::Client::open("redis://localhost")?;
+    let mut con = client.get_multiplexed_async_connection().await?;
+    logs.iter().for_each(|_| {
+        con = other.clone();
+    });
+    let _: String = con.xadd("never.assigned", "*", &[("id", "6")]).await?;
+    Ok(())
+}
+
 pub struct Log;
 
 impl Log {

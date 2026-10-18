@@ -211,7 +211,7 @@
     },
     {
       "path": "crates/worker/src/streams.rs",
-      "hash": "f0129551f85a81114b4aeab0bde7032d0979fa3960c6c993b305caad1bf85721"
+      "hash": "6c07bec26dbddc90baf1042c88a016114919c577211a0445998bc1720a5424da"
     },
     {
       "path": "crates/worker/src/subjects.rs",
@@ -2855,16 +2855,16 @@
       "id": "example.com/acme/conformance::crates/worker/src/streams.rs::Log",
       "span": {
         "path": "crates/worker/src/streams.rs",
-        "start": 2309,
-        "end": 2324
+        "start": 3475,
+        "end": 3490
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
       "span": {
         "path": "crates/worker/src/streams.rs",
-        "start": 2341,
-        "end": 2374
+        "start": 3507,
+        "end": 3540
       }
     },
     {
@@ -2876,11 +2876,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2465,
+        "end": 2956
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names.nested",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2815,
+        "end": 2877
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/streams.rs::not_redis",
       "span": {
         "path": "crates/worker/src/streams.rs",
-        "start": 2378,
-        "end": 2438
+        "start": 3544,
+        "end": 3604
       }
     },
     {
@@ -2913,6 +2929,14 @@
         "path": "crates/worker/src/streams.rs",
         "start": 1506,
         "end": 1907
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3079,
+        "end": 3473
       }
     },
     {
@@ -9914,14 +9938,135 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names.nested::con.xadd#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names.nested",
+      "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
+      "level": "exact",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2846,
+        "end": 2870
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::(call_expression).for_each#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2667,
+        "end": 2718
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::(call_expression).for_each#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2724,
+        "end": 2809
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2948,
+        "end": 2954
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::client.get_multiplexed_async_connection#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2613,
+        "end": 2654
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::con.xadd#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2694,
+        "end": 2717
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::con.xadd#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2780,
+        "end": 2801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::con.xadd#2",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2898,
+        "end": 2935
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::logs.iter#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2667,
+        "end": 2678
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::logs.iter#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2724,
+        "end": 2735
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::redis.Client.open#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 2552,
+        "end": 2592
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/streams.rs::not_redis::log.xadd#0",
       "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::not_redis",
       "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
       "level": "exact",
       "span": {
         "path": "crates/worker/src/streams.rs",
-        "start": 2412,
-        "end": 2435
+        "start": 3578,
+        "end": 3601
       }
     },
     {
@@ -10219,6 +10364,83 @@
         "path": "crates/worker/src/streams.rs",
         "start": 1704,
         "end": 1727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::(call_expression).for_each#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3321,
+        "end": 3383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3465,
+        "end": 3471
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::client.get_multiplexed_async_connection#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3267,
+        "end": 3308
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::con.xadd#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3405,
+        "end": 3452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::logs.iter#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3321,
+        "end": 3332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::other.clone#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3362,
+        "end": 3375
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned::redis.Client.open#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/streams.rs",
+        "start": 3206,
+        "end": 3246
       }
     },
     {
@@ -11178,6 +11400,10 @@
     {
       "contract": "channel::redis::events.audit",
       "site": "example.com/acme/conformance::crates/worker/src/streams.rs::append_all::con.xadd#2"
+    },
+    {
+      "contract": "channel::redis::kept",
+      "site": "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names::con.xadd#2"
     },
     {
       "contract": "channel::redis::orders",
@@ -12261,7 +12487,10 @@
       "members": [
         "example.com/acme/conformance::crates/worker/src/streams.rs::Log.xadd",
         "example.com/acme/conformance::crates/worker/src/streams.rs::append_all",
-        "example.com/acme/conformance::crates/worker/src/streams.rs::not_redis"
+        "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names",
+        "example.com/acme/conformance::crates/worker/src/streams.rs::hidden_names.nested",
+        "example.com/acme/conformance::crates/worker/src/streams.rs::not_redis",
+        "example.com/acme/conformance::crates/worker/src/streams.rs::reassigned"
       ]
     },
     {

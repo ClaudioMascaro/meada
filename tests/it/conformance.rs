@@ -1657,6 +1657,9 @@ fn rust() {
             "crates/worker/src/streams.rs::read_inline",
             "crates/worker/src/streams.rs::read_unknown",
             "crates/worker/src/streams.rs::read_plain",
+            "crates/worker/src/streams.rs::hidden_names",
+            "crates/worker/src/streams.rs::hidden_names.nested",
+            "crates/worker/src/streams.rs::reassigned",
             "crates/worker/src/streams.rs::Log",
             "crates/worker/src/streams.rs::Log.xadd",
             "crates/worker/src/streams.rs::not_redis",
@@ -4794,6 +4797,7 @@ fn rust_redis_streams_are_channel_producers_and_consumers() {
                 &redis("append_all::con.xadd#2")
             ),
             ("channel::redis", &redis("append_all::con.xadd#3")),
+            ("channel::redis::kept", &redis("hidden_names::con.xadd#2")),
         ])
     );
     assert_eq!(

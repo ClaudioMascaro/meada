@@ -1916,22 +1916,31 @@ impl<'a> Code<'a> {
 
     /// The `let mut` that `name`, written in `scope` of `path`, refers to (`Facts::mutable`),
     /// looked up from the scope outwards: the scope it is bound in and the value it holds.
-    // ponytail: a name an inner scope binds again hides the outer one only in the value flow,
-    // which reads the outer `let mut`.
+    /// A name an inner scope binds again (a closure's parameter, a `let` in a closure given to a
+    /// call, a nested function's parameter) hides the outer `let mut`: nothing is returned.
     pub fn mutable(
         &self,
         path: &'a str,
         scope: &'a str,
-        name: &str,
+        name: &'a str,
     ) -> Option<(&'a str, &'a Value)> {
         let held = &self.full(path)?.mutable;
+        let r = self.resolver;
         let mut scope = scope;
         loop {
             let local = crate::qualify(scope, name);
-            if let Some((_, value)) = held.iter().find(|(n, _)| *n == local) {
+            if let Some(value) = held.get(&local) {
                 return Some((scope, value));
             }
-            if scope.is_empty() {
+            let param = |d: &Def| {
+                (d.params.iter()).any(|p| p.name == name || p.fields.iter().any(|f| f.name == name))
+            };
+            if r.locals[path].contains(local.as_str())
+                || r.consts[path].contains(local.as_str())
+                || r.receivers[path].contains_key(&(scope, name))
+                || r.defs[path].get(scope).is_some_and(|d| param(d))
+                || scope.is_empty()
+            {
                 return None;
             }
             scope = crate::parent(scope);

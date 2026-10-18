@@ -370,6 +370,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut bindings: HashMap<String, usize> = HashMap::new();
     // The names a `let mut` of a plain name declares.
     let mut mut_lets: HashSet<String> = HashSet::new();
+    // The scope and name of each assignment: it changes the nearest binding of the name, which
+    // an enclosing scope may hold (a closure given to a call is a scope of its own).
+    let mut assigned: Vec<(String, String)> = Vec::new();
     // The Strings a function builds, by scope and name, and the names two of them share.
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
@@ -822,8 +825,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             // A name assigned again is not a constant.
             "assignment_expression" | "compound_assignment_expr" => {
                 if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
-                    let local = qualify(&scope, text(left, src));
-                    *bindings.entry(local).or_default() += 1;
+                    assigned.push((scope.clone(), text(left, src).to_string()));
                 }
             }
             // A closure given to a call is a definition of its own: the shared side names it
@@ -880,6 +882,18 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             open,
             arg: node.kind() == "arguments",
         }));
+    }
+    for (scope, name) in assigned {
+        let mut at = scope.as_str();
+        let home = loop {
+            let local = qualify(at, &name);
+            if bindings.contains_key(&local) || at.is_empty() {
+                break local;
+            }
+            at = crate::parent(at);
+        };
+        // A name nothing binds is counted where it is written, as it always was.
+        *bindings.entry(home).or_default() += 1;
     }
     let mut heads = Heads::default();
     for Use { path, name, public } in &imported {
@@ -944,7 +958,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 let value = reader.value(&at, node);
                 // Declared `mut` once, and bound or assigned nowhere else.
                 if bindings.get(&name) == Some(&2) && mut_lets.contains(&name) {
-                    facts.mutable.push((name.clone(), value.clone()));
+                    facts.mutable.insert(name.clone(), value.clone());
                 }
                 facts
                     .rebound
