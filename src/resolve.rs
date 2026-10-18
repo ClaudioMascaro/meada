@@ -67,8 +67,25 @@ struct Caller<'a> {
     by_name: bool,
 }
 
-/// Seen `(file, exported name)` pairs: re-exports may form cycles.
-type Seen<'a> = HashSet<(&'a str, &'a str)>;
+/// What resolving one name follows through exports: the `(file, exported name)` pairs seen, as
+/// re-exports may form cycles, and how many exports deep it is now.
+#[derive(Default)]
+struct Seen<'a> {
+    pairs: HashSet<(&'a str, &'a str)>,
+    depth: usize,
+}
+
+impl Seen<'_> {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// The most files a name is followed through, each re-exporting it from the next; deeper, it
+/// is unknown.
+// ponytail: real re-export chains are a few files long; the limit keeps a crafted chain of
+// thousands from overflowing the stack.
+const REEXPORT_DEPTH: usize = 64;
 
 /// A local whose class, or a class whose family, is being resolved: one met again while
 /// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
@@ -615,11 +632,20 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// What `path` exports as `name`: all it lets an explicit import name.
+    /// What `path` exports as `name`: all it lets an explicit import name. Unknown more than
+    /// `REEXPORT_DEPTH` exports deep.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        if !seen.insert((path, name)) {
+        if seen.depth >= REEXPORT_DEPTH || !seen.pairs.insert((path, name)) {
             return Binding::Unknown;
         }
+        seen.depth += 1;
+        let found = self.own_export(path, name, seen);
+        seen.depth -= 1;
+        found
+    }
+
+    /// `export`, once `path` and `name` are seen.
+    fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         let exports = &self.files[path].exports;
         for export in exports {
             match export {
@@ -1660,6 +1686,63 @@ mod tests {
             classes.reverse();
         }
         classes.join("\n\n")
+    }
+
+    /// Whether a call of `x` in `main` is exact when `f0` defines it as `define`, each file
+    /// `f{i}` up to `f{n - 1}` re-exports it from the one before as `link(i - 1)` writes, and
+    /// `main` imports it from the last as `import(n - 1)` writes.
+    fn reexported(
+        pack: &dyn LanguagePack,
+        ext: &str,
+        n: usize,
+        define: &str,
+        link: impl Fn(usize) -> String,
+        import: impl Fn(usize) -> String,
+    ) -> bool {
+        let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
+        sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
+        sources.push((format!("main.{ext}"), import(n - 1)));
+        let facts: Vec<(String, Facts)> = (sources.iter())
+            .map(|(path, src)| (path.clone(), pack.parse(path, src.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = (facts.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let main = format!("main.{ext}");
+        let resolver = Resolver::new(&files, pack.modules(&[]).unwrap(), pack);
+        let call = files[main.as_str()].calls.iter().find(|c| c.callee == "x");
+        let defined = format!("f0.{ext}");
+        matches!(resolver.call(&main, call.unwrap()), Resolution::Exact(t) if t.path == defined)
+    }
+
+    #[test]
+    fn a_name_reexported_deeper_than_the_limit_is_unknown() {
+        use crate::lang::ts::TsJs;
+
+        // Far past the limit: a recursion through re-exports that does not stop overflows the
+        // stack.
+        let far = 5_000;
+        // Every other file re-exports by name, the others re-export everything.
+        let ts = |n| {
+            let link = |p: usize| match p % 2 {
+                0 => format!("export {{ x }} from './f{p}';\n"),
+                _ => format!("export * from './f{p}';\n"),
+            };
+            let import = |p| format!("import {{ x }} from './f{p}';\nx();\n");
+            reexported(&TsJs, "ts", n, "export function x() {}\n", link, import)
+        };
+        let py = |n| {
+            let link = |p: usize| match p % 2 {
+                0 => format!("from f{p} import x\n"),
+                _ => format!("from f{p} import *\n"),
+            };
+            let import = |p| format!("from f{p} import x\nx()\n");
+            reexported(&Python, "py", n, "def x():\n    pass\n", link, import)
+        };
+
+        for exact in [ts, py] {
+            assert!(exact(REEXPORT_DEPTH));
+            assert!(!exact(REEXPORT_DEPTH + 1));
+            assert!(!exact(far));
+        }
     }
 
     #[test]
