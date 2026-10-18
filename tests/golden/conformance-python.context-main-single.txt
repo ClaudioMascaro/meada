@@ -1,0 +1,8 @@
+example.com/acme/conformance jobs/single.py:5-6 __main__
+community: jobs
+processes: 1 (1 program; 1 repository): __main__ (example.com/acme/conformance)
+if '__main__' == __name__:
+    steps.fetch()
+callers: none
+callees:
+example.com/acme/conformance jobs/steps.py:4 fetch

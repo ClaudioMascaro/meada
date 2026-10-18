@@ -1,3 +1,9 @@
 [project]
 name = "acme-conformance"
 version = "0.1.0"
+
+[project.scripts]
+acme-sync = "jobs.sync:run"
+acme-report = "reports:build"
+acme-ghost = "ghost.module:go"
+acme-missing = "jobs.sync:missing"

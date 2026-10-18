@@ -1,0 +1,10 @@
+example.com/acme/conformance jobs/sync.py:11-13 __main__
+community: jobs
+processes: 1 (1 program; 1 repository): __main__ (example.com/acme/conformance)
+if __name__ == "__main__":
+    run()
+    store()
+callers: none
+callees:
+example.com/acme/conformance jobs/sync.py:6 run
+example.com/acme/conformance jobs/steps.py:8 store
