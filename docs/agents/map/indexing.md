@@ -81,8 +81,14 @@ modules updates it.
   `globals`: names bound everywhere that contract kinds read through `Code::binds_everywhere`,
   `fetch` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter
   helpers (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx
-  .js .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads
-  `pyproject.toml`: `.pyi` and notebooks are not read). `parse` sees one file at a time; no pack
+  .js .jsx .mjs .cjs`, reads `tsconfig.json`), `lang/python.rs` (`.py`, reads
+  `pyproject.toml`: `.pyi` and notebooks are not read) and `lang/rust.rs` (`.rs`, reads every
+  `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below).
+  `refresh` reads a `**/<name>` config at any depth from the walk, by path; it groups the
+  parsed files by pack, keeps the ones the pack's `members` names (default: all; a left-out
+  file keeps its `files` row and facts with an empty `resolved`, its symbol and call rows are
+  deleted, and the export and `status` skip it), and builds each `Resolver` from
+  `modules(configs, members)`. `parse` sees one file at a time; no pack
   method touches the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
@@ -210,6 +216,31 @@ modules updates it.
   module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
   skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
   and `... | None`.
+- `lang/rust.rs` (spec #30) yields free functions (`Kind::Function`), structs, enums, unions
+  and traits (`Kind::Class`), modules written in place (`Kind::Module`), methods of an `impl`
+  (`Type.method`, or `Type.Trait.method` in a trait's block, `Kind::Method`) and trait methods
+  with a body (`Trait.method`); closures are no definitions, their calls belong to the function
+  around them and their parameters are its locals, as `let`, `for`, `if let`/`while let` and
+  match arm patterns are. A method's `self` is a `Param` with `Binds::Instance`. Each `impl`
+  is a `Facts::impls` entry (its type and trait as callee-like names, from the scope around
+  it). A `mod x;` declaration is an import of the whole file under `x` (`inner.x` in a module
+  written in place), its specifier `mod x` / `mod inner/x` or, with `#[path = "p"]`, `path |p`
+  / `path inner|p`; at the top level the file also exports it. Every top-level item is
+  exported; the `pub` ones are `Facts::star`. Calls: an identifier, a member chain
+  (`Call::by_path` false) or a path (`by_path` true, dotted by `normalize` once the file is
+  read: `crate.…` and `super.…` with their synthetic imports `crate` and `super(.super)`,
+  `Self.…`, `self::`/in-file `super::` as a plain name from the module named, a `mod`
+  declared in an inline module prefixed with it, and a first segment no item, local or `use`
+  of the file binds imported as an outside crate). `use` declarations are only scanned for the
+  names they bind (spec #30's `use` resolution is #126). Macro invocations are not read.
+  `lang/rust/crates.rs` (`Tree`) is the module tree behind `members` and `modules`: the crate
+  roots of the root `Cargo.toml`'s package and members (`[lib] path` or `src/lib.rs`,
+  `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`, `src/bin/*/main.rs`), walked breadth first
+  through each file's `mod` imports (`x.rs` or `x/mod.rs` under the directory the file owns:
+  its own for a root, a `mod.rs` or a `#[path]` file, the one named after it otherwise; a
+  `#[path]` from the file's directory, or from the inline module's directory inside one).
+  `lookup` answers `crate` (the root), `super` (`super::super`, through the top-level
+  declarations that reached the file) and a `mod` specifier (its file).
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
@@ -231,7 +262,16 @@ modules updates it.
   module-level binding is read from functions as it is; a function that rebinds it through
   `global` makes it unknown. A pack that writes `Def::bases` and `Facts::receivers` gets this
   without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
-  keyword).
+  keyword). A class's blocks (`Facts::impls`: Rust `impl`s, in any file, their type and trait
+  resolved from `Impl::within` once in `Resolver::new` into `impls` and `blocks`) add members:
+  `member` tries the class's own `Class.m`, then `block_member` (an inherent block's `scope.m`,
+  else the single trait block's `scope.m` or its trait's default `Trait.m`; two traits giving it
+  leave it unknown), and `class` (the `receiver` keyword, `Self`) answers the block's type
+  inside a block. A `Kind::Module` definition (a module written in place) is a member chain
+  like a function (`inner.helper`), and a file imported under it (`Import::local` `inner.x`) is
+  its member `x`. Name inference keys a function or class of modules written in place by its
+  last name, like a top-level one, and a call with `Call::by_path` (a Rust path) matches
+  functions as well as methods by that name.
   `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.

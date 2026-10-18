@@ -645,6 +645,257 @@ sample.py
   ]
 }
 
+sample.rs
+{
+  "defs": [
+    {
+      "name": "Store",
+      "kind": "Class",
+      "range": {
+        "start": 148,
+        "end": 180
+      },
+      "params": []
+    },
+    {
+      "name": "Persist",
+      "kind": "Class",
+      "range": {
+        "start": 182,
+        "end": 246
+      },
+      "params": []
+    },
+    {
+      "name": "Persist.describe",
+      "kind": "Method",
+      "range": {
+        "start": 206,
+        "end": 244
+      },
+      "params": []
+    },
+    {
+      "name": "Store.new",
+      "kind": "Method",
+      "range": {
+        "start": 265,
+        "end": 334
+      },
+      "params": [
+        {
+          "name": "path",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "Store.empty",
+      "kind": "Method",
+      "range": {
+        "start": 340,
+        "end": 471
+      },
+      "params": [
+        {
+          "name": "",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "inner",
+      "kind": "Module",
+      "range": {
+        "start": 509,
+        "end": 627
+      },
+      "params": []
+    },
+    {
+      "name": "inner.helper",
+      "kind": "Function",
+      "range": {
+        "start": 525,
+        "end": 625
+      },
+      "params": []
+    },
+    {
+      "name": "save",
+      "kind": "Function",
+      "range": {
+        "start": 629,
+        "end": 715
+      },
+      "params": [
+        {
+          "name": "store",
+          "binds": "Any"
+        }
+      ]
+    }
+  ],
+  "imports": [
+    {
+      "local": "disk",
+      "source": "mod disk",
+      "name": "Namespace"
+    },
+    {
+      "local": "util",
+      "source": "path |legacy/util.rs",
+      "name": "Namespace"
+    },
+    {
+      "local": "crate",
+      "source": "crate",
+      "name": "Namespace"
+    },
+    {
+      "local": "std",
+      "source": "std",
+      "name": "Namespace"
+    },
+    {
+      "local": "super",
+      "source": "super",
+      "name": "Namespace"
+    }
+  ],
+  "exports": [
+    {
+      "From": {
+        "exported": "disk",
+        "source": "mod disk",
+        "name": "Namespace"
+      }
+    },
+    {
+      "From": {
+        "exported": "util",
+        "source": "path |legacy/util.rs",
+        "name": "Namespace"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Persist",
+        "local": "Persist"
+      }
+    },
+    {
+      "Local": {
+        "exported": "inner",
+        "local": "inner"
+      }
+    },
+    {
+      "Local": {
+        "exported": "save",
+        "local": "save"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "util",
+      "Store",
+      "Persist",
+      "save"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Store.new",
+      "callee": "Self.empty",
+      "range": {
+        "start": 306,
+        "end": 328
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Store.empty",
+      "callee": "disk.read",
+      "range": {
+        "start": 407,
+        "end": 423
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Store.empty",
+      "callee": "run",
+      "range": {
+        "start": 433,
+        "end": 438
+      }
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "open",
+      "range": {
+        "start": 551,
+        "end": 564
+      },
+      "by_path": true
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "crate.util.go",
+      "range": {
+        "start": 574,
+        "end": 591
+      },
+      "by_path": true
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "std.mem.drop",
+      "range": {
+        "start": 601,
+        "end": 618
+      },
+      "by_path": true
+    },
+    {
+      "scope": "save",
+      "callee": "store.flush",
+      "range": {
+        "start": 662,
+        "end": 675
+      }
+    }
+  ],
+  "consts": [],
+  "locals": [
+    "Store.empty.name",
+    "Store.empty.size",
+    "Store.empty.run"
+  ],
+  "receivers": [],
+  "impls": [
+    {
+      "scope": "Store",
+      "ty": "Store",
+      "within": ""
+    },
+    {
+      "scope": "Store.Persist",
+      "ty": "super.Store",
+      "of": "Persist",
+      "within": ""
+    }
+  ]
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",

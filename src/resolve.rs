@@ -133,9 +133,22 @@ pub struct Resolver<'a> {
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
-    /// functions and classes by their name (`false`).
+    /// functions and classes, and those of modules written in place, by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
     modules: Modules,
+    /// The blocks that add members to each class (`Facts::impls`), the inherent ones first.
+    impls: HashMap<Target<'a>, Vec<Block<'a>>>,
+    /// The class each block adds members to, by its file and scope: what `Self` names in it.
+    blocks: HashMap<(&'a str, &'a str), Target<'a>>,
+}
+
+/// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
+/// the trait when it is a class of the repository.
+struct Block<'a> {
+    path: &'a str,
+    scope: &'a str,
+    of_trait: bool,
+    of: Option<Target<'a>>,
 }
 
 impl<'a> Resolver<'a> {
@@ -144,7 +157,7 @@ impl<'a> Resolver<'a> {
         modules: Modules,
         language: &dyn LanguagePack,
     ) -> Self {
-        let defs = files
+        let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
             .map(|(path, facts)| {
                 let names = facts.defs.iter().map(|d| (d.name.as_str(), d)).collect();
@@ -173,11 +186,27 @@ impl<'a> Resolver<'a> {
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
+            let names: &HashMap<&str, &Def> = &defs[path];
+            // Whether `scope` is the top level or modules written in place, all the way up.
+            let in_modules = |mut scope: &str| {
+                while !scope.is_empty() {
+                    if names.get(scope).map(|d| d.kind) != Some(Kind::Module) {
+                        return false;
+                    }
+                    scope = crate::parent(scope);
+                }
+                true
+            };
             for def in &facts.defs {
                 let name = def.name.as_str();
                 let key = match (def.kind, name.rsplit_once('.')) {
                     (Kind::Method, Some((_, last))) => (true, last),
                     (Kind::Function | Kind::Class, None) => (false, name),
+                    // A path reaches one in a module written in place as it does a top-level
+                    // one.
+                    (Kind::Function | Kind::Class, Some((scope, last))) if in_modules(scope) => {
+                        (false, last)
+                    }
                     _ => continue,
                 };
                 by_name.entry(key).or_default().push(Target { path, name });
@@ -197,6 +226,8 @@ impl<'a> Resolver<'a> {
             callers: HashMap::new(),
             by_name,
             modules,
+            impls: HashMap::new(),
+            blocks: HashMap::new(),
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -211,6 +242,30 @@ impl<'a> Resolver<'a> {
             }
         }
         resolver.families = work.families;
+        let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
+        let mut blocks = HashMap::new();
+        for (path, facts) in files {
+            for block in &facts.impls {
+                let class = |name: &'a str| match resolver.binding(path, &block.within, name) {
+                    Binding::Def(t) if resolver.is_class(t) => Some(t),
+                    _ => None,
+                };
+                let Some(ty) = class(&block.ty) else {
+                    continue;
+                };
+                blocks.insert((*path, block.scope.as_str()), ty);
+                impls.entry(ty).or_default().push(Block {
+                    path,
+                    scope: &block.scope,
+                    of_trait: block.of.is_some(),
+                    of: block.of.as_deref().and_then(class),
+                });
+            }
+        }
+        impls
+            .values_mut()
+            .for_each(|b| b.sort_by_key(|b| b.of_trait));
+        (resolver.impls, resolver.blocks) = (impls, blocks);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
@@ -241,7 +296,7 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.infer(&call.callee),
+            | Binding::Unknown => self.infer(&call.callee, call.by_path),
         }
     }
 
@@ -275,7 +330,21 @@ impl<'a> Resolver<'a> {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, work)
                 }
-                Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
+                Binding::Def(t) => {
+                    let qualified = format!("{}.{member}", t.name);
+                    match self.def(t.path, &qualified) {
+                        // A module written in place may import a whole file under it (Rust's
+                        // `mod inner { mod x; }` binds `inner.x`).
+                        Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
+                            let mut imports = self.files[t.path].imports.iter().rev();
+                            match imports.find(|i| i.local == qualified) {
+                                Some(i) => self.import(t.path, &i.source, &i.name, seen),
+                                None => Binding::Unknown,
+                            }
+                        }
+                        found => found,
+                    }
+                }
                 Binding::Module(m) => self.export(m, member, seen),
                 other => other,
             };
@@ -350,8 +419,36 @@ impl<'a> Resolver<'a> {
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
             }
+            if let Some(found) = self.block_member(c, member) {
+                return found;
+            }
         }
         Binding::Unknown
+    }
+
+    /// `member` of `class` in its blocks (`Facts::impls`): an inherent block's first, else the
+    /// one trait's block that defines it or whose trait gives it a default body. Several
+    /// traits giving it leave it unknown; none, `None`.
+    fn block_member(&self, class: Target<'a>, member: &str) -> Option<Binding<'a>> {
+        let blocks = self.impls.get(&class)?;
+        let find = |path: &'a str, scope: &str| {
+            let qualified = format!("{scope}.{member}");
+            let (name, _) = self.defs[path].get_key_value(qualified.as_str())?;
+            Some(Target { path, name })
+        };
+        let inherent = blocks.iter().filter(|b| !b.of_trait);
+        if let Some(t) = inherent.filter_map(|b| find(b.path, b.scope)).next() {
+            return Some(Binding::Def(t));
+        }
+        let traits = blocks.iter().filter(|b| b.of_trait);
+        let found: BTreeSet<Target> = traits
+            .filter_map(|b| find(b.path, b.scope).or_else(|| find(b.of?.path, b.of?.name)))
+            .collect();
+        match found.into_iter().collect::<Vec<_>>()[..] {
+            [] => None,
+            [one] => Some(Binding::Def(one)),
+            _ => Some(Binding::Unknown),
+        }
     }
 
     /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
@@ -441,20 +538,22 @@ impl<'a> Resolver<'a> {
 
     /// The definitions whose name matches the callee's last name anywhere in the repository:
     /// methods for a member call (`x.area()`), top-level functions and classes for a plain
-    /// call (`area()`).
-    fn infer(&self, callee: &str) -> Resolution<'a> {
+    /// call (`area()`), both for a path (`a::area()`, `by_path`).
+    fn infer(&self, callee: &str, by_path: bool) -> Resolution<'a> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
             None => (false, callee),
         };
-        let found = self
-            .by_name
-            .get(&(member, last))
-            .map_or(&[][..], Vec::as_slice);
-        match found {
+        let found = |member| (self.by_name.get(&(member, last))).map_or(&[][..], Vec::as_slice);
+        let mut found = found(member).to_vec();
+        if member && by_path {
+            found.extend(self.by_name.get(&(false, last)).into_iter().flatten());
+            found.sort();
+        }
+        match found[..] {
             [] => Resolution::Unresolved,
-            [one] => Resolution::Inferred(*one),
-            all => Resolution::Ambiguous(all.to_vec()),
+            [one] => Resolution::Inferred(one),
+            _ => Resolution::Ambiguous(found),
         }
     }
 
@@ -465,7 +564,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// The class whose body encloses `scope`, for `this`.
+    /// The class whose body, or one of whose blocks (`Facts::impls`), encloses `scope`, for
+    /// `this` and Rust's `Self`.
     fn class(&self, path: &'a str, scope: &str) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = scope;
@@ -474,6 +574,9 @@ impl<'a> Resolver<'a> {
                 && def.kind == Kind::Class
             {
                 return Binding::Def(Target { path, name });
+            }
+            if let Some(class) = self.blocks.get(&(path, scope)) {
+                return Binding::Def(*class);
             }
             scope = crate::parent(scope);
         }

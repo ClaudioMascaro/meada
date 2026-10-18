@@ -130,6 +130,28 @@ fn python_functions_are_found_by_name_and_list_callers_and_callees() {
 }
 
 #[test]
+fn rust_items_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_rust",
+        "conformance-rust",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // A struct and its methods, in a crate whose root `[lib] path` names.
+    assert_golden(
+        "conformance-rust.search-invoice.txt",
+        &engine.search("Invoice", None, None).unwrap(),
+    );
+    // Callers from another module of the crate; callees through `mod` declarations, `super::`
+    // and a method matched by name.
+    assert_golden(
+        "conformance-rust.context-serve.txt",
+        &engine.context("serve", None).unwrap(),
+    );
+}
+
+#[test]
 fn python_programs_are_found_as_processes_and_shown_with_their_range() {
     let repo = fixture_repo(
         "context_python_programs",

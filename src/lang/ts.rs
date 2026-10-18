@@ -1,6 +1,6 @@
 //! The TypeScript and JavaScript language pack.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
@@ -127,6 +127,7 @@ impl LanguagePack for TsJs {
                                 .unwrap_or_default(),
                             kwargs: Vec::new(),
                             decorates: None,
+                            by_path: false,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -232,7 +233,7 @@ impl LanguagePack for TsJs {
         messages::messages(code)
     }
 
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
+    fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         let aliases = match configs.first() {
             Some((name, src)) => Aliases::parse(src).map_err(|e| format!("{name}: {e}"))?,
             None => Aliases::default(),

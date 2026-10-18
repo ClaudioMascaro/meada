@@ -1349,6 +1349,233 @@ fn python() {
     );
 }
 
+#[test]
+fn rust() {
+    const MAIN: &str = "api/src/main.rs";
+    const STORE: &str = "api/src/store.rs";
+    conform(
+        "conformance-rust",
+        &[
+            "api/extra/legacy_util.rs::legacy",
+            "api/src/bin/tool.rs::helper",
+            "api/src/bin/tool.rs::helper.go",
+            "api/src/bin/tool.rs::main",
+            "api/src/main.rs::checks",
+            "api/src/main.rs::checks.compute",
+            "api/src/main.rs::checks.run_checks",
+            "api/src/main.rs::checks.verify",
+            "api/src/main.rs::compute",
+            "api/src/main.rs::inner",
+            "api/src/main.rs::inner.helper",
+            "api/src/main.rs::inner.twice",
+            "api/src/main.rs::main",
+            "api/src/main.rs::run",
+            "api/src/main.rs::start",
+            "api/src/routes/health.rs::check",
+            "api/src/routes/mod.rs::serve",
+            "api/src/store.rs::Mode",
+            "api/src/store.rs::Persist",
+            "api/src/store.rs::Persist.describe",
+            "api/src/store.rs::Store",
+            "api/src/store.rs::Store.Persist.persist",
+            "api/src/store.rs::Store.empty",
+            "api/src/store.rs::Store.new",
+            "api/src/store.rs::Store.save",
+            "api/src/store.rs::reset",
+            "api/src/store/disk.rs::Store.check",
+            "api/src/store/disk.rs::Store.reload",
+            "api/src/store/disk.rs::open",
+            "api/tools/admin.rs::main",
+            "api/tools/shared.rs::ping",
+            "crates/billing/src/billing.rs::total",
+            "crates/billing/src/billing.rs::util",
+            "crates/billing/src/billing.rs::util.round",
+            "crates/billing/src/invoice.rs::Invoice",
+            "crates/billing/src/invoice.rs::Invoice.amount",
+            "crates/billing/src/invoice.rs::Invoice.new",
+            "crates/billing/src/invoice.rs::tax",
+        ],
+        &[],
+        &[
+            // An inline module, by its path and through `self::`.
+            (
+                "api/src/main.rs::inner.twice::helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::inner.twice::helper#1",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::main::inner.helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            // `super::` out of an inline module; the one its module hides stays unresolved.
+            (
+                "api/src/main.rs::checks.verify::start#0",
+                EXACT,
+                &["api/src/main.rs::start"],
+            ),
+            (
+                "api/src/main.rs::checks.run_checks::(scoped_identifier)#0",
+                None,
+                &[],
+            ),
+            (
+                "api/src/main.rs::checks.run_checks::compute#0",
+                EXACT,
+                &["api/src/main.rs::checks.compute"],
+            ),
+            // `<name>.rs`, `mod.rs` and `#[path]` modules, and `crate::`.
+            (
+                "api/src/main.rs::main::store.Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/main.rs::main::routes.serve#0",
+                EXACT,
+                &["api/src/routes/mod.rs::serve"],
+            ),
+            (
+                "api/src/main.rs::main::util.legacy#0",
+                EXACT,
+                &["api/extra/legacy_util.rs::legacy"],
+            ),
+            (
+                "api/src/main.rs::main::crate.store.reset#0",
+                EXACT,
+                &["api/src/store.rs::reset"],
+            ),
+            // A closure's call belongs to the function around it; the closure's binding hides
+            // the function of its name.
+            (
+                "api/src/main.rs::main::start#0",
+                EXACT,
+                &["api/src/main.rs::start"],
+            ),
+            (
+                "api/src/main.rs::main::run#0",
+                INFERRED,
+                &["api/src/main.rs::run"],
+            ),
+            // Paths into crates outside the repository.
+            ("api/src/main.rs::main::String.new#0", None, &[]),
+            ("api/src/main.rs::main::std.mem.drop#0", None, &[]),
+            (
+                "api/src/routes/mod.rs::serve::health.check#0",
+                EXACT,
+                &["api/src/routes/health.rs::check"],
+            ),
+            (
+                "api/src/routes/mod.rs::serve::super.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            (
+                "api/src/routes/mod.rs::serve::store.save#0",
+                INFERRED,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/routes/health.rs::check::crate.inner.helper#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/routes/health.rs::check::super.super.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            // `Self::`, `Type::` and `Trait::` calls, inherent and trait `impl`s, and an
+            // `impl` in another file than the type.
+            (
+                "api/src/store.rs::Store.new::Self.empty#0",
+                EXACT,
+                &["api/src/store.rs::Store.empty"],
+            ),
+            (
+                "api/src/store.rs::Store.empty::disk.open#0",
+                EXACT,
+                &["api/src/store/disk.rs::open"],
+            ),
+            (
+                "api/src/store.rs::Store.empty::Store.reload#0",
+                EXACT,
+                &["api/src/store/disk.rs::Store.reload"],
+            ),
+            (
+                "api/src/store.rs::Store.Persist.persist::Self.describe#0",
+                EXACT,
+                &["api/src/store.rs::Persist.describe"],
+            ),
+            (
+                "api/src/store.rs::reset::Store.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/store.rs::reset::Persist.describe#0",
+                EXACT,
+                &["api/src/store.rs::Persist.describe"],
+            ),
+            (
+                "api/src/store/disk.rs::Store.reload::open#0",
+                EXACT,
+                &["api/src/store/disk.rs::open"],
+            ),
+            (
+                "api/src/store/disk.rs::Store.reload::Self.check#0",
+                EXACT,
+                &["api/src/store/disk.rs::Store.check"],
+            ),
+            // Crate roots from `src/bin/` and `[[bin]]`.
+            (
+                "api/src/bin/tool.rs::main::helper.go#0",
+                EXACT,
+                &["api/src/bin/tool.rs::helper.go"],
+            ),
+            (
+                "api/tools/admin.rs::main::shared.ping#0",
+                EXACT,
+                &["api/tools/shared.rs::ping"],
+            ),
+            // The second member, its root named by `[lib] path`.
+            (
+                "crates/billing/src/billing.rs::total::invoice.Invoice.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "crates/billing/src/billing.rs::total::invoice.tax#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::tax"],
+            ),
+            (
+                "crates/billing/src/billing.rs::total::(call_expression).amount#0",
+                INFERRED,
+                &["crates/billing/src/invoice.rs::Invoice.amount"],
+            ),
+            // A path call that does not resolve matches functions as well as methods by name.
+            (
+                "crates/billing/src/invoice.rs::tax::u.round#0",
+                INFERRED,
+                &["crates/billing/src/billing.rs::util.round"],
+            ),
+        ],
+    );
+    // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.
+    let repo = fixture_repo("conformance_rust_absent", "conformance-rust", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(!export.contains(&format!("{MAIN}::main::compute#")));
+    assert!(!export.contains("orphan.rs"));
+    assert!(!export.contains("scratch"));
+    assert!(export.contains(&format!("{STORE}::Store.Persist.persist")));
+}
+
 /// The Python conformance fixture's export, and its providers (contract, site) whose site is
 /// under `dir`, sorted.
 fn python_providers(case: &str, dir: &str) -> (Value, Vec<(String, String)>) {

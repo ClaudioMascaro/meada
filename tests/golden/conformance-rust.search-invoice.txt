@@ -1,0 +1,3 @@
+example.com/acme/conformance crates/billing/src/invoice.rs:3 Invoice
+example.com/acme/conformance crates/billing/src/invoice.rs:12 Invoice.amount
+example.com/acme/conformance crates/billing/src/invoice.rs:8 Invoice.new

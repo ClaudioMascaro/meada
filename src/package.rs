@@ -75,11 +75,13 @@ impl Ecosystem {
     }
 
     /// The ecosystem whose packages the source file at `path` imports: PyPI's for a `.py`
-    /// file, npm's for the TS/JS pack's.
-    fn of_source(path: &str) -> Self {
-        match path.ends_with(".py") {
-            true => Ecosystem::Pypi,
-            false => Ecosystem::Npm,
+    /// file, npm's for the TS/JS pack's; none yet for a Rust file, whose imports name no
+    /// package.
+    fn of_source(path: &str) -> Option<Self> {
+        match path.rsplit_once('.').map(|(_, extension)| extension) {
+            Some("py") => Some(Ecosystem::Pypi),
+            Some("rs") => None,
+            _ => Some(Ecosystem::Npm),
         }
     }
 
@@ -988,7 +990,9 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
         for call in &export.import_calls {
             let (from, chain) = ((n, call.path.as_str()), call.chain.as_str());
             let symbol = |at: &Provided, id: &str| at.symbol(id);
-            let ecosystem = Ecosystem::of_source(&call.path);
+            let Some(ecosystem) = Ecosystem::of_source(&call.path) else {
+                continue;
+            };
             for (entry, resolved) in resolutions(
                 exports,
                 providers,
@@ -1149,7 +1153,7 @@ fn resolutions<'e>(
     known: impl Fn(&Provided<'e>, &str) -> bool,
 ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
     let at = |m: usize| provided[m].get_or_init(|| Provided::new(&exports[m]));
-    if Ecosystem::of_source(from) == Ecosystem::Pypi {
+    if Ecosystem::of_source(from) == Some(Ecosystem::Pypi) {
         return pypi_resolutions(exports, providers, &at, (n, from), specifier, chain, known);
     }
     let Some((name, subpath)) = split(specifier) else {
@@ -1568,7 +1572,9 @@ impl ContractKind for Packages {
     /// manifests are read apart from the packs.
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
-        for (&path, facts) in code.files() {
+        // A file of no ecosystem (Rust, until Cargo is one) imports no package.
+        let files = (code.files().iter()).filter(|(path, _)| Ecosystem::of_source(path).is_some());
+        for (&path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
                 let Some((specifier, chain)) = code.imported(path, &call.scope, &call.callee)
                 else {
@@ -2589,7 +2595,7 @@ mod tests {
                 .map(|(p, s)| (*p, TsJs.parse(p, s.as_bytes()).unwrap()))
                 .collect();
             let files = facts.iter().map(|(p, f)| (*p, f)).collect();
-            let rows = Resolver::new(&files, TsJs.modules(&[]).unwrap(), &TsJs).exported();
+            let rows = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs).exported();
             let p = provided(&rows);
             // As in ES modules, two `export *` giving `f` differently export no `f`.
             assert_eq!(lookup(&p, "i.ts", "f"), None, "{other}");
