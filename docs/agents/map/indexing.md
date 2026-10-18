@@ -43,7 +43,8 @@ modules updates it.
   so `.gitignore` does not hide it; a listed path that is not a file, or that has a symbolic
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
-  is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
+  is the shared pass behind `documents` and `manifests` (spec #22), reading each file up to one
+  byte past its reader's size limit (`read_up_to`): the `manifests` table (path,
   hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json`,
   `pyproject.toml` and `requirements*.txt` the walk finds (`manifests_found`, through
   `package::is_manifest`; `package::read_manifest` reads each by its ecosystem; any path with a
@@ -85,7 +86,8 @@ modules updates it.
   `pyproject.toml`: `.pyi` and notebooks are not read) and `lang/rust.rs` (`.rs`, reads every
   `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below).
   `refresh` reads a `**/<name>` config at any depth from the walk, in path order, and any
-  config through `read_config` (stat'ed first, skipped past `MAX_CONFIG`); it groups the
+  config through `read_config` (up to one byte past `package::MAX_BYTES`, no symbolic link,
+  as a manifest is); it groups the
   parsed files by pack, keeps the ones the pack's `members` names (default: all; a left-out
   file keeps its `files` row and facts with an empty `resolved`, its symbol and call rows are
   deleted, and the export and `status` skip it), and builds each `Resolver` from
@@ -174,8 +176,11 @@ modules updates it.
   for both packs.
 - `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
   two definitions of one name, spans a decorated definition with its decorators, and exports
-  every module-level name (imports included), as an explicit import or `m.x` sees them; what
-  `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
+  every module-level name (imports included), as an explicit import or `m.x` sees them, and
+  its star imports, last binding first, since a later one rebinds the name (`stars_bind`: the
+  resolver takes the first export that gives a name, so a star import after a definition
+  rebinds it when its module exports it); what `import *` takes is `Facts::star`: the public
+  names, or a literal `__all__` alone.
   Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
