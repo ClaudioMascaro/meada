@@ -253,6 +253,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "documents",
         &documents_found(root, &all, serve),
         now,
+        |abs| fs::read(abs),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
     refresh_stamped(
@@ -260,6 +261,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "manifests",
         &manifests_found(&all),
         now,
+        read_manifest,
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
@@ -685,15 +687,20 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The pack config file `name` at the repository root, read up to one byte past
-/// `package::MAX_BYTES`: the pack reads a file that large as invalid, so the rest of it is never
-/// read. Like the walk, the read goes through no symbolic link.
+/// The pack config file `name` at the repository root, read as `read_manifest` reads one. Like
+/// the walk, the read goes through no symbolic link.
 fn read_config(root: &Path, name: &str) -> Option<Vec<u8>> {
+    read_manifest(&plain_file(root, name)?).ok()
+}
+
+/// A manifest or pack config file, read up to one byte past `package::MAX_BYTES`: its reader
+/// takes a file that large as invalid whatever the rest holds, so the rest is never read, and
+/// what was read stands for the whole file wherever it is hashed.
+fn read_manifest(abs: &Path) -> std::io::Result<Vec<u8>> {
     let mut src = Vec::new();
-    let file = fs::File::open(plain_file(root, name)?).ok()?;
     let limit = package::MAX_BYTES as u64 + 1;
-    file.take(limit).read_to_end(&mut src).ok()?;
-    Some(src)
+    fs::File::open(abs)?.take(limit).read_to_end(&mut src)?;
+    Ok(src)
 }
 
 /// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
@@ -710,13 +717,14 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
 
 /// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
 /// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// hash, then `summarize` only what changed. A stored row not found, or whose file cannot be
-/// statted or read, leaves the table.
+/// `read` and hash, then `summarize` only what changed. A stored row not found, or whose file
+/// cannot be statted or read, leaves the table.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
     found: &[(String, PathBuf)],
     now: SystemTime,
+    read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
 ) -> Result<()> {
     let stored: HashMap<String, Stamp> = tx
@@ -739,7 +747,7 @@ fn refresh_stamped(
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
-        let Ok(src) = fs::read(abs) else {
+        let Ok(src) = read(abs) else {
             seen.remove(path.as_str());
             continue;
         };
@@ -1503,6 +1511,7 @@ mod tests {
             "manifests",
             &found,
             std::time::SystemTime::now(),
+            |abs| fs::read(abs),
             |_, _| Ok("{}".into()),
         )
         .unwrap();

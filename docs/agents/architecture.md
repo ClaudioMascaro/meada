@@ -454,9 +454,11 @@ one for the area a change touches.
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
-  no fragments, since only `refresh` writes it. A pack config file (`tsconfig.json`,
-  `jsconfig.json`, `pyproject.toml`) is read up to one byte past `package::MAX_BYTES`, which its
-  pack reads as invalid, and through no symbolic link (`read_config`), as the walk follows none.
+  no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
+  `pyproject.toml`, `requirements*.txt`, `tsconfig.json`, `jsconfig.json`) is read up to one
+  byte past `package::MAX_BYTES` (`read_manifest`), which its reader takes as invalid whatever
+  the rest holds, so the `manifests` hash and the config digest are of what was read. A root
+  pack config is read through no symbolic link (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
