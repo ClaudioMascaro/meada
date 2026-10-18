@@ -252,7 +252,7 @@ pub struct Resolver<'a> {
     /// The class each block adds members to, by its file and scope: what `Self` names in it.
     blocks: HashMap<(&'a str, &'a str), Target<'a>>,
     /// The files whose exports other packages can import, when the pack says which
-    /// (`LanguagePack::published`).
+    /// (`Layout::published`).
     published: Option<BTreeSet<String>>,
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
@@ -432,7 +432,7 @@ impl<'a> Resolver<'a> {
         resolver
     }
 
-    /// Limits `exported` to these files (`LanguagePack::published`); `None` keeps every file.
+    /// Limits `exported` to these files (`Layout::published`); `None` keeps every file.
     pub fn publishing(mut self, published: Option<BTreeSet<String>>) -> Self {
         self.published = published;
         self
@@ -2514,7 +2514,7 @@ impl<'a> Code<'a> {
         }
     }
 
-    /// Whether other packages may import the exports of `path` (`LanguagePack::published`).
+    /// Whether other packages may import the exports of `path` (`Layout::published`).
     pub fn published(&self, path: &str) -> bool {
         (self.resolver.published.as_ref()).is_none_or(|files| files.contains(path))
     }

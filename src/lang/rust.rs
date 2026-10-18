@@ -11,7 +11,7 @@ use std::ops::Range;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Message, Modules, Param, Receiver, Star, children, named, text,
+    Layout, Message, Modules, Param, Receiver, Star, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
@@ -125,41 +125,25 @@ impl LanguagePack for Rust {
         configs: &[(&str, &[u8])],
         files: &BTreeMap<&str, &Facts>,
     ) -> Result<Modules> {
-        let tree = Tree::new(configs, files);
-        Ok(Box::new(move |from, specifier| {
-            tree.lookup(from, specifier)
-        }))
+        Ok(self.layout(configs, files)?.modules)
     }
 
-    fn members(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        Some(Tree::new(configs, files).members())
+    fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
+        let tree = Tree::new(configs, files);
+        let programs = (tree.bins())
+            .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
+            .map(|bin| (bin.to_string(), MAIN.to_string()))
+            .collect();
+        Ok(Layout {
+            members: Some(tree.members()),
+            published: Some(tree.published()),
+            programs,
+            modules: Box::new(move |from, specifier| tree.lookup(from, specifier)),
+        })
     }
 
     fn messages(&self, code: &Code) -> Vec<Message> {
         messages::messages(code)
-    }
-
-    fn published(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        Some(Tree::new(configs, files).published())
-    }
-
-    fn programs(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Vec<(String, String)> {
-        (Tree::new(configs, files).bins())
-            .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
-            .map(|bin| (bin.to_string(), MAIN.to_string()))
-            .collect()
     }
 }
 
@@ -2099,7 +2083,7 @@ mod tests {
         ]);
         // `src/lib.rs` is a library root and `src/m.rs` a module: neither starts a program.
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
-        let found = Rust.programs(&configs, &files);
+        let found = Rust.layout(&configs, &files).unwrap().programs;
         assert_eq!(found, [("src/main.rs".to_string(), "main".to_string())]);
     }
 
@@ -2108,7 +2092,7 @@ mod tests {
         let inline = facts("mod x { pub fn main() {} }\n");
         let files = BTreeMap::from([("src/main.rs", &inline)]);
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
-        assert!(Rust.programs(&configs, &files).is_empty());
+        assert!(Rust.layout(&configs, &files).unwrap().programs.is_empty());
     }
 
     #[test]

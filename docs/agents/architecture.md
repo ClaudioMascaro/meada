@@ -333,9 +333,12 @@ one for the area a change touches.
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
   path order, each read as a root config is (`read_config`) and folded into the configs digest on
-  every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
-  empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
-  facts besides the configs. A language whose imports name a path rather than a file (Rust's
+  every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
+  and every file the pack parsed, and which answers four things from one build (Rust's crate
+  `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
+  files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
+  and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
+  and `Layout::programs` (both below). A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -349,7 +352,7 @@ one for the area a change touches.
   a glob beats them, another crate of the repository answers through `Modules` and the rest
   is `Binding::External`. `Facts::private` lists the `exports` names `Resolver::exported`
   leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
-  crate), and `LanguagePack::published` (default: none) the files whose exports a pack counts
+  crate), and `Layout::published` (default: none) the files whose exports a pack counts
   at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
   library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
@@ -374,7 +377,7 @@ one for the area a change touches.
   `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
   edit re-extract) to files through `python_roots`. A form only the whole repository tells
   (Rust `fn main`, a program only in a binary target's root, which one file's `parse` cannot
-  see) is `LanguagePack::programs(configs, files)`, which `refresh` calls per pack beside
+  see) is `Layout::programs`, which `refresh` takes from each pack's `layout` beside
   `python_programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
@@ -456,7 +459,7 @@ one for the area a change touches.
   mismatch it forgets the file's mtime, refreshes and retries once.
 - Facts resolve only among files of the same pack, and inference runs only when resolution
   fails; an import from outside the repository is never inferred. A file its pack leaves out
-  (`members`) resolves nothing and has no symbol, call or `files` row in the export.
+  (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
 ## Tests (`tests/`)
 
