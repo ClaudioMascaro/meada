@@ -426,43 +426,23 @@ sample.py
       "local": "*",
       "source": ".models",
       "name": "All"
+    },
+    {
+      "local": "*",
+      "source": ".extras",
+      "name": "All"
     }
   ],
   "exports": [
     {
-      "Local": {
-        "exported": "os",
-        "local": "os"
+      "All": {
+        "source": ".extras"
       }
     },
     {
       "Local": {
-        "exported": "Shape",
-        "local": "Shape"
-      }
-    },
-    {
-      "Local": {
-        "exported": "helpers",
-        "local": "helpers"
-      }
-    },
-    {
-      "Local": {
-        "exported": "__all__",
-        "local": "__all__"
-      }
-    },
-    {
-      "Local": {
-        "exported": "BASE",
-        "local": "BASE"
-      }
-    },
-    {
-      "Local": {
-        "exported": "Circle",
-        "local": "Circle"
+        "exported": "main",
+        "local": "main"
       }
     },
     {
@@ -473,13 +453,43 @@ sample.py
     },
     {
       "Local": {
-        "exported": "main",
-        "local": "main"
+        "exported": "Circle",
+        "local": "Circle"
+      }
+    },
+    {
+      "Local": {
+        "exported": "BASE",
+        "local": "BASE"
+      }
+    },
+    {
+      "Local": {
+        "exported": "__all__",
+        "local": "__all__"
       }
     },
     {
       "All": {
         "source": ".models"
+      }
+    },
+    {
+      "Local": {
+        "exported": "helpers",
+        "local": "helpers"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Shape",
+        "local": "Shape"
+      }
+    },
+    {
+      "Local": {
+        "exported": "os",
+        "local": "os"
       }
     }
   ],

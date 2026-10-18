@@ -286,7 +286,9 @@ one for the area a change touches.
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
-  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
+  Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
+  argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
@@ -454,7 +456,12 @@ one for the area a change touches.
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
-  no fragments, since only `refresh` writes it.
+  no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
+  `pyproject.toml`, `requirements*.txt`, `tsconfig.json`, `jsconfig.json`) is read up to one
+  byte past `package::MAX_BYTES`, and a provider document up to one byte past
+  `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
+  holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A root
+  pack config is read through no symbolic link (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
@@ -472,8 +479,29 @@ one for the area a change touches.
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
   makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
   its ancestors in C3 order) longer than that is absent, so every member of the class is
-  unknown (a name match at most), and the linearization recurses no deeper down the bases.
-- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
+  unknown (a name match at most), and the linearization recurses no deeper down the bases. The
+  bases count from where the walk started, a family looked up for a member a base names
+  (`class Z(K.D)` linearizes `K`'s) included.
+  `REEXPORT_DEPTH` (64): a name followed through more files than that, each re-exporting it from
+  the next (`export { x } from`, `export * from`, a Python `from m import x` or `import *`), is
+  unknown (a name match at most), and no other import, `export *` or submodule binds it in its
+  place. A star import from outside the repository (`from numpy import *`) is taken to bind
+  nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
+  import or definition before it, as with the standard library's accelerator modules (`from
+  _heapq import *` after `def heappush`). Where a Python star import sits is not compared with
+  the code that reads a name it rebinds (`ponytail:` in `Resolver::rebound`): code run while
+  the module loads (its top level, a class body there, its main guard) gets the name unknown, as
+  it may run before the star import, and a function's code gets the star import's, as for every
+  binding a function reads. `RECEIVER_DEPTH` (64): a receiver whose class is named through
+  more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
+  The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
+  a walk, the families being linearized give up and none is kept: each is linearized again when
+  asked for, and does not depend on the walk that first reached it.
+- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
+  `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
+  (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
+  not an object declares no `paths` or `baseUrl` and the refresh carries on, with no status
+  line. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
   is not a definition (its body belongs to the one around it, and its name is a local that hides outer
@@ -648,7 +676,9 @@ one for the area a change touches.
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
-  larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
+  larger parts are unreadable or open. `mod.rs`: `MAX_BYTES` (16 MiB, above the largest public
+  single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
+  document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
   marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind

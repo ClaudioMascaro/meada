@@ -37,3 +37,6 @@ def area(circle: Circle, factor=2):
 def main():
     shape = Circle(3)
     helpers.log(area(shape))
+
+
+from .extras import *

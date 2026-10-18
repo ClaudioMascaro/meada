@@ -28,12 +28,48 @@ All notable changes to Meada are recorded here. The format follows
   with the range as written and `range unchecked`. A Python import of one of its modules crosses
   into the provider's symbols: `exact` through the distribution's own name, `inferred` through
   another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
-  package of one name never link. The index is rebuilt once (schema version 21).
+  package of one name never link. The index is rebuilt once (schema version 23).
 - Python program entry points, each with its process: the `if __name__ == "__main__":` block of a
   file (symbol `__main__`, its range the `if` block) and each function a `[project.scripts]`
   (or Poetry `[tool.poetry.scripts]`) target names, mapped to its file through the package's
   source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
   entry points, though an import still reaches the others.
+
+### Fixed
+
+- A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,
+  no longer stops indexing: it declares no `paths`, as a `pyproject.toml` that cannot be read
+  declares no source roots. A root config that is a symbolic link is not read, as the walk
+  follows none.
+- A manifest or config larger than 1 MiB (`package.json`, `pyproject.toml`,
+  `requirements*.txt`, `tsconfig.json`) is no longer read whole on every refresh: only its first
+  1 MiB and one byte are read, and it still counts as empty.
+- A provider document (OpenAPI, AsyncAPI) larger than 16 MiB is no longer read and parsed
+  whole: only its first 16 MiB and one byte are read, and `meada status` reports it unreadable.
+- A name re-exported through a crafted chain of thousands of files no longer overflows the
+  stack while indexing: past 64 files it is unknown, and no other import or `export *` binds
+  it instead.
+- A receiver whose class is named through a crafted chain of thousands of receivers
+  (`x: y.C`, `x = y.C()`) no longer overflows the stack while indexing: past 64 receivers its
+  class is unknown.
+- A name that a later star import (`from a import *`, `export * from`) binds to a constant or to
+  something from outside the repository is no longer linked `exact` to an earlier star import's
+  function of that name. A Python module that star-imports one name from several modules
+  re-exports the last one's, as Python binds it.
+- A Python name defined or assigned before a star import of a module of the repository that
+  exports it (`def x(): ...`, then `from a import *`) is linked to that module's from a
+  function, as Python rebinds it, and no longer to the earlier definition. Code that runs while
+  the module loads (its top level, a class body, its main guard) may run before the star import,
+  and links neither. A name bound again after the star import (`with ... as x`, `for x in`,
+  `except ... as x`, `:=`, a `case` capture, unpacking, `+=`, a function's `global x`) keeps
+  that binding, and a star import of a module whose `__all__` is computed rebinds a name to
+  nothing known.
+- A name two `export *` of one module give differently is no longer linked `exact` to the first
+  one's: as in ES modules, the module exports neither. Two that lead to the same definition
+  still export it.
+- A class whose base is named through a member of a class with a family close to 128 classes
+  long (`class Z(K.D)`) no longer resolves its members differently depending on which class was
+  read first.
 
 ## [0.1.0] - Unreleased
 

@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -25,7 +26,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 21;
+const SCHEMA_VERSION: i64 = 23;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -252,6 +253,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "documents",
         &documents_found(root, &all, serve),
         now,
+        |abs| read_up_to(abs, document::MAX_BYTES),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
     refresh_stamped(
@@ -259,6 +261,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "manifests",
         &manifests_found(&all),
         now,
+        |abs| read_up_to(abs, package::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
@@ -304,13 +307,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|p| !packs.contains_key(p.as_str()))
         .collect();
 
-    // Config files, read whole on every refresh: they are few and small.
+    // Config files, read on every refresh: they are few and small.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
-            if let Ok(src) = fs::read(root.join(name)) {
+            if let Some(src) = read_config(root, name) {
                 digest.update(format!("{pack}\0{name}\0{}\0", src.len()).as_bytes());
                 digest.update(&src);
                 found.push((name, src));
@@ -684,6 +687,24 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
+/// The pack config file `name` at the repository root, read as a manifest is (`read_up_to`).
+/// Like the walk, the read goes through no symbolic link.
+fn read_config(root: &Path, name: &str) -> Option<Vec<u8>> {
+    read_up_to(&plain_file(root, name)?, package::MAX_BYTES).ok()
+}
+
+/// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
+/// the rest holds (`package::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
+/// for a provider document): the rest is never read, and what was read stands for the whole
+/// file wherever it is hashed.
+fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {
+    let mut src = Vec::new();
+    fs::File::open(abs)?
+        .take(max as u64 + 1)
+        .read_to_end(&mut src)?;
+    Ok(src)
+}
+
 /// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
 /// `tsconfig.json` files (path and absolute path), but those under a `node_modules` directory,
 /// which the walk finds when `.gitignore` does not list it.
@@ -698,13 +719,14 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
 
 /// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
 /// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// hash, then `summarize` only what changed. A stored row not found, or whose file cannot be
-/// statted or read, leaves the table.
+/// `read` and hash, then `summarize` only what changed. A stored row not found, or whose file
+/// cannot be statted or read, leaves the table.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
     found: &[(String, PathBuf)],
     now: SystemTime,
+    read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
 ) -> Result<()> {
     let stored: HashMap<String, Stamp> = tx
@@ -727,7 +749,7 @@ fn refresh_stamped(
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
-        let Ok(src) = fs::read(abs) else {
+        let Ok(src) = read(abs) else {
             seen.remove(path.as_str());
             continue;
         };
@@ -1462,7 +1484,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
+    use super::{SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
     use crate::{document, lang, package};
 
     #[test]
@@ -1491,6 +1513,7 @@ mod tests {
             "manifests",
             &found,
             std::time::SystemTime::now(),
+            |abs| fs::read(abs),
             |_, _| Ok("{}".into()),
         )
         .unwrap();
@@ -1501,6 +1524,25 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
         assert_eq!(paths, ["Cargo.toml"]);
+    }
+
+    #[test]
+    fn a_config_file_is_read_up_to_one_byte_past_the_size_limit() {
+        let root = std::env::temp_dir().join(format!("meada-index-config-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("tsconfig.json"),
+            " ".repeat(package::MAX_BYTES * 2),
+        )
+        .unwrap();
+        fs::write(root.join("jsconfig.json"), "{}").unwrap();
+
+        let large = read_config(&root, "tsconfig.json").map(|src| src.len());
+        let small = read_config(&root, "jsconfig.json");
+        fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(large, Some(package::MAX_BYTES + 1));
+        assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
