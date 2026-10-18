@@ -29,6 +29,11 @@ All notable changes to Meada are recorded here. The format follows
   into the provider's symbols: `exact` through the distribution's own name, `inferred` through
   another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
   package of one name never link. The index is rebuilt once (schema version 21).
+- Python program entry points, each with its process: the `if __name__ == "__main__":` block of a
+  file (symbol `__main__`, its range the `if` block) and each function a `[project.scripts]`
+  (or Poetry `[tool.poetry.scripts]`) target names, mapped to its file through the package's
+  source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
+  entry points, though an import still reaches the others.
 
 ## [0.1.0] - Unreleased
 
