@@ -2,6 +2,7 @@
 //! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
 //! A pack never touches the index or other files.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use crate::Result;
 use crate::resolve::Code;
 
 pub mod python;
+pub mod rust;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -21,12 +23,28 @@ pub trait LanguagePack {
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
 
     /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`. The shared side reads those present and hands them to `modules`.
+    /// `tsconfig.json`. The shared side reads those present and hands them to `modules` and
+    /// `members`. A name starting with `**/` names every file of that name the walk finds, at
+    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
     fn config_files(&self) -> &'static [&'static str];
 
     /// How imports name files in one repository, built from its config files as
-    /// `(path, contents)`, in `config_files` order.
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
+    /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files
+    /// (the files `members` keeps): a Rust `mod` declaration names a file by where the
+    /// declaring file sits in its crate's module tree.
+    fn modules(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>)
+    -> Result<Modules>;
+
+    /// The files the language builds, among those it parsed, when it says which: a Rust file
+    /// is part of a crate only when a `mod` declaration reaches it from a crate root. `None`
+    /// keeps every file. A file left out has no symbol or call, and resolves nothing.
+    fn members(
+        &self,
+        _configs: &[(&str, &[u8])],
+        _files: &BTreeMap<&str, &Facts>,
+    ) -> Option<BTreeSet<String>> {
+        None
+    }
 
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
     /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
@@ -101,7 +119,7 @@ pub enum Handler {
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -156,6 +174,25 @@ pub struct Facts {
     /// dropped without a word: each pack's conformance golden is what catches a wrong one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub programs: Vec<String>,
+    /// The blocks that add definitions to a type written elsewhere, such as Rust's `impl`:
+    /// the shared side looks a member of the type up in each block too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub impls: Vec<Impl>,
+}
+
+/// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
+/// Rust `impl Store` is the scope `Store`; a trait's `impl Persist for Store` is `Store.Persist`,
+/// whose members come after the inherent ones, and whose trait lends its default bodies.
+#[derive(Serialize, Deserialize)]
+pub struct Impl {
+    pub scope: String,
+    /// The type, as a callee-like name resolved from `within`.
+    pub ty: String,
+    /// The trait a trait's block implements, resolved the same way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub of: Option<String>,
+    /// The scope enclosing the block: an inline module, or the top level.
+    pub within: String,
 }
 
 /// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
@@ -262,6 +299,9 @@ pub enum Kind {
     /// shared side names it when a contract kind says what it is (an inline route handler)
     /// and folds it into its enclosing definition otherwise.
     Inline,
+    /// A module written in place (Rust's `mod inner { }`): its definitions are named under it
+    /// (`inner.helper`), and a function of it is matched by name like a top-level one.
+    Module,
 }
 
 /// A definition. `name` is qualified by its enclosing definitions: `outer.inner`,
@@ -379,6 +419,10 @@ pub struct Call {
     /// written on `def index()` decorates `index`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decorates: Option<String>,
+    /// The callee is a path (Rust's `a::b::f()`), not a member chain: the name match a call
+    /// that does not resolve falls back to takes functions as well as methods.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub by_path: bool,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
     #[serde(skip)]

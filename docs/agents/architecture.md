@@ -32,7 +32,7 @@ one for the area a change touches.
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
-  language adapter and the TS/JS and Python packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python and Rust packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
@@ -51,7 +51,14 @@ one for the area a change touches.
 - Symbol: `<repository>::<path>::<qualified name>` (`Class.method`, `outer.inner`).
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
-  other expression becomes `(<node kind>)`.
+  other expression becomes `(<node kind>)`. A Rust path is dotted like a chain (`crate::a::f`
+  is `crate.a.f`, `Type::new` is `Type.new`); its `self::` and a `super::` that stays in the
+  file are read from the file's top under the keyword `mod` (`self::f` in `inner` is
+  `mod.inner.f`, `super::f` out of `inner` is `mod.f`).
+- Rust qualified names use `.` as well: `Type.method` (an inherent `impl`), `Type.Trait.method`
+  (a trait's `impl`), `Trait.method` (a default body), `inner.helper` (an inline module); a
+  later block that gives a name already given a method is `Type.Trait#2.method` (`impl From<A>`
+  then `impl From<B>`). A module, inline or declared with `mod x;`, is a symbol of its file.
 - Inline handlers: a pack emits anonymous function arguments (and functions written in an
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
@@ -181,7 +188,8 @@ one for the area a change touches.
   (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
   `flag`; PyPI's is never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
   range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
-  its file's (`Ecosystem::of_source`), and resolving the import into the provider is the
+  its file's (`Ecosystem::of_source`; none for a `.rs` file until Cargo is an ecosystem, so
+  `Packages::extract` stores no import row for it), and resolving the import into the provider is the
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
   `pypi_resolutions`, `Provided::module`). A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
@@ -288,7 +296,24 @@ one for the area a change touches.
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes) and `Param::binds` (which argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
-  would have resolved. A pack that has program entry points fills
+  would have resolved. A language whose files are not all built, or whose imports name files by
+  a tree spread over several files (Rust's crates and `mod` declarations), says so through
+  three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
+  path order, each stat'ed against `MAX_CONFIG`, read and folded into the configs digest on
+  every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
+  empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
+  facts besides the configs. A block that adds members to a type written elsewhere (Rust's
+  `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
+  (`block_member`, before the class's own names: the inherent blocks' definitions, else the
+  trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
+  an `ambiguous` call with exactly those candidates) and `Resolver::class` (`Self` inside a
+  block) read. A module is `Kind::Module`: its functions are name-match candidates like
+  top-level ones, a `Kind::Module` that an import of its own name binds to a file (Rust's `mod
+  store;`) has that file's exports as members, and `Resolver::lexical` does not climb past
+  one (the names around a module are not its own; the file's imports still are). A call
+  written as a path sets `Call::by_path`: its head is read among types and modules alone
+  (`lexical_as`, no local or parameter hides it), and a failed resolution matches functions as
+  well as methods by name. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -371,7 +396,8 @@ one for the area a change touches.
 - `context` shows span text only while the file's BLAKE3 still equals the indexed hash; on a
   mismatch it forgets the file's mtime, refreshes and retries once.
 - Facts resolve only among files of the same pack, and inference runs only when resolution
-  fails; an import from outside the repository is never inferred.
+  fails; an import from outside the repository is never inferred. A file its pack leaves out
+  (`members`) resolves nothing and has no symbol, call or `files` row in the export.
 
 ## Tests (`tests/`)
 
@@ -682,6 +708,26 @@ one for the area a change touches.
   scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
   module's global of that name; only the first `__main__` of a file (a guard or a
   `def __main__()`) counts.
+- `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
+  (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
+  member chain in a callee is its node kind, and an `impl` type behind more references names
+  no type. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
+  `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
+  line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
+  a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
+  none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
+  `benches/` and `build.rs` are no crate roots (no marker). A file two crates reach (`mod
+  util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
+  first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
+  is not read, and `super::` out of a file declared inside a module written in place of its
+  parent reaches nothing (no marker). Imports bind for the whole file, so the `mod` imports and
+  the synthetic ones (`crate`, `super`, `mod`, an outside crate's first segment: `std`,
+  `String`, added only when neither the module's items nor any `use`, a glob included, binds
+  it) are seen inside every inline module too; `use` declarations are not imports yet, so a
+  call through one is a name match at most. `self::` and `super::` read inside a module that
+  sits in a function are `(scoped_identifier)`, unresolved. A file's `pub` items are its
+  public set (`Facts::star`), whatever the visibility of the modules above it. Calls inside
+  macro invocations are not indexed.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

@@ -25,13 +25,14 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 21;
+const SCHEMA_VERSION: i64 = 23;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
 /// is NULL when it was too recent to trust. `files.facts` is what the pack parsed, as JSON
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
-/// file's resolved symbol and call rows. `calls.target` holds the one definition an `exact` or
+/// file's resolved symbol and call rows, empty for a file its pack leaves out (`members`: a
+/// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
@@ -125,7 +126,9 @@ pub fn state(root: &Path) -> State {
     if version.ok() != Some(SCHEMA_VERSION) {
         return State::OtherSchema;
     }
-    match db.query_row("SELECT count(*) FROM files", [], |r| r.get(0)) {
+    match db.query_row("SELECT count(*) FROM files WHERE resolved != ''", [], |r| {
+        r.get(0)
+    }) {
         Ok(files) => State::Indexed { files },
         Err(_) => State::OtherSchema,
     }
@@ -304,16 +307,26 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|p| !packs.contains_key(p.as_str()))
         .collect();
 
-    // Config files, read whole on every refresh: they are few and small.
+    // Config files, read whole on every refresh: they are few and small (`read_config`). A
+    // `**/` name takes every file of that name the walk found, in path order.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
-            if let Ok(src) = fs::read(root.join(name)) {
-                digest.update(format!("{pack}\0{name}\0{}\0", src.len()).as_bytes());
-                digest.update(&src);
-                found.push((name, src));
+            let paths: BTreeMap<&str, PathBuf> = match name.strip_prefix("**/") {
+                Some(file) => (all.iter())
+                    .filter(|(path, _)| path.rsplit('/').next() == Some(file))
+                    .map(|(path, abs)| (path.as_str(), abs.clone()))
+                    .collect(),
+                None => BTreeMap::from([(name, root.join(name))]),
+            };
+            for (path, abs) in paths {
+                if let Some(src) = read_config(&abs) {
+                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
+                    digest.update(&src);
+                    found.push((path, src));
+                }
             }
         }
     }
@@ -359,26 +372,46 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         db.execute("DELETE FROM meta", [])?;
         return refresh(db, root, identity, serve);
     };
-    let all: BTreeMap<&str, &Facts> = changed
+    let parsed: BTreeMap<&str, &Facts> = changed
         .iter()
         .map(|p| (p.path.as_str(), &p.facts))
         .chain(kept.iter().map(|(path, facts)| (path.as_str(), facts)))
         .collect();
 
-    // Calls resolve among the files of their own pack.
+    // Calls resolve among the files of their own pack, those the pack builds.
     let mut groups: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
-    for (&path, &facts) in &all {
+    for (&path, &facts) in &parsed {
         groups.entry(packs[path]).or_default().insert(path, facts);
+    }
+    let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
+        (configs[&pack].iter())
+            .map(|(n, c)| (*n, c.as_slice()))
+            .collect()
+    };
+    for (&pack, files) in &mut groups {
+        if let Some(keep) = lang::pack(pack).members(&found_configs(pack), files) {
+            files.retain(|path, _| keep.contains(*path));
+        }
+    }
+    let all: BTreeMap<&str, &Facts> = groups.values().flatten().map(|(p, f)| (*p, *f)).collect();
+    // A file its pack leaves out keeps its facts, for when a change brings it in, but no rows:
+    // an empty `resolved` both marks it and makes the rows be written again then.
+    for path in parsed.keys().filter(|p| !all.contains_key(*p)) {
+        if stored.get(*path).is_some_and(|s| s.resolved.is_empty()) {
+            continue;
+        }
+        forget_calls(&tx, path)?;
+        tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
+        tx.execute(
+            "UPDATE files SET resolved = '' WHERE path = ?1",
+            params![path],
+        )?;
     }
     let resolvers = groups
         .iter()
         .map(|(&pack, files)| {
-            let found: Vec<(&str, &[u8])> = configs[&pack]
-                .iter()
-                .map(|(n, c)| (*n, c.as_slice()))
-                .collect();
             let language = lang::pack(pack);
-            let modules = language.modules(&found)?;
+            let modules = language.modules(&found_configs(pack), files)?;
             Ok((pack, Resolver::new(files, modules, language)))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
@@ -789,6 +822,20 @@ pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
 
 /// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
 /// [`with_reversed_walk`]).
+/// The largest config file a pack is handed (`tsconfig.json`, `pyproject.toml`, each
+/// `Cargo.toml`); a larger one is not read, as if absent, with no status line.
+// ponytail: configs are a few KiB; the limit keeps a crafted one from being read and hashed
+// on every refresh.
+const MAX_CONFIG: u64 = 1 << 20;
+
+/// The bytes of the config file at `abs`, stat'ed first: `None` when it is missing, unreadable
+/// or larger than `MAX_CONFIG`.
+fn read_config(abs: &Path) -> Option<Vec<u8>> {
+    (fs::metadata(abs).ok()?.len() <= MAX_CONFIG)
+        .then(|| fs::read(abs).ok())
+        .flatten()
+}
+
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
@@ -1171,7 +1218,7 @@ fn stored_shape(json: Option<String>) -> Option<Shape> {
 pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
     let files = db
         .prepare(&format!(
-            "SELECT path, hash FROM {schema}.files ORDER BY path"
+            "SELECT path, hash FROM {schema}.files WHERE resolved != '' ORDER BY path"
         ))?
         .query_map([], |r| {
             Ok(File {
@@ -1462,8 +1509,21 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
+    use super::{MAX_CONFIG, SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
     use crate::{document, lang, package};
+
+    #[test]
+    fn a_config_past_the_size_limit_is_not_read() {
+        let dir = std::env::temp_dir().join(format!("meada-config-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let (at, past) = (dir.join("at.toml"), dir.join("past.toml"));
+        fs::write(&at, vec![b' '; MAX_CONFIG as usize]).unwrap();
+        fs::write(&past, vec![b' '; MAX_CONFIG as usize + 1]).unwrap();
+        assert_eq!(read_config(&at).map(|s| s.len()), Some(MAX_CONFIG as usize));
+        assert_eq!(read_config(&past), None);
+        assert_eq!(read_config(&dir.join("missing.toml")), None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {

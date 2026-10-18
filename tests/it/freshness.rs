@@ -194,6 +194,57 @@ fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
     );
 }
 
+/// Moves `mod health;` out of `routes/mod.rs` (its file is no longer reached), declares the
+/// unreached `orphan.rs`, adds a module with its file, deletes a module's file, edits a
+/// function others call and drops the `[[bin]]` root from a member's `Cargo.toml`.
+fn edit_rust(repo: &Path) {
+    let replace = |file: &str, from: &str, to: &str| {
+        let text = fs::read_to_string(repo.join(file)).unwrap();
+        assert!(text.contains(from), "{file} holds {from}");
+        fs::write(repo.join(file), text.replacen(from, to, 1)).unwrap();
+    };
+    replace("api/src/routes/mod.rs", "mod health;\n", "");
+    replace(
+        "api/src/main.rs",
+        "mod routes;\n",
+        "mod routes;\nmod health;\nmod orphan;\n",
+    );
+    replace("api/src/store.rs", "pub fn reset()", "pub fn restart()");
+    replace(
+        "crates/billing/src/billing.rs",
+        "pub mod invoice;\n",
+        "pub mod invoice;\nmod audit;\n",
+    );
+    fs::write(
+        repo.join("crates/billing/src/audit.rs"),
+        "pub fn record() -> u32 {\n    crate::total()\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(repo.join("api/tools/shared.rs")).unwrap();
+    replace("api/Cargo.toml", "[[bin]]", "[[example]]");
+}
+
+#[test]
+fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_rust", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_rust(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    // The moved declaration looks for `api/src/health.rs`, which is not there.
+    assert!(before.contains("api/src/routes/health.rs::check"));
+    assert!(!refreshed.contains("api/src/routes/health.rs"));
+    assert!(refreshed.contains("api/src/orphan.rs::lost"));
+    assert!(refreshed.contains("crates/billing/src/audit.rs::record"));
+    assert!(!refreshed.contains("api/tools/admin.rs"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_rust_cold", "conformance-rust", ORIGIN, edit_rust)
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.
@@ -904,6 +955,17 @@ fn the_export_does_not_depend_on_the_order_files_are_found() {
 
     let (web, _, _) = chain("fresh_order_reversed");
     let reversed = meada::with_reversed_walk(|| export_chain(&web));
+
+    assert_eq!(reversed, normal);
+}
+
+#[test]
+fn a_rust_export_does_not_depend_on_the_order_files_and_manifests_are_found() {
+    let repo = fixture_repo("fresh_order_rust", "conformance-rust", ORIGIN);
+    let normal = Engine::open(&repo).unwrap().export().unwrap();
+
+    let repo = fixture_repo("fresh_order_rust_reversed", "conformance-rust", ORIGIN);
+    let reversed = meada::with_reversed_walk(|| Engine::open(&repo).unwrap().export().unwrap());
 
     assert_eq!(reversed, normal);
 }

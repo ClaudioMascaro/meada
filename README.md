@@ -185,8 +185,13 @@ Constantes fixas:
 ## Estado
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) e Python (`.py`) e liga repositórios, também de uma linguagem para a
-outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` no lado que
+`.jsx`, `.mjs`, `.cjs`) e Python (`.py`), lê o código Rust (`.rs`) dos crates do repositório
+(cada `Cargo.toml` com `[package]`, em qualquer pasta, cada crate pela árvore de módulos que os
+`mod` montam, sem toolchain Rust: um arquivo que nenhum `mod` alcança fica de
+fora) com as suas funções, tipos, traits, módulos e métodos de `impl` e as chamadas escritas
+como caminho (`crate::a::f()`, `Tipo::new()`, `Self::f()`; as de dentro de macros não são
+indexadas, e `use`, contratos e pacotes Rust ainda não), e liga repositórios, também de uma
+linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django no lado que serve,
 também atrás de um gateway), pelos recursos
 declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python`), filas RabbitMQ

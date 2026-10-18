@@ -1,0 +1,14 @@
+example.com/acme/conformance api/src/routes/mod.rs:5-9 serve
+community: api/src#2
+processes: none
+pub fn serve(store: &Store) {
+    health::check();
+    super::compute();
+    store.save();
+}
+callers:
+example.com/acme/conformance api/src/main.rs:42 main
+callees:
+example.com/acme/conformance api/src/routes/health.rs:1 check
+example.com/acme/conformance api/src/store.rs:42 Store.save [inferred: one method named save]
+example.com/acme/conformance api/src/main.rs:56 compute

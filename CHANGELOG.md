@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A Rust language pack (`.rs`, spec #30, first ticket): the repository's crates (each
+  `Cargo.toml` with a `[package]`, at any depth, a workspace's members included), each built
+  from its roots (`src/lib.rs` or `[lib] path`, `src/main.rs`, `src/bin/`, `[[bin]] path`)
+  through its `mod` declarations (`x.rs`, `x/mod.rs`, `#[path]`, inline modules); a file no
+  `mod` reaches is not indexed. Functions, structs, enums, traits, modules and `impl` methods
+  (`Type.method`, `Type.Trait.method`, `Trait.method`) are symbols, and calls written as paths
+  (`crate::`, `super::`, `self::`, `Type::new()`, `Self::helper()`) resolve `exact` through the
+  module tree, an `impl` in another file than its type included; a path that does not resolve
+  matches functions and methods by name, and one that fits several `impl` blocks is
+  `ambiguous`. Calls inside macro invocations are not indexed. No Rust toolchain is run. A
+  config file of any pack (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`) larger than 1 MiB
+  is not read.
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

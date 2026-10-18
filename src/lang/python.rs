@@ -196,6 +196,7 @@ impl LanguagePack for Python {
                             args,
                             kwargs,
                             decorates: decorators.remove(&node.id()),
+                            by_path: false,
                             arg_types: Vec::new(),
                             uses: Vec::new(),
                         });
@@ -308,7 +309,7 @@ impl LanguagePack for Python {
         messages::messages(code)
     }
 
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
+    fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
         // nothing, and indexing carries on.
         let declared =
