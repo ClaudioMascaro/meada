@@ -9251,6 +9251,10 @@
     {
       "contract": "http::PUT::/members/{}",
       "site": "example.com/acme/conformance::web/accounts.py::update"
+    },
+    {
+      "contract": "package::pypi::acme-conformance",
+      "site": "example.com/acme/conformance::pyproject.toml"
     }
   ],
   "consumers": [
@@ -9705,6 +9709,14 @@
       "exchange": "events",
       "key": "refund.paid",
       "site": "example.com/acme/conformance::messages/pika_amqp.py::announce::channel.basic_publish#2"
+    }
+  ],
+  "packages": [
+    {
+      "name": "acme-conformance",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "."
     }
   ],
   "communities": [

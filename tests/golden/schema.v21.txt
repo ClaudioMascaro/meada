@@ -791,6 +791,47 @@ sample.package.json
   "main": "./dist/index.cjs"
 }
 
+sample.pyproject.toml
+{
+  "name": "example-sample",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "field": "project.dependencies",
+      "name": "requests"
+    },
+    {
+      "field": "project.dependencies",
+      "name": "shared-lib",
+      "range": ">=1.0,<2"
+    },
+    {
+      "field": "tool.poetry.dependencies",
+      "name": "shared-tools",
+      "range": "^0.3"
+    }
+  ],
+  "roots": [
+    "src"
+  ]
+}
+
+sample.requirements.txt
+{
+  "dependencies": [
+    {
+      "field": "requirements",
+      "name": "shared-lib",
+      "range": ">=1.0"
+    },
+    {
+      "field": "requirements",
+      "name": "shared-tools",
+      "range": "==0.3.0"
+    }
+  ]
+}
+
 sample.tsconfig.json
 {
   "out_dir": "./dist",

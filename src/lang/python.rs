@@ -14,6 +14,7 @@ use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
 mod messages;
+pub mod pyproject;
 
 /// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads;
 /// deeper is `Unknown`. A value is read again by every call around it, and the recursion must
@@ -229,7 +230,9 @@ impl LanguagePack for Python {
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
         let declared = match configs.first() {
-            Some((name, src)) => source_roots(src).map_err(|e| format!("{name}: {e}"))?,
+            Some((name, src)) => (pyproject::Pyproject::parse(src))
+                .map_err(|e| format!("{name}: {e}"))?
+                .roots(),
             None => Vec::new(),
         };
         // The repository root, then the declared roots; a `src` directory when none is
@@ -328,7 +331,7 @@ impl Module {
 /// The repository-relative files that module `name`, a `/`-separated path, may be under
 /// `base`: the `__init__.py` of the package `name` (`base` itself when `name` is empty), which
 /// Python prefers, or `name.py`.
-fn files(base: &str, name: &str) -> Vec<String> {
+pub(crate) fn files(base: &str, name: &str) -> Vec<String> {
     let path = [base, name]
         .into_iter()
         .filter(|p| !p.is_empty())
@@ -344,64 +347,6 @@ fn files(base: &str, name: &str) -> Vec<String> {
     } else {
         vec![init, format!("{path}.py")]
     }
-}
-
-/// The source roots `pyproject.toml` declares besides the repository root: setuptools'
-/// `package-dir` and `packages.find` `where`, and Poetry's `packages` with `from`.
-// ponytail: other build backends (hatch, pdm, flit) and nested projects are not read.
-fn source_roots(src: &[u8]) -> Result<Vec<String>> {
-    let config: toml::Table = std::str::from_utf8(src)?.parse()?;
-    let tool = config.get("tool");
-    let setuptools = tool.and_then(|t| t.get("setuptools"));
-    let mut roots: Vec<String> = Vec::new();
-    // `"" = "src"` roots every package in `src`; `"pkg" = "lib/pkg"` roots `pkg` in `lib`, and
-    // `"a.b" = "lib/a/b"` roots `a.b` in `lib`. A directory not named after its package says
-    // nothing about a root.
-    let dirs = setuptools.and_then(|s| s.get("package-dir"));
-    for (package, dir) in dirs.and_then(toml::Value::as_table).into_iter().flatten() {
-        let (Some(dir), Some(package)) = (
-            dir.as_str().and_then(clean),
-            clean(&package.replace('.', "/")),
-        ) else {
-            continue;
-        };
-        if package.is_empty() {
-            roots.push(dir);
-        } else if let Some(root) = dir.strip_suffix(&format!("/{package}")) {
-            roots.push(root.to_string());
-        }
-    }
-    let find = setuptools.and_then(|s| s.get("packages")?.get("find"));
-    let wheres = find.and_then(|f| f.get("where")?.as_array());
-    roots.extend(
-        wheres
-            .into_iter()
-            .flatten()
-            .filter_map(|w| clean(w.as_str()?)),
-    );
-    let poetry = tool.and_then(|t| t.get("poetry")?.get("packages")?.as_array());
-    roots.extend(
-        poetry
-            .into_iter()
-            .flatten()
-            .filter_map(|p| clean(p.get("from")?.as_str()?)),
-    );
-    let mut seen = HashSet::new();
-    roots.retain(|root| !root.is_empty() && seen.insert(root.clone()));
-    Ok(roots)
-}
-
-/// A repository-relative directory in its plain form, `None` when it leaves the repository.
-fn clean(path: &str) -> Option<String> {
-    let mut parts = Vec::new();
-    for part in path.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => return None,
-            part => parts.push(part),
-        }
-    }
-    Some(parts.join("/"))
 }
 
 /// The span of a definition: a decorated one includes its decorators.
