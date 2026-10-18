@@ -32,6 +32,25 @@ pub fn scope_of(name: &str) -> &str {
     name.rsplit_once('.').map_or("", |(scope, _)| scope)
 }
 
+/// What a crate outside the repository is imported as.
+static NAMESPACE: Imported = Imported::Namespace;
+
+/// An `exports` row: the name, the file and the definition in it.
+type Row<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+
+/// Whether the export names `name`.
+fn exports_name(export: &Export, name: &str) -> bool {
+    matches!(export, Export::Local { exported, .. } | Export::From { exported, .. } if exported == name)
+}
+
+/// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
+fn bound_in(local: &str, scope: &str, name: &str) -> bool {
+    match scope {
+        "" => local == name,
+        scope => local.strip_prefix(scope).and_then(|l| l.strip_prefix('.')) == Some(name),
+    }
+}
+
 /// What a name or a member chain refers to.
 enum Binding<'a> {
     Def(Target<'a>),
@@ -364,7 +383,7 @@ impl<'a> Resolver<'a> {
                     Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
                         let mut imports = self.files[t.path].imports.iter().rev();
                         match imports.find(|i| i.local == t.name) {
-                            Some(i) => match self.import(t.path, &i.source, &i.name, seen) {
+                            Some(i) => match self.import(t.path, "", &i.source, &i.name, seen) {
                                 Binding::Module(m) => self.export(m, member, seen),
                                 _ => Binding::Unknown,
                             },
@@ -660,7 +679,12 @@ impl<'a> Resolver<'a> {
                     Some((name, def)) if def.kind != Kind::Method => {
                         return Binding::Def(Target { path, name });
                     }
-                    _ => continue,
+                    _ => {
+                        if let Some(found) = self.imported_at(path, s, name, seen) {
+                            return found;
+                        }
+                        continue;
+                    }
                 }
             }
             // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
@@ -697,17 +721,21 @@ impl<'a> Resolver<'a> {
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
+            if let Some(found) = self.imported_at(path, s, name, seen) {
+                return found;
+            }
         }
         self.imported(path, name, seen)
     }
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
-    /// `name` only if the module takes it.
+    /// `name` only if the module takes it, and so does a glob, after every explicit import.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         for import in self.files[path].imports.iter().rev() {
             if import.local == name {
-                return self.import(path, &import.source, &import.name, seen);
+                let scope = scope_of(&import.local);
+                return self.import(path, scope, &import.source, &import.name, seen);
             }
             if matches!(import.name, Imported::All)
                 && let Some(module) = self.module(path, &import.source)
@@ -717,7 +745,102 @@ impl<'a> Resolver<'a> {
                 return found;
             }
         }
-        Binding::Unknown
+        if let Some(found) = self.globs(path, "", name, false, seen) {
+            return found;
+        }
+        if !self.files[path].externs.iter().any(|n| n == name) {
+            return Binding::Unknown;
+        }
+        match self.module(path, name) {
+            Some(module) => Binding::Module(module),
+            None => Binding::External(name, &NAMESPACE),
+        }
+    }
+
+    /// What the imports a pack writes inside `scope` (a module written in place, a function:
+    /// Rust's `use`) bind `name` to, if any: a path import of the name, else a glob that gives it.
+    fn imported_at(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<Binding<'a>> {
+        if scope.is_empty() {
+            return None;
+        }
+        for import in self.files[path].imports.iter().rev() {
+            if matches!(import.name, Imported::Path(_)) && bound_in(&import.local, scope, name) {
+                return Some(self.import(path, scope, &import.source, &import.name, seen));
+            }
+        }
+        self.globs(path, scope, name, false, seen)
+    }
+
+    /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
+    /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
+    /// itself.
+    fn globs(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        public: bool,
+        seen: &mut Seen<'a>,
+    ) -> Option<Binding<'a>> {
+        for import in self.files[path].imports.iter().rev() {
+            let Imported::Glob {
+                path: target,
+                inside,
+                public: re_exports,
+            } = &import.name
+            else {
+                continue;
+            };
+            if (public && !re_exports)
+                || !bound_in(&import.local, scope, "*")
+                || !seen.insert((target, name))
+            {
+                continue;
+            }
+            let (work, types) = (&mut Work::default(), true);
+            let found = match self.resolve_as(path, scope, target, seen, work, types) {
+                Binding::Module(m) if *inside => self.export(m, name, seen),
+                Binding::Module(m) => self.star(m, name, seen),
+                // A module written in place states no visibility of its items: only a glob
+                // from inside it, which sees them all, is read.
+                Binding::Def(t) if *inside && self.defs[t.path][t.name].kind == Kind::Module => {
+                    let member = format!("{}.{name}", t.name);
+                    match self.def(t.path, &member) {
+                        Binding::Unknown => self
+                            .imported_at(t.path, t.name, name, seen)
+                            .unwrap_or(Binding::Unknown),
+                        found => found,
+                    }
+                }
+                _ => continue,
+            };
+            if matches!(found, Binding::Def(_) | Binding::Module(_)) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
+    /// read among types and modules, so no local hides it. An alias met again while resolving
+    /// itself gives nothing.
+    fn alias(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        target: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Binding<'a> {
+        if !seen.insert((path, target)) {
+            return Binding::Unknown;
+        }
+        self.resolve_as(path, scope, target, seen, &mut Work::default(), true)
     }
 
     /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
@@ -738,14 +861,18 @@ impl<'a> Resolver<'a> {
             })
     }
 
+    /// What an import of `name` from `source`, written in `scope`, gives.
     fn import(
         &self,
         path: &'a str,
+        scope: &'a str,
         source: &'a str,
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let found = match (name, self.module(path, source)) {
+            (Imported::Path(target), _) => return self.alias(path, scope, target, seen),
+            (Imported::Glob { .. }, _) => return Binding::Unknown,
             (_, None) => Binding::External(source, name),
             (Imported::Namespace, Some(module)) => Binding::Module(module),
             (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
@@ -767,7 +894,7 @@ impl<'a> Resolver<'a> {
         if self.files[path].star.takes(name) {
             self.export(path, name, seen)
         } else {
-            Binding::Unknown
+            (self.globs(path, "", name, true, seen)).unwrap_or(Binding::Unknown)
         }
     }
 
@@ -786,7 +913,7 @@ impl<'a> Resolver<'a> {
                     exported,
                     source,
                     name: imported,
-                } if exported == name => return self.import(path, source, imported, seen),
+                } if exported == name => return self.import(path, "", source, imported, seen),
                 _ => {}
             }
         }
@@ -799,30 +926,26 @@ impl<'a> Resolver<'a> {
                 return found;
             }
         }
-        Binding::Unknown
+        (self.globs(path, "", name, false, seen)).unwrap_or(Binding::Unknown)
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
     /// `export` reads it: for each name a file exports, the definition, the module-level
     /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
     /// the repository or not known (an import from another package stops there); for each `export * from` a file of the repository, that
-    /// file. Sorted.
+    /// file. The names a pack keeps to the package (`Facts::private`) are left out, and a
+    /// `pub use` glob of a file gives each name that file's star takes. Sorted.
     pub fn exported(&self) -> Vec<Exported> {
         let mut rows = BTreeSet::new();
         for (&path, facts) in self.files {
+            let private: HashSet<&str> = facts.private.iter().map(String::as_str).collect();
             for export in &facts.exports {
                 let row = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
-                        match self.export(path, exported, &mut Seen::new()) {
-                            Binding::Def(t) => {
-                                (Some(exported.as_str()), Some(t.path), Some(t.name))
-                            }
-                            Binding::Module(m) => (Some(exported.as_str()), Some(m), None),
-                            // A constant or a type: the shape a package keeps of it (issue
-                            // #175) is found through it; it is no symbol a call reaches.
-                            Binding::Const(at, c) => (Some(exported.as_str()), Some(at), Some(c)),
-                            _ => (Some(exported.as_str()), None, None),
+                        if private.contains(exported.as_str()) {
+                            continue;
                         }
+                        self.row(path, exported)
                     }
                     Export::All { source } => match self.module(path, source) {
                         Some(m) => (None, Some(m), None),
@@ -831,6 +954,10 @@ impl<'a> Resolver<'a> {
                 };
                 rows.insert((path, row));
             }
+            let mut names = BTreeSet::new();
+            self.glob_names(path, &mut HashSet::new(), &mut names);
+            names.retain(|n| facts.exports.iter().all(|e| !exports_name(e, n)));
+            rows.extend(names.into_iter().map(|name| (path, self.row(path, name))));
         }
         (rows.into_iter())
             .map(|(path, (name, file, target))| Exported {
@@ -840,6 +967,48 @@ impl<'a> Resolver<'a> {
                 target: target.map(String::from),
             })
             .collect()
+    }
+
+    /// The row of `file` exporting `exported`: its name, the file and the definition it gives.
+    fn row(&self, path: &'a str, exported: &'a str) -> Row<'a> {
+        match self.export(path, exported, &mut Seen::new()) {
+            Binding::Def(t) => (Some(exported), Some(t.path), Some(t.name)),
+            Binding::Module(m) => (Some(exported), Some(m), None),
+            // A constant or a type: the shape a package keeps of it (issue #175) is found
+            // through it; it is no symbol a call reaches.
+            Binding::Const(at, c) => (Some(exported), Some(at), Some(c)),
+            _ => (Some(exported), None, None),
+        }
+    }
+
+    /// The names the `pub use` globs of `path` give, through the files they glob (each once).
+    fn glob_names(&self, path: &'a str, done: &mut HashSet<&'a str>, out: &mut BTreeSet<&'a str>) {
+        if !done.insert(path) {
+            return;
+        }
+        for import in &self.files[path].imports {
+            let Imported::Glob {
+                path: target,
+                public: true,
+                ..
+            } = &import.name
+            else {
+                continue;
+            };
+            if import.local == "*"
+                && let Binding::Module(m) = self.alias(path, "", target, &mut Seen::new())
+            {
+                let facts = self.files[m];
+                let named = facts.exports.iter().filter_map(|e| match e {
+                    Export::Local { exported, .. } | Export::From { exported, .. } => {
+                        Some(exported.as_str())
+                    }
+                    Export::All { .. } => None,
+                });
+                out.extend(named.filter(|n| facts.star.takes(n)));
+                self.glob_names(m, done, out);
+            }
+        }
     }
 
     /// The file an import of `specifier` from `path` names, if the pack parses it.
@@ -1009,7 +1178,7 @@ impl<'a> Code<'a> {
                     Imported::Namespace => String::new(),
                     Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
                     // A star import spells no name of its own.
-                    Imported::All => return None,
+                    Imported::All | Imported::Path(_) | Imported::Glob { .. } => return None,
                 },
                 binding: None,
             },
@@ -1070,7 +1239,7 @@ impl<'a> Code<'a> {
         let mut spelled = match name {
             Imported::Namespace => String::new(),
             Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
-            Imported::All => return None,
+            Imported::All | Imported::Path(_) | Imported::Glob { .. } => return None,
         };
         if let Some(members) = members {
             if !spelled.is_empty() {

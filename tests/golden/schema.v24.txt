@@ -670,8 +670,8 @@ sample.rs
       "name": "Store",
       "kind": "Class",
       "range": {
-        "start": 148,
-        "end": 180
+        "start": 220,
+        "end": 252
       },
       "params": []
     },
@@ -679,8 +679,8 @@ sample.rs
       "name": "Persist",
       "kind": "Class",
       "range": {
-        "start": 182,
-        "end": 246
+        "start": 254,
+        "end": 318
       },
       "params": []
     },
@@ -688,8 +688,8 @@ sample.rs
       "name": "Persist.describe",
       "kind": "Method",
       "range": {
-        "start": 206,
-        "end": 244
+        "start": 278,
+        "end": 316
       },
       "params": []
     },
@@ -697,8 +697,8 @@ sample.rs
       "name": "Store.new",
       "kind": "Method",
       "range": {
-        "start": 265,
-        "end": 334
+        "start": 337,
+        "end": 406
       },
       "params": [
         {
@@ -711,8 +711,8 @@ sample.rs
       "name": "Store.empty",
       "kind": "Method",
       "range": {
-        "start": 340,
-        "end": 471
+        "start": 412,
+        "end": 543
       },
       "params": [
         {
@@ -725,8 +725,8 @@ sample.rs
       "name": "inner",
       "kind": "Module",
       "range": {
-        "start": 509,
-        "end": 627
+        "start": 581,
+        "end": 699
       },
       "params": []
     },
@@ -734,8 +734,8 @@ sample.rs
       "name": "inner.helper",
       "kind": "Function",
       "range": {
-        "start": 525,
-        "end": 625
+        "start": 597,
+        "end": 697
       },
       "params": []
     },
@@ -743,8 +743,8 @@ sample.rs
       "name": "save",
       "kind": "Function",
       "range": {
-        "start": 629,
-        "end": 715
+        "start": 701,
+        "end": 787
       },
       "params": [
         {
@@ -766,6 +766,38 @@ sample.rs
       "name": "Namespace"
     },
     {
+      "local": "open",
+      "source": "",
+      "name": {
+        "Path": "crate.disk.open"
+      }
+    },
+    {
+      "local": "maps",
+      "source": "",
+      "name": {
+        "Path": "std.collections"
+      }
+    },
+    {
+      "local": "Map",
+      "source": "",
+      "name": {
+        "Path": "std.collections.HashMap"
+      }
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "super",
+          "inside": true,
+          "public": true
+        }
+      }
+    },
+    {
       "local": "crate",
       "source": "crate",
       "name": "Namespace"
@@ -773,11 +805,6 @@ sample.rs
     {
       "local": "mod",
       "source": "self",
-      "name": "Namespace"
-    },
-    {
-      "local": "std",
-      "source": "std",
       "name": "Namespace"
     },
     {
@@ -799,6 +826,24 @@ sample.rs
         "exported": "util",
         "source": "path |legacy/util.rs",
         "name": "Namespace"
+      }
+    },
+    {
+      "Local": {
+        "exported": "open",
+        "local": "open"
+      }
+    },
+    {
+      "Local": {
+        "exported": "maps",
+        "local": "maps"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Map",
+        "local": "Map"
       }
     },
     {
@@ -839,8 +884,8 @@ sample.rs
       "scope": "Store.new",
       "callee": "Self.empty",
       "range": {
-        "start": 306,
-        "end": 328
+        "start": 378,
+        "end": 400
       },
       "by_path": true
     },
@@ -848,8 +893,8 @@ sample.rs
       "scope": "Store.empty",
       "callee": "disk.read",
       "range": {
-        "start": 407,
-        "end": 423
+        "start": 479,
+        "end": 495
       },
       "by_path": true
     },
@@ -857,16 +902,16 @@ sample.rs
       "scope": "Store.empty",
       "callee": "run",
       "range": {
-        "start": 433,
-        "end": 438
+        "start": 505,
+        "end": 510
       }
     },
     {
       "scope": "inner.helper",
       "callee": "mod.open",
       "range": {
-        "start": 551,
-        "end": 564
+        "start": 623,
+        "end": 636
       },
       "by_path": true
     },
@@ -874,8 +919,8 @@ sample.rs
       "scope": "inner.helper",
       "callee": "crate.util.go",
       "range": {
-        "start": 574,
-        "end": 591
+        "start": 646,
+        "end": 663
       },
       "by_path": true
     },
@@ -883,8 +928,8 @@ sample.rs
       "scope": "inner.helper",
       "callee": "std.mem.drop",
       "range": {
-        "start": 601,
-        "end": 618
+        "start": 673,
+        "end": 690
       },
       "by_path": true
     },
@@ -892,8 +937,8 @@ sample.rs
       "scope": "save",
       "callee": "store.flush",
       "range": {
-        "start": 662,
-        "end": 675
+        "start": 734,
+        "end": 747
       }
     }
   ],
@@ -916,6 +961,16 @@ sample.rs
       "of": "Persist",
       "within": ""
     }
+  ],
+  "externs": [
+    "std"
+  ],
+  "private": [
+    "disk",
+    "open",
+    "maps",
+    "Map",
+    "inner"
   ]
 }
 

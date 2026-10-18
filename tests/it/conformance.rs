@@ -1364,6 +1364,40 @@ fn rust() {
             "api/src/bin/tool.rs::helper",
             "api/src/bin/tool.rs::helper.go",
             "api/src/bin/tool.rs::main",
+            "api/src/main.rs::below",
+            "api/src/main.rs::below.go",
+            "api/src/main.rs::elsewhere",
+            "api/src/main.rs::extras",
+            "api/src/main.rs::hidden",
+            "api/src/main.rs::loops",
+            "api/src/main.rs::loops.f",
+            "api/src/main.rs::outside",
+            "api/src/main.rs::prelude",
+            "api/src/main.rs::ring",
+            "api/src/main.rs::scoped",
+            "api/src/main.rs::scoped.go",
+            "api/src/main.rs::within",
+            "api/src/extras.rs::dup",
+            "api/src/prelude.rs::dup",
+            "api/src/prelude.rs::greet",
+            "api/src/ring.rs::c",
+            "api/src/ring.rs::d",
+            "api/src/ring.rs::e",
+            "api/src/ring.rs::x",
+            "api/src/ring.rs::y",
+            "api/src/ring/c.rs::Gear",
+            "api/src/ring/c.rs::Gear.spin",
+            "api/src/ring/c.rs::hidden",
+            "api/src/ring/c.rs::internal",
+            "api/src/store.rs::private_helper",
+            "crates/billing/src/billing.rs::settle",
+            "crates/ledger-core/src/lib.rs::audit",
+            "crates/ledger-core/src/lib.rs::entries",
+            "crates/ledger-core/src/lib.rs::entries.add",
+            "crates/ledger-core/src/lib.rs::entries.seal",
+            "crates/ledger-core/src/lib.rs::internal",
+            "crates/ledger-core/src/lib.rs::internal.secret",
+            "crates/ledger-core/src/lib.rs::post",
             "api/src/main.rs::checks",
             "api/src/main.rs::checks.compute",
             "api/src/main.rs::checks.run_checks",
@@ -1577,15 +1611,18 @@ fn rust() {
                     "api/src/store.rs::Store.From.from",
                 ],
             ),
-            // An inline module does not see the file's own `Store`: a name match only.
+            // An inline module does not see the file's own `Store`: `use crate::util::Store`
+            // names another one, which a `use super::*` glob does not override; the glob takes
+            // the file's private items.
             (
                 "api/src/store.rs::tests.t::Store.new#0",
-                AMBIGUOUS,
-                &[
-                    "api/extra/legacy_util.rs::Store.new",
-                    "api/src/store.rs::Store.new",
-                    "crates/billing/src/invoice.rs::Invoice.new",
-                ],
+                EXACT,
+                &["api/extra/legacy_util.rs::Store.new"],
+            ),
+            (
+                "api/src/store.rs::tests.t::private_helper#0",
+                EXACT,
+                &["api/src/store.rs::private_helper"],
             ),
             (
                 "api/src/store/disk.rs::Store.reload::open#0",
@@ -1629,12 +1666,131 @@ fn rust() {
                 INFERRED,
                 &["crates/billing/src/invoice.rs::Invoice.amount"],
             ),
-            // A path call that does not resolve matches functions as well as methods by name.
+            // `use crate::util as u` renames a module written in place.
             (
                 "crates/billing/src/invoice.rs::tax::u.round#0",
-                INFERRED,
+                EXACT,
                 &["crates/billing/src/billing.rs::util.round"],
             ),
+            // The other workspace member, by its name with the hyphen turned into an
+            // underscore, through a `use` of its module.
+            (
+                "crates/billing/src/billing.rs::settle::ledger_core.post#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::post"],
+            ),
+            (
+                "crates/billing/src/billing.rs::settle::entries.add#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::entries.add"],
+            ),
+            // `use`s and `pub use`s, from the first member into the others.
+            (
+                "api/src/main.rs::main::aid#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            (
+                "api/src/main.rs::main::dive#0",
+                EXACT,
+                &["api/src/nested/deep.rs::dive"],
+            ),
+            (
+                "api/src/main.rs::main::Repo.new#0",
+                EXACT,
+                &["api/src/store.rs::Store.new"],
+            ),
+            (
+                "api/src/main.rs::main::stores.reset#0",
+                EXACT,
+                &["api/src/store.rs::reset"],
+            ),
+            (
+                "api/src/main.rs::main::total#0",
+                EXACT,
+                &["crates/billing/src/billing.rs::total"],
+            ),
+            (
+                "api/src/main.rs::main::Bill.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "api/src/main.rs::main::billing.invoice.tax#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::tax"],
+            ),
+            (
+                "api/src/main.rs::main::billing.Invoice.new#0",
+                EXACT,
+                &["crates/billing/src/invoice.rs::Invoice.new"],
+            ),
+            (
+                "api/src/main.rs::main::ledger_core.post#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::post"],
+            ),
+            (
+                "api/src/main.rs::main::books.add#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::entries.add"],
+            ),
+            // A crate outside the repository is external: `new` is not matched by name.
+            ("api/src/main.rs::main::HashMap.new#0", None, &[]),
+            // Globs: the public items of a module, not its private `dup`.
+            (
+                "api/src/main.rs::main::dup#0",
+                EXACT,
+                &["api/src/extras.rs::dup"],
+            ),
+            (
+                "api/src/main.rs::main::greet#0",
+                EXACT,
+                &["api/src/prelude.rs::greet"],
+            ),
+            // `pub use` renames three files deep, and a cycle of re-exports.
+            (
+                "api/src/main.rs::main::ring.e.Wheel.spin#0",
+                EXACT,
+                &["api/src/ring/c.rs::Gear.spin"],
+            ),
+            (
+                "api/src/main.rs::main::ring.Gear.spin#0",
+                EXACT,
+                &["api/src/ring/c.rs::Gear.spin"],
+            ),
+            ("api/src/main.rs::main::ring.x.Loop.unheard#0", None, &[]),
+            // A `use` in a module binds there alone, hides the file's name of it and is not in
+            // scope outside; `use super::*` takes the private `compute`.
+            (
+                "api/src/main.rs::scoped.go::aid#0",
+                EXACT,
+                &["api/src/main.rs::checks.run_checks"],
+            ),
+            (
+                "api/src/main.rs::scoped.go::twice#0",
+                EXACT,
+                &["api/src/main.rs::inner.twice"],
+            ),
+            (
+                "api/src/main.rs::outside::twice#0",
+                INFERRED,
+                &["api/src/main.rs::inner.twice"],
+            ),
+            (
+                "api/src/main.rs::below.go::compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
+            ),
+            // A function's `use` binds in it alone, and a `let` hides a `use`d name.
+            (
+                "api/src/main.rs::within::local_aid#0",
+                EXACT,
+                &["api/src/main.rs::inner.helper"],
+            ),
+            ("api/src/main.rs::elsewhere::local_aid#0", None, &[]),
+            ("api/src/main.rs::loops.f::a#0", None, &[]),
+            ("api/src/main.rs::hidden::aid#0", None, &[]),
         ],
     );
     // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.
@@ -1642,6 +1798,61 @@ fn rust() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(!export.contains(&format!("{MAIN}::main::compute#")));
     assert!(!export.contains("orphan.rs"));
+}
+
+/// A crate's exports are the `pub` items reachable from its root through `pub` modules and
+/// `pub use`; `pub(crate)` and narrower items stay inside it (the `exports` table, read as the
+/// next ticket's cross-repository imports do).
+#[test]
+fn rust_exports_are_the_public_items_reachable_from_the_root() {
+    let repo = fixture_repo("conformance_rust_exports", "conformance-rust", Some(ORIGIN));
+    Engine::open(&repo).unwrap().export().unwrap();
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    let mut rows = db
+        .prepare(
+            "SELECT path, name, file, target FROM exports WHERE path LIKE 'crates/%' \
+             OR path LIKE 'api/src/ring%' ORDER BY path, name",
+        )
+        .unwrap();
+    let found: Vec<String> = rows
+        .query_map([], |row| {
+            let col = |n| {
+                row.get::<_, Option<String>>(n)
+                    .map(|v| v.unwrap_or("-".into()))
+            };
+            Ok(format!("{} {} {} {}", col(0)?, col(1)?, col(2)?, col(3)?))
+        })
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    let expected = [
+        "api/src/ring.rs Gear api/src/ring/c.rs Gear",
+        "api/src/ring.rs c api/src/ring/c.rs -",
+        "api/src/ring.rs d api/src/ring/d.rs -",
+        "api/src/ring.rs e api/src/ring/e.rs -",
+        "api/src/ring.rs x api/src/ring/x.rs -",
+        "api/src/ring.rs y api/src/ring/y.rs -",
+        // `pub(crate)` and private items are not exported.
+        "api/src/ring/c.rs Gear api/src/ring/c.rs Gear",
+        // The renames reach the definition three files away; a cycle reaches none.
+        "api/src/ring/d.rs Cog api/src/ring/c.rs Gear",
+        "api/src/ring/e.rs Wheel api/src/ring/c.rs Gear",
+        "api/src/ring/x.rs Loop - -",
+        "api/src/ring/y.rs Loop - -",
+        // `pub use` at the root, `pub` modules and the items of a `pub` module written in
+        // place; a private module and what it holds are not.
+        "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
+        "crates/billing/src/billing.rs invoice crates/billing/src/invoice.rs -",
+        "crates/billing/src/billing.rs settle crates/billing/src/billing.rs settle",
+        "crates/billing/src/billing.rs total crates/billing/src/billing.rs total",
+        "crates/billing/src/invoice.rs Invoice crates/billing/src/invoice.rs Invoice",
+        "crates/billing/src/invoice.rs tax crates/billing/src/invoice.rs tax",
+        "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
+        "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
+        "crates/ledger-core/src/lib.rs post crates/ledger-core/src/lib.rs post",
+        "crates/scratch/src/lib.rs ignored crates/scratch/src/lib.rs ignored",
+    ];
+    assert_eq!(found, expected);
 }
 
 /// The Python conformance fixture's export, and its providers (contract, site) whose site is

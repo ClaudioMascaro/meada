@@ -5,6 +5,8 @@ mod disk;
 pub mod util;
 
 use crate::disk::open;
+use std::collections::{self as maps, HashMap as Map};
+pub use super::*;
 
 pub struct Store {
     n: u32,

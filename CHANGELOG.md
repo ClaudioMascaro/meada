@@ -20,6 +20,16 @@ All notable changes to Meada are recorded here. The format follows
   `ambiguous`. Calls inside macro invocations are not indexed. No Rust toolchain is run. A
   config file of any pack (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`) larger than 1 MiB
   is not read.
+- Rust `use` declarations (spec #30): paths from `crate::`, `super::`, `self::`, a module in
+  scope or a crate name, groups, renames, globs (`use super::*` takes the private items too,
+  any other glob the public ones) and `pub use` re-exports at any depth, with cycles cut; a
+  `use` in a module written in place or in a function binds and hides there alone, and a call
+  through a `use`d name, a renamed one or a glob is `exact` when one definition is found. A
+  crate outside the repository (`std`, `serde`) is external, never name-matched, and another
+  crate of the repository is reached by its name with hyphens as underscores. A crate's
+  exports are its `pub` items reachable from the root through `pub` modules and `pub use`;
+  `pub(crate)` and narrower items stay inside the crate. The index is rebuilt once (schema
+  version 24).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

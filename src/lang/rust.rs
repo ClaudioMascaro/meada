@@ -28,6 +28,11 @@ const DEFINITION_DEPTH: usize = 128;
 // ponytail: real code destructures a few levels; the recursion must stay shallow.
 const BINDING_DEPTH: usize = 64;
 
+/// How many names the `use` declarations of one file bind; the rest bind nothing.
+// ponytail: real files import a few hundred names; every lookup walks the imports, so a crafted
+// file of a million cannot be left to make each call a scan.
+const USE_BINDINGS: usize = 4096;
+
 /// The head of a path read from the file's own top (`self::`, and `super::` that stays in the
 /// file): an import of the file itself. A keyword, so no name of the code is spelled so.
 const SELF: &str = "mod";
@@ -97,6 +102,16 @@ struct Visit<'t> {
     /// there.
     pure: bool,
     body: Body,
+    /// Whether every module written in place around the node is `pub`: its `pub` items are
+    /// then exported under their dotted names.
+    open: bool,
+}
+
+/// A name a `use` binds (or, with no name, the glob of its path), read once the whole file is.
+struct Use {
+    path: Path,
+    name: Option<String>,
+    public: bool,
 }
 
 /// A path read once the whole file is: a call's callee or an `impl` block's type.
@@ -115,23 +130,31 @@ enum Slot {
 }
 
 /// What the file binds, for the paths: the qualified names of its non-method definitions
-/// (`mod` declarations included), its locals (written once each), and the names its `use`
-/// declarations bind (or that one of them is a glob).
+/// (`mod` declarations included), its locals (written once each), the names its `use`
+/// declarations bind, qualified by the scope they are written in.
 #[derive(Default)]
 struct Scan {
     defs: HashSet<String>,
     locals: HashSet<String>,
     uses: HashSet<String>,
-    glob: bool,
+}
+
+/// What the paths of a file need besides its own items: imports of the file itself and of
+/// the modules around it, and the crates outside it that a path names with no `use`.
+#[derive(Default)]
+struct Heads {
+    imports: BTreeSet<(String, String)>,
+    externs: BTreeSet<String>,
 }
 
 impl Scan {
-    /// Whether a scope from `scope` up to `module`, `module` included, defines `name`: what a
-    /// path's head may name there (a module ends the names in scope).
+    /// Whether a scope from `scope` up to `module`, `module` included, defines or imports
+    /// `name`: what a path's head may name there (a module ends the names in scope).
     fn defines(&self, scope: &str, module: &str, name: &str) -> bool {
         let mut s = scope;
         loop {
-            if self.defs.contains(&qualify(s, name)) {
+            let qualified = qualify(s, name);
+            if self.defs.contains(&qualified) || self.uses.contains(&qualified) {
                 return true;
             }
             if s.len() <= module.len() {
@@ -151,10 +174,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut facts = Facts::default();
     let mut scan = Scan::default();
     let mut paths: Vec<(Slot, Path)> = Vec::new();
+    let mut imported: Vec<Use> = Vec::new();
+    let mut bound = 0;
     let mut defined = HashSet::new();
     // The last `#n` given to the blocks of each scope.
     let mut suffixes: HashMap<String, usize> = HashMap::new();
-    let mut public = Vec::new();
+    let mut public_names = Vec::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Visit {
         node: tree.root_node(),
@@ -162,6 +187,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         module: String::new(),
         pure: true,
         body: Body::Items,
+        open: true,
     }];
     while let Some(Visit {
         node,
@@ -169,10 +195,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
         module,
         pure,
         body,
+        open,
     }) = stack.pop()
     {
-        let mut inner = (scope.clone(), module.clone(), pure, body.clone());
-        let top = scope.is_empty() && matches!(body, Body::Items);
+        let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
+        // Directly in a module (the file's or one written in place): not in a function, an
+        // `impl` or a trait.
+        let in_module = pure && scope == module && matches!(body, Body::Items);
         let deep = levels(&scope) >= DEFINITION_DEPTH;
         let mut locals = Vec::new();
         match node.kind() {
@@ -181,7 +210,28 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 continue;
             }
             "use_declaration" => {
-                uses(node, src, 0, &mut scan);
+                let public = is_pub(node, src);
+                let mut found = Vec::new();
+                if let Some(argument) = field(node, "argument") {
+                    let room = USE_BINDINGS.saturating_sub(bound);
+                    leaves(argument, &mut Vec::new(), 0, room, src, &mut found);
+                }
+                bound += found.len();
+                for Leaf { segments, name } in found {
+                    if let Some(name) = &name {
+                        scan.uses.insert(qualify(&scope, name));
+                        if in_module {
+                            export(&mut facts, &mut public_names, public, name, &module, open);
+                        }
+                    }
+                    let path = Path {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                        segments,
+                    };
+                    imported.push(Use { path, name, public });
+                }
                 continue;
             }
             "function_item" if deep => {
@@ -215,11 +265,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         params,
                         ..def(&qualified, kind, node)
                     });
-                    if top {
-                        export(&mut facts, &mut public, node, name, src);
+                    if in_module {
+                        let is_pub = is_pub(node, src);
+                        export(&mut facts, &mut public_names, is_pub, name, &module, open);
                     }
                 }
-                inner = (qualified, module.clone(), pure, Body::Items);
+                inner = (qualified, module.clone(), pure, Body::Items, open);
             }
             "struct_item" | "enum_item" | "union_item" | "trait_item" if !deep => {
                 let Some(name) = field(node, "name").map(|n| text(n, src)) else {
@@ -229,8 +280,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if defined.insert(qualified.clone()) {
                     scan.defs.insert(qualified.clone());
                     facts.defs.push(def(&qualified, Kind::Class, node));
-                    if top {
-                        export(&mut facts, &mut public, node, name, src);
+                    if in_module {
+                        let is_pub = is_pub(node, src);
+                        export(&mut facts, &mut public_names, is_pub, name, &module, open);
                     }
                 }
                 if node.kind() == "trait_item" {
@@ -241,13 +293,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 let Some(name) = field(node, "name").map(|n| text(n, src)) else {
                     continue;
                 };
-                // Directly in a module: not in a function, an `impl` or a trait.
-                let in_module = pure && scope == module && matches!(body, Body::Items);
                 if field(node, "body").is_none() {
                     let qualified = qualify(&module, name);
                     if in_module && !deep && defined.insert(qualified.clone()) {
                         scan.defs.insert(qualified);
-                        declare(&mut facts, &mut public, node, &module, name, src);
+                        declare(&mut facts, &mut public_names, node, &module, name, src);
                     }
                     continue;
                 }
@@ -259,11 +309,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     if defined.insert(qualified.clone()) {
                         scan.defs.insert(qualified.clone());
                         facts.defs.push(def(&qualified, Kind::Module, node));
-                        if top {
-                            export(&mut facts, &mut public, node, name, src);
+                        if in_module {
+                            let is_pub = is_pub(node, src);
+                            export(&mut facts, &mut public_names, is_pub, name, &module, open);
                         }
                     }
-                    inner = (qualified.clone(), qualified, in_module, Body::Items);
+                    let open = open && in_module && is_pub(node, src);
+                    inner = (qualified.clone(), qualified, in_module, Body::Items, open);
                 }
             }
             "impl_item" if !deep => {
@@ -378,7 +430,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 facts.locals.push(local);
             }
         }
-        let (scope, module, pure, body) = inner;
+        let (scope, module, pure, body, open) = inner;
         let kids: Vec<Node> = children(node).collect();
         stack.extend(kids.into_iter().rev().map(|child| Visit {
             node: child,
@@ -386,11 +438,36 @@ fn parse(src: &[u8]) -> Result<Facts> {
             module: module.clone(),
             pure,
             body: body.clone(),
+            open,
         }));
     }
-    let mut synthetic = BTreeSet::new();
+    let mut heads = Heads::default();
+    for Use { path, name, public } in &imported {
+        let Some(target) = normalize(path, &scan, &mut heads, true) else {
+            continue;
+        };
+        let (local, name) = match name {
+            Some(name) => (qualify(&path.scope, name), Imported::Path(target)),
+            None => {
+                let inside = path.segments.iter().all(|s| s == "self" || s == "super");
+                let inside = inside || path.segments == ["crate"];
+                let glob = Imported::Glob {
+                    path: target,
+                    inside,
+                    public: *public,
+                };
+                (qualify(&path.scope, "*"), glob)
+            }
+        };
+        let source = String::new();
+        facts.imports.push(Import {
+            local,
+            source,
+            name,
+        });
+    }
     for (slot, path) in &paths {
-        let callee = normalize(path, &scan, &mut synthetic);
+        let callee = normalize(path, &scan, &mut heads, false);
         match slot {
             Slot::Call(at) => {
                 facts.calls[*at].callee = callee.unwrap_or_else(|| "(scoped_identifier)".into())
@@ -401,14 +478,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     // A type or trait no path names reaches no class.
     facts.impls.retain(|i| !i.ty.is_empty());
-    for (local, source) in synthetic {
+    facts.externs = heads.externs.into_iter().collect();
+    for (local, source) in heads.imports {
         facts.imports.push(Import {
             local,
             source,
             name: Imported::Namespace,
         });
     }
-    facts.star = Star::Only(public);
+    facts.star = Star::Only(public_names);
     Ok(facts)
 }
 
@@ -442,14 +520,32 @@ fn is_pub(node: Node, src: &[u8]) -> bool {
     named(node).any(|n| n.kind() == "visibility_modifier" && text(n, src) == "pub")
 }
 
-/// A top-level item: the file exports it, and a glob import takes it when it is `pub`.
-fn export(facts: &mut Facts, public: &mut Vec<String>, node: Node, name: &str, src: &[u8]) {
-    facts.exports.push(Export::Local {
-        exported: name.to_string(),
-        local: name.to_string(),
-    });
-    if is_pub(node, src) {
-        public.push(name.to_string());
+/// A top-level name: the file exports it to its own crate, and to others and to a glob import
+/// when it is `pub`. In a module written in place, whose modules around are all `pub` (`open`),
+/// a `pub` name is exported under its dotted name (`inner.helper`).
+fn export(
+    facts: &mut Facts,
+    public: &mut Vec<String>,
+    is_pub: bool,
+    name: &str,
+    module: &str,
+    open: bool,
+) {
+    if module.is_empty() {
+        facts.exports.push(Export::Local {
+            exported: name.to_string(),
+            local: name.to_string(),
+        });
+        match is_pub {
+            true => public.push(name.to_string()),
+            false => facts.private.push(name.to_string()),
+        }
+    } else if open && is_pub {
+        let dotted = qualify(module, name);
+        facts.exports.push(Export::Local {
+            exported: dotted.clone(),
+            local: dotted,
+        });
     }
 }
 
@@ -477,8 +573,9 @@ fn declare(
             source: source.clone(),
             name: Imported::Namespace,
         });
-        if is_pub(node, src) {
-            public.push(name.to_string());
+        match is_pub(node, src) {
+            true => public.push(name.to_string()),
+            false => facts.private.push(name.to_string()),
         }
     }
     facts.imports.push(Import {
@@ -586,35 +683,97 @@ fn bind(pattern: Node, depth: usize, out: &mut Vec<String>, src: &[u8]) {
     }
 }
 
-/// The names a `use` declaration binds, or that it is a glob.
-fn uses(node: Node, src: &[u8], depth: usize, scan: &mut Scan) {
-    if depth >= BINDING_DEPTH {
+/// A name a `use` tree binds, with the path it names; no name for a glob of the path.
+struct Leaf {
+    segments: Vec<String>,
+    name: Option<String>,
+}
+
+/// The leaves of a `use` tree below the path `prefix`, `BINDING_DEPTH` levels deep and `room`
+/// of them in all (`use a::{b, c as d, e::*}` has three). `use serde;` names nothing a path
+/// could not reach already, and `as _` binds no name.
+fn leaves(
+    node: Node,
+    prefix: &mut Vec<String>,
+    depth: usize,
+    room: usize,
+    src: &[u8],
+    out: &mut Vec<Leaf>,
+) {
+    if depth >= BINDING_DEPTH || out.len() >= room {
         return;
     }
+    let joined = |prefix: &[String], tail: Vec<String>| {
+        let mut all = prefix.to_vec();
+        all.extend(tail);
+        all
+    };
     match node.kind() {
-        "identifier" => {
-            scan.uses.insert(text(node, src).to_string());
+        "scoped_identifier" | "identifier" | "crate" | "super" => {
+            let Some(tail) = segments(node, src) else {
+                return;
+            };
+            let all = joined(prefix, tail);
+            if all.len() > 1 {
+                let name = all.last().cloned();
+                out.push(Leaf {
+                    segments: all,
+                    name,
+                });
+            }
         }
-        "scoped_identifier" => {
-            if let Some(name) = field(node, "name") {
-                scan.uses.insert(text(name, src).to_string());
+        // `use a::b::{self}` binds `b`.
+        "self" => {
+            if let Some(name) = prefix.last().cloned() {
+                let segments = prefix.clone();
+                let name = Some(name);
+                out.push(Leaf { segments, name });
             }
         }
         "use_as_clause" => {
-            if let Some(alias) = field(node, "alias") {
-                scan.uses.insert(text(alias, src).to_string());
+            let alias = field(node, "alias").map(|a| text(a, src).to_string());
+            let tail = field(node, "path").and_then(|p| segments(p, src));
+            if let (Some(alias), Some(tail)) = (alias, tail)
+                && alias != "_"
+            {
+                let tail = if tail == ["self"] && !prefix.is_empty() {
+                    Vec::new()
+                } else {
+                    tail
+                };
+                let segments = joined(prefix, tail);
+                let name = Some(alias);
+                out.push(Leaf { segments, name });
             }
         }
-        "use_wildcard" => scan.glob = true,
-        // `use a::b::{self}` binds `b`: every path before a list counts.
         "scoped_use_list" => {
-            for part in ["path", "list"].into_iter().filter_map(|f| field(node, f)) {
-                uses(part, src, depth + 1, scan);
+            let tail = match field(node, "path") {
+                Some(path) => segments(path, src),
+                None => Some(Vec::new()),
+            };
+            if let (Some(tail), Some(list)) = (tail, field(node, "list")) {
+                let at = prefix.len();
+                prefix.extend(tail);
+                leaves(list, prefix, depth + 1, room, src, out);
+                prefix.truncate(at);
             }
         }
-        "use_declaration" | "use_list" => {
+        "use_list" => {
             for child in named(node) {
-                uses(child, src, depth + 1, scan);
+                leaves(child, prefix, depth + 1, room, src, out);
+            }
+        }
+        "use_wildcard" => {
+            let tail = match named(node).next() {
+                Some(path) => segments(path, src),
+                None => Some(Vec::new()),
+            };
+            let segments = tail.map(|tail| joined(prefix, tail));
+            if let Some(segments) = segments.filter(|s| !s.is_empty()) {
+                out.push(Leaf {
+                    segments,
+                    name: None,
+                });
             }
         }
         _ => {}
@@ -696,17 +855,14 @@ fn member(node: Node, src: &[u8]) -> String {
 /// `Self.f`, `mod.inner.f`), with the imports it needs (`crate`, `super`, `mod` for the file
 /// itself, an outside crate). `self::` and `super::` within the file are read from the file's
 /// top (`mod.<module>.<rest>`), so no name between hides them; `None` where they are read in a
-/// module inside a function, whose place in the file no path names.
-fn normalize(
-    path: &Path,
-    scan: &Scan,
-    synthetic: &mut BTreeSet<(String, String)>,
-) -> Option<String> {
+/// module inside a function, whose place in the file no path names. A `use` path (`module`)
+/// may be the module itself (`super`, `self`).
+fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Option<String> {
     let segments = &path.segments;
     let head = segments.first()?.as_str();
     match head {
         "crate" => {
-            synthetic.insert(("crate".into(), "crate".into()));
+            heads.imports.insert(("crate".into(), "crate".into()));
             Some(segments.join("."))
         }
         "Self" => Some(segments.join(".")),
@@ -719,16 +875,23 @@ fn normalize(
                 .take_while(|s| *s == "super")
                 .count();
             let rest = &segments[skip + ups..];
-            rest.first()?;
+            if rest.is_empty() && !module {
+                return None;
+            }
             let module: Vec<&str> = path.module.split('.').filter(|m| !m.is_empty()).collect();
             if ups > module.len() {
                 // Out of the file: the module that declares it, and so on up.
                 let up = ups - module.len();
                 let local = vec!["super"; up].join(".");
-                synthetic.insert((local.clone(), vec!["super"; up].join("::")));
-                return Some(format!("{local}.{}", rest.join(".")));
+                heads
+                    .imports
+                    .insert((local.clone(), vec!["super"; up].join("::")));
+                let anchored = [local.as_str()]
+                    .into_iter()
+                    .chain(rest.iter().map(String::as_str));
+                return Some(anchored.collect::<Vec<_>>().join("."));
             }
-            synthetic.insert((SELF.into(), "self".into()));
+            heads.imports.insert((SELF.into(), "self".into()));
             let target = &module[..module.len() - ups];
             let anchored = [SELF].iter().chain(target).map(|s| s.to_string());
             Some(
@@ -740,9 +903,9 @@ fn normalize(
         }
         _ => {
             let defined = scan.defines(&path.scope, &path.module, head);
-            if !defined && !scan.uses.contains(head) && !scan.glob {
+            if !defined {
                 // Neither the module nor a `use` binds it: a crate outside the repository.
-                synthetic.insert((head.to_string(), head.to_string()));
+                heads.externs.insert(head.to_string());
             }
             Some(segments.join("."))
         }
@@ -791,7 +954,6 @@ mod tests {
         let pairs = [
             ("a", "mod a"),
             ("inner.x", "mod inner/x"),
-            ("Vec", "Vec"),
             ("crate", "crate"),
             ("mod", "self"),
             ("super.super", "super::super"),
@@ -801,6 +963,8 @@ mod tests {
             .map(|(l, s)| (l.to_string(), s.to_string()))
             .collect();
         assert_eq!(imports, pairs);
+        // A crate no item of the file names is left to the resolver, after the file's imports.
+        assert_eq!(facts(src).externs, ["Vec"]);
     }
 
     #[test]
@@ -863,5 +1027,89 @@ mod tests {
         let path = vec!["a"; PATH_DEPTH + 1].join("::");
         let src = format!("fn f() {{ {path}(); }}\n");
         assert_eq!(callees(&src)[0].0, "(scoped_identifier)");
+    }
+
+    /// The imports as `local = path`, a glob as `local * path` (`^` marks one inside the module
+    /// it globs), anything else as `local source`.
+    fn bindings(src: &str) -> Vec<String> {
+        let imports = facts(src).imports.into_iter();
+        imports
+            .map(|i| match i.name {
+                Imported::Path(p) => format!("{} = {p}", i.local),
+                Imported::Glob { path, inside, .. } => {
+                    format!("{} * {}{path}", i.local, if inside { "^ " } else { "" })
+                }
+                _ => format!("{} {}", i.local, i.source),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn use_trees_bind_each_name_they_spell() {
+        let src = "use a::b;\nuse a::{c as d, e::*, f::{self, g}, h::{self as i}};\n\
+                   use std::fmt as _;\nuse serde;\nuse super::*;\nuse self::m::n;\n\
+                   mod m { use super::*; use crate::z; fn f() { use super::y; } }\n";
+        let expected = [
+            "b = a.b",
+            "d = a.c",
+            "* * a.e",
+            "f = a.f",
+            "g = a.f.g",
+            "i = a.h",
+            "* * ^ super",
+            "n = mod.m.n",
+            "m.* * ^ mod",
+            "m.z = crate.z",
+            "m.f.y = mod.y",
+            "crate crate",
+            "mod self",
+            "super super",
+        ];
+        assert_eq!(bindings(src), expected);
+        // `as _` and a bare crate bind nothing; the first segment of a path is a crate outside
+        // the file when nothing binds it.
+        assert_eq!(facts(src).externs, ["a"]);
+    }
+
+    #[test]
+    fn names_a_use_binds_hide_in_their_scope_alone() {
+        let src = "mod m { use y::x; }\nfn f() { x::g(); }\n";
+        assert_eq!(facts(src).externs, ["x", "y"]);
+        let src = "use y::x;\nfn f() { x::g(); }\n";
+        assert_eq!(facts(src).externs, ["y"]);
+    }
+
+    #[test]
+    fn exports_are_the_pub_names_reachable_through_pub_modules() {
+        let src = "pub fn a() {}\nfn b() {}\npub(crate) fn c() {}\n\
+                   pub mod m { pub fn d() {} fn e() {} pub mod k { pub fn l() {} } }\n\
+                   mod n { pub fn f() {} }\npub use x::Y;\nuse z::W;\n";
+        let facts = facts(src);
+        let exported: Vec<&str> = (facts.exports.iter())
+            .map(|e| match e {
+                Export::Local { exported, .. } | Export::From { exported, .. } => exported.as_str(),
+                Export::All { .. } => "*",
+            })
+            .collect();
+        assert_eq!(
+            exported,
+            ["a", "b", "c", "m", "m.d", "m.k", "m.k.l", "n", "Y", "W"]
+        );
+        assert_eq!(facts.private, ["b", "c", "n", "W"]);
+        assert!(facts.star.takes("a"));
+        assert!(!facts.star.takes("W"));
+    }
+
+    #[test]
+    fn uses_past_the_limit_bind_nothing() {
+        let names: Vec<String> = (0..USE_BINDINGS + 5).map(|i| format!("n{i}")).collect();
+        let src = format!("use a::{{{}}};\n", names.join(", "));
+        assert_eq!(facts(&src).imports.len(), USE_BINDINGS);
+        let nested = format!(
+            "{}b{}",
+            "a::{".repeat(BINDING_DEPTH + 8),
+            "}".repeat(BINDING_DEPTH + 8)
+        );
+        assert!(facts(&format!("use {nested};\n")).imports.is_empty());
     }
 }

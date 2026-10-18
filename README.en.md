@@ -189,8 +189,9 @@ Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`
 repository's crates (each `Cargo.toml` with a `[package]`, in any directory, each crate
 through the module tree its `mod` declarations build, with no Rust toolchain: a file no `mod`
 reaches stays out) with its functions, types, traits, modules and `impl` methods and the calls
-written as paths (`crate::a::f()`, `Type::new()`, `Self::f()`; calls inside macros are not
-indexed, and Rust `use`, contracts and packages are not there yet), and links repositories,
+written as paths (`crate::a::f()`, `Type::new()`, `Self::f()`), also through `use` (groups,
+renames, globs, `pub use` and the other workspace crates by name; calls inside macros are not
+indexed, and Rust contracts and packages are not there yet), and links repositories,
 also from one language to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
 Django on the serving side, also behind a gateway), through

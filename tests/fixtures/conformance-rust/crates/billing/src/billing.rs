@@ -1,5 +1,8 @@
 pub mod invoice;
 
+pub use invoice::Invoice;
+use ledger_core::entries;
+
 mod util {
     pub fn round(x: u32) -> u32 {
         x
@@ -8,4 +11,9 @@ mod util {
 
 pub fn total() -> u32 {
     invoice::Invoice::new().amount() + invoice::tax()
+}
+
+pub fn settle() {
+    ledger_core::post();
+    entries::add();
 }
