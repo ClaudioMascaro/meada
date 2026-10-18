@@ -174,6 +174,10 @@ modules updates it.
   no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds
   it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
   for both packs.
+- `lang/rust/frameworks.rs` (`FRAMEWORKS`): per object of axum, actix-web, Rocket, reqwest and
+  ureq, the outside names of its constructors and the methods that hand it back; `RustPack::passes`
+  reads it (else `messages::passes`) and the HTTP kind asks it what a constructor makes
+  (`frameworks::made`). `VERBS` (the `Method` constants) lives there too.
 - Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
   (suffix-matched on `Code::external`) and the methods that hand back the same object
@@ -238,8 +242,9 @@ modules updates it.
   skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
   and `... | None`.
 - `lang/rust.rs` also yields `Facts::macro_use` (the crates of `#[macro_use] extern crate x;`,
-  stored) and `Facts::mentions` (the names a file writes apart from the functions it defines
-  and its route attributes; not stored, so the providers get it from the files parsed again).
+  stored) and `Facts::mentions` (`lang/rust/mentions.rs`: the names a file refers to, apart
+  from those a pattern, a parameter, a field or an item declares, a reference a local hides and
+  its route attributes; not stored, so the providers get it from the files parsed again).
   A function does not hide the crate a path begins with (`rocket::build()` beside a
   `fn rocket`), and a module of the same name as a function still hides the crate.
 - `lang/rust.rs` (spec #30) yields free functions (`Kind::Function`), structs, enums, unions

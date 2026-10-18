@@ -190,7 +190,7 @@ Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.
 `mod` montam, sem toolchain Rust: um arquivo que nenhum `mod` alcança fica de
 fora) com as suas funções, tipos, traits, módulos e métodos de `impl` e as chamadas escritas
 como caminho (`crate::a::f()`, `Tipo::new()`, `Self::f()`), também por `use` (grupos,
-renomeações, globs, `pub use` e os outros crates do workspace pelo nome; as de método (`x.m()`) pelo tipo do receptor quando o código o escreve (`let`, parâmetro, campo, `self`, retorno de função; um `dyn Trait` ou genérico com trait vai ao método do trait), senão pelo nome; as de dentro de macros
+renomeações, globs, `pub use` e os outros crates do workspace pelo nome; as de método (`x.m()`) pelo tipo do receptor quando o código o escreve (`let`, parâmetro, campo, `self`, retorno de função; um `dyn Trait` ou genérico com trait vai ao método do trait; um método que os `impl` de um tipo do repositório não têm, de um `derive` ou de um trait de fora, não liga a nada, e um atributo de rota nunca liga a uma função), senão pelo nome; as de dentro de macros
 não são indexadas, e os contratos Rust são os pacotes, o HTTP e os canais (abaixo); só a configuração padrão de cada crate entra, para um alvo fixo x86_64 Linux: item sob um `#[cfg(..)]` falso, ou sob uma feature fora do `default` do `Cargo.toml`, fica de fora, e módulos `#[cfg(test)]` entram), e liga repositórios, também de uma
 linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` e, em Rust, `reqwest` e `ureq` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django e, em Rust, axum, actix-web e Rocket no lado que serve,

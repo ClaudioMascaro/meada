@@ -97,21 +97,27 @@ All notable changes to Meada are recorded here. The format follows
   one trait stops at the trait's method (required methods of a trait are symbols now) and never
   searches the implementations. A receiver whose type is not written goes by name, `inferred`
   with one candidate and `ambiguous` with every one; a type from outside the repository (`std`,
-  another crate) is opaque, and its methods are not matched by name. The index is rebuilt once
-  (schema version 25).
+  another crate) is opaque, and its methods are not matched by name. A type of the repository
+  whose `impl` blocks lack the method (a `derive`, a blanket or outside trait), written on the
+  receiver or as a path (`Store::default()`), resolves to nothing rather than by name. The index
+  is rebuilt once (schema version 25).
 - Rust actix-web and Rocket providers (spec #30): a function with a route attribute
   (`#[get("/x")]`, actix-web's `#[route("/x", method = "GET")]`) or one named by
   `.route(path, web::get().to(h))` provides `http::<METHOD>::<path>`, served under the prefixes of
   what registers it: `App::new().service(h)`, nested `web::scope(prefix)`, `web::resource(path)`,
   a `.configure(f)` function, and Rocket's `build().mount(prefix, routes![a, b])`. They go
-  through the same mounts and prefixes as axum. A handler no code writes other than defining it
-  is served at its own path; one that code Meada does not read mentions (`services![..]`,
-  `vec![..]`, `concat()`, `cfg_if!`, an alias) may be registered there, and is served nowhere,
-  as it is under a scope or mount prefix Meada cannot read. `.route(path, web::get().to(h))`
+  through the same mounts and prefixes as axum. A handler no code of its crate refers to (of any
+  crate, when its file is public in a library) is served at its own path: a name only bound (a
+  `let`, a parameter, a field) or a reference a local of the name hides does not count. One
+  that code Meada does not read refers to (`services![..]`, `vec![..]`, `concat()`, `cfg_if!`,
+  an alias, a use before a `let` of the name) may be registered there, and is served nowhere,
+  as it is under a scope or mount prefix Meada cannot read; a file too large to tell what it
+  refers to does so for the handlers of its own crate alone. `.route(path, web::get().to(h))`
   with a handler Meada cannot resolve is still a provider, at the file site: the path and the
   method are certain, the handler is unknown. A `ServiceConfig` passed on to another function
-  is followed; `#[macro_use] extern crate rocket;` brings Rocket's attributes into every
-  module of the crate. `{id}`, `{tail:.*}`, `<id>`, `<path..>` and `?<q>` are params. The Rust pack
+  is followed; `#[macro_use] extern crate rocket;` in the crate's root (wherever `[lib] path`
+  puts it) brings Rocket's attributes into every module of the crate. A route attribute is no
+  call: it never links to a function of the repository, by name or by path. `{id}`, `{tail:.*}`, `<id>`, `<path..>` and `?<q>` are params. The Rust pack
   now emits route attributes as calls that decorate their function, and reads `routes![..]`. A
   crate path (`rocket::build()`) is no longer hidden by a function of the file with the same
   name. The index is rebuilt once (schema version 35).

@@ -365,7 +365,10 @@ one for the area a change touches.
   one (the names around a module are not its own; the file's imports still are). A call
   written as a path sets `Call::by_path`: its head is read among types and modules alone
   (`lexical_as`, no local or parameter hides it), and a failed resolution matches functions as
-  well as methods by name. A pack that has program entry points fills
+  well as methods by name. A pack whose types are closed (`LanguagePack::strict`, Rust) has a
+  member its blocks lack on a type the receiver or the path head writes resolve to nothing
+  (`Resolver::lacks`: a derive, a blanket or outside trait), not by name, and its attribute
+  calls (`Call::decorates`) resolve to nothing, read only through `Code::external_of`. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -855,7 +858,10 @@ one for the area a change touches.
   pack config is), not UTF-8 or not TOML declares no crate, with no status line. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
   none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
-  `benches/` and `build.rs` are no crate roots (no marker). A file two crates reach (`mod
+  `benches/` and `build.rs` are no crate roots (no marker). The default features a file is
+  parsed with (`settings`) are those of the nearest `Cargo.toml` with a `[package]` above it,
+  read before any module tree exists, so a file another package's `#[path]` reaches is parsed
+  with its nearest package's features, not those of the crate that builds it (no marker). A file two crates reach (`mod
   util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
   first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
   is not read, and `super::` out of a file declared inside a module written in place of its
@@ -888,20 +894,29 @@ one for the area a change touches.
   that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
   a `routes![..]` listing more handlers is `Unknown`; `ROUTE_METHODS` (16): the `method = ".."`
   of a `#[route]` past that are `Unknown`, so the attribute gives no provider. `MENTIONS`
-  (16384): a file writing more distinct names has no `Facts::mentions`, so none of its names is
-  taken as unmentioned. `Facts::mentions` is not kept in the index (see `Call::args`); the
-  providers read it from the files parsed again, all of the pack's when a handler is registered by
-  no call they read.
+  (16384, `lang/rust/mentions.rs`): a file referring to more distinct names has no
+  `Facts::mentions`, so none of the handlers of its crate is taken as unmentioned.
+  `Facts::mentions` is not kept in the index (see `Call::args`); the providers read it from the
+  files parsed again, all of the pack's when a handler is registered by no call they read. A
+  mention is a name in a reference position (an expression, a receiver, a path, a `use`, a
+  macro's tokens); a pattern, a parameter or a field declaring it is none, and a local hides a
+  reference from the end of its `let` to the end of the block, a parameter in its function's
+  or closure's body, a `match`, `if let`, `while let` or `for` binding in its arm or block (an
+  `else` sees none). An item declared in a block (`const`, `static`, `fn` inside a function)
+  hides nothing, and a pattern deeper than `BINDING_DEPTH` binds nothing, so the reference
+  still counts (no marker).
 - `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
   returned lists adds, over the whole repository, to the handlers a call names; a list past it
   is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate
-  of a bare route attribute is read from the `#[macro_use] extern crate x;` of the files under
-  the same `src/`, so a package with several crate roots shares what any of them declares, and
-  it needs exactly one such crate (actix-web or Rocket). A handler is served at its own path only
-  when no file writes its name other than defining it, or in a route attribute; any other
-  mention Meada does not read as a registration (`services![..]`, `vec![..]`, `concat()`,
-  `cfg_if!`, an alias, a local of the name) means it may be registered where Meada cannot tell,
-  and then it is served nowhere. A service configuration is followed into the functions of the
+  of a bare route attribute is read from the `#[macro_use] extern crate x;` of its crate's root
+  (the `Tree`'s `crate`, wherever `[lib] path` puts it), and it needs exactly one such crate
+  (actix-web or Rocket). A handler is served at its own path only when no file of its crate
+  mentions its name (`mentions.rs` above), or of any crate when its file is one another crate
+  may import (`Code::published`, a library's `pub mod` files); any other mention Meada does not
+  read as a registration (`services![..]`, `vec![..]`, `concat()`, `cfg_if!`, an alias, a use
+  before a `let` of the name) means it may be registered where Meada cannot tell, and then it is
+  served nowhere. A file two crates reach belongs to the first (see above), so a mention in the
+  second, of a handler not published, is not counted (no marker). A service configuration is followed into the functions of the
   repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
 - `http.rs` (axum): `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
   to that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
