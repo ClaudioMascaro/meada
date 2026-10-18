@@ -43,6 +43,18 @@ fn exports_name(export: &Export, name: &str) -> bool {
     matches!(export, Export::Local { exported, .. } | Export::From { exported, .. } if exported == name)
 }
 
+/// The index among `calls` of the call spanning `range`. Packs list calls in the order a
+/// depth-first walk meets them, an enclosing call before the ones inside it, so the search is
+/// a bisection; a list in another order is scanned.
+pub fn call_at(calls: &[Call], range: &std::ops::Range<usize>) -> Option<usize> {
+    let key = |r: &std::ops::Range<usize>| (r.start, std::cmp::Reverse(r.end));
+    let at = calls.partition_point(|c| key(&c.range) < key(range));
+    match calls.get(at) {
+        Some(c) if c.range == *range => Some(at),
+        _ => calls.iter().position(|c| c.range == *range),
+    }
+}
+
 /// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
 fn bound_in(local: &str, scope: &str, name: &str) -> bool {
     match scope {
@@ -1371,6 +1383,20 @@ struct Written<'a> {
     at: (&'a str, usize),
 }
 
+/// How many calls a builder chain is read through, down to what starts it.
+// ponytail: a chain of more builder calls than this is not read to its start; its calls past
+// the limit have no origin.
+pub const FLUENT_CHAIN: usize = 1024;
+
+/// Where a builder chain stops (`Code::chain_tail`): the call, whether a step above it was
+/// found only by a name match, and how many steps lead to it.
+#[derive(Clone, Copy)]
+struct Tail {
+    stop: usize,
+    matched: bool,
+    depth: usize,
+}
+
 /// What `Code::origins` follows: a constant, a parameter, a function's return values.
 #[derive(PartialEq)]
 enum Flow<'a> {
@@ -1400,6 +1426,7 @@ pub struct Code<'a> {
     resolver: &'a Resolver<'a>,
     full: &'a BTreeMap<&'a str, &'a Facts>,
     misses: RefCell<BTreeSet<&'a str>>,
+    chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -1426,6 +1453,7 @@ impl<'a> Code<'a> {
             resolver,
             full,
             misses: RefCell::new(BTreeSet::new()),
+            chains: RefCell::new(HashMap::new()),
             pack,
         }
     }
@@ -1580,6 +1608,42 @@ impl<'a> Code<'a> {
         self.full(path)?.calls.get(index)
     }
 
+    /// The value the call at `index` of `path` is made on (`Call::receiver`).
+    pub fn receiver(&self, path: &'a str, index: usize) -> Option<&'a Value> {
+        self.call(path, index)?.receiver.as_ref()
+    }
+
+    /// The values the call at `index` of `path` may return, when a function of the repository
+    /// answers it (`Exact`) or a name match does (`Inferred`, `Ambiguous`): the file and name
+    /// of each function with each value it returns.
+    pub fn returned(&self, path: &'a str, index: usize) -> Vec<(&'a str, &'a str, &'a Value)> {
+        let call = &self.resolver.files[path].calls[index];
+        let targets = match self.resolver.call(path, call) {
+            Resolution::Exact(t) | Resolution::Inferred(t) => vec![t],
+            Resolution::Ambiguous(ts) => ts,
+            Resolution::Unresolved => return Vec::new(),
+        };
+        let mut out = Vec::new();
+        for t in targets {
+            let defs = self.full(t.path).map(|f| f.defs.iter());
+            let def = defs.and_then(|mut d| d.find(|d| d.name == t.name));
+            let values = def.map(|d| d.return_values.iter()).into_iter().flatten();
+            out.extend(values.map(|v| (t.path, t.name, v)));
+        }
+        out
+    }
+
+    /// The scope and value of each `let` of `path` whose name is bound again or assigned again
+    /// (`Facts::rebound`).
+    pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {
+        self.full(path).map_or(&[], |f| f.rebound.as_slice())
+    }
+
+    /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).
+    pub fn call_index(&self, path: &'a str, range: &std::ops::Range<usize>) -> Option<usize> {
+        call_at(&self.resolver.files[path].calls, range)
+    }
+
     /// Whether the pack binds `name` everywhere, as JavaScript does `fetch`.
     pub fn binds_everywhere(&self, name: &str) -> bool {
         self.resolver.globals.contains(&name)
@@ -1659,35 +1723,36 @@ impl<'a> Code<'a> {
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(call) => {
                 let calls = &self.resolver.files[path].calls;
-                let Some(index) = calls.iter().position(|c| c.range == call.range) else {
+                let Some(index) = call_at(calls, &call.range) else {
                     return;
                 };
-                let function = match self.resolver.call(path, &calls[index]) {
-                    Resolution::Exact(t) if !self.resolver.is_class(t) => t,
-                    _ => {
-                        trail.out.insert((path, index));
-                        return;
+                // A builder chain (`Router::new().route(..).nest(..)`) is the value it started
+                // from, down to the call that starts it or that a function of the repository
+                // answers. A step only a name match found must start at an outside constructor,
+                // whose method it is then (a method of the library wins over a name).
+                let tail = match self.pack.fluent() {
+                    true => self.chain_tail(path, index),
+                    false => Some(Tail {
+                        stop: index,
+                        matched: false,
+                        depth: 0,
+                    }),
+                };
+                let Some(Tail { stop, matched, .. }) = tail else {
+                    return;
+                };
+                let kept = matched.then(|| std::mem::take(&mut trail.out));
+                self.flow_from(path, stop, trail);
+                if let Some(mut kept) = kept {
+                    let outside = (trail.out.iter()).all(|&(p, n)| {
+                        let call = &self.resolver.files[p].calls[n];
+                        self.external(p, &call.scope, &call.callee).is_some()
+                    });
+                    if outside {
+                        kept.append(&mut trail.out);
                     }
-                };
-                let Some(def) = (self.full(function.path))
-                    .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-                else {
-                    return;
-                };
-                if trail.busy.contains(&Flow::Returns(function)) {
-                    return;
+                    trail.out = kept;
                 }
-                trail.busy.push(Flow::Returns(function));
-                trail.frames.push(Frame {
-                    def: function,
-                    path,
-                    index,
-                });
-                for returned in &def.return_values {
-                    self.flow(function.path, function.name, returned, trail);
-                }
-                trail.frames.pop();
-                trail.busy.pop();
             }
             Value::List(items) => {
                 for item in items {
@@ -1696,6 +1761,88 @@ impl<'a> Code<'a> {
             }
             _ => {}
         }
+    }
+
+    /// The origins of the call at `index` of `path`, where a chain stops: what a function of
+    /// the repository returns, the value the call is made on, or the call itself.
+    fn flow_from(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
+        let calls = &self.resolver.files[path].calls;
+        let function = match self.resolver.call(path, &calls[index]) {
+            Resolution::Exact(t) if !self.resolver.is_class(t) => t,
+            _ if self.pack.fluent() => match self.receiver(path, index) {
+                None => {
+                    trail.out.insert((path, index));
+                    return;
+                }
+                Some(Value::Call(_)) => return,
+                Some(other) => return self.flow(path, &calls[index].scope, other, trail),
+            },
+            _ => {
+                trail.out.insert((path, index));
+                return;
+            }
+        };
+        let Some(def) = (self.full(function.path))
+            .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
+        else {
+            return;
+        };
+        if trail.busy.contains(&Flow::Returns(function)) {
+            return;
+        }
+        trail.busy.push(Flow::Returns(function));
+        trail.frames.push(Frame {
+            def: function,
+            path,
+            index,
+        });
+        for returned in &def.return_values {
+            self.flow(function.path, function.name, returned, trail);
+        }
+        trail.frames.pop();
+        trail.busy.pop();
+    }
+
+    /// Where the builder chain ending in the call at `index` of `path` stops: the first call
+    /// down its receivers that a function of the repository answers or that is made on no
+    /// call. Each call is walked once, whatever the chain.
+    fn chain_tail(&self, path: &'a str, index: usize) -> Option<Tail> {
+        let calls = &self.resolver.files[path].calls;
+        let mut walked: Vec<(usize, bool)> = Vec::new();
+        let mut at = index;
+        let mut tail = loop {
+            if let Some(&known) = self.chains.borrow().get(&(path, at)) {
+                break known;
+            }
+            let resolution = self.resolver.call(path, &calls[at]);
+            let answered =
+                matches!(&resolution, Resolution::Exact(t) if !self.resolver.is_class(*t));
+            match (self.receiver(path, at), answered) {
+                (Some(Value::Call(next)), false) => {
+                    walked.push((at, !matches!(resolution, Resolution::Unresolved)));
+                    match call_at(calls, &next.range) {
+                        Some(next) => at = next,
+                        None => break None,
+                    }
+                }
+                _ => {
+                    break Some(Tail {
+                        stop: at,
+                        matched: false,
+                        depth: 0,
+                    });
+                }
+            }
+        };
+        for &(step, matched) in walked.iter().rev() {
+            tail = tail.filter(|t| t.depth < FLUENT_CHAIN).map(|t| Tail {
+                matched: t.matched || matched,
+                depth: t.depth + 1,
+                ..t
+            });
+            self.chains.borrow_mut().insert((path, step), tail);
+        }
+        tail
     }
 
     fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
@@ -2280,6 +2427,20 @@ mod tests {
             classes.reverse();
         }
         classes.join("\n\n")
+    }
+
+    #[test]
+    fn a_call_is_found_by_its_range_in_a_list_in_any_order() {
+        let facts = Python.parse("a.py", b"f(g(1))\nh()\n").unwrap();
+        let mut calls = facts.calls;
+        assert_eq!(calls.len(), 3);
+        for _ in 0..2 {
+            for (i, call) in calls.iter().enumerate() {
+                assert_eq!(call_at(&calls, &call.range), Some(i));
+            }
+            calls.reverse();
+        }
+        assert_eq!(call_at(&calls, &(0..1)), None);
     }
 
     #[test]

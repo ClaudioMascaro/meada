@@ -94,6 +94,16 @@ pub trait LanguagePack {
         None
     }
 
+    /// Whether a method call that no function of the repository answers hands back the value
+    /// it was called on, as a builder does (`Router::new().route(..)` in Rust): `Code::origins`
+    /// then follows the call's `receiver`. A method that resolves to nothing does; one only a
+    /// name match found does when the chain starts at a constructor of an outside crate, whose
+    /// method it then is, and ends the flow otherwise. A language whose methods return
+    /// anything stays with the call as the origin.
+    fn fluent(&self) -> bool {
+        false
+    }
+
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
@@ -189,6 +199,11 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
+    /// The scope and value of each `let` whose name is bound again in its scope or assigned
+    /// again (Rust): no constant, since the name holds no one value, but a value that flows
+    /// somewhere unread. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub rebound: Vec<(String, Value)>,
     /// Every other name a binding makes, qualified like `Const::name` by the definition whose
     /// body or parameters hold it (a function that is no definition lends its names to the
     /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
@@ -501,6 +516,11 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
+    /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
+    /// index, like `args`.
+    #[serde(skip)]
+    pub receiver: Option<Value>,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
     #[serde(skip)]

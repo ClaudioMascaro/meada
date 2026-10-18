@@ -10,15 +10,17 @@ use tree_sitter::{Node, Parser};
 use std::ops::Range;
 
 use super::{
-    Binds, Call, Class, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack, Modules,
-    Param, Receiver, Star, children, named, text,
+    Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
+    Modules, Param, Receiver, Star, children, named, text,
 };
 use crate::{Result, qualify};
 
 pub(crate) mod cfg;
 pub(crate) mod crates;
+mod values;
 
 use crates::{MOD, PATH, Tree};
+use values::{Reader, Where};
 
 /// How many definitions may nest in one file. Names are qualified by the definitions around
 /// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
@@ -84,6 +86,12 @@ impl LanguagePack for Rust {
         Some("Self")
     }
 
+    // Types are strict: a builder method hands back the type it was called on, so
+    // `Router::new().route(..)` is the router `Router::new()` made.
+    fn fluent(&self) -> bool {
+        true
+    }
+
     fn modules(
         &self,
         configs: &[(&str, &[u8])],
@@ -147,6 +155,26 @@ struct Visit<'t> {
     /// Whether every module written in place around the node is `pub`: its `pub` items are
     /// then exported under their dotted names.
     open: bool,
+    /// Whether the node is an argument of a call: a closure there is a definition.
+    arg: bool,
+}
+
+/// What a value is read for, once the whole file is.
+enum Put {
+    /// The arguments and the receiver of the call at this index of `Facts::calls`.
+    Call(usize),
+    /// A `let` binding a plain name once in its scope, by this qualified name: a constant.
+    Let(String),
+    /// A `const` or a `static`, by this qualified name.
+    Item(String),
+    /// What the definition at this index of `Facts::defs` returns: the node is its body.
+    Returns(usize),
+}
+
+struct Held<'t> {
+    at: Where,
+    node: Node<'t>,
+    put: Put,
 }
 
 /// A name a `use` binds (or, with no name, the glob of its path), read once the whole file is.
@@ -240,6 +268,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The last `#n` given to the blocks of each scope.
     let mut suffixes: HashMap<String, usize> = HashMap::new();
     let mut public_names = Vec::new();
+    // The values to read once the file is, and how many bindings each local name has.
+    let mut held: Vec<Held> = Vec::new();
+    let mut bindings: HashMap<String, usize> = HashMap::new();
     // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
@@ -250,6 +281,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         pure: true,
         body: Body::Items,
         open: true,
+        arg: false,
     }];
     while let Some(Visit {
         node,
@@ -258,6 +290,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         pure,
         body,
         open,
+        arg,
     }) = stack.pop()
     {
         let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
@@ -323,9 +356,15 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         .map(|p| (qualified.clone(), p.name.clone())),
                 );
                 for local in bound.iter().flatten().map(|n| qualify(&qualified, n)) {
+                    *bindings.entry(local.clone()).or_default() += 1;
                     if scan.locals.insert(local.clone()) {
                         facts.locals.push(local);
                     }
+                }
+                for param in params.iter().filter(|p| !p.name.is_empty()) {
+                    *bindings
+                        .entry(qualify(&qualified, &param.name))
+                        .or_default() += 1;
                 }
                 if defined.insert(qualified.clone()) {
                     if kind == Kind::Function {
@@ -358,6 +397,19 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                             class: Class::Unknown,
                         });
                     }
+                    if let Some(body) = field(node, "body") {
+                        let at = Where {
+                            scope: qualified.clone(),
+                            module: module.clone(),
+                            pure,
+                        };
+                        let put = Put::Returns(facts.defs.len());
+                        held.push(Held {
+                            at,
+                            node: body,
+                            put,
+                        });
+                    }
                     facts.defs.push(Def {
                         params,
                         ..def(&qualified, kind, node)
@@ -368,6 +420,31 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     }
                 }
                 inner = (qualified, module.clone(), pure, Body::Items, open);
+            }
+            "const_item" | "static_item" if !deep && matches!(body, Body::Items) => {
+                let name = field(node, "name").map(|n| text(n, src));
+                if let Some(name) = name
+                    && defined.insert(qualify(&scope, name))
+                {
+                    let at = Where {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                    };
+                    // A `static mut` is written to elsewhere: it holds no known value.
+                    if let Some(value) = field(node, "value").filter(|_| !mutable(node)) {
+                        let put = Put::Item(qualify(&scope, name));
+                        held.push(Held {
+                            at,
+                            node: value,
+                            put,
+                        });
+                    }
+                    if in_module {
+                        let is_pub = is_pub(node, src);
+                        export(&mut facts, &mut public_names, is_pub, name, &module, open);
+                    }
+                }
             }
             "struct_item" | "enum_item" | "union_item" | "trait_item" if !deep => {
                 let Some(name) = field(node, "name").map(|n| text(n, src)) else {
@@ -522,6 +599,13 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     };
                     paths.push((Slot::Call(facts.calls.len()), path));
                 }
+                let at = Where {
+                    scope: scope.clone(),
+                    module: module.clone(),
+                    pure,
+                };
+                let put = Put::Call(facts.calls.len());
+                held.push(Held { at, node, put });
                 facts.calls.push(Call {
                     scope: scope.clone(),
                     callee,
@@ -530,6 +614,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     kwargs: Vec::new(),
                     decorates: None,
                     by_path,
+                    receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
                 });
@@ -559,6 +644,22 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     How::Call(range) => returned.push((facts.receivers.len(), range)),
                 }
                 let class = Class::Unknown;
+                // It is a constant too, if nothing else binds the name in its scope.
+                let local = qualify(&scope, &name);
+                *bindings.entry(local.clone()).or_default() += 1 + usize::from(mutable(node));
+                if let Some(value) = field(node, "value") {
+                    let at = Where {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                    };
+                    let put = Put::Let(local);
+                    held.push(Held {
+                        at,
+                        node: value,
+                        put,
+                    });
+                }
                 facts.receivers.push(Receiver {
                     scope: scope.clone(),
                     name,
@@ -568,10 +669,55 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             "let_declaration" | "for_expression" | "let_condition" | "match_arm" => {
                 if let Some(pattern) = field(node, "pattern") {
                     bind(pattern, 0, &mut locals, src);
+                    // A `let` of a plain name is a constant if nothing else binds the name in
+                    // its scope: a `let mut` is a second binding, as an assignment is.
+                    let value = field(node, "value");
+                    if let (true, Some(value), "identifier") =
+                        (node.kind() == "let_declaration", value, pattern.kind())
+                    {
+                        let at = Where {
+                            scope: scope.clone(),
+                            module: module.clone(),
+                            pure,
+                        };
+                        let local = qualify(&scope, text(pattern, src));
+                        *bindings.entry(local.clone()).or_default() += usize::from(mutable(node));
+                        let put = Put::Let(local);
+                        held.push(Held {
+                            at,
+                            node: value,
+                            put,
+                        });
+                    }
                 }
             }
-            // A closure is no definition: its calls belong to the enclosing one, where its
-            // parameters bind.
+            // A name assigned again is not a constant.
+            "assignment_expression" | "compound_assignment_expr" => {
+                if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
+                    let local = qualify(&scope, text(left, src));
+                    *bindings.entry(local).or_default() += 1;
+                }
+            }
+            // A closure given to a call is a definition of its own: the shared side names it
+            // when a contract kind says it is a route handler, and folds it into the one
+            // around it otherwise. Its parameters bind in it.
+            "closure_expression" if arg && !deep => {
+                let name = values::inline(&scope, node);
+                facts.defs.push(def(&name, Kind::Inline, node));
+                let mut names = Vec::new();
+                if let Some(params) = field(node, "parameters") {
+                    bind(params, 0, &mut names, src);
+                }
+                for local in names.into_iter().map(|n| qualify(&name, &n)) {
+                    *bindings.entry(local.clone()).or_default() += 1;
+                    if scan.locals.insert(local.clone()) {
+                        facts.locals.push(local);
+                    }
+                }
+                inner = (name, module.clone(), pure, Body::Items, open);
+            }
+            // Any other closure is no definition: its calls belong to the enclosing one,
+            // where its parameters bind.
             "closure_expression" => {
                 if let Some(params) = field(node, "parameters") {
                     bind(params, 0, &mut locals, src);
@@ -581,6 +727,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         }
         for name in locals {
             let local = qualify(&scope, &name);
+            *bindings.entry(local.clone()).or_default() += 1;
             if scan.locals.insert(local.clone()) {
                 facts.locals.push(local);
             }
@@ -600,6 +747,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             pure,
             body: body.clone(),
             open,
+            arg: node.kind() == "arguments",
         }));
     }
     let mut heads = Heads::default();
@@ -641,6 +789,49 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Type),
         }
     }
+    // The values, now that the file's `use` declarations are known.
+    let mut reader = Reader {
+        src,
+        scan: &scan,
+        heads: &mut heads,
+    };
+    let mut constants = HashSet::new();
+    for Held { at, node, put } in held {
+        match put {
+            Put::Call(at_call) => {
+                let (args, receiver) = reader.call(&at, node);
+                let call = &mut facts.calls[at_call];
+                call.args = args;
+                call.receiver = receiver;
+            }
+            Put::Let(name) if bindings.get(&name) == Some(&1) => {
+                let value = reader.value(&at, node);
+                constants.insert(name.clone());
+                facts.consts.push(Const {
+                    name,
+                    value,
+                    ty: None,
+                });
+            }
+            Put::Let(name) => {
+                let value = reader.value(&at, node);
+                facts
+                    .rebound
+                    .push((crate::parent(&name).to_string(), value));
+            }
+            Put::Item(name) => {
+                let value = reader.value(&at, node);
+                facts.consts.push(Const {
+                    name,
+                    value,
+                    ty: None,
+                });
+            }
+            Put::Returns(def) => facts.defs[def].return_values = reader.returns(&at, node),
+        }
+    }
+    // A constant is a name that holds its value, not a local hiding what it is bound to.
+    facts.locals.retain(|l| !constants.contains(l));
     // A `let` holding a call: the function it names, when the call is a path or a bare name.
     let callees: HashMap<&Range<usize>, &str> = (facts.calls.iter())
         .filter(|c| c.by_path || !c.callee.contains('.'))
@@ -962,6 +1153,11 @@ enum How {
     Type(Vec<String>),
     /// The span of the call (`Call::range`).
     Call(Range<usize>),
+}
+
+/// Whether a `let` or `static` is `mut`.
+fn mutable(node: Node) -> bool {
+    children(node).any(|c| c.kind() == "mutable_specifier")
 }
 
 fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
@@ -1365,6 +1561,28 @@ mod tests {
     fn callees(src: &str) -> Vec<(String, bool)> {
         let calls = facts(src).calls.into_iter();
         calls.map(|c| (c.callee, c.by_path)).collect()
+    }
+
+    #[test]
+    fn a_value_nested_past_the_depth_limit_is_unknown() {
+        let read = |n: usize| {
+            let src = format!("const X: &str = {}\"a\"{};\n", "(".repeat(n), ")".repeat(n));
+            let facts = facts(&src);
+            let x = facts.consts.into_iter().find(|c| c.name == "X").unwrap();
+            matches!(x.value, crate::lang::Value::Str(_))
+        };
+        assert!(read(values::VALUE_DEPTH - 1));
+        assert!(!read(values::VALUE_DEPTH));
+    }
+
+    #[test]
+    fn a_let_bound_once_and_never_assigned_is_a_constant() {
+        let src = "fn f(c: bool) {\n    let once = \"/a\";\n    let mut mutable = \"/b\";\n\
+                   let mut again = \"/c\";\n    again = \"/d\";\n    let plain = \"/e\";\n\
+                   let twice = \"/f\";\n    if c { twice = \"/g\"; }\n}\n";
+        let mut found: Vec<String> = facts(src).consts.into_iter().map(|c| c.name).collect();
+        found.sort();
+        assert_eq!(found, ["f.once", "f.plain"]);
     }
 
     #[test]

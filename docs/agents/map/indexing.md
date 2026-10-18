@@ -289,6 +289,13 @@ modules updates it.
   root through `pub mod` declarations (`Export::From` whose source is the specifier, not in
   `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
   root exports nothing (no other crate can import it), so no `export` entry point either.
+  `lang/rust/values.rs` (`Reader`) reads values for contract kinds (axum, spec #30 #129): each
+  call's `Call::args` and `Call::receiver` (the value a builder call is made on,
+  `LanguagePack::fluent`), a closure argument as a `Kind::Inline` def named `@<byte offset>` and a
+  `Value::Function`, a `const`, `static` and a `let` bound once in its scope as a `Const`, and a
+  function's `return_values` (its tail expression and `return`s); `Put` queues each until the
+  file's `use`s are known, so a path normalizes like a call's. Depth is bounded by `VALUE_DEPTH`.
+  `args`, `receiver` and `return_values` are not stored (the constants arrived with schema version 28).
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a

@@ -15,7 +15,7 @@ modules updates it.
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`clients`, below), Next.js app-router, Express,
-  FastAPI, Flask and Django providers (Next.js and Express ones each with a `Found::shape` from
+  FastAPI, Flask, Django and axum (`http::axum`, Rust) providers (Next.js and Express ones each with a `Found::shape` from
   `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
   lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
@@ -54,7 +54,15 @@ modules updates it.
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
   (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
-  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
+  `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::axum`: `route`,
+  `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
+  `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or
+  `any(h)` read by `method_router`, a closure handler an `Inline` def, the paths normalized by
+  `normalize_path`, with `{{` and `}}` of axum 0.8 kept literal, and the method the name axum gives the function; the Express rules do not run on `.rs` files; `nest` prefixes and `merge`
+  go through `prefixes` as Express mounts do, a router given to a call Meada does not read (`route_service`,
+  `fallback_service`, an outside wrapper, a name-matched method; `axum_unread`) is mounted
+  nowhere, a mount through a value it cannot read serves nothing, and a router nothing nests is
+  served at its root; `prefixes` stops at `PREFIX_DEPTH` and `PREFIX_WORK`), reached through `Code::origins`: a route counts only
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,

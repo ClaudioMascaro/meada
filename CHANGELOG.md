@@ -71,6 +71,21 @@ All notable changes to Meada are recorded here. The format follows
   with one candidate and `ambiguous` with every one; a type from outside the repository (`std`,
   another crate) is opaque, and its methods are not matched by name. The index is rebuilt once
   (schema version 25).
+- Rust axum providers (spec #30): a route of a `Router::new()` chain (`route`, `nest`, `merge`)
+  provides `http::<METHOD>::<path>`; `get(a).post(b)` gives one provider per method, `any` gives
+  `ANY`, and a closure handler is an inline route. A router is served under every prefix it is
+  nested under (one router under two prefixes is two providers), through functions in other
+  modules, constants and `let`s, as the Express ones are; `:id`, `{id}`, `*rest` and `{*rest}`
+  are params. A router nested under a prefix Meada cannot read, or mounted on a field, is served
+  nowhere; a router nothing nests is served at its root. The Rust pack now emits call
+  arguments, constants, return values and closures as values, and a call in a builder chain
+  keeps its receiver (`Call::receiver`), so the value flow follows `Router::new().route(..)`.
+  A router handed to a call Meada does not read (`route_service`, `fallback_service`, an
+  outside function wrapping it, a method found only by name) is served nowhere, a router held by a `let mut`
+  or a name bound or assigned again is served nowhere too, `{{` and `}}` stay literal braces, and the method
+  of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
+  nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
+  once (schema version 30).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

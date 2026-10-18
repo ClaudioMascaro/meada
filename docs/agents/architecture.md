@@ -178,6 +178,16 @@ one for the area a change touches.
   a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
   calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
   of the contract itself, with the roles `sides` names.
+- A **builder** language (spec #30 #129: a call whose method returns its receiver, such as
+  `Router::new().route(..)`): the pack sets `LanguagePack::fluent` and gives each call its
+  `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
+  `Code::origins` then walks a chain down its receivers, by `call_at` (a call found by its byte
+  range; `Code::call_index` for a kind) and `Code::receiver` (the value a call is made on).
+  A step no function of the repository answers passes the receiver on; one only a name match
+  found does when the chain starts at a constructor of an outside crate (whose method it then
+  is), else the flow ends. A kind reads a route off each call of the chain (`http::axum`).
+  `Code::returned` and `Code::constant` give a kind the values a call may return and a
+  constant holds, for what it must not leave unmounted.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -777,7 +787,12 @@ one for the area a change touches.
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names
   no type; `USE_BINDINGS` (4096): the names the `use` declarations of a file bind, the rest
-  bind nothing. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
+  bind nothing; `VALUE_DEPTH` (64): a value nested deeper in wrappers (`(x)`, `&x`, `x?`) and
+  arrays is `Unknown` from there. A call inside a value is a stub (its callee and span), so a
+  builder chain costs one value per call. A closure written as an argument of a call is a
+  `Kind::Inline` definition; any other closure is not, and neither is a `let mut`, a name bound
+  twice in its scope or assigned again, or a destructuring a constant. A string literal with an escape sequence is
+  `Unknown`. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
   `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
   line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
@@ -810,6 +825,23 @@ one for the area a change touches.
   file gives that file's public names; whether the file itself is reachable from the crate's
   root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
   are not indexed.
+- `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
+  that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
+  `resolve.rs`): a builder chain (`Router::new().route(..)`) is read to that many calls down to
+  what starts it, and a call past it has no origin, so its route is no provider (the walk is
+  memoized per call, linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum), reads a router
+  nested deeper than the first, or through more mounts than the second, as served nowhere
+  rather than under part of its prefixes. A name bound again in its scope (`let mut`,
+  shadowing) or assigned again holds no known value, and the routers its `let` holds
+  (`Facts::rebound`) are served nowhere; `on(MethodFilter, h)` and a method router held in a
+  variable are not followed. A router nothing mounts is served at its root. A router
+  given to a call Meada does not read (`route_service`, `fallback_service`, an outside
+  function wrapping it, a method only a name match found) is mounted nowhere, so it is not
+  served at the root; so is one whose `nest` prefix cannot be read, or that is mounted on a
+  router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
+  of one in its arguments (a router put in a struct, a closure capture) is not told from one
+  nothing mounts.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

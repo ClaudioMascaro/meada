@@ -199,6 +199,7 @@ impl LanguagePack for Python {
                             kwargs,
                             decorates: decorators.remove(&node.id()),
                             by_path: false,
+                            receiver: None,
                             arg_types: Vec::new(),
                             uses: Vec::new(),
                         });
