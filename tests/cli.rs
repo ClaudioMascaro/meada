@@ -6,7 +6,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use common::{assert_golden, chain, decisions, fixture_repo, loose_chain};
+use common::{
+    assert_golden, chain, decisions, documented_chain, drift_chain, fixture_repo, loose_chain,
+};
 
 /// Runs `meada <arg>` in `repo` under `lang`; returns stdout and stderr, with the repository's
 /// path replaced by `<repo>`.
@@ -61,7 +63,7 @@ fn config_errors_follow_lang() {
     );
     fs::write(
         repo.join("meada.toml"),
-        "[serve]\ndocuments = [\"openapi.yaml\"]\n",
+        "[serve]\ndomains = [\"openapi.yaml\"]\n",
     )
     .unwrap();
     for (lang, name) in LANGS {
@@ -113,6 +115,30 @@ fn status_reports_loose_resources_follow_lang() {
         assert_golden(
             &format!("cli.status-resources.{name}.txt"),
             &meada(&gateway, lang, "status"),
+        );
+    }
+}
+
+#[test]
+fn status_reports_documents_follow_lang() {
+    let (_, gateway, _) = documented_chain("cli_documents");
+    meada(&gateway, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-documents.{name}.txt"),
+            &meada(&gateway, lang, "status"),
+        );
+    }
+}
+
+#[test]
+fn status_reports_drift_follow_lang() {
+    let (web, _, _) = drift_chain("cli_drift");
+    meada(&web, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-drift.{name}.txt"),
+            &meada(&web, lang, "status"),
         );
     }
 }

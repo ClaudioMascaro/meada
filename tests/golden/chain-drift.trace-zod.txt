@@ -1,0 +1,11 @@
+example.com/chain/catalog app/api/comments/route.ts:7 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/comments.ts:6 comments drift: missing [].rating
+chain: inferred · 1 hops · 2 repos · 69 tokens
+
+example.com/chain/catalog app/api/comments/route.ts:17 POST
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/comments.ts:12 submit drift: missing rating
+chain: inferred · 1 hops · 2 repos · 69 tokens
+
+example.com/chain/catalog app/api/comments/summary/route.ts:8 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/comments.ts:19 summary drift: missing total
+chain: inferred · 1 hops · 2 repos · 70 tokens

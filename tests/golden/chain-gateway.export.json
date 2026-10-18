@@ -6,16 +6,32 @@
       "hash": "fbc6c33933fc1ca32d05d56832d4d0390f8247118306696f10ffbb06c6813d6c"
     },
     {
+      "path": "src/checkout.ts",
+      "hash": "7fe5fcd92556c46897ed1ab54171fa50397ad413584dd48ee24e6ae82c08a1b9"
+    },
+    {
+      "path": "src/events.ts",
+      "hash": "440b59957b7299c33faa73da5b262ec8ca1d8a35c9a27a4f4c670d6c7ff91e9a"
+    },
+    {
+      "path": "src/kafka.ts",
+      "hash": "cadad0416bbbbc9d51f3e86f9edbdebf413881b655857ce8d545b8889d976df6"
+    },
+    {
       "path": "src/orders.ts",
       "hash": "cc219d2699a0df0993157f43a7296a4e647d8d067d38a8f5b5ec597878c2bf7b"
     },
     {
       "path": "src/routes.ts",
-      "hash": "544a30f831856aaebe8a69f2983a2dbfe891cff6bcef5d7547fc832ecd5d122a"
+      "hash": "324da83a6cb269025e3952d5581276d4423e209cbd892cd5d4c1ba3b6940b876"
     },
     {
       "path": "src/server.ts",
       "hash": "2b1f1f5bf4518b5c2b7abbc7c3373edb8cef85efdf3325043ac386f076c15cea"
+    },
+    {
+      "path": "src/topics.ts",
+      "hash": "c5cf5f0db74b63420f49ec1e3277d659fe8283e8949e89244f6c1e86f52bd1fb"
     }
   ],
   "symbols": [
@@ -25,6 +41,22 @@
         "path": "src/catalog.ts",
         "start": 65,
         "end": 165
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 279,
+        "end": 508
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/events.ts::publish",
+      "span": {
+        "path": "src/events.ts",
+        "start": 129,
+        "end": 237
       }
     },
     {
@@ -47,8 +79,8 @@
       "id": "example.com/chain/gateway::src/routes.ts::POST /api/events",
       "span": {
         "path": "src/routes.ts",
-        "start": 208,
-        "end": 244
+        "start": 287,
+        "end": 323
       }
     },
     {
@@ -70,6 +102,94 @@
         "path": "src/catalog.ts",
         "start": 107,
         "end": 162
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::(call_expression).end#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 484,
+        "end": 505
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::JSON.stringify#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 456,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/catalog.ts::productOf",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 394,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::publish#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/events.ts::publish",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 432,
+        "end": 480
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::res.status#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 484,
+        "end": 499
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/events.ts::publish::producer.send#0",
+      "caller": "example.com/chain/gateway::src/events.ts::publish",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 187,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/kafka.ts::Kafka#0",
+      "caller": "example.com/chain/gateway::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 48,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/kafka.ts::kafka.producer#0",
+      "caller": "example.com/chain/gateway::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 134,
+        "end": 150
       }
     },
     {
@@ -123,8 +243,8 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 223,
-        "end": 244
+        "start": 302,
+        "end": 323
       }
     },
     {
@@ -134,8 +254,8 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 223,
-        "end": 238
+        "start": 302,
+        "end": 317
       }
     },
     {
@@ -145,8 +265,8 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 106,
-        "end": 114
+        "start": 148,
+        "end": 156
       }
     },
     {
@@ -156,8 +276,8 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 148,
-        "end": 186
+        "start": 227,
+        "end": 265
       }
     },
     {
@@ -167,8 +287,8 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 116,
-        "end": 146
+        "start": 158,
+        "end": 188
       }
     },
     {
@@ -178,8 +298,19 @@
       "level": null,
       "span": {
         "path": "src/routes.ts",
-        "start": 188,
-        "end": 245
+        "start": 267,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::api.put#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/routes.ts",
+        "start": 190,
+        "end": 225
       }
     },
     {
@@ -240,20 +371,53 @@
   ],
   "providers": [
     {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/chain/gateway::src/checkout.ts::createOrder::publish#0"
+    },
+    {
       "contract": "http::DELETE::/api/orders/{}",
       "site": "example.com/chain/gateway::src/orders.ts::cancelOrder"
     },
     {
       "contract": "http::GET::/api/health",
-      "site": "example.com/chain/gateway::src/server.ts::GET /api/health"
+      "site": "example.com/chain/gateway::src/server.ts::GET /api/health",
+      "shape": {
+        "source": {
+          "literals": "src/server.ts"
+        },
+        "fields": [],
+        "scalars": [
+          ""
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/orders",
-      "site": "example.com/chain/gateway::src/orders.ts::listOrders"
+      "site": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "shape": {
+        "source": {
+          "literals": "src/orders.ts"
+        },
+        "fields": [
+          "[]",
+          "[].id",
+          "[].product"
+        ],
+        "open": [
+          "[].product"
+        ],
+        "scalars": [
+          "[].id"
+        ]
+      }
     },
     {
       "contract": "http::POST::/api/events",
       "site": "example.com/chain/gateway::src/routes.ts::POST /api/events"
+    },
+    {
+      "contract": "http::PUT::/api/orders/{}",
+      "site": "example.com/chain/gateway::src/checkout.ts::createOrder"
     },
     {
       "contract": "resource::postgres::orders",
@@ -261,6 +425,11 @@
     }
   ],
   "consumers": [
+    {
+      "contract": "http::GET::/api/products/{}",
+      "site": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "via": "host:catalog.example.com"
+    },
     {
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
@@ -274,6 +443,13 @@
       "contract": "resource::postgres::orders",
       "level": "declared",
       "reason": "resource::postgres::orders"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
     },
     {
       "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
@@ -290,6 +466,13 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/orders.ts::createOrder::request#0",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "contract": "http::PUT::/api/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
+    },
+    {
       "consumer": "example.com/chain/web::src/orders.ts::listOrders::request#0",
       "provider": "example.com/chain/gateway::src/orders.ts::listOrders",
       "contract": "http::GET::/api/orders",
@@ -302,6 +485,13 @@
       "contract": "http::GET::/api/health",
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
+    },
+    {
+      "consumer": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder::publish#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
     },
     {
       "consumer": "example.com/chain/worker::src/jobs.ts::settleOrders",

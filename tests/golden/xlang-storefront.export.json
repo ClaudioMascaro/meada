@@ -177,19 +177,67 @@
   "providers": [
     {
       "contract": "http::GET::/api/health",
-      "site": "example.com/xlang/storefront::app/api/health/route.ts::GET"
+      "site": "example.com/xlang/storefront::app/api/health/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/health/route.ts"
+        },
+        "fields": [
+          "ok"
+        ],
+        "scalars": [
+          "ok"
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/prices/{}",
-      "site": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET"
+      "site": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/prices/[sku]/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "open": [
+          "sku"
+        ],
+        "scalars": [
+          "price"
+        ]
+      }
     },
     {
       "contract": "http::GET::/api/promotions",
-      "site": "example.com/xlang/storefront::app/api/promotions/route.ts::GET"
+      "site": "example.com/xlang/storefront::app/api/promotions/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/promotions/route.ts"
+        },
+        "fields": [
+          "[]"
+        ],
+        "open": [
+          "[]"
+        ]
+      }
     },
     {
       "contract": "http::POST::/api/audit",
-      "site": "example.com/xlang/storefront::app/api/audit/route.ts::POST"
+      "site": "example.com/xlang/storefront::app/api/audit/route.ts::POST",
+      "shape": {
+        "source": {
+          "literals": "app/api/audit/route.ts"
+        },
+        "fields": [
+          "ok"
+        ],
+        "scalars": [
+          "ok"
+        ]
+      }
     }
   ],
   "consumers": [

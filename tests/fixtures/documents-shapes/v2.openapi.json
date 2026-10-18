@@ -1,0 +1,20 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Shapes v2", "version": "2.0" },
+  "paths": {
+    "/orders/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Also in openapi.json, which comes first by path and gives the shape",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "reference": { "type": "string" } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

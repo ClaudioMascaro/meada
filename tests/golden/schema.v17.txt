@@ -1,0 +1,796 @@
+CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
+CREATE TABLE files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    facts TEXT NOT NULL, resolved TEXT NOT NULL
+);
+CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
+CREATE INDEX symbols_path ON symbols (path);
+CREATE TABLE calls (
+    id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
+    path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL
+);
+CREATE INDEX calls_path ON calls (path);
+CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
+CREATE INDEX candidates_call ON candidates (call);
+CREATE TABLE contracts (
+    role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
+    method TEXT, fragments TEXT, shape TEXT
+);
+CREATE INDEX contracts_path ON contracts (path);
+CREATE TABLE documents (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE manifests (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+
+sample.ts
+{
+  "defs": [
+    {
+      "name": "Store",
+      "kind": "Class",
+      "range": {
+        "start": 380,
+        "end": 531
+      },
+      "params": []
+    },
+    {
+      "name": "Store.find",
+      "kind": "Method",
+      "range": {
+        "start": 396,
+        "end": 529
+      },
+      "params": [
+        {
+          "name": "id",
+          "binds": "Any"
+        },
+        {
+          "name": "",
+          "binds": "Any",
+          "fields": [
+            {
+              "name": "limit",
+              "key": "limit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "serve",
+      "kind": "Function",
+      "range": {
+        "start": 540,
+        "end": 880
+      },
+      "params": [
+        {
+          "name": "port",
+          "binds": "Any"
+        },
+        {
+          "name": "",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "serve.@789",
+      "kind": "Inline",
+      "range": {
+        "start": 789,
+        "end": 822
+      },
+      "params": [
+        {
+          "name": "_req",
+          "binds": "Any"
+        },
+        {
+          "name": "res",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "serve.@851",
+      "kind": "Inline",
+      "range": {
+        "start": 851,
+        "end": 876
+      },
+      "params": []
+    }
+  ],
+  "imports": [
+    {
+      "local": "express",
+      "source": "express",
+      "name": {
+        "Name": "default"
+      }
+    },
+    {
+      "local": "Router",
+      "source": "express",
+      "name": {
+        "Name": "Router"
+      }
+    },
+    {
+      "local": "path",
+      "source": "node:path",
+      "name": "Namespace"
+    },
+    {
+      "local": "helper",
+      "source": "./helper",
+      "name": {
+        "Name": "helper"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "From": {
+        "exported": "reexported",
+        "source": "./helper",
+        "name": {
+          "Name": "helper"
+        }
+      }
+    },
+    {
+      "All": {
+        "source": "./shapes"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "serve",
+        "local": "serve"
+      }
+    },
+    {
+      "Local": {
+        "exported": "default",
+        "local": "default"
+      }
+    }
+  ],
+  "star": "ExceptDefault",
+  "calls": [
+    {
+      "scope": "",
+      "callee": "express",
+      "range": {
+        "start": 361,
+        "end": 370
+      }
+    },
+    {
+      "scope": "Store.find",
+      "callee": "fetch",
+      "range": {
+        "start": 462,
+        "end": 524
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "helper",
+      "range": {
+        "start": 692,
+        "end": 723
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "helper",
+      "range": {
+        "start": 749,
+        "end": 762
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "app.get",
+      "range": {
+        "start": 770,
+        "end": 823
+      }
+    },
+    {
+      "scope": "serve.@789",
+      "callee": "res.send",
+      "range": {
+        "start": 804,
+        "end": 822
+      }
+    },
+    {
+      "scope": "serve.@789",
+      "callee": "helper",
+      "range": {
+        "start": 813,
+        "end": 821
+      }
+    },
+    {
+      "scope": "serve",
+      "callee": "app.listen",
+      "range": {
+        "start": 834,
+        "end": 877
+      }
+    },
+    {
+      "scope": "serve.@851",
+      "callee": "path.join",
+      "range": {
+        "start": 857,
+        "end": 876
+      }
+    },
+    {
+      "scope": "",
+      "callee": "Router",
+      "range": {
+        "start": 1039,
+        "end": 1047
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "BASE"
+    },
+    {
+      "name": "app"
+    },
+    {
+      "name": "Row"
+    },
+    {
+      "name": "Rows"
+    }
+  ],
+  "locals": [
+    "serve.first",
+    "serve.tries",
+    "serve.rest",
+    "serve.host",
+    "serve.item",
+    "serve.error"
+  ],
+  "receivers": []
+}
+
+sample.py
+{
+  "defs": [
+    {
+      "name": "Circle",
+      "kind": "Class",
+      "range": {
+        "start": 207,
+        "end": 498
+      },
+      "params": [],
+      "bases": [
+        "Shape"
+      ]
+    },
+    {
+      "name": "Circle.__init__",
+      "kind": "Method",
+      "range": {
+        "start": 251,
+        "end": 345
+      },
+      "params": [
+        {
+          "name": "self",
+          "binds": "Instance"
+        },
+        {
+          "name": "radius",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "Circle.unit",
+      "kind": "Method",
+      "range": {
+        "start": 351,
+        "end": 430
+      },
+      "params": [
+        {
+          "name": "cls",
+          "binds": "Class"
+        },
+        {
+          "name": "args",
+          "binds": "Rest"
+        },
+        {
+          "name": "scale",
+          "binds": "Keyword"
+        },
+        {
+          "name": "kwargs",
+          "binds": "Rest"
+        }
+      ],
+      "decorators": [
+        "classmethod"
+      ]
+    },
+    {
+      "name": "Circle.describe",
+      "kind": "Method",
+      "range": {
+        "start": 436,
+        "end": 498
+      },
+      "params": [
+        {
+          "name": "label",
+          "binds": "Keyword"
+        }
+      ],
+      "decorators": [
+        "staticmethod"
+      ]
+    },
+    {
+      "name": "area",
+      "kind": "Function",
+      "range": {
+        "start": 501,
+        "end": 681
+      },
+      "params": [
+        {
+          "name": "circle",
+          "binds": "Any"
+        },
+        {
+          "name": "factor",
+          "binds": "Any"
+        }
+      ],
+      "decorators": [
+        "require_GET"
+      ]
+    },
+    {
+      "name": "main",
+      "kind": "Function",
+      "range": {
+        "start": 684,
+        "end": 746
+      },
+      "params": []
+    }
+  ],
+  "imports": [
+    {
+      "local": "os",
+      "source": "os",
+      "name": "Namespace"
+    },
+    {
+      "local": "os.path",
+      "source": "os.path",
+      "name": "Namespace"
+    },
+    {
+      "local": "Shape",
+      "source": "shapes",
+      "name": {
+        "Member": {
+          "name": "Shape",
+          "module": "shapes.Shape"
+        }
+      }
+    },
+    {
+      "local": "helpers",
+      "source": ".",
+      "name": {
+        "Member": {
+          "name": "helpers",
+          "module": ".helpers"
+        }
+      }
+    },
+    {
+      "local": "*",
+      "source": ".models",
+      "name": "All"
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "os",
+        "local": "os"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Shape",
+        "local": "Shape"
+      }
+    },
+    {
+      "Local": {
+        "exported": "helpers",
+        "local": "helpers"
+      }
+    },
+    {
+      "Local": {
+        "exported": "__all__",
+        "local": "__all__"
+      }
+    },
+    {
+      "Local": {
+        "exported": "BASE",
+        "local": "BASE"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Circle",
+        "local": "Circle"
+      }
+    },
+    {
+      "Local": {
+        "exported": "area",
+        "local": "area"
+      }
+    },
+    {
+      "Local": {
+        "exported": "main",
+        "local": "main"
+      }
+    },
+    {
+      "All": {
+        "source": ".models"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Circle",
+      "area"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Circle.__init__",
+      "callee": "Client",
+      "range": {
+        "start": 337,
+        "end": 345
+      }
+    },
+    {
+      "scope": "Circle.unit",
+      "callee": "cls",
+      "range": {
+        "start": 424,
+        "end": 430
+      }
+    },
+    {
+      "scope": "",
+      "callee": "app.get",
+      "range": {
+        "start": 502,
+        "end": 526
+      },
+      "decorates": "area"
+    },
+    {
+      "scope": "area",
+      "callee": "open",
+      "range": {
+        "start": 585,
+        "end": 614
+      }
+    },
+    {
+      "scope": "area",
+      "callee": "os.path.join",
+      "range": {
+        "start": 590,
+        "end": 613
+      }
+    },
+    {
+      "scope": "area",
+      "callee": "handle.read",
+      "range": {
+        "start": 634,
+        "end": 647
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "Circle",
+      "range": {
+        "start": 708,
+        "end": 717
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "helpers.log",
+      "range": {
+        "start": 722,
+        "end": 746
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "area",
+      "range": {
+        "start": 734,
+        "end": 745
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "__all__"
+    },
+    {
+      "name": "BASE"
+    },
+    {
+      "name": "Circle.client"
+    },
+    {
+      "name": "area.handle"
+    },
+    {
+      "name": "main.shape"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "",
+      "name": "BASE",
+      "class": "Unknown"
+    },
+    {
+      "scope": "",
+      "name": "__all__",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Circle",
+      "name": "client",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Circle",
+      "name": "radius",
+      "class": {
+        "Named": "float"
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "name": "radius",
+      "class": {
+        "Named": "float"
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "name": "self",
+      "class": "Enclosing"
+    },
+    {
+      "scope": "Circle.unit",
+      "name": "cls",
+      "class": "Enclosing"
+    },
+    {
+      "scope": "area",
+      "name": "circle",
+      "class": {
+        "Named": "Circle"
+      }
+    },
+    {
+      "scope": "area",
+      "name": "handle",
+      "class": {
+        "Named": "open"
+      }
+    },
+    {
+      "scope": "main",
+      "name": "shape",
+      "class": {
+        "Named": "Circle"
+      }
+    }
+  ]
+}
+
+sample.openapi.yaml
+{
+  "format": "openapi",
+  "version": "3.1.0",
+  "title": "Sample",
+  "routes": [
+    {
+      "path": "/items/{}",
+      "method": "GET",
+      "shape": {
+        "source": {
+          "document": "sample.openapi.yaml"
+        },
+        "fields": [
+          "extra",
+          "id",
+          "tags",
+          "tags[]"
+        ],
+        "open": [
+          "extra"
+        ],
+        "scalars": [
+          "id",
+          "tags[]"
+        ]
+      }
+    },
+    {
+      "path": "/linked",
+      "method": "POST",
+      "shape": {
+        "source": {
+          "document": "sample.openapi.yaml"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
+    }
+  ],
+  "servers": [
+    {
+      "host": "api.example.com",
+      "path": "/v1"
+    }
+  ],
+  "problems": [
+    {
+      "problem": "external-path-item",
+      "reference": "./other.yaml#/paths/remote"
+    },
+    {
+      "problem": "external-ref",
+      "reference": "./other.yaml#/Item"
+    }
+  ]
+}
+
+sample.asyncapi.yaml
+{
+  "format": "asyncapi",
+  "version": "3.0.0",
+  "title": "Sample",
+  "channels": [
+    {
+      "broker": "kafka",
+      "name": "orders.created",
+      "role": "producer",
+      "shape": {
+        "source": {
+          "document": "sample.asyncapi.yaml"
+        },
+        "fields": [
+          "id"
+        ],
+        "scalars": [
+          "id"
+        ]
+      }
+    },
+    {
+      "broker": "kafka",
+      "name": "orders.created",
+      "role": "consumer",
+      "shape": {
+        "source": {
+          "document": "sample.asyncapi.yaml"
+        },
+        "fields": [
+          "id"
+        ],
+        "scalars": [
+          "id"
+        ]
+      }
+    }
+  ],
+  "problems": [
+    {
+      "problem": "no-protocol",
+      "server": "bare"
+    }
+  ]
+}
+
+sample.package.json
+{
+  "name": "@example/sample",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "left-pad",
+      "range": "^1.3.0"
+    },
+    {
+      "field": "devDependencies",
+      "name": "@example/other",
+      "range": "workspace:*"
+    },
+    {
+      "field": "optionalDependencies",
+      "name": "fsevents",
+      "range": "*"
+    },
+    {
+      "field": "peerDependencies",
+      "name": "react",
+      "range": ">=18"
+    }
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./internal/*": null,
+    "./utils/*": "./src/utils/*.ts"
+  },
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.mjs",
+  "main": "./dist/index.cjs"
+}
+
+sample.tsconfig.json
+{
+  "out_dir": "./dist",
+  "root_dir": "src"
+}

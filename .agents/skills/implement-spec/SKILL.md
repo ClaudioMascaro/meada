@@ -20,16 +20,16 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 1. Read the spec and tickets to understand the task graph.
 
-2. (optional) Use an **exploration subagent** to conduct any exploration required by the tickets - relevant codebase files or external documentation. Ensure the exploration subagent can save files - it should save its markdown notes in a directory outside the repo, accessible by all future subagents. This lets **implementer subagents** focus on implementation rather than exploration.
+2. Create the integration branch from the tip of the base branch and check it out: `git fetch`, then branch from `origin/main`, since the session's own checkout may sit behind it. Everything after this step, exploration included, reads that checkout. If the issue tracker closes work through PRs, or the user asks for one, open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one), marked as closing the spec and tickets.
 
-3. Create the integration branch from the tip of the base branch: `git fetch`, then branch from `origin/main`, since the session's own checkout may sit behind it. If the issue tracker closes work through PRs, or the user asks for one, open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one), marked as closing the spec and tickets.
+3. (optional) Use an **exploration subagent** to conduct any exploration required by the tickets - relevant codebase files or external documentation. Ensure the exploration subagent can save files - it should save its markdown notes in a directory outside the repo, accessible by all future subagents. This lets **implementer subagents** focus on implementation rather than exploration.
 
 4. Use **implementer subagents** to implement each ticket, each in its own worktree on its own branch. Each implementer subagent:
    - confirms its worktree is based on the integration branch before starting, and resets onto it if not;
    - calls the Skill tool with `tdd` to build the ticket;
    - merges the integration branch tip into its own branch before reporting done
 
-5. Once an **implementer subagent** completes, merge its work to the integration branch with a **merger subagent**.
+5. Once an **implementer subagent** completes, and its ticket names a reviewer, run a **reviewer subagent** of that size on `git diff <integration branch>...<ticket branch>` against the ticket and `CODING_STANDARDS.md`; findings go back to the same implementer. Then merge its work to the integration branch with a **merger subagent**.
 
 6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
 

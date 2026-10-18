@@ -1,0 +1,13 @@
+{
+  "version": "3.0.0",
+  "dependencies": {
+    "@example/kit": "2.x",
+    "@example/shared": "1.1.0"
+  },
+  "peerDependencies": {
+    "@example/shared": ">=1.0.0"
+  },
+  "optionalDependencies": {
+    "@example/shared": true
+  }
+}

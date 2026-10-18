@@ -7,7 +7,9 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, chain, fixture_repo, set_mtime, worker};
+use common::{
+    age, assert_golden, chain, documented_chain, drift_chain, fixture_repo, set_mtime, worker,
+};
 use meada::engine::Engine;
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
@@ -281,6 +283,58 @@ fn contracts_follow_values_edited_in_other_files() {
     }
 }
 
+/// Renames the topic the gateway produces through its wrapper, in the imported constant, and
+/// the topics the conformance fixture builds from a constant (spec #20).
+fn edit_topics(gateway: &Path, conformance: &Path) {
+    let replace = |path: PathBuf, from: &str, to: &str| {
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(src.contains(from), "{from} in {}", path.display());
+        fs::write(&path, src.replace(from, to)).unwrap();
+    };
+    replace(
+        gateway.join("src/topics.ts"),
+        "orders.created",
+        "orders.placed",
+    );
+    replace(
+        conformance.join("src/messages/topics.ts"),
+        "\"orders\"",
+        "\"sales\"",
+    );
+}
+
+#[test]
+fn channels_follow_an_edited_topic_constant() {
+    let topics = |case: &str| {
+        let (_, gateway, _) = chain(case);
+        let conformance = fixture_repo(&format!("{case}_conformance"), "conformance-ts-js", ORIGIN);
+        [gateway.clone(), worker(&gateway), conformance]
+    };
+    let exports = |repos: &[PathBuf; 3]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = topics("fresh_topics");
+    repos.iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_topics(&repos[0], &repos[2]);
+
+    let refreshed = exports(&repos);
+
+    let cold = topics("fresh_topics_cold");
+    edit_topics(&cold[0], &cold[2]);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
 type Chain = (PathBuf, PathBuf, PathBuf);
 
 /// Edits, adds and deletes files in each repository of the chain: the web adds a consumer and
@@ -429,5 +483,225 @@ fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     {
         assert_ne!(refreshed, before, "repository {n}");
         assert_eq!(*refreshed, cold, "repository {n}");
+    }
+}
+
+/// Moves the documented-only route of the gateway's OpenAPI document, adds a JSON document with
+/// a route of its own, and deletes the invalid one.
+fn edit_documents(gateway: &Path) {
+    let doc = fs::read_to_string(gateway.join("openapi.yaml")).unwrap();
+    let doc = doc.replace("/api/shipments/{id}", "/api/parcels/{id}");
+    fs::write(gateway.join("openapi.yaml"), doc).unwrap();
+    fs::write(
+        gateway.join("extra.openapi.json"),
+        r#"{"openapi": "3.0.3", "paths": {"/api/returns": {"post": {}}}}"#,
+    )
+    .unwrap();
+    fs::remove_file(gateway.join("broken.openapi.yaml")).unwrap();
+}
+
+/// Writes the listed path that did not exist, and takes the gitignored document and the
+/// oddly named one off the list.
+fn edit_listed_documents(gateway: &Path) {
+    fs::write(
+        gateway.join("docs/missing.yaml"),
+        "openapi: 3.0.3\npaths:\n  /api/returns:\n    post: {}\n",
+    )
+    .unwrap();
+    let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
+    let toml = toml.replace(
+        "\"generated/openapi.yaml\", \"docs/api-contract.yaml\", ",
+        "",
+    );
+    fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
+/// Drops the gateway's `[serve]` table: its documents stop counting.
+fn drop_serve(gateway: &Path) {
+    let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
+    let serve = ["[serve]", "hosts = ", "documents = "];
+    let kept = toml
+        .lines()
+        .filter(|l| !serve.iter().any(|k| l.starts_with(k)));
+    let toml = kept.map(|l| format!("{l}\n")).collect::<String>();
+    fs::write(gateway.join("meada.toml"), toml).unwrap();
+}
+
+/// The web's client wrapper returns the response instead of its parsed body: its caller, in an
+/// unchanged file, reads no field any more.
+fn return_the_response(web: &Path) {
+    let path = web.join("src/api/body.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    fs::write(&path, src.replace("return res.json();", "return res;")).unwrap();
+}
+
+#[test]
+fn an_edited_client_wrapper_changes_its_callers_drift_like_a_cold_chain() {
+    let (web, _, _) = drift_chain("fresh_drift");
+    age(web.parent().unwrap());
+    let before = Engine::open(&web).unwrap().export().unwrap();
+    return_the_response(&web);
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_drift_cold");
+    return_the_response(&cold);
+    assert!(before.contains("\"[].customer\""));
+    assert!(!refreshed.contains("\"[].customer\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}
+
+/// The web's shared `Entity` type renames `id`: the consumers that extend it, in another file
+/// and unchanged, declare `key` instead.
+fn rename_a_shared_field(web: &Path) {
+    let path = web.join("src/api/types.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace("  id: string;", "  key: string;");
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+#[test]
+fn an_edited_shared_type_changes_the_drift_of_its_users_like_a_cold_chain() {
+    let (web, _, _) = drift_chain("fresh_type");
+    age(web.parent().unwrap());
+    let before = Engine::open(&web).unwrap().export().unwrap();
+    rename_a_shared_field(&web);
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_type_cold");
+    rename_a_shared_field(&cold);
+    assert!(!before.contains("\"items[].key\": \"exact\""));
+    assert!(refreshed.contains("\"items[].key\": \"exact\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}
+
+/// The catalog's zod schema drops `title`, which a consumer in the web app reads.
+fn drop_a_schema_field(catalog: &Path) {
+    let path = catalog.join("lib/schemas.ts");
+    let src = fs::read_to_string(&path).unwrap();
+    let edited = src.replace("  title: z.string().min(1),\n", "");
+    assert_ne!(src, edited);
+    fs::write(&path, edited).unwrap();
+}
+
+#[test]
+fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, _, catalog) = drift_chain("fresh_zod");
+    age(web.parent().unwrap());
+    let before = exports([&catalog, &web]);
+    drop_a_schema_field(&catalog);
+
+    let refreshed = exports([&catalog, &web]);
+
+    let (cold_web, _, cold) = drift_chain("fresh_zod_cold");
+    drop_a_schema_field(&cold);
+    assert!(!before[1].contains("\"[].title\": \"inferred\""));
+    assert!(refreshed[1].contains("\"[].title\": \"inferred\""));
+    assert_eq!(refreshed, exports([&cold, &cold_web]));
+}
+
+/// The catalog's shared package drops `price` from its zod schema and `warehouse` from its
+/// constant, which consumers in the web app read; the routes importing them are unchanged.
+fn drop_shared_fields(catalog: &Path) {
+    for (file, from, to) in [
+        ("quote.ts", ", price: z.number()", ""),
+        (
+            "shelf.ts",
+            "{ warehouse: \"w1\", reserved: 0 }",
+            "{ reserved: 0 }",
+        ),
+    ] {
+        let path = catalog.join("packages/contracts/src").join(file);
+        let src = fs::read_to_string(&path).unwrap();
+        let edited = src.replace(from, to);
+        assert_ne!(src, edited);
+        fs::write(&path, edited).unwrap();
+    }
+}
+
+#[test]
+fn an_edited_shared_package_changes_its_importers_drift_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        (repos.iter())
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let (web, gateway, catalog) = drift_chain("fresh_shared");
+    age(web.parent().unwrap());
+    let before = exports([&gateway, &web]);
+    drop_shared_fields(&catalog);
+
+    let refreshed = exports([&gateway, &web]);
+
+    let (cold_web, cold_gateway, cold) = drift_chain("fresh_shared_cold");
+    drop_shared_fields(&cold);
+    // The links of the quote's reader and the shelf's now miss what the package dropped.
+    let link = |export: &str, consumer: &str| -> String {
+        let site = format!("\"consumer\": \"example.com/chain/web::src/shared.ts::{consumer}\"");
+        let at = export.find(&site).unwrap();
+        export[at..].split("\n    }").next().unwrap().to_string()
+    };
+    for (consumer, missing) in [
+        ("quote::fetch#0", "\"price\": \"inferred\""),
+        ("shelf::fetch#0", "\"warehouse\": \"inferred\""),
+    ] {
+        assert!(!link(&before[1], consumer).contains(missing), "{missing}");
+        assert!(link(&refreshed[1], consumer).contains(missing), "{missing}");
+    }
+    assert_eq!(refreshed, exports([&cold_gateway, &cold_web]));
+}
+
+#[test]
+fn a_package_that_gets_its_name_back_keeps_its_shapes_like_a_cold_chain() {
+    let (web, _, catalog) = drift_chain("fresh_shared_name");
+    let path = catalog.join("packages/contracts/package.json");
+    let named = fs::read_to_string(&path).unwrap();
+    let unnamed = named.replace("  \"name\": \"@chain/contracts\",\n", "");
+    assert_ne!(named, unnamed);
+    age(web.parent().unwrap());
+    fs::write(&path, unnamed).unwrap();
+    let without = Engine::open(&web).unwrap().export().unwrap();
+    age(web.parent().unwrap());
+    fs::write(&path, named).unwrap();
+
+    let refreshed = Engine::open(&web).unwrap().export().unwrap();
+
+    let (cold, _, _) = drift_chain("fresh_shared_name_cold");
+    assert!(!without.contains("\"aisle\": \"inferred\""));
+    assert!(refreshed.contains("\"aisle\": \"inferred\""));
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+}
+
+#[test]
+fn edited_documents_relink_like_a_cold_chain() {
+    let exports = |repos: [&Path; 2]| -> Vec<String> {
+        repos
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    for (case, edit) in [
+        ("fresh_documents", edit_documents as fn(&Path)),
+        ("fresh_documents_listed", edit_listed_documents),
+        ("fresh_documents_serve", drop_serve),
+    ] {
+        let (web, gateway, _) = documented_chain(case);
+        age(gateway.parent().unwrap());
+        let before = exports([&gateway, &web]);
+        edit(&gateway);
+
+        let refreshed = exports([&gateway, &web]);
+
+        let (cold_web, cold, _) = documented_chain(&format!("{case}_cold"));
+        edit(&cold);
+        assert_ne!(refreshed[0], before[0], "{case}");
+        assert_eq!(refreshed, exports([&cold, &cold_web]), "{case}");
     }
 }

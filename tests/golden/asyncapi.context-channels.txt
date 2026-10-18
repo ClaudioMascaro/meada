@@ -1,0 +1,14 @@
+channel::kafka::orders.created
+  example.com/asyncapi/events producer asyncapi.yaml (documented only)
+    example.com/asyncapi/events asyncapi.yaml (document) payload fields: customer, customer.email, id, total
+  example.com/asyncapi/services consumer src/kafka.ts:13 onOrder
+
+channel::kafka::payments.requested
+  example.com/asyncapi/services producer src/kafka.ts:19 requestPayment
+  example.com/asyncapi/events consumer asyncapi.yaml (documented only)
+    example.com/asyncapi/events asyncapi.yaml (document) payload fields: amount, currency, orderId
+
+channel::amqp::invoices.issued
+  example.com/asyncapi/events producer billing.asyncapi.yaml (documented only)
+    example.com/asyncapi/events billing.asyncapi.yaml (document) payload fields: number, reason
+  example.com/asyncapi/services consumer src/queues.ts:11 onInvoice

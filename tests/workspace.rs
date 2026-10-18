@@ -77,7 +77,7 @@ fn search_rejects_an_unknown_kind_naming_the_valid_ones() {
 
     assert_eq!(
         error.to_string(),
-        "`kind` takes `symbol`, `contract`, `route`, `resource`, `ambiguous` or `unresolved`, not `file`"
+        "`kind` takes `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `drift`, `ambiguous` or `unresolved`, not `file`"
     );
 }
 
@@ -158,9 +158,19 @@ fn config_error(case: &str, toml: &str) -> String {
 fn invalid_config_errors_name_file_line_and_key() {
     for (case, toml, expected) in [
         (
-            "config_documents",
-            "[serve]\nhosts = [\"api.example.com\"]\ndocuments = [\"openapi.yaml\"]\n",
-            "<repo>/meada.toml:3: `serve.documents` is not in v0.1; track A adds it (OpenAPI and AsyncAPI documents)",
+            "config_serve_key",
+            "[serve]\nhosts = [\"api.example.com\"]\ndomains = [\"openapi.yaml\"]\n",
+            "<repo>/meada.toml:3: `serve.domains` is not a meada.toml key",
+        ),
+        (
+            "config_documents_absolute",
+            "[serve]\ndocuments = [\"docs/api.yaml\", \"/etc/api.yaml\"]\n",
+            "<repo>/meada.toml:2: `serve.documents`: `/etc/api.yaml` is not a path inside the repository",
+        ),
+        (
+            "config_documents_parent",
+            "[serve]\ndocuments = [\"docs/../../api.yaml\"]\n",
+            "<repo>/meada.toml:2: `serve.documents`: `docs/../../api.yaml` is not a path inside the repository",
         ),
         (
             "config_resource_key",

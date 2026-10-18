@@ -83,6 +83,62 @@ pub fn loose_chain(case: &str) -> PathBuf {
     gateway
 }
 
+/// The chain with the OpenAPI documents of spec #21 laid over it (`tests/fixtures/
+/// chain-documents/`): the gateway gains `openapi.yaml` (3.1, one route its code also serves,
+/// one only the document lists), a Swagger 2.0 file, an invalid YAML file and, under its
+/// gitignored `generated/`, a document never read; the web app gains a call to the
+/// documented-only route and a vendored `vendor/openapi.yaml`, ignored since it has no
+/// `[serve]`. Each overlaid repository gets a second commit. Returns (web, gateway, catalog).
+pub fn documented_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let (web, gateway, catalog) = chain(case);
+    let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-documents");
+    copy_dir(&overlay.join("gateway"), &gateway);
+    copy_dir(&overlay.join("web"), &web);
+    // The gateway lists the gitignored document, one with a name discovery does not know, and
+    // a path that does not exist.
+    let toml = gateway.join("meada.toml");
+    let hosts = "hosts = [\"gateway.example.com\"]\n";
+    let listed = "documents = [\"generated/openapi.yaml\", \"docs/api-contract.yaml\", \
+                  \"docs/missing.yaml\"]\n";
+    let src = fs::read_to_string(&toml).unwrap();
+    fs::write(&toml, src.replace(hosts, &format!("{hosts}{listed}"))).unwrap();
+    // The overlay cannot hold the gitignored document: Meada's own git would ignore it there.
+    fs::create_dir_all(gateway.join("generated")).unwrap();
+    fs::copy(
+        overlay.join("generated-openapi.yaml"),
+        gateway.join("generated/openapi.yaml"),
+    )
+    .unwrap();
+    for repo in [&web, &gateway] {
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "documents"]);
+    }
+    (web, gateway, catalog)
+}
+
+/// The documented chain with the shape drift cases of spec #23 laid over it
+/// (`tests/fixtures/chain-drift/`): the web app gains consumers of the gateway's documented
+/// `GET /api/orders` reading a field the document lacks, a present field, a field under its
+/// open part, a field through a client wrapper that returns the parsed body, and a name the
+/// function rebinds. For the provider shapes the object literals of a handler give, the gateway
+/// gains Express routes returning literals (an imported constant spread, an error branch with
+/// a literal status, a spread of an unknown value) and the catalog Next.js routes doing the
+/// same through `NextResponse.json` and `Response.json`; the web app reaches both through
+/// `GATEWAY_URL` and `CATALOG_URL`. For shapes through package imports (issue #175), the catalog
+/// holds the package `@chain/contracts`, which its own routes, the gateway and the web app import.
+/// Each overlaid repository gets a third commit. Returns
+/// (web, gateway, catalog).
+pub fn drift_chain(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let (web, gateway, catalog) = documented_chain(case);
+    let overlay = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/chain-drift");
+    for (repo, dir) in [(&web, "web"), (&gateway, "gateway"), (&catalog, "catalog")] {
+        copy_dir(&overlay.join(dir), repo);
+        git(repo, &["add", "-A"]);
+        git(repo, &["commit", "-q", "-m", "drift"]);
+    }
+    (web, gateway, catalog)
+}
+
 /// The chain's worker, next to any repository of the chain.
 pub fn worker(sibling: &Path) -> PathBuf {
     sibling.with_file_name("chain-worker")

@@ -1,0 +1,3 @@
+# Code with no documents; `events` documents the channels it talks over.
+[[peer]]
+repo = "example.com/asyncapi/events"

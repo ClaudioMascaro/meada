@@ -1,0 +1,13 @@
+asyncapi: 3.0.0
+info:
+  title: Serverless
+  version: 1.0.0
+# No root `servers`: no channel has a broker kind, so the channel is ignored.
+channels:
+  audits:
+    address: audits.logged
+operations:
+  logAudit:
+    action: send
+    channel:
+      $ref: '#/channels/audits'

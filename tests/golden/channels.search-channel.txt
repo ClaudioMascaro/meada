@@ -1,0 +1,3 @@
+example.com/channels/api src/orders.ts:6 channel::kafka::orders.created
+example.com/channels/billing src/listen.ts:10 channel::kafka::orders.created
+example.com/channels/worker src/consumer.ts:11 channel::kafka::orders.created

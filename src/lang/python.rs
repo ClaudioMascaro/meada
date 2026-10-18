@@ -6,8 +6,8 @@ use std::ops::Range;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Local,
-    Modules, Param, Part, Star, Value, children, named, text,
+    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
+    LanguagePack, Modules, Param, Part, Receiver, Star, Value, children, named, text,
 };
 use crate::{Result, parent, qualify};
 
@@ -76,7 +76,9 @@ impl LanguagePack for Python {
                                 params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
                                 decorators: bare.remove(&inner).unwrap_or_default(),
-                                returns: Vec::new(),
+                                return_values: Vec::new(),
+                                returns: None,
+                                type_params: Vec::new(),
                             });
                         }
                         if !is_class {
@@ -117,13 +119,15 @@ impl LanguagePack for Python {
                             args,
                             kwargs,
                             decorates: decorators.remove(&node.id()),
+                            arg_types: Vec::new(),
+                            uses: Vec::new(),
                         });
                     }
                 }
                 "return_statement" => {
                     if let (Some(&at), Some(returned)) = (functions.get(&scope), named(node).next())
                     {
-                        facts.defs[at].returns.push(value(returned, src));
+                        facts.defs[at].return_values.push(value(returned, src));
                     }
                 }
                 // ponytail: an import binds its names for the whole file, wherever it sits; a
@@ -201,7 +205,7 @@ impl LanguagePack for Python {
             }));
         }
         (facts.exports, facts.star) = module.exports();
-        (facts.locals, facts.consts) = locals.finish();
+        (facts.receivers, facts.consts) = locals.finish();
         Ok(facts)
     }
 
@@ -661,7 +665,7 @@ impl Locals {
     /// `nonlocal`, in the nearest enclosing function that binds it, class bodies skipped. An
     /// annotation decides; other bindings that disagree make the class unknown. A name its
     /// scope binds once, by `name = value`, is also a constant holding that value.
-    fn finish(self) -> (Vec<Local>, Vec<Const>) {
+    fn finish(self) -> (Vec<Receiver>, Vec<Const>) {
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
             .filter(|&(scope, name)| !self.declared.contains_key(&(scope.into(), name.into())))
@@ -695,6 +699,7 @@ impl Locals {
             .map(|(at, value)| Const {
                 name: qualify(&homes[at].0, &homes[at].1),
                 value,
+                ty: None,
             })
             .collect();
         let mut bound: BTreeMap<(String, String), (Class, How)> = BTreeMap::new();
@@ -711,7 +716,7 @@ impl Locals {
         }
         let locals = (bound.into_iter())
             .filter(|(_, (_, how))| *how != How::Param)
-            .map(|((scope, name), (class, _))| Local { scope, name, class })
+            .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
         (locals, consts)
     }
@@ -968,7 +973,19 @@ fn value(node: Node, src: &[u8]) -> Value {
             name if name.starts_with('(') => Value::Unknown,
             name => Value::Ref(name),
         },
-        "call" => parts(node, src).map_or(Value::Call(node.byte_range()), Value::Str),
+        "call" => parts(node, src).map_or_else(
+            || {
+                Value::Call(Invocation {
+                    callee: node
+                        .child_by_field_name("function")
+                        .map_or_else(String::new, |f| callee(f, src)),
+                    receiver: None,
+                    args: Vec::new(),
+                    range: node.byte_range(),
+                })
+            },
+            Value::Str,
+        ),
         "list" | "tuple" => Value::List(named(node).map(|item| value(item, src)).collect()),
         "parenthesized_expression" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
         _ => parts(node, src).map_or(Value::Unknown, Value::Str),

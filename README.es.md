@@ -100,11 +100,15 @@ tu agente (por ejemplo el `.mcp.json` de Claude Code):
 Son tres herramientas, siempre en inglés, y ninguna escribe:
 
 - `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
-  un recurso por su tipo o su id; con el tipo `ambiguous` o `unresolved`, lista los ítems
+  un recurso por su tipo o su id; con el tipo `channel`, un canal (cola o tópico) por el broker
+  o el nombre; con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
   contratos que toca; en un recurso (`resource::postgres::orders`), lista quién lo escribe y
-  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero;
+  quién lo lee, con el símbolo y la línea, o `(repository-level)` para el repositorio entero; en
+  un canal (`channel::kafka::orders.created`), lista productores y consumidores, también los
+  que llegan a él por un comodín o por un binding, con el nivel y el motivo, y un lado cuyo
+  nombre Meada no puede evaluar aparece como `(unresolved)` y nunca se enlaza;
 - `trace` sigue una cadena de llamadas por varios repositorios, río abajo (`down`) o río arriba
   (`up`); con `changes: uncommitted`, parte del diff del árbol de trabajo y sirve para analizar
   el impacto de lo que se acaba de editar.
@@ -188,14 +192,33 @@ Constantes fijas:
 
 Versión 0.1, la primera. Indexa repositorios TypeScript y JavaScript (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) y Python (`.py`) y enlaza repositorios, también de un lenguaje al otro,
-por contratos HTTP y por los recursos declarados en el `meada.toml`. Del lado que consume,
-`fetch` y, en Python, `requests`, `httpx` y `aiohttp`; del lado que sirve, Next.js (app router)
-y Express y, en Python, FastAPI, Flask y Django, también detrás de un gateway. Cada enlace tiene
-el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no se
-puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
+por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` del lado que consume;
+Next.js (app router) y Express y, en Python, FastAPI, Flask y Django del lado que sirve, también
+detrás de un gateway), por los
+recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs`), colas RabbitMQ
+(`amqplib`, con el `publish` a un exchange llegando a las colas que los bindings le atan), colas
+Amazon SQS (AWS SDK v3 y `sqs-consumer`), subjects NATS (con los comodines `*` y `>`), jobs
+BullMQ y streams Redis (`ioredis` y `node-redis`), con el productor enlazado al handler de cada
+consumidor, también en el mismo repositorio. Un repositorio con la tabla `[serve]` también lee
+sus documentos OpenAPI (3.0 y 3.1) y AsyncAPI (2.x y 3.0), encontrados por el nombre o listados
+en `[serve] documents`: las rutas y los canales que describen se vuelven contratos, con los
+campos de cada respuesta o payload, y `meada status` dice qué leyó y qué ignoró. Cada
+`package.json` con nombre se vuelve el contrato `package::npm::<nombre>`, y cada dependencia
+(`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) que nombra un
+paquete del workspace (de cualquier repositorio, el propio incluido) se enlaza a él, con el rango de versión comprobado
+contra la versión local (`range mismatch` cuando no la acepta, `range unchecked` cuando no se
+puede comprobar). Una llamada a una función importada de ese paquete atraviesa hasta el código
+del proveedor, por los campos `exports`, `types`, `module` y `main` y por los re-exports,
+también cuando el punto de entrada apunta a la carpeta de build (el `outDir` del
+`tsconfig.json`, mapeado de vuelta al `rootDir`). `search` con el tipo `package` encuentra el
+paquete por el nombre, con el repositorio, la carpeta, la versión y el número de consumidores,
+y `context` de una función exportada lista quién la llama, en cualquier repositorio del workspace. No lee
+lockfile ni consulta el registro npm. Meada también señala el *drift* de forma: los campos que un consumidor `fetch` lee de la respuesta ya interpretada y que la ruta que llama no devuelve, comparados con la forma de la ruta (un documento OpenAPI, un schema zod o los objetos literales de su handler). `trace` termina la línea del enlace con `drift: missing <camino>`, `context` de una ruta dice de dónde viene su forma y lista cada consumidor que lee campos de la respuesta, con su drift y nivel y las lecturas no comprobadas bajo una parte abierta cuando las hay, `search` con el tipo `drift` lista todo el drift, y `meada status` cuenta las lecturas ausentes de los consumidores de cada repositorio (las cuenta el repositorio del consumidor; el del proveedor no muestra nada). Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
+se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
 `decided`, y una ruta que Meada no sabe dónde se sirve queda fuera del mapa en vez de ser
-adivinada. Aún no hay: otros lenguajes, colas, paquetes ni el paquete npm. El alcance y el
-orden del trabajo están
+adivinada. Los clústeres de broker no se modelan: dos clústeres que tienen un tópico con el
+mismo nombre se enlazan como si fueran uno solo. Aún no hay: otros lenguajes, otros clientes HTTP
+además de esos, otros clientes de mensajería además de estos, ni el paquete npm de Meada. El alcance y el orden del trabajo están
 en el [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); las decisiones, en
 [`docs/adr`](docs/adr). Mira el [CHANGELOG](CHANGELOG.md).
 

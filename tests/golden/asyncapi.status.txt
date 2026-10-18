@@ -1,0 +1,13 @@
+example.com/asyncapi/services (.) indexed, 2 files
+example.com/asyncapi/events (../asyncapi-events) indexed, 1 files
+  asyncapi.yaml: asyncapi 2.6.0, channels: 3
+  asyncapi.yaml: channel `orders.{region}.created` has parameters, ignored
+  billing.asyncapi.yaml: asyncapi 3.0.0, channels: 3
+  legacy.asyncapi.json: not AsyncAPI 2.x or 3.0 (asyncapi 1.2.0), ignored
+  routing.asyncapi.yaml: asyncapi 2.6.0, channels: 0
+  routing.asyncapi.yaml: server `bare` has no `protocol`, its channels are ignored
+  routing.asyncapi.yaml: channel `routes.updated` names server `gone`, which the document does not have, ignored there
+  sensors.asyncapi.yml: asyncapi 2.6.0, channels: 0
+  sensors.asyncapi.yml: server protocol `mqtt` has no broker kind, its channels are ignored
+  serverless.asyncapi.yaml: asyncapi 3.0.0, channels: 0
+  serverless.asyncapi.yaml: no root `servers`, so no channel has a broker kind: its channels are ignored

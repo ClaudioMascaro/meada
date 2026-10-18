@@ -94,11 +94,15 @@ configuration (for example Claude Code's `.mcp.json`):
 There are three tools, always in English, and none of them writes:
 
 - `search` finds a symbol, a route or a contract by name; with the kind `resource`, a resource
-  by its kind or id; with the kind `ambiguous` or `unresolved`, it lists the open items (see
+  by its kind or id; with the kind `channel`, a channel (queue or topic) by broker or name;
+  with the kind `ambiguous` or `unresolved`, it lists the open items (see
   Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
   contracts it touches; on a resource (`resource::postgres::orders`), it lists who writes and
-  who reads it, with the symbol and line, or `(repository-level)` for the whole repository;
+  who reads it, with the symbol and line, or `(repository-level)` for the whole repository; on
+  a channel (`channel::kafka::orders.created`), it lists producers and consumers, those that
+  reach it through a wildcard or a binding included, with the level and the reason, and a side
+  whose name Meada cannot evaluate shows as `(unresolved)` and is never linked;
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
   with `changes: uncommitted`, it starts from the working-tree diff, which covers the impact
   analysis of what was just edited.
@@ -182,14 +186,33 @@ Fixed constants:
 
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
 `.jsx`, `.mjs`, `.cjs`) and Python ones (`.py`), and links repositories, also from one language
-to the other, through HTTP contracts and through the resources declared in `meada.toml`. On the
-consuming side, `fetch` and, in Python, `requests`, `httpx` and `aiohttp`; on the serving side,
-Next.js (app router) and Express and, in Python, FastAPI, Flask and Django, also behind a
-gateway. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a
-call whose URL cannot be resolved shows up as unresolved and becomes a link only through a
-decision, at the level `decided`, and a route Meada cannot place stays out of the map rather
-than being guessed. Not there yet: other languages, queues, packages and the npm package. The
-scope and order of the work are in
+to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
+on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
+Django on the serving side, also behind a gateway), through
+the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs`), RabbitMQ
+queues (`amqplib`, with a `publish` to an exchange reaching the queues its bindings tie to it),
+Amazon SQS queues (AWS SDK v3 and `sqs-consumer`), NATS subjects (with the `*` and `>`
+wildcards), BullMQ jobs and Redis streams (`ioredis` and `node-redis`), with the producer linked
+to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
+also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
+listed in `[serve] documents`: the routes and channels they describe become contracts, with the
+fields of each response or payload, and `meada status` says what it read and what it ignored.
+Each named `package.json` becomes the contract `package::npm::<name>`, and each dependency
+(`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) that names a
+package of the workspace (from any repository, its own included) links to it, with the version range checked
+against the local version (`range mismatch` when it does not accept it, `range unchecked` when
+it cannot be checked). A call to a function imported from that package crosses into the
+provider's code, through the `exports`, `types`, `module` and `main` fields and through
+re-exports, also when the entry point points into the build folder (the `outDir` of
+`tsconfig.json`, mapped back to its `rootDir`). `search` with the kind `package` finds the
+package by name, with its repository, folder, version and number of consumers, and `context` on
+an exported function lists who calls it, in any repository of the workspace. It reads no lockfile and queries
+no npm registry. Meada also reports shape drift: the fields a `fetch` consumer reads from the parsed response that the route it calls does not return, compared with the route's shape (an OpenAPI document, a zod schema or the object literals of its handler). `trace` ends the link line with `drift: missing <path>`, `context` on a route names where its shape comes from and lists each consumer that reads fields of the response, with its drift and level and the reads not checked under an open part when there are any, `search` with the kind `drift` lists all the drift, and `meada status` counts the missing reads of each repository's consumers (the consumer's repository counts them; the provider's shows nothing). Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
+resolved shows up as unresolved and becomes a link only through a decision, at the level
+`decided`, and a route Meada cannot place stays out of the map rather than being guessed. Broker
+clusters are not modelled: two clusters that each have a topic with the same
+name link as if they were one. Not there yet: other languages, HTTP clients other than these,
+messaging clients other than these, or Meada's npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).
 

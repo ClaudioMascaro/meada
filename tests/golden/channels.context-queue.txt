@@ -1,0 +1,3 @@
+channel::amqp::orders
+  example.com/channels/api producer src/amqp.ts:9 queueOrder
+  example.com/channels/worker consumer src/queues.ts:26 onOrder

@@ -1,0 +1,8 @@
+example.com/chain/catalog app/api/batches/route.ts:4 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:65 handed
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:16 ids drift: missing items[].owner.email, items[].weight
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:8 pageOf drift: missing page.size
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:30 quantities drift: missing items[].note, items[].sku
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:39 rebound
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/batches.ts:51 shadowed
+chain: inferred · 6 hops · 2 repos · 267 tokens

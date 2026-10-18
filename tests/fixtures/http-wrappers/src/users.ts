@@ -10,6 +10,12 @@ export function deleteUser(id: string) {
   return remove(`/api/users/${id}`);
 }
 
+// inferred, with type arguments under `await`.
+export async function listUsersTyped() {
+  const users = await get<string[]>("/api/users");
+  return users;
+}
+
 // inferred, through the cycle: retry reaches get without looping.
 export function listUsersPatiently() {
   return retry("/api/users", 3);

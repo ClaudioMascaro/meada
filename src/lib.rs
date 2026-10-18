@@ -1,24 +1,32 @@
 //! Meada: an LLM-free code graph. The query engine (`engine`) is the seam the CLI, the MCP
 //! server and the tests share.
 
+mod channel;
 mod config;
 mod contract;
 pub mod decide;
 mod decider;
 mod decisions;
+mod declared;
+mod document;
+mod drift_view;
 pub mod engine;
 mod http;
 mod index;
 mod items;
 mod lang;
+mod literals;
 pub mod mcp;
 pub mod msg;
+mod package;
 mod render;
 pub mod repo;
 mod resolve;
 mod resource;
+mod shape;
 mod trace;
 mod workspace;
+mod zod;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

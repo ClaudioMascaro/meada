@@ -1,0 +1,7 @@
+openapi: 3.1.0
+info:
+  title: Broken
+  version: "1.0"
+paths:
+  /api/broken:
+    get: [unclosed

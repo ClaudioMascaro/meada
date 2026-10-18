@@ -1,0 +1,797 @@
+{
+  "repository": "example.com/pkg/shared",
+  "files": [
+    {
+      "path": "bare/src/thing.ts",
+      "hash": "fb725627c93b6242e467c185daea658723d84fa2c3bd725f8bb5f07e9aa90574"
+    },
+    {
+      "path": "dts/index.js",
+      "hash": "f936b835c1860bca4f822ee8a9ceeb39ff61915c831dc165015446417c11b2ca"
+    },
+    {
+      "path": "esm/lib/parts/index.ts",
+      "hash": "f13869d7bbddb89e5feba9a21850ad9d2b9abf79c1ea4bdab535fdf009c1b392"
+    },
+    {
+      "path": "esm/lib/tool.ts",
+      "hash": "cdb73175f2667fe1c4ed098a067e91ad1b3976c62aa284905e79bb9a07543eba"
+    },
+    {
+      "path": "esm/src/index.mjs",
+      "hash": "0538f72569e57969370e40c0ce7769cc559d00de7c5030ed1c845d398349d48e"
+    },
+    {
+      "path": "kit/src/format.ts",
+      "hash": "8dc6cea527a5f83cdcb5e3ebb5ba0149c082d855a6264c1a1e6b7eaeab72f5ae"
+    },
+    {
+      "path": "kit/src/greet.ts",
+      "hash": "52da1ff633cc2f08e1d09aee4f2cad80fa6b17c2cfea983cb2787a116b5f456c"
+    },
+    {
+      "path": "kit/src/index.ts",
+      "hash": "34ea6b3d1bbc731b3a897d09daf78f612893930310016f08d47bbd645f298fb5"
+    },
+    {
+      "path": "kit/src/internal/secret.ts",
+      "hash": "ccf3913da78714d73e08750c1fd236cd74c094f6312973d6626f74ab7c67b46c"
+    },
+    {
+      "path": "kit/src/legacy.ts",
+      "hash": "31c2800150e264731e5410240721a3587a9c3bf49dc78f716ffed1d0f327f923"
+    },
+    {
+      "path": "kit/src/more.ts",
+      "hash": "da83c5d962751a6dd9ff0cdb26f017629300e4ab43a9aba3fb4f360fbd031272"
+    },
+    {
+      "path": "kit/src/utils/slug.ts",
+      "hash": "f76b02cee77f96941152b79568cf54d41e6758a3f0708b3cb2bd8a008bdcaaf3"
+    },
+    {
+      "path": "nest/index/index.ts",
+      "hash": "6b22d4265f0bde1321c36cacd219cd37620757360db53889dbeefd3421e4211c"
+    },
+    {
+      "path": "nest/sub/deep.ts",
+      "hash": "00a3d0fc825bad7656e6a3cac62988146e730ac0c0d1eff921f5ec5192d6ad59"
+    },
+    {
+      "path": "plain/index.ts",
+      "hash": "016f1c092cff2ae70d39e0d4071eda485c70377fbf138a555df371e65ffb1802"
+    },
+    {
+      "path": "prec/index.ts",
+      "hash": "b9ff91e30adeb9f3aab3a436cfa0e376cd730069ed64134f5e29dc560612f02d"
+    },
+    {
+      "path": "prec/legacy.ts",
+      "hash": "abfe5bd639813eb7551371a6ff7b51f8934c25223772aca0604ef4b5b5a1ef07"
+    },
+    {
+      "path": "sealed/src/one.ts",
+      "hash": "4168d8686775eec83309aaf2b50b2372b36ea6cd3fafd0782ef7d284b8217ff7"
+    },
+    {
+      "path": "sealed/src/two.ts",
+      "hash": "ed75595565f70cfa13bf8d06d1c2736749c5e6746d7387a298a150597fbed04b"
+    },
+    {
+      "path": "src/index.ts",
+      "hash": "4598d6f302bacce6bf50978d52c18128d4fb4edff2c4e1f001fc30655640aa25"
+    },
+    {
+      "path": "src/text.ts",
+      "hash": "07f3572867c5c39f0d6d715c3a775da7391e1301fbd89f2d01d5d6c37072d782"
+    },
+    {
+      "path": "src/utils/collapse.ts",
+      "hash": "845b7f37a7e1b0111ebaa606e945f504bb388be38a460351c8ce6a302bfc1cc0"
+    },
+    {
+      "path": "src/utils/trim.ts",
+      "hash": "7397e61a19ce21ca145da94670b097e95aa32680f785af3e201a1eb958c0c2ca"
+    },
+    {
+      "path": "typed/src/index.ts",
+      "hash": "30c6f501adeca72e78c38331b928bf2ea31755df0e270369f4e406684240126d"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/shared::bare/src/thing.ts::thing",
+      "span": {
+        "path": "bare/src/thing.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::dts/index.js::dts",
+      "span": {
+        "path": "dts/index.js",
+        "start": 7,
+        "end": 41
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+      "span": {
+        "path": "esm/lib/parts/index.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+      "span": {
+        "path": "esm/lib/tool.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::esm/src/index.mjs::esm",
+      "span": {
+        "path": "esm/src/index.mjs",
+        "start": 7,
+        "end": 41
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/format.ts::format",
+      "span": {
+        "path": "kit/src/format.ts",
+        "start": 7,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 7,
+        "end": 80
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 82,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/index.ts::kit",
+      "span": {
+        "path": "kit/src/index.ts",
+        "start": 159,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/internal/secret.ts::secret",
+      "span": {
+        "path": "kit/src/internal/secret.ts",
+        "start": 7,
+        "end": 49
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/legacy.ts::greet",
+      "span": {
+        "path": "kit/src/legacy.ts",
+        "start": 74,
+        "end": 121
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 83,
+        "end": 156
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 100,
+        "end": 154
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::farewell",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 7,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "span": {
+        "path": "kit/src/utils/slug.ts",
+        "start": 7,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::nest/index/index.ts::inner",
+      "span": {
+        "path": "nest/index/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::nest/sub/deep.ts::deep",
+      "span": {
+        "path": "nest/sub/deep.ts",
+        "start": 7,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::plain/index.ts::plain",
+      "span": {
+        "path": "plain/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::prec/index.ts::prec",
+      "span": {
+        "path": "prec/index.ts",
+        "start": 7,
+        "end": 52
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::prec/legacy.ts::prec",
+      "span": {
+        "path": "prec/legacy.ts",
+        "start": 7,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/one.ts::normalize",
+      "span": {
+        "path": "sealed/src/one.ts",
+        "start": 154,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/one.ts::seal",
+      "span": {
+        "path": "sealed/src/one.ts",
+        "start": 7,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::sealed/src/two.ts::seal",
+      "span": {
+        "path": "sealed/src/two.ts",
+        "start": 7,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize",
+      "span": {
+        "path": "src/text.ts",
+        "start": 90,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "span": {
+        "path": "src/utils/collapse.ts",
+        "start": 7,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "span": {
+        "path": "src/utils/trim.ts",
+        "start": 7,
+        "end": 68
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::typed/src/index.ts::typed",
+      "span": {
+        "path": "typed/src/index.ts",
+        "start": 7,
+        "end": 53
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/shared::kit/src/format.ts::format::value.toFixed#0",
+      "caller": "example.com/pkg/shared::kit/src/format.ts::format",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/format.ts",
+        "start": 57,
+        "end": 73
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::greet::shout#0",
+      "caller": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 55,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/greet.ts::shout::text.toUpperCase#0",
+      "caller": "example.com/pkg/shared::kit/src/greet.ts::shout",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/greet.ts",
+        "start": 130,
+        "end": 148
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client.create::Client#0",
+      "caller": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "target": "example.com/pkg/shared::kit/src/more.ts::Client",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 137,
+        "end": 149
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify::text.toLowerCase#0",
+      "caller": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "kit/src/utils/slug.ts",
+        "start": 57,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::(call_expression).toLowerCase#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/text.ts",
+        "start": 141,
+        "end": 174
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::collapse#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "level": "exact",
+      "span": {
+        "path": "src/text.ts",
+        "start": 141,
+        "end": 160
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/text.ts::normalize::trim#0",
+      "caller": "example.com/pkg/shared::src/text.ts::normalize",
+      "target": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "level": "exact",
+      "span": {
+        "path": "src/text.ts",
+        "start": 150,
+        "end": 159
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/collapse.ts::collapse::text.replace#0",
+      "caller": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/utils/collapse.ts",
+        "start": 58,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/pkg/shared::src/utils/trim.ts::trim::text.trim#0",
+      "caller": "example.com/pkg/shared::src/utils/trim.ts::trim",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/utils/trim.ts",
+        "start": 54,
+        "end": 65
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::npm::@example/bare",
+      "site": "example.com/pkg/shared::bare/package.json"
+    },
+    {
+      "contract": "package::npm::@example/dts",
+      "site": "example.com/pkg/shared::dts/package.json"
+    },
+    {
+      "contract": "package::npm::@example/esm",
+      "site": "example.com/pkg/shared::esm/package.json"
+    },
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/shared::kit/package.json"
+    },
+    {
+      "contract": "package::npm::@example/nest",
+      "site": "example.com/pkg/shared::nest/package.json"
+    },
+    {
+      "contract": "package::npm::@example/plain",
+      "site": "example.com/pkg/shared::plain/package.json"
+    },
+    {
+      "contract": "package::npm::@example/prec",
+      "site": "example.com/pkg/shared::prec/package.json"
+    },
+    {
+      "contract": "package::npm::@example/sealed",
+      "site": "example.com/pkg/shared::sealed/package.json"
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/shared::package.json"
+    },
+    {
+      "contract": "package::npm::@example/typed",
+      "site": "example.com/pkg/shared::typed/package.json"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "@example/bare",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "bare"
+    },
+    {
+      "name": "@example/dts",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "dts"
+    },
+    {
+      "name": "@example/esm",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "esm"
+    },
+    {
+      "name": "@example/kit",
+      "version": "2.1.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "kit"
+    },
+    {
+      "name": "@example/nest",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "nest"
+    },
+    {
+      "name": "@example/plain",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "plain"
+    },
+    {
+      "name": "@example/prec",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "prec"
+    },
+    {
+      "name": "@example/sealed",
+      "version": "0.3.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "sealed"
+    },
+    {
+      "name": "@example/shared",
+      "version": "1.2.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "."
+    },
+    {
+      "name": "@example/typed",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/shared",
+      "directory": "typed"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared none (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch; import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/api::src/report.js::report::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::e2e/package.json::devDependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::e2e/smoke.ts::smoke::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.1.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/bare",
+      "provider": "example.com/pkg/shared::bare/package.json",
+      "contract": "package::npm::@example/bare",
+      "level": "exact",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/dts",
+      "provider": "example.com/pkg/shared::dts/package.json",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/esm",
+      "provider": "example.com/pkg/shared::esm/package.json",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/nest",
+      "provider": "example.com/pkg/shared::nest/package.json",
+      "contract": "package::npm::@example/nest",
+      "level": "exact",
+      "reason": "package::npm::@example/nest 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/plain",
+      "provider": "example.com/pkg/shared::plain/package.json",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/prec",
+      "provider": "example.com/pkg/shared::prec/package.json",
+      "contract": "package::npm::@example/prec",
+      "level": "exact",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/sealed",
+      "provider": "example.com/pkg/shared::sealed/package.json",
+      "contract": "package::npm::@example/sealed",
+      "level": "exact",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::dependencies::@example/typed",
+      "provider": "example.com/pkg/shared::typed/package.json",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::package.json::devDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared ~1.2.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::Client.create#0",
+      "provider": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::all.farewell#0",
+      "provider": "example.com/pkg/shared::kit/src/more.ts::farewell",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::fixed#0",
+      "provider": "example.com/pkg/shared::kit/src/format.ts::format",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::kit#0",
+      "provider": "example.com/pkg/shared::kit/src/index.ts::kit",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::main::slugify#0",
+      "provider": "example.com/pkg/shared::kit/src/utils/slug.ts::slugify",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/app.ts::welcome::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::dts#0",
+      "provider": "example.com/pkg/shared::dts/index.js::dts",
+      "contract": "package::npm::@example/dts",
+      "level": "exact",
+      "reason": "package::npm::@example/dts 1.0.0 (local 1.0.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::esm#0",
+      "provider": "example.com/pkg/shared::esm/src/index.mjs::esm",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import module"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::part#0",
+      "provider": "example.com/pkg/shared::esm/lib/parts/index.ts::part",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::plain#0",
+      "provider": "example.com/pkg/shared::plain/index.ts::plain",
+      "contract": "package::npm::@example/plain",
+      "level": "exact",
+      "reason": "package::npm::@example/plain 1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::thing#0",
+      "provider": "example.com/pkg/shared::bare/src/thing.ts::thing",
+      "contract": "package::npm::@example/bare",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/bare 1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::tool#0",
+      "provider": "example.com/pkg/shared::esm/lib/tool.ts::tool",
+      "contract": "package::npm::@example/esm",
+      "level": "exact",
+      "reason": "package::npm::@example/esm ~1.0.0 (local 1.0.0); import path"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/entries.ts::entries::typed#0",
+      "provider": "example.com/pkg/shared::typed/src/index.ts::typed",
+      "contract": "package::npm::@example/typed",
+      "level": "exact",
+      "reason": "package::npm::@example/typed 1.x (local 1.0.0); import types"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/nest.ts::nest::prec#0",
+      "provider": "example.com/pkg/shared::prec/index.ts::prec",
+      "contract": "package::npm::@example/prec",
+      "level": "inferred",
+      "reason": "package::npm::@example/prec 1.0.0 (local 1.0.0); import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::clean::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/one.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::lock::seal#0",
+      "provider": "example.com/pkg/shared::sealed/src/two.ts::seal",
+      "contract": "package::npm::@example/sealed",
+      "level": "ambiguous",
+      "reason": "package::npm::@example/sealed 0.3.0 (local 0.3.0); import main"
+    },
+    {
+      "consumer": "example.com/pkg/web::src/text.ts::squash::collapse#0",
+      "provider": "example.com/pkg/shared::src/utils/collapse.ts::collapse",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir"
+    }
+  ]
+}

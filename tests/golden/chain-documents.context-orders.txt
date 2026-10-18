@@ -1,0 +1,14 @@
+example.com/chain/gateway src/orders.ts:5 listOrders
+async function listOrders(req: Request, res: { json(body: unknown): void }) {
+  const product = await productOf(req.query.product);
+  res.json([{ id: "o1", product }]);
+}
+callers: none
+callees:
+example.com/chain/gateway src/catalog.ts:2 productOf
+example.com/chain/gateway src/orders.ts:7 (unresolved) res.json
+contracts:
+example.com/chain/gateway src/orders.ts:5 provides http::GET::/api/orders
+example.com/chain/gateway openapi.yaml (document) response fields: [], [].id, [].product
+example.com/chain/gateway openapi.yaml (document) response open: [].product
+example.com/chain/gateway src/orders.ts:6 consumes http::GET::/api/products/{}

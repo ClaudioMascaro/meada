@@ -1,0 +1,2 @@
+# Documents its channels in AsyncAPI files: the `[serve]` table makes them provider sources.
+[serve]

@@ -1,0 +1,4 @@
+example.com/pkg/web src/app.ts:10 greet
+  →[exact: package::npm::@example/kit ^2.0.0 (local 2.1.0); import exports] example.com/pkg/shared kit/src/greet.ts:1 greet
+    example.com/pkg/shared kit/src/greet.ts:5 shout
+chain: exact · 1 hops · 2 repos · 67 tokens

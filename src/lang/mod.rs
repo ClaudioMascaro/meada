@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
 
 use crate::Result;
+use crate::resolve::Code;
 
 pub mod python;
 pub mod ts;
@@ -28,7 +29,7 @@ pub trait LanguagePack {
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
 
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
-    /// language that names it as a parameter (`self`) writes it in `Facts::locals` instead.
+    /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
     fn receiver(&self) -> Option<&'static str> {
         None
     }
@@ -44,6 +45,54 @@ pub trait LanguagePack {
     fn globals(&self) -> &'static [&'static str] {
         &[]
     }
+
+    /// The producer and consumer calls of the message libraries the pack knows (spec #20),
+    /// read from its files' facts through `code`: a call counts only when its receiver traces
+    /// back to the library's package (`Code::origin`), and its channel name is evaluated like
+    /// a URL, client wrappers included (`Code::expand`). The channel contract kind turns them
+    /// into contracts; a pack never touches the index.
+    fn messages(&self, _code: &Code) -> Vec<Message> {
+        Vec::new()
+    }
+}
+
+/// A call that produces to or consumes from a channel: a queue or topic of one broker kind.
+pub struct Message {
+    /// `kafka`, `amqp`, `sqs`, `nats`, `bullmq` or `redis`.
+    pub broker: &'static str,
+    /// The channel name as evaluated, kept as it is; `None` when it cannot be evaluated (an
+    /// unresolved side, never linked).
+    pub name: Option<String>,
+    /// The call site: the producing or subscribing call, or the call of a client wrapper that
+    /// leads to it, as its file and position in `Facts::calls`.
+    pub path: String,
+    pub call: usize,
+    pub role: Role,
+}
+
+pub enum Role {
+    /// The provider side of the channel.
+    Producer,
+    /// A publish to a named exchange (`name` is its routing key): the message reaches the
+    /// queues bound to the exchange whose pattern matches, wherever the binding is declared.
+    Publish { exchange: String },
+    /// A binding of the queue `name` to an exchange by a pattern. It is neither side of a
+    /// channel; the channel kind keeps it for the links.
+    Binding { exchange: String, pattern: String },
+    /// The consumer side, with the function that handles what it receives.
+    Consumer(Handler),
+}
+
+/// Where a consumer's messages are handled.
+#[derive(Clone)]
+pub enum Handler {
+    /// A definition by qualified name; an empty name is the file's top level. A name whose
+    /// last segments are inline definitions no kind names stands for the definition that
+    /// encloses them.
+    Def { path: String, name: String },
+    /// An anonymous function written in place: the `Kind::Inline` definition `def` of `path`,
+    /// which the channel kind names after the channels it handles.
+    Inline { path: String, def: String },
 }
 
 /// The repository-relative paths an import of a specifier (second argument) from a file
@@ -66,6 +115,12 @@ pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
 
+/// Every pack, in `PACKS` order.
+#[cfg(test)]
+pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
+    PACKS.iter().copied()
+}
+
 /// One file's facts, each list in source order. The index keeps them, so a refresh resolves
 /// unchanged files without parsing them again.
 #[derive(Default, Serialize, Deserialize)]
@@ -80,14 +135,24 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
-    /// Names bound in a scope whose class the syntax may tell, one per scope and name.
-    pub locals: Vec<Local>,
+    /// Every other name a binding makes, qualified like `Const::name` by the definition whose
+    /// body or parameters hold it (a function that is no definition lends its names to the
+    /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
+    /// and `for ... of` bindings, and each parameter name `Def::params` does not hold (a nested,
+    /// array or rest pattern, or any parameter of a function that is no definition). Each hides
+    /// the same spelling in its whole scope (`Resolver::lexical`), whatever block it sits in: an
+    /// outer name, and a definition, constant or parameter of its own scope.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub locals: Vec<String>,
+    /// Names bound in a scope whose class the syntax may tell, one per scope and name: what a
+    /// method call on the name reaches. Each also hides an outer binding of its name.
+    pub receivers: Vec<Receiver>,
 }
 
 /// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
 /// its instances. The shared side follows a method call on it to the class it holds.
 #[derive(Serialize, Deserialize)]
-pub struct Local {
+pub struct Receiver {
     pub scope: String,
     pub name: String,
     pub class: Class,
@@ -195,7 +260,15 @@ pub struct Def {
     /// What a function returns, one value per `return`. Not kept in the index (see
     /// `Call::args`).
     #[serde(skip)]
-    pub returns: Vec<Value>,
+    pub return_values: Vec<Value>,
+    /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
+    /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
+    /// the index (see `Call::args`).
+    #[serde(skip)]
+    pub returns: Option<Ty>,
+    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
+    #[serde(skip)]
+    pub type_params: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -249,6 +322,11 @@ pub struct Const {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip, default = "unknown")]
     pub value: Value,
+    /// The type the constant is declared to have, by an annotation or a cast (spec #23), when
+    /// it lists fields: the value as written may lack what the type has, an index signature.
+    /// Not kept in the index, like `value`.
+    #[serde(skip)]
+    pub ty: Option<Ty>,
 }
 
 fn unknown() -> Value {
@@ -275,6 +353,16 @@ pub struct Call {
     /// written on `def index()` decorates `index`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decorates: Option<String>,
+    /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
+    /// (spec #23). Not kept in the index, like `args`.
+    #[serde(skip)]
+    pub arg_types: Vec<Option<Ty>>,
+    /// Shape facts (spec #23), an optional part of a pack's output: what the function making
+    /// the call does with its result, one chain of steps per use, such as `res.json()` then
+    /// `.items`, `[0]` and `.id`. A pack that leaves it empty gives its consumers no shape.
+    /// Not kept in the index, like `args`.
+    #[serde(skip)]
+    pub uses: Vec<Vec<Step>>,
 }
 
 impl Call {
@@ -282,6 +370,79 @@ impl Call {
     pub fn keyword(&self, name: &str) -> Option<&Value> {
         self.kwargs.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
+}
+
+/// One step of what code does with a value (spec #23): the value read through a chain of
+/// member and element accesses and method calls, then maybe returned. A chain ends where the
+/// pack cannot follow the value (passed to a function, stored, rebound).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// `.name`, `?.name` or `["name"]`.
+    Field(String),
+    /// An element: `[0]`, an index with a literal number.
+    Element,
+    /// A call of the method `name` on the value: `.json()`.
+    Call(String),
+    /// The value is declared to have this type: by a cast, a type argument of the method called
+    /// or an annotation on the variable that receives it. A chain ends here, but the reads that
+    /// follow the cast go on in a chain of their own.
+    Typed(Ty),
+    /// The type arguments the call itself is given (`get<Row>(path)`), in order. They type the
+    /// result only if the function called says so (a cast of its result to a type parameter, or
+    /// a return type that is one): the caller cannot tell. A chain of its own, at the start.
+    Argument(Vec<Ty>),
+    /// The value is returned by the function making the call.
+    Return,
+}
+
+/// How deep a pack reads a type, and the shared side follows one (spec #23): the nesting of
+/// the type as written, and the names it follows on the way. A part deeper than that adds no
+/// fields.
+// ponytail: real types nest a handful of levels; the limit keeps a crafted chain of `extends`
+// or aliases, or a type nested thousands of levels, from costing the stack.
+pub const TYPE_DEPTH: usize = 32;
+
+/// A type as written (spec #23), as far as drift reads it: the fields it lists. A form that
+/// lists none is `Unknown`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Ty {
+    /// `{ a: A; b?: B }`, or an interface body. `open` when it has an index signature.
+    Object { members: Vec<Member>, open: bool },
+    /// A name: an interface, an alias, a class or an import; the shared side resolves it.
+    /// Type arguments are not substituted.
+    Named(String),
+    /// `A & B`, and an interface with the types it extends.
+    Intersection(Vec<Ty>),
+    /// `T[]` and `Array<T>`.
+    Array(Box<Ty>),
+    /// `z.infer<typeof S>`: the name of the schema.
+    Schema(String),
+    /// A type parameter of the function around the use (`as T` in `get<T>`): the caller's type
+    /// argument stands for it. One of an interface or alias adds no fields.
+    Param(String),
+    /// Any other form: a union, a primitive, a mapped type.
+    Unknown,
+}
+
+impl Ty {
+    /// Whether a type parameter is written in the type.
+    pub fn has_param(&self) -> bool {
+        match self {
+            Ty::Param(_) => true,
+            Ty::Array(of) => of.has_param(),
+            Ty::Intersection(parts) => parts.iter().any(Ty::has_param),
+            Ty::Object { members, .. } => members.iter().any(|m| m.ty.has_param()),
+            _ => false,
+        }
+    }
+}
+
+/// A property of an object type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Member {
+    pub name: String,
+    pub optional: bool,
+    pub ty: Ty,
 }
 
 /// An expression as written. The pack does not follow names: the shared side folds
@@ -297,15 +458,80 @@ pub enum Value {
     Ref(String),
     /// `undefined`, or an argument the call leaves out.
     Undefined,
-    /// The result of a call: the range of that call among the file's calls.
-    Call(Range<usize>),
-    /// A list or tuple literal's items.
+    /// The result of a call, such as `express.Router()`.
+    Call(Invocation),
+    /// A property of a named value, such as `parsed.data` (spec #23).
+    Member(String, String),
+    /// A value declared to have the type a schema infers, such as `x as z.infer<typeof S>`
+    /// (spec #23): the name of the schema.
+    Schema(String),
+    /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
+    /// the arguments.
+    New(String, Vec<Value>),
+    /// An array, list or tuple literal's items.
     List(Vec<Value>),
+    /// An `interface` or `type` declaration (spec #23), held by a `Const` of the name it
+    /// declares: the type namespace shares the name of a `const` of the same spelling.
+    Type(Ty),
+    /// A number or a boolean literal (spec #23): a scalar. A number written as a plain integer
+    /// carries it (an HTTP status).
+    Scalar(Option<u32>),
     /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
     /// definition.
     Function(String),
     /// Anything else.
     Unknown,
+}
+
+/// A call as written (spec #23): `receiver` is the expression a method is called on (`z` in
+/// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
+/// the callee is no member. `range` is the range of that call among the file's calls, which
+/// the shared side resolves to follow the value it returns.
+#[derive(Clone)]
+pub struct Invocation {
+    pub callee: String,
+    pub receiver: Option<Box<Value>>,
+    pub args: Vec<Value>,
+    pub range: Range<usize>,
+}
+
+/// What a reader of evaluated values needs depends on a parameter of the enclosing function:
+/// the function is a client wrapper (see `Code::expand`).
+pub struct Depends;
+
+/// The value of the last property `key` of an object, as JavaScript reads it, through spreads:
+/// `None` when no property sets it, `Unknown` when a spread of something unknown may.
+pub fn property<'v>(
+    properties: &'v [(String, Value)],
+    key: &str,
+) -> std::result::Result<Option<&'v Value>, Depends> {
+    static UNKNOWN: Value = Value::Unknown;
+    for (k, value) in properties.iter().rev() {
+        match (k.as_str(), value) {
+            (k, value) if k == key => return Ok(Some(value)),
+            ("...", Value::Object(inner)) => {
+                if let Some(found) = property(inner, key)? {
+                    return Ok(Some(found));
+                }
+            }
+            ("...", Value::Undefined) => {}
+            ("...", Value::Ref(_)) => return Err(Depends),
+            ("...", _) => return Ok(Some(&UNKNOWN)),
+            _ => {}
+        }
+    }
+    Ok(None)
+}
+
+/// The text of `parts` when every part is literal.
+pub fn literal(parts: &[Part]) -> Option<String> {
+    parts
+        .iter()
+        .map(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[derive(Clone, PartialEq)]

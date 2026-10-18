@@ -2,7 +2,8 @@
 
 Which module owns what, the seams between them, and what the code relies on. Verified against
 `src/` and `tests/` of the v0.1 trunk; the code wins over this file, and a change to a seam
-updates it. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
+updates it. Per-area detail lives in `map/`, one file per area, each named from the module
+list below. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 
 ## Flow
 
@@ -16,323 +17,28 @@ give byte-identical output.
 
 ## Modules (`src/`)
 
-- `engine.rs`: `Engine` is the one query seam. The CLI, the MCP server and almost every test call
-  it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `local_items`,
-  `local_item`, `decision_report`, `local_decisions`, `root`, plus `status(dir)` (never creates
-  an index; when every repository is already indexed at the current schema it refreshes them
-  like a query, to evaluate decisions, and writes
-  only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. `search`
-  kind `resource` is the contracts under `resource::` (matched by kind and id), the same lines
-  `contract` and no kind list; `context` on `resource::<kind>::<id>` lists the writers and
-  readers across the workspace (`resource_sides`). `status` also prints, under each
-  repository, `Engine::resource_report` (resource lines, same indexed-only rule as decisions).
-- `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
-  the one place that derives them. `list` takes the exports and the core's links (before any
-  decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
-  candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
-  reach come from `http::route_fits` (method, or a route of every method, and ordered literal
-  fragments, see `Found::method` / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
-  path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a
-  decision applies (its call has a `Level::Decided` link after replay); `open_items` and
-  `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
-  decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
-- `decide.rs`: `meada decide`. `items(engine, only)` (`Engine::local_items`: the open items
-  whose call lives in the repository where Meada runs, id order; with `--item`,
-  `Engine::local_item`, which also takes a decided call, offered with every candidate so the
-  new pick replaces its entry; an id that is neither is an error),
-  `ask(items, input, out) -> Vec<Decision>` (human mode: prints each item and its numbered
-  candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
-  dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
-  writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
-  decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
-  exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
-  is stale) and `run`, the public entry. Human mode reads no environment variable and
-  opens no connection. With `--decider` (and neither `--list` nor `--prune`), `run` reads
-  `decider::Config` first (and validates `--min-p` with `decider::min_p`, before the
-  variables), then hands the items to `decider::run`, which returns an `Outcome {decisions,
-  failed}`; the decisions go to `finish` and, when `failed > 0`, `run` then returns an error
-  (`meada: N item(s) failed`, exit 1) so a script sees the failure while the other items are
-  already written. `--show-request` stops after printing.
-- `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
-  `Config::from_env` (the four `MEADA_DECIDER_*` variables, read nowhere else: errors name the
-  variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.13` and needs the key, `chat`
-  needs URL and model; HTTPS except to a loopback host), `Question` (the excerpt: call
-  expression, the enclosing span read from disk only when the pack's parse of the file says
-  that symbol is a function, method or inline function (`function_like`), so a call in a class
-  field initializer goes alone and the top level says so; `offers: Vec<Offer {key, description,
-  target}>`, keyed `"1".."n"`, described by `Candidate::describe`), `MAX_CANDIDATES` (50: more
-  is skipped in decider mode only), `Config::requests` (the protocol dispatch), `show`
-  (`--show-request`, the
-  `Authorization` value printed as `<hidden>`) and `send` (`ureq`, rustls, fixed `TIMEOUT`, no
-  proxy to a loopback host, no redirects, no retries; a non-success status is the error
-  `Msg::HttpStatus` (`http status: <code>`, plus `: <message>` when the redacted body has
-  `{"error": {"message"}}`)). `Config::shown(text)` is the one gate for every decoded upstream
-  string printed or recorded (error message, model id, serde error text, type, keys, choice):
-  control characters dropped, then the key replaced by `<hidden>`, since a JSON escape hides
-  it from the raw-body redaction in `send`. `Config` has no `Debug`; the key
-  leaves it only as the bearer header.
-  Protocol adapters are files beside it that build requests and read answers: `chat.rs`
-  (`request(config, question)`, one `POST <url>/chat/completions` per item; `answer(config,
-  question, body) -> Result<Proposal>` reads `choices[0].message.content` as `{choice,
-  probability}`, `by` = the response `model` or the configured one). `decisions.rs`
-  (OpenRouter's alpha API: `request(config, questions) -> Option<Request>`, one `POST
-  <url>/api/alpha/decisions` carrying every eligible item, `state {task, repository, items:
-  name -> excerpt}` (upstream: `state` is the content to evaluate), `questions` named
-  `item1..` zero-padded so the sorted maps keep item order, each `{type: choice,
-  instructions: "... the call in items.<name> ...", criteria: key -> describe}`, `provider
-  {zdr: true, data_collection: deny}`; `answers(config, asked, body)` parses `{model, answers, id?, provider?,
-  usage?}` and each `{type, choice, confidence, probabilities}` with `deny_unknown_fields`: a
-  shape error or an answer to an unknown question fails every item, an answer's values (type
-  `choice`, choice and probability keys offered, each in [0,1], sum 1 within `SUM_TOLERANCE` =
-  0.01, `confidence` in [0,1]) fail its item; `p` = probability of the choice, `by` = response
-  `model`, `confidence` printed, not recorded). A refusal of the data-retention preferences
-  arrives as a non-success status: every item of the request fails, nothing is written,
-  nothing retries. A new protocol adds a file and one arm each in `Config::requests` and
-  `Config::answers`.
-  `validate.rs` is shared by every protocol: `proposal(config, question, choice, p, by) ->
-  Result<Proposal>` (choice among the offered keys through `offered(config, question, choice)
-  -> Result<&Offer>`, `p` in [0,1] through `probability(p)`, `by` not empty and not `human`; a
-  `Proposal {decision, p, candidate, confidence}`) and `invalid(reason)` (the `invalid answer:
-  <reason>` error text). `run`
-  prints per item: `<id>` then `proposed: ...` (`p >= min_p`, returned to be written),
-  `suggestion, not written: ...` (below it, `MIN_P` = 0.5 unless `--min-p`), both with
-  `confidence` when the protocol gives one, or the error (`request failed: ...` /
-  `invalid answer: ...`, counted in `Outcome::failed`).
-- `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
-  `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
-  and `--min-p`, which require `--decider`). `search`, `context` and `trace`
-  are reachable through MCP and the library, not the CLI.
-- `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
-  that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
-- `workspace.rs`, `config.rs`: `Workspace::discover` finds `Repository { root, identity, config }`
-  from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
-  repository already in join, transitively; a sibling with an invalid `meada.toml` or
-  `meada.decisions.toml` is skipped). Peers not found go to `Workspace::missing`. `config` parses
-  `[[peer]]`, `[serve] hosts`, `[serve] prefix` and `strip` (each must start with `/`, normalized
-  by `gateway_key`) and `[[resource]]` (`kind` checked as a lowercase identifier, `id` not empty,
-  `role` read, write or read-write, optional `via`) with `deny_unknown_fields`; keys later track A
-  specs add are listed in `LATER` so the error says "not in v0.1". `Serve::gateway_path(code path)
-  -> Option<(gateway path, reason)>` is the one gateway rule (spec #19), written for A4's document
-  routes to reuse. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
-  every error), also used for the decisions file; `Repository` carries both `config` and
-  `decisions`, loaded together at discovery.
-- `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
-  `Decision { kind (ambiguous-link | dynamic-url), call, target, by, p }`, `load(root)` and
-  `replay(links, workspace, exports) -> (links, Vec<Evaluation>)`, called by
-  `Engine::links_and_decisions` at the end. Replay is a pure function of links, exports and the
-  files, so nothing is stored and a changed file needs no reindex. `evaluate` is the one place
-  that decides a decision's `Fate`, in this order: call gone (`Cause::CallGone`), target
-  repository a missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no
-  longer open (the core resolves the call on its own, or the item is not of the decision's kind:
-  `ItemNotOpen`), target gone (`TargetGone`), target not among the ambiguous link's candidates
-  (`NotCandidate`); else it applies. A stale or waiting decision changes no link. `Evaluation {
-  repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target, peer}>
-  }` is per repository, in file order; `Engine::decision_report()` returns them for the workspace
-  (`Engine::local_decisions()` the one of the repository where Meada runs,
-  `Engine::status_report()` them and the resource lines in one pass), `export` and `status` render
-  them, and `Evaluation::lines` is the one rendering of the stale and waiting lines (`status`,
-  `meada decide --list`); `--prune` reuses the same call. `probability(p)` is the one [0,1] check,
-  for the file's `p`, a decider's answer and `--min-p`. `load` rejects a file that repeats a
-  `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file
-  invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)`
-  (existing entries minus those of the same `call`, plus `new`, sorted by `call`, no comments or
-  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`.
-- `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
-  shelling out to `git`.
-- `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
-  `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
-  only changed files, resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository.
-- `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`, `receiver`: a keyword naming the enclosing class's instance,
-  `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose members
-  are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
-  `globals`: names bound everywhere that contract kinds read, `fetch` for TS/JS, none for
-  Python), and the `Facts`/`Value` types, plus the tree-sitter helpers
-  (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx .js
-  .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads `pyproject.toml`:
-  `.pyi` and notebooks are not read). A pack sees one file at a time and never touches the index.
-  `python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
-  two definitions of one name, spans a decorated definition with its decorators, and exports
-  every module-level name (imports included), as an explicit import or `m.x` sees them; what
-  `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
-  Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
-  and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
-  `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
-  `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
-  `packages.from`), or `src` when none is declared; a package comes before a module of the
-  same name.
-  It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
-  written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::locals`, one
-  `Local {scope, name, class}` per name a scope binds: a method's first parameter unless
-  `@staticmethod` (`Class::Enclosing`), an annotated parameter or name, `x = C(...)`
-  (`Class::Named("C")`, whatever `C` turns out to be), `self.x: T` in a method (an attribute,
-  at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
-  binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
-  `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
-  and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
-  also a `Const` holding that value; so is the name of `with C(...) as x` (also
-  `Class::Named("C")`, as `x = C(...)` is) and a `self.x = C(...)` attribute (a `Const` of the
-  class, only for a call). `xs += ...` and `xs = xs + ...` on a name whose latest
-  value in that scope is a list literal do not bind it again: a list literal added joins the
-  `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
-  as `Value`s (strings, f-strings and `+` folded into parts, a name or a member chain in them,
-  `config.BASE`, a `Part::Ref`; `[...]`/`(...)` a `Value::List`, a call
-  a `Value::Call` at its range), a decorator call names the definition it decorates
-  (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
-  callee, `http.require_safe`), and a function lists the values it returns (`Def::returns`).
-  A function's parameters carry their defaults as written (`Param::default`) and which
-  argument binds them (`Param::binds`, a `Binds`): `*args` and `**kwargs` are `Rest` (no single
-  argument), the parameters after them or after the bare `*` (which is no parameter) are
-  `Keyword`, a method's first one is `Instance` (`Class` for a `@classmethod`, neither for a
-  `@staticmethod`), any other `Any`. A target that is `self.x`, also inside unpacking, a `for`
-  or an `as`, and also written in a function nested in the method, binds the class's attribute
-  `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
-  and resolves through the file's imports. An annotation decides; other bindings that
-  disagree make the class unknown. `global x` sends the function's bindings of `x` to the
-  module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
-  skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
-  and `... | None`.
-- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions (scope,
-  imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
-  bound by several imports (the latest in source order decides, whatever it resolves to), a
-  callee may start with a dotted import, and an `Imported::All` import counts as one binding
-  of each name its module's `Facts::star` takes. `lexical` skips a class's scope unless the
-  lookup starts in it (a class body's names are not in scope for its methods). A member of a
-  class, or of a parameter or local whose `Class` resolves to a class of the repository
-  (`Binding::Instance`), is looked up through the class's family: the class and the ancestors
-  its written bases give, in C3 order (Python's method resolution order), linearized once per
-  class in `Resolver::new`. A base that is not a class of the repository is an opaque
-  ancestor, named by what the file imports for it (`abc.ABC`) or as written (`object`), so
-  classes that share it give C3 one entry; a base that is no name (`mixin()`) is its own
-  entry: reaching it before a class that has the member leaves the member unknown, and so
-  does a hierarchy C3 rejects or bases in a cycle. The first class that defines the member, or
-  binds it as an attribute local, wins, `exact`. A receiver whose class (or whose value's
-  callee) is outside the repository is unresolved; any other member call falls back to the
-  name match. `Busy` guards locals and families that resolve through themselves. A single
-  module-level binding is read from functions as it is; a function that rebinds it through
-  `global` makes it unknown. A pack that writes `Def::bases` and `Facts::locals` gets this
-  without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
-  keyword). `Code` folds constants and client wrapper arguments into values for contract kinds,
-  a destructured object parameter reading its names (`Param::fields`) off the literal object the
-  caller passes. An argument binds a parameter as its `Param::binds` says: by position or by
-  the parameter's name among the keyword arguments, only by name, or not at all (`Rest`); a
-  method called on an instance (`x.m(a)`) passes nothing for an `Instance` receiver, one called
-  on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
-  `Code::expand(path, index, read)` hands
-  `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
-  with them; a call found only by a name match (`Caller::by_name`: `data.get(...)` matched to
-  a wrapper method, or a bare name no import binds) is not climbed, since it may be on any
-  object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
-  `value_origins` for a value as written) is the shared value flow: the call sites whose result
-  a name may hold, followed through constants, imports and module attributes, the arguments
-  every caller passes to a parameter (a caller found only by a name match is not climbed, as in
-  `Code::expand`), the values a function of the repository returns (its
-  parameters then bound by that call only) and the items of a list or tuple; an attribute
-  assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
-  reaches no function of the repository is the origin. A constant, parameter or function met
-  again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
-  import from outside the repository binds a callee to (`fastapi.APIRouter`,
-  `express.default`): contract kinds recognize framework constructors with it.
-  `Code::definition` resolves a name or a member chain (`views.index`) to a definition,
-  `Code::module` a name to the file it binds as a whole module, and `Code::import_file` an
-  import specifier (`shop.orders.urls`) to its file.
-- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `link`), `KINDS`, `Level`,
-  `Link`, `Names`. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`; only in a pack whose `globals` has it), Python client consumers (`clients`, below),
-  Next.js app-router, Express, FastAPI, Flask and Django providers, `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
-  (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
-  on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
-  (`POST /health`) take it the same way. A route also matches by its gateway path: `declare`
-  fills `Provider::gateway`, `http::gateway_contract` turns it into a contract and
-  `http::serves(provider, contract)` is the one check of either path, through `fits` (also used
-  by open items and decision replay, so a gateway candidate carries the provider's own
-  contract). That link is
-  `inferred` with the rewrite as its reason (`gateway prefix <p>`, `gateway strip <s>` or both);
-  within one repository a code path match wins over gateway path matches. An app or router
-  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
-  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
-  on a receiver that traces back to its framework's constructor (`Code::external`; Express
-  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
-  route is served under every prefix (`prefixes`): the segment of each mount (`use`,
-  `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
-  prefix of the router it is mounted on; FastAPI's mount segment is the given prefix (or
-  `mount`'s path) then the router's own (`APIRouter(prefix=)`), Flask's given `url_prefix`
-  replaces the own one (`Blueprint(url_prefix=)`). What nothing mounts is served at its root
-  (`prefixes`' `root`): every Express app or router; a FastAPI or Flask app, unless a mount
-  whose child cannot be read (no origin of the child is an app or router of the framework),
-  called on another app or router of its framework and able to hold an app (FastAPI's
-  `include_router(app.router)` and `mount`, not Flask's `register_blueprint`), may mount it;
-  never an `APIRouter` or a `Blueprint`, which serves only where a mount Meada reads puts it,
-  so a router mounted through an import that does not resolve is not guessed at the root. A
-  prefix or a path with a part that cannot be read (an f-string or template-literal hole, a
-  parameter) adds no route (Express included: `` `/${name}/items` `` is no provider, and a
-  router mounted only under such a prefix is served under no prefix); a path parameter written
-  in the literal (`{id}`, `<int:id>`, `:id`) stays one. FastAPI method
-  decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
-  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
-  `include()` argument names is an `Include`: a module of the repository (by dotted name or
-  as a module), the entries of a list, either of them first in the tuple form `(module or
-  list, "app_name")`, a dotted name no module answers to from the source roots (an import
-  from outside the repository, or one that does not resolve: `Named`), or `Unknown` (anything
-  else, or a value whose origins are not all `path()`/`re_path()` entries). A root URLconf is
-  a file with a module-level `urlpatterns` that no `include()` may name: none resolves to it,
-  no `Named` is its dotted path or a suffix of it (`may_be`: `backend/shop/urls.py` may be
-  `shop.urls`), and no `include()` is `Unknown` (then there is no root). Its `path()` and
-  `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
-  view adding its route before the entries it holds, at any depth, an `include()` met again
-  on the walk (a cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
-  `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
-  (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
-  `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
-  `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
-  `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
-  the provider's site. Python clients (`clients`, from `LIBRARIES`: `requests`, `httpx`,
-  `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
-  library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
-  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
-  to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
-  `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
-  attribute, or a parameter the callers pass one to, or a value a function of the repository
-  returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
-  `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
-  a value counts (module constants, caller parameters, return values). A `get` on any other
-  object is nothing.
-  `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
-  front of a relative URL (an absolute one, or one starting with a hole, is left alone);
-  different constructors with different bases make the base a hole. URL and method fold like
-  any `Value` (`str.format` and `%` do not). `python.rs` folds an environment read into
-  `Part::Env`, as `ts.rs` does (`env_read`/`single_env`): `os.environ["X"]`,
-  `os.environ.get("X")`, `os.getenv("X")` and the bare `environ`/`getenv`, matched as written
-  (not through the file's imports), alone or in an f-string hole, through `or` fallbacks (the
-  read on the left, no other variable on the right), a default argument (ignored, unless it
-  reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
-  `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
-  reads the value. `Code::expand` follows a function whose URL
-  or method depends on its parameters, so each of its call sites is a consumer (an argument
-  it leaves out takes the parameter's default). `resource.rs` (spec
-  #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
-  provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
-  reader to every writer of another repository at `declared`, reason the contract. A `via` that
-  names no symbol is dropped. An entry without `via`, or with none matched, makes the repository
-  the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
-  `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
-  level, and a resource with no link in the workspace (unlinked).
-- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
-  whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
-  down and back going up; a call-site consumer the other way. A repository-level side
-  (`Graph::is_repo`) prints as `<repository> (repository-level)` and ends its branch: it is
-  pushed as a row, never entered. Starts take only HTTP routes, symbols and call sites; a
-  `resource::...` start gets an answer pointing to `context`.
-- `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>: <reason>]`
-  after a call that is not exact, in `trace` and in `context`'s callers and callees; the reason
-  is derived when rendering, never stored: `one method named render`, `2 functions or classes
-  named render`). Display only.
-- `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). Only `main.rs` calls
-  `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
+Each line names what a module owns; the file in `map/` it points to has the detail. Read the
+one for the area a change touches.
+
+- `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
+  `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
+  items, derived in one place. `trace.rs`: the `Graph`, the walk and the chain footer.
+  `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
+  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools. `main.rs`: clap.
+  `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
+- `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
+  decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
+- `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
+  `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
+  language adapter and the TS/JS and Python packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  and receivers (`Code`). Detail: [map/indexing.md](map/indexing.md).
+- `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
+  resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
+  [map/contracts.md](map/contracts.md).
+- `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
+  shape a contract carries, and the shapes read from a handler's returned literals and zod
+  schemas (`lang/ts/types.rs` finds the schema a `z.infer` annotation names). Detail:
+  [map/documents.md](map/documents.md).
 
 ## Identities and formats
 
@@ -342,17 +48,59 @@ give byte-identical output.
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
   other expression becomes `(<node kind>)`.
-- Inline route handlers: a pack emits anonymous function arguments as `Kind::Inline` named
-  `@<byte offset>`; `Names` renames the ones a kind claims to `<METHOD> <full path>` (`#<n>` from
-  the second equal name) and folds the rest into the enclosing symbol.
-- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`. A path
-  parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`) is `{}`. A provider of
-  every method is `http::ANY::<path>`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, links}`; a provider has
-  `gateway` when `[serve]` rewrites its path. An unresolved consumer's method and URL fragments
+- Inline handlers: a pack emits anonymous function arguments (and functions written in an
+  options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
+  kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
+  handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
+  `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
+  path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
+  A call through a package import that resolves is also a consumer of the package, at its call
+  site, linked to the provider's symbol (`<repository>::<path>::<name>`).
+- Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
+  document lists, such as `example.com/chain/gateway::openapi.yaml::GET /api/shipments/{}`
+  (`Export::document_of` recognises it). Document channel side: `<repository>::<document
+  path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
+  document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
+- Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
+  `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
+  unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
+  is `{}`. A provider of every method is `http::ANY::<path>`.
+- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
+  publishes, packages, dependencies, imports, links}`; `imports` (absent when empty) lists each
+  call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
+  target, where `level` is the import's own level (how certain the entry and the name were), not
+  the hop's: the link from that call carries the hop's level, the weaker of it and the package
+  link's. `how` is the field or rule that named the entry (`exports`, `types`, `module`,
+  `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
+  `ambiguous` import it names the declared field or rule whose entry could not be followed to a
+  source file; a provider has
+  `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
+  declared, optional, guessed}`, each of the last five absent when empty; `guessed` lists the
+  parts a package import filled through a resolution that was not `exact`, issue #175) when a document gives its route or channel side one, or, for an HTTP route with
+  no document, when its handler returns a zod schema's value (`{"source": {"zod": "<file>"}, ...}`)
+  or object literals (`{"source": {"literals": "<file>"}, ...}`, spec #23); a consumer has the same
+  `shape` for a channel side a document lists, and an HTTP call that reads fields of the parsed
+  response has `shape` `{"source": {"reads": "<file>"}, fields}` (spec #23). A link of an HTTP
+  route with a shape on both sides and a single provider has `drift` (`{missing, unchecked}`,
+  each absent when empty: `missing` maps each missing path to its level, `unchecked` each
+  consumer path below an open part to that open path) when some consumer path is missing or
+  not checked. `documents` (absent when none was read) lists each
+  document read, in path order, as `{path, format, version, contracts}` (route and channel
+  contracts, sorted);
+  ignored documents are left out (`meada status` names them). An unresolved consumer's method and URL fragments
   live in the index (`contracts.method`, `contracts.fragments`) and are left out of the export. A
   resource side is a provider or consumer whose `site` is the `via` symbol, or the repository
-  identity for a repository-level side (a consumer's `via` is null). A call has `level` (`exact`,
+  identity for a repository-level side (a consumer's `via` is null). A channel producer is a
+  provider whose `site` is a call site; a channel consumer is a consumer whose `site` is its
+  handler symbol (or file, at the top level), `via` null. A RabbitMQ binding is neither: it is in
+  `bindings: [{contract, exchange, pattern, site}]` (the queue's channel, the exchange, the
+  pattern, the `bindQueue` call site), sorted, absent when empty; `context` on the queue lists
+  it as `<repository> binding <exchange> <pattern> <path>:<line> <symbol>` after the sides. A
+  RabbitMQ publish to a named exchange is in `publishes: [{exchange, key, site}]` (the `publish`
+  call site), sorted, absent when empty: it is no channel's side by itself, and a link from a
+  queue's consumer names its site as the provider. Every channel the export names has the form
+  `channel::<broker>::<name>` (or `channel::<broker>`) of a v1 broker kind. A call has `level` (`exact`,
   `inferred`, `ambiguous` or null) and `target`; an ambiguous call has `target: null` and a sorted
   `candidates`. `export` keeps only the links that touch the repository where Meada runs. A
   repository with stale decisions also has `stale_decisions: [{call, target, cause}]`
@@ -371,7 +119,95 @@ give byte-identical output.
   (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
   a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
   calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
-  whole workspace's providers. A kind's rules stay in its own file.
+  whole workspace's providers. A kind's rules stay in its own file. A kind whose consumers
+  need providers from other repositories (a package depends on one the workspace holds) adds a
+  workspace step: `Engine::exports` runs it after every `declare`, as `package::consume` (the
+  dependency entries) and `package::import` (the calls through an import) are, over a
+  `Providers` index built once, and `link` reads what the step left on the consumer. Such a
+  consumer is no open item when ambiguous: `items.rs` (`decidable`) skips the contracts of the
+  kind explicitly, since several providers of a name are no call for a person to decide. Its
+  sites show in `context` and `search` through hooks in `engine.rs`: `package::place` names where
+  a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
+  calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
+  of the contract itself, with the roles `sides` names.
+- New **package ecosystem** (spec #22 user story 26, track B packs): a pack for another manifest
+  format (`Cargo.toml`, `pyproject.toml`, `go.mod`) plugs in beside npm without a new kind of
+  contract. Discovery is a file name in `manifests_found` (`index.rs`), which stamps the file
+  into `manifests` like `package.json`; a reader per ecosystem, beside `package::read`, turns
+  its bytes into the same `Summary` (name, version, dependency entries, entry fields) and never
+  fails; the contract is `package::<ecosystem>::<name>` (`package::npm::<name>` is the first),
+  so `PREFIX` still routes it to the same `declare`, `consume`, `link`, `place` and `reached`;
+  and the reason grammar and `flag` stay the one function each, with the ecosystem's range
+  syntax checked there (a range it cannot check is `range unchecked`). Resolving an import
+  into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
+  stored bumps `SCHEMA_VERSION`.
+- New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
+  `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
+  its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
+  answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
+  and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
+  <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
+  binding match (reason `<queue contract> binding <exchange> <p>`) is `routed`. `reaching`
+  joins both for `link` (with the whole workspace's providers and `Routes`) and
+  `Engine::contract_sides` uses `fits` and `Routes::reached`, so `context` on a channel shows
+  every side a link would join. Something that is neither side, like a binding or a publish to
+  a named exchange, is a `Found` with its own `Role`, an export list of its own
+  (`Export::bindings`, `Export::publishes`) and, to show in `context` on a channel, a line in
+  `Engine::contract_sides`. A form whose site is a
+  constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
+  `new`, with its arguments, like any other call.
+- New **document format or document data** (spec #21 tickets after #50): what is read from the
+  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` and
+  `asyncapi.rs` sees
+  only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
+  through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
+  (HTTP: `Http::declare`; channels: `Channel::declare`). A new gateway form is one more `Gateway` in `Provider::gateways`, a
+  new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
+  `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
+  type.
+- New **shape source** (spec #23): a provider's is a `shape::Source` variant, never a new shape
+  type, with an arm in `Source::at` and `Source::declared`, in the order `http::provider_shape`
+  and `Http::declare` apply (a document, then a zod schema, `zod.rs`, then the returned
+  literals, `literals.rs`). A consumer's (field reads, destructuring, iteration, declared types)
+  adds no variant: every consumer shape is `Source::Reads`, and a source adds its paths through
+  `Shape::list`, which fills `Shape::declared` for the paths a type gives and `Shape::optional`
+  for those it marks optional, keeping both within `fields` (a path is optional only while
+  everything listing it says so). A source that knows scalar leaves fills `Shape::scalars`
+  (documents do, from primitive `type`s), and a missing path is `exact` only when the
+  provider's source is declared and the path is in the consumer's `declared`. A reader of code
+  charges its per-file limit to a `shape::Budget`, and an extraction holds one reader of each
+  source (`Literals` holds its `Types`, which hold their `Zod`), so each limit is spent once per
+  file. What a pack reads from code
+  for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
+  `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
+  TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
+  applies to a call's result). The kind turns them into a `Found::shape`, stored as
+  `contracts.shape` and exported on the side; `Http::declare` keeps a code shape unless a
+  document gives the route one. Drift is one pure function, `shape::drift(provider,
+  consumer)`, which `http::drift` runs over the workspace's links in
+  `Engine::links_and_decisions`, after the decisions replay, setting `Link::drift`: `trace`
+  (`Row::link`), the export and every other reader of links see the same value;
+  `drift_view.rs` renders it for `context` (a route's consumers that read fields, with their
+  drift), `search` (kind `drift`) and `status` (a count per repository): it computes no drift
+  of its own, reading `Link::drift`, the exports' consumer shapes (which consumers read fields)
+  and their calls (where each consumer is).
+- **Shapes through package imports** (issue #175): a source reading a name that `Code::imported`
+  says comes from outside the repository records a `shape::Import` on the shape (its path, the
+  importing file, the specifier and name, and the `Want` view: `zod`, `infer`, `literals`,
+  `type`, or `opens` for a provider typed with a package type, which takes that type's index
+  signatures alone) instead of opening it or dropping it. A repository keeps, beside its
+  contracts, the shapes of the module-level constants and types the files of its packages'
+  public surface export (`package::surface`: the entries of each named manifest, as an import
+  resolves them, and what their `exports` rows lead to; `package::exported_shapes`, a step
+  `index::refresh` runs after the kinds' `extract`, as
+  `Role::Shape` rows; each source reads its own: `Types::exported`, `Zod::exported`,
+  `Literals::exported`). The workspace step `package::shapes`, after `package::import` in
+  `Engine::exports`, resolves each import as a call through it resolves (`Provided::resolve`,
+  over the `exports` rows, which name constants and types too) and fills it with
+  `shape::fill`, the one recursion and the one place its limits live, carrying the
+  resolution's level: through one that is not `exact` (an `outDir` mapping) a provider's part is
+  `guessed` and a consumer's paths are not declared, so no drift on them is `exact`. A new source that reads
+  an exported name adds a `Want`, a reader's `exported` and an arm in `exported_shapes`.
 - New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
   candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
@@ -385,11 +221,11 @@ give byte-identical output.
   A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
-  its family), `Facts::locals` (the class each binding gives a name), `Facts::star` (what a
+  its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes) and `Param::binds` (which argument binds each parameter). A pack that
-  writes none of them (TypeScript writes no bases or locals) gets name matches where those
+  writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved.
-- New **config key**: add the field to `Config`, delete it from `LATER`. Parse errors name file,
+- New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
 - New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
   (descriptions plus parameter schemas) must stay within 1,000 tokens.
@@ -400,12 +236,39 @@ give byte-identical output.
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
   an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
-- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA` or to the facts a pack stores. An
-  index with another version, or an unreadable one, is deleted and rebuilt, and `status` says so.
+- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
+  a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
+  `tests/golden/schema.v<version>.txt` (the facts of each pack's
+  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml`,
+  `sample.asyncapi.yaml` and `sample.package.json` there) and never re-blesses it in place: a change
+  fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
+  An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
+  so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
+  a file changed), which `status` cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`). `Call::args`,
-  `Call::kwargs`, `Def::returns`, `Param::default`, `Field::default` and `Const::value` are `serde(skip)`, so unchanged files come
-  back from SQLite without them. `Code` records every file it needs but lacks as a miss, and
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
+  of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
+  consumer reads from the parsed response, and those of the zod schema or object literals a
+  route handler returns, spec #23, with the parts a package import gives as the specifier, the
+  name imported, the importing file and the view, issue #175), the shapes a repository with a
+  named manifest keeps for the constants and types its files export (`contracts` rows of role
+  `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
+  parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
+  #175; what crosses repositories is this shape of an exported name,
+  never its source text), and what a
+  provider document states (`documents.summary`: format, version, title, normalized route paths
+  and methods, channel sides (broker kind, name, role), the field paths of their response and
+  payload shapes (fields, open parts, scalar leaves) and the external references met, the
+  hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
+  document it could not read), and what spec #22 stores of the build and package files: the
+  `manifests` summaries of each `package.json` (name, version, the dependency ranges as
+  written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
+  (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
+  the definition, constant, type or file they name). `Call::args`,
+  `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
+  `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
+  back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
+  name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
   `refresh` re-parses those and extracts again until none is missed. A contract kind that reads a
   value from a new place relies on this loop.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
@@ -428,43 +291,66 @@ give byte-identical output.
   one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
   the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
   the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
-  level). `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
+  level) and handles the Kafka topic `orders.created` the gateway's `createOrder` (`PUT
+  /api/orders/:id`, which the web's `createOrder` calls) produces through its `publish` wrapper. `loose_chain(case)` adds an unlinked bucket and a `via` naming no symbol to the
   catalog. `git()` pins config, author and dates; `age()` pushes
   mtimes into the past so a later edit always changes them. `decisions(repo, name)` copies
   `tests/fixtures/decisions/<name>.toml` to `<repo>/meada.decisions.toml`; the base chain fixture
-  has none.
+  has none. `documented_chain(case)` lays `tests/fixtures/chain-documents/{gateway,web}/` over
+  the chain (and copies `generated-openapi.yaml` to the gateway's gitignored
+  `generated/openapi.yaml`, which Meada's own git would ignore inside the overlay), then commits:
+  the gateway gains `openapi.yaml` (3.1: `GET /api/orders`, merged with the Express route and
+  given a response shape with an open part, and
+  the documented-only `GET /api/shipments/{id}`; a `servers` URL on `api.example.com` with base
+  path `/gw`), `orders.openapi.json` (3.0, the same shipments route again: a duplicate; servers
+  with variable defaults `https://{region}.example.com/{version}` and a relative `/relative/base`,
+  and one URL with a variable without default, which gives nothing), a Swagger 2.0 `legacy.openapi.yaml` and an invalid
+  `broken.openapi.yaml`, `docs/api-contract.yaml` (3.0, `GET /api/carriers`) and the
+  gitignored `generated/openapi.yaml` (`GET /api/generated`), both listed, with a path that does
+  not exist, in the gateway's `[serve] documents` (the helper writes that line); the web app gains `src/shipments.ts` (the shipments route through
+  `GATEWAY_URL` and through the gateway's host, plus one call per server case) and a vendored `vendor/openapi.yaml`, ignored
+  since it has no `[serve]`. Later spec #21 tickets extend this overlay, so the base chain
+  goldens never change. `drift_chain(case)`
+  (spec #23) lays `tests/fixtures/chain-drift/web/` over the documented chain and commits:
+  `src/drift.ts` holds consumers of the documented `GET /api/orders` reading a field the
+  document lacks, a present one, one under its open `[].product`, one through the client
+  wrapper `src/api/body.ts` (`get(path)`, which returns the parsed body), and one whose name a
+  `catch` rebinds (no reads), plus a read below a documented scalar (`[].id.length`), a wrapper
+  `load` fetching two routes whose two consumers share their caller's site, and a wrapper `both`
+  calling `get` twice, which reaches one consumer site by two paths. Declared types (#64) add
+  the catalog route `app/api/profiles/route.ts` (a zod page of profiles) and, in the web app,
+  `src/declared.ts` (casts, type arguments of the wrapper `src/api/typed.ts` and of
+  `res.json<T>()`, an annotation, `z.infer`, a package type and an optional field),
+  `src/api/types.ts` (an interface another file extends) and the golden
+  `chain-drift.trace-declared.txt`; the catalog route `app/api/labels/route.ts` returns a literal
+  typed by an index signature, and the web's `src/labels.ts` reads under that open part (golden
+  `chain-drift.trace-labels.txt`). Shapes through packages (#175) add the catalog's package
+  `packages/contracts/` (`@chain/contracts`: an entry `src/index.ts` re-exporting by name, with
+  `export *` and as types, plus a default zod schema; `quote.ts`, `shelf.ts` and `receipt.ts`
+  hold a zod schema, constants, an interface, a union and a type with an index signature), a
+  root `package.json` in the catalog, the gateway and the web app depending on it, the catalog
+  routes `app/api/quotes`, `app/api/tickets` (the default export) and `app/api/offers` (a
+  namespace import) parsed with the shared schemas, `app/api/tags` (a package return type)
+  and `app/api/receipts`, the gateway's `src/shelves.ts` (spreading the shared
+  constants) and the web's `src/shared.ts` (casts, an annotation, a type argument and `z.infer`
+  of the package's names; golden `chain-drift.trace-shared.txt`). Error answers in other forms
+  (the gateway's `GET /api/inventory/:sku/price`, the catalog's `app/api/reviews`), a `GET
+  /api/ping` both serve (ambiguous) and the web's `src/open.ts` (a dynamic URL the decisions file
+  `chain-drift-web` links) cover the rest of the drift rules. Later spec
+  #23 tickets extend this overlay, so the `chain` and
+  `chain-documents` goldens never change.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
   ranges are in them.
-- Test files by subject: `conformance` (pack; for Python also its HTTP providers and consumers,
-  over `conformance-python`, `python-mounts` and `python-django`), `xlang` (a TypeScript and a
-  Python repository linked both ways: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
-  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `decisions`
-  (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
-  (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
-  `freshness` (cold vs refreshed), `items` (open items and their `search` goldens, fixtures
-  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`), `mcp`
-  (the binary over stdio), `resources` (resource `search`, `context`, `trace` start and `status`
-  over the chain).
-- **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
-  listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
-  the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
-  once it runs out, 404 on other paths) and records every request it receives
-  (`requests() -> Vec<Request {method, path, headers, body}>`, `header(name)`, `json()`).
-  `Reply::chat(model, content)`, `Reply::ok(json)`, `Reply::status(code, body)`.
-  `tests/decider.rs` runs the binary with only the decider variables it sets and asserts the
-  key is in no output; `--show-request`, `--list`, human mode, `index`, `export`, `status` and
-  the MCP server leave the stub with zero requests. Answer cases (malformed, threshold,
-  `--min-p`, `--dry-run`) script the stub per test; a malformed first answer must leave the
-  second item written.
+- Test files by subject, the fixtures each uses and the loopback decider stub: [map/tests.md](map/tests.md).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
+- `scripts/edges <dir>[=<origin url>] [<peer dir>...]` is the repro harness for reviewing a
+  resolution or contract change: it copies the directories as sibling repositories, exports the
+  first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
-
-Each is marked `ponytail:` at its site unless noted.
 
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
@@ -477,36 +363,196 @@ Each is marked `ponytail:` at its site unless noted.
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
-- `resolve.rs`: wrapper expansion walks every simple path up the callers, and neither it nor
-  value flow (for a parameter's arguments) climbs a call found only by a name match, so a
-  wrapper method called on a receiver whose class Meada cannot tell, or a function called by a
-  bare name no import binds (`require` in TypeScript), is read where it stands; a parameter
-  captured by a closure is unknown (`Code::origins` does not follow it either; nor a name its scope binds
-  more than once, or an attribute not assigned a call once in its class); a nested or rest pattern in a destructured parameter binds nothing, and a
-  spread in the object a caller passes makes the names it may override unknown.
+- `resolve.rs`: wrapper expansion (HTTP clients, message producers and consumers) walks every
+  simple path up the callers, and does not climb a call found only by a name match, so a wrapper
+  method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
+  `this`, a `const api = new Api()` included), or a function called by a bare name no import
+  binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
+  not climb such a call either; a parameter captured by a closure is unknown (`Code::origins`
+  does not follow it either; nor a name its scope binds more than once, or an attribute not
+  assigned a call once in its class); a nested or rest
+  pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
+  makes the names it may override unknown.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
-  `module.exports` are not imports, and `new X()` is not a call (no `ponytail:` marker).
+  `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
+  and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
+  is not a definition (its body belongs to the one around it, and its name is a local that hides outer
+  ones), since qualified names and `Resolver::lexical` cost time cubic in the nesting; a function
+  written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
+  arguments, objects, arrays and the receivers of method chains is `Unknown` from there.
+  `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
+  rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
+  `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
+  tree's depth.
+- `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
+  held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
+  binding (`new Kafka().producer().send`), is not recognized (no marker).
+- `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
+  (the function that subscribes handles); only the first `run` on a consumer binding counts. An
+  amqplib `bindQueue` whose queue, exchange or pattern is not a literal is dropped.
+  A BullMQ `Queue` is named by its own `new Queue(name)` binding: `new Queue(name).add(...)` with
+  no binding, a `Queue` that is a class field or a parameter, and `addBulk` are not recognized. A
+  node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
+  has no binding); a BullMQ processor given as a file path is not followed (the function that
+  makes the `Worker` handles).
+- `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
+  across the workspace), and an exchange's type is not read: every binding pattern follows
+  topic-exchange rules.
+- `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
+  (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
+  `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
+  length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
+  calls a longer one `range unchecked`. Import resolution: `exported` follows at most
+  `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
+  levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
+  read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
+  like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
+  invalid (`None`, no config; an option of another type is absent in a valid one), and `roots` voids the mapping for an absolute `outDir` or `rootDir`, one with an empty or
+  `..` segment, or an `outDir` that is the config's own directory (a path read from a config stays
+  inside the repository; nothing is opened on disk, the mapped file must be one the walk indexed,
+  and the walk follows no symlink). `extends` is not followed (`ponytail:` in `Tsconfig`; the
+  trunk follows none for `paths` either): a base config's `outDir` counts as absent, so such an
+  entry is `ambiguous`; `declarationDir` is not read, and a package with no `rootDir` maps
+  `dist/index.js` to `index.ts` at its own directory. An entry with no output extension never
+  maps (`main: "./dist"`, `"dist/index"`, `types: "dist/index.d.mts"` or `.d.cts`): only `.d.ts`,
+  `.js`, `.mjs`, `.cjs` and `.jsx` are stripped (no marker). The ambiguous candidates of an
+  import have no cap: every file of the package exporting the name is listed, so a name exported
+  by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
+  client bound from it (`const c = new Client(); c.run()`) does not (no marker).
+- `lang/ts/uses.rs`: following call results (`Call::uses`) charges every node it visits and
+  every step it copies into a `const`'s uses to `USES_BUDGET` (2^20 per file); past it, the
+  file's remaining calls have no uses, so their consumers read nothing and give no drift. A
+  value is followed only in the function making the call, through the names a `const`
+  declaration, a `for...of` variable or an array method's callback parameter binds (patterns
+  included), when nothing else in that function binds or assigns the name; a `let`
+  declaration, `.then(...)`, a callback given by name, `reduce` and a value passed to a
+  function end it (no marker). A destructuring pattern nested deeper than `PATTERN_DEPTH` (32)
+  reads nothing below that depth (`ponytail:`; a unit test feeds it a deeper pattern). A wrapper's caller is read only when the
+  wrapper returns one thing (the response, the body or one path below it) from the function
+  holding its call; whether the body was awaited is not checked (no marker).
+- Shape readers (`zod.rs`, `declared.rs`, `literals.rs`): each per-file budget below is one
+  `shape::Budget` per extraction (`Http::extract`, `package::exported_shapes`), shared by every
+  reader of that extraction, so a file spends each at most once per extraction.
+- `zod.rs`: reading the schemas of a file's handlers charges every schema expression examined
+  to `ZOD_BUDGET` (2^14, over all the handlers of the file, and the `z.infer` schemas its
+  types name); past it, the remaining handlers
+  give no shape from a schema. Nesting, constants followed and methods chained count together
+  against `ZOD_DEPTH` (32): a part deeper is open. A schema is read only when every 2xx body a
+  handler sends is typed with one; otherwise the literals are read (no marker). A name imported
+  from a package is a schema the query fills (issue #175) where a schema stands (the receiver
+  of `parse`, a field, an element, a member, a `z.infer`), or under the methods `KEEPS` and
+  `SCHEMA_METHODS` list; `.pick`, `.omit`, `.partial` and `.required` on it open the part,
+  since its fields are not known here (no marker). `.passthrough`, `.catchall`, `z.record`, `z.any`, `z.unknown`, `.transform`, `z.lazy`
+  and any call Meada does not read open the part; so does a `pick` / `omit` with a computed
+  key and a `z.union([])`. A schema or a parse result held in a constant of the handler (a
+  function-local `const out = Schema.parse(..)`) is followed, unlike in `literals.rs`, and
+  nothing records a later write to it (`Object.assign(out, { extra: 1 })`), so it is still
+  read as the schema's shape (no marker).
+- Declared types (spec #23, `declared.rs`, `lang/ts/types.rs`): a type is read to at most
+  `TYPE_DEPTH` (32) levels, both when it is written (`lang/mod.rs`, the nesting of an object or
+  array type) and when a consumer's cast, type argument or annotation is followed through
+  `extends`, aliases and intersections; a level deeper adds no fields. Reading the types of one
+  file (its consumers' and its handlers') charges every type examined to `TYPES_BUDGET` (2^14); past it, the type being
+  read adds no fields on a consumer, and opens the value on a provider. A declaration that leads
+  back to itself (`interface A extends B`, `interface B extends A`) adds what it did the first
+  time. A type parameter hides a declared type of its name only when it sits within
+  `HIDING_CLIMB` (64) levels of the use; one declared farther up leaves the name unknown, so
+  it adds no fields. Only interfaces (with `extends`), aliases to object types, intersections,
+  arrays and `z.infer<typeof S>` give fields; a union, a mapped or conditional type
+  add none (no marker); a type from a package is filled at query time (issue #175). A generic of the repository
+  (`Paged<Row>`) adds its own fields, its type arguments not substituted (its `T` adds none).
+  An optional field (`?`) adds no drift, nor does what lies below it; the fields of a
+  `z.infer` schema that `.optional()`, `.nullish()` or `.partial()` make may be absent are
+  optional too (`.required()` undoes it), and a schema union adds no fields. A type argument
+  given to a wrapper types the body only when the wrapper's return type is its own type
+  parameter (`Promise<T>`) or it casts the body to it (`as T`, `json<T>()`); `json<T>()` and
+  the like type their result when they have exactly one type argument. A cast or an annotation is read at the top of a value (not
+  inside an object literal), and a value that goes through a function, a `let` or a rebinding
+  is not followed (no marker). On a provider, an index signature in the type of a returned
+  constant, a cast body or the handler's return annotation opens that part of the shape.
+- `literals.rs`: reading a handler's returned literals charges every call examined and every
+  value read or constant followed, over all the handlers of a file, to `LITERALS_BUDGET` (2^16);
+  past it, the file's remaining handlers give their routes no shape. Nested literals and
+  constant hops count together against `LITERALS_DEPTH` (32): a part deeper is present and open,
+  and a constant chain longer is unknown. Only a body Meada reads (an object or array literal,
+  a constant naming one) gives fields; a call, a `map` over rows, a parameter or a spread of
+  anything but a known object is open (no marker). The handler is the function `res.json` and
+  its kin sit in or in a callback inside it. A response with a literal status outside 2xx is
+  left out whatever its form (`res.status(404).json(..)`, `res.status(404).end()`,
+  `res.sendStatus(404)`, `new Response(null, { status: 404 })`), and so is Express's error path,
+  `next(err)` (`next` called with an argument other than `'route'` or `'router'`). A response
+  sent another way opens the root of the shape (no marker): in Next.js, a call whose result the
+  handler itself returns and that is no `NextResponse.json` / `Response.json` (`return
+  ok(user)`, `new Response(..)` with no such status, `redirect`); in Express, `res` passed to
+  another call, a `res` method other than `json`, `send` and the ones that only set a header or
+  the status (`end`, `render`, `redirect`, `sendFile`, `sendStatus`, ...) with no such status,
+  or `next()`, `next('route')` and `next('router')`. A `res` stored in another name or a status set in a separate
+  statement (`res.status(404);` then `res.json(...)`) is not followed, so such a send counts as
+  2xx (no marker). Only a module-level constant is followed: nothing records a later write to
+  a function-local one (`body.next = cursor`, `Object.assign(body, x)`), so it is unknown and
+  open; a module-level object mutated after its declaration is still read as written. A constant
+  held by another repository (a package import the repository's `Resolver` does not map to one
+  of its files) is filled at query time (issue #175), and so are the index signatures of a
+  package type a returned value, a cast or the return annotation names.
+- Shapes through package imports (issue #175, `shape.rs`, `package.rs`): `shape::fill` follows
+  an import into the shape the package keeps, and the imports of that shape in turn, at most
+  `PACKAGE_HOPS` (8) packages deep, and charges every import looked up and every path grafted
+  to `GRAFT_BUDGET` (2^16) per side; past either, the import is unresolved: open on a provider,
+  nothing on a consumer. So is an import that resolves nowhere, `ambiguous`, to several names,
+  or in two providers to different shapes, and a name no reader keeps a shape for (a call, a
+  union type). Only a module-level constant or type a file of a package's public surface
+  (`package::surface`) exports itself keeps a shape (a re-export reaches it through the
+  `exports` rows): the files the entries of each named manifest (the bare name and each
+  `exports` subpath without a `*`, as an import resolves them) lead to through the `exports`
+  rows. Those are re-read, their files parsed again, on every refresh that extracts, so the
+  cost is bounded by the packages' surface, not the repository. A subpath pattern (`./x/*`) and
+  a deep import into a package without `exports` (`pkg/src/x`) reach files off the surface,
+  which keep no shape, so such an import is unresolved (no marker). An edited `package.json` or
+  `tsconfig.json` extracts again. A type through a namespace import (`C.Receipt`) is not read
+  (no marker); a schema through one (`C.Quote`) is. Since constants and types are `exports`
+  targets, two `export *` that give a name differently (a function and a constant) export
+  neither, as in ES modules.
+- `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
+  definition, whatever block holds it, the definition's own definitions, constants and
+  parameters of that name included, and a function that is no definition (an object literal
+  method, `module.exports = (db) => ...`, an IIFE, an arrow kept in an object) lends its
+  parameters and locals to the definition around it; at the top level that is the whole file.
+  A call to the hidden name elsewhere in that scope loses its exact link or its value, never
+  gains a wrong one (no marker).
+- `index.rs` (`refresh_stamped`): a `package.json` or document that cannot be statted or read
+  (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
+  `[serve] documents` entry in that state is then reported as missing.
+- `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
+  larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
+  `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
+  marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
+  `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
+  another one that is external is dropped without a status line (no marker).
+- `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
+  scanning the calls of every repository, once per link (no marker); an index by call id waits
+  for a workspace that makes this slow.
 - `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
   root declarations. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
-  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or tuple. A `**k` splat
-  in a call is not read; a `*a` splat is read as one positional argument.
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
+  tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; what
   an extension of `urlpatterns` adds other than a list literal is left out (marked in
   `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
-  yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf (`require_POST(view)`), a
-  handler method a class-based view inherits and `as_view()` on a class outside the repository
-  yield nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
-  backslashes yields nothing. Python clients: a receiver that is the result of a call
-  (`Session().get(...)`, `make().get(...)`) or an attribute set from anything but a call
-  (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a client
-  takes the base of every caller that passes one, and several different bases make it a hole.
+  yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf
+  (`require_POST(view)`), a handler method a class-based view inherits and `as_view()` on a
+  class outside the repository yield nothing; a `re_path()` pattern is read as written, so a
+  non-raw string with doubled backslashes yields nothing. Python clients: a receiver that is the
+  result of a call (`Session().get(...)`, `make().get(...)`) or an attribute set from anything
+  but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
+  client takes the base of every caller that passes one, and several different bases make it a
+  hole.
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

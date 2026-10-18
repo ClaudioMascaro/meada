@@ -1,0 +1,12 @@
+example.com/chain/catalog app/api/profiles/route.ts:15 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:25 cast drift: missing items[].address.zip, items[].nickname
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:36 counts drift: missing count
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:61 foreign
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:52 pages drift: missing pages
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:97 plain drift: missing items[].nickname
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:43 ranked drift: missing count, items[].rank
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:79 searched
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:69 typedJson drift: missing count
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:85 viaReturn drift: missing count
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/declared.ts:90 wrapped drift: missing data
+chain: inferred · 10 hops · 2 repos · 438 tokens

@@ -6,3 +6,5 @@ example.com/acme/backend src/routes/users.ts:24 find
 example.com/acme/backend src/routes/users.ts:13 (unresolved) res.json
 contracts:
 example.com/acme/backend src/routes/users.ts:13 provides http::GET::/api/users/{}
+example.com/acme/backend src/routes/users.ts (literals) response fields:
+example.com/acme/backend src/routes/users.ts (literals) response open: (root)
