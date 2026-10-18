@@ -962,7 +962,7 @@ fn constructor(call: Node, src: &[u8]) -> Option<String> {
 }
 
 /// The targets an assignment, a `for` or an `as` binds, or a `del` unbinds: names, and `self.x`
-/// attributes, also inside `a, (b, c)`, to `TARGET_DEPTH` nodes deep.
+/// attributes, also inside `a, (b, c)`, `a, *b` and `(a)`, to `TARGET_DEPTH` nodes deep.
 fn targets(node: Node) -> Vec<Node> {
     let mut out = Vec::new();
     targets_at(node, 0, &mut out);
@@ -974,10 +974,16 @@ fn targets_at<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
         _ if depth >= TARGET_DEPTH => {}
         "identifier" | "attribute" => out.push(node),
-        "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
-        | "as_pattern_target" | "expression_list" => {
-            named(node).for_each(|n| targets_at(n, depth + 1, out))
-        }
+        "pattern_list"
+        | "tuple_pattern"
+        | "list_pattern"
+        | "tuple"
+        | "list"
+        | "as_pattern_target"
+        | "expression_list"
+        | "list_splat_pattern"
+        | "list_splat"
+        | "parenthesized_expression" => named(node).for_each(|n| targets_at(n, depth + 1, out)),
         _ => {}
     }
 }

@@ -3290,6 +3290,9 @@ mod tests {
             "x: int = 1\n",
             "x += 1\n",
             "y, x = g()\n",
+            "a, *x = xs\n",
+            "[*x] = xs\n",
+            "(x) = 1\n",
             "from a import y as x\n",
             "import a as x\n",
             "with open(p) as x:\n    pass\n",
@@ -3339,6 +3342,7 @@ mod tests {
                 "    g: int = 1\n",
                 "    g += 1\n",
                 "    y, g = k()\n",
+                "    a, *g = k()\n",
                 "    from a import y as g\n",
                 "    import a as g\n",
                 "    with open(p) as g:\n        pass\n",
@@ -3414,7 +3418,7 @@ mod tests {
         let def = "def x():\n    pass\n";
         let b = ("b.py", def);
         for before in [def, "from b import x\n"] {
-            for del in ["del x\n", "del y, x\n", "del [x]\n"] {
+            for del in ["del x\n", "del y, x\n", "del [x]\n", "del (x)\n"] {
                 for call in ["x()\n", "def f():\n    x()\n"] {
                     let main = format!("{before}{del}{call}");
                     let sources = owned(&[b, ("main.py", &main)]);
