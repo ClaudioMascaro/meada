@@ -73,12 +73,17 @@ struct Caller<'a> {
 /// nothing) and diamonds (one met again once resolved exports what it did), how many exports
 /// deep it is now, and whether an export was cut at `REEXPORT_DEPTH`. A cut export is unknown,
 /// not absent (`Resolver::exports`): a module that may export the name leaves it unknown rather
-/// than let another import or module bind it.
+/// than let another import or module bind it. What a cycle gives is absent instead, as in ES
+/// modules (and a Python module met again while it is initialized has only what its bindings
+/// before gave): `looped` says what is being resolved met a pair being resolved, since the
+/// innermost star import began (`Resolver::star`), and each pair keeps whether it did.
 #[derive(Default)]
 struct Seen<'a> {
-    pairs: HashMap<(&'a str, &'a str), Option<Binding<'a>>>,
+    /// `None` while the pair is resolved.
+    pairs: HashMap<(&'a str, &'a str), Option<(Option<Binding<'a>>, bool)>>,
     depth: usize,
     cut: bool,
+    looped: bool,
 }
 
 impl Seen<'_> {
@@ -696,12 +701,19 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// What a star import of `path` takes as `name` (`exports`).
+    /// What a star import of `path` takes as `name` (`exports`). An unknown it reaches through
+    /// a cycle (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut
+    /// at `REEXPORT_DEPTH` stays unknown.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
-        if self.files[path].star.takes(name) {
-            self.exports(path, name, seen)
-        } else {
-            None
+        if !self.files[path].star.takes(name) {
+            return None;
+        }
+        let outer = std::mem::take(&mut seen.looped);
+        let found = self.exports(path, name, seen);
+        let looped = std::mem::replace(&mut seen.looped, outer);
+        match found {
+            Some(Binding::Unknown) if looped && !seen.cut => None,
+            found => found,
         }
     }
 
@@ -719,14 +731,24 @@ impl<'a> Resolver<'a> {
             seen.cut = true;
             return Some(Binding::Unknown);
         }
-        if let Some(&found) = seen.pairs.get(&(path, name)) {
-            return found;
+        match seen.pairs.get(&(path, name)) {
+            Some(None) => {
+                seen.looped = true;
+                return None;
+            }
+            Some(&Some((found, looped))) => {
+                seen.looped |= looped;
+                return found;
+            }
+            None => {}
         }
         seen.pairs.insert((path, name), None);
+        let outer = std::mem::take(&mut seen.looped);
         seen.depth += 1;
         let found = self.own_export(path, name, seen);
         seen.depth -= 1;
-        seen.pairs.insert((path, name), found);
+        seen.pairs.insert((path, name), Some((found, seen.looped)));
+        seen.looped |= outer;
         found
     }
 
@@ -2143,6 +2165,55 @@ mod tests {
         let main = format!("{global}from a import *\nx()\n");
         let sources = owned(&[("a.py", def), ("main.py", &main)]);
         assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+    }
+
+    #[test]
+    fn a_star_import_that_reaches_the_name_back_through_a_cycle_gives_nothing() {
+        use crate::lang::ts::TsJs;
+
+        // `utils` imports `helper` from the package being initialized, which has `core`'s by
+        // then: its star import gives nothing new, and `core`'s is the package's.
+        let sources = owned(&[
+            (
+                "pkg/__init__.py",
+                "from .core import *\nfrom .utils import *\n",
+            ),
+            ("pkg/core.py", "def helper():\n    pass\n"),
+            ("pkg/utils.py", "from pkg import helper\n"),
+            ("main.py", "from pkg import helper\nhelper()\n"),
+        ]);
+        let found = exact_in(&Python, &sources, "main.py", "helper");
+        assert_eq!(found.as_deref(), Some("pkg/core.py"));
+        // As in ES modules, where the cycle resolves to null: `c`'s `x` is `index`'s.
+        let sources = owned(&[
+            ("index.ts", "export * from './a';\nexport * from './c';\n"),
+            ("a.ts", "export { x } from './index';\n"),
+            ("c.ts", "export function x() {}\n"),
+            ("main.ts", "import { x } from './index';\nx();\n"),
+        ]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("c.ts"));
+    }
+
+    #[test]
+    fn a_star_import_through_a_cycle_and_two_differing_stars_gives_neither() {
+        use crate::lang::ts::TsJs;
+
+        // `a` reaches `index` back through a cycle, and `p` and `q` give `x` differently: `a`
+        // exports no `x` it is sure of, so neither does `index`, `c`'s notwithstanding.
+        let def = "export function x() {}\n";
+        let sources = owned(&[
+            ("index.ts", "export * from './a';\nexport * from './c';\n"),
+            (
+                "a.ts",
+                "export * from './index';\nexport * from './p';\nexport * from './q';\n",
+            ),
+            ("p.ts", def),
+            ("q.ts", def),
+            ("c.ts", def),
+            ("main.ts", "import { x } from './index';\nx();\n"),
+        ]);
+        assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None);
     }
 
     #[test]
