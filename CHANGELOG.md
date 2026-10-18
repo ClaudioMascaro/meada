@@ -22,6 +22,13 @@ All notable changes to Meada are recorded here. The format follows
   (`boto3`), NATS (`nats-py`, wildcards `inferred`) and Redis streams (`redis-py`: `xadd` and the
   streams of `xreadgroup`). A call counts only when its client traces back to the library's
   constructor; a channel name Meada cannot evaluate is an unresolved side, never linked.
+- PyPI packages: a named `pyproject.toml` (`[project]` or `[tool.poetry]`) provides
+  `package::pypi::<name>` (PEP 503 normalized), and dependencies in `[project] dependencies`,
+  `[tool.poetry.dependencies]` and `requirements*.txt` that name a workspace package link to it,
+  with the range as written and `range unchecked`. A Python import of one of its modules crosses
+  into the provider's symbols: `exact` through the distribution's own name, `inferred` through
+  another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
+  package of one name never link. The index is rebuilt once (schema version 21).
 
 ## [0.1.0] - Unreleased
 

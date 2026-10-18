@@ -43,8 +43,10 @@ modules updates it.
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
   is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
-  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json` the walk
-  finds (`manifests_found`: any path with a `node_modules` segment is skipped, since the walk
+  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json`,
+  `pyproject.toml` and `requirements*.txt` the walk finds (`manifests_found`, through
+  `package::is_manifest`; `package::read_manifest` reads each by its ecosystem; any path with a
+  `node_modules` segment is skipped, since the walk
   yields it unless `.gitignore` lists it), a nameless one too, whatever `serve.declared` says;
   `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
   (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
@@ -170,8 +172,8 @@ modules updates it.
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
-  `packages.from`), or `src` when none is declared; a package comes before a module of the
-  same name.
+  `packages.from`, read by `lang/python/pyproject.rs`, which the PyPI package reader shares), or
+  `src` when none is declared; a package comes before a module of the same name.
   It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
   written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::receivers`, one
   `Receiver {scope, name, class}` per name a scope binds: a method's first parameter unless

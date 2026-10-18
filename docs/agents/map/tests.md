@@ -142,6 +142,24 @@ modules updates it.
   Ticket T4 adds `pkg-web.trace-down-outdir.txt` and `pkg-shared.trace-up-outdir.txt` (the calls
   through `@example/shared`); an invalid, hostile or edited nested `tsconfig.json` is tested the
   same way as a `package.json` (refreshed equals cold).
+- `tests/it/pypi.rs` (spec #24): the PyPI fixtures `pkg-pylib` and `pkg-pyweb` as siblings
+  (`pyweb` names `pylib` as its peer). `pylib` provides `Shared_Lib` (`shared-lib`, PEP 621, a
+  `src/` layout: `shared_lib/__init__.py` re-exports `greet` from `core.py`, which calls
+  `text.py`'s `shout`; `api.py` holds `fetch` and `Client.create`; `src/sl_extras/` is a second
+  top-level module), `tools/pyproject.toml` provides `shared.tools` (`shared-tools`, Poetry)
+  whose only module is `tools/sl_extras/`, and `js/package.json` is an npm `shared-lib`. `pyweb`
+  depends on `shared-lib` in `pyproject.toml` (extras and markers) and `requirements-dev.txt`, on
+  `shared-tools` in `requirements.txt` (with option lines, a comment and a URL) and in
+  `worker/pyproject.toml` (Poetry, a dev group naming `shared-lib` not read), and its
+  `ui/package.json` names `shared-tools` on npm (no link). `app/main.py` crosses `exact` through
+  the re-export, a submodule reached as `shared_lib.api.fetch` and `from shared_lib.api import
+  Client`, `ambiguous` through `sl_extras` (both distributions expose it), and not at all
+  through a local `greet` or `json`; `worker/job.py` crosses `inferred` through `sl_extras`.
+  Goldens `pkg-{pyweb,pylib}.export.json`, `pkg-pylib.context-greet.txt` and
+  `pkg-pyweb.trace-down.txt`; the freshness test edits both repositories' `pyproject.toml`, the
+  root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
+  (PEP 503 names, requirement lines, both readers, the limits) and
+  `lang/python/pyproject.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

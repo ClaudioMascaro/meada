@@ -36,7 +36,8 @@ one for the area a change touches.
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
-  resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
+  resource and channel kinds. `package.rs`: npm and PyPI packages as contracts (specs #22 and
+  #24). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -74,9 +75,11 @@ one for the area a change touches.
   and entry points are unique by identity. The stored export entry points are candidates:
   `Engine::exports` drops, after `package::import`, each one that is the target of an import
   from its own repository (a monorepo), at any level.
-- Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
-  `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
-  path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
+- Package: `package::npm::<name>` or `package::pypi::<name>` (the PEP 503 normalized name),
+  provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
+  `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
+  path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
+  `requirements` for a `requirements*.txt`). Both sites hold a `::`, which `Engine::export` needs to keep their links.
   A call through a package import that resolves is also a consumer of the package, at its call
   site, linked to the provider's symbol (`<repository>::<path>::<name>`).
 - Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
@@ -107,7 +110,8 @@ one for the area a change touches.
   target, where `level` is the import's own level (how certain the entry and the name were), not
   the hop's: the link from that call carries the hop's level, the weaker of it and the package
   link's. `how` is the field or rule that named the entry (`exports`, `types`, `module`,
-  `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
+  `main`, `path`, or `outDir` when the output-to-source mapping found the file; for a Python
+  import, `moduleName` or `topLevel`, spec #24); for an
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
@@ -165,17 +169,21 @@ one for the area a change touches.
   a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
   calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
   of the contract itself, with the roles `sides` names.
-- New **package ecosystem** (spec #22 user story 26, track B packs): a pack for another manifest
-  format (`Cargo.toml`, `pyproject.toml`, `go.mod`) plugs in beside npm without a new kind of
-  contract. Discovery is a file name in `manifests_found` (`index.rs`), which stamps the file
-  into `manifests` like `package.json`; a reader per ecosystem, beside `package::read`, turns
-  its bytes into the same `Summary` (name, version, dependency entries, entry fields) and never
-  fails; the contract is `package::<ecosystem>::<name>` (`package::npm::<name>` is the first),
-  so `PREFIX` still routes it to the same `declare`, `consume`, `link`, `place` and `reached`;
-  and the reason grammar and `flag` stay the one function each, with the ecosystem's range
-  syntax checked there (a range it cannot check is `range unchecked`). Resolving an import
-  into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
-  stored bumps `SCHEMA_VERSION`.
+- New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
+  `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
+  `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
+  name, which `package::is_manifest` makes `manifests_found` (`index.rs`) stamp into
+  `manifests`; `Ecosystem::read` (behind `package::read_manifest`) turns the bytes into the same
+  `Summary` (name, version, dependency entries, entry fields, source roots) and never fails;
+  `Ecosystem::prefix` gives the contract `package::<ecosystem>::<name>`, so `PREFIX` still
+  routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
+  keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
+  (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
+  `flag`; PyPI's is never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
+  range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
+  its file's (`Ecosystem::of_source`), and resolving the import into the provider is the
+  ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
+  `pypi_resolutions`, `Provided::module`). A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
@@ -337,7 +345,9 @@ one for the area a change touches.
   hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
   document it could not read), and what spec #22 stores of the build and package files: the
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
-  written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
+  written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
+  `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
+  roots it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
@@ -501,7 +511,18 @@ one for the area a change touches.
   (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
   `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
   length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
-  calls a longer one `range unchecked`. Import resolution: `exported` follows at most
+  calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
+  `MAX_BYTES` hold for `pyproject.toml` and `requirements*.txt` too (a file past it, not UTF-8
+  or not TOML reads as empty; the toml crate's own depth limit stops nested input); a
+  requirements file is read line by line, its option lines (`-r`, `-e`, `-c`, `--index-url`),
+  URLs and paths skipped, and what `-r` names is not followed; environment markers and extras
+  are dropped and a direct reference (`name @ url`) is no entry; Poetry groups and
+  `[project.optional-dependencies]` are not read; a range is never evaluated (no marker). A
+  Python import is looked up in the distributions the nearest directory's manifests depend
+  on, among the top-level modules under each provider's roots (its directory, then the roots its
+  `pyproject.toml` declares, or `src`); a namespace package (a directory without
+  `__init__.py`) exposes nothing, and an import several distributions expose is `ambiguous` for
+  each, its reason naming none of the others (no marker). Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
@@ -632,8 +653,9 @@ one for the area a change touches.
   for a workspace that makes this slow.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
-  stack. Only the root `pyproject.toml` is read, and only the setuptools and Poetry
-  root declarations. `src` is a source root when nothing is declared, whether or not it holds
+  stack. For imports inside the repository only the root `pyproject.toml` is read
+  (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
+  Poetry root declarations; one that does not parse fails the refresh with its name. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
