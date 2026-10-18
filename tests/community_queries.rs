@@ -28,8 +28,7 @@ fn context_names_the_community_and_the_processes_across_repositories() {
     assert_golden("chain.context-processes.txt", &answer);
 }
 
-const SPAN_CUT_SYMBOL: &str = "src/checkout.ts::createOrder";
-const SPAN_CUT_BUDGET: usize = 258;
+const SPAN_CUT_BUDGET: usize = 150;
 
 const HEALTH: &str = "src/server.ts::GET /api/health";
 
@@ -137,11 +136,24 @@ fn the_answer_stays_within_the_budget_and_keeps_the_summary() {
 
 #[test]
 fn a_long_body_is_cut_before_the_processes_and_the_callers() {
-    let (_, gateway, _) = chain("community_queries_span_cut");
-    let engine = Engine::open(&gateway).unwrap();
+    let (_, _, catalog) = chain("community_queries_span_cut");
+    let body: String = (1..=9)
+        .map(|n| format!("  const step{n} = find(id + {n});\n"))
+        .collect();
+    fs::write(
+        catalog.join("lib/long.ts"),
+        format!(
+            "import {{ find }} from \"./products\";\n\n\
+             export function long(id: string) {{\n{body}  return find(id);\n}}\n\n\
+             export function first(id: string) {{\n  return long(id);\n}}\n\n\
+             export function second(id: string) {{\n  return long(id);\n}}\n"
+        ),
+    )
+    .unwrap();
+    let engine = Engine::open(&catalog).unwrap();
 
     let answer = engine
-        .context(SPAN_CUT_SYMBOL, Some(SPAN_CUT_BUDGET))
+        .context("lib/long.ts::long", Some(SPAN_CUT_BUDGET))
         .unwrap();
 
     assert_golden("chain.context-processes-span-cut.txt", &answer);

@@ -1,17 +1,15 @@
-example.com/chain/gateway src/checkout.ts:9 createOrder
-community: src#2
-processes: 2 (1 route, 1 export; 2 repositories): PUT /api/orders/{} (example.com/chain/gateway), createOrder (example.com/chain/web)
-async function createOrder(req: Request, res: { status(code: number): { end(): void } }) {
-  const product = await productOf(req.query.product);
-… cut after 2 of 5 lines (budget 258 tokens); raise budget for more
-callers: none
+example.com/chain/catalog lib/long.ts:3 long
+community: lib#2
+processes: 2 (2 export; 1 repository): first (example.com/chain/catalog), second (example.com/chain/catalog)
+function long(id: string) {
+  const step1 = find(id + 1);
+  const step2 = find(id + 2);
+  const step3 = find(id + 3);
+  const step4 = find(id + 4);
+  const step5 = find(id + 5);
+… cut after 6 of 12 lines (budget 150 tokens); raise budget for more
+callers:
+example.com/chain/catalog lib/long.ts:17 first
+example.com/chain/catalog lib/long.ts:21 second
 callees:
-example.com/chain/gateway src/catalog.ts:2 productOf
-example.com/chain/gateway src/events.ts:4 publish
-example.com/chain/gateway src/checkout.ts:12 (unresolved) (call_expression).end
-example.com/chain/gateway src/checkout.ts:11 (unresolved) JSON.stringify
-example.com/chain/gateway src/checkout.ts:12 (unresolved) res.status
-contracts:
-example.com/chain/gateway src/checkout.ts:9 provides http::PUT::/api/orders/{}
-example.com/chain/gateway src/checkout.ts:11 produces channel::kafka::orders.created
-example.com/chain/gateway src/checkout.ts:10 consumes http::GET::/api/products/{}
+example.com/chain/catalog lib/products.ts:10 find

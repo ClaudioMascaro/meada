@@ -104,7 +104,8 @@ modules updates it.
   that fit its room, then `+<m> more` for the rest; when not even one fits, the summary is the
   line. The room is what the budget leaves after the header and community, less the note of
   the final cut. `context_fresh` cuts in this order: the span text first (`render::cut`, with
-  its own note, or the note alone), then the tail (callers, callees, consumers, contracts) by
+  its own note; left out when not even the note fits, so the agent reads it from the file the
+  header names), then the tail (callers, callees, consumers, contracts) by
   the usual cut; the header, community and processes lines survive it. An answer that fits
   names every process and is cut nowhere. Two processes of one repository
   with the same label show as their `process::<identity>`.

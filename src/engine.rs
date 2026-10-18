@@ -671,7 +671,9 @@ impl Engine {
     /// symbols, they are listed instead of guessed. The answer is cut at `budget` tokens, from
     /// the last to give up: the first line, the community, the processes line (its summary, then
     /// as many entries as fit), the callers, callees, consumers and contracts, and the span
-    /// text, which keeps its leading lines and ends with the cut note of `render::cut`.
+    /// text, which keeps its leading lines and ends with the cut note of `render::cut`, or is
+    /// left out when not even that note fits (the agent reads it from the file the first line
+    /// names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -740,13 +742,17 @@ impl Engine {
             .find(|c| c.members.contains(&symbol_found.id))
             .map_or("none", |c| c.name.as_str());
         let community = format!("community: {community}");
-        let span = text.unwrap_or_else(|| {
-            vec![format!(
+        // Without the span text there is no span: the note is a line of the tail, kept in its
+        // output position and ahead of the callers, so the cut never rewrites it.
+        let unavailable = text.is_none().then(|| {
+            format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
-            )]
+            )
         });
-        let mut tail = relations(identity, export, &mut files, &symbol_found.id);
+        let span = text.unwrap_or_default();
+        let mut tail = Vec::from_iter(unavailable);
+        tail.extend(relations(identity, export, &mut files, &symbol_found.id));
         tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
@@ -781,12 +787,16 @@ impl Engine {
         let room = cap.saturating_sub(bytes(&head) + 1 + widest.len());
         let processes = processes_line(&found, repos, room);
         let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
-        // The span gives up first: it keeps the lines the tail leaves, then its own note.
-        let (_, span) = render::cut(
-            &span,
-            left.saturating_sub(bytes(&tail)),
-            budget.unwrap_or(render::DEFAULT_BUDGET),
-        );
+        // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
+        // room even for the note it is left out, and the agent reads it from the file the header
+        // names.
+        let span_room = left.saturating_sub(bytes(&tail));
+        let (_, span) = render::cut(&span, span_room, budget.unwrap_or(render::DEFAULT_BUDGET));
+        let span = if span.len() > span_room {
+            String::new()
+        } else {
+            span
+        };
         let mut lines = Vec::from(head);
         lines.push(processes);
         lines.extend(span.lines().map(str::to_string));
