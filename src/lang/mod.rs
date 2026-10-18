@@ -58,6 +58,17 @@ pub trait LanguagePack {
         None
     }
 
+    /// The program entry points only the whole repository tells, as `(file, qualified name)`
+    /// among the files `members` kept: a Rust `fn main` starts a program only in a binary
+    /// target's root, which `parse` of one file cannot know. `Facts::programs` still applies.
+    fn programs(
+        &self,
+        _configs: &[(&str, &[u8])],
+        _files: &BTreeMap<&str, &Facts>,
+    ) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
     /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
     fn receiver(&self) -> Option<&'static str> {

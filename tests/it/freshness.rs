@@ -262,6 +262,31 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     );
 }
 
+fn add_bin(repo: &Path) {
+    fs::write(repo.join("api/tools/second.rs"), "fn main() {}\n").unwrap();
+    let manifest = repo.join("api/Cargo.toml");
+    let mut text = fs::read_to_string(&manifest).unwrap();
+    text.push_str("\n[[bin]]\nname = \"second\"\npath = \"tools/second.rs\"\n");
+    fs::write(manifest, text).unwrap();
+}
+
+#[test]
+fn a_bin_added_to_cargo_toml_refreshes_its_program_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_bin", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    add_bin(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("api/tools/second.rs"));
+    assert!(refreshed.contains("example.com/acme/conformance::api/tools/second.rs::main"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_rust_bin_cold", "conformance-rust", ORIGIN, add_bin)
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.

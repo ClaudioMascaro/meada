@@ -29,6 +29,8 @@ pub struct Tree {
     /// The libraries of the repository each crate root may name, by the name it writes:
     /// the root file of each.
     libs: HashMap<String, HashMap<String, String>>,
+    /// The roots of binary targets: every root but a library's.
+    bins: BTreeSet<String>,
     /// The file each `mod` declaration names, by declaring file and specifier.
     children: HashMap<(String, String), String>,
     /// The files whose `pub` items another crate can name.
@@ -42,13 +44,17 @@ impl Tree {
         let mut tree = Tree {
             nodes: BTreeMap::new(),
             libs: HashMap::new(),
+            bins: BTreeSet::new(),
             children: HashMap::new(),
             published: BTreeSet::new(),
         };
         let packages = packages(configs, files);
         let dependencies = dependencies(configs, &packages);
         let mut queue = VecDeque::new();
-        for (root, dir) in roots(configs, files) {
+        for (root, dir, bin) in roots(configs, files) {
+            if bin {
+                tree.bins.insert(root.clone());
+            }
             let node = Node {
                 root: root.clone(),
                 parent: None,
@@ -135,6 +141,11 @@ impl Tree {
     /// Every file a crate builds.
     pub fn members(&self) -> BTreeSet<String> {
         self.nodes.keys().cloned().collect()
+    }
+
+    /// The roots of the binary targets: the files whose `fn main` starts a program.
+    pub fn bins(&self) -> impl Iterator<Item = &str> {
+        self.bins.iter().map(String::as_str)
     }
 
     /// The file `specifier` names from `from`: `crate` its crate root, `self` itself, `super`
@@ -343,10 +354,10 @@ fn workspace_deps(manifest: &toml::Table) -> Option<&toml::Table> {
 
 /// The crate roots, in order: per `Cargo.toml` with a `[package]` table, at any depth, by
 /// path, its library (`[lib] path`, else `src/lib.rs`), `src/main.rs`, each `[[bin]] path`,
-/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found, with the directory
-/// of the manifest. A workspace's members are such manifests too, so `[workspace] members`
-/// adds none.
-fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(String, String)> {
+/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found, each with the
+/// directory of its manifest and whether it is a binary target (every root but the library).
+/// A workspace's members are such manifests too, so `[workspace] members` adds none.
+fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(String, String, bool)> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     for (dir, manifest) in &manifests(configs) {
@@ -365,13 +376,13 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(Stri
                 Some((_, file)) => file == "main.rs",
             }
         });
-        let candidates = (lib.into_iter())
-            .chain(at("src/main.rs"))
+        let bins = (at("src/main.rs").into_iter())
             .chain(declared)
             .chain(found.map(|f| f.to_string()));
-        for file in candidates {
+        let candidates = (lib.into_iter().map(|f| (f, false))).chain(bins.map(|f| (f, true)));
+        for (file, bin) in candidates {
             if files.contains_key(file.as_str()) && seen.insert(file.clone()) {
-                out.push((file, dir.to_string()));
+                out.push((file, dir.to_string(), bin));
             }
         }
     }
@@ -391,6 +402,18 @@ mod tests {
         assert_eq!(join("api/src", "./x.rs").as_deref(), Some("api/src/x.rs"));
         assert_eq!(join("api", "../../x.rs"), None);
         assert_eq!(join("api", "/etc/x.rs"), None);
+    }
+
+    #[test]
+    fn a_bin_path_outside_the_repository_or_missing_is_no_root() {
+        let facts = Facts::default();
+        let files = BTreeMap::from([("api/src/lib.rs", &facts)]);
+        let configs: [(&str, &[u8]); 1] = [(
+            "api/Cargo.toml",
+            b"[package]\nname = \"a\"\n[[bin]]\npath = \"../../x.rs\"\n[[bin]]\npath = \"gone.rs\"\n",
+        )];
+        let tree = Tree::new(&configs, &files);
+        assert_eq!(tree.bins().count(), 0);
     }
 
     #[test]
@@ -414,17 +437,17 @@ mod tests {
             // A virtual manifest builds nothing of its own.
             ("virtual/Cargo.toml", b"[workspace]\nmembers = []\n"),
         ];
-        let found: Vec<String> = (roots(&configs, &files).into_iter())
-            .map(|(file, _)| file)
+        let found: Vec<(String, bool)> = (roots(&configs, &files).into_iter())
+            .map(|(file, _, bin)| (file, bin))
             .collect();
         assert_eq!(
             found,
             [
-                "backend/src/lib.rs",
-                "backend/src/main.rs",
-                "backend/src/bin/sync/main.rs",
-                "backend/src/bin/tool.rs",
-                "src-tauri/src/main.rs",
+                ("backend/src/lib.rs".to_string(), false),
+                ("backend/src/main.rs".to_string(), true),
+                ("backend/src/bin/sync/main.rs".to_string(), true),
+                ("backend/src/bin/tool.rs".to_string(), true),
+                ("src-tauri/src/main.rs".to_string(), true),
             ]
         );
     }

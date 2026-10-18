@@ -17,7 +17,9 @@ All notable changes to Meada are recorded here. The format follows
   (`crate::`, `super::`, `self::`, `Type::new()`, `Self::helper()`) resolve `exact` through the
   module tree, an `impl` in another file than its type included; a path that does not resolve
   matches functions and methods by name, and one that fits several `impl` blocks is
-  `ambiguous`. Calls inside macro invocations are not indexed. No Rust toolchain is run. A
+  `ambiguous`. The `fn main` of each binary target (`src/main.rs`, `src/bin/`, `[[bin]] path`)
+  is a program entry point with its process; a `main` elsewhere is not. Calls inside macro
+  invocations are not indexed. No Rust toolchain is run. A
   config file of any pack (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`) larger than 1 MiB
   is not read.
 - Rust `use` declarations (spec #30): paths from `crate::`, `super::`, `self::`, a module in

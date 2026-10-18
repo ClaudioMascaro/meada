@@ -152,6 +152,22 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
 }
 
 #[test]
+fn rust_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "search_rust_programs",
+        "conformance-rust",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // `src/main.rs`, `src/bin/` and a `[[bin]] path`, each with its own process.
+    assert_golden(
+        "conformance-rust.search-process-main.txt",
+        &engine.search("main", Some("process"), None).unwrap(),
+    );
+}
+
+#[test]
 fn python_programs_are_found_as_processes_and_shown_with_their_range() {
     let repo = fixture_repo(
         "context_python_programs",
