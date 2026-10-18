@@ -6,6 +6,10 @@
       "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
     },
     {
+      "path": "inventory/events.py",
+      "hash": "82eece9accb0b5022bf0a8dd49e009f8e00f0bca5a53b6fcdc77aad1f90557c7"
+    },
+    {
       "path": "inventory/jobs.py",
       "hash": "5726c6c1bf145f35943a97c7565d0c0f381e56e18ae3ac7407db5587bfc3599c"
     },
@@ -15,6 +19,22 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 64,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 113,
+        "end": 464
+      }
+    },
     {
       "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
       "span": {
@@ -65,6 +85,61 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::apply_restock::audit#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "target": "example.com/xlang/inventory::inventory/main.py::audit",
+      "level": "exact",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 103,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::Consumer#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 230,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::apply_restock#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "level": "exact",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 442,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::consumer.poll#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 379,
+        "end": 397
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::consumer.subscribe#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 305,
+        "end": 344
+      }
+    },
     {
       "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::os.getenv#0",
       "caller": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
@@ -265,6 +340,11 @@
   ],
   "consumers": [
     {
+      "contract": "channel::kafka::stock.restocked",
+      "site": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
       "via": "env:STOREFRONT_URL"
@@ -300,7 +380,24 @@
       "via": "env:STOREFRONT_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "inventory",
+      "members": [
+        "example.com/xlang/inventory::inventory/events.py::apply_restock",
+        "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+        "example.com/xlang/inventory::inventory/main.py::audit"
+      ]
+    }
+  ],
   "links": [
+    {
+      "consumer": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "provider": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0",
+      "contract": "channel::kafka::stock.restocked",
+      "level": "exact",
+      "reason": "channel::kafka::stock.restocked"
+    },
     {
       "consumer": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
       "provider": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",

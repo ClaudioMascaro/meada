@@ -189,10 +189,11 @@ Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.
 outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django no lado que serve,
 também atrás de um gateway), pelos recursos
-declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs`), filas RabbitMQ (`amqplib`,
-com o `publish` numa exchange chegando às filas que os bindings ligam a ela), filas Amazon SQS
-(AWS SDK v3 e `sqs-consumer`), subjects NATS (com os curingas `*` e `>`), jobs BullMQ e streams
-Redis (`ioredis` e `node-redis`), com o produtor ligado ao handler de cada consumidor, inclusive
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python`), filas RabbitMQ
+(`amqplib` e, em Python, `pika`, com o `publish` numa exchange chegando às filas que os bindings
+ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3`), subjects NATS
+(`nats` e, em Python, `nats-py`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
+(`ioredis`, `node-redis` e, em Python, `redis-py`), com o produtor ligado ao handler de cada consumidor, inclusive
 no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus documentos OpenAPI
 (3.0 e 3.1) e AsyncAPI (2.x e 3.0), achados pelo nome ou listados em `[serve] documents`: as rotas
 e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o

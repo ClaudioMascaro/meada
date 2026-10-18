@@ -7,9 +7,19 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Receiver, Star, Value, children, named, text,
+    LanguagePack, Message, Modules, Param, Part, Receiver, Star, Value, children, literal, named,
+    text,
 };
+use crate::resolve::Code;
 use crate::{Result, parent, qualify};
+
+mod messages;
+
+/// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads;
+/// deeper is `Unknown`. A value is read again by every call around it, and the recursion must
+/// stay shallow, whatever the file.
+// ponytail: real code nests a few levels of options; 64 is far past any.
+const VALUE_DEPTH: usize = 64;
 
 pub struct Python;
 
@@ -211,6 +221,10 @@ impl LanguagePack for Python {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["pyproject.toml"]
+    }
+
+    fn messages(&self, code: &Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
@@ -966,6 +980,15 @@ fn arguments(node: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Value)>) {
 
 /// What an expression is, as far as its own syntax tells.
 fn value(node: Node, src: &[u8]) -> Value {
+    value_at(node, src, 0)
+}
+
+/// `value` of a node `depth` levels inside the expression it started from.
+fn value_at(node: Node, src: &[u8], depth: usize) -> Value {
+    if depth >= VALUE_DEPTH {
+        return Value::Unknown;
+    }
+    let deeper = |n: Node| value_at(n, src, depth + 1);
     match node.kind() {
         "identifier" => Value::Ref(text(node, src).to_string()),
         "none" => Value::Undefined,
@@ -986,9 +1009,34 @@ fn value(node: Node, src: &[u8]) -> Value {
             },
             Value::Str,
         ),
-        "list" | "tuple" => Value::List(named(node).map(|item| value(item, src)).collect()),
-        "parenthesized_expression" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
+        "list" | "tuple" => Value::List(named(node).map(deeper).collect()),
+        "dictionary" => {
+            let entries = named(node).filter_map(|entry| pair(entry, src, depth + 1));
+            Value::Object(entries.collect())
+        }
+        "await" | "parenthesized_expression" => named(node).next().map_or(Value::Unknown, deeper),
         _ => parts(node, src).map_or(Value::Unknown, Value::Str),
+    }
+}
+
+/// An entry of a dict literal as a property of `Value::Object`: a string literal key is the
+/// key, any other key is `[]` holding the list of the key and the value; `**d` is a spread.
+/// `depth` is the level of the values it reads.
+fn pair(node: Node, src: &[u8], depth: usize) -> Option<(String, Value)> {
+    match node.kind() {
+        "pair" => {
+            let key = node.child_by_field_name("key")?;
+            let item = value_at(node.child_by_field_name("value")?, src, depth);
+            Some(match parts(key, src).and_then(|p| literal(&p)) {
+                Some(key) => (key, item),
+                None => (
+                    "[]".into(),
+                    Value::List(vec![value_at(key, src, depth), item]),
+                ),
+            })
+        }
+        "dictionary_splat" => Some(("...".into(), value_at(named(node).next()?, src, depth))),
+        _ => None,
     }
 }
 
@@ -1118,5 +1166,102 @@ fn callee(node: Node, src: &[u8]) -> String {
             _ => format!("({})", node.kind()),
         },
         kind => format!("({kind})"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn consts(src: &str) -> Vec<Const> {
+        Python.parse("a.py", src.as_bytes()).unwrap().consts
+    }
+
+    fn held(consts: &[Const], name: &str) -> Value {
+        (consts.iter().find(|c| c.name == name).unwrap().value).clone()
+    }
+
+    /// How many levels deep the first item of `value` goes.
+    fn nesting(value: &Value) -> usize {
+        match value {
+            Value::List(items) => 1 + items.first().map_or(0, nesting),
+            Value::Object(entries) => 1 + entries.first().map_or(0, |(_, v)| nesting(v)),
+            _ => 0,
+        }
+    }
+
+    #[test]
+    fn an_await_is_the_value_it_awaits() {
+        let consts = consts("async def f():\n    nc = await connect()\n");
+
+        let Value::Call(call) = held(&consts, "f.nc") else {
+            unreachable!("not a call");
+        };
+
+        assert_eq!(call.callee, "connect");
+    }
+
+    #[test]
+    fn a_dict_literal_is_an_object_with_a_key_for_each_kind_of_entry() {
+        let src = "streams = {\n    # A comment is no entry.\n    \"orders\": \">\",\n    \
+                   ORDERS: \">\",\n    f\"{X}.eu\": 1,\n    **rest,\n}\n";
+
+        let Value::Object(entries) = held(&consts(src), "streams") else {
+            unreachable!("not an object");
+        };
+
+        let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["orders", "[]", "[]", "..."]);
+        // A key that is no string literal travels with its value, to be folded with it.
+        let Value::List(pair) = &entries[1].1 else {
+            unreachable!("not a pair");
+        };
+        assert!(matches!(pair.as_slice(), [Value::Ref(k), Value::Str(_)] if k == "ORDERS"));
+        let Value::List(pair) = &entries[2].1 else {
+            unreachable!("not a pair");
+        };
+        let [Value::Str(key), Value::Unknown] = pair.as_slice() else {
+            unreachable!("not an f-string and a number");
+        };
+        assert!(key.iter().any(|p| matches!(p, Part::Ref(x) if x == "X")));
+        assert!(matches!(&entries[3].1, Value::Ref(name) if name == "rest"));
+    }
+
+    #[test]
+    fn what_is_no_dict_literal_stays_unknown() {
+        let consts = consts("a = {1, 2}\nb = {k: v for k, v in c}\n");
+
+        assert!(matches!(held(&consts, "a"), Value::Unknown));
+        assert!(matches!(held(&consts, "b"), Value::Unknown));
+    }
+
+    #[test]
+    fn values_nested_past_the_depth_limit_are_unknown() {
+        // Far past the limit: a recursion that does not stop overflows the stack.
+        let n = 20_000;
+        let dict = format!("x = {}1{}\n", "{\"k\": ".repeat(n), "}".repeat(n));
+        let list = format!("x = {}1{}\n", "[".repeat(n), "]".repeat(n));
+        let tuple = format!("x = {}1{}\n", "(".repeat(n), ",)".repeat(n));
+        let parenthesized = format!("x = {}[1]{}\n", "(".repeat(n), ")".repeat(n));
+        let awaited = format!("async def f():\n    x = {}[1]\n", "await ".repeat(n));
+
+        for (src, name) in [
+            (dict, "x"),
+            (list, "x"),
+            (tuple, "x"),
+            (parenthesized, "x"),
+            (awaited, "f.x"),
+        ] {
+            let depth = nesting(&held(&consts(&src), name));
+            assert!(depth <= VALUE_DEPTH, "{depth} levels in `{}`", &src[..20]);
+        }
+    }
+
+    #[test]
+    fn a_value_just_inside_the_depth_limit_is_read() {
+        let n = VALUE_DEPTH - 1;
+        let src = format!("x = {}1{}\n", "[".repeat(n), "]".repeat(n));
+
+        assert_eq!(nesting(&held(&consts(&src), "x")), n);
     }
 }

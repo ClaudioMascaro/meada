@@ -462,6 +462,8 @@ pub enum Value {
     /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
     /// An object literal's properties; a spread `...x` is the key `...` with the value of `x`.
+    /// A Python dict literal is one too: an entry whose key is no string literal is the key
+    /// `[]` with the list of its key and value.
     Object(Vec<(String, Value)>),
     /// A name: a constant, a parameter, a definition.
     Ref(String),
@@ -541,6 +543,36 @@ pub fn literal(parts: &[Part]) -> Option<String> {
             _ => None,
         })
         .collect()
+}
+
+/// A channel name as evaluated: `None` when it depends on a parameter, `Some(None)` when it is
+/// not a literal string (an environment read, a runtime value, a regular expression).
+pub fn channel_name(value: &Value) -> Option<Option<String>> {
+    match value {
+        Value::Ref(_) => None,
+        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
+        Value::Str(parts) => Some(literal(parts)),
+        _ => Some(None),
+    }
+}
+
+/// The SQS queue the URL `url` names: the last segment of the URL, whatever precedes it (an
+/// account and a region are often dynamic). `None` when it depends on a parameter, `Some(None)`
+/// when it cannot be read.
+pub fn queue_name(url: Option<&Value>) -> Option<Option<String>> {
+    let parts = match url {
+        Some(Value::Str(parts)) => parts,
+        Some(Value::Ref(_)) => return None,
+        _ => return Some(None),
+    };
+    match parts.last() {
+        Some(Part::Text(tail)) if tail.contains('/') => {
+            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
+            Some(queue.map(String::from))
+        }
+        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
+        _ => Some(None),
+    }
 }
 
 #[derive(Clone, PartialEq)]

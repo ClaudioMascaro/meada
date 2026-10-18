@@ -96,6 +96,49 @@ fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files(
     );
 }
 
+/// Renames a topic constant the Python channel files import, adds a consumer of a topic that
+/// had none, and deletes a module with producers and consumers (spec #73).
+fn edit_python_channels(repo: &Path) {
+    let topics = fs::read_to_string(repo.join("messages/topics.py")).unwrap();
+    assert!(topics.contains("\"orders\""));
+    fs::write(
+        repo.join("messages/topics.py"),
+        topics.replace("\"orders\"", "\"sales\""),
+    )
+    .unwrap();
+    fs::write(
+        repo.join("messages/extra.py"),
+        "from confluent_kafka import Consumer\n\n\ndef consume_extra():\n    \
+         consumer = Consumer({})\n    consumer.subscribe([\"retries\"])\n",
+    )
+    .unwrap();
+    fs::remove_file(repo.join("messages/sqs_boto.py")).unwrap();
+}
+
+#[test]
+fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
+    let repo = fixture_repo("fresh_python_channels", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python_channels(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    // The renamed constant reaches the channels of the files that import it.
+    assert!(refreshed.contains("channel::kafka::sales"));
+    assert!(!refreshed.contains("channel::kafka::orders"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_channels_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python_channels
+        )
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.
@@ -412,7 +455,7 @@ fn edit_resources(gateway: &Path) {
 
 /// Edits, adds and deletes `.py` files of the inventory and deletes a route of the storefront:
 /// a route path changes, a module with a consumer on the declared host appears, the jobs
-/// module goes.
+/// module goes, and the topic its handler consumes changes names.
 fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
     let main = inventory.join("inventory/main.py");
     let src = fs::read_to_string(&main).unwrap();
@@ -429,6 +472,11 @@ fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
     .unwrap();
     fs::remove_file(inventory.join("inventory/jobs.py")).unwrap();
     fs::remove_file(storefront.join("app/api/promotions/route.ts")).unwrap();
+    // The topic the storefront produces and the inventory's handler consumes changes names.
+    let events = inventory.join("inventory/events.py");
+    let src = fs::read_to_string(&events).unwrap();
+    assert!(src.contains("stock.restocked"));
+    fs::write(&events, src.replace("stock.restocked", "stock.replenished")).unwrap();
 }
 
 #[test]

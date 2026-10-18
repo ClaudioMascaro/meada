@@ -561,6 +561,91 @@ fn python() {
             "helpers.py::format_name",
             "legacy.py::legacy",
             "main.py::main",
+            "messages/confluent.py::Bus",
+            "messages/confluent.py::Bus.relay",
+            "messages/confluent.py::Counter",
+            "messages/confluent.py::Counter.produce",
+            "messages/confluent.py::consume_orders",
+            "messages/confluent.py::consume_pattern",
+            "messages/confluent.py::consume_refunds",
+            "messages/confluent.py::emit",
+            "messages/confluent.py::emit_refund",
+            "messages/confluent.py::not_produced",
+            "messages/confluent.py::produce_all",
+            "messages/confluent.py::produce_unknown",
+            "messages/confluent.py::relay_dynamic",
+            "messages/kafka_python.py::Relay",
+            "messages/kafka_python.py::Relay.__init__",
+            "messages/kafka_python.py::Relay.forward",
+            "messages/kafka_python.py::idle",
+            "messages/kafka_python.py::listen_alias",
+            "messages/kafka_python.py::listen_invoices",
+            "messages/kafka_python.py::listen_retries",
+            "messages/kafka_python.py::not_sent",
+            "messages/kafka_python.py::send_invoice",
+            "messages/kafka_python.py::send_retry",
+            "messages/nats_py.py::Plain",
+            "messages/nats_py.py::Plain.publish",
+            "messages/nats_py.py::announce",
+            "messages/nats_py.py::announce_all",
+            "messages/nats_py.py::bus",
+            "messages/nats_py.py::not_published",
+            "messages/nats_py.py::on_job",
+            "messages/nats_py.py::publish_all",
+            "messages/nats_py.py::publish_legacy",
+            "messages/nats_py.py::publish_returned",
+            "messages/nats_py.py::publish_unknown",
+            "messages/nats_py.py::record",
+            "messages/nats_py.py::subscribe_middle",
+            "messages/nats_py.py::subscribe_one",
+            "messages/nats_py.py::subscribe_rest",
+            "messages/pika_amqp.py::Worker",
+            "messages/pika_amqp.py::Worker.__init__",
+            "messages/pika_amqp.py::Worker.consume",
+            "messages/pika_amqp.py::Worker.enqueue",
+            "messages/pika_amqp.py::Worker.on_report",
+            "messages/pika_amqp.py::announce",
+            "messages/pika_amqp.py::bind",
+            "messages/pika_amqp.py::enqueue",
+            "messages/pika_amqp.py::enqueue_reports",
+            "messages/pika_amqp.py::enqueue_unknown",
+            "messages/pika_amqp.py::listen",
+            "messages/pika_amqp.py::not_published",
+            "messages/pika_amqp.py::on_alert",
+            "messages/pika_amqp.py::on_audit",
+            "messages/pika_amqp.py::on_mail",
+            "messages/pika_amqp.py::on_task",
+            "messages/pika_amqp.py::queue",
+            "messages/pika_amqp.py::record",
+            "messages/pika_amqp.py::send_chained",
+            "messages/pika_amqp.py::send_mail",
+            "messages/redis_streams.py::append",
+            "messages/redis_streams.py::append_all",
+            "messages/redis_streams.py::append_audit",
+            "messages/redis_streams.py::append_more",
+            "messages/redis_streams.py::append_unknown",
+            "messages/redis_streams.py::not_streamed",
+            "messages/redis_streams.py::read_many",
+            "messages/redis_streams.py::read_orders",
+            "messages/redis_streams.py::read_plain",
+            "messages/redis_streams.py::read_unknown",
+            "messages/shadowed.py::rebound_by_except",
+            "messages/shadowed.py::rebound_by_loop",
+            "messages/shadowed.py::rebound_by_parameter",
+            "messages/shadowed.py::rebound_by_with",
+            "messages/shadowed.py::rebound_constructor",
+            "messages/sqs_boto.py::enqueue",
+            "messages/sqs_boto.py::enqueue_billing",
+            "messages/sqs_boto.py::not_queued",
+            "messages/sqs_boto.py::receive_billing",
+            "messages/sqs_boto.py::receive_jobs",
+            "messages/sqs_boto.py::receive_mail",
+            "messages/sqs_boto.py::receive_session",
+            "messages/sqs_boto.py::receive_unknown",
+            "messages/sqs_boto.py::send_batch",
+            "messages/sqs_boto.py::send_chained",
+            "messages/sqs_boto.py::send_job",
+            "messages/sqs_boto.py::send_session",
             "methods.py::Base",
             "methods.py::Base.ping",
             "methods.py::Base.shared",
@@ -2223,4 +2308,530 @@ fn typescript_and_javascript_amqplib() {
     ];
     expected.sort();
     assert_eq!(links, expected);
+}
+
+/// The channel sides of `file` in the Python fixture: the export, its producers as `(contract,
+/// site)` and its consumers as `(contract, via, site)`, sorted, with repository-relative sites.
+/// An unresolved side has the contract `channel::<broker>`.
+fn python_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
+    let dir = format!("messages/{file}::");
+    let (json, producers) = python_providers(case, &dir);
+    let consumers = consumers(&json, &dir);
+    (json, producers, consumers)
+}
+
+/// A link of the export as `(consumer, producer, reason, level)`, ids relative to the
+/// repository.
+type ChannelLink = (String, String, String, String);
+
+/// The links of `json` whose reason starts with `prefix`, sorted.
+fn channel_links(json: &Value, prefix: &str) -> Vec<ChannelLink> {
+    let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
+    let mut links: Vec<ChannelLink> = (json["links"].as_array().unwrap())
+        .iter()
+        .filter(|l| l["reason"].as_str().unwrap().starts_with(prefix))
+        .map(|l| {
+            (
+                rel(l["consumer"].as_str().unwrap()),
+                rel(l["provider"].as_str().unwrap()),
+                l["reason"].as_str().unwrap().to_string(),
+                l["level"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    links.sort();
+    links
+}
+
+/// A link as `channel_links` lists it.
+fn link(consumer: String, producer: String, reason: &str, level: &str) -> ChannelLink {
+    (consumer, producer, reason.into(), level.into())
+}
+
+/// The Kafka forms of the Python pack (spec #20, #73): confluent-kafka and kafka-python, as
+/// the sides of each file and the links between them, all `exact`. A producer of another
+/// package and `produce` on an object of the repository produce nothing; a topic from the
+/// environment and a client wrapper reached only by a method's name are unresolved producers.
+#[test]
+fn python_kafka_clients_are_channel_producers_and_consumers() {
+    let confluent = |rest: &str| format!("messages/confluent.py::{rest}");
+    let (json, producers, consumers) = python_channels("python_kafka_confluent", "confluent.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &confluent("produce_all::producer.produce#0")
+            ),
+            (
+                "channel::kafka::payments",
+                &confluent("produce_all::producer.produce#1")
+            ),
+            (
+                "channel::kafka::refunds.eu",
+                &confluent("produce_all::other.produce#0")
+            ),
+            ("channel::kafka::refunds", &confluent("emit_refund::emit#0")),
+            (
+                "channel::kafka",
+                &confluent("produce_unknown::producer.produce#0")
+            ),
+            (
+                "channel::kafka",
+                &confluent("Bus.relay::producer.produce#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::orders", "", &confluent("consume_orders")),
+            ("channel::kafka::payments", "", &confluent("consume_orders")),
+            ("channel::kafka::refunds", "", &confluent("consume_refunds")),
+            (
+                "channel::kafka::refunds.eu",
+                "",
+                &confluent("consume_refunds")
+            ),
+            // A topic that starts with `^` is a regular expression, so it names no topic.
+            ("channel::kafka", "", &confluent("consume_pattern")),
+        ])
+    );
+
+    let kafka = |rest: &str| format!("messages/kafka_python.py::{rest}");
+    let (_, producers, consumers) = python_channels("python_kafka_python", "kafka_python.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::invoices",
+                &kafka("send_invoice::producer.send#0")
+            ),
+            (
+                "channel::kafka::retries",
+                &kafka("send_retry::producer.send#0")
+            ),
+            (
+                "channel::kafka::audits",
+                &kafka("Relay.forward::self.producer.send#0")
+            ),
+        ])
+    );
+    // The constructor's topics and `subscribe(topics=)`; a constructor with none is no consumer.
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::invoices", "", &kafka("listen_invoices")),
+            ("channel::kafka::audits", "", &kafka("listen_invoices")),
+            ("channel::kafka::retries", "", &kafka("listen_retries")),
+            // A constructor imported under another name.
+            ("channel::kafka::alias", "", &kafka("listen_alias")),
+        ])
+    );
+
+    let mut expected = vec![
+        link(
+            confluent("consume_orders"),
+            confluent("produce_all::producer.produce#0"),
+            "channel::kafka::orders",
+            "exact",
+        ),
+        link(
+            confluent("consume_orders"),
+            confluent("produce_all::producer.produce#1"),
+            "channel::kafka::payments",
+            "exact",
+        ),
+        link(
+            confluent("consume_refunds"),
+            confluent("emit_refund::emit#0"),
+            "channel::kafka::refunds",
+            "exact",
+        ),
+        link(
+            confluent("consume_refunds"),
+            confluent("produce_all::other.produce#0"),
+            "channel::kafka::refunds.eu",
+            "exact",
+        ),
+        link(
+            kafka("listen_invoices"),
+            kafka("send_invoice::producer.send#0"),
+            "channel::kafka::invoices",
+            "exact",
+        ),
+        link(
+            kafka("listen_invoices"),
+            kafka("Relay.forward::self.producer.send#0"),
+            "channel::kafka::audits",
+            "exact",
+        ),
+        link(
+            kafka("listen_retries"),
+            kafka("send_retry::producer.send#0"),
+            "channel::kafka::retries",
+            "exact",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::kafka::"), expected);
+
+    // A name rebound in its scope (a parameter, `with`, `for`, `except`, the constructor's own
+    // name) is no client of the library.
+    let (_, producers, consumers) = python_channels("python_kafka_shadowed", "shadowed.py");
+    assert_eq!((producers, consumers), (vec![], vec![]));
+}
+
+/// The pika forms of the Python pack (spec #20, #73): `basic_publish`, `basic_consume` and
+/// `queue_bind` on a channel that traces back to `pika.BlockingConnection`, as sides and links.
+/// A publish to the default exchange is the queue its routing key names; one to `events` reaches
+/// the queues bound to it, `inferred` for a wildcard pattern. A channel of another package
+/// produces nothing.
+#[test]
+fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
+    let rabbit = |rest: &str| format!("messages/pika_amqp.py::{rest}");
+    let (json, producers, consumers) = python_channels("python_pika", "pika_amqp.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::amqp::tasks",
+                &rabbit("enqueue::channel.basic_publish#0")
+            ),
+            (
+                "channel::amqp::invoices",
+                &rabbit("enqueue::channel.basic_publish#1")
+            ),
+            (
+                "channel::amqp::reports",
+                &rabbit("enqueue_reports::queue#0")
+            ),
+            (
+                "channel::amqp",
+                &rabbit("enqueue_unknown::channel.basic_publish#0")
+            ),
+            (
+                "channel::amqp::mail",
+                &rabbit("send_mail::sender.basic_publish#0")
+            ),
+            (
+                "channel::amqp::reports",
+                &rabbit("Worker.enqueue::self.channel.basic_publish#0")
+            ),
+            // Clients written as a chain of calls.
+            (
+                "channel::amqp::chained",
+                &rabbit("send_chained::sender.basic_publish#0")
+            ),
+            (
+                "channel::amqp::inline",
+                &rabbit("send_chained::(call).basic_publish#0")
+            ),
+        ])
+    );
+    // A lambda is no definition: the function that consumes handles.
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::amqp::audit", "", &rabbit("on_audit")),
+            ("channel::amqp::alerts", "", &rabbit("on_alert")),
+            ("channel::amqp::shipments", "", &rabbit("listen")),
+            ("channel::amqp::tasks", "", &rabbit("on_task")),
+            ("channel::amqp::mail", "", &rabbit("on_mail")),
+            ("channel::amqp::reports", "", &rabbit("Worker.on_report")),
+        ])
+    );
+
+    let published = |queue: &str, handler: &str, call: usize, binding: &str, level: &str| {
+        link(
+            rabbit(handler),
+            rabbit(&format!("announce::channel.basic_publish#{call}")),
+            &format!("channel::amqp::{queue} binding events {binding}"),
+            level,
+        )
+    };
+    let direct = |handler: &str, producer: &str, queue: &str| {
+        link(
+            rabbit(handler),
+            rabbit(producer),
+            &format!("channel::amqp::{queue}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        direct("on_task", "enqueue::channel.basic_publish#0", "tasks"),
+        direct("Worker.on_report", "enqueue_reports::queue#0", "reports"),
+        direct(
+            "Worker.on_report",
+            "Worker.enqueue::self.channel.basic_publish#0",
+            "reports",
+        ),
+        direct("on_mail", "send_mail::sender.basic_publish#0", "mail"),
+        published("audit", "on_audit", 0, "order.created", "exact"),
+        published("alerts", "on_alert", 0, "order.#", "inferred"),
+        published("alerts", "on_alert", 1, "order.#", "inferred"),
+        published("shipments", "listen", 1, "*.shipped", "inferred"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::amqp::"), expected);
+}
+
+/// The boto3 forms of the Python pack (spec #20, #73): `send_message`, `send_message_batch` and
+/// `receive_message` on a client made for `"sqs"` (also through a `Session`), the queue being
+/// the last segment of the URL. A client of another service or package produces nothing; a
+/// URL read from the environment is an unresolved consumer.
+#[test]
+fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
+    let sqs = |rest: &str| format!("messages/sqs_boto.py::{rest}");
+    let (json, producers, consumers) = python_channels("python_sqs", "sqs_boto.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            ("channel::sqs::jobs", &sqs("send_job::sqs.send_message#0")),
+            ("channel::sqs::mail", &sqs("send_job::sqs.send_message#1")),
+            (
+                "channel::sqs::audit",
+                &sqs("send_batch::sqs.send_message_batch#0")
+            ),
+            ("channel::sqs::billing", &sqs("enqueue_billing::enqueue#0")),
+            (
+                "channel::sqs::session",
+                &sqs("send_session::queues.send_message#0")
+            ),
+            // Clients written as a chain of calls; the one made for `"s3"` is no producer.
+            (
+                "channel::sqs::chained",
+                &sqs("send_chained::chained.send_message#0")
+            ),
+            (
+                "channel::sqs::inline",
+                &sqs("send_chained::(call).send_message#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::sqs::jobs", "", &sqs("receive_jobs")),
+            ("channel::sqs::mail", "", &sqs("receive_mail")),
+            ("channel::sqs::billing", "", &sqs("receive_billing")),
+            ("channel::sqs::session", "", &sqs("receive_session")),
+            ("channel::sqs", "", &sqs("receive_unknown")),
+        ])
+    );
+
+    let queue = |handler: &str, producer: &str, name: &str| {
+        link(
+            sqs(handler),
+            sqs(producer),
+            &format!("channel::sqs::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        queue("receive_jobs", "send_job::sqs.send_message#0", "jobs"),
+        queue("receive_mail", "send_job::sqs.send_message#1", "mail"),
+        queue("receive_billing", "enqueue_billing::enqueue#0", "billing"),
+        queue(
+            "receive_session",
+            "send_session::queues.send_message#0",
+            "session",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::sqs::"), expected);
+}
+
+/// The nats-py forms of the Python pack (spec #20, #73): `publish` and `subscribe` on a
+/// connection from `nats.connect` (awaited, returned by a function or passed by a caller) or a
+/// `Client`, with the callback from `cb=`. A wildcard subject links at `inferred`, a connection
+/// of another package and `publish` on any object produce nothing.
+#[test]
+fn python_nats_connections_are_channel_producers_and_consumers() {
+    let nats = |rest: &str| format!("messages/nats_py.py::{rest}");
+    let (json, producers, consumers) = python_channels("python_nats", "nats_py.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::nats::jobs.created",
+                &nats("publish_all::nc.publish#0")
+            ),
+            (
+                "channel::nats::jobs.eu.created",
+                &nats("publish_all::nc.publish#1")
+            ),
+            (
+                "channel::nats::jobs.audit.created",
+                &nats("publish_all::other.publish#0")
+            ),
+            (
+                "channel::nats::jobs.legacy",
+                &nats("publish_legacy::nc.publish#0")
+            ),
+            (
+                "channel::nats::refunds",
+                &nats("publish_returned::nc.publish#0")
+            ),
+            (
+                "channel::nats::jobs.announced",
+                &nats("announce::nc.publish#0")
+            ),
+            ("channel::nats", &nats("publish_unknown::nc.publish#0")),
+        ])
+    );
+    // A `cb` that is no definition: the function that subscribes handles.
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::nats::jobs.*", "", &nats("subscribe_one")),
+            ("channel::nats::jobs.>", "", &nats("on_job")),
+            ("channel::nats::jobs.audit.>", "", &nats("subscribe_rest")),
+            (
+                "channel::nats::jobs.*.created",
+                "",
+                &nats("subscribe_middle")
+            ),
+            ("channel::nats::jobs.created", "", &nats("subscribe_middle")),
+            ("channel::nats::refunds", "", &nats("subscribe_middle")),
+        ])
+    );
+
+    let subject = |handler: &str, producer: &str, subject: &str, pattern: Option<&str>| {
+        let (handler, producer) = (nats(handler), nats(producer));
+        match pattern {
+            Some(pattern) => link(
+                handler,
+                producer,
+                &format!("channel::nats::{subject} wildcard {pattern}"),
+                "inferred",
+            ),
+            None => link(
+                handler,
+                producer,
+                &format!("channel::nats::{subject}"),
+                "exact",
+            ),
+        }
+    };
+    let created = "publish_all::nc.publish#0";
+    let created_eu = "publish_all::nc.publish#1";
+    let created_audit = "publish_all::other.publish#0";
+    let legacy = "publish_legacy::nc.publish#0";
+    let announced = "announce::nc.publish#0";
+    let mut expected = vec![
+        subject("subscribe_one", created, "jobs.created", Some("jobs.*")),
+        subject("subscribe_one", legacy, "jobs.legacy", Some("jobs.*")),
+        subject("subscribe_one", announced, "jobs.announced", Some("jobs.*")),
+        subject("on_job", created, "jobs.created", Some("jobs.>")),
+        subject("on_job", created_eu, "jobs.eu.created", Some("jobs.>")),
+        subject(
+            "on_job",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.>"),
+        ),
+        subject("on_job", legacy, "jobs.legacy", Some("jobs.>")),
+        subject("on_job", announced, "jobs.announced", Some("jobs.>")),
+        subject(
+            "subscribe_rest",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.audit.>"),
+        ),
+        subject(
+            "subscribe_middle",
+            created_eu,
+            "jobs.eu.created",
+            Some("jobs.*.created"),
+        ),
+        subject(
+            "subscribe_middle",
+            created_audit,
+            "jobs.audit.created",
+            Some("jobs.*.created"),
+        ),
+        subject("subscribe_middle", created, "jobs.created", None),
+        subject(
+            "subscribe_middle",
+            "publish_returned::nc.publish#0",
+            "refunds",
+            None,
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::nats::"), expected);
+}
+
+/// The redis-py stream forms of the Python pack (spec #20, #73): `xadd`, and the stream keys of
+/// `xreadgroup` (a literal, a constant or an f-string). A read with no consumer group and a
+/// client of another package produce nothing.
+#[test]
+fn python_redis_streams_are_channel_producers_and_consumers() {
+    let redis = |rest: &str| format!("messages/redis_streams.py::{rest}");
+    let (json, producers, consumers) = python_channels("python_redis", "redis_streams.py");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::redis::orders",
+                &redis("append_all::client.xadd#0")
+            ),
+            (
+                "channel::redis::shipments",
+                &redis("append_all::client.xadd#1")
+            ),
+            (
+                "channel::redis::shipments.eu",
+                &redis("append_all::pool.xadd#0")
+            ),
+            (
+                "channel::redis::returns",
+                &redis("append_all::imported.xadd#0")
+            ),
+            (
+                "channel::redis::events.audit",
+                &redis("append_audit::append#0")
+            ),
+            ("channel::redis", &redis("append_unknown::client.xadd#0")),
+            // The old class name, and `from_url` of `redis` and of `redis.asyncio`.
+            (
+                "channel::redis::legacy",
+                &redis("append_more::legacy.xadd#0")
+            ),
+            (
+                "channel::redis::by-url",
+                &redis("append_more::by_url.xadd#0")
+            ),
+            (
+                "channel::redis::async-by-url",
+                &redis("append_more::async_by_url.xadd#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::redis::orders", "", &redis("read_orders")),
+            ("channel::redis::orders", "", &redis("read_many")),
+            ("channel::redis::shipments.eu", "", &redis("read_many")),
+            ("channel::redis", "", &redis("read_unknown")),
+        ])
+    );
+
+    let stream = |handler: &str, producer: &str, name: &str| {
+        link(
+            redis(handler),
+            redis(producer),
+            &format!("channel::redis::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        stream("read_orders", "append_all::client.xadd#0", "orders"),
+        stream("read_many", "append_all::client.xadd#0", "orders"),
+        stream("read_many", "append_all::pool.xadd#0", "shipments.eu"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::redis::"), expected);
 }

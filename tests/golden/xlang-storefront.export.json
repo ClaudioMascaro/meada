@@ -18,6 +18,10 @@
       "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
     },
     {
+      "path": "src/events.ts",
+      "hash": "10e2c0710ba86fe74398faf84393b60750938f5b3c931ce84f740b0306d4fef6"
+    },
+    {
       "path": "src/inventory.ts",
       "hash": "e004522aaae7a7e889481e0d5a766c164f26385e358a6431d631bf4c3046de37"
     },
@@ -57,6 +61,14 @@
         "path": "app/api/promotions/route.ts",
         "start": 7,
         "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang/storefront::src/events.ts::announceRestock",
+      "span": {
+        "path": "src/events.ts",
+        "start": 218,
+        "end": 346
       }
     },
     {
@@ -130,6 +142,39 @@
       }
     },
     {
+      "id": "example.com/xlang/storefront::src/events.ts::Kafka#0",
+      "caller": "example.com/xlang/storefront::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 48,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0",
+      "caller": "example.com/xlang/storefront::src/events.ts::announceRestock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 272,
+        "end": 343
+      }
+    },
+    {
+      "id": "example.com/xlang/storefront::src/events.ts::kafka.producer#0",
+      "caller": "example.com/xlang/storefront::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 129,
+        "end": 145
+      }
+    },
+    {
       "id": "example.com/xlang/storefront::src/inventory.ts::reserveStock::fetch#0",
       "caller": "example.com/xlang/storefront::src/inventory.ts::reserveStock",
       "target": null,
@@ -175,6 +220,10 @@
     }
   ],
   "providers": [
+    {
+      "contract": "channel::kafka::stock.restocked",
+      "site": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0"
+    },
     {
       "contract": "http::GET::/api/health",
       "site": "example.com/xlang/storefront::app/api/health/route.ts::GET",
@@ -263,6 +312,13 @@
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "provider": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0",
+      "contract": "channel::kafka::stock.restocked",
+      "level": "exact",
+      "reason": "channel::kafka::stock.restocked"
+    },
     {
       "consumer": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
       "provider": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",

@@ -57,6 +57,27 @@ fn trace_down_crosses_into_python_and_back_to_typescript() {
     assert_golden("xlang.trace-down.txt", &answer);
 }
 
+/// The storefront produces the Kafka topic `stock.restocked` in TypeScript; the inventory
+/// service consumes it in Python, the function that subscribes being the handler (spec #73).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_python_handler_of_the_topic() {
+    let (storefront, _) = xlang("xlang_channel_down");
+
+    let answer = Engine::open(&storefront)
+        .unwrap()
+        .trace(Start::From("announceRestock"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::stock.restocked] example.com/xlang/inventory \
+             inventory/events.py:10 consume_restocks"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang.trace-channel-down.txt", &answer);
+}
+
 #[test]
 fn trace_up_crosses_into_python_and_back_to_typescript() {
     let (storefront, _) = xlang("xlang_up");
