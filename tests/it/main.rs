@@ -30,13 +30,14 @@ mod trace;
 mod urls;
 mod workspace;
 
-/// A file of this directory left out of the list above would never compile or run.
+/// A file or directory here left out of the list above would never compile or run.
 #[test]
 fn every_file_here_is_a_module() {
     let main = std::fs::read_to_string("tests/it/main.rs").unwrap();
     for entry in std::fs::read_dir("tests/it").unwrap() {
         let name = entry.unwrap().file_name().into_string().unwrap();
-        if let Some(module) = name.strip_suffix(".rs").filter(|m| *m != "main") {
+        let module = name.strip_suffix(".rs").unwrap_or(&name);
+        if module != "main" {
             assert!(main.contains(&format!("\nmod {module};\n")), "{name}");
         }
     }

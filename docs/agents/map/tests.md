@@ -4,9 +4,9 @@ Detail behind the [architecture map](../architecture.md), which keeps the flow, 
 seams, invariants and Known ceilings. The code wins over this file, and a change to these
 modules updates it.
 
-- Test modules of `tests/it/` by subject: `docs` (the repository map against the code: `ponytail:` limits in
-  Known ceilings, entry point kinds and process marks in their lists), `conformance` (pack), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+- Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
+  `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
+  `conformance` (pack), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an

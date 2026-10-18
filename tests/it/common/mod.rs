@@ -232,6 +232,11 @@ pub fn assert_golden(name: &str, actual: &str) {
 /// the `*.processes.json` goldens keep them.
 pub fn without_processes(export: &str) -> String {
     let Some(start) = export.find(",\n  \"processes\": [") else {
+        // A change to the export's layout must not let the processes back into the goldens.
+        assert!(
+            !export.contains("\"processes\""),
+            "processes left in:\n{export}"
+        );
         return export.to_string();
     };
     // The array ends at the first line that is `  ]`: the arrays inside it are indented deeper.
