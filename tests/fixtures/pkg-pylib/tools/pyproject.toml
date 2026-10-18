@@ -1,0 +1,4 @@
+[tool.poetry]
+name = "shared.tools"
+version = "0.3.0"
+description = "Helpers whose top-level module is not named after the distribution."

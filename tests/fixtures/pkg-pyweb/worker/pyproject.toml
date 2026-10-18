@@ -1,0 +1,6 @@
+[tool.poetry.dependencies]
+python = "^3.11"
+shared-tools = "^0.3"
+
+[tool.poetry.group.dev.dependencies]
+shared-lib = "^1.0"

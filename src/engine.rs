@@ -489,6 +489,11 @@ impl Engine {
                     None => p.name.clone(),
                 };
                 let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
+                // An npm package is named alone, as before PyPI's: any other says its ecosystem.
+                let name = match p.ecosystem.is_npm() {
+                    true => name,
+                    false => format!("{name} ({})", p.ecosystem.name()),
+                };
                 let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
                 hits.push((r, format!("{} {}", p.repository, p.directory), line));
             }

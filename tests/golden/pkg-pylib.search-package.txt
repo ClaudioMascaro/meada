@@ -1,0 +1,3 @@
+example.com/pkg/pylib . shared-lib@1.2.0 (pypi) (consumers: 2)
+example.com/pkg/pylib js shared-lib@9.0.0 (consumers: 0)
+example.com/pkg/pylib tools shared-tools@0.3.0 (pypi) (consumers: 2)

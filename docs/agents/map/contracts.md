@@ -261,3 +261,33 @@ modules updates it.
   different shapes is unresolved. A consumer left with no field has no shape.
   `Resolver::exported` names constants and types as targets too, which no call reaches since
   they are no symbols.
+  Ecosystems (spec #24): everything above is npm's, behind `Ecosystem` (`Npm`, `Pypi`), which
+  names a manifest by its file name (`of`), gives the contract prefix (`package::npm::`,
+  `package::pypi::`), reads the bytes (`read`), checks a range (`flag`) and holds the
+  `workspace:` rule (`reaches`, npm only); `Providers` is keyed by ecosystem and name, so an
+  npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
+  nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
+  of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
+  `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
+  `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
+  source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
+  dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, and the declared
+  `roots`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
+  skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
+  written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
+  `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
+  reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
+  the next. A call from a `.py` file (`Ecosystem::of_source`) resolves through
+  `pypi_resolutions`: the import names a module, so each distribution a PyPI manifest of a
+  directory holding the file depends on (`holding`: every `pyproject.toml` and
+  `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots
+  (`python_roots`: the manifest's directory, then its declared roots or `src`;
+  `Provided::module` finds `a/b/__init__.py` or `a/b.py`), `exact` with `How::ModuleName`
+  (reason `; import module name`) when that module is the normalized name with `-` turned into
+  `_`, `inferred` with `How::TopLevel` (`; import top-level module`) otherwise, and `ambiguous`
+  for each when several distributions expose it (one consumer per distribution at the call
+  site). The chain is followed from the module the specifier names (`import shared_lib` then
+  `shared_lib.api.greet()`: `shared_lib`, then `api.greet`; `from shared_lib.api import greet`:
+  `shared_lib.api`, then `greet`), and `Provided::member` takes a package's submodule when its
+  `__init__.py` exports no such name. `surface` reads npm manifests alone: no shape crosses a
+  PyPI package.

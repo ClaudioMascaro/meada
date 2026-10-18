@@ -1,0 +1,4 @@
+example.com/pkg/pyweb app/main.py:10 greet
+  →[exact: package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked; import module name] example.com/pkg/pylib src/shared_lib/core.py:4 greet
+    example.com/pkg/pylib src/shared_lib/text.py:1 shout
+chain: exact · 1 hops · 2 repos · 75 tokens

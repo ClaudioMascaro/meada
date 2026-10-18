@@ -1,0 +1,5 @@
+{
+  "name": "pyweb-ui",
+  "private": true,
+  "dependencies": { "shared-tools": "^0.3.0" }
+}

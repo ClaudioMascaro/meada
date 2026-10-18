@@ -1,0 +1,11 @@
+[project]
+name = "Example_Sample"
+version = "1.0.0"
+dependencies = ["shared-lib[fast]>=1.0,<2; python_version >= '3.9'", "requests"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+shared-tools = { version = "^0.3", extras = ["cli"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]

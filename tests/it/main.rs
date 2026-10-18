@@ -23,6 +23,7 @@ mod items;
 mod mcp;
 mod packages;
 mod processes;
+mod pypi;
 mod query;
 mod resources;
 mod stale;
