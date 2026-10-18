@@ -73,11 +73,12 @@ All notable changes to Meada are recorded here. The format follows
   (`crate::`, `super::`, `self::`, `Type::new()`, `Self::helper()`) resolve `exact` through the
   module tree, an `impl` in another file than its type included; a path that does not resolve
   matches functions and methods by name, and one that fits several `impl` blocks is
-  `ambiguous`. The `fn main` of each binary target (`src/main.rs`, `src/bin/`, `[[bin]] path`)
-  is a program entry point with its process; a `main` elsewhere is not. Calls inside macro
-  invocations are not indexed. No Rust toolchain is run. A
-  config file of any pack (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`) larger than 1 MiB
-  is not read.
+  `ambiguous`. A name match only reaches the caller's crate and the repository's libraries it
+  depends on, through their own `[dependencies]` too: never a crate it does not depend on. The
+  `fn main` of each binary target (`src/main.rs`, `src/bin/`, `[[bin]] path`) is a program
+  entry point with its process; a `main` elsewhere is not. Calls inside macro invocations are
+  not indexed. No Rust toolchain is run. A config file of any pack (`tsconfig.json`,
+  `pyproject.toml`, `Cargo.toml`) larger than 1 MiB is not read.
 - Rust `use` declarations (spec #30): paths from `crate::`, `super::`, `self::`, a module in
   scope or a crate name, groups, renames, globs (`use super::*` takes the private items too,
   any other glob the public ones) and `pub use` re-exports at any depth, with cycles cut; a
@@ -96,11 +97,11 @@ All notable changes to Meada are recorded here. The format follows
   for Type` is found through the type; a `dyn Trait`, an `impl Trait` or a generic bounded by
   one trait stops at the trait's method (required methods of a trait are symbols now) and never
   searches the implementations. A receiver whose type is not written goes by name, `inferred`
-  with one candidate and `ambiguous` with every one; a type from outside the repository (`std`,
-  another crate) is opaque, and its methods are not matched by name. A type of the repository
-  whose `impl` blocks lack the method (a `derive`, a blanket or outside trait), written on the
-  receiver or as a path (`Store::default()`), resolves to nothing rather than by name. The index
-  is rebuilt once (schema version 25).
+  with one candidate and `ambiguous` with every one, among the crates a name match reaches; a
+  type from outside the repository (`std`, another crate) is opaque, and its methods are not
+  matched by name. A type of the repository whose `impl` blocks lack the method (a `derive`, a
+  blanket or outside trait), written on the receiver or as a path (`Store::default()`),
+  resolves to nothing rather than by name. The index is rebuilt once (schema version 25).
 - Rust actix-web and Rocket providers (spec #30): a function with a route attribute
   (`#[get("/x")]`, actix-web's `#[route("/x", method = "GET")]`) or one named by
   `.route(path, web::get().to(h))` provides `http::<METHOD>::<path>`, served under the prefixes of

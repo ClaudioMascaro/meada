@@ -29,6 +29,12 @@ pub struct Tree {
     /// The libraries of the repository each crate root may name, by the name it writes:
     /// the root file of each.
     libs: HashMap<String, HashMap<String, String>>,
+    /// The library roots each crate root's code may call into: those in `libs`, then the ones
+    /// their packages' `[dependencies]` list, all the way down (a dependency's function may hand
+    /// back a type of its own dependency, whose methods the caller then calls).
+    // ponytail: one set per crate root, quadratic in a workspace's crates; share the sets per
+    // package if a workspace of thousands of crates shows up in profiles.
+    reach: HashMap<String, BTreeSet<String>>,
     /// The roots of binary targets: every root but a library's.
     bins: BTreeSet<String>,
     /// The file each `mod` declaration names, by declaring file and specifier.
@@ -44,6 +50,7 @@ impl Tree {
         let mut tree = Tree {
             nodes: BTreeMap::new(),
             libs: HashMap::new(),
+            reach: HashMap::new(),
             bins: BTreeSet::new(),
             children: HashMap::new(),
             published: BTreeSet::new(),
@@ -51,7 +58,9 @@ impl Tree {
         // Every `Cargo.toml` is parsed once per tree.
         let tables = tables(configs);
         let packages = packages(&tables, files);
-        let dependencies = dependencies(&tables, &packages);
+        // A library's own dev and build dependencies are not part of what it reaches.
+        let normal = dependencies(&tables, &packages, &["dependencies"]);
+        let dependencies = dependencies(&tables, &packages, &KINDS);
         let mut queue = VecDeque::new();
         for (root, dir, bin) in roots(&tables, files) {
             if bin {
@@ -78,6 +87,19 @@ impl Tree {
             if tree.nodes.insert(root.clone(), node).is_none() {
                 queue.push_back(root);
             }
+        }
+        let uses: HashMap<&str, &HashMap<String, String>> = (packages.iter())
+            .filter_map(|p| Some((p.lib_root.as_deref()?, normal.get(&p.dir)?)))
+            .collect();
+        for (root, libs) in &tree.libs {
+            let mut reach = BTreeSet::new();
+            let mut next: Vec<&String> = libs.values().collect();
+            while let Some(lib) = next.pop() {
+                if reach.insert(lib.clone()) {
+                    next.extend(uses.get(lib.as_str()).into_iter().flat_map(|d| d.values()));
+                }
+            }
+            tree.reach.insert(root.clone(), reach);
         }
         while let Some(file) = queue.pop_front() {
             let (root, owns_dir) = (tree.nodes[&file].root.clone(), tree.nodes[&file].owns_dir);
@@ -174,6 +196,18 @@ impl Tree {
             }
         };
         found.into_iter().collect()
+    }
+
+    /// Whether code in `from` may call into `to`: one crate builds both, or `to` is in a
+    /// library `from`'s crate reaches (`reach`).
+    pub fn reaches(&self, from: &str, to: &str) -> bool {
+        let root = |file: &str| self.nodes.get(file).map(|n| &n.root);
+        match (root(from), root(to)) {
+            (Some(from), Some(to)) => {
+                from == to || self.reach.get(from).is_some_and(|r| r.contains(to))
+            }
+            _ => false,
+        }
     }
 }
 
@@ -311,15 +345,18 @@ pub fn lib_root(manifest: &toml::Table, dir: &str) -> Option<String> {
     join(dir, path.unwrap_or("src/lib.rs"))
 }
 
-/// The libraries of the repository each package may name, by package directory: those its
-/// `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` list (also under
-/// `[target.*]`), by key or through `package = "..."`, and `workspace = true` entries the
-/// nearest `[workspace.dependencies]` names. A dependency is named by the key when it is
-/// renamed, else by the name of its library. The first package in path order keeps a name
-/// two share.
+/// The tables a manifest lists its dependencies in.
+const KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+
+/// The libraries of the repository each package may name, by package directory: those the
+/// tables of `kinds` list (also under `[target.*]`), by key or through `package = "..."`, and
+/// `workspace = true` entries the nearest `[workspace.dependencies]` names. A dependency is
+/// named by the key when it is renamed, else by the name of its library. The first package in
+/// path order keeps a name two share.
 fn dependencies(
     tables: &[(&str, toml::Table)],
     packages: &[Package],
+    kinds: &[&str],
 ) -> HashMap<String, HashMap<String, String>> {
     let workspace = |dir: &str| {
         let holds = |w: &str| w.is_empty() || dir == w || dir.starts_with(&format!("{w}/"));
@@ -331,7 +368,8 @@ fn dependencies(
     };
     let mut out: HashMap<String, HashMap<String, String>> = HashMap::new();
     for (dir, manifest) in manifests(tables) {
-        for (_, key, spec) in entries(manifest) {
+        let listed = entries(manifest).into_iter();
+        for (_, key, spec) in listed.filter(|(kind, ..)| kinds.contains(kind)) {
             let inherits = spec.get("workspace").and_then(|w| w.as_bool()) == Some(true);
             let spec = match inherits {
                 true => workspace(dir).and_then(|w| w.get(key)).unwrap_or(spec),
@@ -365,7 +403,7 @@ fn dependencies(
 pub fn entries(manifest: &toml::Table) -> Vec<(&'static str, &str, &toml::Value)> {
     let mut found = Vec::new();
     let targets = manifest.get("target").and_then(|t| t.as_table());
-    for kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
+    for kind in KINDS {
         let plain = manifest.get(kind).and_then(|d| d.as_table());
         let nested = targets.into_iter().flat_map(|t| t.values());
         let lists = plain
@@ -573,6 +611,71 @@ mod tests {
         );
         // A crate that lists nothing reaches nothing.
         assert!(tree.lookup("loose/src/lib.rs", "ledger_core").is_empty());
+    }
+
+    #[test]
+    fn a_crate_reaches_its_dependencies_and_theirs_but_not_their_dev_dependencies() {
+        let facts = Facts::default();
+        let files = BTreeMap::from([
+            ("a/src/lib.rs", &facts),
+            ("a/src/main.rs", &facts),
+            ("b/src/lib.rs", &facts),
+            ("c/src/lib.rs", &facts),
+            ("d/src/lib.rs", &facts),
+            ("t/src/lib.rs", &facts),
+            ("u/src/lib.rs", &facts),
+        ]);
+        let configs: [(&str, &[u8]); 6] = [
+            (
+                "a/Cargo.toml",
+                b"[package]\nname = \"a\"\n[dependencies]\nb = { path = \"../b\" }\n\
+                  [dev-dependencies]\nt = { path = \"../t\" }\n",
+            ),
+            (
+                "b/Cargo.toml",
+                b"[package]\nname = \"b\"\n[dependencies]\nc = { path = \"../c\" }\n\
+                  [dev-dependencies]\nd = { path = \"../d\" }\n",
+            ),
+            ("c/Cargo.toml", b"[package]\nname = \"c\"\n"),
+            ("d/Cargo.toml", b"[package]\nname = \"d\"\n"),
+            ("t/Cargo.toml", b"[package]\nname = \"t\"\n"),
+            ("u/Cargo.toml", b"[package]\nname = \"u\"\n"),
+        ];
+        let tree = Tree::new(&configs, &files);
+        let reached = |from: &str| -> Vec<&str> {
+            let all = files.keys().copied();
+            all.filter(|to| tree.reaches(from, to)).collect()
+        };
+        // Its own dev dependency, its dependency's dependency, never that one's dev dependency
+        // or its own binary.
+        assert_eq!(
+            reached("a/src/lib.rs"),
+            [
+                "a/src/lib.rs",
+                "b/src/lib.rs",
+                "c/src/lib.rs",
+                "t/src/lib.rs"
+            ]
+        );
+        // A binary reaches its package's library and what that reaches.
+        assert_eq!(
+            reached("a/src/main.rs"),
+            [
+                "a/src/lib.rs",
+                "a/src/main.rs",
+                "b/src/lib.rs",
+                "c/src/lib.rs",
+                "t/src/lib.rs"
+            ]
+        );
+        assert_eq!(
+            reached("b/src/lib.rs"),
+            ["b/src/lib.rs", "c/src/lib.rs", "d/src/lib.rs"]
+        );
+        assert_eq!(reached("u/src/lib.rs"), ["u/src/lib.rs"]);
+        // A file no crate builds reaches nothing and is reached by none.
+        assert!(!tree.reaches("x/src/lib.rs", "x/src/lib.rs"));
+        assert!(!tree.reaches("a/src/lib.rs", "x/src/lib.rs"));
     }
 
     #[test]

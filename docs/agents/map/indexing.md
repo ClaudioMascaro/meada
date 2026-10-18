@@ -91,7 +91,8 @@ modules updates it.
   parsed files by pack, asks each pack once for its `layout(configs, parsed files)`, keeps the
   files `Layout::members` names (default: all; a left-out file keeps its `files` row and facts
   with an empty `resolved`, its symbol and call rows are deleted, and the export and `status`
-  skip it), and builds each `Resolver` from `Layout::modules` and `Layout::published`. `parse` sees one file at a time; no pack
+  skip it), and builds each `Resolver` from `Layout::modules`, `Layout::published` and
+  `Layout::reaches`. `parse` sees one file at a time; no pack
   method touches the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
@@ -316,9 +317,12 @@ modules updates it.
   root of its library, `[lib] name` else the package name, hyphens as underscores; a binary is
   no library), reached only from the crates whose manifests list it as a dependency
   (`Tree::libs`, per crate root; `dependencies()` reads the three tables, a `package =` rename and
-  `workspace = true`). `Tree::published` (`Layout::published`) walks from each library
-  root through `pub mod` declarations (`Export::From` whose source is the specifier, not in
-  `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
+  `workspace = true`). `Tree::reaches` (`Layout::reaches`) answers whether a name match from
+  one file may land in another: one crate builds both, or the second is in a library of
+  `Tree::reach` for the first's crate root (its `libs`, then each one's `[dependencies]`, all
+  the way down: a dev or build dependency of a dependency is not part of it).
+  `Tree::published` (`Layout::published`) walks from each library root through `pub mod`
+  declarations (`Export::From` whose source is the specifier, not in `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
   root exports nothing (no other crate can import it), so no `export` entry point either.
   `lang/rust/values.rs` (`Reader`) reads values for contract kinds (axum, spec #30 #129): each
   call's `Call::args` and `Call::receiver` (the value a builder call is made on,
@@ -367,7 +371,9 @@ modules updates it.
   the file's imports). `call` reads a `Call::by_path` head with `lexical_as(types)`: no local,
   parameter or receiver hides it. Name inference keys a function or class of modules written
   in place by its last name, like a top-level one, and a call with `Call::by_path` matches
-  functions as well as methods by that name.
+  functions as well as methods by that name; `infer` keeps the candidates the calling file
+  reaches (`Resolver::reaching`, from `Layout::reaches`), so a Rust call never matches a crate
+  it does not depend on.
   `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
@@ -379,8 +385,8 @@ modules updates it.
   on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
   `Code::expand(path, index, read)` hands
   `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
-  with them; a call found only by a name match (`Caller::by_name`: `data.get(...)` matched to
-  a wrapper method, or a bare name no import binds) is not climbed, since it may be on any
+  with them; a call found only by a name match (`data.get(...)` matched to a wrapper method,
+  or a bare name no import binds; `Resolver::callers` keeps `exact` calls alone) is not climbed, since it may be on any
   object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
   `value_origins` for a value as written) is the shared value flow: the call sites whose result
   a name may hold, followed through constants, imports and module attributes, the arguments

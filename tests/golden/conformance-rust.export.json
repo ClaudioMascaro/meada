@@ -135,7 +135,7 @@
     },
     {
       "path": "crates/billing/src/billing.rs",
-      "hash": "62c73acb8433703b82176bb4f069b881dd19902c91b0807f5ff53b1c307c7409"
+      "hash": "4e8d159aea8c878f396fb37670b6bb2d0310654a252583d665ef62f70bf7c8e2"
     },
     {
       "path": "crates/billing/src/invoice.rs",
@@ -159,7 +159,7 @@
     },
     {
       "path": "crates/ledger-core/src/lib.rs",
-      "hash": "7cfc390aab4091fa1a6ac6175f7023c68d36598ecc4be6fba96e08c785351d0b"
+      "hash": "40471ab53b1fac697ec60e4a6a3cfc5294a1e556de177633ae3a9b2a548b7087"
     },
     {
       "path": "crates/ledger-core/src/meter.rs",
@@ -2052,6 +2052,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/billing/src/billing.rs::copies",
+      "span": {
+        "path": "crates/billing/src/billing.rs",
+        "start": 401,
+        "end": 501
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/billing/src/billing.rs::invoice",
       "span": {
         "path": "crates/billing/src/billing.rs",
@@ -2177,6 +2185,30 @@
         "path": "crates/greeter/src/names.rs",
         "start": 18,
         "end": 84
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::Ledger",
+      "span": {
+        "path": "crates/ledger-core/src/lib.rs",
+        "start": 364,
+        "end": 382
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::Ledger.Clone.clone",
+      "span": {
+        "path": "crates/ledger-core/src/lib.rs",
+        "start": 412,
+        "end": 458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts",
+      "span": {
+        "path": "crates/ledger-core/src/lib.rs",
+        "start": 551,
+        "end": 633
       }
     },
     {
@@ -6629,6 +6661,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/billing/src/billing.rs::copies::l.clone#0",
+      "caller": "example.com/acme/conformance::crates/billing/src/billing.rs::copies",
+      "target": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::Ledger.Clone.clone",
+      "level": "inferred",
+      "span": {
+        "path": "crates/billing/src/billing.rs",
+        "start": 483,
+        "end": 492
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/billing/src/billing.rs::settle::entries.add#0",
       "caller": "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
       "target": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add",
@@ -6772,14 +6815,21 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts::i.amount#0",
+      "caller": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/ledger-core/src/lib.rs",
+        "start": 614,
+        "end": 624
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/rocket/src/hiding.rs::serve::(call_expression).mount#0",
       "caller": "example.com/acme/conformance::crates/rocket/src/hiding.rs::serve",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "target": "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
+      "level": "inferred",
       "span": {
         "path": "crates/rocket/src/hiding.rs",
         "start": 438,
@@ -8795,12 +8845,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::built::client.get#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::built",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "target": "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get",
+      "level": "inferred",
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 749,
@@ -9188,12 +9234,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::client.get#0",
       "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "target": "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get",
+      "level": "inferred",
       "span": {
         "path": "crates/worker/src/derived.rs",
         "start": 1640,
@@ -9203,12 +9245,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::factory.make#0",
       "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::api/src/methods.rs::Build.make",
-        "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make"
-      ],
+      "target": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make",
+      "level": "inferred",
       "span": {
         "path": "crates/worker/src/derived.rs",
         "start": 1620,
@@ -9229,12 +9267,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).get#0",
       "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "target": "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get",
+      "level": "inferred",
       "span": {
         "path": "crates/worker/src/derived.rs",
         "start": 502,
@@ -10825,12 +10859,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/modules.rs::lookalikes::cache.get#0",
       "caller": "example.com/acme/conformance::crates/worker/src/modules.rs::lookalikes",
-      "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "target": "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get",
+      "level": "inferred",
       "span": {
         "path": "crates/worker/src/modules.rs",
         "start": 727,
@@ -14778,22 +14808,13 @@
     {
       "name": "api/src#10",
       "members": [
-        "example.com/acme/conformance::api/src/methods.rs::modular",
-        "example.com/acme/conformance::api/src/methods.rs::opened",
-        "example.com/acme/conformance::api/src/methods.rs::reopened",
-        "example.com/acme/conformance::api/src/store.rs::Store.save"
-      ]
-    },
-    {
-      "name": "api/src#11",
-      "members": [
         "example.com/acme/conformance::api/src/methods.rs::outside",
         "example.com/acme/conformance::api/src/methods.rs::pick",
         "example.com/acme/conformance::api/src/methods.rs::shadowed"
       ]
     },
     {
-      "name": "api/src#12",
+      "name": "api/src#11",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::wrap",
         "example.com/acme/conformance::api/src/methods.rs::wrapped"
@@ -14859,8 +14880,12 @@
         "example.com/acme/conformance::api/src/main.rs::outside",
         "example.com/acme/conformance::api/src/main.rs::scoped.go",
         "example.com/acme/conformance::api/src/main.rs::within",
+        "example.com/acme/conformance::api/src/methods.rs::modular",
+        "example.com/acme/conformance::api/src/methods.rs::opened",
+        "example.com/acme/conformance::api/src/methods.rs::reopened",
         "example.com/acme/conformance::api/src/routes/health.rs::check",
-        "example.com/acme/conformance::api/src/routes/mod.rs::serve"
+        "example.com/acme/conformance::api/src/routes/mod.rs::serve",
+        "example.com/acme/conformance::api/src/store.rs::Store.save"
       ]
     },
     {
@@ -14965,7 +14990,21 @@
       ]
     },
     {
+      "name": "crates/billing/src",
+      "members": [
+        "example.com/acme/conformance::crates/billing/src/billing.rs::copies",
+        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::Ledger.Clone.clone"
+      ]
+    },
+    {
       "name": "crates/rocket/src",
+      "members": [
+        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
+        "example.com/acme/conformance::crates/rocket/src/hiding.rs::serve"
+      ]
+    },
+    {
+      "name": "crates/rocket/src#2",
       "members": [
         "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
         "example.com/acme/conformance::crates/rocket/src/posts.rs::legacy",
@@ -15038,8 +15077,13 @@
     {
       "name": "crates/worker/src",
       "members": [
+        "example.com/acme/conformance::crates/worker/src/clients.rs::built",
+        "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make",
         "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named",
-        "example.com/acme/conformance::crates/worker/src/derived.rs::by_name"
+        "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+        "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get",
+        "example.com/acme/conformance::crates/worker/src/modules.rs::lookalikes"
       ]
     },
     {
@@ -16085,6 +16129,27 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::crates/billing/src/billing.rs::copies",
+      "kind": "export",
+      "label": "copies",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/billing/src/billing.rs::copies"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::Ledger.Clone.clone"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
       "kind": "export",
       "label": "settle",
@@ -16165,6 +16230,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/greeter/src/names.rs::named"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts",
+      "kind": "export",
+      "label": "amounts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::amounts"
         }
       ]
     },
@@ -16711,6 +16790,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/web/src/items.rs::update"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+      "kind": "export",
+      "label": "Holder.mount",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::late.router"
         }
       ]
     },
