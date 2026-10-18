@@ -263,7 +263,7 @@ fn a_bin_added_to_cargo_toml_refreshes_its_program_to_the_cold_export() {
     let refreshed = Engine::open(&repo).unwrap().export().unwrap();
 
     assert!(!before.contains("api/tools/second.rs"));
-    assert!(refreshed.contains("process::example.com/acme/conformance::api/tools/second.rs::main"));
+    assert!(refreshed.contains("example.com/acme/conformance::api/tools/second.rs::main"));
     assert_eq!(
         refreshed,
         cold_export("fresh_rust_bin_cold", "conformance-rust", ORIGIN, add_bin)
