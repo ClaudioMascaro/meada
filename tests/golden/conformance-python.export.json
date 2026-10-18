@@ -126,6 +126,14 @@
       "hash": "5c9887d7189b98db02c1d831ca18fd50f13c5308eef6792e3ff610af5358c017"
     },
     {
+      "path": "jobs/internal.py",
+      "hash": "dc406a30313403f0bbc12a95929ba08671c6af0338fb1d1203f3afdf129a71e9"
+    },
+    {
+      "path": "jobs/listed.py",
+      "hash": "f32943e4a6e3f20695584bc40722e037fa2341e6bef949ea11d475b78d596d3d"
+    },
+    {
       "path": "jobs/no_guard.py",
       "hash": "6b55e23dbe5ecc363c5fd02da752b2a7de21b26ff9cf858c150b31fc154b018d"
     },
@@ -1909,6 +1917,38 @@
         "path": "helpers.py",
         "start": 0,
         "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/internal.py::_helper",
+      "span": {
+        "path": "jobs/internal.py",
+        "start": 105,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/internal.py::public",
+      "span": {
+        "path": "jobs/internal.py",
+        "start": 76,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/listed.py::left_out",
+      "span": {
+        "path": "jobs/listed.py",
+        "start": 145,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/listed.py::listed",
+      "span": {
+        "path": "jobs/listed.py",
+        "start": 116,
+        "end": 142
       }
     },
     {
@@ -13300,6 +13340,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::geometry/shapes.py::Shape.unit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/internal.py::public",
+      "kind": "export",
+      "label": "public",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/internal.py::public"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/listed.py::listed",
+      "kind": "export",
+      "label": "listed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/listed.py::listed"
         }
       ]
     },
