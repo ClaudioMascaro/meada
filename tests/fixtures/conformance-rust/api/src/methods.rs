@@ -253,8 +253,8 @@ pub fn cleared(c: &Counter) {
 }
 
 // A written type whose blocks do not hold the member (a derive, a blanket or outside trait)
-// resolves to nothing: `Config`'s `default` and `hash` are another type's.
-#[derive(Default, Hash)]
+// resolves to nothing: `Config`'s `default` and `clone` are another type's.
+#[derive(Default, Clone)]
 pub struct Plain;
 
 pub struct Config;
@@ -265,11 +265,13 @@ impl Default for Config {
     }
 }
 
-impl std::hash::Hash for Config {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config
+    }
 }
 
-pub fn derived<H: std::hash::Hasher>(q: &Plain, state: &mut H) {
+pub fn derived(q: &Plain) {
     Plain::default();
-    q.hash(state);
+    q.clone();
 }

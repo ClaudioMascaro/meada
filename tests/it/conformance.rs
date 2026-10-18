@@ -1579,7 +1579,7 @@ fn rust() {
             "api/src/methods.rs::sliced",
             "api/src/methods.rs::cleared",
             "api/src/methods.rs::Config",
-            "api/src/methods.rs::Config.Hash.hash",
+            "api/src/methods.rs::Config.Clone.clone",
             "api/src/methods.rs::Config.Default.default",
             "api/src/methods.rs::Plain",
             "api/src/methods.rs::derived",
@@ -2439,7 +2439,25 @@ fn rust() {
             ),
             // A written type whose blocks lack the member: nothing, never another type's.
             ("api/src/methods.rs::derived::Plain.default#0", None, &[]),
-            ("api/src/methods.rs::derived::q.hash#0", None, &[]),
+            ("api/src/methods.rs::derived::q.clone#0", None, &[]),
+            // `self` of a block of a type from outside the repository is opaque.
+            (
+                "crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
+                None,
+                &[],
+            ),
+            // A chain that starts at a call of an outside crate is that crate's, whatever
+            // function of the file shares the crate's name.
+            (
+                "crates/greeter/src/main.rs::rocket::(call_expression).mount#0",
+                None,
+                &[],
+            ),
+            (
+                "crates/flat/lib.rs::serve::(call_expression).mount#0",
+                None,
+                &[],
+            ),
             // An attribute is no call of a function: neither by name nor through a path.
             ("crates/greeter/src/main.rs::get#0", None, &[]),
             ("crates/greeter/src/names.rs::get#0", None, &[]),

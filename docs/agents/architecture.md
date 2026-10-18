@@ -647,8 +647,13 @@ one for the area a change touches.
   bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
 - `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
   (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
-  be external; a root that is a repository type, a parameter, or a local with no written class
-  (a client a repository function returns) is name-matched as before.
+  be external, and so does one on a chain that starts at a call (`rocket::build().mount(..)`,
+  `Client::new().get(u)`, no `Call::root`) when that first call, the innermost one starting
+  where the chain does, is external (`Resolver::rooted_outside`, Rust only); a root that is a
+  repository type, a parameter, or a local with no written class (a client a repository
+  function returns) is name-matched as before. `self` and `Self` in an `impl` of a type from
+  outside the repository (`impl ApiExt for reqwest::Client`) are opaque too
+  (`Resolver::outside`): `self.clone()` there resolves to nothing.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.

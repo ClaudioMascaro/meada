@@ -35,7 +35,7 @@
     },
     {
       "path": "api/src/methods.rs",
-      "hash": "2aabc627baff4b37a1b850e3a9b23cc5d96870d295060a395db933623b97a684"
+      "hash": "4afa2463c19054f791d4a1ccca107aaeeceb0acd318f1ba2859e07bfa4cfa527"
     },
     {
       "path": "api/src/mock.rs",
@@ -855,24 +855,24 @@
       "id": "example.com/acme/conformance::api/src/methods.rs::Config",
       "span": {
         "path": "api/src/methods.rs",
-        "start": 4918,
-        "end": 4936
+        "start": 4920,
+        "end": 4938
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Config.Clone.clone",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 5045,
+        "end": 5091
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/methods.rs::Config.Default.default",
       "span": {
         "path": "api/src/methods.rs",
-        "start": 4968,
-        "end": 5011
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::api/src/methods.rs::Config.Hash.hash",
-      "span": {
-        "path": "api/src/methods.rs",
-        "start": 5053,
-        "end": 5108
+        "start": 4970,
+        "end": 5013
       }
     },
     {
@@ -1023,8 +1023,8 @@
       "id": "example.com/acme/conformance::api/src/methods.rs::Plain",
       "span": {
         "path": "api/src/methods.rs",
-        "start": 4899,
-        "end": 4916
+        "start": 4901,
+        "end": 4918
       }
     },
     {
@@ -1103,8 +1103,8 @@
       "id": "example.com/acme/conformance::api/src/methods.rs::derived",
       "span": {
         "path": "api/src/methods.rs",
-        "start": 5112,
-        "end": 5219
+        "start": 5095,
+        "end": 5161
       }
     },
     {
@@ -4846,19 +4846,19 @@
       "level": null,
       "span": {
         "path": "api/src/methods.rs",
-        "start": 5181,
-        "end": 5197
+        "start": 5127,
+        "end": 5143
       }
     },
     {
-      "id": "example.com/acme/conformance::api/src/methods.rs::derived::q.hash#0",
+      "id": "example.com/acme/conformance::api/src/methods.rs::derived::q.clone#0",
       "caller": "example.com/acme/conformance::api/src/methods.rs::derived",
       "target": null,
       "level": null,
       "span": {
         "path": "api/src/methods.rs",
-        "start": 5203,
-        "end": 5216
+        "start": 5149,
+        "end": 5158
       }
     },
     {
@@ -6082,11 +6082,7 @@
       "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(try_expression).run#0",
       "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::api/src/methods.rs::Build.run",
-        "example.com/acme/conformance::api/src/methods.rs::Counter.Build.run"
-      ],
+      "level": null,
       "span": {
         "path": "crates/actix/src/lib.rs",
         "start": 316,
@@ -6702,11 +6698,7 @@
       "id": "example.com/acme/conformance::crates/flat/lib.rs::serve::(call_expression).mount#0",
       "caller": "example.com/acme/conformance::crates/flat/lib.rs::serve",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/flat/lib.rs",
         "start": 231,
@@ -6750,11 +6742,7 @@
       "id": "example.com/acme/conformance::crates/greeter/src/main.rs::rocket::(call_expression).mount#0",
       "caller": "example.com/acme/conformance::crates/greeter/src/main.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/greeter/src/main.rs",
         "start": 286,
@@ -6857,11 +6845,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#0",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -6872,11 +6856,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#1",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -6887,11 +6867,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#2",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -6902,11 +6878,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#3",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -6917,11 +6889,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#4",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -6932,11 +6900,7 @@
       "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#5",
       "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-      ],
+      "level": null,
       "span": {
         "path": "crates/rocket/src/lib.rs",
         "start": 251,
@@ -8685,11 +8649,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking::(call_expression).send#2",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1765,
@@ -8851,11 +8811,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::inline::(call_expression).get#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::inline",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1341,
@@ -8877,11 +8833,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::inline::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::inline",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1341,
@@ -8892,11 +8844,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::inline::(call_expression).send#1",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::inline",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1412,
@@ -15955,18 +15903,6 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(try_expression).run#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::api/src/methods.rs::Build.run",
-            "example.com/acme/conformance::api/src/methods.rs::Counter.Build.run"
-          ]
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::api"
@@ -16187,18 +16123,6 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/flat/lib.rs::serve"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/acme/conformance::crates/flat/lib.rs::serve::(call_expression).mount#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::crates/rocket/src/hiding.rs::rocket.Builder.mount",
-            "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-          ]
         }
       ]
     },
