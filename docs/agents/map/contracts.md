@@ -124,7 +124,12 @@ modules updates it.
   and so is a format spec such as `{:?}` or `{x:>8}`; a `format!` the file defines itself is
   unknown), and `lang/rust/builders.rs` a `let mut` String whose block only reads it and
   appends with `push_str`, `push` and `+=` statements: a read holds the text of the pushes
-  before it. A `Part::Env` is left to #132.
+  before it. An environment read is a `Part::Env` (`Reader::env_read`): `std::env::var("X")`,
+  `dotenvy::var("X")` (spelled in full or through the one `use` of their head, `Reader::spelled`)
+  and `env!("X")` (also as a `concat!`/`format!` argument), through `ENV_METHODS` (`unwrap*`,
+  `expect`, `?`, `trim*`, `to_string`...). An argument that mentions `env`, `var` or `dotenvy`
+  (a second read in a fallback) makes it a `Part::Hole`; `option_env!` and an `env` the file
+  defines are no read. A leading `Part::Env` is `via = env:X` in `http::locate`.
   `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like

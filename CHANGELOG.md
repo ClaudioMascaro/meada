@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Rust base URLs read from the environment (spec #30): `std::env::var("X")`, `env::var("X")`
+  after `use std::env` (or `use std::env::var`), `dotenvy::var("X")` and `env!("X")`, also inside
+  `concat!`, through `unwrap`, `unwrap_or`, `unwrap_or_else`, `unwrap_or_default`, `expect`, `?`
+  and string methods such as `trim_end_matches`. A leading URL term that comes from exactly one
+  such read is the base URL variable `X`, linked through `base_url_env` like the TypeScript and
+  Python ones; Meada never reads the value. `option_env!` is not read, an `env` the file defines
+  or one with no `use std::env` is no read, and a second read in a fallback leaves a hole. A
+  cross-language fixture (a TypeScript `fetch` reaches an axum handler, a reqwest call reaches a
+  Next.js route, through a variable and through a declared host) covers `trace` down, up and
+  from uncommitted changes. The index is rebuilt once (schema version 33).
 - Cargo packages (spec #30): each `Cargo.toml` with a `[package] name` provides
   `package::cargo::<name>` (every workspace member is its own provider), and each entry of
   `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` (also under `[target.*]`,

@@ -2743,6 +2743,40 @@ fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
     assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
 }
 
+/// A read under hundreds of string methods is read only as far as `VALUE_DEPTH`, and a read with
+/// hundreds of fallbacks nested in it is a hole: the base is no variable, and indexing carries on.
+#[test]
+fn an_environment_read_under_a_deep_chain_is_a_hole() {
+    let repo = fixture_repo("rust_env_long", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/worker/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod long_env;\n{lib}")).unwrap();
+    let trims = ".trim()".repeat(200);
+    let nested = format!(
+        "{}\"/x\"{}",
+        "std::env::var(\"A\").unwrap_or(".repeat(200),
+        ")".repeat(200)
+    );
+    let long = format!(
+        "pub async fn chain() {{\n    let a = std::env::var(\"LONG_URL\").unwrap(){trims}.to_string();\n    \
+         let _ = reqwest::get(a + \"/long\").await;\n    \
+         let b = {nested};\n    let _ = reqwest::get(b + \"/nested\").await;\n}}\n"
+    );
+    std::fs::write(src.join("long_env.rs"), long).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let found = consumers(&json, "crates/worker/src/long_env.rs");
+    let reads: Vec<_> = found
+        .iter()
+        .map(|(c, v, _)| (c.as_str(), v.as_str()))
+        .collect();
+    assert_eq!(
+        reads,
+        [("http::GET::/long", ""), ("http::GET::/nested", "")]
+    );
+}
+
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
 /// `pub use`; `pub(crate)` and narrower items stay inside it (the `exports` table, read as the
 /// next ticket's cross-repository imports do).
