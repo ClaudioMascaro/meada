@@ -654,6 +654,7 @@ fn python() {
             "messages/sqs_boto.py::receive_unknown",
             "messages/sqs_boto.py::send_batch",
             "messages/sqs_boto.py::send_chained",
+            "messages/sqs_boto.py::send_joined",
             "messages/sqs_boto.py::send_job",
             "messages/sqs_boto.py::send_session",
             "methods.py::Base",
@@ -1716,6 +1717,7 @@ fn rust() {
             "crates/worker/src/queues.rs::send_all",
             "crates/worker/src/queues.rs::enqueue",
             "crates/worker/src/queues.rs::enqueue_audit",
+            "crates/worker/src/queues.rs::send_prefixed",
             "crates/worker/src/queues.rs::send_unknown",
             "crates/worker/src/queues.rs::receive_jobs",
             "crates/worker/src/queues.rs::receive_many",
@@ -4461,6 +4463,10 @@ fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
             ("channel::sqs::jobs", &sqs("send_job::sqs.send_message#0")),
             ("channel::sqs::mail", &sqs("send_job::sqs.send_message#1")),
             (
+                "channel::sqs::jobs-dlq",
+                &sqs("send_joined::sqs.send_message#0")
+            ),
+            (
                 "channel::sqs::audit",
                 &sqs("send_batch::sqs.send_message_batch#0")
             ),
@@ -4805,6 +4811,56 @@ fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
     assert_eq!((producers, consumers), (vec![], vec![]));
 }
 
+/// A builder chain is read to 64 calls (`CHAIN` in `lang/rust/messages.rs`): a record or an SQS
+/// request with more setters than that is no producer, and one with fewer is.
+#[test]
+fn rust_builder_chains_past_the_bound_are_not_read() {
+    let repo = fixture_repo("rust_chain_bound", "conformance-rust", Some(ORIGIN));
+    let setters = |call: &str, n: usize| call.repeat(n);
+    let src = format!(
+        r#"use aws_sdk_sqs::Client;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{{FutureProducer, FutureRecord}};
+use std::time::Duration;
+
+pub async fn bounded() {{
+    let client = Client::new(&aws_config::load_from_env().await);
+    let producer: FutureProducer = ClientConfig::new().create().expect("producer");
+    let wait = Duration::from_secs(0);
+    let _ = producer.send(FutureRecord::to("short.record"){}, wait).await;
+    let _ = producer.send(FutureRecord::to("long.record"){}, wait).await;
+    let _ = client.send_message(){}.queue_url("https://sqs.eu-west-1.amazonaws.com/1/short").send().await;
+    let _ = client.send_message(){}.queue_url("https://sqs.eu-west-1.amazonaws.com/1/long").send().await;
+}}
+"#,
+        setters(".payload(\"p\")", 10),
+        setters(".payload(\"p\")", 100),
+        setters(".message_body(\"b\")", 10),
+        setters(".message_body(\"b\")", 100),
+    );
+    let worker = repo.join("crates/worker/src");
+    std::fs::write(worker.join("bounded.rs"), src).unwrap();
+    let lib = std::fs::read_to_string(worker.join("lib.rs")).unwrap();
+    std::fs::write(worker.join("lib.rs"), format!("{lib}\nmod bounded;\n")).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let mut names: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+        .filter(|p| {
+            p["site"]
+                .as_str()
+                .unwrap()
+                .contains("worker/src/bounded.rs")
+        })
+        .map(|p| p["contract"].as_str().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["channel::kafka::short.record", "channel::sqs::short"]
+    );
+}
+
 /// The lapin forms of the Rust pack (spec #30): `basic_publish`, `basic_consume` and
 /// `queue_bind` on a channel that traces back to `Connection::connect`, as sides and links. A
 /// publish to the default exchange is the queue its key names; one to `events` reaches the
@@ -4878,6 +4934,10 @@ fn rust_aws_sdk_sqs_clients_are_channel_producers_and_consumers() {
                 &sqs("send_all::(call_expression).queue_url#2")
             ),
             ("channel::sqs::audit", &sqs("enqueue_audit::enqueue#0")),
+            (
+                "channel::sqs::prefixed",
+                &sqs("send_prefixed::(call_expression).queue_url#0")
+            ),
             (
                 "channel::sqs",
                 &sqs("send_unknown::(call_expression).queue_url#0")

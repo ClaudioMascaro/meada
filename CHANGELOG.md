@@ -22,7 +22,9 @@ All notable changes to Meada are recorded here. The format follows
   client's flow only (a redis connection is held by one). The cross-language fixture gains a
   topic a TypeScript kafkajs producer sends and a Rust consumer reads, with a golden `trace`
   down. A queue URL built from two literals the evaluation folds (`.../{queue}` given a literal)
-  now names its last segment in every language. The index is rebuilt once (schema version 34).
+  now names its last segment in every language. A Rust method called on a call chain whose root is
+  an outside type (`client.get(u).send()` on a `reqwest::Client`) resolves to nothing, never to a
+  repository method of the same name. The index is rebuilt once (schema version 36).
 
 - Rust base URLs read from the environment (spec #30): `std::env::var("X")`, `env::var("X")`
   after `use std::env` (or `use std::env::var`), `dotenvy::var("X")` and `env!("X")`, also inside

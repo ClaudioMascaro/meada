@@ -552,6 +552,12 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
+    /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
+    /// them. An outside type owns the whole chain, so the resolver reads the call as one on
+    /// that name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
     /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
     /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
     /// index, like `args`.

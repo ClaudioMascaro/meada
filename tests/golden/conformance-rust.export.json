@@ -255,7 +255,7 @@
     },
     {
       "path": "crates/worker/src/queues.rs",
-      "hash": "03905a36d8e81d8e697c00a023aa6a53dde997f620c642703964f63be9de1d97"
+      "hash": "af183535fb8fa9863bee471ccb93fd1065ca3d318ab2c449ea642323bc335f4b"
     },
     {
       "path": "crates/worker/src/rabbit.rs",
@@ -3415,24 +3415,24 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2577,
-        "end": 2595
+        "start": 2962,
+        "end": 2980
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2680,
-        "end": 2748
+        "start": 3065,
+        "end": 3133
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.send_message",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2615,
-        "end": 2674
+        "start": 3000,
+        "end": 3059
       }
     },
     {
@@ -3455,32 +3455,32 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::not_sqs",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2752,
-        "end": 2844
+        "start": 3137,
+        "end": 3229
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::other_calls",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2287,
-        "end": 2575
+        "start": 2672,
+        "end": 2960
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::receive_jobs",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1749,
-        "end": 2048
+        "start": 2134,
+        "end": 2433
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::receive_many",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2050,
-        "end": 2238
+        "start": 2435,
+        "end": 2623
       }
     },
     {
@@ -3492,11 +3492,19 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1570,
+        "end": 1860
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_unknown",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1477,
-        "end": 1747
+        "start": 1862,
+        "end": 2132
       }
     },
     {
@@ -8421,11 +8429,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1596,
@@ -8436,11 +8440,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking::(call_expression).send#1",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::blocking",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1660,
@@ -8706,11 +8706,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::requested::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::requested",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 915,
@@ -8721,11 +8717,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::requested::(call_expression).send#1",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::requested",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1030,
@@ -8736,11 +8728,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::requested::(call_expression).send#2",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::requested",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 1190,
@@ -8806,11 +8794,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 189,
@@ -8821,11 +8805,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#1",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 256,
@@ -8836,11 +8816,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#2",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 325,
@@ -8851,11 +8827,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#3",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 392,
@@ -8866,11 +8838,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#4",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 463,
@@ -8881,11 +8849,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs::(call_expression).send#5",
       "caller": "example.com/acme/conformance::crates/worker/src/clients.rs::verbs",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/clients.rs",
         "start": 536,
@@ -9099,11 +9063,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).get#1",
       "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
-        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/derived.rs",
         "start": 694,
@@ -9114,11 +9074,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/derived.rs",
         "start": 424,
@@ -10655,11 +10611,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/modules.rs::items::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/modules.rs::items",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/modules.rs",
         "start": 413,
@@ -10948,8 +10900,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::enqueue::(call_expression).queue_url#0",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::enqueue",
-      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 1143,
@@ -10960,11 +10912,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::enqueue::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::enqueue",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 1143,
@@ -11022,8 +10970,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2775,
-        "end": 2841
+        "start": 3160,
+        "end": 3226
       }
     },
     {
@@ -11033,8 +10981,8 @@
       "level": "exact",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2775,
-        "end": 2796
+        "start": 3160,
+        "end": 3181
       }
     },
     {
@@ -11044,8 +10992,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2391,
-        "end": 2500
+        "start": 2776,
+        "end": 2885
       }
     },
     {
@@ -11055,8 +11003,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2391,
-        "end": 2529
+        "start": 2776,
+        "end": 2914
       }
     },
     {
@@ -11070,8 +11018,8 @@
       ],
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2391,
-        "end": 2545
+        "start": 2776,
+        "end": 2930
       }
     },
     {
@@ -11081,8 +11029,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2567,
-        "end": 2573
+        "start": 2952,
+        "end": 2958
       }
     },
     {
@@ -11092,8 +11040,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2391,
-        "end": 2423
+        "start": 2776,
+        "end": 2808
       }
     },
     {
@@ -11103,8 +11051,8 @@
       "level": "exact",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2367,
-        "end": 2379
+        "start": 2752,
+        "end": 2764
       }
     },
     {
@@ -11114,8 +11062,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1862,
-        "end": 1971
+        "start": 2247,
+        "end": 2356
       }
     },
     {
@@ -11129,8 +11077,8 @@
       ],
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1862,
-        "end": 2018
+        "start": 2247,
+        "end": 2403
       }
     },
     {
@@ -11140,8 +11088,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1862,
-        "end": 2002
+        "start": 2247,
+        "end": 2387
       }
     },
     {
@@ -11151,8 +11099,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2040,
-        "end": 2046
+        "start": 2425,
+        "end": 2431
       }
     },
     {
@@ -11162,8 +11110,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1862,
-        "end": 1895
+        "start": 2247,
+        "end": 2280
       }
     },
     {
@@ -11173,8 +11121,8 @@
       "level": "exact",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1830,
-        "end": 1842
+        "start": 2215,
+        "end": 2227
       }
     },
     {
@@ -11184,8 +11132,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2163,
-        "end": 2210
+        "start": 2548,
+        "end": 2595
       }
     },
     {
@@ -11199,8 +11147,8 @@
       ],
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2163,
-        "end": 2217
+        "start": 2548,
+        "end": 2602
       }
     },
     {
@@ -11210,8 +11158,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2230,
-        "end": 2236
+        "start": 2615,
+        "end": 2621
       }
     },
     {
@@ -11221,8 +11169,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2163,
-        "end": 2187
+        "start": 2548,
+        "end": 2572
       }
     },
     {
@@ -11232,8 +11180,8 @@
       "level": "exact",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 2131,
-        "end": 2143
+        "start": 2516,
+        "end": 2528
       }
     },
     {
@@ -11261,8 +11209,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).queue_url#0",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
-      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 453,
@@ -11272,8 +11220,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).queue_url#1",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
-      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 696,
@@ -11283,8 +11231,8 @@
     {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).queue_url#2",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
-      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 823,
@@ -11295,11 +11243,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 453,
@@ -11310,11 +11254,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).send#1",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 696,
@@ -11325,11 +11265,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).send#2",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
         "start": 823,
@@ -11403,14 +11339,84 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::(call_expression).message_body#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1676,
+        "end": 1814
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::(call_expression).queue_url#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.queue_url",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1676,
+        "end": 1787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::(call_expression).send#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
+        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
+      ],
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1676,
+        "end": 1830
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1852,
+        "end": 1858
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::client.send_message#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::Mailer.send_message",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1676,
+        "end": 1706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::sqs_client#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
+      "target": "example.com/acme/conformance::crates/worker/src/queues.rs::sqs_client",
+      "level": "exact",
+      "span": {
+        "path": "crates/worker/src/queues.rs",
+        "start": 1652,
+        "end": 1664
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/queues.rs::send_unknown::(call_expression).message_body#0",
       "caller": "example.com/acme/conformance::crates/worker/src/queues.rs::send_unknown",
       "target": null,
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1582,
-        "end": 1701
+        "start": 1967,
+        "end": 2086
       }
     },
     {
@@ -11420,8 +11426,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1582,
-        "end": 1674
+        "start": 1967,
+        "end": 2059
       }
     },
     {
@@ -11435,8 +11441,8 @@
       ],
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1582,
-        "end": 1717
+        "start": 1967,
+        "end": 2102
       }
     },
     {
@@ -11446,8 +11452,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1632,
-        "end": 1673
+        "start": 2017,
+        "end": 2058
       }
     },
     {
@@ -11457,8 +11463,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1739,
-        "end": 1745
+        "start": 2124,
+        "end": 2130
       }
     },
     {
@@ -11468,8 +11474,8 @@
       "level": "inferred",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1582,
-        "end": 1612
+        "start": 1967,
+        "end": 1997
       }
     },
     {
@@ -11479,8 +11485,8 @@
       "level": "exact",
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1558,
-        "end": 1570
+        "start": 1943,
+        "end": 1955
       }
     },
     {
@@ -11490,8 +11496,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/queues.rs",
-        "start": 1632,
-        "end": 1664
+        "start": 2017,
+        "end": 2049
       }
     },
     {
@@ -13291,11 +13297,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::Api.ping::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::Api.ping",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/wrappers.rs",
         "start": 1261,
@@ -13328,11 +13330,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::api_get::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::api_get",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/wrappers.rs",
         "start": 164,
@@ -13464,11 +13462,7 @@
       "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::send::(call_expression).send#0",
       "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::send",
       "target": null,
-      "level": "ambiguous",
-      "candidates": [
-        "example.com/acme/conformance::crates/worker/src/kafka.rs::Transport.send",
-        "example.com/acme/conformance::crates/worker/src/mq_shadowed.rs::Outbox.send"
-      ],
+      "level": null,
       "span": {
         "path": "crates/worker/src/wrappers.rs",
         "start": 812,
@@ -13671,6 +13665,10 @@
     {
       "contract": "channel::sqs::mail",
       "site": "example.com/acme/conformance::crates/worker/src/queues.rs::send_all::(call_expression).queue_url#2"
+    },
+    {
+      "contract": "channel::sqs::prefixed",
+      "site": "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed::(call_expression).queue_url#0"
     },
     {
       "contract": "http::ANY::/alias/renamed-any",
@@ -14904,7 +14902,7 @@
         "example.com/acme/conformance::crates/worker/src/queues.rs::other_calls",
         "example.com/acme/conformance::crates/worker/src/queues.rs::receive_jobs",
         "example.com/acme/conformance::crates/worker/src/queues.rs::receive_many",
-        "example.com/acme/conformance::crates/worker/src/queues.rs::send_all",
+        "example.com/acme/conformance::crates/worker/src/queues.rs::send_prefixed",
         "example.com/acme/conformance::crates/worker/src/queues.rs::send_unknown",
         "example.com/acme/conformance::crates/worker/src/queues.rs::sqs_client"
       ]

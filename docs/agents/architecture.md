@@ -627,9 +627,14 @@ one for the area a change touches.
   that holds `basic_consume` handles). A Kafka topic starting with `^` is unresolved; an
   `queue_bind` that cannot be fully evaluated is dropped; an SQS `queue_url` on a builder held
   in a `let` is not recognized. `Code::mutable` takes the value of a `let mut` bound once and
-  never assigned (`Facts::mutable`), and ignores shadowing in an inner scope.
+  never assigned (`Facts::mutable`, keyed by qualified name); a closure parameter, a `let` in a
+  closure given to a call, a nested function's parameter or an assignment in such a closure hides it.
   `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`) is
   walked to that many calls; a longer one is not a producer.
+- `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
+  (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
+  be external; a root that is a repository type, a parameter, or a local with no written class
+  (a client a repository function returns) is name-matched as before.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.

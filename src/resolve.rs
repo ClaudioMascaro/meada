@@ -444,6 +444,7 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
+            Binding::Unknown if self.owned_outside(path, call) => Resolution::Unresolved,
             Binding::Instance(_)
             | Binding::Module(_)
             | Binding::Const(..)
@@ -452,6 +453,20 @@ impl<'a> Resolver<'a> {
             | Binding::Hidden
             | Binding::Unknown => self.infer(&call.callee, call.by_path),
         }
+    }
+
+    /// Whether a method called on a call chain (`client.get(u).send()`) belongs to a type from
+    /// outside the repository: the name the chain starts at (`Call::root`) resolves, with the
+    /// last method, to something outside it, as a direct `client.send()` does. Such a call
+    /// resolves to nothing, never to a repository method of the same name.
+    fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        let (Some(root), Some((_, last))) = (&call.root, call.callee.rsplit_once('.')) else {
+            return false;
+        };
+        let callee = format!("{root}.{last}");
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, &callee, seen, work, Reading::Value);
+        matches!(found, Binding::External(..))
     }
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.

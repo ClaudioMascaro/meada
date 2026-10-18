@@ -625,6 +625,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 kwargs,
                                 decorates: Some(qualified.clone()),
                                 by_path,
+                                root: None,
                                 receiver: None,
                                 arg_types: Vec::new(),
                                 uses: Vec::new(),
@@ -837,6 +838,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     kwargs: Vec::new(),
                     decorates: None,
                     by_path,
+                    root: chain_root(function, src),
                     receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
@@ -1818,6 +1820,39 @@ fn member(node: Node, src: &[u8]) -> String {
     }
     parts.reverse();
     parts.join(".")
+}
+
+/// The name a method call on a call chain starts at (`Call::root`): `client` for
+/// `client.get(u).send()` and `client.get(u)?.send()`, `None` for a call on anything else.
+fn chain_root(function: Node, src: &[u8]) -> Option<String> {
+    if function.kind() != "field_expression" {
+        return None;
+    }
+    let mut at = field(function, "value")?;
+    if !matches!(
+        at.kind(),
+        "call_expression" | "try_expression" | "await_expression"
+    ) {
+        return None;
+    }
+    for _ in 0..PATH_DEPTH {
+        at = match at.kind() {
+            "try_expression" | "await_expression" | "parenthesized_expression" => {
+                at.named_child(0)?
+            }
+            "call_expression" => match field(at, "function")? {
+                f if f.kind() == "field_expression" => field(f, "value")?,
+                _ => return None,
+            },
+            _ => break,
+        };
+    }
+    let root = match at.kind() {
+        "identifier" | "self" => text(at, src).to_string(),
+        "field_expression" => member(at, src),
+        _ => return None,
+    };
+    (!root.starts_with('(')).then_some(root)
 }
 
 /// A path as a callee-like name the shared resolution reads (`crate.a.f`, `super.f`,

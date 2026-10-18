@@ -47,6 +47,18 @@ pub async fn enqueue_audit() -> Result<(), aws_sdk_sqs::Error> {
     enqueue(&client, "audit").await
 }
 
+/// A prefix read from the environment before a literal tail: the queue is the last segment.
+pub async fn send_prefixed() -> Result<(), aws_sdk_sqs::Error> {
+    let client = sqs_client().await;
+    client
+        .send_message()
+        .queue_url(format!("{}/prefixed", std::env::var("QUEUE_BASE").unwrap()))
+        .message_body("p")
+        .send()
+        .await?;
+    Ok(())
+}
+
 pub async fn send_unknown() -> Result<(), aws_sdk_sqs::Error> {
     let client = sqs_client().await;
     client
