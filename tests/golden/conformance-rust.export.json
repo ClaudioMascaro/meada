@@ -110,6 +110,26 @@
       "hash": "dd1c0b011098bfe1ddce4b0c210b9ddadc0941c2224ee135ed21f458691de5b8"
     },
     {
+      "path": "crates/actix/src/accounts.rs",
+      "hash": "00d96bd3f523f5182df25f6eff6dc9379b43f8a896099b2e4b85b0078bcc0991"
+    },
+    {
+      "path": "crates/actix/src/admin.rs",
+      "hash": "7ef0c3a509ba0686f02f65a7d2ba8a92921e57440222712e492104ed94498c3b"
+    },
+    {
+      "path": "crates/actix/src/lib.rs",
+      "hash": "a15cba0ec81e014ee25b6e94a7fb05cbf96d74386a4b380ef9a3a96642713166"
+    },
+    {
+      "path": "crates/actix/src/orders.rs",
+      "hash": "804db178e510ef4829ccc4add7ef0ff8e2f7b4d3d6555924869f2f7f698b2071"
+    },
+    {
+      "path": "crates/actix/src/stray.rs",
+      "hash": "faaca61cc40d3a1a07bdbf6b9715ddfbb28ceeec30dbbc3b47367a83f6bd74d1"
+    },
+    {
       "path": "crates/billing/src/billing.rs",
       "hash": "62c73acb8433703b82176bb4f069b881dd19902c91b0807f5ff53b1c307c7409"
     },
@@ -124,6 +144,22 @@
     {
       "path": "crates/ledger-core/src/meter.rs",
       "hash": "4605f66cc7297bad147c9cad6e021188fa2ab09a987347781a0e2f7fa006f575"
+    },
+    {
+      "path": "crates/rocket/src/lib.rs",
+      "hash": "2e059281d8bd984723f241fe2c4faba8c1d479d2af79677cfa7504e248a579a6"
+    },
+    {
+      "path": "crates/rocket/src/pages.rs",
+      "hash": "cd2014288f69b9844986aafe445f70946a5a165065d97d7cd13164a1404b4dad"
+    },
+    {
+      "path": "crates/rocket/src/posts.rs",
+      "hash": "4c0eda2098f8227a2748539c16b7f03551ae4d80dc697a072d936d992107af06"
+    },
+    {
+      "path": "crates/rocket/src/stray.rs",
+      "hash": "84511df6d4d6a83dbc10b34ca7a2c533509eee3a15f3557338f4d14ed3229bd8"
     },
     {
       "path": "crates/scratch/src/lib.rs",
@@ -1492,6 +1528,310 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 740,
+        "end": 817
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::create",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 293,
+        "end": 371
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::files",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 666,
+        "end": 738
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::list",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 82,
+        "end": 153
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 412,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::show",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 180,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync",
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 560,
+        "end": 637
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::audit",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 586,
+        "end": 605
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::dashboard",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 544,
+        "end": 567
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 438,
+        "end": 521
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 143,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::status",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 659,
+        "end": 679
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::tools",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 366,
+        "end": 436
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::unreadable",
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 629,
+        "end": 657
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::accounts",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 0,
+        "end": 13
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::admin",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 14,
+        "end": 24
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::orders",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 25,
+        "end": 36
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 246,
+        "end": 1162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog.PUT /inline",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 732,
+        "end": 749
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::stray",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 37,
+        "end": 47
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 221,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::create",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 157,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::echo",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 85,
+        "end": 135
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 362,
+        "end": 556
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item.DELETE /orders/{}",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 533,
+        "end": 552
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::list",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 137,
+        "end": 155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::ping",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 33,
+        "end": 83
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::show",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 201,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::update",
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 179,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::Holder",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 250,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 657,
+        "end": 705
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 677,
+        "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::held",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 226,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::lonely",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 120,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::plain",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 741,
+        "end": 764
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::plug",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 302,
+        "end": 368
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::rebind",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 489,
+        "end": 603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::shadowed",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 461,
+        "end": 487
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/billing/src/billing.rs::invoice",
       "span": {
         "path": "crates/billing/src/billing.rs",
@@ -1633,6 +1973,134 @@
         "path": "crates/ledger-core/src/meter.rs",
         "start": 0,
         "end": 17
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::pages",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 0,
+        "end": 10
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::posts",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 11,
+        "end": 21
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 204,
+        "end": 714
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::stray",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 22,
+        "end": 32
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/pages.rs::about",
+      "span": {
+        "path": "crates/rocket/src/pages.rs",
+        "start": 94,
+        "end": 140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/pages.rs::index",
+      "span": {
+        "path": "crates/rocket/src/pages.rs",
+        "start": 30,
+        "end": 75
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::create",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 167,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::files",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 302,
+        "end": 332
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::legacy",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 378,
+        "end": 428
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::list",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 78,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::old",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 354,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::search",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 228,
+        "end": 274
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::show",
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 112,
+        "end": 135
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::base",
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 227,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::lonely",
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 109,
+        "end": 127
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::moved",
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 208,
+        "end": 225
       }
     },
     {
@@ -3920,6 +4388,1011 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::actix_web.delete#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 373,
+        "end": 411
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::api::(call_expression).service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 768,
+        "end": 815
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::api::(call_expression).service#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 768,
+        "end": 800
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::api::web.scope#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 768,
+        "end": 786
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::create::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::create",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 337,
+        "end": 369
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::create::HttpResponse.Created#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::create",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 337,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::files::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::files",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 709,
+        "end": 736
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::files::HttpResponse.Ok#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::files",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 709,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 62,
+        "end": 81
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 155,
+        "end": 179
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::get#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 639,
+        "end": 665
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::list::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::list",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 124,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::list::HttpResponse.Ok#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::list",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 124,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::post#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 272,
+        "end": 292
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 456,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove::HttpResponse.NoContent#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 456,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 494,
+        "end": 559
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::show::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::show",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 241,
+        "end": 268
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::show::HttpResponse.Ok#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::show",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 241,
+        "end": 259
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync::(call_expression).finish#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 602,
+        "end": 635
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync::HttpResponse.Accepted#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/accounts.rs",
+        "start": 602,
+        "end": 626
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 523,
+        "end": 543
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 569,
+        "end": 585
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::get#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 607,
+        "end": 628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix::(call_expression).unwrap_or_default#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 470,
+        "end": 519
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix::std.env.var#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 470,
+        "end": 499
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 193,
+        "end": 294
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::(call_expression).service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 205,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::(call_expression).to#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 272,
+        "end": 293
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::cfg.service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 193,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::web.get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 272,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::routes::web.scope#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 205,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/admin.rs::tools::cfg.service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/admin.rs::tools",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/admin.rs",
+        "start": 415,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).bind#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 304,
+        "end": 1137
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).configure#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 869
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).configure#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 891,
+        "end": 935
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).route#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).route#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 1102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 936
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#10",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 1046,
+        "end": 1101
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 831
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#3",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 794
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#4",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 571
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#5",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 533
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#6",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#7",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 380
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#8",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 461,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).service#9",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 487,
+        "end": 531
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).to#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 600,
+        "end": 627
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).to#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 657,
+        "end": 686
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(call_expression).to#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 718,
+        "end": 750
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(try_expression).run#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Build.run",
+        "example.com/acme/conformance::api/src/methods.rs::Counter.Build.run"
+      ],
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 304,
+        "end": 1149
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::App.new#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 333,
+        "end": 343
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::HttpServer.new#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 304,
+        "end": 1109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::accounts.api#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+      "level": "exact",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 555,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::admin.prefix#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix",
+      "level": "exact",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 1058,
+        "end": 1073
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::orders.collection#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "level": "exact",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 773,
+        "end": 793
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::orders.item#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "level": "exact",
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 816,
+        "end": 830
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 600,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.put#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 718,
+        "end": 728
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 657,
+        "end": 669
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.scope#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 461,
+        "end": 478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.scope#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 487,
+        "end": 507
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.scope#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 891,
+        "end": 911
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::web.scope#3",
+      "caller": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/lib.rs",
+        "start": 1046,
+        "end": 1074
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 259,
+        "end": 358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::(call_expression).route#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 259,
+        "end": 319
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::(call_expression).to#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 299,
+        "end": 318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::(call_expression).to#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 335,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::web.get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 299,
+        "end": 309
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::web.post#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 335,
+        "end": 346
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::collection::web.resource#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 259,
+        "end": 283
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 394,
+        "end": 554
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).route#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 394,
+        "end": 500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).route#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 394,
+        "end": 463
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).to#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 439,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).to#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 479,
+        "end": 499
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::(call_expression).to#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 516,
+        "end": 553
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::web.delete#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 516,
+        "end": 529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::web.head#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 479,
+        "end": 490
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::web.patch#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 439,
+        "end": 451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/orders.rs::item::web.resource#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/orders.rs::item",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/orders.rs",
+        "start": 394,
+        "end": 423
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs",
+      "target": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get",
+      "level": "exact",
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 707,
+        "end": 740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 98,
+        "end": 119
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 210,
+        "end": 225
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::get#2",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 441,
+        "end": 460
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::plug::holder.app.service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs::plug",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 341,
+        "end": 365
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::rebind::app.service#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs::rebind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 579,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/actix/src/stray.rs::rebind::make#0",
+      "caller": "example.com/acme/conformance::crates/actix/src/stray.rs::rebind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/actix/src/stray.rs",
+        "start": 567,
+        "end": 573
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/billing/src/billing.rs::settle::entries.add#0",
       "caller": "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
       "target": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add",
@@ -3983,6 +5456,215 @@
         "path": "crates/billing/src/invoice.rs",
         "start": 233,
         "end": 244
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+      "level": "inferred",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 227,
+        "end": 712
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#1",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+      "level": "inferred",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 227,
+        "end": 575
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#2",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+      "level": "inferred",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 227,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::(call_expression).mount#3",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+      "level": "inferred",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 227,
+        "end": 299
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::posts.legacy#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/rocket/src/posts.rs::legacy",
+      "level": "exact",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 559,
+        "end": 574
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::rocket.build#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 227,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket::stray.base#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+      "target": "example.com/acme/conformance::crates/rocket/src/stray.rs::base",
+      "level": "exact",
+      "span": {
+        "path": "crates/rocket/src/lib.rs",
+        "start": 675,
+        "end": 688
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/pages.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/pages.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/pages.rs",
+        "start": 18,
+        "end": 29
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/pages.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/rocket/src/pages.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/pages.rs",
+        "start": 77,
+        "end": 93
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 66,
+        "end": 77
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 96,
+        "end": 111
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#2",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 199,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#3",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 276,
+        "end": 301
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::get#4",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 334,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/posts.rs::post#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/posts.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/posts.rs",
+        "start": 137,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::base::(call_expression).unwrap_or_default#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/stray.rs::base",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 257,
+        "end": 298
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::base::std.env.var#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/stray.rs::base",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 257,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::get#0",
+      "caller": "example.com/acme/conformance::crates/rocket/src/stray.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 92,
+        "end": 108
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/rocket/src/stray.rs::get#1",
+      "caller": "example.com/acme/conformance::crates/rocket/src/stray.rs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/rocket/src/stray.rs",
+        "start": 191,
+        "end": 207
       }
     },
     {
@@ -7024,7 +8706,15 @@
     },
     {
       "contract": "http::ANY::/echo",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::echo"
+    },
+    {
+      "contract": "http::ANY::/echo",
       "site": "example.com/acme/conformance::crates/web/src/health.rs::echo"
+    },
+    {
+      "contract": "http::DELETE::/accounts/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove"
     },
     {
       "contract": "http::DELETE::/api/v1/items/{}",
@@ -7035,12 +8725,36 @@
       "site": "example.com/acme/conformance::crates/web/src/items.rs::remove"
     },
     {
+      "contract": "http::DELETE::/orders/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::item.DELETE /orders/{}"
+    },
+    {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::crates/rocket/src/pages.rs::index"
+    },
+    {
+      "contract": "http::GET::/about",
+      "site": "example.com/acme/conformance::crates/rocket/src/pages.rs::about"
+    },
+    {
+      "contract": "http::GET::/accounts",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::list"
+    },
+    {
+      "contract": "http::GET::/admin/dashboard",
+      "site": "example.com/acme/conformance::crates/actix/src/admin.rs::dashboard"
+    },
+    {
       "contract": "http::GET::/admin/stats",
       "site": "example.com/acme/conformance::crates/web/src/admin.rs::stats"
     },
     {
       "contract": "http::GET::/alias/renamed",
       "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
+    },
+    {
+      "contract": "http::GET::/api/files/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::files"
     },
     {
       "contract": "http::GET::/api/ping",
@@ -7079,6 +8793,58 @@
       "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
     },
     {
+      "contract": "http::GET::/legacy/old/{}",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::old"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::list"
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::ping"
+    },
+    {
+      "contract": "http::GET::/posts",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::list"
+    },
+    {
+      "contract": "http::GET::/posts/files/{}",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::files"
+    },
+    {
+      "contract": "http::GET::/posts/search",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::search"
+    },
+    {
+      "contract": "http::GET::/posts/{}",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::show"
+    },
+    {
+      "contract": "http::GET::/shadowed",
+      "site": "example.com/acme/conformance::crates/actix/src/stray.rs::shadowed"
+    },
+    {
+      "contract": "http::GET::/status",
+      "site": "example.com/acme/conformance::crates/actix/src/admin.rs::status"
+    },
+    {
+      "contract": "http::GET::/stray",
+      "site": "example.com/acme/conformance::crates/rocket/src/stray.rs::lonely"
+    },
+    {
+      "contract": "http::GET::/stray/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/stray.rs::lonely"
+    },
+    {
+      "contract": "http::GET::/tools/audit",
+      "site": "example.com/acme/conformance::crates/actix/src/admin.rs::audit"
+    },
+    {
+      "contract": "http::GET::/v1/admin/accounts/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::show"
+    },
+    {
       "contract": "http::GET::/{raw}",
       "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
     },
@@ -7091,6 +8857,10 @@
       "site": "example.com/acme/conformance::crates/web/src/items.rs::show"
     },
     {
+      "contract": "http::HEAD::/orders/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::show"
+    },
+    {
       "contract": "http::OPTIONS::/api/v1/items/{}/tags",
       "site": "example.com/acme/conformance::crates/web/src/items.rs::show"
     },
@@ -7099,12 +8869,24 @@
       "site": "example.com/acme/conformance::crates/web/src/items.rs::show"
     },
     {
+      "contract": "http::PATCH::/api/accounts/{}/sync",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync"
+    },
+    {
       "contract": "http::PATCH::/api/v1/items/{}",
       "site": "example.com/acme/conformance::crates/web/src/items.rs::update"
     },
     {
       "contract": "http::PATCH::/api/v2/items/{}",
       "site": "example.com/acme/conformance::crates/web/src/items.rs::update"
+    },
+    {
+      "contract": "http::PATCH::/orders/{}",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::update"
+    },
+    {
+      "contract": "http::POST::/accounts",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::create"
     },
     {
       "contract": "http::POST::/admin/reset",
@@ -7127,6 +8909,18 @@
       "site": "example.com/acme/conformance::crates/web/src/items.rs::create"
     },
     {
+      "contract": "http::POST::/orders",
+      "site": "example.com/acme/conformance::crates/actix/src/orders.rs::create"
+    },
+    {
+      "contract": "http::POST::/posts",
+      "site": "example.com/acme/conformance::crates/rocket/src/posts.rs::create"
+    },
+    {
+      "contract": "http::PUT::/api/accounts/{}/sync",
+      "site": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync"
+    },
+    {
       "contract": "http::PUT::/api/v1/items/{}",
       "site": "example.com/acme/conformance::crates/web/src/items.rs::update"
     },
@@ -7135,12 +8929,24 @@
       "site": "example.com/acme/conformance::crates/web/src/items.rs::update"
     },
     {
+      "contract": "http::PUT::/inline",
+      "site": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog.PUT /inline"
+    },
+    {
       "contract": "package::cargo::api",
       "site": "example.com/acme/conformance::api/Cargo.toml"
     },
     {
       "contract": "package::cargo::billing",
       "site": "example.com/acme/conformance::crates/billing/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::board",
+      "site": "example.com/acme/conformance::crates/rocket/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::catalog",
+      "site": "example.com/acme/conformance::crates/actix/Cargo.toml"
     },
     {
       "contract": "package::cargo::ledger-core",
@@ -7487,6 +9293,20 @@
       "ecosystem": "cargo"
     },
     {
+      "name": "board",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "crates/rocket",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "catalog",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "crates/actix",
+      "ecosystem": "cargo"
+    },
+    {
       "name": "ledger-core",
       "version": "0.1.0",
       "repository": "example.com/acme/conformance",
@@ -7714,6 +9534,32 @@
       ]
     },
     {
+      "name": "crates/actix/src",
+      "members": [
+        "example.com/acme/conformance::crates/actix/src/accounts.rs::api",
+        "example.com/acme/conformance::crates/actix/src/admin.rs::prefix",
+        "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+        "example.com/acme/conformance::crates/actix/src/orders.rs::collection",
+        "example.com/acme/conformance::crates/actix/src/orders.rs::item"
+      ]
+    },
+    {
+      "name": "crates/actix/src#2",
+      "members": [
+        "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get"
+      ]
+    },
+    {
+      "name": "crates/rocket/src",
+      "members": [
+        "example.com/acme/conformance::crates/rocket/src/lib.rs::rocket",
+        "example.com/acme/conformance::crates/rocket/src/posts.rs::legacy",
+        "example.com/acme/conformance::crates/rocket/src/stray.rs::base",
+        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
+        "example.com/acme/conformance::crates/web/src/lib.rs::late.router"
+      ]
+    },
+    {
       "name": "crates/web/src",
       "members": [
         "example.com/acme/conformance::crates/web/src/admin.rs::mount",
@@ -7735,26 +9581,19 @@
     {
       "name": "crates/web/src#3",
       "members": [
-        "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
-        "example.com/acme/conformance::crates/web/src/lib.rs::late.router"
-      ]
-    },
-    {
-      "name": "crates/web/src#4",
-      "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::orphans.router",
         "example.com/acme/conformance::crates/web/src/lib.rs::unread"
       ]
     },
     {
-      "name": "crates/web/src#5",
+      "name": "crates/web/src#4",
       "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
         "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router"
       ]
     },
     {
-      "name": "crates/web/src#6",
+      "name": "crates/web/src#5",
       "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::served",
         "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
@@ -7762,14 +9601,14 @@
       ]
     },
     {
-      "name": "crates/web/src#7",
+      "name": "crates/web/src#6",
       "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
         "example.com/acme/conformance::crates/web/src/lib.rs::wrapper"
       ]
     },
     {
-      "name": "crates/web/src#8",
+      "name": "crates/web/src#7",
       "members": [
         "example.com/acme/conformance::crates/web/src/local.rs::Router",
         "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
@@ -8284,6 +10123,340 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::create::http::POST::/accounts",
+      "kind": "route",
+      "label": "POST /accounts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::files::http::GET::/api/files/{}",
+      "kind": "route",
+      "label": "GET /api/files/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::files"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::list::http::GET::/accounts",
+      "kind": "route",
+      "label": "GET /accounts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove::http::DELETE::/accounts/{}",
+      "kind": "route",
+      "label": "DELETE /accounts/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::remove"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::show::http::GET::/v1/admin/accounts/{}",
+      "kind": "route",
+      "label": "GET /v1/admin/accounts/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync::http::PATCH::/api/accounts/{}/sync",
+      "kind": "route",
+      "label": "PATCH /api/accounts/{}/sync",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync::http::PUT::/api/accounts/{}/sync",
+      "kind": "route",
+      "label": "PUT /api/accounts/{}/sync",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::sync"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/admin.rs::audit::http::GET::/tools/audit",
+      "kind": "route",
+      "label": "GET /tools/audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/admin.rs::audit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/admin.rs::dashboard::http::GET::/admin/dashboard",
+      "kind": "route",
+      "label": "GET /admin/dashboard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/admin.rs::dashboard"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/admin.rs::status::http::GET::/status",
+      "kind": "route",
+      "label": "GET /status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/admin.rs::status"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog",
+      "kind": "export",
+      "label": "serve_catalog",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog::(try_expression).run#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::api/src/methods.rs::Build.run",
+            "example.com/acme/conformance::api/src/methods.rs::Counter.Build.run"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/actix/src/accounts.rs::api"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::collection"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::item"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/actix/src/admin.rs::prefix"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog.PUT /inline::http::PUT::/inline",
+      "kind": "route",
+      "label": "PUT /inline",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/lib.rs::serve_catalog.PUT /inline"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::create::http::POST::/orders",
+      "kind": "route",
+      "label": "POST /orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::echo::http::ANY::/echo",
+      "kind": "route",
+      "label": "ANY /echo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::echo"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::item.DELETE /orders/{}::http::DELETE::/orders/{}",
+      "kind": "route",
+      "label": "DELETE /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::item.DELETE /orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::list::http::GET::/orders",
+      "kind": "route",
+      "label": "GET /orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::ping::http::GET::/ping",
+      "kind": "route",
+      "label": "GET /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::show::http::HEAD::/orders/{}",
+      "kind": "route",
+      "label": "HEAD /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/orders.rs::update::http::PATCH::/orders/{}",
+      "kind": "route",
+      "label": "PATCH /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/orders.rs::update"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/stray.rs::lonely::http::GET::/stray/{}",
+      "kind": "route",
+      "label": "GET /stray/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/stray.rs::lonely"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/actix/src/stray.rs::shadowed::http::GET::/shadowed",
+      "kind": "route",
+      "label": "GET /shadowed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/actix/src/stray.rs::shadowed"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
       "kind": "export",
       "label": "settle",
@@ -8308,6 +10481,132 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/pages.rs::about::http::GET::/about",
+      "kind": "route",
+      "label": "GET /about",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/pages.rs::about"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/pages.rs::index::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/pages.rs::index"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::create::http::POST::/posts",
+      "kind": "route",
+      "label": "POST /posts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::files::http::GET::/posts/files/{}",
+      "kind": "route",
+      "label": "GET /posts/files/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::files"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::list::http::GET::/posts",
+      "kind": "route",
+      "label": "GET /posts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::list"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::old::http::GET::/legacy/old/{}",
+      "kind": "route",
+      "label": "GET /legacy/old/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::old"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::search::http::GET::/posts/search",
+      "kind": "route",
+      "label": "GET /posts/search",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::search"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/posts.rs::show::http::GET::/posts/{}",
+      "kind": "route",
+      "label": "GET /posts/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/posts.rs::show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/rocket/src/stray.rs::lonely::http::GET::/stray",
+      "kind": "route",
+      "label": "GET /stray",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/rocket/src/stray.rs::lonely"
         }
       ]
     },
@@ -8728,27 +11027,6 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/web/src/items.rs::update"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
-      "kind": "export",
-      "label": "Holder.mount",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/acme/conformance",
-          "level": "exact",
-          "via": "call",
-          "node": "example.com/acme/conformance::crates/web/src/lib.rs::late.router"
         }
       ]
     },

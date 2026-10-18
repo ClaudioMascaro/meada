@@ -15,7 +15,7 @@ modules updates it.
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`clients`, below), Next.js app-router, Express,
-  FastAPI, Flask, Django and axum (`http::axum`, Rust) providers (Next.js and Express ones each with a `Found::shape` from
+  FastAPI, Flask, Django, axum (`http::axum`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and Express ones each with a `Found::shape` from
   `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
   lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
@@ -62,7 +62,14 @@ modules updates it.
   go through `prefixes` as Express mounts do, a router given to a call Meada does not read (`route_service`,
   `fallback_service`, an outside wrapper, a name-matched method; `axum_unread`) is mounted
   nowhere, a mount through a value it cannot read serves nothing, and a router nothing nests is
-  served at its root; `prefixes` stops at `PREFIX_DEPTH` and `PREFIX_WORK`), reached through `Code::origins`: a route counts only
+  served at its root; `prefixes` stops at `PREFIX_DEPTH` and `PREFIX_WORK`); actix-web and Rocket (`http/rust.rs`) reuse these seams: a handler is a function a route
+  attribute sits on (`#[get]`, `#[route(path, method = "X")]`; the pack emits it as a `Call` with
+  `decorates`) or one `.route(path, web::get().to(h))` names; an `App`, `web::scope`,
+  `web::resource`, the `ServiceConfig` a `.configure(f)` function receives or a Rocket instance
+  is a mount node, a handler is one too. A handler any call names (`.service(h)`,
+  `routes![a, b]`) is served only where a mount Meada reads puts it, one no call names at its own
+  path; a scope or a mount prefix Meada cannot read serves nothing (never the root). `routes![..]`
+  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing, reached through `Code::origins`: a route counts only
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,

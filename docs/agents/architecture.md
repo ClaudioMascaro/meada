@@ -185,7 +185,9 @@ one for the area a change touches.
   range; `Code::call_index` for a kind) and `Code::receiver` (the value a call is made on).
   A step no function of the repository answers passes the receiver on; one only a name match
   found does when the chain starts at a constructor of an outside crate (whose method it then
-  is), else the flow ends. A kind reads a route off each call of the chain (`http::axum`).
+  is), else the flow ends. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
+  `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
+  `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
@@ -855,12 +857,15 @@ one for the area a change touches.
   file gives that file's public names; whether the file itself is reachable from the crate's
   root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
   are not indexed.
+- `lang/rust.rs` (spec #30, actix-web and Rocket): `ROUTES_PER_FUNCTION` (16): a function with
+  more route attributes (`#[get("/x")]`, `#[route(..)]`) than that has the first ones as calls
+  that decorate it (`Call::decorates`), the rest nothing.
 - `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
   that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
   `resolve.rs`): a builder chain (`Router::new().route(..)`) is read to that many calls down to
   what starts it, and a call past it has no origin, so its route is no provider (the walk is
   memoized per call, linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
-  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum), reads a router
+  `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
   shadowing) or assigned again holds no known value, and the routers its `let` holds
