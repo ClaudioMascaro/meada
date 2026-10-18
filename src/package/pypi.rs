@@ -112,9 +112,10 @@ pub fn read_pyproject(src: &[u8]) -> Summary {
     }
 }
 
-/// Reads a `requirements*.txt` line by line: comments (`#` at the start or after whitespace),
-/// blank lines, option lines (`-r`, `-e`, `--index-url`, `--hash`, ...) and URLs or paths are
-/// skipped, and a trailing `\` or per-requirement option (` --hash=...`) is cut. Nothing the file
+/// Reads a `requirements*.txt` line by line, a line ending in `\` joined to the next as pip does:
+/// comments (`#` at the start or after whitespace), blank lines, option lines (`-r`, `-e`,
+/// `--index-url`, `--hash`, ...) and URLs or paths are skipped, and a per-requirement option
+/// (` --hash=...`) is cut. Nothing the file
 /// names elsewhere (`-r other.txt`) is followed. A file over `MAX_BYTES` or not UTF-8 reads as
 /// empty.
 pub fn read_requirements(src: &[u8]) -> Summary {
@@ -124,12 +125,24 @@ pub fn read_requirements(src: &[u8]) -> Summary {
     else {
         return Summary::default();
     };
-    let found = text.lines().filter_map(|line| {
+    // A line ending in `\` continues on the next, as pip joins them; a comment line ends it.
+    let mut lines = Vec::new();
+    let mut pending = String::new();
+    for line in text.lines() {
+        match line.strip_suffix('\\') {
+            Some(head) if !line.trim_start().starts_with('#') => pending.push_str(head),
+            _ => {
+                pending.push_str(line);
+                lines.push(std::mem::take(&mut pending));
+            }
+        }
+    }
+    lines.push(pending);
+    let found = lines.iter().filter_map(|line| {
         let comment = line
             .char_indices()
             .find(|&(i, c)| c == '#' && (i == 0 || line[..i].ends_with(char::is_whitespace)));
-        let line = comment.map_or(line, |(i, _)| &line[..i]).trim();
-        let line = line.trim_end_matches('\\').trim();
+        let line = comment.map_or(line.as_str(), |(i, _)| &line[..i]).trim();
         if line.is_empty() || line.starts_with('-') || line.contains("://") {
             return None;
         }
@@ -234,6 +247,21 @@ shared-lib==9
             ]
         );
         assert_eq!((s.name, s.version), (None, None));
+    }
+
+    #[test]
+    fn a_line_ending_in_a_backslash_continues_on_the_next() {
+        let src = "shared-lib \\\n    >=1.0,<2 \\\n    ; python_version >= '3.9'\n\
+                   other\\\n-tools==1\n# a comment ends no continuation \\\nlast==2\n";
+        let s = read_requirements(src.as_bytes());
+        assert_eq!(
+            deps(&s),
+            [
+                (REQUIREMENTS, "last", Some("==2")),
+                (REQUIREMENTS, "other-tools", Some("==1")),
+                (REQUIREMENTS, "shared-lib", Some(">=1.0,<2")),
+            ]
+        );
     }
 
     #[test]

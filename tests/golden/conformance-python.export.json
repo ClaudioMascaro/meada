@@ -9716,7 +9716,8 @@
       "name": "acme-conformance",
       "version": "0.1.0",
       "repository": "example.com/acme/conformance",
-      "directory": "."
+      "directory": ".",
+      "ecosystem": "pypi"
     }
   ],
   "communities": [

@@ -146,19 +146,23 @@ modules updates it.
   (`pyweb` names `pylib` as its peer). `pylib` provides `Shared_Lib` (`shared-lib`, PEP 621, a
   `src/` layout: `shared_lib/__init__.py` re-exports `greet` from `core.py`, which calls
   `text.py`'s `shout`; `api.py` holds `fetch` and `Client.create`; `src/sl_extras/` is a second
-  top-level module), `tools/pyproject.toml` provides `shared.tools` (`shared-tools`, Poetry)
-  whose only module is `tools/sl_extras/`, and `js/package.json` is an npm `shared-lib`. `pyweb`
+  top-level module; `src/shared_lib/requirements.txt` takes none of its files),
+  `tools/pyproject.toml` provides `shared.tools` (`shared-tools`, Poetry) whose modules are
+  `tools/sl_extras/` and `tools/toolkit/`, and `js/package.json` is an npm `shared-lib`. `pyweb`
   depends on `shared-lib` in `pyproject.toml` (extras and markers) and `requirements-dev.txt`, on
   `shared-tools` in `requirements.txt` (with option lines, a comment and a URL) and in
   `worker/pyproject.toml` (Poetry, a dev group naming `shared-lib` not read), and its
   `ui/package.json` names `shared-tools` on npm (no link). `app/main.py` crosses `exact` through
   the re-export, a submodule reached as `shared_lib.api.fetch` and `from shared_lib.api import
   Client`, `ambiguous` through `sl_extras` (both distributions expose it), and not at all
-  through a local `greet` or `json`; `worker/job.py` crosses `inferred` through `sl_extras`.
-  Goldens `pkg-{pyweb,pylib}.export.json`, `pkg-pylib.context-greet.txt` and
+  through a local `greet` or `json`; `app/rel.py`'s relative imports named after the
+  distribution never cross; `tests/test_api.py` crosses `exact` through the root's manifests,
+  though `tests/requirements.txt` names only `pytest`; `worker/job.py` crosses `inferred`
+  through `toolkit`. Goldens `pkg-{pyweb,pylib}.export.json`, `pkg-pylib.context-greet.txt`,
+  `pkg-pylib.search-package.txt` (the PyPI and the npm `shared-lib` apart) and
   `pkg-pyweb.trace-down.txt`; the freshness test edits both repositories' `pyproject.toml`, the
   root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
-  (PEP 503 names, requirement lines, both readers, the limits) and
+  (PEP 503 names, requirement lines and continuations, both readers, the limits) and
   `lang/python/pyproject.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers

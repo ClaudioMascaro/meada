@@ -54,11 +54,17 @@ fn each_import_level_reads_from_the_module_it_names() {
     let at = |caller: &str| links(&json, &format!("example.com/pkg/pyweb::{caller}"));
     let lib = "example.com/pkg/pylib::";
 
-    // The distribution's own name, through a re-export and through a submodule: `exact`.
+    // The distribution's own name, through a re-export and through a submodule: `exact`. A
+    // `requirements.txt` in `tests/` that names other packages leaves the root's in force, and
+    // the one in the library's `src/shared_lib/` takes no file from its `pyproject.toml`.
     let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked";
     let exact = format!("{range}; import module name");
     for (caller, target) in [
         ("app/main.py::welcome::", "src/shared_lib/core.py::greet"),
+        (
+            "tests/test_api.py::test_greet::",
+            "src/shared_lib/core.py::greet",
+        ),
         ("app/main.py::lookup::", "src/shared_lib/api.py::fetch"),
         (
             "app/main.py::make::",
@@ -76,13 +82,14 @@ fn each_import_level_reads_from_the_module_it_names() {
             "{caller}"
         );
     }
-    // A top-level module only one depended-on distribution exposes: `inferred`.
+    // A top-level module only one depended-on distribution exposes: `inferred`, with the range
+    // of the nearest manifest naming it (`worker/pyproject.toml`, before the root's).
     let tools = "package::pypi::shared-tools ^0.3 (local 0.3.0), range unchecked";
     assert_eq!(
         at("worker/job.py::run::"),
         [(
-            "example.com/pkg/pyweb::worker/job.py::run::sl_extras.boost#0",
-            "example.com/pkg/pylib::tools/sl_extras/__init__.py::boost",
+            "example.com/pkg/pyweb::worker/job.py::run::toolkit.polish#0",
+            "example.com/pkg/pylib::tools/toolkit/__init__.py::polish",
             "inferred",
             format!("{tools}; import top-level module").as_str(),
         )]
@@ -106,6 +113,34 @@ fn each_import_level_reads_from_the_module_it_names() {
     // A local binding of the imported name, and a module outside the workspace, do not cross.
     assert!(at("app/main.py::hidden::").is_empty());
     assert!(at("app/main.py::encode::").is_empty());
+}
+
+#[test]
+fn a_relative_import_never_reaches_a_package() {
+    let (_, web) = pair("pypi_relative");
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    // `from . import shared_lib`, `from .shared_lib import greet`, `from ..shared_lib.api import
+    // fetch` and `from . import sl_extras` name modules of the importing package, even when no
+    // such file exists and a dependency has that name.
+    let site = "example.com/pkg/pyweb::app/rel.py::";
+    for list in ["consumers", "links", "imports"] {
+        let named =
+            (json[list].as_array().into_iter().flatten()).any(|v| v.to_string().contains(site));
+        assert!(!named, "{list}");
+    }
+}
+
+#[test]
+fn search_tells_a_pypi_package_from_an_npm_one_of_its_name() {
+    let (lib, _) = pair("pypi_search");
+
+    let found = Engine::open(&lib)
+        .unwrap()
+        .search("shared", Some("package"), None)
+        .unwrap();
+
+    assert_golden("pkg-pylib.search-package.txt", &found);
 }
 
 #[test]

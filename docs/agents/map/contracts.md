@@ -266,17 +266,21 @@ modules updates it.
   `package::pypi::`), reads the bytes (`read`), checks a range (`flag`) and holds the
   `workspace:` rule (`reaches`, npm only); `Providers` is keyed by ecosystem and name, so an
   npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
-  nearest `package.json` and nearest `pyproject.toml` are apart). `package/pypi.rs` reads a
+  nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
+  of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
+  `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
   `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
   dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, and the declared
   `roots`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
   skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
   written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
-  `reason` ends `, range unchecked`. A `pyproject.toml` and the `requirements*.txt` beside it
-  are one nearest manifest (`near`). A call from a `.py` file (`Ecosystem::of_source`) resolves
-  through `pypi_resolutions`: the import names a module, so each distribution `near` depends on
-  is a candidate when a provider exposes the import's top-level module under its roots
+  `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
+  reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
+  the next. A call from a `.py` file (`Ecosystem::of_source`) resolves through
+  `pypi_resolutions`: the import names a module, so each distribution a PyPI manifest of a
+  directory holding the file depends on (`holding`: every `pyproject.toml` and
+  `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots
   (`python_roots`: the manifest's directory, then its declared roots or `src`;
   `Provided::module` finds `a/b/__init__.py` or `a/b.py`), `exact` with `How::ModuleName`
   (reason `; import module name`) when that module is the normalized name with `-` turned into

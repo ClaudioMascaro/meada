@@ -1,5 +1,5 @@
-import sl_extras
+import toolkit
 
 
 def run(value):
-    return sl_extras.boost(value)
+    return toolkit.polish(value)

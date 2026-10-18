@@ -48,7 +48,7 @@ impl Pyproject {
 
     /// The dependencies of `[project] dependencies` and `[tool.poetry.dependencies]` (its
     /// `python` key excepted), in order. Poetry groups and `[project.optional-dependencies]`
-    /// are not read; an entry of another type is left out.
+    /// are not read; an entry of another type, and a Poetry `git` or `url` source, is left out.
     pub fn requirements(&self) -> Vec<Requirement<'_>> {
         let pep621 = self
             .at(&["project", "dependencies"])
@@ -58,13 +58,21 @@ impl Pyproject {
             (pep621.into_iter().flatten()).filter_map(|v| v.as_str().map(Requirement::Pep508));
         let poetry = (poetry.into_iter().flatten())
             .filter(|(name, _)| *name != "python")
-            .map(|(name, v)| {
+            .filter_map(|(name, v)| {
                 let version = match v {
                     toml::Value::String(s) => Some(s.as_str()),
+                    // A git or URL source is a direct reference, as `name @ url` is in PEP 508:
+                    // no entry, unless a `path` keeps the package local.
+                    toml::Value::Table(t)
+                        if !t.contains_key("path")
+                            && (t.contains_key("git") || t.contains_key("url")) =>
+                    {
+                        return None;
+                    }
                     toml::Value::Table(t) => t.get("version").and_then(|v| v.as_str()),
                     _ => None,
                 };
-                Requirement::Poetry(name, version)
+                Some(Requirement::Poetry(name, version))
             });
         pep621.chain(poetry).collect()
     }
@@ -164,11 +172,16 @@ d = "^1.0"
 e = { version = "~2", extras = ["x"] }
 f = { path = "../f" }
 g = [{ version = "1" }]
+i = { git = "https://example.com/i.git", version = "1" }
+j = { url = "https://example.com/j.whl" }
+k = { git = "https://example.com/k.git", path = "../k" }
 [tool.poetry.group.dev.dependencies]
 h = "1"
 "#,
         );
         use Requirement::*;
+        // A git or URL source is a direct reference, as `name @ url` is: no entry. A path keeps
+        // it one.
         assert_eq!(
             p.requirements(),
             [
@@ -178,6 +191,7 @@ h = "1"
                 Poetry("e", Some("~2")),
                 Poetry("f", None),
                 Poetry("g", None),
+                Poetry("k", None),
             ]
         );
     }

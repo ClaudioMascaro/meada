@@ -515,11 +515,12 @@ one for the area a change touches.
   `MAX_BYTES` hold for `pyproject.toml` and `requirements*.txt` too (a file past it, not UTF-8
   or not TOML reads as empty; the toml crate's own depth limit stops nested input); a
   requirements file is read line by line, its option lines (`-r`, `-e`, `-c`, `--index-url`),
-  URLs and paths skipped, and what `-r` names is not followed; environment markers and extras
+  URLs and paths skipped (a Poetry `git` or `url` source too), and what `-r` names is not
+  followed; environment markers and extras
   are dropped and a direct reference (`name @ url`) is no entry; Poetry groups and
   `[project.optional-dependencies]` are not read; a range is never evaluated (no marker). A
-  Python import is looked up in the distributions the nearest directory's manifests depend
-  on, among the top-level modules under each provider's roots (its directory, then the roots its
+  Python import is looked up in the distributions every PyPI manifest of a directory holding
+  the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
   `pyproject.toml` declares, or `src`); a namespace package (a directory without
   `__init__.py`) exposes nothing, and an import several distributions expose is `ambiguous` for
   each, its reason naming none of the others (no marker). Import resolution: `exported` follows at most

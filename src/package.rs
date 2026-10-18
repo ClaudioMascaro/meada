@@ -42,13 +42,27 @@ pub const PREFIX: &str = "package::";
 /// A package ecosystem: the manifests it reads, the contract its packages provide, and its
 /// rules for checking a range. How an import names a package is its own too (`split` for npm,
 /// `pypi_resolutions` for PyPI). An npm and a PyPI package of one name are two contracts.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum Ecosystem {
     Npm,
     Pypi,
 }
 
 impl Ecosystem {
+    /// Whether it is npm's, the ecosystem a package of the export names only when it is not.
+    pub fn is_npm(&self) -> bool {
+        *self == Ecosystem::Npm
+    }
+
+    /// Its name, as the contract identifier spells it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Ecosystem::Npm => "npm",
+            Ecosystem::Pypi => "pypi",
+        }
+    }
+
     /// The ecosystem of the manifest at `path`, by its file name: `package.json` is npm's,
     /// `pyproject.toml` and `requirements*.txt` PyPI's; `None` for any other file.
     pub fn of(path: &str) -> Option<Self> {
@@ -254,6 +268,9 @@ pub struct Package {
     pub repository: String,
     /// The directory of the manifest, relative to the repository root: `.` for the root.
     pub directory: String,
+    /// Its ecosystem, shown only when it is not npm's.
+    #[serde(skip_serializing_if = "Ecosystem::is_npm")]
+    pub ecosystem: Ecosystem,
     /// The path of the manifest.
     #[serde(skip)]
     pub manifest: String,
@@ -497,14 +514,10 @@ fn split(specifier: &str) -> Option<(&str, String)> {
     (valid_name(name) && (segments == 1 || name.contains('/'))).then(|| (name, format!(".{rest}")))
 }
 
-/// The manifest of `ecosystem` in the deepest directory holding `path`; of several there (a
-/// `pyproject.toml` beside `requirements*.txt` files), the first by path.
-fn nearest<'m>(
-    manifests: &'m [Manifest],
-    path: &str,
-    ecosystem: Ecosystem,
-) -> Option<&'m Manifest> {
-    (manifests.iter())
+/// Every manifest of `ecosystem` whose directory holds `path`, the deepest directory first and
+/// those of one directory by path (a `pyproject.toml` before the `requirements*.txt` beside it).
+fn holding<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Vec<&'m Manifest> {
+    let mut found: Vec<&Manifest> = (manifests.iter())
         .filter(|m| Ecosystem::of(&m.path) == Some(ecosystem))
         .filter(|m| match directory(&m.path) {
             "." => true,
@@ -512,22 +525,28 @@ fn nearest<'m>(
                 .strip_prefix(dir)
                 .is_some_and(|rest| rest.starts_with('/')),
         })
-        .max_by_key(|m| {
-            let depth = m.path.rsplit_once('/').map_or(0, |(dir, _)| dir.len() + 1);
-            (depth, std::cmp::Reverse(&m.path))
-        })
+        .collect();
+    found.sort_by_key(|m| {
+        let depth = m.path.rsplit_once('/').map_or(0, |(dir, _)| dir.len() + 1);
+        (std::cmp::Reverse(depth), &m.path)
+    });
+    found
 }
 
-/// Every manifest of `ecosystem` in the directory of the nearest one (`nearest`): one manifest
-/// for npm, a `pyproject.toml` and the `requirements*.txt` beside it for PyPI.
-fn near<'m>(
+/// The manifest of `ecosystem` in the deepest directory holding `path`.
+fn nearest<'m>(
     manifests: &'m [Manifest],
     path: &str,
     ecosystem: Ecosystem,
-) -> impl Iterator<Item = &'m Manifest> {
-    let dir = nearest(manifests, path, ecosystem).map(|m| directory(&m.path));
-    (manifests.iter()).filter(move |m| {
-        Some(directory(&m.path)) == dir && Ecosystem::of(&m.path) == Some(ecosystem)
+) -> Option<&'m Manifest> {
+    holding(manifests, path, ecosystem).into_iter().next()
+}
+
+/// The manifest of the package `path` belongs to: the nearest `package.json` for npm, the
+/// nearest `pyproject.toml` for PyPI (a `requirements*.txt` names no package, so it bounds none).
+fn owner<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Option<&'m Manifest> {
+    (holding(manifests, path, ecosystem).into_iter()).find(|m| {
+        ecosystem != Ecosystem::Pypi || m.path.rsplit('/').next() == Some("pyproject.toml")
     })
 }
 
@@ -777,7 +796,7 @@ impl<'e> Provided<'e> {
     fn owned_source(&self, manifest: &Manifest, path: &str) -> bool {
         let ecosystem = Ecosystem::of(&manifest.path).unwrap_or(Ecosystem::Npm);
         self.source(path)
-            && nearest(self.manifests, path, ecosystem)
+            && owner(self.manifests, path, ecosystem)
                 .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
     }
 
@@ -924,10 +943,10 @@ impl Providers {
 }
 
 /// The workspace step after `consume`: each call through a package import, whose package the
-/// importing file's nearest manifest depends on (in any of its fields) and some repository
-/// of the workspace provides (a `workspace:` range: its own), resolves in each such provider
-/// (`resolutions`). A call that resolves in one at least becomes a consumer of the package
-/// at its site, the range of the entry in `Consumer::method` and where it resolves in
+/// importing file's nearest manifest (PyPI: any above it) depends on, in any field, and some
+/// repository of the workspace provides (a `workspace:` range: its own), resolves in each such
+/// provider (`resolutions`). A call that resolves in one at least becomes a consumer of the
+/// package at its site, the range of the entry in `Consumer::method` and where it resolves in
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider; a Python import several depended-on packages expose is a consumer of each. Any
 /// other, an import of a package outside the workspace included, adds nothing.
@@ -1086,9 +1105,10 @@ type Resolution<'e> = (usize, &'e Manifest, &'e Provided<'e>, Resolved);
 
 /// Where the name `chain`, which the file `from.1` of the repository `from.0` imports from
 /// `specifier`, resolves, by the rules of the file's ecosystem (`Ecosystem::of_source`): each
-/// dependency entry of the file's nearest manifest that names a package the import reaches, and
-/// each repository providing it that the entry reaches and where the name resolves there, with
-/// that repository's position, its manifest and its `Provided`. `known` says which ids of a
+/// dependency entry of the file's nearest manifest (PyPI: of every manifest above it) that
+/// names a package the import reaches, and each repository providing it that the entry
+/// reaches and where the name resolves there, with that repository's position, its manifest
+/// and its `Provided`. `known` says which ids of a
 /// provider the name may resolve to. Empty when the import names no dependency of the file;
 /// npm gives one entry at most.
 fn resolutions<'e>(
@@ -1130,8 +1150,9 @@ fn resolutions<'e>(
 }
 
 /// `resolutions` for a Python import: the import names a module, not a distribution, so each
-/// distribution the nearest manifests (a `pyproject.toml` and the `requirements*.txt` beside it)
-/// depend on is a candidate when a provider of it exposes the import's top-level module under
+/// distribution a PyPI manifest of a directory holding the file depends on (`holding`: every
+/// `pyproject.toml` and `requirements*.txt` above it, the nearest first, whose entry gives the
+/// range) is a candidate when a provider of it exposes the import's top-level module under
 /// its source roots. The import is `exact` (`import module name`) when that module is the
 /// distribution's name with `-` turned into `_`, `inferred` (`import top-level module`) when it
 /// is only one of the provider's top-level modules, and `ambiguous` when several distributions
@@ -1151,7 +1172,8 @@ fn pypi_resolutions<'e>(
         return Vec::new();
     }
     let mut seen = HashSet::new();
-    let entries = near(&exports[n].manifests, from, Ecosystem::Pypi)
+    let entries = holding(&exports[n].manifests, from, Ecosystem::Pypi)
+        .into_iter()
         .flat_map(|m| &m.summary.dependencies)
         .filter(|e| seen.insert(e.name.as_str()));
     let mut out = Vec::new();
@@ -1562,6 +1584,7 @@ impl ContractKind for Packages {
                 version: m.summary.version.clone(),
                 repository: repo.identity.clone(),
                 directory: directory(&m.path).to_string(),
+                ecosystem,
                 manifest: m.path.clone(),
             });
         }
@@ -2065,7 +2088,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pyproject_and_the_requirements_beside_it_are_one_nearest_manifest_per_ecosystem() {
+    fn a_python_file_depends_on_every_manifest_above_it_and_belongs_to_its_pyproject() {
         let pypi = |path: &str| Manifest {
             path: path.to_string(),
             summary: Summary::default(),
@@ -2078,28 +2101,47 @@ mod tests {
             manifest("app/web/package.json", "{}"),
             pypi("tools/requirements.txt"),
         ];
-        let near =
-            |path, e| -> Vec<&str> { near(&all, path, e).map(|m| m.path.as_str()).collect() };
+        let holding = |path, e| -> Vec<&str> {
+            (holding(&all, path, e).into_iter())
+                .map(|m| m.path.as_str())
+                .collect()
+        };
+        // Every manifest of the ecosystem above the file, the deepest directory first.
         assert_eq!(
-            near("x.py", Ecosystem::Pypi),
-            ["pyproject.toml", "requirements.txt"]
+            holding("app/web/x.py", Ecosystem::Pypi),
+            [
+                "app/pyproject.toml",
+                "app/requirements-dev.txt",
+                "pyproject.toml",
+                "requirements.txt"
+            ]
         );
         assert_eq!(
-            near("app/web/x.py", Ecosystem::Pypi),
-            ["app/requirements-dev.txt", "app/pyproject.toml"]
-        );
-        let first = nearest(&all, "app/x.py", Ecosystem::Pypi).map(|m| m.path.as_str());
-        assert_eq!(first, Some("app/pyproject.toml"));
-        assert_eq!(
-            near("tools/x.py", Ecosystem::Pypi),
-            ["tools/requirements.txt"]
+            holding("tools/x.py", Ecosystem::Pypi),
+            [
+                "tools/requirements.txt",
+                "pyproject.toml",
+                "requirements.txt"
+            ]
         );
         // A manifest of another ecosystem, deeper or not, is not the file's.
         assert_eq!(
-            near("app/web/x.ts", Ecosystem::Npm),
+            holding("app/web/x.ts", Ecosystem::Npm),
             ["app/web/package.json"]
         );
-        assert!(near("x.ts", Ecosystem::Npm).is_empty());
+        assert!(holding("x.ts", Ecosystem::Npm).is_empty());
+        // A requirements file names no package: the file belongs to the nearest
+        // `pyproject.toml`, and to the nearest `package.json` for npm.
+        let owner = |path, e| owner(&all, path, e).map(|m| m.path.as_str());
+        assert_eq!(owner("tools/x.py", Ecosystem::Pypi), Some("pyproject.toml"));
+        assert_eq!(
+            owner("app/x.py", Ecosystem::Pypi),
+            Some("app/pyproject.toml")
+        );
+        assert_eq!(
+            owner("app/web/x.ts", Ecosystem::Npm),
+            Some("app/web/package.json")
+        );
     }
 
     #[test]
