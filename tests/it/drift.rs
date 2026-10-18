@@ -1,9 +1,9 @@
 //! Shape drift (spec #23): the field paths a consumer reads from the parsed response, against
 //! the shape of the route it links to, over the drift chain (`common::drift_chain`).
 
-mod common;
+use crate::common;
 
-use common::{assert_golden, decisions, drift_chain};
+use common::{assert_golden, decisions, drift_chain, without_processes};
 use meada::engine::{self, Direction, Engine, Start};
 
 #[test]
@@ -12,7 +12,7 @@ fn export_carries_consumer_shapes_and_drift() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    assert_golden("chain-drift-web.export.json", &export);
+    assert_golden("chain-drift-web.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn export_carries_the_shapes_of_returned_object_literals() {
         (&catalog, "chain-drift-catalog.export.json"),
     ] {
         let export = Engine::open(repo).unwrap().export().unwrap();
-        assert_golden(golden, &export);
+        assert_golden(golden, &without_processes(&export));
     }
 }
 

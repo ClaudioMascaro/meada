@@ -1,12 +1,12 @@
 //! Gateway prefixes (spec #19): `[serve] prefix` and `[serve] strip` declare how a gateway
 //! rewrites the paths of a provider, and a consumer calling the public path links through it.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;
 
-use common::{age, assert_golden, fixture_repo};
+use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 
 /// The consumer `gateway-client` with its providers next to it: (client, orders, billing). The
@@ -27,7 +27,7 @@ fn calls_through_a_gateway_path_link_inferred_and_direct_calls_keep_linking() {
 
     let export = Engine::open(&client).unwrap().export().unwrap();
 
-    assert_golden("gateway-client.export.json", &export);
+    assert_golden("gateway-client.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn the_export_carries_the_gateway_path_of_each_route() {
 
     let export = Engine::open(&billing).unwrap().export().unwrap();
 
-    assert_golden("gateway-billing.export.json", &export);
+    assert_golden("gateway-billing.export.json", &without_processes(&export));
 }
 
 #[test]

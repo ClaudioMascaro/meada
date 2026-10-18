@@ -1,7 +1,7 @@
 //! Freshness (ADR 0004): every query first brings the index up to date with the files on
 //! disk, and a refreshed index exports exactly what a cold index of the same files does.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;

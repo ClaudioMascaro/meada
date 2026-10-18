@@ -2,7 +2,7 @@
 //! resource `orders` through `cancelOrder`, the worker reads it through `settleOrders` and the
 //! catalog reads it as a whole repository.
 
-mod common;
+use crate::common;
 
 use common::{assert_golden, chain, loose_chain};
 use meada::engine::{self, Direction, Engine, Start};

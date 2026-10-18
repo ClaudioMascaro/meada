@@ -153,4 +153,23 @@ and JavaScript files), median of three runs on a 16-thread Linux laptop:
 At today's 664 files: 1.3 s, 23.6 MB and 0.26 s. Tokens count 4 bytes each, as the answer budget
 does. These numbers gate 1.0, not this release.
 
+Communities and processes (spec #31) were measured on 2026-10-17 on the same repository, at the
+same commit and at that day's 692 files. The runs used release builds of `main` just before and
+just after the spec, each a median of three runs on a 16-thread Linux laptop with 7.2 GiB of
+RAM. MB here means 10^6 bytes.
+
+| Metric | Target | 634 files, before → after | 692 files, before → after |
+| --- | --- | --- | --- |
+| Cold index time | ≤ 7 s | 1.81 s → 1.80 s | 2.20 s → 2.12 s |
+| Cold index size | ≤ 37 MB | 22.7 MB → 23.0 MB | 26.8 MB → 27.1 MB |
+| Single-file reindex | ≤ 1 s | 0.74 s → 0.76 s | 0.89 s → 0.92 s |
+| Tool list | ≤ 1k tokens | | 620 tokens |
+| Default answer | ≤ 2k tokens | | 1,996 tokens, the largest of 11 answers |
+
+The tool list counts the whole `tools/list` result as compact JSON. Among the 11 answers are
+`context` on the three most-called symbols, each with its community and process membership,
+and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 s to a reindex.
+The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
+692 files it is close to its target.
+
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0

@@ -1,8 +1,8 @@
-mod common;
+use crate::common;
 
 use std::fs;
 
-use common::{age, assert_golden, fixture_repo, git};
+use common::{age, assert_golden, fixture_repo, git, without_processes};
 use meada::engine::Engine;
 
 #[test]
@@ -23,7 +23,7 @@ fn export_matches_golden() {
 
     let export = Engine::open(&repo).unwrap().export().unwrap();
 
-    assert_golden("ts-basic.export.json", &export);
+    assert_golden("ts-basic.export.json", &without_processes(&export));
 }
 
 #[test]

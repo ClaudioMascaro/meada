@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::fixture_repo;
 use rmcp::{

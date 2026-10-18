@@ -1,5 +1,4 @@
 //! Test harness: fixture repositories on disk and golden files.
-#![allow(dead_code)] // each test binary uses a different part of this module
 
 pub mod stub;
 
@@ -10,7 +9,8 @@ use std::process::Command;
 /// Copies `tests/fixtures/<fixture>` to `<CARGO_TARGET_TMPDIR>/<case>/<fixture>` and makes the
 /// copy a repository of its own: `git init`, `origin` set to `origin` when given, and one
 /// commit of every file. Fixtures live inside Meada's repository, so they are never used in
-/// place. `case` must be unique per test, since tests run in parallel.
+/// place. `case` must be unique per test of every module, since they all run in parallel in one
+/// process.
 pub fn fixture_repo(case: &str, fixture: &str, origin: Option<&str>) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(case)
@@ -224,6 +224,24 @@ pub fn assert_golden(name: &str, actual: &str) {
         "{name} differs from its golden file; review the diff and rerun with MEADA_BLESS=1 to \
          accept it\n--- actual ---\n{actual}"
     );
+}
+
+/// `export` without its `processes`, for an export golden whose test is about something else:
+/// the steps repeat the calls and links, so each change to the walk or to what it crosses would
+/// re-bless every export golden. The chain's own exports (spec #31), the conformance export and
+/// the `*.processes.json` goldens keep them.
+pub fn without_processes(export: &str) -> String {
+    let Some(start) = export.find(",\n  \"processes\": [") else {
+        // A change to the export's layout must not let the processes back into the goldens.
+        assert!(
+            !export.contains("\"processes\""),
+            "processes left in:\n{export}"
+        );
+        return export.to_string();
+    };
+    // The array ends at the first line that is `  ]`: the arrays inside it are indented deeper.
+    let end = start + export[start..].find("\n  ]").unwrap() + "\n  ]".len();
+    format!("{}{}", &export[..start], &export[end..])
 }
 
 fn copy_dir(from: &Path, to: &Path) {

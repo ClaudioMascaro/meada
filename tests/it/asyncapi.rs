@@ -4,11 +4,11 @@
 //! and `meada status`. Over `asyncapi-events` (the documents) and `asyncapi-services` (the
 //! code on the other side of them).
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{self, Direction, Engine, Start};
 use serde_json::Value;
 
@@ -27,10 +27,10 @@ fn documented_channels_are_exported_with_their_payload_shapes() {
     let events = services.with_file_name("asyncapi-events");
 
     let export = Engine::open(&events).unwrap().export().unwrap();
-    assert_golden("asyncapi-events.export.json", &export);
+    assert_golden("asyncapi-events.export.json", &without_processes(&export));
 
     let export = Engine::open(&services).unwrap().export().unwrap();
-    assert_golden("asyncapi-services.export.json", &export);
+    assert_golden("asyncapi-services.export.json", &without_processes(&export));
 }
 
 #[test]

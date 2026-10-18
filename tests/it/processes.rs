@@ -2,7 +2,7 @@
 //! processes, and `trace` reads one from `process::<entry point identity>`, over the chain
 //! fixture.
 
-mod common;
+use crate::common;
 
 use std::fs;
 
