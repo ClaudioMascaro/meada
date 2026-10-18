@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -258,6 +259,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "documents",
         &documents_found(root, &all, serve),
         now,
+        |abs| read_up_to(abs, document::MAX_BYTES),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
     refresh_stamped(
@@ -265,6 +267,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "manifests",
         &manifests_found(&all),
         now,
+        |abs| read_up_to(abs, package::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
@@ -279,22 +282,22 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
-    // Config files, read whole on every refresh: they are few and small (`read_config`). A
-    // `**/` name takes every file of that name the walk found, in path order.
+    // Config files, read on every refresh (`read_config`): they are few and small. A `**/` name
+    // takes every file of that name the walk found, in path order.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
-            let paths: BTreeMap<&str, PathBuf> = match name.strip_prefix("**/") {
+            let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
                 Some(file) => (all.iter())
-                    .filter(|(path, _)| path.rsplit('/').next() == Some(file))
-                    .map(|(path, abs)| (path.as_str(), abs.clone()))
+                    .map(|(path, _)| path.as_str())
+                    .filter(|path| path.rsplit('/').next() == Some(file))
                     .collect(),
-                None => BTreeMap::from([(name, root.join(name))]),
+                None => BTreeSet::from([name]),
             };
-            for (path, abs) in paths {
-                if let Some(src) = read_config(&abs) {
+            for path in paths {
+                if let Some(src) = read_config(root, path) {
                     digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
                     digest.update(&src);
                     found.push((path, src));
@@ -740,6 +743,25 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
+/// The pack config file at `path` under `root` (`tsconfig.json`, `pyproject.toml`, each
+/// `Cargo.toml`), read as a manifest is (`read_up_to`): the pack's reader takes one past
+/// `package::MAX_BYTES` as invalid. Like the walk, the read goes through no symbolic link.
+pub(crate) fn read_config(root: &Path, path: &str) -> Option<Vec<u8>> {
+    read_up_to(&plain_file(root, path)?, package::MAX_BYTES).ok()
+}
+
+/// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
+/// the rest holds (`package::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
+/// for a provider document): the rest is never read, and what was read stands for the whole
+/// file wherever it is hashed.
+fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {
+    let mut src = Vec::new();
+    fs::File::open(abs)?
+        .take(max as u64 + 1)
+        .read_to_end(&mut src)?;
+    Ok(src)
+}
+
 /// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`,
 /// `Cargo.toml`) and its
 /// `tsconfig.json` files (path and absolute path), but those under a `node_modules` directory,
@@ -755,13 +777,14 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
 
 /// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
 /// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// hash, then `summarize` only what changed. A stored row not found, or whose file cannot be
-/// statted or read, leaves the table.
+/// `read` and hash, then `summarize` only what changed. A stored row not found, or whose file
+/// cannot be statted or read, leaves the table.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
     found: &[(String, PathBuf)],
     now: SystemTime,
+    read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
 ) -> Result<()> {
     let stored: HashMap<String, Stamp> = tx
@@ -784,7 +807,7 @@ fn refresh_stamped(
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
-        let Ok(src) = fs::read(abs) else {
+        let Ok(src) = read(abs) else {
             seen.remove(path.as_str());
             continue;
         };
@@ -846,20 +869,6 @@ pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
 
 /// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
 /// [`with_reversed_walk`]).
-/// The largest config file a pack is handed (`tsconfig.json`, `pyproject.toml`, each
-/// `Cargo.toml`); a larger one is not read, as if absent, with no status line.
-// ponytail: configs are a few KiB; the limit keeps a crafted one from being read and hashed
-// on every refresh.
-const MAX_CONFIG: u64 = 1 << 20;
-
-/// The bytes of the config file at `abs`, stat'ed first: `None` when it is missing, unreadable
-/// or larger than `MAX_CONFIG`.
-pub(crate) fn read_config(abs: &Path) -> Option<Vec<u8>> {
-    (fs::metadata(abs).ok()?.len() <= MAX_CONFIG)
-        .then(|| fs::read(abs).ok())
-        .flatten()
-}
-
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
@@ -1545,21 +1554,8 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{MAX_CONFIG, SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
+    use super::{SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
     use crate::{document, lang, package};
-
-    #[test]
-    fn a_config_past_the_size_limit_is_not_read() {
-        let dir = std::env::temp_dir().join(format!("meada-config-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        let (at, past) = (dir.join("at.toml"), dir.join("past.toml"));
-        fs::write(&at, vec![b' '; MAX_CONFIG as usize]).unwrap();
-        fs::write(&past, vec![b' '; MAX_CONFIG as usize + 1]).unwrap();
-        assert_eq!(read_config(&at).map(|s| s.len()), Some(MAX_CONFIG as usize));
-        assert_eq!(read_config(&past), None);
-        assert_eq!(read_config(&dir.join("missing.toml")), None);
-        fs::remove_dir_all(&dir).unwrap();
-    }
 
     #[test]
     fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {
@@ -1587,6 +1583,7 @@ mod tests {
             "manifests",
             &found,
             std::time::SystemTime::now(),
+            |abs| fs::read(abs),
             |_, _| Ok("{}".into()),
         )
         .unwrap();
@@ -1597,6 +1594,25 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
         assert_eq!(paths, ["Cargo.toml"]);
+    }
+
+    #[test]
+    fn a_config_file_is_read_up_to_one_byte_past_the_size_limit() {
+        let root = std::env::temp_dir().join(format!("meada-index-config-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("tsconfig.json"),
+            " ".repeat(package::MAX_BYTES * 2),
+        )
+        .unwrap();
+        fs::write(root.join("jsconfig.json"), "{}").unwrap();
+
+        let large = read_config(&root, "tsconfig.json").map(|src| src.len());
+        let small = read_config(&root, "jsconfig.json");
+        fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(large, Some(package::MAX_BYTES + 1));
+        assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its

@@ -118,6 +118,15 @@ pub trait LanguagePack {
         &[]
     }
 
+    /// Whether a star import binds the names it takes as any other top-level binding does, in
+    /// statement order, the last binding of a name deciding (Python's `from m import *`): the
+    /// pack then lists `Facts::exports` last binding first. Otherwise a star only re-exports (an
+    /// ES `export * from`): the module's own exports win over it, and two that give a name
+    /// differently export neither.
+    fn stars_bind(&self) -> bool {
+        false
+    }
+
     /// The producer and consumer calls of the message libraries the pack knows (spec #20),
     /// read from its files' facts through `code`: a call counts only when its receiver traces
     /// back to the library's package (`Code::origin`), and its channel name is evaluated like
@@ -366,6 +375,9 @@ pub enum Star {
     Public,
     /// Only these names: a literal `__all__`.
     Only(Vec<String>),
+    /// Some of those not starting with `_`, not known which: a computed `__all__`. A star
+    /// import may or may not take each, so what it binds is not sure to rebind a name.
+    Computed,
 }
 
 impl Star {
@@ -373,7 +385,7 @@ impl Star {
     pub fn takes(&self, name: &str) -> bool {
         match self {
             Star::ExceptDefault => name != "default",
-            Star::Public => !name.starts_with('_'),
+            Star::Public | Star::Computed => !name.starts_with('_'),
             Star::Only(names) => names.iter().any(|n| n == name),
         }
     }

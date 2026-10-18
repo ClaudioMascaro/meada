@@ -256,7 +256,7 @@ fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> St
         let name = name.strip_prefix("**/").unwrap_or(name);
         for dir in &dirs {
             let config = format!("{dir}{name}");
-            if let Some(src) = crate::index::read_config(&root.join(&config)) {
+            if let Some(src) = crate::index::read_config(root, &config) {
                 found.push((config, src));
             }
         }

@@ -136,7 +136,7 @@ impl LanguagePack for Python {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
                         if scope.is_empty() {
-                            module.names.push(name.to_string());
+                            module.name(name);
                         }
                         if defined.insert(inner.clone()) {
                             if !is_class {
@@ -213,7 +213,9 @@ impl LanguagePack for Python {
                 }
                 // ponytail: an import binds its names for the whole file, wherever it sits; a
                 // function-local one also hides an outer binding there, but other functions
-                // see it too.
+                // see it too. A star import that rebinds a name is not placed against the code
+                // that reads it either (`Resolver::rebound`): code run while the module loads
+                // gets the name unknown, a function the star import's.
                 "import_statement" | "import_from_statement" => {
                     let first = facts.imports.len();
                     imports(node, src, &mut facts.imports);
@@ -234,12 +236,17 @@ impl LanguagePack for Python {
                     }
                 }
                 "assignment" | "augmented_assignment" => {
-                    if scope.is_empty() && node.kind() == "assignment" {
+                    if scope.is_empty() {
                         module.assign(node, src);
                     }
                     locals.assign(node, &scope, src);
                 }
                 "as_pattern" if node.parent().is_some_and(|p| p.kind() == "with_item") => {
+                    if let Some(alias) = node.child_by_field_name("alias")
+                        && scope.is_empty()
+                    {
+                        module.targets(alias, src);
+                    }
                     locals.with_item(node, &scope, src);
                 }
                 // Other bindings say nothing of a class, but hide an outer binding of the name.
@@ -253,6 +260,13 @@ impl LanguagePack for Python {
                         _ => "alias",
                     };
                     let target = node.child_by_field_name(field);
+                    // A comprehension's variables are its own, not the module's.
+                    if let Some(target) = target
+                        && scope.is_empty()
+                        && node.kind() != "for_in_clause"
+                    {
+                        module.targets(target, src);
+                    }
                     for target in target.map(targets).unwrap_or_default() {
                         locals.target(target, &scope, Class::Unknown, Evidence::Assigned, src);
                     }
@@ -263,7 +277,11 @@ impl LanguagePack for Python {
                         captures(pattern, 0, &mut found);
                     }
                     for name in found {
-                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
+                        let name = text(name, src);
+                        if scope.is_empty() {
+                            module.name(name);
+                        }
+                        locals.bind(&scope, name, Class::Unknown, Evidence::Assigned);
                     }
                 }
                 // A lambda's calls belong to the enclosing scope, which its parameters bind.
@@ -299,6 +317,13 @@ impl LanguagePack for Python {
                 flat: inner_flat,
             }));
         }
+        // A function's `global x` may run at any time after the module's own bindings: it is
+        // bound last, after every star import.
+        for (scope, name, ..) in &locals.written {
+            if locals.declared.get(&(scope.clone(), name.clone())) == Some(&true) {
+                module.name(name);
+            }
+        }
         (facts.exports, facts.star) = module.exports();
         (facts.receivers, facts.consts) = locals.finish();
         Ok(facts)
@@ -310,6 +335,10 @@ impl LanguagePack for Python {
 
     fn messages(&self, code: &Code) -> Vec<Message> {
         messages::messages(code)
+    }
+
+    fn stars_bind(&self) -> bool {
+        true
     }
 
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
@@ -353,55 +382,75 @@ struct Visit<'t> {
 /// What a module binds at its top level, which makes up its exports.
 #[derive(Default)]
 struct Module {
-    names: Vec<String>,
-    /// The names of a literal `__all__`; `None` when there is none, or it is computed.
-    all: Option<Vec<String>>,
-    /// The modules `from m import *` brings in.
-    stars: Vec<String>,
+    /// Every top-level binding in statement order: a name (`Export::Local`) or a star import
+    /// (`Export::All`).
+    bindings: Vec<Export>,
+    /// What a star import takes by `__all__`: the names of a literal one, or `Star::Computed`;
+    /// `None` when there is none.
+    all: Option<Star>,
 }
 
 impl Module {
     fn import(&mut self, imports: &[Import]) {
         for import in imports {
             match import.name {
-                Imported::All => self.stars.push(import.source.clone()),
-                _ if !import.local.contains('.') => self.names.push(import.local.clone()),
+                Imported::All => self.bindings.push(Export::All {
+                    source: import.source.clone(),
+                }),
+                _ if !import.local.contains('.') => self.name(&import.local),
                 _ => {}
             }
         }
     }
 
+    fn name(&mut self, name: &str) {
+        self.bindings.push(Export::Local {
+            exported: name.to_string(),
+            local: name.to_string(),
+        });
+    }
+
+    /// The names an unpacking or `as` target binds; `self.x` binds none at the top level.
+    fn targets(&mut self, node: Node, src: &[u8]) {
+        for target in targets(node)
+            .into_iter()
+            .filter(|t| t.kind() == "identifier")
+        {
+            self.name(text(target, src));
+        }
+    }
+
+    /// A top-level assignment, `x += ...` and `a, b = ...` included, and a literal `__all__`.
     fn assign(&mut self, node: Node, src: &[u8]) {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
-        if left.kind() != "identifier" {
-            return;
+        if left.kind() != "identifier" || node.kind() != "assignment" {
+            return self.targets(left, src);
         }
         let name = text(left, src);
-        self.names.push(name.to_string());
+        self.name(name);
         if name == "__all__" {
-            self.all = node
-                .child_by_field_name("right")
-                .and_then(|right| string_list(right, src));
+            let right = node.child_by_field_name("right");
+            let names = right.and_then(|right| string_list(right, src));
+            self.all = Some(names.map_or(Star::Computed, Star::Only));
         }
     }
 
     /// What an explicit import or an attribute access names: every module-level name (imports
-    /// included, as that is how a package re-exports) and its star imports' names. What
-    /// `import *` takes is a literal `__all__`, else the public names; a computed `__all__` is
-    /// ignored.
+    /// included, as that is how a package re-exports) and its star imports' names, the last
+    /// binding first, as it rebinds a name the bindings before it gave (`stars_bind`): a name
+    /// once, where it was last bound, and every star import. What `import *` takes is a literal
+    /// `__all__`, else the public names, which a computed `__all__` may take or not.
     fn exports(self) -> (Vec<Export>, Star) {
         let mut seen = HashSet::new();
-        let exports = (self.names.into_iter())
-            .filter(|n| seen.insert(n.clone()))
-            .map(|name| Export::Local {
-                exported: name.clone(),
-                local: name,
+        let exports = (self.bindings.into_iter().rev())
+            .filter(|e| match e {
+                Export::Local { exported, .. } => seen.insert(exported.clone()),
+                _ => true,
             })
-            .chain(self.stars.into_iter().map(|source| Export::All { source }))
             .collect();
-        (exports, self.all.map_or(Star::Public, Star::Only))
+        (exports, self.all.unwrap_or(Star::Public))
     }
 }
 
