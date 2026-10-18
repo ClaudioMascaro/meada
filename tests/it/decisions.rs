@@ -2,7 +2,7 @@
 //! links and unresolved consumers into links at the level `decided`. The chain fixture has two
 //! open items, both in `chain-web`; `tests/fixtures/decisions/` holds the files that resolve them.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

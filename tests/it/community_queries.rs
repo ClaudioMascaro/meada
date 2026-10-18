@@ -1,6 +1,6 @@
 //! Communities and processes in `search` and `context` (spec #31), over the chain fixture.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

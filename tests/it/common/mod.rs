@@ -1,5 +1,4 @@
 //! Test harness: fixture repositories on disk and golden files.
-#![allow(dead_code)] // each test binary uses a different part of this module
 
 pub mod stub;
 
@@ -10,7 +9,8 @@ use std::process::Command;
 /// Copies `tests/fixtures/<fixture>` to `<CARGO_TARGET_TMPDIR>/<case>/<fixture>` and makes the
 /// copy a repository of its own: `git init`, `origin` set to `origin` when given, and one
 /// commit of every file. Fixtures live inside Meada's repository, so they are never used in
-/// place. `case` must be unique per test, since tests run in parallel.
+/// place. `case` must be unique per test of every module, since they all run in parallel in one
+/// process.
 pub fn fixture_repo(case: &str, fixture: &str, origin: Option<&str>) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(case)

@@ -1,7 +1,7 @@
 //! Shape drift (spec #23): the field paths a consumer reads from the parsed response, against
 //! the shape of the route it links to, over the drift chain (`common::drift_chain`).
 
-mod common;
+use crate::common;
 
 use common::{assert_golden, decisions, drift_chain, without_processes};
 use meada::engine::{self, Direction, Engine, Start};

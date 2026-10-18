@@ -2,7 +2,7 @@
 //! from the environment, the `chat` requests, `--show-request`, and the network boundary (no
 //! other command reaches the decider). Every run asserts that the key appears in no output.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;

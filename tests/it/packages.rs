@@ -1,7 +1,7 @@
 //! Packages (spec #22): every named `package.json` of a workspace repository provides
 //! `package::npm::<name>`, and every dependency entry naming such a package links to it.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};

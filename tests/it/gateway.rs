@@ -1,7 +1,7 @@
 //! Gateway prefixes (spec #19): `[serve] prefix` and `[serve] strip` declare how a gateway
 //! rewrites the paths of a provider, and a consumer calling the public path links through it.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

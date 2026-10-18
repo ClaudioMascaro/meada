@@ -2,7 +2,7 @@
 //! producers and consumers are listed across the workspace, and a side whose name Meada cannot
 //! evaluate shows as unresolved and is never linked.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

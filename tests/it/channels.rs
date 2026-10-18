@@ -2,7 +2,7 @@
 //! only on clients that trace back to their library, linked from every consumer to every
 //! producer of the same channel, in the same repository too.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

@@ -1,6 +1,6 @@
 //! The built binary's messages follow `LANG` (ADR 0008).
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;

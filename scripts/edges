@@ -29,7 +29,7 @@ for arg in "$@"; do
   [ -e "$repo" ] && { echo "scripts/edges: two directories named $(basename "$repo")" >&2; exit 1; }
   cp -R "$dir" "$repo"
   rm -rf "$repo/.git" "$repo/.meada"
-  # Pinned like tests/common/mod.rs, so ids and hashes match across machines.
+  # Pinned like tests/it/common/mod.rs, so ids and hashes match across machines.
   (
     cd "$repo"
     export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1

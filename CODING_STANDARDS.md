@@ -52,7 +52,7 @@ indexing carries on.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
 - Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
-  `docs/agents/architecture.md` (`tests/docs.rs` checks the name is there), and a unit test
+  `docs/agents/architecture.md` (`tests/it/docs.rs` checks the name is there), and a unit test
   feeds it an input past the limit.
 
 ## Docs move with the capability

@@ -3,7 +3,7 @@
 //! missing peer is reported apart. Each variant edits the chain after it was indexed, so
 //! `status` also shows that it refreshes before it reports.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

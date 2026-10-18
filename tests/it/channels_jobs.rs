@@ -2,7 +2,7 @@
 //! of the `Worker` of the same name, `xadd` to the function that reads the stream with
 //! `xreadgroup`, in the ioredis and node-redis styles.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

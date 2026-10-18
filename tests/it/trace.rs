@@ -3,7 +3,7 @@
 //! client wrapper, imported path constants, a base URL variable, a mount prefix, an absolute
 //! URL on a declared host, a path both B and C serve, an unresolved URL and a cycle in C.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;

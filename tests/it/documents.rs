@@ -2,7 +2,7 @@
 //! provider contracts, merged with the code routes they match, over the documented chain
 //! (`common::documented_chain`).
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};

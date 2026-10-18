@@ -1,7 +1,7 @@
 //! `meada decide` in human mode (spec #18, ADR 0006): the binary driven through scripted
 //! standard input over the chain fixture's two open items, both in `chain-web`.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;

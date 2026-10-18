@@ -4,7 +4,7 @@
 //! and `meada status`. Over `asyncapi-events` (the documents) and `asyncapi-services` (the
 //! code on the other side of them).
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

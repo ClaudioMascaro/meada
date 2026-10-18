@@ -1,7 +1,7 @@
 //! Open items (spec #18): the ambiguous links and unresolved consumers of a workspace, their
 //! sorted candidates, and how `search` lists them.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

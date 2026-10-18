@@ -2,7 +2,7 @@
 //! client wrappers around `fetch`, Express routers under mount prefixes, inline route
 //! handlers, and links Meada can only infer, leave ambiguous or leave out.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 
