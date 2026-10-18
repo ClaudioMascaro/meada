@@ -15,6 +15,7 @@ use super::{
 };
 use crate::{Result, qualify};
 
+mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
 mod values;
@@ -216,6 +217,11 @@ struct Scan {
     uses: HashMap<String, usize>,
     /// The plain names the parameters of each function bind, as `(function, name)`.
     params: HashSet<(String, String)>,
+    /// The path each name a `use` binds imports, as written (the last of them, when it binds the
+    /// name more than once, which `uses` counts).
+    targets: HashMap<String, Vec<String>>,
+    /// The macros the file defines: a `format!` it defines itself is not the standard one.
+    macros: HashSet<String>,
 }
 
 /// What the paths of a file need besides its own items: imports of the file itself and of
@@ -271,6 +277,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
+    // The Strings a function builds, by scope and name, and the names two of them share.
+    let mut candidates: values::Builders = HashMap::new();
+    let mut clash: HashSet<(String, String)> = HashSet::new();
+    let mut spent = 0;
     // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
@@ -299,11 +309,27 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         let in_module = pure && scope == module && matches!(body, Body::Items);
         let deep = levels(&scope) >= DEFINITION_DEPTH;
         let mut locals = Vec::new();
+        // A `let mut` String the rest of its block only reads and appends to. Two in one scope
+        // under one name are told apart by no position the Reader has: neither is kept.
+        if !deep
+            && builders::candidate(node)
+            && let Some(name) = field(node, "pattern").filter(|p| p.kind() == "identifier")
+            && let Some(found) = builders::builder(node, src, &mut spent)
+        {
+            let key = (scope.clone(), text(name, src).to_string());
+            if !clash.contains(&key) && candidates.insert(key.clone(), found).is_some() {
+                candidates.remove(&key);
+                clash.insert(key);
+            }
+        }
         match node.kind() {
             // Macro bodies are token trees; attributes are read by the item they sit on.
-            "macro_invocation" | "macro_definition" | "attribute_item" | "inner_attribute_item" => {
+            "macro_definition" => {
+                scan.macros
+                    .extend(field(node, "name").map(|n| text(n, src).to_string()));
                 continue;
             }
+            "macro_invocation" | "attribute_item" | "inner_attribute_item" => continue,
             "use_declaration" => {
                 let public = is_pub(node, src);
                 let mut found = Vec::new();
@@ -315,6 +341,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 for Leaf { segments, name } in found {
                     if let Some(name) = &name {
                         *scan.uses.entry(qualify(&scope, name)).or_default() += 1;
+                        scan.targets.insert(qualify(&scope, name), segments.clone());
                         if in_module {
                             export(&mut facts, &mut public_names, public, name, &module, open);
                         }
@@ -790,11 +817,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         }
     }
     // The values, now that the file's `use` declarations are known.
-    let mut reader = Reader {
-        src,
-        scan: &scan,
-        heads: &mut heads,
-    };
+    let mut reader = Reader::new(src, &scan, &mut heads, &candidates);
     let mut constants = HashSet::new();
     for Held { at, node, put } in held {
         match put {
@@ -1573,6 +1596,164 @@ mod tests {
         };
         assert!(read(values::VALUE_DEPTH - 1));
         assert!(!read(values::VALUE_DEPTH));
+    }
+
+    /// The first argument of each call to `g` in `src`: a string as its text (`<x>` for a name in
+    /// it, `{}` for a hole), a name as `@x`, anything else as `?`.
+    fn read(src: &str) -> Vec<String> {
+        use crate::lang::{Part, Value};
+        let show = |value: &Value| match value {
+            Value::Str(parts) => (parts.iter())
+                .map(|p| match p {
+                    Part::Text(t) => t.clone(),
+                    Part::Ref(r) => format!("<{r}>"),
+                    Part::Env(e) => format!("env:{e}"),
+                    Part::Hole => "{}".into(),
+                })
+                .collect::<String>(),
+            Value::Ref(name) => format!("@{name}"),
+            _ => "?".into(),
+        };
+        let calls = facts(src).calls.into_iter();
+        let calls = calls.filter(|c| c.callee == "g");
+        calls.map(|c| show(&c.args[0])).collect()
+    }
+
+    #[test]
+    fn a_string_a_function_builds_holds_the_pushes_before_each_read() {
+        let src = "fn f() {\n    let mut u = String::from(\"/a\");\n    g(&u);\n\
+                   u.push_str(\"/b\");\n    u.push('/');\n    u += \"c\";\n    g(&u);\n\
+                   g(format!(\"{u}!\"));\n    g(u);\n}\n";
+        assert_eq!(read(src), ["/a", "/a/b/c", "/a/b/c!", "/a/b/c"]);
+    }
+
+    #[test]
+    fn a_string_something_else_may_change_is_not_a_builder() {
+        // A loop, a branch, a `&mut`, a macro that writes, another binding of the name, a
+        // method that changes it, and a closure that shadows it.
+        for body in [
+            "for p in ps { u.push_str(p); }",
+            "if c { u.push_str(\"/b\"); }",
+            "h(&mut u);",
+            "write!(u, \"/b\");",
+            "let u = \"/x\";",
+            "u.insert(0, 'x');",
+            "u = String::new();",
+        ] {
+            let src = format!("fn f() {{ let mut u = String::from(\"/a\"); {body} g(&u); }}");
+            assert_eq!(read(&src), ["@u"], "{body}");
+        }
+        // Two in one scope under one name: neither is told apart.
+        let twice = "fn f(c: bool) { if c { let mut u = String::from(\"/a\"); g(&u); } \
+                     else { let mut u = String::from(\"/b\"); g(&u); } }";
+        assert_eq!(read(twice), ["@u", "@u"]);
+    }
+
+    #[test]
+    fn a_string_that_doubles_or_chains_is_read_up_to_its_limits() {
+        let doubling = (0..40).map(|_| "u.push_str(&u);").collect::<String>();
+        let src = format!("fn f() {{ let mut u = String::from(\"a\"); {doubling} g(&u); }}");
+        assert_eq!(read(&src), ["{}"]);
+        // Each String pushes the one before it: past the depth limit the chain is a hole.
+        let chain = |n: usize| {
+            let mut src = String::from("fn f() { let mut s0 = String::from(\"a\");\n");
+            for i in 1..=n {
+                let before = i - 1;
+                // A `+=` is no call, so no earlier read has folded the String it adds.
+                src += &format!("let mut s{i} = String::new(); s{i} += &s{before};\n");
+            }
+            src + &format!("g(&s{n}); }}")
+        };
+        assert_eq!(read(&chain(builders::BUILDER_DEPTH - 2)), ["a"]);
+        assert!(read(&chain(builders::BUILDER_DEPTH + 2))[0].contains("{}"));
+    }
+
+    #[test]
+    fn the_builders_of_a_file_scan_up_to_a_budget() {
+        let n = 3000;
+        let mut src = String::from("fn f() {\n");
+        for i in 0..n {
+            src += &format!("let mut s{i} = String::from(\"/{i}\"); g(&s{i});\n");
+        }
+        let found = read(&(src + "}"));
+        assert_eq!(found.len(), n);
+        assert_eq!(found[0], "/0");
+        assert_eq!(found[n - 1], format!("@s{}", n - 1));
+    }
+
+    #[test]
+    fn format_and_concat_fold_literals_and_plain_names() {
+        for (call, expected) in [
+            ("format!(\"/a/{}/{}\", \"b\", c)", "/a/b/<c>"),
+            ("format!(\"/{0}/{1}/{0}\", \"x\", y)", "/x/<y>/x"),
+            ("format!(\"/{p}/{q}\", q = \"z\", p = r)", "/<r>/z"),
+            ("format!(\"/{p}\")", "/<p>"),
+            ("format!(\"{{/{p}}}\")", "{/<p>}"),
+            ("format!(\"/{}\", x.y)", "/{}"),
+            ("format!(\"/{}\", h())", "/{}"),
+            ("format!(\"/{:?}\", z)", "/{}"),
+            ("format!(\"/{z:>8}\")", "/{}"),
+            ("format!(\"/{}\", 5)", "/5"),
+            ("format!(\"/{}\", 5u8)", "/{}"),
+            ("format!(\"/{}\", true)", "/true"),
+            ("format!(\"/{}\", \"a\",)", "/a"),
+            ("std::format!(\"/{}\", \"a\")", "/a"),
+            ("concat!(\"/a\", \"/b\", 7, y)", "/a/b7{}"),
+            // Not a format string, a count that does not match, or a macro of the file.
+            ("format!(\"/{}\")", "?"),
+            ("format!(\"/{}/{}\", a)", "?"),
+            ("format!(\"/{.*}\", 1, 2)", "?"),
+            ("format!(\"/}\", 1)", "?"),
+            ("format!(x, 1)", "?"),
+            ("format!()", "?"),
+            ("format!(\"/a\",, \"b\")", "?"),
+            ("other!(\"/a\")", "?"),
+        ] {
+            let src = format!("fn f() {{ g({call}); }}");
+            assert_eq!(read(&src), [expected], "{call}");
+        }
+        let own = "macro_rules! format { ($($t:tt)*) => { String::new() } }\n\
+                   fn f() { g(format!(\"/a\")); }";
+        assert_eq!(read(own), ["?"]);
+    }
+
+    #[test]
+    fn a_string_conversion_keeps_the_text_and_a_sum_needs_a_string() {
+        for (value, expected) in [
+            ("\"/a\".to_string()", "/a"),
+            ("String::from(\"/a\")", "/a"),
+            ("String::new()", ""),
+            ("A.to_string() + \"/b\"", "<A>/b"),
+            ("\"/a\".to_owned() + \"/b\" + b", "/a/b<b>"),
+            ("\"/a\".to_string() + h()", "/a{}"),
+            ("a + b", "?"),
+            ("A.into()", "?"),
+            ("\"/a\".replace(\"a\", \"b\")", "?"),
+        ] {
+            let src = format!("fn f() {{ g({value}); }}");
+            assert_eq!(read(&src), [expected], "{value}");
+        }
+    }
+
+    #[test]
+    fn a_method_constant_is_text_only_from_an_http_crate() {
+        let name = |head: &str, call: &str| {
+            let src = format!("{head}\nfn f() {{ g({call}); }}");
+            read(&src)
+        };
+        assert_eq!(name("use reqwest::Method;", "Method::PUT"), ["PUT"]);
+        assert_eq!(name("use http::Method;", "Method::PUT"), ["PUT"]);
+        assert_eq!(name("", "reqwest::Method::DELETE"), ["DELETE"]);
+        // The file's own `Method`, another crate's, and a name that is no verb.
+        for (head, call) in [
+            ("enum Method { PUT }", "Method::PUT"),
+            ("use mine::Method;", "Method::PUT"),
+            ("use reqwest::Method;", "Method::PURGE"),
+            ("use reqwest::Method;\nuse mine::Method;", "Method::PUT"),
+        ] {
+            let found = name(head, call);
+            assert!(found[0].starts_with('@'), "{head} {call}: {found:?}");
+        }
     }
 
     #[test]

@@ -842,6 +842,25 @@ one for the area a change touches.
   router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
   nothing mounts.
+- Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
+  (2^20 syntax nodes per file, over every `let mut`), `BUILDER_DEPTH` (64 builders read within
+  one another) and `BUILDER_SIZE` (4096, bytes of text plus parts): a `let mut` String past the
+  budget is unknown, and one read past the depth or the size is a hole (`push_str(&s)` of
+  itself doubles). A `let mut` String is a builder only when its block reads it, `push_str`s,
+  `push`es and `+=`s it in statements of that block; a push in a branch or a loop, `&mut s`,
+  `write!(s, ..)`, another binding of the name, a method that changes it (`insert`, `clear`)
+  or a second builder of that name in the scope leave it unknown. `format!` and `concat!` read
+  a literal format string and arguments that are a literal or a plain name; a spec such as
+  `{:.*}` or `{:1$}`, a count that does not match or a `{`/`}` left alone are unknown; a macro
+  of another name or one the file defines (`macro_rules!`, in this file only) is not read.
+  `Method::GET` is text only through a `use` of one name from `reqwest`, `http`, `hyper`,
+  `axum` or `actix_web`, or written in full from one of them; a glob import or an alias is not
+  followed. `a + b` is a string only when one side is a string literal or a conversion: two
+  names may add numbers. Rust clients: a client held in a field of a struct (`self.client`), in
+  a `static` or a `OnceLock`, and a client from a crate other than `reqwest` and `ureq`
+  (`hyper`, `surf`, `isahc`, `attohttpc`) are not read; a client parameter is followed through
+  the callers that pass a constructor, as in Python; `reqwest::Request::new` and
+  `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

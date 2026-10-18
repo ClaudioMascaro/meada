@@ -108,7 +108,22 @@ modules updates it.
   returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
   `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
   a value counts (module constants, caller parameters, return values). A `get` on any other
-  object is nothing.
+  object is nothing. Rust clients (spec #30 #131) are the same code with two more `LIBRARIES`
+  entries: `reqwest` (modules `reqwest` and `reqwest.blocking`; clients `Client::new`,
+  `Client::builder()`, `ClientBuilder::new` and the `blocking` equivalents, a builder chain
+  followed to its constructor by `fluent`) and `ureq` (module functions; clients `agent()`,
+  `Agent::new*`, `AgentBuilder::new`). The receiver of a chain (`Client::new().get(..)`,
+  `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::value_origins`. The method
+  is the name, or `request(Method::X, url)` (reqwest: a `Method` of `reqwest`, `http`, `hyper`,
+  `axum` or `actix_web`, written in full or imported with `use`) and `request("X", url)`
+  (ureq). `lang/rust/values.rs` folds the URL like any `Value`: literals, `+` (one side a
+  string), `String::from`, `.to_string()`, `.to_owned()`, `.as_str()`, `format!` and `concat!`
+  (the format string, `{}`, `{0}`, `{name}`, `{name}` captures, `name = value` arguments and
+  `{{`/`}}`; an argument that is a literal or a plain name folds, any other is a `Part::Hole`,
+  and so is a format spec such as `{:?}` or `{x:>8}`; a `format!` the file defines itself is
+  unknown), and `lang/rust/builders.rs` a `let mut` String whose block only reads it and
+  appends with `push_str`, `push` and `+=` statements: a read holds the text of the pushes
+  before it. A `Part::Env` is left to #132.
   `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like

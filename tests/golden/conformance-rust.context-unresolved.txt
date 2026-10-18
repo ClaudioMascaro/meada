@@ -1,0 +1,12 @@
+example.com/acme/conformance crates/worker/src/dynamic.rs:6-8 unresolved
+community: crates/worker/src
+processes: none
+pub async fn unresolved() {
+    let _ = reqwest::get(pick()).await;
+}
+callers: none
+callees:
+example.com/acme/conformance crates/worker/src/dynamic.rs:1 pick
+example.com/acme/conformance crates/worker/src/dynamic.rs:7 (unresolved) reqwest.get
+contracts:
+example.com/acme/conformance crates/worker/src/dynamic.rs:7 consumes (unresolved) reqwest.get
