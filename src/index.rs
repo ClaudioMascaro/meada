@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 27;
+const SCHEMA_VERSION: i64 = 29;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -68,7 +68,7 @@ const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    facts TEXT NOT NULL, resolved TEXT NOT NULL
+    facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
@@ -162,6 +162,8 @@ struct Stored {
     mtime: Option<i64>,
     size: i64,
     resolved: String,
+    /// `files.setting`: `Facts::setting` of the stored facts.
+    setting: String,
 }
 
 /// What the index knows of a document: its hash and the stat seen when it was hashed.
@@ -235,7 +237,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
     };
     let stored: HashMap<String, Stored> = tx
-        .prepare("SELECT path, hash, mtime, size, resolved FROM files")?
+        .prepare("SELECT path, hash, mtime, size, resolved, setting FROM files")?
         .query_map([], |r| {
             Ok((
                 r.get(0)?,
@@ -244,6 +246,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                     mtime: r.get(2)?,
                     size: r.get(3)?,
                     resolved: r.get(4)?,
+                    setting: r.get(5)?,
                 },
             ))
         })?
@@ -276,37 +279,6 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
-    let mut changed = Vec::new();
-    for &(path, abs, pack) in &walked {
-        let (size, mtime, trusted) = stat(abs, now)?;
-        let known = stored.get(path);
-        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
-            continue;
-        }
-        let mtime = mtime.filter(|_| trusted);
-        let src = fs::read(abs)?;
-        let hash = blake3::hash(&src).to_hex().to_string();
-        if known.is_some_and(|k| k.hash == hash) {
-            tx.execute(
-                "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
-                params![path, mtime, size],
-            )?;
-            continue;
-        }
-        let facts = lang::pack(pack).parse(path, &src)?;
-        changed.push(Parsed {
-            path: path.clone(),
-            hash,
-            mtime,
-            size,
-            facts,
-        });
-    }
-    let deleted: Vec<&String> = stored
-        .keys()
-        .filter(|p| !packs.contains_key(p.as_str()))
-        .collect();
-
     // Config files, read whole on every refresh: they are few and small (`read_config`). A
     // `**/` name takes every file of that name the walk found, in path order.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
@@ -330,6 +302,48 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             }
         }
     }
+    // What the configs make of each file's facts (`LanguagePack::settings`): a file parsed
+    // under another setting is parsed again, whatever its content.
+    let settings: BTreeMap<usize, _> = (configs.iter())
+        .map(|(&pack, found)| {
+            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
+            (pack, lang::pack(pack).settings(&found))
+        })
+        .collect();
+    let mut changed = Vec::new();
+    for &(path, abs, pack) in &walked {
+        let setting = settings[&pack](path);
+        let (size, mtime, trusted) = stat(abs, now)?;
+        let known = stored.get(path);
+        let current = known.is_some_and(|k| k.setting == setting);
+        if current && known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size)
+        {
+            continue;
+        }
+        let mtime = mtime.filter(|_| trusted);
+        let src = fs::read(abs)?;
+        let hash = blake3::hash(&src).to_hex().to_string();
+        if current && known.is_some_and(|k| k.hash == hash) {
+            tx.execute(
+                "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
+                params![path, mtime, size],
+            )?;
+            continue;
+        }
+        let facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+        changed.push(Parsed {
+            path: path.clone(),
+            hash,
+            mtime,
+            size,
+            facts,
+        });
+    }
+    let deleted: Vec<&String> = stored
+        .keys()
+        .filter(|p| !packs.contains_key(p.as_str()))
+        .collect();
+
     // An edited `package.json` or `tsconfig.json` changes which files keep shapes (`surface`),
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
@@ -455,7 +469,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
         for path in misses {
             let src = fs::read(root.join(&path))?;
-            let facts = lang::pack(packs[path.as_str()]).parse(&path, &src)?;
+            let pack = packs[path.as_str()];
+            let facts = lang::pack(pack).parse_with(&path, &src, &settings[&pack](&path))?;
             reparsed.insert(path, facts);
         }
     };
@@ -839,7 +854,7 @@ const MAX_CONFIG: u64 = 1 << 20;
 
 /// The bytes of the config file at `abs`, stat'ed first: `None` when it is missing, unreadable
 /// or larger than `MAX_CONFIG`.
-fn read_config(abs: &Path) -> Option<Vec<u8>> {
+pub(crate) fn read_config(abs: &Path) -> Option<Vec<u8>> {
     (fs::metadata(abs).ok()?.len() <= MAX_CONFIG)
         .then(|| fs::read(abs).ok())
         .flatten()
@@ -866,13 +881,14 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
 /// its contracts with the repository's, and links are derived from contracts when queried.
 fn write_file(tx: &Transaction, p: &Parsed) -> Result<()> {
     tx.execute(
-        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '')",
+        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '', ?6)",
         params![
             p.path,
             p.hash,
             p.mtime,
             p.size,
-            serde_json::to_string(&p.facts)?
+            serde_json::to_string(&p.facts)?,
+            p.facts.setting
         ],
     )?;
     Ok(())

@@ -22,6 +22,19 @@ pub trait LanguagePack {
     /// What one file defines, imports, exports and calls. `path` is repository-relative.
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
 
+    /// `parse` under the file's `setting`, what `settings` answers for its path. A pack whose
+    /// facts depend on its config files overrides both; a change of the setting parses the file
+    /// again, whatever its content.
+    fn parse_with(&self, path: &str, src: &[u8], _setting: &str) -> Result<Facts> {
+        self.parse(path, src)
+    }
+
+    /// What the config files make of each file's facts, from the config files as `modules`
+    /// gets them: Rust's default features of the crate a file belongs to.
+    fn settings(&self, _configs: &[(&str, &[u8])]) -> Box<dyn Fn(&str) -> String> {
+        Box::new(|_| String::new())
+    }
+
     /// Repository-relative files that configure how imports name files, such as
     /// `tsconfig.json`. The shared side reads those present and hands them to `modules` and
     /// `members`. A name starting with `**/` names every file of that name the walk finds, at
@@ -210,6 +223,13 @@ pub struct Facts {
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
+    /// Whether the file opens with an inner `#![cfg(..)]` that is false for the target: it is
+    /// left out of the crate, as if no `mod` reached it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unbuilt: bool,
+    /// The `settings` the file was parsed under; the index parses it again when they change.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub setting: String,
 }
 
 /// A block whose definitions are members of a type: those named `scope.<member>`. An inherent

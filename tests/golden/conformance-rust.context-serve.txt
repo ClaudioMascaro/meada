@@ -1,5 +1,5 @@
 example.com/acme/conformance api/src/routes/mod.rs:5-9 serve
-community: api/src#3
+community: api/src#5
 processes: 1 (1 program; 1 repository): main (example.com/acme/conformance)
 pub fn serve(store: &Store) {
     health::check();
@@ -7,8 +7,8 @@ pub fn serve(store: &Store) {
     store.save();
 }
 callers:
-example.com/acme/conformance api/src/main.rs:111 main
+example.com/acme/conformance api/src/main.rs:124 main
 callees:
 example.com/acme/conformance api/src/routes/health.rs:1 check
 example.com/acme/conformance api/src/store.rs:42 Store.save
-example.com/acme/conformance api/src/main.rs:184 compute
+example.com/acme/conformance api/src/main.rs:197 compute
