@@ -6,9 +6,10 @@ modules updates it.
 
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
-  `conformance` (pack; for Python also its HTTP providers and consumers,
-  over `conformance-python`, `python-mounts` and `python-django`), `xlang` (a TypeScript and a
-  Python repository linked both ways: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  `conformance` (pack; for Python also its HTTP providers and consumers
+  and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
+  `python-django`), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
+  and over a Kafka topic: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an

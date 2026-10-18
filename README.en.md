@@ -189,10 +189,12 @@ Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`
 to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
 Django on the serving side, also behind a gateway), through
-the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs`), RabbitMQ
-queues (`amqplib`, with a `publish` to an exchange reaching the queues its bindings tie to it),
-Amazon SQS queues (AWS SDK v3 and `sqs-consumer`), NATS subjects (with the `*` and `>`
-wildcards), BullMQ jobs and Redis streams (`ioredis` and `node-redis`), with the producer linked
+the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
+`confluent-kafka` and `kafka-python`), RabbitMQ queues (`amqplib` and, in Python, `pika`, with a
+`publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK
+v3, `sqs-consumer` and, in Python, `boto3`), NATS subjects (`nats` and, in Python, `nats-py`, with
+the `*` and `>` wildcards), BullMQ jobs and Redis streams (`ioredis`, `node-redis` and, in Python,
+`redis-py`), with the producer linked
 to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
 also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
 listed in `[serve] documents`: the routes and channels they describe become contracts, with the

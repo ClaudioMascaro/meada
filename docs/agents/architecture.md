@@ -177,8 +177,9 @@ one for the area a change touches.
   into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
   stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
-  its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
+  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
+  method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
+  `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
   <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
@@ -480,6 +481,17 @@ one for the area a change touches.
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
+- `lang/python/messages.rs`: a client is traced to its constructor by `Code::origins` (a name its
+  scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
+  value a function returns), with one level of `channel()` or `client()` above it (a pika
+  channel of a connection, a boto3 client of a session); deeper factories, a client held in a
+  container and a module imported under another path (`kafka.producer.KafkaProducer`) are not
+  recognized. A boto3 client counts for SQS when its service is the literal `"sqs"` (a name or
+  constant is not followed). A pika `queue_bind` whose queue, exchange or routing key is left out
+  or not a literal is dropped. A callback is a handler when it is a definition of the repository
+  (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
+  function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
+  constant folded to one); a dict built otherwise is an unresolved stream.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.

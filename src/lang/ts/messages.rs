@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::lang::{Handler, Message, Part, Role, Value, literal, property};
+use crate::lang::{
+    Handler, Message, Role, Value, channel_name as name, literal, property, queue_name,
+};
 use crate::resolve::Code;
 
 const KAFKAJS: &str = "kafkajs";
@@ -306,17 +308,6 @@ fn options(args: &[Value]) -> Option<Option<&[(String, Value)]>> {
     }
 }
 
-/// A channel name as evaluated: `None` when it depends on a parameter, `Some(None)` when it is
-/// not a literal string (an environment read, a runtime value, a regular expression).
-fn name(value: &Value) -> Option<Option<String>> {
-    match value {
-        Value::Ref(_) => None,
-        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        Value::Str(parts) => Some(literal(parts)),
-        _ => Some(None),
-    }
-}
-
 /// The channel name a call gives as its first argument: a NATS subject, the queue of a BullMQ
 /// `Queue` or `Worker`, the key of a Redis `xadd`, an amqplib queue.
 fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
@@ -329,19 +320,7 @@ fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
     let Some(options) = options(args)? else {
         return Some(vec![None]);
     };
-    let parts = match property(options, key).ok()? {
-        Some(Value::Str(parts)) => parts,
-        Some(Value::Ref(_)) => return None,
-        _ => return Some(vec![None]),
-    };
-    match parts.last() {
-        Some(Part::Text(tail)) if tail.contains('/') => {
-            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
-            Some(vec![queue.map(String::from)])
-        }
-        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        _ => Some(vec![None]),
-    }
+    Some(vec![queue_name(property(options, key).ok()?)?])
 }
 
 /// The streams an ioredis `xreadgroup` reads: the arguments after `STREAMS` that name them,

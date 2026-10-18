@@ -7,9 +7,13 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Receiver, Star, Value, children, named, text,
+    LanguagePack, Message, Modules, Param, Part, Receiver, Star, Value, children, literal, named,
+    text,
 };
+use crate::resolve::Code;
 use crate::{Result, parent, qualify};
+
+mod messages;
 
 pub struct Python;
 
@@ -211,6 +215,10 @@ impl LanguagePack for Python {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["pyproject.toml"]
+    }
+
+    fn messages(&self, code: &Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
@@ -987,8 +995,27 @@ fn value(node: Node, src: &[u8]) -> Value {
             Value::Str,
         ),
         "list" | "tuple" => Value::List(named(node).map(|item| value(item, src)).collect()),
+        "dictionary" => Value::Object(named(node).filter_map(|entry| pair(entry, src)).collect()),
+        "await" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
         "parenthesized_expression" => named(node).next().map_or(Value::Unknown, |n| value(n, src)),
         _ => parts(node, src).map_or(Value::Unknown, Value::Str),
+    }
+}
+
+/// An entry of a dict literal as a property of `Value::Object`: a string literal key is the
+/// key, any other key is `[]` holding the list of the key and the value; `**d` is a spread.
+fn pair(node: Node, src: &[u8]) -> Option<(String, Value)> {
+    match node.kind() {
+        "pair" => {
+            let key = node.child_by_field_name("key")?;
+            let item = value(node.child_by_field_name("value")?, src);
+            Some(match parts(key, src).and_then(|p| literal(&p)) {
+                Some(key) => (key, item),
+                None => ("[]".into(), Value::List(vec![value(key, src), item])),
+            })
+        }
+        "dictionary_splat" => Some(("...".into(), value(named(node).next()?, src))),
+        _ => None,
     }
 }
 

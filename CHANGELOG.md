@@ -17,6 +17,11 @@ All notable changes to Meada are recorded here. The format follows
   to TypeScript repositories both ways. A base URL read from the environment links through
   `base_url_env`. A router or URLconf Meada cannot place, and a route with a part it cannot
   read, stay out of the map rather than being guessed.
+- Python message channels, linked to the same channels in TypeScript both ways: Kafka
+  (`confluent-kafka`, `kafka-python`), RabbitMQ (`pika`, with exchanges and bindings), Amazon SQS
+  (`boto3`), NATS (`nats-py`, wildcards `inferred`) and Redis streams (`redis-py`: `xadd` and the
+  streams of `xreadgroup`). A call counts only when its client traces back to the library's
+  constructor; a channel name Meada cannot evaluate is an unresolved side, never linked.
 
 ## [0.1.0] - Unreleased
 
