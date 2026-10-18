@@ -50,10 +50,12 @@ sample.ts
       },
       "params": [
         {
-          "name": "id"
+          "name": "id",
+          "binds": "Any"
         },
         {
           "name": "",
+          "binds": "Any",
           "fields": [
             {
               "name": "limit",
@@ -72,10 +74,12 @@ sample.ts
       },
       "params": [
         {
-          "name": "port"
+          "name": "port",
+          "binds": "Any"
         },
         {
-          "name": ""
+          "name": "",
+          "binds": "Any"
         }
       ]
     },
@@ -88,10 +92,12 @@ sample.ts
       },
       "params": [
         {
-          "name": "_req"
+          "name": "_req",
+          "binds": "Any"
         },
         {
-          "name": "res"
+          "name": "res",
+          "binds": "Any"
         }
       ]
     },
@@ -167,6 +173,7 @@ sample.ts
       }
     }
   ],
+  "star": "ExceptDefault",
   "calls": [
     {
       "scope": "",
@@ -270,6 +277,371 @@ sample.ts
     "serve.host",
     "serve.item",
     "serve.error"
+  ],
+  "receivers": []
+}
+
+sample.py
+{
+  "defs": [
+    {
+      "name": "Circle",
+      "kind": "Class",
+      "range": {
+        "start": 207,
+        "end": 498
+      },
+      "params": [],
+      "bases": [
+        "Shape"
+      ]
+    },
+    {
+      "name": "Circle.__init__",
+      "kind": "Method",
+      "range": {
+        "start": 251,
+        "end": 345
+      },
+      "params": [
+        {
+          "name": "self",
+          "binds": "Instance"
+        },
+        {
+          "name": "radius",
+          "binds": "Any"
+        }
+      ]
+    },
+    {
+      "name": "Circle.unit",
+      "kind": "Method",
+      "range": {
+        "start": 351,
+        "end": 430
+      },
+      "params": [
+        {
+          "name": "cls",
+          "binds": "Class"
+        },
+        {
+          "name": "args",
+          "binds": "Rest"
+        },
+        {
+          "name": "scale",
+          "binds": "Keyword"
+        },
+        {
+          "name": "kwargs",
+          "binds": "Rest"
+        }
+      ],
+      "decorators": [
+        "classmethod"
+      ]
+    },
+    {
+      "name": "Circle.describe",
+      "kind": "Method",
+      "range": {
+        "start": 436,
+        "end": 498
+      },
+      "params": [
+        {
+          "name": "label",
+          "binds": "Keyword"
+        }
+      ],
+      "decorators": [
+        "staticmethod"
+      ]
+    },
+    {
+      "name": "area",
+      "kind": "Function",
+      "range": {
+        "start": 501,
+        "end": 681
+      },
+      "params": [
+        {
+          "name": "circle",
+          "binds": "Any"
+        },
+        {
+          "name": "factor",
+          "binds": "Any"
+        }
+      ],
+      "decorators": [
+        "require_GET"
+      ]
+    },
+    {
+      "name": "main",
+      "kind": "Function",
+      "range": {
+        "start": 684,
+        "end": 746
+      },
+      "params": []
+    }
+  ],
+  "imports": [
+    {
+      "local": "os",
+      "source": "os",
+      "name": "Namespace"
+    },
+    {
+      "local": "os.path",
+      "source": "os.path",
+      "name": "Namespace"
+    },
+    {
+      "local": "Shape",
+      "source": "shapes",
+      "name": {
+        "Member": {
+          "name": "Shape",
+          "module": "shapes.Shape"
+        }
+      }
+    },
+    {
+      "local": "helpers",
+      "source": ".",
+      "name": {
+        "Member": {
+          "name": "helpers",
+          "module": ".helpers"
+        }
+      }
+    },
+    {
+      "local": "*",
+      "source": ".models",
+      "name": "All"
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "os",
+        "local": "os"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Shape",
+        "local": "Shape"
+      }
+    },
+    {
+      "Local": {
+        "exported": "helpers",
+        "local": "helpers"
+      }
+    },
+    {
+      "Local": {
+        "exported": "__all__",
+        "local": "__all__"
+      }
+    },
+    {
+      "Local": {
+        "exported": "BASE",
+        "local": "BASE"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Circle",
+        "local": "Circle"
+      }
+    },
+    {
+      "Local": {
+        "exported": "area",
+        "local": "area"
+      }
+    },
+    {
+      "Local": {
+        "exported": "main",
+        "local": "main"
+      }
+    },
+    {
+      "All": {
+        "source": ".models"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "Circle",
+      "area"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Circle.__init__",
+      "callee": "Client",
+      "range": {
+        "start": 337,
+        "end": 345
+      }
+    },
+    {
+      "scope": "Circle.unit",
+      "callee": "cls",
+      "range": {
+        "start": 424,
+        "end": 430
+      }
+    },
+    {
+      "scope": "",
+      "callee": "app.get",
+      "range": {
+        "start": 502,
+        "end": 526
+      },
+      "decorates": "area"
+    },
+    {
+      "scope": "area",
+      "callee": "open",
+      "range": {
+        "start": 585,
+        "end": 614
+      }
+    },
+    {
+      "scope": "area",
+      "callee": "os.path.join",
+      "range": {
+        "start": 590,
+        "end": 613
+      }
+    },
+    {
+      "scope": "area",
+      "callee": "handle.read",
+      "range": {
+        "start": 634,
+        "end": 647
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "Circle",
+      "range": {
+        "start": 708,
+        "end": 717
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "helpers.log",
+      "range": {
+        "start": 722,
+        "end": 746
+      }
+    },
+    {
+      "scope": "main",
+      "callee": "area",
+      "range": {
+        "start": 734,
+        "end": 745
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "__all__"
+    },
+    {
+      "name": "BASE"
+    },
+    {
+      "name": "Circle.client"
+    },
+    {
+      "name": "area.handle"
+    },
+    {
+      "name": "main.shape"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "",
+      "name": "BASE",
+      "class": "Unknown"
+    },
+    {
+      "scope": "",
+      "name": "__all__",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Circle",
+      "name": "client",
+      "class": "Unknown"
+    },
+    {
+      "scope": "Circle",
+      "name": "radius",
+      "class": {
+        "Named": "float"
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "name": "radius",
+      "class": {
+        "Named": "float"
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "name": "self",
+      "class": "Enclosing"
+    },
+    {
+      "scope": "Circle.unit",
+      "name": "cls",
+      "class": "Enclosing"
+    },
+    {
+      "scope": "area",
+      "name": "circle",
+      "class": {
+        "Named": "Circle"
+      }
+    },
+    {
+      "scope": "area",
+      "name": "handle",
+      "class": {
+        "Named": "open"
+      }
+    },
+    {
+      "scope": "main",
+      "name": "shape",
+      "class": {
+        "Named": "Circle"
+      }
+    }
   ]
 }
 
@@ -417,6 +789,53 @@ sample.package.json
   "types": "./dist/index.d.ts",
   "module": "./dist/index.mjs",
   "main": "./dist/index.cjs"
+}
+
+sample.pyproject.toml
+{
+  "name": "example-sample",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "field": "project.dependencies",
+      "name": "requests"
+    },
+    {
+      "field": "project.dependencies",
+      "name": "shared-lib",
+      "range": ">=1.0,<2"
+    },
+    {
+      "field": "tool.poetry.dependencies",
+      "name": "shared-tools",
+      "range": "^0.3"
+    }
+  ],
+  "roots": [
+    "src"
+  ],
+  "scripts": [
+    [
+      "example.cli",
+      "main"
+    ]
+  ]
+}
+
+sample.requirements.txt
+{
+  "dependencies": [
+    {
+      "field": "requirements",
+      "name": "shared-lib",
+      "range": ">=1.0"
+    },
+    {
+      "field": "requirements",
+      "name": "shared-tools",
+      "range": "==0.3.0"
+    }
+  ]
 }
 
 sample.tsconfig.json

@@ -1,0 +1,3 @@
+example.com/acme/conformance build process::example.com/acme/conformance::reports/__init__.py::build (program)
+example.com/acme/conformance Registry.build process::example.com/acme/conformance::defs.py::Registry.build (export)
+example.com/acme/conformance Panel.build process::example.com/acme/conformance::methods.py::Panel.build (export)

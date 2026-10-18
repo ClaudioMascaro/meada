@@ -1,0 +1,6 @@
+# Pins for the deployment.
+-r requirements-dev.txt
+-e ./vendor/local
+--index-url https://pypi.example.com/simple
+Shared.Tools==0.3.0  # the helpers
+git+https://example.com/pkg/other.git#egg=other

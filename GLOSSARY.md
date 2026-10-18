@@ -69,10 +69,10 @@ search, context and the export, never linked.
 _Avoid_: dynamic call, unknown call
 
 **Client wrapper**:
-A function whose call to an HTTP client (`fetch`) or a message client (a Kafka producer) takes
-its URL, method or channel name from the function's own parameters. Each call site of the
-wrapper is a consumer or producer, read with its arguments in place of the parameters, through
-any number of wrapper levels.
+A function whose call to an HTTP client (`fetch`, or `requests`, `httpx` or `aiohttp` in
+Python) or a message client (a Kafka producer) takes its URL, method or channel name from the
+function's own parameters. Each call site of the wrapper is a consumer or producer, read with its
+arguments in place of the parameters, through any number of wrapper levels.
 _Avoid_: API client, helper, fetcher
 
 **Contract**:
@@ -83,6 +83,13 @@ _Avoid_: interface, integration
 **Contract kind**:
 A category of contract with its own matching rules, such as HTTP route, channel or package.
 _Avoid_: contract type, protocol
+
+**Package ecosystem**:
+The registry a package is published to, which decides the manifests that declare it and the
+second part of its contract: npm (`package.json`, `package::npm::<name>`) or PyPI
+(`pyproject.toml` and `requirements*.txt`, `package::pypi::<name>`). A dependency links only
+to a package of its own ecosystem, so an npm and a PyPI package of one name never link.
+_Avoid_: registry, package manager, language
 
 **Gateway prefix**:
 The rewrite a gateway applies to the paths of a repository: `prefix` is added in front, `strip`
@@ -193,7 +200,8 @@ _Avoid_: step, jump
 **Entry point**:
 A door into a repository: each route an HTTP handler serves (kind `route`, the handler a
 function or a file), each channel a consumer handler consumes (kind `channel`), each program
-start a language pack declares (kind `program`, a door even when called) and each exported
+start a language pack declares or a manifest names, such as a console script of a
+`pyproject.toml` (kind `program`, a door even when called) and each exported
 function or method that nothing in its repository calls, directly or through a package import
 of the same repository, an ambiguous candidate counting as a caller and a self-call not (kind
 `export`). It has an identity (the handler's identity plus, for a route or a channel, the

@@ -32,11 +32,12 @@ one for the area a change touches.
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
-  language adapter and the TS/JS pack. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS and Python packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
-  resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
+  resource and channel kinds. `package.rs`: npm and PyPI packages as contracts (specs #22 and
+  #24). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -74,9 +75,11 @@ one for the area a change touches.
   and entry points are unique by identity. The stored export entry points are candidates:
   `Engine::exports` drops, after `package::import`, each one that is the target of an import
   from its own repository (a monorepo), at any level.
-- Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
-  `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
-  path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
+- Package: `package::npm::<name>` or `package::pypi::<name>` (the PEP 503 normalized name),
+  provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
+  `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
+  path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
+  `requirements` for a `requirements*.txt`). Both sites hold a `::`, which `Engine::export` needs to keep their links.
   A call through a package import that resolves is also a consumer of the package, at its call
   site, linked to the provider's symbol (`<repository>::<path>::<name>`).
 - Document route: `<repository>::<document path>::<METHOD> <path>`, the site of a route only a
@@ -90,7 +93,8 @@ one for the area a change touches.
   another community is already named (a directory `src#2`), so the name is unique.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
-  unresolved side). A path parameter of any spelling is `{}`.
+  unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
+  is `{}`. A provider of every method is `http::ANY::<path>`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   publishes, packages, dependencies, imports, communities, links, processes}`;
   `communities` (absent when empty) lists each community as `{name, members}`, by name, with
@@ -106,7 +110,8 @@ one for the area a change touches.
   target, where `level` is the import's own level (how certain the entry and the name were), not
   the hop's: the link from that call carries the hop's level, the weaker of it and the package
   link's. `how` is the field or rule that named the entry (`exports`, `types`, `module`,
-  `main`, `path`, or `outDir` when the output-to-source mapping found the file); for an
+  `main`, `path`, or `outDir` when the output-to-source mapping found the file; for a Python
+  import, `moduleName` or `topLevel`, spec #24); for an
   `ambiguous` import it names the declared field or rule whose entry could not be followed to a
   source file; a provider has
   `gateway` when `[serve]` rewrites its path, and `shape` (`{source, fields, open, scalars,
@@ -164,20 +169,25 @@ one for the area a change touches.
   a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
   calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
   of the contract itself, with the roles `sides` names.
-- New **package ecosystem** (spec #22 user story 26, track B packs): a pack for another manifest
-  format (`Cargo.toml`, `pyproject.toml`, `go.mod`) plugs in beside npm without a new kind of
-  contract. Discovery is a file name in `manifests_found` (`index.rs`), which stamps the file
-  into `manifests` like `package.json`; a reader per ecosystem, beside `package::read`, turns
-  its bytes into the same `Summary` (name, version, dependency entries, entry fields) and never
-  fails; the contract is `package::<ecosystem>::<name>` (`package::npm::<name>` is the first),
-  so `PREFIX` still routes it to the same `declare`, `consume`, `link`, `place` and `reached`;
-  and the reason grammar and `flag` stay the one function each, with the ecosystem's range
-  syntax checked there (a range it cannot check is `range unchecked`). Resolving an import
-  into the provider is the ecosystem's own rule (`ways`, `Provided`). A change to what is
-  stored bumps `SCHEMA_VERSION`.
+- New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
+  `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
+  `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
+  name, which `package::is_manifest` makes `manifests_found` (`index.rs`) stamp into
+  `manifests`; `Ecosystem::read` (behind `package::read_manifest`) turns the bytes into the same
+  `Summary` (name, version, dependency entries, entry fields, source roots, console scripts) and never fails;
+  `Ecosystem::prefix` gives the contract `package::<ecosystem>::<name>`, so `PREFIX` still
+  routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
+  keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
+  (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
+  `flag`; PyPI's is never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
+  range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
+  its file's (`Ecosystem::of_source`), and resolving the import into the provider is the
+  ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
+  `pypi_resolutions`, `Provided::module`). A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`), matching a call's method and the `Code::origin` of
-  its receiver (package and `expr`), reading the name through `Code::expand` (a reader that
+  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
+  method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
+  `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
   <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
@@ -272,15 +282,23 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
-  A pack is done when that suite passes. A pack that has program entry points fills
+  A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
+  shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
+  class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
+  its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
+  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  writes none of them (TypeScript writes no bases or receivers) gets name matches where those
+  would have resolved. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
   entry point is top-level code, `parse` yields a definition for that code (the calls it makes
   belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
   golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
-  which names a function of another file) needs a repository-level step that the pack adds in
-  its own ticket, feeding `entry::Local::programs` with `entry::Program`s. The forms per language are spec #31 "Program entry points per language
+  which names a function of another file) needs a repository-level step feeding
+  `entry::Local::programs` with `entry::Program`s: for Python, `package::python_programs` maps the
+  `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
+  edit re-extract) to files through `python_roots`. The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
@@ -329,12 +347,14 @@ one for the area a change touches.
   hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
   document it could not read), and what spec #22 stores of the build and package files: the
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
-  written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
+  written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
+  `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
+  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
   each community's name and member identities (`communities`, spec #31). `Call::args`,
-  `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::type_params`, `Param::default`,
+  `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
@@ -445,9 +465,14 @@ one for the area a change touches.
   simple path up the callers, and does not climb a call found only by a name match, so a wrapper
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
-  binds, is read where it stands; a parameter captured by a closure is unknown; a nested or rest
+  binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
+  not climb such a call either; a parameter captured by a closure is unknown (`Code::origins`
+  does not follow it either; nor a name its scope binds more than once, or an attribute not
+  assigned a call once in its class); a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
-  makes the names it may override unknown.
+  makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
+  its ancestors in C3 order) longer than that is absent, so every member of the class is
+  unknown (a name match at most), and the linearization recurses no deeper down the bases.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
@@ -470,6 +495,19 @@ one for the area a change touches.
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
+- `lang/python/messages.rs`: a client is traced to its constructor by `Code::origins` (a name its
+  scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
+  value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
+  `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
+  `client()` above it (a pika channel of a connection, a boto3 client of a session); deeper
+  factories, a client held in a container and a module imported under another path
+  (`kafka.producer.KafkaProducer`) are not recognized. A boto3 client counts for SQS when its
+  service is the literal `"sqs"` (a name or constant is not followed). A topic that starts with
+  `^` is a regular expression, so it is an unresolved name. A pika `queue_bind` whose queue, exchange or routing key is left out
+  or not a literal is dropped. A callback is a handler when it is a definition of the repository
+  (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
+  function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
+  constant folded to one); a dict built otherwise is an unresolved stream.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
@@ -477,7 +515,19 @@ one for the area a change touches.
   (1 MiB; a larger file reads as empty, but is read whole first, as code and documents are) and
   `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
   length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
-  calls a longer one `range unchecked`. Import resolution: `exported` follows at most
+  calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
+  `MAX_BYTES` hold for `pyproject.toml` and `requirements*.txt` too (a file past it, not UTF-8
+  or not TOML reads as empty; the toml crate's own depth limit stops nested input); a
+  requirements file is read line by line, its option lines (`-r`, `-e`, `-c`, `--index-url`),
+  URLs and paths skipped (a Poetry `git` or `url` source too), and what `-r` names is not
+  followed; environment markers and extras
+  are dropped and a direct reference (`name @ url`) is no entry; Poetry groups and
+  `[project.optional-dependencies]` are not read; a range is never evaluated (no marker). A
+  Python import is looked up in the distributions every PyPI manifest of a directory holding
+  the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
+  `pyproject.toml` declares, or `src`); a namespace package (a directory without
+  `__init__.py`) exposes nothing, and an import several distributions expose is `ambiguous` for
+  each, its reason naming none of the others (no marker). Import resolution: `exported` follows at most
   `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
@@ -606,10 +656,53 @@ one for the area a change touches.
 - `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
   scanning the calls of every repository, once per link (no marker); an index by call id waits
   for a workspace that makes this slow.
-- `http.rs`: an Express app or router passed as a parameter, `router.route(path)` chains and
-  `require` are not followed.
+- `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
+  `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
+  stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
+  defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
+  chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
+  of nested calls costs up to `FOLD_DEPTH` steps per call. `DEFINITION_DEPTH` (128): a
+  function or class nested deeper is not a definition (its body belongs to the one around it,
+  its name and parameters are locals that hide outer ones there, and its `return`s are no
+  one's), since qualified names and `Resolver::lexical` cost time cubic in the nesting.
+  `TARGET_DEPTH` (64 nodes): a name deeper in an unpacking target or a `case` pattern is not
+  bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
+  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
+  (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
+  Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
+  packages (a pack sees no file list). An import binds its names for the whole file, wherever
+  it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
+  there for the whole scope (the safe side: a name match instead of `exact`). A write to an
+  attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
+  class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
+  tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
+  table form (`{ callable = "...", extras = [...] }`) is left out, and so are
+  `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the
+  scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
+  module's global of that name; only the first `__main__` of a file (a guard or a
+  `def __main__()`) counts.
+- `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
+  that depends on a parameter is not read through callers (it yields no route). A FastAPI
+  mount whose child cannot be read hides every other app of its framework that nothing else
+  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
+  walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
+  module included under several prefixes is read once for each), so the entries past it yield
+  no provider; what
+  an extension of `urlpatterns` adds other than a list literal is left out (marked in
+  `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
+  yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf
+  (`require_POST(view)`), a handler method a class-based view inherits and `as_view()` on a
+  class outside the repository yield nothing; a `re_path()` pattern is read as written, so a
+  non-raw string with doubled backslashes yields nothing. Python clients: a receiver that is the
+  result of a call (`Session().get(...)`, `make().get(...)`) or an attribute set from anything
+  but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
+  client takes the base of every caller that passes one, and several different bases make it a
+  hole.
 - `entry.rs`: an export entry point is a function, or a method of an exported class (a
-  constructor excepted), that the `exports` rows name and no call reaches in its repository,
+  constructor excepted), whose exported name the exporting file's `Facts::star` lets through when
+  its pack names a public set (Python: no leading `_`, or a literal `__all__`; TypeScript names
+  none, so all pass), that the `exports` rows name and no call reaches in its repository,
   an ambiguous candidate counting as a caller and a self-call not; a call through a package
   import of its own repository counts too, but only at query time (`Engine::exports`), so the
   stored rows over-list in a monorepo. A method of a class that is not exported, a

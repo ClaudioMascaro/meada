@@ -1,0 +1,5 @@
+{
+  "name": "shared-lib",
+  "version": "9.0.0",
+  "description": "An npm package with the PyPI distribution's name: never linked to it."
+}

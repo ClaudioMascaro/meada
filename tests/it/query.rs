@@ -104,6 +104,66 @@ fn context_lists_every_candidate_of_an_ambiguous_call() {
 }
 
 #[test]
+fn python_functions_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_python",
+        "conformance-python",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    assert_golden(
+        "conformance-python.search-scale.txt",
+        &engine.search("scale", None, None).unwrap(),
+    );
+    // Callers through an alias, a dotted import and the same file; a callee through a
+    // relative import.
+    assert_golden(
+        "conformance-python.context-scale.txt",
+        &engine.context("scale", None).unwrap(),
+    );
+    // A method's callers through `self`, annotations and constructors, and by name alone.
+    assert_golden(
+        "conformance-python.context-render.txt",
+        &engine.context("Panel.render", None).unwrap(),
+    );
+}
+
+#[test]
+fn python_programs_are_found_as_processes_and_shown_with_their_range() {
+    let repo = fixture_repo(
+        "context_python_programs",
+        "conformance-python",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // A main guard and a console script, each with its own process.
+    assert_golden(
+        "conformance-python.search-process-main.txt",
+        &engine.search("__main__", Some("process"), None).unwrap(),
+    );
+    assert_golden(
+        "conformance-python.search-process-script.txt",
+        &engine.search("build", Some("process"), None).unwrap(),
+    );
+    // The range is the `if` block, up to its last line and not the `else` after it.
+    assert_golden(
+        "conformance-python.context-main.txt",
+        &engine.context("jobs/sync.py::__main__", None).unwrap(),
+    );
+    assert_golden(
+        "conformance-python.context-main-single.txt",
+        &engine.context("jobs/single.py::__main__", None).unwrap(),
+    );
+    // A decorated handler's range starts at its decorator.
+    assert_golden(
+        "conformance-python.context-decorated.txt",
+        &engine.context("web/api.py::health", None).unwrap(),
+    );
+}
+
+#[test]
 fn answers_over_budget_say_where_they_stopped() {
     // 30 tokens are 120 bytes: room for the cut note and one result line.
     let engine = web("budget_cut");

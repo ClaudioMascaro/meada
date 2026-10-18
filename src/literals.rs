@@ -573,7 +573,7 @@ mod tests {
     fn read_with(reader: &mut Literals, src: &str, name: &str, kind: Handler) -> Option<Shape> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
-        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap(), &TsJs);
         let code = Code::new(&resolver, &files, lang::pack(0));
         let responses = reader.responses(&code, "a.ts", name, kind)?;
         reader.shape(&code, &responses)

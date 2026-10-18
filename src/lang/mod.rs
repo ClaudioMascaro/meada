@@ -5,10 +5,12 @@
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
+use tree_sitter::Node;
 
 use crate::Result;
 use crate::resolve::Code;
 
+pub mod python;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -25,6 +27,24 @@ pub trait LanguagePack {
     /// How imports name files in one repository, built from its config files as
     /// `(path, contents)`, in `config_files` order.
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
+
+    /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
+    /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
+    fn receiver(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// A keyword naming the base of the enclosing class, such as `super`: what its members
+    /// are is not resolved.
+    fn base_receiver(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// Names every file of the language may call without binding them, which contract kinds
+    /// read, such as `fetch`.
+    fn globals(&self) -> &'static [&'static str] {
+        &[]
+    }
 
     /// The producer and consumer calls of the message libraries the pack knows (spec #20),
     /// read from its files' facts through `code`: a call counts only when its receiver traces
@@ -81,7 +101,7 @@ pub enum Handler {
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -107,7 +127,10 @@ pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
 pub struct Facts {
     pub defs: Vec<Def>,
     pub imports: Vec<Import>,
+    /// Everything an explicit import can name: `exports` lists every binding the file makes
+    /// available, and `star` narrows what a star import takes from them.
     pub exports: Vec<Export>,
+    pub star: Star,
     pub calls: Vec<Call>,
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
@@ -121,6 +144,9 @@ pub struct Facts {
     /// outer name, and a definition, constant or parameter of its own scope.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub locals: Vec<String>,
+    /// Names bound in a scope whose class the syntax may tell, one per scope and name: what a
+    /// method call on the name reaches. Each also hides an outer binding of its name.
+    pub receivers: Vec<Receiver>,
     /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
     /// the source: the qualified names (`Def::name`) of the definitions that start a program,
     /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point
@@ -132,8 +158,34 @@ pub struct Facts {
     pub programs: Vec<String>,
 }
 
+/// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
+/// its instances. The shared side follows a method call on it to the class it holds.
+#[derive(Serialize, Deserialize)]
+pub struct Receiver {
+    pub scope: String,
+    pub name: String,
+    pub class: Class,
+}
+
+/// What the syntax says a name holds. It is read as written: the shared side decides whether
+/// the name it gives is a class, and no type is inferred beyond that.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum Class {
+    /// An instance of the class whose body encloses the scope, or that class: `self`, `cls`.
+    Enclosing,
+    /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
+    /// an instance of: a constructor call or an annotation. A function's result is unknown.
+    Named(String),
+    /// Bound by an import in the scope: what the file's imports bind the name to.
+    Imported,
+    /// Bound otherwise, so an outer binding of the name is hidden.
+    Unknown,
+}
+
 /// A file-level binding to what another module exports: `import { name as local } from
-/// 'source'`.
+/// 'source'`. Several imports may bind one `local`: the latest in source order decides. A
+/// `local` may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its
+/// head.
 #[derive(Serialize, Deserialize)]
 pub struct Import {
     pub local: String,
@@ -145,8 +197,16 @@ pub struct Import {
 pub enum Imported {
     /// One exported name; a default import is the name `default`.
     Name(String),
+    /// A name the module exports or, when it exports none (or the module is not a file of
+    /// the repository), the module `module`: `from p import m` names `m` of `p` or the
+    /// submodule `p.m`. `module` is a specifier, as `Import::source` is.
+    Member { name: String, module: String },
     /// The whole module.
     Namespace,
+    /// Every name the module's `star` takes, as `from source import *` binds them (`local` is
+    /// unused). It binds a name only when the module takes it, and then like an import of
+    /// that name written there.
+    All,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -159,8 +219,37 @@ pub enum Export {
         source: String,
         name: Imported,
     },
-    /// Every name `source` exports, except `default`.
+    /// Every name `source` exports that its `star` lets through.
     All { source: String },
+}
+
+/// Which of a file's exports a star import (`export * from`, `from m import *`) takes.
+#[derive(Default, Serialize, Deserialize)]
+pub enum Star {
+    /// Every one except `default`.
+    #[default]
+    ExceptDefault,
+    /// Those not starting with `_`.
+    Public,
+    /// Only these names: a literal `__all__`.
+    Only(Vec<String>),
+}
+
+impl Star {
+    /// Whether a star import takes the export `name`.
+    pub fn takes(&self, name: &str) -> bool {
+        match self {
+            Star::ExceptDefault => name != "default",
+            Star::Public => !name.starts_with('_'),
+            Star::Only(names) => names.iter().any(|n| n == name),
+        }
+    }
+
+    /// Whether the pack names a public set: every export but those a star import leaves out is
+    /// one. `ExceptDefault` names none, since a default export is as public as any.
+    pub fn is_public_set(&self) -> bool {
+        !matches!(self, Star::ExceptDefault)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,6 +274,19 @@ pub struct Def {
     /// A function's parameters in order; a destructured one has an empty name and lists the
     /// names it binds in `fields`.
     pub params: Vec<Param>,
+    /// A class's bases as written, in order, as callee-like names resolved from the scope
+    /// enclosing the class.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bases: Vec<String>,
+    /// The decorators written as a bare name (`@require_GET`, `@http.require_safe`), as
+    /// callee-like names resolved from the scope enclosing the definition. A decorator call
+    /// is a `Call` that names the definition in `Call::decorates`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decorators: Vec<String>,
+    /// What a function returns, one value per `return`. Not kept in the index (see
+    /// `Call::args`).
+    #[serde(skip)]
+    pub return_values: Vec<Value>,
     /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
     /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
     /// the index (see `Call::args`).
@@ -198,12 +300,34 @@ pub struct Def {
 #[derive(Serialize, Deserialize)]
 pub struct Param {
     pub name: String,
+    /// Which argument of a call binds it.
+    #[serde(default)]
+    pub binds: Binds,
     /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub default: Option<Value>,
     /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
+}
+
+/// Which argument of a call binds a parameter. A positional argument binds the parameters that
+/// take one in order; a keyword argument binds the parameter of its name.
+#[derive(Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub enum Binds {
+    /// A positional or a keyword argument.
+    #[default]
+    Any,
+    /// Only a keyword argument: a Python parameter after `*` or `*args`.
+    Keyword,
+    /// No single argument: Python's `*args` and `**kwargs`.
+    Rest,
+    /// The receiver of a method (`self`): a call on an instance binds it, so its positional
+    /// arguments start at the next parameter; a call on the class passes it first.
+    Instance,
+    /// The receiver of a class method (`cls`): the call binds it, on the class or on an
+    /// instance.
+    Class,
 }
 
 /// A name bound by a destructured object parameter: `{ key: name = default }`.
@@ -248,6 +372,13 @@ pub struct Call {
     /// parses a file again when a contract needs them.
     #[serde(skip)]
     pub args: Vec<Value>,
+    /// The keyword arguments, as written, after the positional ones. Not kept in the index.
+    #[serde(skip)]
+    pub kwargs: Vec<(String, Value)>,
+    /// The qualified name of the definition a decorator call applies to: `@app.get("/")`
+    /// written on `def index()` decorates `index`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decorates: Option<String>,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
     #[serde(skip)]
@@ -258,6 +389,13 @@ pub struct Call {
     /// Not kept in the index, like `args`.
     #[serde(skip)]
     pub uses: Vec<Vec<Step>>,
+}
+
+impl Call {
+    /// The keyword argument `name`.
+    pub fn keyword(&self, name: &str) -> Option<&Value> {
+        self.kwargs.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
 }
 
 /// One step of what code does with a value (spec #23): the value read through a chain of
@@ -341,12 +479,14 @@ pub enum Value {
     /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
     /// An object literal's properties; a spread `...x` is the key `...` with the value of `x`.
+    /// A Python dict literal is one too: an entry whose key is no string literal is the key
+    /// `[]` with the list of its key and value.
     Object(Vec<(String, Value)>),
     /// A name: a constant, a parameter, a definition.
     Ref(String),
     /// `undefined`, or an argument the call leaves out.
     Undefined,
-    /// The result of calling the normalized callee, such as `express.Router`.
+    /// The result of a call, such as `express.Router()`.
     Call(Invocation),
     /// A property of a named value, such as `parsed.data` (spec #23).
     Member(String, String),
@@ -356,7 +496,7 @@ pub enum Value {
     /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
     /// the arguments.
     New(String, Vec<Value>),
-    /// An array literal's elements.
+    /// An array, list or tuple literal's items.
     List(Vec<Value>),
     /// An `interface` or `type` declaration (spec #23), held by a `Const` of the name it
     /// declares: the type namespace shares the name of a `const` of the same spelling.
@@ -373,12 +513,14 @@ pub enum Value {
 
 /// A call as written (spec #23): `receiver` is the expression a method is called on (`z` in
 /// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
-/// the callee is no member.
+/// the callee is no member. `range` is the range of that call among the file's calls, which
+/// the shared side resolves to follow the value it returns.
 #[derive(Clone)]
 pub struct Invocation {
     pub callee: String,
     pub receiver: Option<Box<Value>>,
     pub args: Vec<Value>,
+    pub range: Range<usize>,
 }
 
 /// What a reader of evaluated values needs depends on a parameter of the enclosing function:
@@ -420,7 +562,37 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
-#[derive(Clone)]
+/// A channel name as evaluated: `None` when it depends on a parameter, `Some(None)` when it is
+/// not a literal string (an environment read, a runtime value, a regular expression).
+pub fn channel_name(value: &Value) -> Option<Option<String>> {
+    match value {
+        Value::Ref(_) => None,
+        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
+        Value::Str(parts) => Some(literal(parts)),
+        _ => Some(None),
+    }
+}
+
+/// The SQS queue the URL `url` names: the last segment of the URL, whatever precedes it (an
+/// account and a region are often dynamic). `None` when it depends on a parameter, `Some(None)`
+/// when it cannot be read.
+pub fn queue_name(url: Option<&Value>) -> Option<Option<String>> {
+    let parts = match url {
+        Some(Value::Str(parts)) => parts,
+        Some(Value::Ref(_)) => return None,
+        _ => return Some(None),
+    };
+    match parts.last() {
+        Some(Part::Text(tail)) if tail.contains('/') => {
+            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
+            Some(queue.map(String::from))
+        }
+        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
+        _ => Some(None),
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub enum Part {
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
@@ -430,4 +602,22 @@ pub enum Part {
     Env(String),
     /// Any other expression inside a string.
     Hole,
+}
+
+// Tree-sitter helpers every pack uses.
+
+fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .collect::<Vec<_>>()
+        .into_iter()
+}
+
+fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
+    let mut cursor = node.walk();
+    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
+}
+
+fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
+    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
 }

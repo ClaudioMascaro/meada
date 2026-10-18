@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::lang::{Handler, Message, Part, Role, Value, literal, property};
+use crate::lang::{
+    Handler, Message, Role, Value, channel_name as name, literal, property, queue_name,
+};
 use crate::resolve::Code;
 
 const KAFKAJS: &str = "kafkajs";
@@ -58,11 +60,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let Some(origin) = code.origin(path, &call.scope, chain) else {
                 continue;
             };
-            let produce = |broker, read: Read| producers(broker, code.expand(path, n, read));
+            let produce =
+                |broker, read: Read| producers(broker, code.expand(path, n, &|a, _| read(a)));
             // The handler of the call itself (its `option` of argument `arg`), else the
             // function the call is in.
             let consume = |broker, read: Read, handler: Option<Handler>| {
-                (code.expand(path, n, read).into_iter())
+                (code.expand(path, n, &|a, _| read(a)).into_iter())
                     .flat_map(|(site, at, names)| {
                         let handler = handler.clone().unwrap_or_else(|| enclosing(code, site, at));
                         names.into_iter().map(move |name| Message {
@@ -114,7 +117,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 // class field, a parameter) and `addBulk` are not recognized.
                 (BULLMQ, BULLMQ_QUEUE, "add") => {
                     if let Some(binding) = origin.binding {
-                        let found = code.expand_constructed(binding, (path, n), &first);
+                        let found = code.expand_constructed(binding, (path, n), &|a, _| first(a));
                         out.extend(producers("bullmq", found));
                     }
                 }
@@ -148,7 +151,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 (AMQPLIB, expr, "publish") if AMQP_CHANNELS.contains(&expr) => {
                     let read = |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?));
-                    for (site, at, (exchange, key)) in code.expand(path, n, &read) {
+                    for (site, at, (exchange, key)) in code.expand(path, n, &|a, _| read(a)) {
                         // The empty exchange is the queue named by the key; one that cannot
                         // be evaluated leaves the producer unresolved.
                         let (name, role) = match exchange {
@@ -169,7 +172,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 (AMQPLIB, expr, "bindQueue") if AMQP_CHANNELS.contains(&expr) => {
                     let read =
                         |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?, arg_name(a, 2)?));
-                    for (site, at, bound) in code.expand(path, n, &read) {
+                    for (site, at, bound) in code.expand(path, n, &|a, _| read(a)) {
                         // ponytail: a binding that cannot be fully evaluated is dropped, not
                         // shown as unresolved.
                         if let (Some(queue), Some(exchange), Some(pattern)) = bound {
@@ -189,7 +192,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     }
     for (path, n, binding) in subscriptions {
         let read = |a: &[Value]| names(a, &["topics", "topic"]);
-        for (site, at, names) in code.expand(path, n, &read) {
+        for (site, at, names) in code.expand(path, n, &|a, _| read(a)) {
             // With no `run` handler Meada can read, the function that subscribes handles.
             // ponytail: a handler passed through a wrapper's parameter is not followed.
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
@@ -305,17 +308,6 @@ fn options(args: &[Value]) -> Option<Option<&[(String, Value)]>> {
     }
 }
 
-/// A channel name as evaluated: `None` when it depends on a parameter, `Some(None)` when it is
-/// not a literal string (an environment read, a runtime value, a regular expression).
-fn name(value: &Value) -> Option<Option<String>> {
-    match value {
-        Value::Ref(_) => None,
-        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        Value::Str(parts) => Some(literal(parts)),
-        _ => Some(None),
-    }
-}
-
 /// The channel name a call gives as its first argument: a NATS subject, the queue of a BullMQ
 /// `Queue` or `Worker`, the key of a Redis `xadd`, an amqplib queue.
 fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
@@ -328,19 +320,7 @@ fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
     let Some(options) = options(args)? else {
         return Some(vec![None]);
     };
-    let parts = match property(options, key).ok()? {
-        Some(Value::Str(parts)) => parts,
-        Some(Value::Ref(_)) => return None,
-        _ => return Some(vec![None]),
-    };
-    match parts.last() {
-        Some(Part::Text(tail)) if tail.contains('/') => {
-            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
-            Some(vec![queue.map(String::from)])
-        }
-        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        _ => Some(vec![None]),
-    }
+    Some(vec![queue_name(property(options, key).ok()?)?])
 }
 
 /// The streams an ioredis `xreadgroup` reads: the arguments after `STREAMS` that name them,

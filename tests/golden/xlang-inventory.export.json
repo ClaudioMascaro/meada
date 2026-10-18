@@ -1,0 +1,458 @@
+{
+  "repository": "example.com/xlang/inventory",
+  "files": [
+    {
+      "path": "inventory/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "inventory/events.py",
+      "hash": "82eece9accb0b5022bf0a8dd49e009f8e00f0bca5a53b6fcdc77aad1f90557c7"
+    },
+    {
+      "path": "inventory/jobs.py",
+      "hash": "5726c6c1bf145f35943a97c7565d0c0f381e56e18ae3ac7407db5587bfc3599c"
+    },
+    {
+      "path": "inventory/main.py",
+      "hash": "3ffa64c1708b13464caf278d4746a09e2dd35b94904fa83ee9aff71093c7c042"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 64,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 113,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 29,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 329,
+        "end": 614
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::warm",
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 200,
+        "end": 326
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::audit",
+      "span": {
+        "path": "inventory/main.py",
+        "start": 586,
+        "end": 748
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "span": {
+        "path": "inventory/main.py",
+        "start": 334,
+        "end": 583
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::stock_level",
+      "span": {
+        "path": "inventory/main.py",
+        "start": 161,
+        "end": 331
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::apply_restock::audit#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "target": "example.com/xlang/inventory::inventory/main.py::audit",
+      "level": "exact",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 103,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::Consumer#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 230,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::apply_restock#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": "example.com/xlang/inventory::inventory/events.py::apply_restock",
+      "level": "exact",
+      "span": {
+        "path": "inventory/events.py",
+        "start": 442,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::consumer.poll#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 379,
+        "end": 397
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/events.py::consume_restocks::consumer.subscribe#0",
+      "caller": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/events.py",
+        "start": 305,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::os.getenv#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 121,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 108,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::(string).format#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 555,
+        "end": 613
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.get#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 542,
+        "end": 614
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::restock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 473,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
+      "caller": "example.com/xlang/inventory::inventory/jobs.py::warm",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/jobs.py",
+        "start": 269,
+        "end": 326
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::FastAPI#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 106,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::app.get#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 162,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::app.post#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 335,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::audit::(call).strip#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 670,
+        "end": 732
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::audit::environ.get#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 670,
+        "end": 724
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::audit::requests.post#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 656,
+        "end": 748
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::reserve::(parenthesized_expression).rstrip#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 476,
+        "end": 541
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::reserve::client.get#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 554,
+        "end": 583
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::reserve::getenv#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 477,
+        "end": 501
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::reserve::httpx.Client#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 454,
+        "end": 542
+      }
+    },
+    {
+      "id": "example.com/xlang/inventory::inventory/main.py::stock_level::requests.get#0",
+      "caller": "example.com/xlang/inventory::inventory/main.py::stock_level",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "inventory/main.py",
+        "start": 285,
+        "end": 331
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/stock/{}",
+      "site": "example.com/xlang/inventory::inventory/main.py::stock_level"
+    },
+    {
+      "contract": "http::POST::/stock/reserve",
+      "site": "example.com/xlang/inventory::inventory/main.py::reserve"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::kafka::stock.restocked",
+      "site": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
+      "via": "env:STOREFRONT_URL"
+    },
+    {
+      "contract": null,
+      "site": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "via": "host:storefront.example.com"
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
+      "via": "host:storefront.example.com"
+    },
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang/inventory::inventory/main.py::audit::requests.post#0",
+      "via": "env:STOREFRONT_URL"
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang/inventory::inventory/main.py::reserve::client.get#0",
+      "via": "env:STOREFRONT_URL"
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang/inventory::inventory/main.py::stock_level::requests.get#0",
+      "via": "env:STOREFRONT_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": "inventory",
+      "members": [
+        "example.com/xlang/inventory::inventory/events.py::apply_restock",
+        "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+        "example.com/xlang/inventory::inventory/main.py::audit"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang/inventory::inventory/events.py::consume_restocks",
+      "provider": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0",
+      "contract": "channel::kafka::stock.restocked",
+      "level": "exact",
+      "reason": "channel::kafka::stock.restocked"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",
+      "provider": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.post#0",
+      "provider": "example.com/xlang/storefront::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "exact",
+      "reason": "host storefront.example.com is served by example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/jobs.py::warm::requests.get#0",
+      "provider": "example.com/xlang/storefront::app/api/health/route.ts::GET",
+      "contract": "http::GET::/api/health",
+      "level": "exact",
+      "reason": "host storefront.example.com is served by example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/main.py::audit::requests.post#0",
+      "provider": "example.com/xlang/storefront::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "inferred",
+      "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/main.py::reserve::client.get#0",
+      "provider": "example.com/xlang/storefront::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "inferred",
+      "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/inventory::inventory/main.py::stock_level::requests.get#0",
+      "provider": "example.com/xlang/storefront::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront"
+    },
+    {
+      "consumer": "example.com/xlang/storefront::src/inventory.ts::reserveStock::fetch#0",
+      "provider": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "contract": "http::POST::/stock/reserve",
+      "level": "exact",
+      "reason": "host inventory.example.com is served by example.com/xlang/inventory"
+    },
+    {
+      "consumer": "example.com/xlang/storefront::src/sync.ts::syncInventory::stockLevel#0",
+      "provider": "example.com/xlang/inventory::inventory/main.py::stock_level",
+      "contract": "http::GET::/stock/{}",
+      "level": "inferred",
+      "reason": "base URL from INVENTORY_URL, a base_url_env of peer example.com/xlang/inventory"
+    }
+  ]
+}

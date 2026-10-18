@@ -226,7 +226,7 @@ mod tests {
         let ty = Ty::Named(name.to_string());
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
-        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap(), &TsJs);
         let code = Code::new(&resolver, &files, lang::pack(0));
         let Declared { fields, open, .. } = Types::default().read(&code, "a.ts", "", &ty)?;
         let fields = (fields.into_iter())
@@ -361,7 +361,7 @@ mod tests {
                    interface Holder { ext: Ext; list: Ext[]; inferred: z.infer<typeof Schema>; own: string }\n";
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
-        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap(), &TsJs);
         let code = Code::new(&resolver, &files, lang::pack(0));
         let ty = Ty::Named("Holder".into());
         let read = Types::default().read(&code, "a.ts", "", &ty).unwrap();
@@ -382,7 +382,7 @@ mod tests {
                    import type { Ext2 } from '@acme/types';\n";
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
-        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap());
+        let resolver = Resolver::new(&files, TsJs.modules(&[]).unwrap(), &TsJs);
         let code = Code::new(&resolver, &files, lang::pack(0));
         let ty = Ty::Named("Page".into());
         let read = Types::default().read(&code, "a.ts", "", &ty).unwrap();

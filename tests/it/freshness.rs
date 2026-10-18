@@ -56,6 +56,144 @@ fn refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
     );
 }
 
+/// Renames a function others import, adds a module whose function turns an inferred call
+/// into an ambiguous one, deletes a module star-imported elsewhere, and declares a source
+/// root, which drops the implicit `src` one.
+fn edit_python(repo: &Path) {
+    let units = fs::read_to_string(repo.join("geometry/units.py")).unwrap();
+    fs::write(
+        repo.join("geometry/units.py"),
+        units.replace("def to_cm", "def to_mm"),
+    )
+    .unwrap();
+    fs::write(repo.join("stars/extra.py"), "def legacy():\n    return 2\n").unwrap();
+    fs::remove_file(repo.join("helpers.py")).unwrap();
+    fs::write(
+        repo.join("pyproject.toml"),
+        "[tool.setuptools.packages.find]\nwhere = [\"lib\"]\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_python", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python
+        )
+    );
+}
+
+/// Drops the console script that names `reports:build` and adds one for `jobs.steps:store`.
+fn edit_python_scripts(repo: &Path) {
+    fs::write(
+        repo.join("pyproject.toml"),
+        "[project]\nname = \"acme-conformance\"\n[project.scripts]\n\
+         acme-sync = \"jobs.sync:run\"\nacme-steps = \"jobs.steps:store\"\n",
+    )
+    .unwrap();
+}
+
+/// The kind of the process an entry point of the export starts, by the end of its identity.
+fn kind_of(export: &str, entry_point: &str) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_str(export).unwrap();
+    let processes = json["processes"].as_array().unwrap().iter();
+    let mut kinds = processes.filter(|p| p["entry_point"].as_str().unwrap().ends_with(entry_point));
+    kinds
+        .next()
+        .map(|p| p["kind"].as_str().unwrap().to_string())
+}
+
+#[test]
+fn python_console_scripts_follow_an_edited_pyproject_like_a_cold_index() {
+    let repo = fixture_repo("fresh_python_scripts", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python_scripts(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    // `build` is a program while a script names it, an export once none does; `store` is
+    // called by other functions, so only a script makes it a door.
+    assert_eq!(
+        kind_of(&before, "reports/__init__.py::build").as_deref(),
+        Some("program")
+    );
+    assert_eq!(
+        kind_of(&refreshed, "reports/__init__.py::build").as_deref(),
+        Some("export")
+    );
+    assert_eq!(kind_of(&before, "jobs/steps.py::store"), None);
+    assert_eq!(
+        kind_of(&refreshed, "jobs/steps.py::store").as_deref(),
+        Some("program")
+    );
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_scripts_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python_scripts
+        )
+    );
+}
+
+/// Renames a topic constant the Python channel files import, adds a consumer of a topic that
+/// had none, and deletes a module with producers and consumers (spec #73).
+fn edit_python_channels(repo: &Path) {
+    let topics = fs::read_to_string(repo.join("messages/topics.py")).unwrap();
+    assert!(topics.contains("\"orders\""));
+    fs::write(
+        repo.join("messages/topics.py"),
+        topics.replace("\"orders\"", "\"sales\""),
+    )
+    .unwrap();
+    fs::write(
+        repo.join("messages/extra.py"),
+        "from confluent_kafka import Consumer\n\n\ndef consume_extra():\n    \
+         consumer = Consumer({})\n    consumer.subscribe([\"retries\"])\n",
+    )
+    .unwrap();
+    fs::remove_file(repo.join("messages/sqs_boto.py")).unwrap();
+}
+
+#[test]
+fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
+    let repo = fixture_repo("fresh_python_channels", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python_channels(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    // The renamed constant reaches the channels of the files that import it.
+    assert!(refreshed.contains("channel::kafka::sales"));
+    assert!(!refreshed.contains("channel::kafka::orders"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_channels_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python_channels
+        )
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.
@@ -368,6 +506,60 @@ fn edit_resources(gateway: &Path) {
         "role = \"read\"",
         "role = \"read-write\"",
     );
+}
+
+/// Edits, adds and deletes `.py` files of the inventory and deletes a route of the storefront:
+/// a route path changes, a module with a consumer on the declared host appears, the jobs
+/// module goes, and the topic its handler consumes changes names.
+fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
+    let main = inventory.join("inventory/main.py");
+    let src = fs::read_to_string(&main).unwrap();
+    assert!(src.contains("\"/stock/{sku}\""));
+    fs::write(
+        &main,
+        src.replace("\"/stock/{sku}\"", "\"/stock/{sku}/level\""),
+    )
+    .unwrap();
+    fs::write(
+        inventory.join("inventory/report.py"),
+        "import requests\n\n\ndef report():\n    return requests.post(\"https://storefront.example.com/api/audit\")\n",
+    )
+    .unwrap();
+    fs::remove_file(inventory.join("inventory/jobs.py")).unwrap();
+    fs::remove_file(storefront.join("app/api/promotions/route.ts")).unwrap();
+    // The topic the storefront produces and the inventory's handler consumes changes names.
+    let events = inventory.join("inventory/events.py");
+    let src = fs::read_to_string(&events).unwrap();
+    assert!(src.contains("stock.restocked"));
+    fs::write(&events, src.replace("stock.restocked", "stock.replenished")).unwrap();
+}
+
+#[test]
+fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(storefront, inventory): &(PathBuf, PathBuf)| -> Vec<String> {
+        [storefront, inventory]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang("fresh_xlang");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang("fresh_xlang_cold");
+    edit_xlang(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
 }
 
 #[test]

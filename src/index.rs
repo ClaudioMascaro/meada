@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 19;
+const SCHEMA_VERSION: i64 = 21;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -44,9 +44,10 @@ const SCHEMA_VERSION: i64 = 19;
 /// same stat and hash as `files`, and its `summary` (`document::Summary` as JSON: format,
 /// version, title, routes with their shapes, servers, channel sides with theirs, and problems,
 /// derived from the bytes alone); a document that could not be read keeps its row, so its hash
-/// is cached too. `manifests` holds each `package.json` (spec #22) the same way, its `summary`
-/// being `package::Summary` as JSON (name, version, dependency entries and the entry fields
-/// `exports`, `types`, `module` and `main`), read from the bytes alone; a manifest without a
+/// is cached too. `manifests` holds each `package.json` (spec #22), `pyproject.toml` and
+/// `requirements*.txt` (spec #24) the same way, its `summary` being `package::Summary` as JSON
+/// (name, version, dependency entries, the entry fields `exports`, `types`, `module` and `main`,
+/// and a `pyproject.toml`'s source `roots`), read from the bytes alone; a manifest without a
 /// name keeps its row too. A `tsconfig.json` has a row there as well, its `summary` being
 /// `package::Tsconfig` (`out_dir`, `root_dir`), or `null` when the file is invalid. An `import`
 /// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
@@ -260,7 +261,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         now,
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
-            false => Ok(serde_json::to_string(&package::read(src))?),
+            false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
         },
     )?;
     // The packages decide which files keep the shapes of what they export (issue #175).
@@ -376,17 +377,16 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
                 .iter()
                 .map(|(n, c)| (*n, c.as_slice()))
                 .collect();
-            Ok((
-                pack,
-                Resolver::new(files, lang::pack(pack).modules(&found)?),
-            ))
+            let language = lang::pack(pack);
+            let modules = language.modules(&found)?;
+            Ok((pack, Resolver::new(files, modules, language)))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+    let files: Vec<&str> = all.keys().copied().collect();
     // The files an import of one of the repository's packages reaches: only they keep shapes.
     let surface = {
-        let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
         let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-        let files: Vec<&str> = all.keys().copied().collect();
         package::surface(&manifests, &tsconfigs, &exported, &files)
     };
 
@@ -559,13 +559,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    // The programs the packs declare per file, and the console scripts of the manifests.
+    let scripts = package::python_programs(&manifests, &files);
     let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
-            (facts.programs.iter()).map(move |def| entry::Program {
-                file: path.to_string(),
-                def: def.clone(),
-            })
+            (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))
         })
+        .chain(scripts)
+        .map(|(file, def)| entry::Program { file, def })
         .collect();
     let local = entry::Local {
         identity,
@@ -683,15 +684,12 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The `package.json` and `tsconfig.json` files of a repository (path and absolute path), but
-/// those under a `node_modules` directory, which the walk finds when `.gitignore` does not list
-/// it.
+/// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
+/// `tsconfig.json` files (path and absolute path), but those under a `node_modules` directory,
+/// which the walk finds when `.gitignore` does not list it.
 fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
-    let is_manifest = |path: &str| {
-        let mut segments = path.split('/').rev();
-        matches!(segments.next(), Some("package.json" | "tsconfig.json"))
-            && !segments.any(|s| s == "node_modules")
-    };
+    let is_manifest =
+        |path: &str| package::is_manifest(path) && !path.split('/').any(|s| s == "node_modules");
     (walked.iter())
         .filter(|(path, _)| is_manifest(path))
         .cloned()
@@ -1530,6 +1528,15 @@ mod tests {
         let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
         let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
+        for (name, path) in [
+            ("sample.pyproject.toml", "pyproject.toml"),
+            ("sample.requirements.txt", "requirements.txt"),
+        ] {
+            let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
+            let summary = package::read_manifest(path, &src);
+            let summary = serde_json::to_string_pretty(&summary).unwrap();
+            actual += &format!("\n{name}\n{summary}\n");
+        }
         let src = fs::read(tests.join("fixtures/schema/sample.tsconfig.json")).unwrap();
         let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
         actual += &format!("\nsample.tsconfig.json\n{summary}\n");

@@ -185,12 +185,15 @@ Constantes fixas:
 ## Estado
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) e liga repositórios por contratos HTTP (`fetch` no lado que consome,
-Next.js (app router) e Express no lado que serve, também atrás de um gateway), pelos recursos
-declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs`), filas RabbitMQ (`amqplib`,
-com o `publish` numa exchange chegando às filas que os bindings ligam a ela), filas Amazon SQS
-(AWS SDK v3 e `sqs-consumer`), subjects NATS (com os curingas `*` e `>`), jobs BullMQ e streams
-Redis (`ioredis` e `node-redis`), com o produtor ligado ao handler de cada consumidor, inclusive
+`.jsx`, `.mjs`, `.cjs`) e Python (`.py`) e liga repositórios, também de uma linguagem para a
+outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` no lado que
+consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django no lado que serve,
+também atrás de um gateway), pelos recursos
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python`), filas RabbitMQ
+(`amqplib` e, em Python, `pika`, com o `publish` numa exchange chegando às filas que os bindings
+ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3`), subjects NATS
+(`nats` e, em Python, `nats-py`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
+(`ioredis`, `node-redis` e, em Python, `redis-py`), com o produtor ligado ao handler de cada consumidor, inclusive
 no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus documentos OpenAPI
 (3.0 e 3.1) e AsyncAPI (2.x e 3.0), achados pelo nome ou listados em `[serve] documents`: as rotas
 e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o
@@ -204,11 +207,20 @@ uma função importada desse pacote atravessa até o código do provedor, pelos 
 pasta de build (o `outDir` do `tsconfig.json`, mapeado de volta para o `rootDir`). O `search`
 com o tipo `package` acha o pacote pelo nome, com o repositório, a pasta, a versão e o número
 de consumidores, e o `context` de uma função exportada lista quem a chama, em qualquer
-repositório do workspace. Não lê lockfile nem consulta o registro npm. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). O `meada export` traz as comunidades de cada repositório: grupos de símbolos que se chamam mais entre si do que com o resto, achados pelo algoritmo de Leiden sem nada aleatório e só com aritmética inteira, e nomeados pela pasta onde vive a maioria dos seus membros (`src`, `src#2`), iguais em toda máquina. Cada ligação tem o nível `exact`,
+repositório do workspace. Em Python, cada `pyproject.toml` com nome (`[project]` ou
+`[tool.poetry]`) vira o contrato `package::pypi::<nome>`, com o nome normalizado como o PEP 503
+manda, e cada dependência de `[project] dependencies`, `[tool.poetry.dependencies]` ou de um
+`requirements*.txt` que nomeia um pacote do workspace se liga a ele, com a faixa como escrita e
+`range unchecked` (faixas PyPI não são conferidas); um `import` de um módulo desse pacote
+atravessa até o código do provedor, `exact` quando o módulo tem o nome da distribuição,
+`inferred` quando é só um módulo de topo dela e `ambiguous` quando várias o expõem. Um pacote
+npm e um PyPI de mesmo nome nunca se ligam. Não lê lockfile nem consulta o registro npm ou o
+PyPI. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). O `meada export` traz as comunidades de cada repositório: grupos de símbolos que se chamam mais entre si do que com o resto, achados pelo algoritmo de Leiden sem nada aleatório e só com aritmética inteira, e nomeados pela pasta onde vive a maioria dos seus membros (`src`, `src#2`), iguais em toda máquina. Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
-aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`. Clusters de
+aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`, e uma rota que o Meada não sabe onde é servida fica fora do mapa em vez de
+ser adivinhada. Clusters de
 broker não são modelados: dois clusters com um tópico de mesmo nome se ligam como se fossem um
-só. Cada rota que um handler serve, cada canal que um handler consumidor consome e cada função ou método exportado que nada chama no próprio repositório é um ponto de entrada, com o seu processo: o `trace` com `process::<identidade do ponto de entrada>` lê a árvore de chamadas que ele dispara, atravessando os repositórios, e o `meada export` traz o processo de cada ponto de entrada. O `search` com o tipo `community` acha a comunidade pelo nome e com o tipo `process` acha o processo pelo rótulo do ponto de entrada, e o `context` de um símbolo diz a sua comunidade (ou `community: none`) e os processos a que ele pertence, achados subindo pelas mesmas chamadas e ligações que o processo percorre. Ainda não há: outras linguagens, outros clientes HTTP além do `fetch`, outros clientes de
+só. Cada rota que um handler serve, cada canal que um handler consumidor consome e cada função ou método exportado que nada chama no próprio repositório é um ponto de entrada, com o seu processo: o `trace` com `process::<identidade do ponto de entrada>` lê a árvore de chamadas que ele dispara, atravessando os repositórios, e o `meada export` traz o processo de cada ponto de entrada. Em Python, o bloco `if __name__ == "__main__":` de um arquivo (o símbolo `__main__`) e cada função que um `[project.scripts]` do `pyproject.toml` nomeia (`módulo:função`) também são pontos de entrada, e só os nomes públicos (sem `_` na frente, ou os do `__all__` literal) contam como exportados. O `search` com o tipo `community` acha a comunidade pelo nome e com o tipo `process` acha o processo pelo rótulo do ponto de entrada, e o `context` de um símbolo diz a sua comunidade (ou `community: none`) e os processos a que ele pertence, achados subindo pelas mesmas chamadas e ligações que o processo percorre. Ainda não há: outras linguagens, outros clientes HTTP além desses, outros clientes de
 mensageria além desses, nem o pacote npm do Meada. O escopo e a ordem do trabalho estão no
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); as decisões, em [`docs/adr`](docs/adr).
 Veja o [CHANGELOG](CHANGELOG.md).

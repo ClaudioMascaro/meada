@@ -24,7 +24,8 @@ modules updates it.
   shelling out to `git`.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
-  `Facts::programs` the packs set) and
+  `Facts::programs` the packs set, and the console scripts of the `manifests` rows through
+  `package::python_programs`) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -43,8 +44,10 @@ modules updates it.
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
   is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
-  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json` the walk
-  finds (`manifests_found`: any path with a `node_modules` segment is skipped, since the walk
+  hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json`,
+  `pyproject.toml` and `requirements*.txt` the walk finds (`manifests_found`, through
+  `package::is_manifest`; `package::read_manifest` reads each by its ecosystem; any path with a
+  `node_modules` segment is skipped, since the walk
   yields it unless `.gitignore` lists it), a nameless one too, whatever `serve.declared` says;
   `export` loads them as `Export::manifests` (`serde(skip)`), and the `tsconfig.json` rows
   (`manifests_found` takes them too, `package::read_tsconfig`) as `Export::tsconfigs`. With the contracts, `refresh`
@@ -72,9 +75,15 @@ modules updates it.
   subcommunity) and aggregation (nodes numbered by smallest member), until an iteration moves
   and merges nothing, with no cap. `export` loads the rows as `Export::communities`.
 - `lang/mod.rs`: the **language adapter**, `LanguagePack` (extensions, `parse` to `Facts`,
-  `config_files`, `modules`, `messages`), and the `Facts`/`Value` types. `lang/ts.rs` is the only
-  pack (`.ts .tsx .js .jsx .mjs .cjs`). `parse` sees one file at a time; no pack method touches
-  the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
+  `config_files`, `modules`, `messages`, `receiver`: a keyword naming the enclosing class's
+  instance, `this` for TS/JS, none for Python, `base_receiver`: a keyword naming its base, whose
+  members are not resolved, `super` for TS/JS, none for Python, whose `super()` is a call, and
+  `globals`: names bound everywhere that contract kinds read through `Code::binds_everywhere`,
+  `fetch` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter
+  helpers (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx
+  .js .jsx .mjs .cjs`, reads `tsconfig.json`) and `lang/python.rs` (`.py`, reads
+  `pyproject.toml`: `.pyi` and notebooks are not read). `parse` sees one file at a time; no pack
+  method touches the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
   enclosing definition; `Resolver::lexical` checks it first at each scope, so it hides an outer
@@ -91,7 +100,8 @@ modules updates it.
   `USES_BUDGET` per file. `Def::returns` holds a function's return type annotation as a `Ty` (`serde(skip)`, reparsed). Types (spec #23): `Ty` (`Object`, `Named`, `Intersection`, `Array`, `Schema`, `Param`, a type parameter of the
   enclosing function, `Unknown`) is what `lang/ts/types.rs` reads from a type; an `interface` or `type` declaration is a `Const` holding `Value::Type(Ty)` (so lexical, import and export resolution find it; `Code::held` skips it and `Code::declared_type` finds it), `Const::ty` and `Call::arg_types` hold the type a constant or argument is annotated or cast to (`serde(skip)`), and `declared.rs` (`Types`) expands a `Ty` into its field paths, optional marks and open (index signature) paths, with `TYPE_DEPTH` and `TYPES_BUDGET`. `Value` has `New(callee, args)` (`new X(...)` as a value), `List` (an array literal),
   `Call(Invocation)` (the callee, the receiver value of a method call and its arguments, so a
-  chain such as `z.object({..}).optional()` is read), `Member(object, property)` (`schema.shape`),
+  chain such as `z.object({..}).optional()` is read, and the call's range in `Facts::calls`,
+  which `Code::origins` resolves to follow what it returns), `Member(object, property)` (`schema.shape`),
   `Schema(name)` (a constant annotated `z.infer<typeof name>`, from `lang/ts/types.rs`) and
   `Scalar(Option<u32>)` (a number or boolean literal, spec #23; a plain integer carries its value,
   a status), and `Code::is_param` and `Code::is_global` tell a name that is the handler's own
@@ -133,17 +143,122 @@ modules updates it.
   form can start at a constructor, and `value` reads through `await`, so `const nc = await
   connect()` or `const channel = await conn.createChannel()` is a traced binding. Both are in
   every export (`Kafka#0` and the like: unresolved calls, no target).
+- Python message forms live in `lang/python/messages.rs`, which finds the client of a call with
+  `Code::origins` (not `Code::origin`, which does not follow `self.x`, parameters or returns) and
+  names the constructor it reached from the file's imports (`Code::imported`:
+  `confluent_kafka.Producer`, however it is imported; `Code::external` also answers for a method
+  of a typed local, so it is not used). One `channel()` or `client()` above a constructor is
+  followed (`pika.BlockingConnection.channel`, `boto3.Session.client`), also when the client is a
+  call written in place (`boto3.client("sqs").send_message(...)`): `head` takes the call that
+  starts where the outer one does and ends last inside it, since the callee of such a call is
+  `(call).method`. A `KafkaConsumer` is told by its resolved name, so an alias counts. Forms: confluent-kafka
+  `Producer.produce(topic)` and `Consumer.subscribe(topics)`; kafka-python `KafkaProducer.send(topic)`,
+  the topics a `KafkaConsumer(...)` constructor takes and `subscribe(topics=)` (a `^` topic is a regular expression, so it is unresolved); pika
+  `basic_publish(exchange, routing_key)` (the empty exchange is a producer of the key),
+  `basic_consume(queue, on_message_callback)` and `queue_bind(queue, exchange, routing_key)`;
+  boto3 `send_message`, `send_message_batch` and `receive_message` with `QueueUrl=` on a client
+  made for `"sqs"`; nats-py `publish(subject)` and `subscribe(subject, cb=)` on `nats.connect()`
+  or `nats.aio.client.Client()`; redis-py `xadd(name)` and the keys of `xreadgroup(...,
+  streams={...})` on `Redis` or `StrictRedis` (`redis` or `redis.asyncio`, also `from_url`). A polling
+  client's handler is the function that subscribes. The pack's `value` reads `await x` as `x`
+  (a traced `nc = await nats.connect()`) and a dict literal as `Value::Object` (a key that is
+  no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds
+  it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
+  for both packs.
+- `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
+  two definitions of one name, spans a decorated definition with its decorators, and exports
+  every module-level name (imports included), as an explicit import or `m.x` sees them; what
+  `import *` takes is `Facts::star`: the public names, or a literal `__all__` alone.
+  Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
+  and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
+  `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
+  `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
+  `packages.from`, read by `lang/python/pyproject.rs` through the PyPI manifest reader, so an
+  unreadable file declares nothing), or `src` when none is declared (`pyproject::source_roots`,
+  which `package::python_roots` shares); a package comes before a module of the same name.
+  An `if __name__ == "__main__":` block at the top level (either operand order, either quote,
+  nothing else) yields the definition `__main__`, spanning the `if` and its body (an `else` is
+  not part of it), owns the calls in that body, and is named in `Facts::programs`.
+  It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
+  written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::receivers`, one
+  `Receiver {scope, name, class}` per name a scope binds: a method's first parameter unless
+  `@staticmethod` (`Class::Enclosing`), an annotated parameter or name, `x = C(...)`
+  (`Class::Named("C")`, whatever `C` turns out to be), `self.x: T` in a method (an attribute,
+  at the class's scope), and `Class::Unknown`, which hides an outer binding, for any other
+  binding: other assignments, `for` and comprehension targets, `with` and `except ... as`,
+  `:=`, `case` captures, a lambda's parameters (in the enclosing scope, which owns its calls)
+  and a parameter the body assigns. A name its scope binds only once, by `name = value`, is
+  also a `Const` holding that value; so is the name of `with C(...) as x` (also
+  `Class::Named("C")`, as `x = C(...)` is) and a `self.x = C(...)` attribute (a `Const` of the
+  class, only for a call). `xs += ...` and `xs = xs + ...` on a name whose latest
+  value in that scope is a list literal do not bind it again: a list literal added joins the
+  `Const`'s items, anything else added (`+= static(...)`) is left out. Calls carry their positional `args` and keyword `kwargs`
+  as `Value`s (strings, f-strings and `+` folded into parts, a name or a member chain in them,
+  `config.BASE`, a `Part::Ref`; `[...]`/`(...)` a `Value::List`, a call
+  a `Value::Call` with its callee and range, no receiver or arguments), a decorator call names the definition it decorates
+  (`Call::decorates`), a decorator written as a bare name is in `Def::decorators` (as a
+  callee, `http.require_safe`), and a function lists the values it returns (`Def::return_values`).
+  A function's parameters carry their defaults as written (`Param::default`) and which
+  argument binds them (`Param::binds`, a `Binds`): `*args` and `**kwargs` are `Rest` (no single
+  argument), the parameters after them or after the bare `*` (which is no parameter) are
+  `Keyword`, a method's first one is `Instance` (`Class` for a `@classmethod`, neither for a
+  `@staticmethod`), any other `Any`. A target that is `self.x`, also inside unpacking, a `for`
+  or an `as`, and also written in a function nested in the method, binds the class's attribute
+  `x`. An import in a function or a class is `Class::Imported`: it hides an outer binding there
+  and resolves through the file's imports. An annotation decides; other bindings that
+  disagree make the class unknown. `global x` sends the function's bindings of `x` to the
+  module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
+  skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
+  and `... | None`.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
-  (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. `Code`
+  (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
+  bound by several imports (the latest in source order decides, whatever it resolves to), a
+  callee may start with a dotted import, and an `Imported::All` import counts as one binding
+  of each name its module's `Facts::star` takes. `lexical` skips a class's scope unless the
+  lookup starts in it (a class body's names are not in scope for its methods). A member of a
+  class, or of a parameter or local whose `Class` resolves to a class of the repository
+  (`Binding::Instance`), is looked up through the class's family: the class and the ancestors
+  its written bases give, in C3 order (Python's method resolution order), linearized once per
+  class in `Resolver::new`. A base that is not a class of the repository is an opaque
+  ancestor, named by what the file imports for it (`abc.ABC`) or as written (`object`), so
+  classes that share it give C3 one entry; a base that is no name (`mixin()`) is its own
+  entry: reaching it before a class that has the member leaves the member unknown, and so
+  does a hierarchy C3 rejects, bases in a cycle or a family longer than `FAMILY_DEPTH` (cut
+  without being kept on the way up when the walk down the bases reaches that depth, `Cut`). The first class that defines the member, or
+  binds it as an attribute (a `Receiver` of the class), wins, `exact`. A receiver whose class (or whose value's
+  callee) is outside the repository is unresolved; any other member call falls back to the
+  name match. `Busy` guards locals and families that resolve through themselves. A single
+  module-level binding is read from functions as it is; a function that rebinds it through
+  `global` makes it unknown. A pack that writes `Def::bases` and `Facts::receivers` gets this
+  without resolver changes (TypeScript writes none yet; its `this` is the pack's `receiver`
+  keyword).
+  `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
   `Code::expand_frames` is `expand` that also returns, for each site, the wrapper calls it
   climbed (`Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
-  `Call::uses` like `args` (a file without full facts is a miss).
-  `Code::expand` climbs only callers that resolved exact: a call found only by a name match
-  (`Caller::by_name`: `data.get(...)` matched to a wrapper method, or a bare name no import
-  binds) may be on any object or reach another function, so a wrapper with no exact caller is
-  read where it stands.
+  `Call::uses` like `args` (a file without full facts is a miss). An argument binds a parameter as its `Param::binds` says: by position or by
+  the parameter's name among the keyword arguments, only by name, or not at all (`Rest`); a
+  method called on an instance (`x.m(a)`) passes nothing for an `Instance` receiver, one called
+  on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
+  `Code::expand(path, index, read)` hands
+  `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
+  with them; a call found only by a name match (`Caller::by_name`: `data.get(...)` matched to
+  a wrapper method, or a bare name no import binds) is not climbed, since it may be on any
+  object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
+  `value_origins` for a value as written) is the shared value flow: the call sites whose result
+  a name may hold, followed through constants, imports and module attributes, the arguments
+  every caller passes to a parameter (a caller found only by a name match is not climbed, as in
+  `Code::expand`), the values a function of the repository returns (its
+  parameters then bound by that call only) and the items of a list or tuple; an attribute
+  assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
+  reaches no function of the repository is the origin. A constant, parameter or function met
+  again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
+  import from outside the repository binds a callee to (`fastapi.APIRouter`,
+  `express.default`): contract kinds recognize framework constructors with it.
+  `Code::definition` resolves a name or a member chain (`views.index`) to a definition,
+  `Code::module` a name to the file it binds as a whole module, and `Code::import_file` an
+  import specifier (`shop.orders.urls`) to its file.
   `Code::origin(path, scope, chain) -> Option<Origin {package, expr, binding}>` is the
   **receiver tracing** every message library form relies on: it follows a name or member chain
   through `const` bindings (same file and imported) down to an import whose module is outside

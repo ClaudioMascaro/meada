@@ -1,0 +1,2 @@
+def deals(request):
+    return []

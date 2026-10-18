@@ -10,18 +10,22 @@ modules updates it.
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
-  `fetch`; each with `Found::shape` from `response_reads`, spec #23: over the frames
+  `fetch`; only in a pack whose `globals` has it; each with `Found::shape` from `response_reads`, spec #23: over the frames
   `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
-  caller reaches), Next.js app-router and Express providers (each with a `Found::shape` from
+  caller reaches), Python client consumers (`clients`, below), Next.js app-router, Express,
+  FastAPI, Flask and Django providers (Next.js and Express ones each with a `Found::shape` from
   `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
   lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
   `Zod`, which `response_reads` and `provider_shape` reach through it), holding the budgets of
   each file; Express reads a handler once for every prefix it is mounted under),
   `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). `http::drift(links, exports)` sets `Link::drift` on every
+  `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
+  (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
+  on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
+  (`POST /health`) take it the same way. `http::drift(links, exports)` sets `Link::drift` on every
   HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site
   alone for an unresolved one; several of one contract count only when their shapes agree) and
   provider (by site, serving the link's contract) both have a shape, through `shape::drift`. An Express route path or mount prefix with a part that cannot
@@ -44,11 +48,75 @@ modules updates it.
   exported: `[serve] hosts` plus the host of every `servers` URL of the repository's documents,
   checked by `link` for a `host:` consumer). `shape`, `gateways` and `hosts` are set on HTTP
   providers only; `http::gateway_contracts(provider)` yields each as
-  `(contract, reason)` and `http::serves(provider, contract)` is the one check of any path (also
+  `(contract, reason)` and `http::serves(provider, contract)` is the one check of any path, through `fits` (also
   used by open items and decision replay, so a gateway candidate carries the provider's own
   contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
-  one repository a code path match wins over gateway path matches. `resource.rs` (spec
+  one repository a code path match wins over gateway path matches. An app or router
+  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
+  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
+  on a receiver that traces back to its framework's constructor (`Code::external`; Express
+  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
+  route is served under every prefix (`prefixes`): the segment of each mount (`use`,
+  `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
+  prefix of the router it is mounted on; FastAPI's mount segment is the given prefix (or
+  `mount`'s path) then the router's own (`APIRouter(prefix=)`), Flask's given `url_prefix`
+  replaces the own one (`Blueprint(url_prefix=)`). What nothing mounts is served at its root
+  (`prefixes`' `root`): every Express app or router; a FastAPI or Flask app, unless a mount
+  whose child cannot be read (no origin of the child is an app or router of the framework),
+  called on another app or router of its framework and able to hold an app (FastAPI's
+  `include_router(app.router)` and `mount`, not Flask's `register_blueprint`), may mount it;
+  never an `APIRouter` or a `Blueprint`, which serves only where a mount Meada reads puts it,
+  so a router mounted through an import that does not resolve is not guessed at the root. A
+  prefix or a path with a part that cannot be read (an f-string or template-literal hole, a
+  parameter) adds no route (Express included: `` `/${name}/items` `` is no provider, and a
+  router mounted only under such a prefix is served under no prefix); a path parameter written
+  in the literal (`{id}`, `<int:id>`, `:id`) stays one. FastAPI method
+  decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
+  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
+  `include()` argument names is an `Include`: a module of the repository (by dotted name or
+  as a module), the entries of a list, either of them first in the tuple form `(module or
+  list, "app_name")`, a dotted name no module answers to from the source roots (an import
+  from outside the repository, or one that does not resolve: `Named`), or `Unknown` (anything
+  else, or a value whose origins are not all `path()`/`re_path()` entries). A root URLconf is
+  a file with a module-level `urlpatterns` that no `include()` may name: none resolves to it,
+  no `Named` is its dotted path or a suffix of it (`may_be`: `backend/shop/urls.py` may be
+  `shop.urls`), and no `include()` is `Unknown` (then there is no root). Its `path()` and
+  `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
+  view adding its route before the entries it holds, at any depth, an `include()` met again
+  on the walk (a cycle) adding nothing, every entry read charged to `URLCONF_BUDGET`. Routes join as Django joins them (plain concatenation). A
+  `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
+  (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
+  `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
+  `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
+  `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
+  the provider's site. Python clients (`clients`, from `LIBRARIES`: `requests`, `httpx`,
+  `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
+  library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
+  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
+  to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
+  `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
+  attribute, or a parameter the callers pass one to, or a value a function of the repository
+  returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
+  `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
+  a value counts (module constants, caller parameters, return values). A `get` on any other
+  object is nothing.
+  `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
+  front of a relative URL (an absolute one, or one starting with a hole, is left alone);
+  different constructors with different bases make the base a hole. URL and method fold like
+  any `Value` (`str.format` and `%` do not). `python.rs` folds an environment read into
+  `Part::Env`, as `ts.rs` does (`env_read`/`single_env`): `os.environ["X"]`,
+  `os.environ.get("X")`, `os.getenv("X")` and the bare `environ`/`getenv`, matched as written
+  (not through the file's imports), alone or in an f-string hole, through `or` fallbacks (the
+  read on the left, no other variable on the right), a default argument (ignored, unless it
+  reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
+  `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
+  reads the value. `Code::expand` follows a function whose URL
+  or method depends on its parameters, so each of its call sites is a consumer (an argument
+  it leaves out takes the parameter's default). In Express `use(first,
+  ...)`, `first` has no path only when it is a router (a call, also one `Code::origins` reaches
+  through arguments and return values) or a handler (a function or a definition); anything
+  else is an unreadable prefix, so what it mounts is served under no prefix. `resource.rs` (spec
   #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   reader to every writer of another repository at `declared`, reason the contract. A `via` that
@@ -193,3 +261,34 @@ modules updates it.
   different shapes is unresolved. A consumer left with no field has no shape.
   `Resolver::exported` names constants and types as targets too, which no call reaches since
   they are no symbols.
+  Ecosystems (spec #24): everything above is npm's, behind `Ecosystem` (`Npm`, `Pypi`), which
+  names a manifest by its file name (`of`), gives the contract prefix (`package::npm::`,
+  `package::pypi::`), reads the bytes (`read`), checks a range (`flag`) and holds the
+  `workspace:` rule (`reaches`, npm only); `Providers` is keyed by ecosystem and name, so an
+  npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
+  nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
+  of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
+  `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
+  `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
+  source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
+  dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
+  `roots` and the console `scripts`, `[project.scripts]` else `[tool.poetry.scripts]`, as
+  `(module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
+  skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
+  written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
+  `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
+  reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
+  the next. A call from a `.py` file (`Ecosystem::of_source`) resolves through
+  `pypi_resolutions`: the import names a module, so each distribution a PyPI manifest of a
+  directory holding the file depends on (`holding`: every `pyproject.toml` and
+  `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots
+  (`python_roots`: the manifest's directory, then its declared roots or `src`;
+  `Provided::module` finds `a/b/__init__.py` or `a/b.py`), `exact` with `How::ModuleName`
+  (reason `; import module name`) when that module is the normalized name with `-` turned into
+  `_`, `inferred` with `How::TopLevel` (`; import top-level module`) otherwise, and `ambiguous`
+  for each when several distributions expose it (one consumer per distribution at the call
+  site). The chain is followed from the module the specifier names (`import shared_lib` then
+  `shared_lib.api.greet()`: `shared_lib`, then `api.greet`; `from shared_lib.api import greet`:
+  `shared_lib.api`, then `greet`), and `Provided::member` takes a package's submodule when its
+  `__init__.py` exports no such name. `surface` reads npm manifests alone: no shape crosses a
+  PyPI package.

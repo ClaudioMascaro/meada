@@ -185,12 +185,16 @@ Fixed constants:
 ## Status
 
 Version 0.1, the first. It indexes TypeScript and JavaScript repositories (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) and links repositories through HTTP contracts (`fetch` on the consuming
-side, Next.js (app router) and Express on the serving side, also behind a gateway), through
-the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs`), RabbitMQ
-queues (`amqplib`, with a `publish` to an exchange reaching the queues its bindings tie to it),
-Amazon SQS queues (AWS SDK v3 and `sqs-consumer`), NATS subjects (with the `*` and `>`
-wildcards), BullMQ jobs and Redis streams (`ioredis` and `node-redis`), with the producer linked
+`.jsx`, `.mjs`, `.cjs`) and Python ones (`.py`), and links repositories, also from one language
+to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
+on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
+Django on the serving side, also behind a gateway), through
+the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
+`confluent-kafka` and `kafka-python`), RabbitMQ queues (`amqplib` and, in Python, `pika`, with a
+`publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK
+v3, `sqs-consumer` and, in Python, `boto3`), NATS subjects (`nats` and, in Python, `nats-py`, with
+the `*` and `>` wildcards), BullMQ jobs and Redis streams (`ioredis`, `node-redis` and, in Python,
+`redis-py`), with the producer linked
 to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
 also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
 listed in `[serve] documents`: the routes and channels they describe become contracts, with the
@@ -204,11 +208,19 @@ provider's code, through the `exports`, `types`, `module` and `main` fields and 
 re-exports, also when the entry point points into the build folder (the `outDir` of
 `tsconfig.json`, mapped back to its `rootDir`). `search` with the kind `package` finds the
 package by name, with its repository, folder, version and number of consumers, and `context` on
-an exported function lists who calls it, in any repository of the workspace. It reads no lockfile and queries
-no npm registry. Meada also reports shape drift: the fields a `fetch` consumer reads from the parsed response that the route it calls does not return, compared with the route's shape (an OpenAPI document, a zod schema or the object literals of its handler). `trace` ends the link line with `drift: missing <path>`, `context` on a route names where its shape comes from and lists each consumer that reads fields of the response, with its drift and level and the reads not checked under an open part when there are any, `search` with the kind `drift` lists all the drift, and `meada status` counts the missing reads of each repository's consumers (the consumer's repository counts them; the provider's shows nothing). `meada export` carries each repository's communities: groups of symbols that call each other more than they call the rest, found with the Leiden algorithm with nothing random and integer arithmetic only, and named after the directory most of their members live in (`src`, `src#2`), the same on every machine. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
+an exported function lists who calls it, in any repository of the workspace. In Python, each
+named `pyproject.toml` (`[project]` or `[tool.poetry]`) becomes the contract
+`package::pypi::<name>`, the name normalized as PEP 503 does, and each dependency in `[project]
+dependencies`, `[tool.poetry.dependencies]` or a `requirements*.txt` that names a package of the
+workspace links to it, with the range as written and `range unchecked` (PyPI ranges are not
+checked); an `import` of one of that package's modules crosses into the provider's code,
+`exact` when the module bears the distribution's name, `inferred` when it is only one of its
+top-level modules and `ambiguous` when several expose it. An npm and a PyPI package of the same
+name never link. It reads no lockfile and queries neither the npm registry nor PyPI. Meada also reports shape drift: the fields a `fetch` consumer reads from the parsed response that the route it calls does not return, compared with the route's shape (an OpenAPI document, a zod schema or the object literals of its handler). `trace` ends the link line with `drift: missing <path>`, `context` on a route names where its shape comes from and lists each consumer that reads fields of the response, with its drift and level and the reads not checked under an open part when there are any, `search` with the kind `drift` lists all the drift, and `meada status` counts the missing reads of each repository's consumers (the consumer's repository counts them; the provider's shows nothing). `meada export` carries each repository's communities: groups of symbols that call each other more than they call the rest, found with the Leiden algorithm with nothing random and integer arithmetic only, and named after the directory most of their members live in (`src`, `src#2`), the same on every machine. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
-`decided`. Broker clusters are not modelled: two clusters that each have a topic with the same
-name link as if they were one. Each route a handler serves, each channel a consumer handler consumes and each exported function or method nothing in its own repository calls is an entry point with its process: `trace` with `process::<entry point identity>` reads the call tree it sets in motion, across repositories, and `meada export` carries the process of each entry point. `search` with the kind `community` finds a community by name and with the kind `process` finds a process by its entry point's label, and `context` on a symbol names its community (or `community: none`) and the processes it belongs to, found by walking upstream over the same calls and links a process follows. Not there yet: other languages, HTTP clients other than `fetch`,
+`decided`, and a route Meada cannot place stays out of the map rather than being guessed. Broker
+clusters are not modelled: two clusters that each have a topic with the same
+name link as if they were one. Each route a handler serves, each channel a consumer handler consumes and each exported function or method nothing in its own repository calls is an entry point with its process: `trace` with `process::<entry point identity>` reads the call tree it sets in motion, across repositories, and `meada export` carries the process of each entry point. In Python, a file's `if __name__ == "__main__":` block (the symbol `__main__`) and each function a `[project.scripts]` entry of `pyproject.toml` names (`module:function`) are entry points too, and only public names (no leading `_`, or those of a literal `__all__`) count as exported. `search` with the kind `community` finds a community by name and with the kind `process` finds a process by its entry point's label, and `context` on a symbol names its community (or `community: none`) and the processes it belongs to, found by walking upstream over the same calls and links a process follows. Not there yet: other languages, HTTP clients other than these,
 messaging clients other than these, or Meada's npm package. The scope and order of the work are in
 [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md); the decisions are in
 [`docs/adr`](docs/adr). See the [CHANGELOG](CHANGELOG.md).

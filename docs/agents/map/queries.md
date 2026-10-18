@@ -47,7 +47,8 @@ modules updates it.
   follows the format, so OpenAPI lines never gain a `channels: 0`). `search` kind `package`
   (`search_packages`, an early branch too) lists the `packages` rows whose name matches, as
   `<repository> <directory> <name>@<version> (consumers: <n>)` (no `@<version>` for a manifest
-  without one); the consumers are the links whose provider is the package's manifest
+  without one; a package of another ecosystem than npm's adds it after the name, as in
+  `shared-lib@1.2.0 (pypi)`, and so does its `packages` row, as `ecosystem`); the consumers are the links whose provider is the package's manifest
   (`Package::site`), that is the dependency entries at any level, not the call hops, which link to
   symbols. A dependency entry's site (`<repository>::<path>::<field>::<name>`) and a manifest's
   print as `package.json dependencies` and `kit/package.json` in `search` and in `context` on
@@ -81,8 +82,8 @@ modules updates it.
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
-  reach come from `http::route_fits` (method and ordered literal fragments, see `Found::method`
-  / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
+  reach come from `http::route_fits` (method, or a route of every method, and ordered literal
+  fragments, see `Found::method` / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
   path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
@@ -145,8 +146,11 @@ modules updates it.
   callees, and `trace` up reaches the call through `into[symbol]`; a hop into another repository
   counts in the footer's hops and repositories.
 - `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes; `DEFAULT_BUDGET`
-  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, plus the markers
-  `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display only.
+  2000) and the line helpers `Files`, `label`, `callee`, `unresolved`, `mark` (` [<level>:
+  <reason>]` after a call that is not exact, in `trace` and in `context`'s callers and callees;
+  the reason is derived when rendering, never stored: `one method named render`, `2 functions or
+  classes named render`), plus the markers `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display
+  only.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,

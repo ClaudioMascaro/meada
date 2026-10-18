@@ -1,0 +1,2 @@
+example.com/acme/conformance __main__ process::example.com/acme/conformance::jobs/single.py::__main__ (program)
+example.com/acme/conformance __main__ process::example.com/acme/conformance::jobs/sync.py::__main__ (program)

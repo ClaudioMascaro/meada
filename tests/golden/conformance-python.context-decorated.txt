@@ -1,0 +1,10 @@
+example.com/acme/conformance web/api.py:13-15 health
+community: none
+processes: 1 (1 route; 1 repository): GET /health (example.com/acme/conformance)
+@app.get("/health")
+def health():
+    return {"ok": True}
+callers: none
+callees: none
+contracts:
+example.com/acme/conformance web/api.py:13 provides http::GET::/health

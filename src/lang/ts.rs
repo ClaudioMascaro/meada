@@ -6,8 +6,8 @@ use std::ops::Range;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind, LanguagePack,
-    Message, Modules, Param, Part, Ty, Value,
+    Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
+    LanguagePack, Message, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
@@ -96,6 +96,9 @@ impl LanguagePack for TsJs {
                     name: inner.clone(),
                     kind,
                     range,
+                    bases: Vec::new(),
+                    decorators: Vec::new(),
+                    return_values: Vec::new(),
                 });
             }
             match node.kind() {
@@ -122,6 +125,8 @@ impl LanguagePack for TsJs {
                                         .collect()
                                 })
                                 .unwrap_or_default(),
+                            kwargs: Vec::new(),
+                            decorates: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -209,6 +214,18 @@ impl LanguagePack for TsJs {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["tsconfig.json", "jsconfig.json"]
+    }
+
+    fn receiver(&self) -> Option<&'static str> {
+        Some("this")
+    }
+
+    fn base_receiver(&self) -> Option<&'static str> {
+        Some("super")
+    }
+
+    fn globals(&self) -> &'static [&'static str] {
+        &["fetch"]
     }
 
     fn messages(&self, code: &Code) -> Vec<Message> {
@@ -525,6 +542,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
     if list.kind() == "identifier" {
         return vec![Param {
             name: text(list, src).to_string(),
+            binds: Binds::Any,
             default: None,
             fields: Vec::new(),
         }];
@@ -548,6 +566,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
                     .filter(|n| n.kind() == "identifier")
                     .map_or("", |n| text(n, src))
                     .to_string(),
+                binds: Binds::Any,
                 default: default.map(|d| value(d, src, scope, up)),
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
@@ -818,6 +837,11 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
+                        // The span of the call in `Facts::calls`.
+                        range: match awaited_artifact(node) {
+                            true => f.start_byte()..node.end_byte(),
+                            false => node.byte_range(),
+                        },
                     })
                 })
             }
@@ -989,18 +1013,6 @@ fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
-        .collect::<Vec<_>>()
-        .into_iter()
-}
-
-fn children<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect::<Vec<_>>().into_iter()
-}
-
 /// A string literal's content: `'./m'` is `./m`.
 fn unquote(node: Node, src: &[u8]) -> String {
     let quoted = text(node, src);
@@ -1064,10 +1076,6 @@ fn callee(node: Node, src: &[u8]) -> String {
         .iter()
         .rev()
         .fold(base, |path, name| path + "." + name)
-}
-
-fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
-    std::str::from_utf8(&src[node.byte_range()]).unwrap_or("")
 }
 
 #[cfg(test)]

@@ -1,0 +1,16 @@
+example.com/xlang/inventory inventory/jobs.py:16-20 restock
+community: none
+processes: 1 (1 export; 1 repository): restock (example.com/xlang/inventory)
+def restock(sku):
+    # A consumer linked through the declared host, next to one Meada leaves unresolved:
+    # `str.format` is not folded.
+    requests.post("https://storefront.example.com/api/audit")
+    return requests.get("https://storefront.example.com/api/prices/{}".format(sku))
+callers: none
+callees:
+example.com/xlang/inventory inventory/jobs.py:20 (unresolved) (string).format
+example.com/xlang/inventory inventory/jobs.py:20 (unresolved) requests.get
+example.com/xlang/inventory inventory/jobs.py:19 (unresolved) requests.post
+contracts:
+example.com/xlang/inventory inventory/jobs.py:20 consumes (unresolved) requests.get
+example.com/xlang/inventory inventory/jobs.py:19 consumes http::POST::/api/audit

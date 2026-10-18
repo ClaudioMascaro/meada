@@ -1,0 +1,4 @@
+example.com/xlang/inventory inventory/main.py:19 reserve
+  →[exact: host inventory.example.com is served by example.com/xlang/inventory] example.com/xlang/storefront src/inventory.ts:10 reserveStock
+    example.com/xlang/storefront src/sync.ts:5 syncInventory
+chain: exact · 1 hops · 2 repos · 78 tokens

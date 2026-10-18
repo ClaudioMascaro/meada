@@ -1,0 +1,4 @@
+# A sample of what the index stores of a requirements file.
+-r requirements-dev.txt
+shared-lib>=1.0  # pinned below 2
+Shared.Tools==0.3.0

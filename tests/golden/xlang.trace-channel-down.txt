@@ -1,0 +1,6 @@
+example.com/xlang/storefront src/events.ts:7 announceRestock
+  →[exact: channel::kafka::stock.restocked] example.com/xlang/inventory inventory/events.py:10 consume_restocks
+    example.com/xlang/inventory inventory/events.py:6 apply_restock
+      example.com/xlang/inventory inventory/main.py:26 audit
+        →[inferred: base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront] example.com/xlang/storefront app/api/audit/route.ts:1 POST
+chain: inferred · 2 hops · 2 repos · 130 tokens

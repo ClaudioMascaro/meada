@@ -4,6 +4,37 @@ All notable changes to Meada are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
+  *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
+  through `self`, annotations, constructor calls and Python's method resolution order.
+- Python HTTP providers (FastAPI, Flask and Django URLconfs, with their prefixes, mounts and
+  `include()`s, and the methods each view serves) and consumers (`requests`, `httpx` and
+  `aiohttp`, with a client's `base_url` and client wrappers read at each call site), linked
+  to TypeScript repositories both ways. A base URL read from the environment links through
+  `base_url_env`. A router or URLconf Meada cannot place, and a route with a part it cannot
+  read, stay out of the map rather than being guessed.
+- Python message channels, linked to the same channels in TypeScript both ways: Kafka
+  (`confluent-kafka`, `kafka-python`), RabbitMQ (`pika`, with exchanges and bindings), Amazon SQS
+  (`boto3`), NATS (`nats-py`, wildcards `inferred`) and Redis streams (`redis-py`: `xadd` and the
+  streams of `xreadgroup`). A call counts only when its client traces back to the library's
+  constructor; a channel name Meada cannot evaluate is an unresolved side, never linked.
+- PyPI packages: a named `pyproject.toml` (`[project]` or `[tool.poetry]`) provides
+  `package::pypi::<name>` (PEP 503 normalized), and dependencies in `[project] dependencies`,
+  `[tool.poetry.dependencies]` and `requirements*.txt` that name a workspace package link to it,
+  with the range as written and `range unchecked`. A Python import of one of its modules crosses
+  into the provider's symbols: `exact` through the distribution's own name, `inferred` through
+  another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
+  package of one name never link. The index is rebuilt once (schema version 21).
+- Python program entry points, each with its process: the `if __name__ == "__main__":` block of a
+  file (symbol `__main__`, its range the `if` block) and each function a `[project.scripts]`
+  (or Poetry `[tool.poetry.scripts]`) target names, mapped to its file through the package's
+  source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
+  entry points, though an import still reaches the others.
+
 ## [0.1.0] - Unreleased
 
 The first release: the trunk of the roadmap (ADR 0003). The maintainer sets the date when
@@ -174,4 +205,5 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0

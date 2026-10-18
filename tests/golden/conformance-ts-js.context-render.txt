@@ -5,5 +5,5 @@ function render(label) {
   return <i>{label}</i>;
 }
 callers:
-example.com/acme/conformance src/app.ts:21 main [ambiguous]
+example.com/acme/conformance src/app.ts:21 main [ambiguous: 2 functions or classes named render]
 callees: none

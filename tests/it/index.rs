@@ -41,6 +41,20 @@ fn exports_of_the_same_files_are_byte_identical() {
 }
 
 #[test]
+fn python_exports_of_the_same_files_are_byte_identical() {
+    let origin = Some("https://example.com/acme/conformance.git");
+    let a = fixture_repo("python_byte_identical_a", "conformance-python", origin);
+    let b = fixture_repo("python_byte_identical_b", "conformance-python", origin);
+
+    let first = Engine::open(&a).unwrap().export().unwrap();
+    let again = Engine::open(&a).unwrap().export().unwrap();
+    let elsewhere = Engine::open(&b).unwrap().export().unwrap();
+
+    assert_eq!(first, again);
+    assert_eq!(first, elsewhere);
+}
+
+#[test]
 fn index_writes_only_inside_meada() {
     let repo = fixture_repo("writes_only_inside_meada", "ts-basic", None);
 

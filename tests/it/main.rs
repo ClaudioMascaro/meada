@@ -23,12 +23,14 @@ mod items;
 mod mcp;
 mod packages;
 mod processes;
+mod pypi;
 mod query;
 mod resources;
 mod stale;
 mod trace;
 mod urls;
 mod workspace;
+mod xlang;
 
 /// A file or directory here left out of the list above would never compile or run.
 #[test]

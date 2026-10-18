@@ -1,0 +1,3 @@
+# The clients the fixture calls; an option line is skipped.
+--index-url https://pypi.org/simple
+httpx==0.27.0

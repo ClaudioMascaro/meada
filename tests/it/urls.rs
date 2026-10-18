@@ -7,7 +7,7 @@ use crate::common;
 use std::path::PathBuf;
 
 use common::{assert_golden, fixture_repo, without_processes};
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 
 /// The Next.js provider of `tests/fixtures/http-api`, in the case directory.
 fn api(case: &str) -> PathBuf {
@@ -167,4 +167,46 @@ fn a_parameter_defaulting_to_fetch_is_a_fetch_call() {
     let export = Engine::open(&client).unwrap().export().unwrap();
 
     assert_golden("http-fetch-param.export.json", &without_processes(&export));
+}
+
+#[test]
+fn a_route_of_every_method_links_a_consumer_of_any_method() {
+    let case = "urls_any_method";
+    let client = fixture_repo(
+        case,
+        "http-any-client",
+        Some("https://example.com/acme/client.git"),
+    );
+    fixture_repo(
+        case,
+        "conformance-python",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&client).unwrap();
+
+    assert_golden(
+        "http-any-client.export.json",
+        &without_processes(&engine.export().unwrap()),
+    );
+    // A route named with any method starts at the provider of every method.
+    let up = engine.trace(Start::From("POST /health"), Direction::Up, None);
+    assert_golden("http-any-client.trace-up.txt", &up.unwrap());
+    let items = engine.open_items().unwrap();
+    // The peer's own unresolved calls are items too: only the client's are read here.
+    let candidates: Vec<&str> = (items
+        .iter()
+        .filter(|i| i.repository == "example.com/acme/client"))
+    .flat_map(|i| &i.candidates)
+    .map(|c| c.contract.as_str())
+    .collect();
+    assert_eq!(
+        candidates,
+        [
+            "http::ANY::/about",
+            "http::ANY::/contact",
+            "http::ANY::/health",
+            "http::ANY::/vintage/{}",
+            "http::PUT::/members/{}"
+        ]
+    );
 }

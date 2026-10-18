@@ -1,0 +1,12 @@
+example.com/acme/conformance geometry/shapes.py:4-5 scale
+community: stars
+processes: 2 (2 export; 1 repository): lazy (example.com/acme/conformance), main (example.com/acme/conformance)
+def scale(value):
+    return to_cm(value)
+callers:
+example.com/acme/conformance bindings.py:111 lazy
+example.com/acme/conformance geometry/extra/measure.py:8 perimeter
+example.com/acme/conformance geometry/shapes.py:22 Circle.area
+example.com/acme/conformance main.py:24 main
+callees:
+example.com/acme/conformance geometry/units.py:1 to_cm

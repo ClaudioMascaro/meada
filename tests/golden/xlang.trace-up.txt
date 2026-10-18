@@ -1,0 +1,5 @@
+example.com/xlang/storefront app/api/prices/[sku]/route.ts:1 GET
+  →[inferred: base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront] example.com/xlang/inventory inventory/jobs.py:8 refresh_prices
+  →[inferred: base URL from STOREFRONT_URL, a base_url_env of peer example.com/xlang/storefront] example.com/xlang/inventory inventory/main.py:16 stock_level
+    →[inferred: base URL from INVENTORY_URL, a base_url_env of peer example.com/xlang/inventory] example.com/xlang/storefront src/sync.ts:4 syncInventory
+chain: inferred · 3 hops · 2 repos · 149 tokens

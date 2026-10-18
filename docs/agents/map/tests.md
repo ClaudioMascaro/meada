@@ -6,8 +6,11 @@ modules updates it.
 
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
-  `conformance` (pack), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
-  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
+  `conformance` (pack; for Python also its HTTP providers and consumers
+  and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
+  `python-django`), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
+  and over a Kafka topic: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
   export process, an ambiguous call, a missing peer, a budget cut), `community_queries`
@@ -139,6 +142,28 @@ modules updates it.
   Ticket T4 adds `pkg-web.trace-down-outdir.txt` and `pkg-shared.trace-up-outdir.txt` (the calls
   through `@example/shared`); an invalid, hostile or edited nested `tsconfig.json` is tested the
   same way as a `package.json` (refreshed equals cold).
+- `tests/it/pypi.rs` (spec #24): the PyPI fixtures `pkg-pylib` and `pkg-pyweb` as siblings
+  (`pyweb` names `pylib` as its peer). `pylib` provides `Shared_Lib` (`shared-lib`, PEP 621, a
+  `src/` layout: `shared_lib/__init__.py` re-exports `greet` from `core.py`, which calls
+  `text.py`'s `shout`; `api.py` holds `fetch` and `Client.create`; `src/sl_extras/` is a second
+  top-level module; `src/shared_lib/requirements.txt` takes none of its files),
+  `tools/pyproject.toml` provides `shared.tools` (`shared-tools`, Poetry) whose modules are
+  `tools/sl_extras/` and `tools/toolkit/`, and `js/package.json` is an npm `shared-lib`. `pyweb`
+  depends on `shared-lib` in `pyproject.toml` (extras and markers) and `requirements-dev.txt`, on
+  `shared-tools` in `requirements.txt` (with option lines, a comment and a URL) and in
+  `worker/pyproject.toml` (Poetry, a dev group naming `shared-lib` not read), and its
+  `ui/package.json` names `shared-tools` on npm (no link). `app/main.py` crosses `exact` through
+  the re-export, a submodule reached as `shared_lib.api.fetch` and `from shared_lib.api import
+  Client`, `ambiguous` through `sl_extras` (both distributions expose it), and not at all
+  through a local `greet` or `json`; `app/rel.py`'s relative imports named after the
+  distribution never cross; `tests/test_api.py` crosses `exact` through the root's manifests,
+  though `tests/requirements.txt` names only `pytest`; `worker/job.py` crosses `inferred`
+  through `toolkit`. Goldens `pkg-{pyweb,pylib}.export.json`, `pkg-pylib.context-greet.txt`,
+  `pkg-pylib.search-package.txt` (the PyPI and the npm `shared-lib` apart) and
+  `pkg-pyweb.trace-down.txt`; the freshness test edits both repositories' `pyproject.toml`, the
+  root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
+  (PEP 503 names, requirement lines and continuations, both readers, the limits) and
+  `lang/python/pyproject.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
