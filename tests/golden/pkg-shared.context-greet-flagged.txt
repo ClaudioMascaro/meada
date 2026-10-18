@@ -1,4 +1,4 @@
-example.com/pkg/shared kit/src/greet.ts:1 greet
+example.com/pkg/shared kit/src/greet.ts:1-3 greet
 community: kit/src
 processes: 4 (4 export; 3 repositories): report (example.com/pkg/api), greet (example.com/pkg/shared), smoke (example.com/pkg/web), caught (example.com/pkg/web)
 function greet(name: string): string {

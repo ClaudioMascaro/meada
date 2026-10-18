@@ -1,4 +1,4 @@
-example.com/acme/web src/math.ts:1 add
+example.com/acme/web src/math.ts:1-3 add
 community: src
 processes: 1 (1 export; 1 repository): sum (example.com/acme/web)
 function add(a: number, b: number): number {

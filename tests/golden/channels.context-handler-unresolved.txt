@@ -1,4 +1,4 @@
-example.com/channels/worker src/pattern.ts:12 seen
+example.com/channels/worker src/pattern.ts:12-14 seen
 community: none
 processes: 1 (1 channel; 1 repository): channel::kafka (unresolved) (example.com/channels/worker)
 async function seen({ message }: { message: { value: string } }) {
