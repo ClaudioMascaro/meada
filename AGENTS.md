@@ -42,6 +42,22 @@ write tools; one index per repository; determinism) live in
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a
   contract kind or a language pack.
 
+## Code graph
+
+Meada indexes this repository too: `.mcp.json` serves it as the `meada` MCP server (`search`,
+`context`, `trace`). Reach for it first to find where a symbol lives, who calls it and what a
+change touches, then read the files it names.
+
+- Install the binary once per machine with `cargo install --path . --locked`, and again after a
+  change to a language pack or a contract kind: the server runs the installed binary, while the
+  index follows the working tree on every query.
+- Read its answers as Meada's own levels say: `exact` is certain, `inferred` and `ambiguous` are
+  name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
+  `format!`, `vec!`) are not indexed.
+- Results under `tests/fixtures/` are test data.
+- A wrong answer on Meada's own code is a bug: open an issue with the query, the answer and the
+  expected one.
+
 ## Agent skills
 
 ### Issue tracker

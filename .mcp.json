@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "meada": {
+      "type": "stdio",
+      "command": "meada",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}
