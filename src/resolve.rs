@@ -84,6 +84,9 @@ struct Seen<'a> {
     depth: usize,
     cut: bool,
     looped: bool,
+    /// The file whose code being run while it loads (at its top level, in a class body there or
+    /// in its main guard) the name is resolved from (`Resolver::seen`).
+    load: Option<&'a str>,
 }
 
 /// What a pair exports, and whether it met a cycle (`Seen::looped`).
@@ -313,7 +316,13 @@ impl<'a> Resolver<'a> {
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
     fn binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
-        self.resolve(path, scope, callee, &mut Seen::new(), &mut Work::default())
+        self.resolve(
+            path,
+            scope,
+            callee,
+            &mut self.seen(path, scope),
+            &mut Work::default(),
+        )
     }
 
     /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
@@ -378,7 +387,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         };
         if let Class::Imported = class {
-            return self.imported(path, name, &mut Seen::new());
+            return self.imported(path, name, &mut self.seen(path, scope));
         }
         let key = Busy::Local(path, scope, name);
         let depth = (work.busy.iter())
@@ -394,7 +403,9 @@ impl<'a> Resolver<'a> {
         work.busy.push(key);
         let found = match class {
             Class::Enclosing => self.class(path, scope),
-            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Named(class) => {
+                self.resolve(path, scope, class, &mut self.seen(path, scope), work)
+            }
             Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
@@ -500,15 +511,21 @@ impl<'a> Resolver<'a> {
         let scope = crate::parent(class.name);
         let bases = self.defs[class.path][class.name].bases.iter().enumerate();
         bases
-            .map(
-                |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
+            .map(|(n, base)| {
+                match self.resolve(
+                    class.path,
+                    scope,
+                    base,
+                    &mut self.seen(class.path, scope),
+                    work,
+                ) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
                     }
                     _ => Ancestor::Opaque(self.imported_name(class.path, base)),
-                },
-            )
+                }
+            })
             .collect()
     }
 
@@ -565,6 +582,27 @@ impl<'a> Resolver<'a> {
             scope = crate::parent(scope);
         }
         Binding::Unknown
+    }
+
+    /// A `Seen` to resolve a name written in `scope` of `path` with: one that runs while the
+    /// module loads, unless it is in a function (`Seen::load`).
+    fn seen(&self, path: &'a str, scope: &str) -> Seen<'a> {
+        let mut s = scope;
+        while !s.is_empty() {
+            let program = self.files[path].programs.iter().any(|p| p == s);
+            if !program
+                && !self.defs[path]
+                    .get(s)
+                    .is_some_and(|d| d.kind == Kind::Class)
+            {
+                return Seen::new();
+            }
+            s = crate::parent(s);
+        }
+        Seen {
+            load: Some(path),
+            ..Seen::new()
+        }
     }
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
@@ -823,12 +861,18 @@ impl<'a> Resolver<'a> {
     fn rebound(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let (stars, after) = self.later.get(path)?;
         let stars = &stars[..*after.get(name)?];
-        latest(
-            stars
-                .iter()
-                .map(|source| self.taken(path, source, name, seen)),
-            true,
-        )
+        let given = stars
+            .iter()
+            .map(|source| self.taken(path, source, name, seen));
+        let found = latest(given, true)?;
+        // Code run while the module loads may come before the star import, and see the binding
+        // before it.
+        // ponytail: where the code sits is not compared with the star import's line, so what a
+        // star import rebinds is unknown to all of it.
+        Some(match seen.load == Some(path) {
+            true => Binding::Unknown,
+            false => found,
+        })
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
@@ -1074,44 +1118,48 @@ impl<'a> Code<'a> {
     ) -> Option<Origin<'a>> {
         let mut members = chain.split('.');
         let head = members.next()?;
-        let mut origin = match self.resolver.lexical(path, scope, head, &mut Seen::new()) {
-            Binding::External(package, name) => Origin {
-                package,
-                expr: match name {
-                    Imported::Namespace => String::new(),
-                    Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
-                    // A star import spells no name of its own.
-                    Imported::All => return None,
+        let mut origin =
+            match self
+                .resolver
+                .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
+            {
+                Binding::External(package, name) => Origin {
+                    package,
+                    expr: match name {
+                        Imported::Namespace => String::new(),
+                        Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
+                        // A star import spells no name of its own.
+                        Imported::All => return None,
+                    },
+                    binding: None,
                 },
-                binding: None,
-            },
-            Binding::Const(at, constant) => {
-                // `const a = b; const b = a;` comes from nowhere.
-                if seen.contains(&(at, constant)) {
-                    return None;
+                Binding::Const(at, constant) => {
+                    // `const a = b; const b = a;` comes from nowhere.
+                    if seen.contains(&(at, constant)) {
+                        return None;
+                    }
+                    seen.push((at, constant));
+                    let (value, within) = self.held(at, constant)?;
+                    let mut origin = match value {
+                        Value::Ref(name) => self.trace(at, within, name, seen)?,
+                        Value::Call(call) => {
+                            let callee = &call.callee;
+                            let mut origin = self.trace(at, within, callee, seen)?;
+                            origin.expr += "()";
+                            origin
+                        }
+                        Value::New(callee, _) => {
+                            let mut origin = self.trace(at, within, callee, seen)?;
+                            origin.expr = format!("new {}()", origin.expr);
+                            origin
+                        }
+                        _ => return None,
+                    };
+                    origin.binding = Some((at, constant));
+                    origin
                 }
-                seen.push((at, constant));
-                let (value, within) = self.held(at, constant)?;
-                let mut origin = match value {
-                    Value::Ref(name) => self.trace(at, within, name, seen)?,
-                    Value::Call(call) => {
-                        let callee = &call.callee;
-                        let mut origin = self.trace(at, within, callee, seen)?;
-                        origin.expr += "()";
-                        origin
-                    }
-                    Value::New(callee, _) => {
-                        let mut origin = self.trace(at, within, callee, seen)?;
-                        origin.expr = format!("new {}()", origin.expr);
-                        origin
-                    }
-                    _ => return None,
-                };
-                origin.binding = Some((at, constant));
-                origin
-            }
-            _ => return None,
-        };
+                _ => return None,
+            };
         for member in members {
             if !origin.expr.is_empty() {
                 origin.expr.push('.');
@@ -1135,7 +1183,8 @@ impl<'a> Code<'a> {
             .split_once('.')
             .map_or((chain, None), |(h, m)| (h, Some(m)));
         let Binding::External(specifier, name) =
-            self.resolver.lexical(path, scope, head, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
         else {
             return None;
         };
@@ -1439,7 +1488,10 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
     ) -> Option<((&'a str, &'a str), &'a Value)> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        match self
+            .resolver
+            .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
+        {
             Binding::Const(at, constant) => Some(((at, constant), self.held(at, constant)?.0)),
             _ => None,
         }
@@ -1468,7 +1520,8 @@ impl<'a> Code<'a> {
         name: &'a str,
     ) -> Option<(&'a str, &'a str, &'a Ty)> {
         let Binding::Const(at, constant) =
-            self.resolver.lexical(path, scope, name, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         else {
             return None;
         };
@@ -1492,7 +1545,8 @@ impl<'a> Code<'a> {
         default: &str,
     ) -> bool {
         let Binding::Param(function, n, field) =
-            self.resolver.lexical(path, scope, name, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         else {
             return false;
         };
@@ -1515,7 +1569,7 @@ impl<'a> Code<'a> {
         n: usize,
     ) -> bool {
         matches!(
-            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            self.resolver.lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
             Binding::Param(f, at, None) if f == function && at == n
         )
     }
@@ -1524,7 +1578,8 @@ impl<'a> Code<'a> {
     /// global such as `Response`. A local binding of the name hides the global.
     pub fn is_global(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
         matches!(
-            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
             Binding::Unknown
         )
     }
@@ -2131,15 +2186,29 @@ mod tests {
 
     #[test]
     fn a_star_import_after_a_definition_rebinds_its_name() {
-        // `a` exports `x`, so `from a import *` after `def x()` rebinds `x` to `a`'s, for a call
-        // after it and for a call in a function, which runs once the module is loaded.
+        // `a` exports `x`, so `from a import *` after `def x()` rebinds `x` to `a`'s for a call
+        // in a function, which runs once the module is loaded.
         let def = "def x():\n    pass\n";
         let a = ("a.py", def);
-        for call in ["x()\n", "def f():\n    x()\n"] {
-            let main = format!("{def}from a import *\n{call}");
-            let sources = owned(&[a, ("main.py", &main)]);
-            let found = exact_in(&Python, &sources, "main.py", "x");
-            assert_eq!(found.as_deref(), Some("a.py"), "{main}");
+        let main = format!("{def}from a import *\ndef f():\n    x()\n");
+        let sources = owned(&[a, ("main.py", &main)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("a.py"));
+        // Code that runs while the module loads (at the top level, in a class body, in the main
+        // guard) may run before the star import and reach `main`'s `x`, or after it and reach
+        // `a`'s: neither exactly.
+        for call in [
+            "x()\n",
+            "class C:\n    x()\n",
+            "if __name__ == \"__main__\":\n    x()\n",
+        ] {
+            for main in [
+                format!("{def}{call}from a import *\n"),
+                format!("{def}from a import *\n{call}"),
+            ] {
+                let sources = owned(&[a, ("main.py", &main)]);
+                assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            }
         }
         // The same through a module that defines `x`, then star-imports `a`.
         let m = format!("{def}from a import *\n");

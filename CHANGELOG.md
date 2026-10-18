@@ -57,8 +57,13 @@ All notable changes to Meada are recorded here. The format follows
   function of that name. A Python module that star-imports one name from several modules
   re-exports the last one's, as Python binds it.
 - A Python name defined or assigned before a star import of a module of the repository that
-  exports it (`def x(): ...`, then `from a import *`) is linked to that module's, as Python
-  rebinds it, and no longer to the earlier definition.
+  exports it (`def x(): ...`, then `from a import *`) is linked to that module's from a
+  function, as Python rebinds it, and no longer to the earlier definition. Code that runs while
+  the module loads (its top level, a class body, its main guard) may run before the star import,
+  and links neither. A name bound again after the star import (`with ... as x`, `for x in`,
+  `except ... as x`, `:=`, a `case` capture, unpacking, `+=`, a function's `global x`) keeps
+  that binding, and a star import of a module whose `__all__` is computed rebinds a name to
+  nothing known.
 - A name two `export *` of one module give differently is no longer linked `exact` to the first
   one's: as in ES modules, the module exports neither. Two that lead to the same definition
   still export it.

@@ -209,7 +209,9 @@ impl LanguagePack for Python {
                 }
                 // ponytail: an import binds its names for the whole file, wherever it sits; a
                 // function-local one also hides an outer binding there, but other functions
-                // see it too.
+                // see it too. A star import that rebinds a name is not placed against the code
+                // that reads it either (`Resolver::rebound`): code run while the module loads
+                // gets the name unknown, a function the star import's.
                 "import_statement" | "import_from_statement" => {
                     let first = facts.imports.len();
                     imports(node, src, &mut facts.imports);

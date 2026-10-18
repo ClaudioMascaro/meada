@@ -488,7 +488,11 @@ one for the area a change touches.
   place. A star import from outside the repository (`from numpy import *`) is taken to bind
   nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
   import or definition before it, as with the standard library's accelerator modules (`from
-  _heapq import *` after `def heappush`). `RECEIVER_DEPTH` (64): a receiver whose class is named through
+  _heapq import *` after `def heappush`). Where a Python star import sits is not compared with
+  the code that reads a name it rebinds (`ponytail:` in `Resolver::rebound`): code run while
+  the module loads (its top level, a class body there, its main guard) gets the name unknown, as
+  it may run before the star import, and a function's code gets the star import's, as for every
+  binding a function reads. `RECEIVER_DEPTH` (64): a receiver whose class is named through
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when
