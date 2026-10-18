@@ -1,7 +1,7 @@
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    facts TEXT NOT NULL, resolved TEXT NOT NULL
+    facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
@@ -682,6 +682,398 @@ sample.py
   ]
 }
 
+sample.rs
+{
+  "defs": [
+    {
+      "name": "disk",
+      "kind": "Module",
+      "range": {
+        "start": 72,
+        "end": 81
+      },
+      "params": []
+    },
+    {
+      "name": "util",
+      "kind": "Module",
+      "range": {
+        "start": 109,
+        "end": 122
+      },
+      "params": []
+    },
+    {
+      "name": "Store",
+      "kind": "Class",
+      "range": {
+        "start": 220,
+        "end": 252
+      },
+      "params": []
+    },
+    {
+      "name": "Persist",
+      "kind": "Class",
+      "range": {
+        "start": 254,
+        "end": 318
+      },
+      "params": []
+    },
+    {
+      "name": "Persist.describe",
+      "kind": "Method",
+      "range": {
+        "start": 278,
+        "end": 316
+      },
+      "params": [],
+      "result": {
+        "Type": "u32"
+      }
+    },
+    {
+      "name": "Store.new",
+      "kind": "Method",
+      "range": {
+        "start": 337,
+        "end": 406
+      },
+      "params": [
+        {
+          "name": "path",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "Self"
+      }
+    },
+    {
+      "name": "Store.empty",
+      "kind": "Method",
+      "range": {
+        "start": 412,
+        "end": 543
+      },
+      "params": [
+        {
+          "name": "",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "Self"
+      }
+    },
+    {
+      "name": "inner",
+      "kind": "Module",
+      "range": {
+        "start": 581,
+        "end": 699
+      },
+      "params": []
+    },
+    {
+      "name": "inner.helper",
+      "kind": "Function",
+      "range": {
+        "start": 597,
+        "end": 697
+      },
+      "params": []
+    },
+    {
+      "name": "save",
+      "kind": "Function",
+      "range": {
+        "start": 701,
+        "end": 837
+      },
+      "params": [
+        {
+          "name": "store",
+          "binds": "Any"
+        }
+      ]
+    }
+  ],
+  "imports": [
+    {
+      "local": "disk",
+      "source": "mod disk",
+      "name": "Namespace"
+    },
+    {
+      "local": "util",
+      "source": "path |legacy/util.rs",
+      "name": "Namespace"
+    },
+    {
+      "local": "open",
+      "source": "",
+      "name": {
+        "Path": "crate.disk.open"
+      }
+    },
+    {
+      "local": "maps",
+      "source": "",
+      "name": {
+        "Path": "std.collections"
+      }
+    },
+    {
+      "local": "Map",
+      "source": "",
+      "name": {
+        "Path": "std.collections.HashMap"
+      }
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "super",
+          "inside": true,
+          "public": true
+        }
+      }
+    },
+    {
+      "local": "crate",
+      "source": "crate",
+      "name": "Namespace"
+    },
+    {
+      "local": "mod",
+      "source": "self",
+      "name": "Namespace"
+    },
+    {
+      "local": "super",
+      "source": "super",
+      "name": "Namespace"
+    }
+  ],
+  "exports": [
+    {
+      "From": {
+        "exported": "disk",
+        "source": "mod disk",
+        "name": "Namespace"
+      }
+    },
+    {
+      "From": {
+        "exported": "util",
+        "source": "path |legacy/util.rs",
+        "name": "Namespace"
+      }
+    },
+    {
+      "Local": {
+        "exported": "open",
+        "local": "open"
+      }
+    },
+    {
+      "Local": {
+        "exported": "maps",
+        "local": "maps"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Map",
+        "local": "Map"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Persist",
+        "local": "Persist"
+      }
+    },
+    {
+      "Local": {
+        "exported": "inner",
+        "local": "inner"
+      }
+    },
+    {
+      "Local": {
+        "exported": "save",
+        "local": "save"
+      }
+    }
+  ],
+  "star": {
+    "Only": [
+      "util",
+      "Store",
+      "Persist",
+      "save"
+    ]
+  },
+  "calls": [
+    {
+      "scope": "Store.new",
+      "callee": "Self.empty",
+      "range": {
+        "start": 378,
+        "end": 400
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Store.empty",
+      "callee": "disk.read",
+      "range": {
+        "start": 479,
+        "end": 495
+      },
+      "by_path": true
+    },
+    {
+      "scope": "Store.empty",
+      "callee": "run",
+      "range": {
+        "start": 505,
+        "end": 510
+      }
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "mod.open",
+      "range": {
+        "start": 623,
+        "end": 636
+      },
+      "by_path": true
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "crate.util.go",
+      "range": {
+        "start": 646,
+        "end": 663
+      },
+      "by_path": true
+    },
+    {
+      "scope": "inner.helper",
+      "callee": "std.mem.drop",
+      "range": {
+        "start": 673,
+        "end": 690
+      },
+      "by_path": true
+    },
+    {
+      "scope": "save",
+      "callee": "Store.new",
+      "range": {
+        "start": 745,
+        "end": 760
+      },
+      "by_path": true
+    },
+    {
+      "scope": "save",
+      "callee": "store.flush",
+      "range": {
+        "start": 766,
+        "end": 779
+      }
+    },
+    {
+      "scope": "save",
+      "callee": "made.flush",
+      "range": {
+        "start": 785,
+        "end": 797
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "Store.empty.run"
+    },
+    {
+      "name": "save.made"
+    }
+  ],
+  "locals": [
+    "Store.empty.name",
+    "Store.empty.size"
+  ],
+  "receivers": [
+    {
+      "scope": "Store",
+      "name": "n",
+      "class": {
+        "Type": "u32"
+      }
+    },
+    {
+      "scope": "Store.new",
+      "name": "path",
+      "class": {
+        "Type": "str"
+      }
+    },
+    {
+      "scope": "save",
+      "name": "store",
+      "class": {
+        "Type": "Store"
+      }
+    },
+    {
+      "scope": "save",
+      "name": "made",
+      "class": {
+        "Returned": "Store.new"
+      }
+    }
+  ],
+  "impls": [
+    {
+      "scope": "Store",
+      "ty": "Store",
+      "within": ""
+    },
+    {
+      "scope": "Store.Persist",
+      "ty": "super.Store",
+      "of": "Persist",
+      "within": ""
+    }
+  ],
+  "externs": [
+    "std",
+    "str",
+    "u32"
+  ],
+  "private": [
+    "disk",
+    "open",
+    "maps",
+    "Map",
+    "inner"
+  ]
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",
@@ -826,6 +1218,60 @@ sample.package.json
   "types": "./dist/index.d.ts",
   "module": "./dist/index.mjs",
   "main": "./dist/index.cjs"
+}
+
+sample.Cargo.toml
+{
+  "name": "sample-crate",
+  "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "cousin",
+      "via": "path ../cousin/Cargo.toml"
+    },
+    {
+      "field": "dependencies",
+      "name": "inherited",
+      "inherits": true
+    },
+    {
+      "field": "dependencies",
+      "name": "shared-extras",
+      "range": "0.3",
+      "alias": "kit"
+    },
+    {
+      "field": "dependencies",
+      "name": "remote",
+      "via": "git example.com/org/repo"
+    },
+    {
+      "field": "dependencies",
+      "name": "shared-core",
+      "range": "^1.1"
+    },
+    {
+      "field": "dependencies",
+      "name": "sibling",
+      "via": "path crates/sibling/Cargo.toml"
+    },
+    {
+      "field": "dev-dependencies",
+      "name": "serde",
+      "range": "1"
+    }
+  ],
+  "main": "src/core.rs",
+  "workspace": [
+    {
+      "field": "workspace.dependencies",
+      "name": "inherited",
+      "range": "2"
+    }
+  ],
+  "lib_name": "core_lib",
+  "inherits_version": true,
+  "workspace_version": "1.0.0"
 }
 
 sample.pyproject.toml

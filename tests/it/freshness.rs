@@ -194,6 +194,200 @@ fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
     );
 }
 
+/// Moves `mod health;` out of `routes/mod.rs` (its file is no longer reached), declares the
+/// unreached `orphan.rs`, adds a module with its file, deletes a module's file, edits a
+/// function others call and drops the `[[bin]]` root from a member's `Cargo.toml`.
+fn edit_rust(repo: &Path) {
+    let replace = |file: &str, from: &str, to: &str| {
+        let text = fs::read_to_string(repo.join(file)).unwrap();
+        assert!(text.contains(from), "{file} holds {from}");
+        fs::write(repo.join(file), text.replacen(from, to, 1)).unwrap();
+    };
+    replace("api/src/routes/mod.rs", "mod health;\n", "");
+    replace(
+        "api/src/main.rs",
+        "mod routes;\n",
+        "mod routes;\nmod health;\nmod orphan;\n",
+    );
+    replace("api/src/store.rs", "pub fn reset()", "pub fn restart()");
+    replace(
+        "crates/billing/src/billing.rs",
+        "pub mod invoice;\n",
+        "pub mod invoice;\nmod audit;\n",
+    );
+    fs::write(
+        repo.join("crates/billing/src/audit.rs"),
+        "pub fn record() -> u32 {\n    crate::total()\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(repo.join("api/tools/shared.rs")).unwrap();
+    replace("api/Cargo.toml", "[[bin]]", "[[example]]");
+    // A `pub use` edited, an item moved to another file, a package renamed.
+    replace(
+        "crates/billing/src/billing.rs",
+        "pub use invoice::Invoice;",
+        "pub use invoice::{tax, Invoice};",
+    );
+    let lib = "crates/ledger-core/src/lib.rs";
+    replace(lib, "mod meter;\n\n", "");
+    replace(lib, "pub use meter::meter;", "pub fn meter() {}");
+    fs::remove_file(repo.join("crates/ledger-core/src/meter.rs")).unwrap();
+    replace(
+        "crates/ledger-core/Cargo.toml",
+        "name = \"ledger-core\"",
+        "name = \"ledger-kernel\"",
+    );
+}
+
+#[test]
+fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_rust", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_rust(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    // The moved declaration looks for `api/src/health.rs`, which is not there.
+    assert!(before.contains("api/src/routes/health.rs::check"));
+    assert!(!refreshed.contains("api/src/routes/health.rs"));
+    assert!(refreshed.contains("api/src/orphan.rs::lost"));
+    assert!(refreshed.contains("crates/billing/src/audit.rs::record"));
+    assert!(!refreshed.contains("api/tools/admin.rs"));
+    assert!(before.contains("crates/ledger-core/src/meter.rs::meter"));
+    assert!(!refreshed.contains("crates/ledger-core/src/meter.rs"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_rust_cold", "conformance-rust", ORIGIN, edit_rust)
+    );
+}
+
+fn enable_metrics(repo: &Path) {
+    let manifest = repo.join("api/Cargo.toml");
+    let text = fs::read_to_string(&manifest).unwrap();
+    let from = "default = [\"net\", \"json\"]";
+    assert!(text.contains(from));
+    let to = "default = [\"net\", \"json\", \"metrics\"]";
+    fs::write(manifest, text.replacen(from, to, 1)).unwrap();
+}
+
+#[test]
+fn a_default_feature_toggled_in_cargo_toml_refreshes_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_feature", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    enable_metrics(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("api/src/metrics.rs"));
+    assert!(!before.contains("gated.rs::metrics_only"));
+    assert!(before.contains("gated.rs::unix_without_metrics"));
+    assert!(refreshed.contains("api/src/metrics.rs::gauge"));
+    assert!(refreshed.contains("gated.rs::metrics_only"));
+    assert!(refreshed.contains("gated.rs::Gauge.sampled"));
+    assert!(!refreshed.contains("gated.rs::unix_without_metrics"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_rust_feature_cold",
+            "conformance-rust",
+            ORIGIN,
+            enable_metrics
+        )
+    );
+}
+
+fn edit_file(repo: &Path, file: &str, from: &str, to: &str) {
+    let text = fs::read_to_string(repo.join(file)).unwrap();
+    assert!(text.contains(from), "{file} holds {from}");
+    fs::write(repo.join(file), text.replacen(from, to, 1)).unwrap();
+}
+
+fn chain_metrics(repo: &Path) {
+    // `json` is a default feature: what it enables is on now.
+    edit_file(repo, "api/Cargo.toml", "json = []", "json = [\"metrics\"]");
+}
+
+#[test]
+fn a_feature_enabled_through_another_default_feature_refreshes_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_chain", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    chain_metrics(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("gated.rs::metrics_only"));
+    assert!(refreshed.contains("gated.rs::metrics_only"));
+    assert!(refreshed.contains("api/src/metrics.rs::gauge"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_rust_chain_cold",
+            "conformance-rust",
+            ORIGIN,
+            chain_metrics
+        )
+    );
+}
+
+fn move_cfg_mod(repo: &Path) {
+    edit_file(
+        repo,
+        "api/src/main.rs",
+        "#[cfg(windows)]\nmod winonly;",
+        "#[cfg(unix)]\nmod winonly;",
+    );
+}
+
+#[test]
+fn a_cfg_mod_that_starts_to_hold_brings_its_file_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_cfg_mod", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    move_cfg_mod(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("api/src/winonly.rs"));
+    assert!(refreshed.contains("api/src/winonly.rs::registry"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_rust_cfg_mod_cold",
+            "conformance-rust",
+            ORIGIN,
+            move_cfg_mod
+        )
+    );
+}
+
+fn add_bin(repo: &Path) {
+    fs::write(repo.join("api/tools/second.rs"), "fn main() {}\n").unwrap();
+    let manifest = repo.join("api/Cargo.toml");
+    let mut text = fs::read_to_string(&manifest).unwrap();
+    text.push_str("\n[[bin]]\nname = \"second\"\npath = \"tools/second.rs\"\n");
+    fs::write(manifest, text).unwrap();
+}
+
+#[test]
+fn a_bin_added_to_cargo_toml_refreshes_its_program_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_bin", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    add_bin(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("api/tools/second.rs"));
+    assert!(refreshed.contains("example.com/acme/conformance::api/tools/second.rs::main"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_rust_bin_cold", "conformance-rust", ORIGIN, add_bin)
+    );
+}
+
 #[test]
 fn an_open_engine_answers_after_files_change() {
     // No aging: every file was just written, so none can be trusted by mtime alone.
@@ -562,6 +756,64 @@ fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
     }
 }
 
+/// Edits, adds and deletes `.rs` files of the api and deletes a route of the web app: a route
+/// path changes, the variable a base URL is read from changes names, a module with a consumer on
+/// the declared host appears, and the module a `mod` declaration points to goes.
+fn edit_xlang_rust((web, api): &(PathBuf, PathBuf)) {
+    edit_file(
+        api,
+        "src/orders.rs",
+        "\"/orders/:id\"",
+        "\"/orders/:id/level\"",
+    );
+    edit_file(api, "src/pricing.rs", "\"WEB_URL\"", "\"SITE_URL\"");
+    edit_file(
+        api,
+        "src/main.rs",
+        "mod orders;\n",
+        "mod orders;\nmod report;\n",
+    );
+    fs::write(
+        api.join("src/report.rs"),
+        "pub async fn report() {\n    let _ = reqwest::get(\"https://web.example.com/api/audit\").await;\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(api.join("src/audit.rs")).unwrap();
+    fs::remove_file(web.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_rust_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_rust("fresh_xlang_rust");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_rust(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_rust("fresh_xlang_rust_cold");
+    edit_xlang_rust(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+    // The renamed variable no longer reaches the web app's routes.
+    assert!(before[1].contains("env:WEB_URL"));
+    assert!(refreshed[1].contains("env:SITE_URL"));
+    assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {
@@ -904,6 +1156,17 @@ fn the_export_does_not_depend_on_the_order_files_are_found() {
 
     let (web, _, _) = chain("fresh_order_reversed");
     let reversed = meada::with_reversed_walk(|| export_chain(&web));
+
+    assert_eq!(reversed, normal);
+}
+
+#[test]
+fn a_rust_export_does_not_depend_on_the_order_files_and_manifests_are_found() {
+    let repo = fixture_repo("fresh_order_rust", "conformance-rust", ORIGIN);
+    let normal = Engine::open(&repo).unwrap().export().unwrap();
+
+    let repo = fixture_repo("fresh_order_rust_reversed", "conformance-rust", ORIGIN);
+    let reversed = meada::with_reversed_walk(|| Engine::open(&repo).unwrap().export().unwrap());
 
     assert_eq!(reversed, normal);
 }

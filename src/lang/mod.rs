@@ -2,15 +2,17 @@
 //! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
 //! A pack never touches the index or other files.
 
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
 
 use crate::Result;
-use crate::resolve::Code;
+use crate::resolve::{Code, Keywords};
 
 pub mod python;
+pub mod rust;
 pub mod ts;
 
 pub trait LanguagePack {
@@ -20,13 +22,43 @@ pub trait LanguagePack {
     /// What one file defines, imports, exports and calls. `path` is repository-relative.
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
 
+    /// `parse` under the file's `setting`, what `settings` answers for its path. A pack whose
+    /// facts depend on its config files overrides both; a change of the setting parses the file
+    /// again, whatever its content.
+    fn parse_with(&self, path: &str, src: &[u8], _setting: &str) -> Result<Facts> {
+        self.parse(path, src)
+    }
+
+    /// What the config files make of each file's facts, from the config files as `modules`
+    /// gets them: Rust's default features of the crate a file belongs to.
+    fn settings(&self, _configs: &[(&str, &[u8])]) -> Box<dyn Fn(&str) -> String> {
+        Box::new(|_| String::new())
+    }
+
     /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`. The shared side reads those present and hands them to `modules`.
+    /// `tsconfig.json`. The shared side reads those present and hands them to `layout`. A name starting with `**/` names every file of that name the walk finds, at
+    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
     fn config_files(&self) -> &'static [&'static str];
 
     /// How imports name files in one repository, built from its config files as
-    /// `(path, contents)`, in `config_files` order.
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules>;
+    /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
+    /// Rust `mod` declaration names a file by where the declaring file sits in its crate's
+    /// module tree. The default `layout` calls it.
+    fn modules(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>)
+    -> Result<Modules>;
+
+    /// What the config files and every parsed file of the language make of the repository,
+    /// built once per refresh (`Layout`): Rust builds its crates' module trees once for all four
+    /// answers. The default keeps every file, publishes them all and names no program, with
+    /// `modules` for how imports name files.
+    fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
+        Ok(Layout {
+            members: None,
+            modules: self.modules(configs, files)?,
+            published: None,
+            programs: Vec::new(),
+        })
+    }
 
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
     /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
@@ -38,6 +70,33 @@ pub trait LanguagePack {
     /// are is not resolved.
     fn base_receiver(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Whether a method call that no function of the repository answers may hand back the
+    /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
+    /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
+    /// `passes` every method on the way. One only a name match found counts when the chain
+    /// starts at a constructor of an outside crate, whose method it then is, and ends the flow
+    /// otherwise. A language whose methods return anything stays with the call as the origin.
+    fn fluent(&self) -> bool {
+        false
+    }
+
+    /// Whether `method`, called on what the outside constructor `origin` (`axum.Router.new`)
+    /// made, hands back that same object. Listed per library: a method not listed (`headers()`
+    /// of a response, `json()`, a method of a trait the repository defines) makes a different
+    /// value, and the chain is not followed through it.
+    fn passes(&self, _origin: &str, _method: &str) -> bool {
+        false
+    }
+
+    /// Whether the source writes everything a name of the repository is (Rust): the blocks of a
+    /// type hold every member it has there, so a member they lack on a type the receiver or the
+    /// path writes is outside the repository (a derive, a blanket or outside trait) and resolves
+    /// to nothing; and an attribute (`Call::decorates`) is a macro, no call of a function, so it
+    /// resolves to nothing too. Otherwise both fall to a name match.
+    fn strict(&self) -> bool {
+        false
     }
 
     /// Names every file of the language may call without binding them, which contract kinds
@@ -109,8 +168,28 @@ pub enum Handler {
 /// the pack parses.
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
 
+/// What a language makes of the whole repository (`LanguagePack::layout`), from its config files
+/// and the facts of every file it parsed.
+pub struct Layout {
+    /// The files the language builds, when it says which: a Rust file is part of a crate only
+    /// when a `mod` declaration reaches it from a crate root. `None` keeps every file. A file
+    /// left out has no symbol or call, and resolves nothing.
+    pub members: Option<BTreeSet<String>>,
+    /// How imports name files (`LanguagePack::modules`).
+    pub modules: Modules,
+    /// The files whose exports (the `exports` table) another package can import, when the
+    /// language says which: a Rust file's `pub` items are reachable from outside its crate only
+    /// through a library root and `pub mod` declarations, and a binary exports nothing. `None`
+    /// keeps every file.
+    pub published: Option<BTreeSet<String>>,
+    /// The program entry points only the whole repository tells, as `(file, qualified name)`
+    /// among the members: a Rust `fn main` starts a program only in a binary target's root,
+    /// which `parse` of one file cannot know. `Facts::programs` still applies.
+    pub programs: Vec<(String, String)>,
+}
+
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -144,6 +223,17 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
+    /// The scope and value of each `let` whose name is bound again in its scope or assigned
+    /// again (Rust): no constant, since the name holds no one value, but a value that flows
+    /// somewhere unread. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub rebound: Vec<(String, Value)>,
+    /// The qualified name and value of each `let mut` of a plain name that nothing else binds
+    /// or assigns (Rust). It is no constant, since a method may change what it holds (a
+    /// `String` is pushed to), but an object it holds is still the one its call made: the flow
+    /// of a client reads it (`Code::mutable`). Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub mutable: HashMap<String, Value>,
     /// Every other name a binding makes, qualified like `Const::name` by the definition whose
     /// body or parameters hold it (a function that is no definition lends its names to the
     /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
@@ -167,6 +257,51 @@ pub struct Facts {
     /// dropped without a word: each pack's conformance golden is what catches a wrong one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub programs: Vec<String>,
+    /// The blocks that add definitions to a type written elsewhere, such as Rust's `impl`:
+    /// the shared side looks a member of the type up in each block too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub impls: Vec<Impl>,
+    /// Names a path of the file begins with that nothing in it binds: the crates outside the
+    /// file (Rust's extern prelude). They resolve after every import and glob: to another crate
+    /// of the repository by its name, else to something outside it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub externs: Vec<String>,
+    /// The crates the file brings in with `#[macro_use] extern crate x;` (Rust): their macros
+    /// and attributes are in scope in every file of the crate, as if imported.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub macro_use: Vec<String>,
+    /// The names the file writes as a value, a path or inside a macro call, apart from the
+    /// names it defines and the route attributes it carries (Rust): `None` where the pack does
+    /// not tell, or the file writes more than the pack reads. A name no file mentions is
+    /// registered by no code. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub mentions: Option<BTreeSet<String>>,
+    /// The `exports` names only the package itself sees (Rust's items that are not `pub`):
+    /// they resolve for the package's own files but are not in the exports table.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub private: Vec<String>,
+    /// Whether the file opens with an inner `#![cfg(..)]` that is false for the target: it is
+    /// left out of the crate, as if no `mod` reached it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unbuilt: bool,
+    /// The `settings` the file was parsed under; the index parses it again when they change.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub setting: String,
+}
+
+/// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
+/// Rust `impl Store` is the scope `Store`; a trait's `impl Persist for Store` is `Store.Persist`,
+/// whose members come after the inherent ones, and whose trait lends its default bodies.
+#[derive(Serialize, Deserialize)]
+pub struct Impl {
+    pub scope: String,
+    /// The type, as a callee-like name resolved from `within`.
+    pub ty: String,
+    /// The trait a trait's block implements, resolved the same way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub of: Option<String>,
+    /// The scope enclosing the block: an inline module, or the top level.
+    pub within: String,
 }
 
 /// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
@@ -187,6 +322,14 @@ pub enum Class {
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
+    /// What this path (`Store`, or `store::Store` as `store.Store`), written as a type, names:
+    /// an instance of that class. Its head is read among types and modules, so a local or a
+    /// parameter of the same name does not hide it (Rust's `store: store::Store`).
+    Type(String),
+    /// What the function this callee-like name gives, called in the scope, returns: the class
+    /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
+    /// repository stays outside; a function with no written result is unknown.
+    Returned(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -218,6 +361,19 @@ pub enum Imported {
     /// unused). It binds a name only when the module takes it, and then like an import of
     /// that name written there.
     All,
+    /// What this callee-like name (`crate.a.f`, `inner.helper`) gives, resolved from the scope
+    /// that holds `local` (Rust's `use a::f as local`). `source` is unused. Only the scope
+    /// of the name's own `local` sees it, and a binding of the name in a scope inside hides it.
+    Path(String),
+    /// Every name the module this callee-like name gives takes, as a `use path::*` binds them
+    /// (`local` is the scope's `*`, `qualify(scope, "*")`; `source` is unused). `inside` is
+    /// whether the scope is within that module, which then gives its private items too.
+    /// `public` is whether the glob re-exports (`pub use`).
+    Glob {
+        path: String,
+        inside: bool,
+        public: bool,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -276,6 +432,9 @@ pub enum Kind {
     /// shared side names it when a contract kind says what it is (an inline route handler)
     /// and folds it into its enclosing definition otherwise.
     Inline,
+    /// A module written in place (Rust's `mod inner { }`): its definitions are named under it
+    /// (`inner.helper`), and a function of it is matched by name like a top-level one.
+    Module,
 }
 
 /// A definition. `name` is qualified by its enclosing definitions: `outer.inner`,
@@ -309,6 +468,11 @@ pub struct Def {
     /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
     #[serde(skip)]
     pub type_params: Vec<String>,
+    /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
+    /// Trait`), as a callee-like name resolved from the function's own scope: what a call to
+    /// it gives (`Class::Returned`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<Class>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -393,6 +557,21 @@ pub struct Call {
     /// written on `def index()` decorates `index`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decorates: Option<String>,
+    /// The callee is a path (Rust's `a::b::f()`), not a member chain: the name match a call
+    /// that does not resolve falls back to takes functions as well as methods.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub by_path: bool,
+    /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
+    /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
+    /// them. An outside type owns the whole chain, so the resolver reads the call as one on
+    /// that name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
+    /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
+    /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
+    /// index, like `args`.
+    #[serde(skip)]
+    pub receiver: Option<Value>,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
     #[serde(skip)]
@@ -596,13 +775,100 @@ pub fn queue_name(url: Option<&Value>) -> Option<Option<String>> {
         Some(Value::Ref(_)) => return None,
         _ => return Some(None),
     };
-    match parts.last() {
-        Some(Part::Text(tail)) if tail.contains('/') => {
-            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
-            Some(queue.map(String::from))
-        }
-        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        _ => Some(None),
+    // The literal text at the end: a name folded into the URL leaves two text parts side by side.
+    let mut tail: Vec<&str> = (parts.iter().rev())
+        .map_while(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect();
+    tail.reverse();
+    let tail = tail.concat();
+    if tail.contains('/') {
+        let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
+        return Some(queue.map(String::from));
+    }
+    match parts.iter().any(|p| matches!(p, Part::Ref(_))) {
+        true => None,
+        false => Some(None),
+    }
+}
+
+/// What a form reads of a call's arguments: the channel names.
+pub type Read<'a> = &'a dyn Fn(&[Value], &Keywords) -> Option<Vec<Option<String>>>;
+
+/// A producer per name read at each site an expansion found.
+pub fn produce<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: Read,
+) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .flat_map(|(site, at, names)| {
+            names.into_iter().map(move |name| Message {
+                broker,
+                name,
+                path: site.into(),
+                call: at,
+                role: Role::Producer,
+            })
+        })
+        .collect()
+}
+
+/// A consumer per name read at each site an expansion found: the call's own `handler`, else
+/// the function the site is in (a polling client).
+pub fn consume<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: Read,
+    handler: Option<Handler>,
+) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .flat_map(|(site, at, names)| {
+            let handler = handler.clone().unwrap_or_else(|| Handler::Def {
+                path: site.into(),
+                name: code.files()[site].calls[at].scope.clone(),
+            });
+            names.into_iter().map(move |name| Message {
+                broker,
+                name,
+                path: site.into(),
+                call: at,
+                role: Role::Consumer(handler.clone()),
+            })
+        })
+        .collect()
+}
+
+/// A Kafka topic name (see `channel_name`). A name that starts with `^` is a regular expression
+/// that picks topics at run time, so it names none.
+pub fn topic(value: &Value) -> Option<Option<String>> {
+    Some(channel_name(value)?.filter(|t| !t.starts_with('^')))
+}
+
+/// The topics of a list of them, or of the one a value gives. `None` when one depends on a
+/// parameter (a client wrapper); a name that is not a literal string is unresolved (`None` in
+/// the list).
+pub fn topics(value: &Value) -> Option<Vec<Option<String>>> {
+    match value {
+        Value::List(items) => items.iter().map(topic).collect(),
+        value => Some(vec![topic(value)?]),
+    }
+}
+
+/// A publish to the exchange `exchange` with the routing key `key`, as its name and role: the
+/// empty exchange is the queue named by the key; one that cannot be evaluated leaves the
+/// producer unresolved.
+pub fn publication(exchange: Option<String>, key: Option<String>) -> (Option<String>, Role) {
+    match exchange {
+        Some(e) if e.is_empty() => (key, Role::Producer),
+        Some(exchange) => (key, Role::Publish { exchange }),
+        None => (None, Role::Producer),
     }
 }
 

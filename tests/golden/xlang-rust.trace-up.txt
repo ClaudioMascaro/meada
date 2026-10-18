@@ -1,0 +1,4 @@
+example.com/xlang-rust/web app/api/prices/[sku]/route.ts:1 GET
+  →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-rust/web] example.com/xlang-rust/api src/orders.rs:14 status
+    →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-rust/api] example.com/xlang-rust/web src/sync.ts:4 syncOrders
+chain: inferred · 2 hops · 2 repos · 100 tokens

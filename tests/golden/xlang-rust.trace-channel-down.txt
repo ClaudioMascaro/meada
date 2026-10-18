@@ -1,0 +1,6 @@
+example.com/xlang-rust/web src/events.ts:7 announceShipment
+  →[exact: channel::kafka::orders.shipped] example.com/xlang-rust/api src/events.rs:9 consume_shipments
+    example.com/xlang-rust/api src/events.rs:6 apply_shipment
+    example.com/xlang-rust/api src/pricing.rs:10 promotions
+      →[exact: host web.example.com is served by example.com/xlang-rust/web] example.com/xlang-rust/web app/api/promotions/route.ts:1 GET
+chain: exact · 2 hops · 2 repos · 119 tokens

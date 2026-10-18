@@ -1,0 +1,20 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "admin"
+path = "tools/admin.rs"
+
+[dependencies]
+billing = { path = "../crates/billing" }
+ledger-core = { path = "../crates/ledger-core" }
+serde = "1"
+
+[features]
+default = ["net", "json"]
+net = ["wire", "serde/std"]
+wire = []
+json = []
+metrics = ["wire"]

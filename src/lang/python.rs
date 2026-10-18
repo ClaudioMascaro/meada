@@ -112,6 +112,7 @@ impl LanguagePack for Python {
                             return_values: Vec::new(),
                             returns: None,
                             type_params: Vec::new(),
+                            result: None,
                         });
                         facts.programs.push(MAIN.to_string());
                     }
@@ -157,6 +158,7 @@ impl LanguagePack for Python {
                                 return_values: Vec::new(),
                                 returns: None,
                                 type_params: Vec::new(),
+                                result: None,
                             });
                         }
                         if !is_class {
@@ -201,6 +203,9 @@ impl LanguagePack for Python {
                             args,
                             kwargs,
                             decorates: decorators.remove(&node.id()),
+                            by_path: false,
+                            root: None,
+                            receiver: None,
                             arg_types: Vec::new(),
                             uses: Vec::new(),
                         });
@@ -359,7 +364,7 @@ impl LanguagePack for Python {
         true
     }
 
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
+    fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
         // nothing, and indexing carries on.
         let declared =

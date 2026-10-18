@@ -1,6 +1,6 @@
 //! The TypeScript and JavaScript language pack.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
@@ -93,6 +93,7 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
+                    result: None,
                     name: inner.clone(),
                     kind,
                     range,
@@ -127,6 +128,9 @@ impl LanguagePack for TsJs {
                                 .unwrap_or_default(),
                             kwargs: Vec::new(),
                             decorates: None,
+                            by_path: false,
+                            root: None,
+                            receiver: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -232,7 +236,7 @@ impl LanguagePack for TsJs {
         messages::messages(code)
     }
 
-    fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
+    fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as `package::read_tsconfig` reads one: a config past the size limit, not UTF-8,
         // not JSON or not an object declares no paths, and indexing carries on.
         let aliases =
@@ -1086,7 +1090,9 @@ mod tests {
     #[test]
     fn a_tsconfig_that_is_invalid_or_past_the_size_limit_declares_no_paths() {
         let resolve = |config: &[u8]| {
-            let modules = TsJs.modules(&[("tsconfig.json", config)]).unwrap();
+            let modules = TsJs
+                .modules(&[("tsconfig.json", config)], &BTreeMap::new())
+                .unwrap();
             (modules("src/a.ts", "@/b"), modules("src/a.ts", "./c"))
         };
         let valid = r#"{"compilerOptions": {"paths": {"@/*": ["src/*"]}}}"#;

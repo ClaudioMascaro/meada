@@ -32,8 +32,39 @@ pub fn scope_of(name: &str) -> &str {
     name.rsplit_once('.').map_or("", |(scope, _)| scope)
 }
 
+/// What a crate outside the repository is imported as.
+static NAMESPACE: Imported = Imported::Namespace;
+
+/// An `exports` row: the name, the file and the definition in it.
+type Row<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+
+/// Whether the export names `name`.
+fn exports_name(export: &Export, name: &str) -> bool {
+    matches!(export, Export::Local { exported, .. } | Export::From { exported, .. } if exported == name)
+}
+
+/// The index among `calls` of the call spanning `range`. Packs list calls in the order a
+/// depth-first walk meets them, an enclosing call before the ones inside it, so the search is
+/// a bisection; a list in another order is scanned.
+pub fn call_at(calls: &[Call], range: &std::ops::Range<usize>) -> Option<usize> {
+    let key = |r: &std::ops::Range<usize>| (r.start, std::cmp::Reverse(r.end));
+    let at = calls.partition_point(|c| key(&c.range) < key(range));
+    match calls.get(at) {
+        Some(c) if c.range == *range => Some(at),
+        _ => calls.iter().position(|c| c.range == *range),
+    }
+}
+
+/// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
+fn bound_in(local: &str, scope: &str, name: &str) -> bool {
+    match scope {
+        "" => local == name,
+        scope => local.strip_prefix(scope).and_then(|l| l.strip_prefix('.')) == Some(name),
+    }
+}
+
 /// What a name or a member chain refers to.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Binding<'a> {
     Def(Target<'a>),
     /// What a receiver whose class the source writes holds: an instance of this class, or
@@ -55,6 +86,9 @@ enum Binding<'a> {
     /// A `let`, a `catch` binding, a destructured name: it hides every name it spells, and what
     /// it holds is not known.
     Hidden,
+    /// Several definitions fit a member equally (two trait blocks of one class give it),
+    /// sorted.
+    Several(Vec<Target<'a>>),
     /// Neither scope nor import resolution knows it.
     Unknown,
 }
@@ -68,19 +102,24 @@ struct Caller<'a> {
     by_name: bool,
 }
 
-/// What resolving one name follows through exports: what each `(file, exported name)` pair
-/// seen exports, as re-exports may form cycles (a pair met again while it is resolved exports
-/// nothing) and diamonds (one met again once resolved exports what it did), how many exports
-/// deep it is now, and whether an export was cut at `REEXPORT_DEPTH`. A cut export is unknown,
-/// not absent (`Resolver::exports`): a module that may export the name leaves it unknown rather
-/// than let another import or module bind it. What a cycle gives is absent instead, as in ES
-/// modules (and a Python module met again while it is initialized has only what its bindings
-/// before gave): `looped` says what is being resolved met a pair being resolved, since the
-/// innermost star import began (`Resolver::star`), and each pair keeps whether it did.
+/// What resolving one name follows through exports, aliases and globs: what each `(file,
+/// exported name)` pair seen exports, read as a value or not (`Resolver::export_as`), as
+/// re-exports may form cycles (a pair met again while it is resolved exports nothing) and
+/// diamonds (one met again once resolved exports what it did); the aliases (`use a as b`: file
+/// and path) and the glob imports (file, place in its imports and name) met, as a `use` may
+/// reach itself; how many links deep it is now, and whether a link was cut at `LINK_DEPTH`. A
+/// cut link is unknown, not absent (`Resolver::exports`, `Resolver::globs`): a module or a glob
+/// that may give the name leaves it unknown rather than let another import, module or glob
+/// bind it. What a cycle gives is absent instead, as in ES modules (and a Python module met
+/// again while it is initialized has only what its bindings before gave): `looped` says what is
+/// being resolved met a pair being resolved, since the innermost star import began
+/// (`Resolver::star`), and each pair keeps whether it did.
 #[derive(Default)]
 struct Seen<'a> {
     /// `None` while the pair is resolved.
-    pairs: HashMap<(&'a str, &'a str), Option<Given<'a>>>,
+    pairs: HashMap<(&'a str, &'a str, bool), Option<Given<'a>>>,
+    aliases: HashSet<(&'a str, &'a str)>,
+    globs: HashSet<(&'a str, usize, &'a str)>,
     depth: usize,
     cut: bool,
     looped: bool,
@@ -98,11 +137,37 @@ impl Seen<'_> {
     }
 }
 
-/// The most files a name is followed through, each re-exporting it from the next; deeper, it
-/// is unknown.
-// ponytail: real re-export chains are a few files long; the limit keeps a crafted chain of
-// thousands from overflowing the stack.
-const REEXPORT_DEPTH: usize = 64;
+/// The most links a name is followed through, each into the next: a file re-exporting it from
+/// another (`export { x } from`, `export * from`, a Python `from m import x` or `import *`,
+/// Rust's `pub use`), an alias (`use a as b`) or a glob (`use m::*`). Deeper, it is unknown.
+// ponytail: real chains are a few links long; the limit keeps a crafted chain of thousands from
+// overflowing the stack.
+const LINK_DEPTH: usize = 64;
+
+/// What a name is read as.
+#[derive(Clone, Copy, PartialEq)]
+enum Reading {
+    /// Whatever the name is bound to: how exports and flows read it.
+    Any,
+    /// A called name: a module (Rust's `mod x;`) is no value, and a `use` of its name beyond
+    /// it is read.
+    Value,
+    /// A path called (`a::b::f()`): its head among types and modules, no local or parameter
+    /// hiding it, and its last member a value.
+    Path,
+    /// A `use` path: its head among types and modules, its last member of any kind.
+    Alias,
+}
+
+impl Reading {
+    fn types(self) -> bool {
+        matches!(self, Reading::Path | Reading::Alias)
+    }
+
+    fn value(self) -> bool {
+        matches!(self, Reading::Value | Reading::Path)
+    }
+}
 
 /// A local whose class, or a class whose family, is being resolved: one met again while
 /// resolving itself (`a: b.C` and `b: a.D`, `class A(B)` and `class B(A)`) resolves to
@@ -114,7 +179,8 @@ enum Busy<'a> {
 }
 
 /// The most receivers a class is followed through, each naming its class through the next
-/// (`x: y.C`, `x = y.C()`); deeper, the class is unknown.
+/// (`x: y.C`, `x = y.C()`, or the result of a call on it, Rust's `let x = y.f()`); deeper, the
+/// class is unknown.
 // ponytail: real receivers name their class through a few others; the limit keeps a crafted
 // chain of thousands of parameters from overflowing the stack.
 const RECEIVER_DEPTH: usize = 64;
@@ -178,15 +244,36 @@ pub struct Resolver<'a> {
     /// The call sites whose single target (exact or inferred) is each definition, sorted.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
-    /// functions and classes by their name (`false`).
+    /// functions and classes, and those of modules written in place, by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
     modules: Modules,
+    /// The blocks that add members to each class (`Facts::impls`), the inherent ones first.
+    impls: HashMap<Target<'a>, Vec<Block<'a>>>,
+    /// The class each block adds members to, by its file and scope: what `Self` names in it.
+    blocks: HashMap<(&'a str, &'a str), Target<'a>>,
+    /// The blocks that add members to a type from outside the repository, by file and scope
+    /// (`impl Trait for reqwest::Client`): what `self` and `Self` name in them is opaque.
+    outside: HashSet<(&'a str, &'a str)>,
+    /// The files whose exports other packages can import, when the pack says which
+    /// (`Layout::published`).
+    published: Option<BTreeSet<String>>,
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
+    /// The pack's `LanguagePack::strict`.
+    strict: bool,
     /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
     /// them and the last of one specifier alone, and how many of them each top-level name comes
     /// before: those written after its last binding (`rebound`).
     later: HashMap<&'a str, (Vec<&'a str>, HashMap<&'a str, usize>)>,
+}
+
+/// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
+/// the trait when it is a class of the repository.
+struct Block<'a> {
+    path: &'a str,
+    scope: &'a str,
+    of_trait: bool,
+    of: Option<Target<'a>>,
 }
 
 impl<'a> Resolver<'a> {
@@ -195,7 +282,7 @@ impl<'a> Resolver<'a> {
         modules: Modules,
         language: &dyn LanguagePack,
     ) -> Self {
-        let defs = files
+        let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
             .map(|(path, facts)| {
                 let names = facts.defs.iter().map(|d| (d.name.as_str(), d)).collect();
@@ -224,11 +311,27 @@ impl<'a> Resolver<'a> {
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
+            let names: &HashMap<&str, &Def> = &defs[path];
+            // Whether `scope` is the top level or modules written in place, all the way up.
+            let in_modules = |mut scope: &str| {
+                while !scope.is_empty() {
+                    if names.get(scope).map(|d| d.kind) != Some(Kind::Module) {
+                        return false;
+                    }
+                    scope = crate::parent(scope);
+                }
+                true
+            };
             for def in &facts.defs {
                 let name = def.name.as_str();
                 let key = match (def.kind, name.rsplit_once('.')) {
                     (Kind::Method, Some((_, last))) => (true, last),
                     (Kind::Function | Kind::Class, None) => (false, name),
+                    // A path reaches one in a module written in place as it does a top-level
+                    // one.
+                    (Kind::Function | Kind::Class, Some((scope, last))) if in_modules(scope) => {
+                        (false, last)
+                    }
                     _ => continue,
                 };
                 by_name.entry(key).or_default().push(Target { path, name });
@@ -268,7 +371,12 @@ impl<'a> Resolver<'a> {
             callers: HashMap::new(),
             by_name,
             modules,
+            impls: HashMap::new(),
+            blocks: HashMap::new(),
+            outside: HashSet::new(),
+            published: None,
             stars_bind,
+            strict: language.strict(),
             later,
         };
         let mut work = Work::default();
@@ -284,6 +392,35 @@ impl<'a> Resolver<'a> {
             }
         }
         resolver.families = work.families;
+        let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
+        let mut blocks = HashMap::new();
+        let mut outside = HashSet::new();
+        for (path, facts) in files {
+            for block in &facts.impls {
+                let class = |name: &'a str| match resolver.path_binding(path, &block.within, name) {
+                    Binding::Def(t) if resolver.is_class(t) => Some(t),
+                    _ => None,
+                };
+                let Some(ty) = class(&block.ty) else {
+                    let ty = resolver.path_binding(path, &block.within, &block.ty);
+                    if matches!(ty, Binding::External(..)) {
+                        outside.insert((*path, block.scope.as_str()));
+                    }
+                    continue;
+                };
+                blocks.insert((*path, block.scope.as_str()), ty);
+                impls.entry(ty).or_default().push(Block {
+                    path,
+                    scope: &block.scope,
+                    of_trait: block.of.is_some(),
+                    of: block.of.as_deref().and_then(class),
+                });
+            }
+        }
+        impls
+            .values_mut()
+            .for_each(|b| b.sort_by_key(|b| b.of_trait));
+        (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
@@ -304,29 +441,127 @@ impl<'a> Resolver<'a> {
         resolver
     }
 
+    /// Limits `exported` to these files (`Layout::published`); `None` keeps every file.
+    pub fn publishing(mut self, published: Option<BTreeSet<String>>) -> Self {
+        self.published = published;
+        self
+    }
+
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        match self.binding(path, &call.scope, &call.callee) {
+        if self.strict && call.decorates.is_some() {
+            return Resolution::Unresolved;
+        }
+        let binding = match call.by_path {
+            true => self.path_binding(path, &call.scope, &call.callee),
+            false => self.binding(path, &call.scope, &call.callee),
+        };
+        match binding {
             Binding::Def(t) => Resolution::Exact(t),
+            Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
+            Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
+                Resolution::Unresolved
+            }
             Binding::Instance(_)
             | Binding::Module(_)
             | Binding::Const(..)
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.infer(&call.callee),
+            | Binding::Unknown => self.infer(&call.callee, call.by_path),
         }
+    }
+
+    /// Whether a method called on a call chain (`client.get(u).send()`) belongs to a type from
+    /// outside the repository: the name the chain starts at (`Call::root`) resolves, with the
+    /// last method, to something outside it, as a direct `client.send()` does. Such a call
+    /// resolves to nothing, never to a repository method of the same name.
+    fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, last)) = call.callee.rsplit_once('.') else {
+            return false;
+        };
+        let Some(root) = &call.root else {
+            return self.strict && head.starts_with('(') && self.rooted_outside(path, call);
+        };
+        let callee = format!("{root}.{last}");
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, &callee, seen, work, Reading::Value);
+        matches!(found, Binding::External(..))
+    }
+
+    /// Whether, in a strict pack, the call chain `call` is made on (`rocket::build().mount(..)`,
+    /// `Call::root` none)
+    /// starts at a call that reaches outside the repository: the innermost call that begins
+    /// where `call` does, a path or a name read as its own call is (a path's head among types
+    /// and modules, so a `fn rocket()` of the file does not hide the crate).
+    fn rooted_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        let calls = &self.files[path].calls;
+        let Some(at) = call_at(calls, &call.range) else {
+            return false;
+        };
+        let start = call.range.start;
+        let chain = calls[at + 1..]
+            .iter()
+            .take_while(|c| c.range.start == start);
+        let Some(root) = chain.last().filter(|c| !c.callee.starts_with('(')) else {
+            return false;
+        };
+        let binding = match root.by_path {
+            true => self.path_binding(path, &root.scope, &root.callee),
+            false => self.binding(path, &root.scope, &root.callee),
+        };
+        matches!(binding, Binding::External(..))
+    }
+
+    /// Whether, in a strict pack (`LanguagePack::strict`), the receiver or the path head of
+    /// `call` is a type of the repository the source writes (`s: Store`, `Store::`): the member
+    /// its blocks lack is outside the repository, not any member of the name.
+    fn lacks(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, _)) = call.callee.rsplit_once('.').filter(|_| self.strict) else {
+            return false;
+        };
+        let reading = match call.by_path {
+            true => Reading::Path,
+            false => Reading::Value,
+        };
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, head, seen, work, reading);
+        let found = self.instance(found, work);
+        let enclosing = head == "self" || Some(head) == self.receiver;
+        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t))
+            || (enclosing && self.in_outside_block(path, &call.scope))
+    }
+
+    /// Whether the nearest block or class around `scope` is a block of a type from outside the
+    /// repository (`outside`), whose `self` is opaque.
+    fn in_outside_block(&self, path: &'a str, scope: &str) -> bool {
+        let mut scope = scope;
+        while !scope.is_empty() {
+            if self.outside.contains(&(path, scope)) {
+                return true;
+            }
+            let class = self.defs[path]
+                .get(scope)
+                .is_some_and(|d| d.kind == Kind::Class);
+            if class || self.blocks.contains_key(&(path, scope)) {
+                return false;
+            }
+            scope = crate::parent(scope);
+        }
+        false
     }
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
     fn binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
-        self.resolve(
-            path,
-            scope,
-            callee,
-            &mut self.seen(path, scope),
-            &mut Work::default(),
-        )
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
+        self.resolve_as(path, scope, callee, seen, work, Reading::Value)
+    }
+
+    /// `binding` of a path (Rust's `store::Store::new`, `Call::by_path`): its head names a
+    /// module or a type, which a local or a parameter of the same name does not hide.
+    fn path_binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
+        self.resolve_as(path, scope, callee, seen, work, Reading::Path)
     }
 
     /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
@@ -339,27 +574,75 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
+        self.resolve_as(path, scope, callee, seen, work, Reading::Any)
+    }
+
+    /// `resolve`, read as `reading` says.
+    fn resolve_as(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+        reading: Reading,
+    ) -> Binding<'a> {
         let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
                 _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
-                _ => self.lexical(path, scope, head, seen),
+                _ => self.lexical_as(path, scope, head, seen, reading),
             };
             (binding, members)
         });
-        for member in members.split('.').filter(|m| !m.is_empty()) {
+        let members: Vec<&str> = members.split('.').filter(|m| !m.is_empty()).collect();
+        for (n, member) in members.iter().enumerate() {
+            let value = reading.value() && n + 1 == members.len();
             binding = match self.instance(binding, work) {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, work)
                 }
-                Binding::Def(t) => self.def(t.path, &format!("{}.{member}", t.name)),
-                Binding::Module(m) => self.export(m, member, seen),
+                Binding::Def(t) => match self.def(t.path, &format!("{}.{member}", t.name)) {
+                    Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
+                        self.module_member(t, member, value, seen)
+                    }
+                    found => found,
+                },
+                Binding::Module(m) => self.export_as(m, member, seen, value),
+                Binding::Several(_) => Binding::Unknown,
                 other => other,
             };
         }
         binding
+    }
+
+    /// A member of a module written in place that no item of it is: a name its `pub use` brings
+    /// (a row of the exports under the dotted name), else, for a module declared in its file
+    /// (Rust's `mod store;`, the file an import of its name binds), what that file exports.
+    fn module_member(
+        &self,
+        module: Target<'a>,
+        member: &'a str,
+        value: bool,
+        seen: &mut Seen<'a>,
+    ) -> Binding<'a> {
+        let (path, dotted) = (module.path, format!("{}.{member}", module.name));
+        let exports = &self.files[path].exports;
+        if let Some(Export::Local { exported, .. } | Export::From { exported, .. }) =
+            exports.iter().find(|e| exports_name(e, &dotted))
+        {
+            return self.export_as(path, exported, seen, value);
+        }
+        let mut imports = self.files[path].imports.iter().rev();
+        match imports.find(|i| i.local == module.name && matches!(i.name, Imported::Namespace)) {
+            Some(i) => match self.import(path, "", &i.source, &i.name, seen) {
+                Binding::Module(m) => self.export_as(m, member, seen, value),
+                _ => Binding::Unknown,
+            },
+            None => Binding::Unknown,
+        }
     }
 
     fn is_class(&self, t: Target) -> bool {
@@ -410,11 +693,61 @@ impl<'a> Resolver<'a> {
             Class::Named(class) => {
                 self.resolve(path, scope, class, &mut self.seen(path, scope), work)
             }
+            Class::Type(class) => {
+                let (seen, reading) = (&mut self.seen(path, scope), Reading::Path);
+                self.resolve_as(path, scope, class, seen, work, reading)
+            }
+            Class::Returned(callee) => self.returned(path, scope, callee, work),
             Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
             Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
+            external @ Binding::External(..) => external,
+            _ => Binding::Unknown,
+        }
+    }
+
+    /// What a call to `callee`, written in `scope`, gives: the class its definition writes as
+    /// its result (`Def::result`), the class itself for a constructor, or something outside the
+    /// repository for a call that reaches outside. A call that is not exact gives nothing known.
+    /// Only `instance` calls it, so `RECEIVER_DEPTH` bounds a chain of results.
+    fn returned(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
+        let (seen, path_reading) = (&mut self.seen(path, scope), Reading::Path);
+        let by_path = callee.rsplit_once('.');
+        let reading = if by_path.is_some() {
+            path_reading
+        } else {
+            Reading::Value
+        };
+        let called = self.resolve_as(path, scope, callee, seen, work, reading);
+        match called {
+            Binding::Def(t) if self.is_class(t) => Binding::Def(t),
+            Binding::Def(t) => match &self.defs[t.path][t.name].result {
+                // `Self` is the type the call named (`Counter` in `Counter::make()`), not the
+                // trait whose default body the call found.
+                Some(Class::Type(class)) if class == "Self" => {
+                    let Some((ty, _)) = by_path else {
+                        return Binding::Unknown;
+                    };
+                    let seen = &mut self.seen(path, scope);
+                    match self.resolve_as(path, scope, ty, seen, work, path_reading) {
+                        Binding::Def(c) if self.is_class(c) => Binding::Def(c),
+                        _ => Binding::Unknown,
+                    }
+                }
+                Some(Class::Type(class)) => {
+                    let seen = &mut self.seen(t.path, t.name);
+                    self.resolve_as(t.path, t.name, class, seen, work, path_reading)
+                }
+                _ => Binding::Unknown,
+            },
             external @ Binding::External(..) => external,
             _ => Binding::Unknown,
         }
@@ -431,6 +764,9 @@ impl<'a> Resolver<'a> {
             let Ancestor::Class(c) = ancestor else {
                 return Binding::Unknown;
             };
+            if let Some(found) = self.block_member(c, member) {
+                return found;
+            }
             let qualified = format!("{}.{member}", c.name);
             if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
                 return Binding::Def(Target { path: c.path, name });
@@ -440,6 +776,32 @@ impl<'a> Resolver<'a> {
             }
         }
         Binding::Unknown
+    }
+
+    /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
+    /// trait blocks' that define it or whose trait gives it a default body. Several definitions
+    /// at that step are `Several` (two `impl From<_>` blocks, two traits); none, `None`.
+    fn block_member(&self, class: Target<'a>, member: &str) -> Option<Binding<'a>> {
+        let blocks = self.impls.get(&class)?;
+        let find = |path: &'a str, scope: &str| {
+            let qualified = format!("{scope}.{member}");
+            let (name, _) = self.defs[path].get_key_value(qualified.as_str())?;
+            Some(Target { path, name })
+        };
+        let one = |found: BTreeSet<Target<'a>>| match found.into_iter().collect::<Vec<_>>()[..] {
+            [] => None,
+            [one] => Some(Binding::Def(one)),
+            ref several => Some(Binding::Several(several.to_vec())),
+        };
+        let inherent = blocks.iter().filter(|b| !b.of_trait);
+        let found = one(inherent.filter_map(|b| find(b.path, b.scope)).collect());
+        if found.is_some() {
+            return found;
+        }
+        let traits = blocks.iter().filter(|b| b.of_trait);
+        one(traits
+            .filter_map(|b| find(b.path, b.scope).or_else(|| find(b.of?.path, b.of?.name)))
+            .collect())
     }
 
     /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
@@ -527,42 +889,69 @@ impl<'a> Resolver<'a> {
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
                     }
-                    _ => Ancestor::Opaque(self.imported_name(class.path, base)),
+                    _ => Ancestor::Opaque(self.imported_name(class.path, scope, base)),
                 }
             })
             .collect()
     }
 
     /// `name` as the file's imports spell it: the module and name its head imports, then the
-    /// rest (`ABC` imported from `abc` is `abc.ABC`); as written when no import binds it.
-    fn imported_name(&self, path: &str, name: &str) -> String {
+    /// rest (`ABC` imported from `abc` is `abc.ABC`); as written when no import binds it. A
+    /// pack's path import (Rust's `use`), bound in the innermost of the scopes around `scope`
+    /// that has one, gives the path it names, spelled the same way in turn.
+    fn imported_name(&self, path: &str, scope: &str, name: &str) -> String {
+        let imports = &self.files[path].imports;
+        let mut name = name.to_string();
+        for _ in 0..LINK_DEPTH {
+            let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
+            let mut at = Some(scope);
+            let target = loop {
+                let Some(s) = at else { break None };
+                let found = imports.iter().rev().find_map(|i| match &i.name {
+                    Imported::Path(t) if bound_in(&i.local, s, head) => Some(t),
+                    _ => None,
+                });
+                if found.is_some() {
+                    break found;
+                }
+                at = (!s.is_empty()).then(|| crate::parent(s));
+            };
+            let Some(target) = target else { break };
+            let next = format!("{target}{rest}");
+            if next.split('.').next() == Some(head) {
+                return next;
+            }
+            name = next;
+        }
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
-        let imports = self.files[path].imports.iter().rev();
+        let imports = imports.iter().rev();
         match imports.map(|i| (i, &i.name)).find(|(i, _)| i.local == head) {
             Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
                 format!("{}.{n}{rest}", i.source)
             }
-            _ => name.to_string(),
+            _ => name,
         }
     }
 
     /// The definitions whose name matches the callee's last name anywhere in the repository:
     /// methods for a member call (`x.area()`), top-level functions and classes for a plain
-    /// call (`area()`).
-    fn infer(&self, callee: &str) -> Resolution<'a> {
+    /// call (`area()`), both for a path (`a::area()`, `by_path`).
+    fn infer(&self, callee: &str, by_path: bool) -> Resolution<'a> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
             None => (false, callee),
         };
-        let found = self
-            .by_name
-            .get(&(member, last))
-            .map_or(&[][..], Vec::as_slice);
-        match found {
+        let found = |member| (self.by_name.get(&(member, last))).map_or(&[][..], Vec::as_slice);
+        let mut found = found(member).to_vec();
+        if member && by_path {
+            found.extend(self.by_name.get(&(false, last)).into_iter().flatten());
+            found.sort();
+        }
+        match found[..] {
             [] => Resolution::Unresolved,
-            [one] => Resolution::Inferred(*one),
-            all => Resolution::Ambiguous(all.to_vec()),
+            [one] => Resolution::Inferred(one),
+            _ => Resolution::Ambiguous(found),
         }
     }
 
@@ -573,7 +962,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// The class whose body encloses `scope`, for `this`.
+    /// The class whose body, or one of whose blocks (`Facts::impls`), encloses `scope`, for
+    /// `this` and Rust's `Self`.
     fn class(&self, path: &'a str, scope: &str) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = scope;
@@ -582,6 +972,9 @@ impl<'a> Resolver<'a> {
                 && def.kind == Kind::Class
             {
                 return Binding::Def(Target { path, name });
+            }
+            if let Some(class) = self.blocks.get(&(path, scope)) {
+                return Binding::Def(*class);
             }
             scope = crate::parent(scope);
         }
@@ -613,9 +1006,10 @@ impl<'a> Resolver<'a> {
     /// binding, which hides the name; else what it defines, its constants, its parameters, its
     /// receivers), then the top level (where a star import written after every other binding
     /// of the name, a hiding one included, may rebind it first, `rebound`), then the file's
-    /// imports. Methods are not lexical
-    /// bindings, and a class body's names are in scope only for the statements written directly
-    /// in it, not for its methods or nested classes.
+    /// imports. Methods are not lexical bindings, and a class body's names are in scope only for
+    /// the statements written directly in it, not for its methods or nested classes. A module
+    /// written in place (`Kind::Module`) ends the climb: the names around it are not its own,
+    /// only the file's imports are.
     fn lexical(
         &self,
         path: &'a str,
@@ -623,11 +1017,27 @@ impl<'a> Resolver<'a> {
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
+        self.lexical_as(path, scope, name, seen, Reading::Any)
+    }
+
+    /// `lexical`, read as `reading` says: among types and modules alone for a path's head (no
+    /// local, parameter or receiver, which are values, hides it), and for a called name with a
+    /// module written in place no value.
+    fn lexical_as(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        reading: Reading,
+    ) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = Some(scope);
-        let mut first = true;
+        let (mut first, mut top) = (true, false);
         while let Some(s) = scope {
-            scope = (!s.is_empty()).then(|| crate::parent(s));
+            top |= s.is_empty();
+            let module = defs.get(s).is_some_and(|d| d.kind == Kind::Module);
+            scope = (!s.is_empty() && !module).then(|| crate::parent(s));
             let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
             first = false;
             if class_body {
@@ -638,6 +1048,24 @@ impl<'a> Resolver<'a> {
             } else {
                 format!("{s}.{name}")
             };
+            if reading.types() {
+                match defs.get_key_value(candidate.as_str()) {
+                    // A function is no head of a path called (`rocket::build()` beside a
+                    // `fn rocket`), though a `use` may name one.
+                    Some((name, def))
+                        if def.kind != Kind::Method
+                            && (reading == Reading::Alias || def.kind != Kind::Function) =>
+                    {
+                        return Binding::Def(Target { path, name });
+                    }
+                    _ => {
+                        if let Some(found) = self.imported_at(path, s, name, seen) {
+                            return found;
+                        }
+                        continue;
+                    }
+                }
+            }
             if s.is_empty()
                 && let Some(found) = self.rebound(path, name, seen)
             {
@@ -651,6 +1079,7 @@ impl<'a> Resolver<'a> {
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
+                && !(def.kind == Kind::Module && reading == Reading::Value)
             {
                 return Binding::Def(Target { path, name });
             }
@@ -673,31 +1102,182 @@ impl<'a> Resolver<'a> {
                 return Binding::Param(function, n, field);
             }
             match self.receivers[path].get(&(s, name)) {
-                Some(Class::Imported) => return self.imported(path, name, seen),
+                Some(Class::Imported) => return self.imported_in(path, name, seen, true),
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
+            if let Some(found) = self.imported_at(path, s, name, seen) {
+                return found;
+            }
         }
-        self.imported(path, name, seen)
+        self.imported_in(path, name, seen, top)
     }
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
-    /// `name` only if the module exports it (`star`), to whatever it is there.
+    /// `name` only if the module exports it (`star`), to whatever it is there. The imports a
+    /// pack scopes (`Imported::Path` and `Glob`, Rust's `use`) are not these: `imported_at` reads
+    /// them where they are written, and a name no import binds is a crate outside the file when
+    /// the pack says so (`Facts::externs`).
     // ponytail: a star import from outside the repository (`from numpy import *`) is taken to
     // bind nothing, here, in `rebound` and in `own_export`, since what it takes is not known: a
     // name it rebinds stays linked to the import or definition before it (`from _heapq import
     // *` after `def heappush`). Taking it to rebind every name loses about as many right links
     // as wrong ones on the standard library.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        let given = (self.files[path].imports.iter().rev()).map(|import| match import.name {
-            _ if import.local == name => {
-                Some((self.import(path, &import.source, &import.name, seen), false))
+        self.imported_in(path, name, seen, true)
+    }
+
+    /// `imported`, the file's own top level (`top`) reached or not: a module written in place
+    /// does not see the globs of the file's top level.
+    fn imported_in(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        top: bool,
+    ) -> Binding<'a> {
+        let given = (self.files[path].imports.iter().rev()).map(|import| {
+            let scoped = matches!(import.name, Imported::Path(_) | Imported::Glob { .. });
+            // A module declared in the file (Rust's `mod x;`) is in scope where its
+            // definition is.
+            let declared = matches!(import.name, Imported::Namespace)
+                && (self.defs[path].get(import.local.as_str()))
+                    .is_some_and(|d| d.kind == Kind::Module);
+            match import.name {
+                _ if import.local == name && !scoped && (top || !declared) => {
+                    let scope = scope_of(&import.local);
+                    let found = self.import(path, scope, &import.source, &import.name, seen);
+                    Some((found, false))
+                }
+                Imported::All => self.taken(path, &import.source, name, seen),
+                _ => None,
             }
-            Imported::All => self.taken(path, &import.source, name, seen),
-            _ => None,
         });
-        latest(given, false).unwrap_or(Binding::Unknown)
+        if let Some(found) = latest(given, false) {
+            return found;
+        }
+        if top && let Some(found) = self.globs(path, "", name, false, seen) {
+            return found;
+        }
+        if !self.files[path].externs.iter().any(|n| n == name) {
+            return Binding::Unknown;
+        }
+        match self.module(path, name) {
+            Some(module) => Binding::Module(module),
+            None => Binding::External(name, &NAMESPACE),
+        }
+    }
+
+    /// What the imports a pack writes in `scope` (the top level, a module written in place, a
+    /// function: Rust's `use`) bind `name` to, if any: a path import of the name, else a glob
+    /// that gives it. An import met again while it is being resolved is skipped: its own path
+    /// begins with a name it binds (`use tokio::{self}`), which is then the outer one.
+    fn imported_at(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<Binding<'a>> {
+        for import in self.files[path].imports.iter().rev() {
+            if let Imported::Path(target) = &import.name
+                && bound_in(&import.local, scope, name)
+                && !seen.aliases.contains(&(path, target.as_str()))
+            {
+                return Some(self.import(path, scope, &import.source, &import.name, seen));
+            }
+        }
+        // The globs of the top level come after the file's own imports (`imported`).
+        match scope.is_empty() {
+            true => None,
+            false => self.globs(path, scope, name, false, seen),
+        }
+    }
+
+    /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
+    /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
+    /// itself. A glob cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob
+    /// binds it in its place.
+    fn globs(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        public: bool,
+        seen: &mut Seen<'a>,
+    ) -> Option<Binding<'a>> {
+        let imports = self.files[path].imports.iter().enumerate();
+        for (at, import) in imports.rev() {
+            let Imported::Glob {
+                path: target,
+                inside,
+                public: re_exports,
+            } = &import.name
+            else {
+                continue;
+            };
+            if (public && !re_exports) || !bound_in(&import.local, scope, "*") {
+                continue;
+            }
+            if seen.depth >= LINK_DEPTH {
+                seen.cut = true;
+                return Some(Binding::Unknown);
+            }
+            if !seen.globs.insert((path, at, name)) {
+                continue;
+            }
+            seen.depth += 1;
+            let work = &mut Work::default();
+            let found = match self.resolve_as(path, scope, target, seen, work, Reading::Alias) {
+                Binding::Module(m) if *inside => self.export(m, name, seen),
+                Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
+                // A module written in place states no visibility of its items: only a glob
+                // from inside it, which sees them all, is read.
+                Binding::Def(t) if *inside && self.defs[t.path][t.name].kind == Kind::Module => {
+                    let member = format!("{}.{name}", t.name);
+                    match self.def(t.path, &member) {
+                        Binding::Unknown => self
+                            .imported_at(t.path, t.name, name, seen)
+                            .unwrap_or(Binding::Unknown),
+                        found => found,
+                    }
+                }
+                _ => Binding::Unknown,
+            };
+            seen.depth -= 1;
+            if seen.cut {
+                return Some(Binding::Unknown);
+            }
+            if matches!(found, Binding::Def(_) | Binding::Module(_)) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
+    /// read among types and modules, so no local hides it. An alias met again while resolving
+    /// itself gives nothing; one cut at `LINK_DEPTH` is unknown (`Seen::cut`).
+    fn alias(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        target: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Binding<'a> {
+        if seen.depth >= LINK_DEPTH {
+            seen.cut = true;
+            return Binding::Unknown;
+        }
+        if !seen.aliases.insert((path, target)) {
+            return Binding::Unknown;
+        }
+        seen.depth += 1;
+        let work = &mut Work::default();
+        let found = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
+        seen.depth -= 1;
+        found
     }
 
     /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
@@ -718,14 +1298,18 @@ impl<'a> Resolver<'a> {
             })
     }
 
+    /// What an import of `name` from `source`, written in `scope`, gives.
     fn import(
         &self,
         path: &'a str,
+        scope: &'a str,
         source: &'a str,
         name: &'a Imported,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let found = match (name, self.module(path, source)) {
+            (Imported::Path(target), _) => return self.alias(path, scope, target, seen),
+            (Imported::Glob { .. }, _) => return Binding::Unknown,
             (_, None) => Binding::External(source, name),
             (Imported::Namespace, Some(module)) => Binding::Module(module),
             (Imported::Name(name) | Imported::Member { name, .. }, Some(module)) => {
@@ -743,15 +1327,16 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// What a star import of `path` takes as `name` (`exports`). An unknown it reaches through
-    /// a cycle (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut
-    /// at `REEXPORT_DEPTH` stays unknown.
+    /// What a star import of `path` takes as `name` (`exports`), else what its re-exporting
+    /// globs give it (Rust's `pub use m::*`). An unknown it reaches through a cycle
+    /// (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut at
+    /// `LINK_DEPTH` stays unknown.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         if !self.files[path].star.takes(name) {
-            return None;
+            return self.globs(path, "", name, true, seen);
         }
         let outer = std::mem::take(&mut seen.looped);
-        let found = self.exports(path, name, seen);
+        let found = self.exports(path, name, seen, false);
         let looped = std::mem::replace(&mut seen.looped, outer);
         match found {
             Some(Binding::Unknown) if looped && !seen.cut => None,
@@ -775,35 +1360,55 @@ impl<'a> Resolver<'a> {
 
     /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        self.exports(path, name, seen).unwrap_or(Binding::Unknown)
+        self.export_as(path, name, seen, false)
     }
 
-    /// `export`, or `None` when `path` exports no `name`, so that another star may bind it. An
-    /// export of what is not known (a constant, something from outside the repository, an
-    /// export cut more than `REEXPORT_DEPTH` exports deep, where `seen` records the cut) is
-    /// still the name's: no other star binds it.
-    fn exports(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
-        if seen.depth >= REEXPORT_DEPTH {
+    /// `export`, for a `value` (the callee of a call) when two names are exported as one: of a
+    /// module (Rust's `mod x;`) and of an item (`pub use x::x;`), the item.
+    fn export_as(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Binding<'a> {
+        self.exports(path, name, seen, value)
+            .unwrap_or(Binding::Unknown)
+    }
+
+    /// `export_as`, or `None` when `path` exports no `name`, so that another star may bind it.
+    /// An export of what is not known (a constant, something from outside the repository, an
+    /// export cut more than `LINK_DEPTH` links deep, where `seen` records the cut) is still the
+    /// name's: no other star binds it.
+    fn exports(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
+        if seen.depth >= LINK_DEPTH {
             seen.cut = true;
             return Some(Binding::Unknown);
         }
-        match seen.pairs.get(&(path, name)) {
+        let key = (path, name, value);
+        match seen.pairs.get(&key).cloned() {
             Some(None) => {
                 seen.looped = true;
                 return None;
             }
-            Some(&Some((found, looped))) => {
+            Some(Some((found, looped))) => {
                 seen.looped |= looped;
                 return found;
             }
             None => {}
         }
-        seen.pairs.insert((path, name), None);
+        seen.pairs.insert(key, None);
         let outer = std::mem::take(&mut seen.looped);
         seen.depth += 1;
-        let found = self.own_export(path, name, seen);
+        let found = self.own_export(path, name, seen, value);
         seen.depth -= 1;
-        seen.pairs.insert((path, name), Some((found, seen.looped)));
+        seen.pairs.insert(key, Some((found.clone(), seen.looped)));
         seen.looped |= outer;
         found
     }
@@ -812,49 +1417,83 @@ impl<'a> Resolver<'a> {
     /// are listed last binding first, and the first that gives `name` exports it. Otherwise
     /// the module's own export of the name decides, else its `export *`: the binding they give
     /// it when they all give the same one, as in ES modules; two that differ leave the name
-    /// unknown, still the module's, so that no other star binds it.
-    fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
+    /// unknown, still the module's, so that no other star binds it. With neither, the globs of
+    /// its top level give it (Rust's `use m::*`).
+    fn own_export(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
         if self.stars_bind {
             let given = (exports.iter()).map(|export| match export {
                 Export::All { source } => self.taken(path, source, name, seen),
-                _ => self
-                    .gives(path, export, name, seen)
-                    .map(|found| (found, false)),
+                _ => (self.gives(path, export, name, seen, value)).map(|found| (found, false)),
             });
             return latest(given, false);
         }
         let star = |export: &&Export| matches!(export, Export::All { .. });
-        let mut own = (exports.iter()).filter(|export| !star(export));
-        if let Some(found) = own.find_map(|export| self.gives(path, export, name, seen)) {
-            return Some(found);
+        let named = || (exports.iter()).filter(|e| !star(e) && exports_name(e, name));
+        let namespace = |e: &&Export| {
+            matches!(
+                e,
+                Export::From {
+                    name: Imported::Namespace,
+                    ..
+                }
+            )
+        };
+        let own = match value {
+            true => named().find(|e| !namespace(e)).or_else(|| named().next()),
+            false => named().next(),
+        };
+        if let Some(export) = own {
+            return self.gives(path, export, name, seen, value);
         }
-        let mut given =
-            (exports.iter().filter(star)).filter_map(|export| self.gives(path, export, name, seen));
-        let first = given.next()?;
-        match given.all(|other| same(first, other)) {
+        let mut given = (exports.iter().filter(star))
+            .filter_map(|export| self.gives(path, export, name, seen, value));
+        let Some(first) = given.next() else {
+            return self.globs(path, "", name, false, seen);
+        };
+        match given.all(|other| same(&first, &other)) {
             true => Some(first),
             false => Some(Binding::Unknown),
         }
     }
 
-    /// What one export of `path` gives `name`, if it gives it.
+    /// What one export of `path` gives `name`, if it gives it, read as a value when `value`.
     fn gives(
         &self,
         path: &'a str,
         export: &'a Export,
         name: &'a str,
         seen: &mut Seen<'a>,
+        value: bool,
     ) -> Option<Binding<'a>> {
         match export {
             Export::Local { exported, local } if exported == name => {
-                Some(self.lexical(path, "", local, seen))
+                // The item of a module written in place is exported under its dotted name, and
+                // read from inside that module.
+                let (scope, bare) = match local.rsplit_once('.') {
+                    Some((m, _))
+                        if self.defs[path]
+                            .get(m)
+                            .is_some_and(|d| d.kind == Kind::Module) =>
+                    {
+                        (m, &local[m.len() + 1..])
+                    }
+                    _ => ("", local.as_str()),
+                };
+                let reading = if value { Reading::Value } else { Reading::Any };
+                Some(self.lexical_as(path, scope, bare, seen, reading))
             }
             Export::From {
                 exported,
                 source,
                 name: imported,
-            } if exported == name => Some(self.import(path, source, imported, seen)),
+            } if exported == name => Some(self.import(path, "", source, imported, seen)),
             Export::All { source } => self.star(self.module(path, source)?, name, seen),
             _ => None,
         }
@@ -884,31 +1523,39 @@ impl<'a> Resolver<'a> {
     /// `export` reads it: for each name a file exports, the definition, the module-level
     /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
     /// the repository or not known (an import from another package stops there); for each `export * from` a file of the repository, that
-    /// file. Sorted.
+    /// file. The names a pack keeps to the package (`Facts::private`, but for one that is also
+    /// public: `mod x; pub use x::x;`) are left out, so are the files the pack does not publish
+    /// (`publishing`), and a `pub use` glob of a file gives each name that file's star takes.
+    /// Sorted.
     pub fn exported(&self) -> Vec<Exported> {
         let mut rows = BTreeSet::new();
         for (&path, facts) in self.files {
+            if self.published.as_ref().is_some_and(|p| !p.contains(path)) {
+                continue;
+            }
+            let private: HashSet<&str> = facts.private.iter().map(String::as_str).collect();
             for export in &facts.exports {
-                let row = match export {
+                let found = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
-                        match self.export(path, exported, &mut Seen::new()) {
-                            Binding::Def(t) => {
-                                (Some(exported.as_str()), Some(t.path), Some(t.name))
-                            }
-                            Binding::Module(m) => (Some(exported.as_str()), Some(m), None),
-                            // A constant or a type: the shape a package keeps of it (issue
-                            // #175) is found through it; it is no symbol a call reaches.
-                            Binding::Const(at, c) => (Some(exported.as_str()), Some(at), Some(c)),
-                            _ => (Some(exported.as_str()), None, None),
+                        if private.contains(exported.as_str()) && !facts.star.takes(exported) {
+                            continue;
                         }
+                        self.rows(path, exported, private.contains(exported.as_str()))
                     }
                     Export::All { source } => match self.module(path, source) {
-                        Some(m) => (None, Some(m), None),
+                        Some(m) => vec![(None, Some(m), None)],
                         None => continue,
                     },
                 };
-                rows.insert((path, row));
+                rows.extend(found.into_iter().map(|row| (path, row)));
             }
+            let mut names = BTreeSet::new();
+            self.glob_names(path, &mut HashSet::new(), &mut names);
+            names.retain(|n| facts.exports.iter().all(|e| !exports_name(e, n)));
+            let found = names
+                .into_iter()
+                .flat_map(|name| self.rows(path, name, false));
+            rows.extend(found.map(|row| (path, row)));
         }
         (rows.into_iter())
             .map(|(path, (name, file, target))| Exported {
@@ -918,6 +1565,63 @@ impl<'a> Resolver<'a> {
                 target: target.map(String::from),
             })
             .collect()
+    }
+
+    /// The rows of `file` exporting `exported`: its name, the file and the definition it gives;
+    /// two when a module and an item share the name (`mod x; pub use x::x;`), one when the
+    /// module is `private` (only the item is exported).
+    fn rows(&self, path: &'a str, exported: &'a str, private: bool) -> Vec<Row<'a>> {
+        let (item, any) = (
+            self.row(path, exported, true),
+            self.row(path, exported, false),
+        );
+        match (item == any || item.1.is_none(), private) {
+            (true, _) => vec![any],
+            (false, true) => vec![item],
+            (false, false) => vec![item, any],
+        }
+    }
+
+    /// The row of `file` exporting `exported`, read as an item when `value`.
+    fn row(&self, path: &'a str, exported: &'a str, value: bool) -> Row<'a> {
+        match self.export_as(path, exported, &mut Seen::new(), value) {
+            Binding::Def(t) => (Some(exported), Some(t.path), Some(t.name)),
+            Binding::Module(m) => (Some(exported), Some(m), None),
+            // A constant or a type: the shape a package keeps of it (issue #175) is found
+            // through it; it is no symbol a call reaches.
+            Binding::Const(at, c) => (Some(exported), Some(at), Some(c)),
+            _ => (Some(exported), None, None),
+        }
+    }
+
+    /// The names the `pub use` globs of `path` give, through the files they glob (each once).
+    fn glob_names(&self, path: &'a str, done: &mut HashSet<&'a str>, out: &mut BTreeSet<&'a str>) {
+        if done.len() >= LINK_DEPTH || !done.insert(path) {
+            return;
+        }
+        for import in &self.files[path].imports {
+            let Imported::Glob {
+                path: target,
+                public: true,
+                ..
+            } = &import.name
+            else {
+                continue;
+            };
+            if import.local == "*"
+                && let Binding::Module(m) = self.alias(path, "", target, &mut Seen::new())
+            {
+                let facts = self.files[m];
+                let named = facts.exports.iter().filter_map(|e| match e {
+                    Export::Local { exported, .. } | Export::From { exported, .. } => {
+                        Some(exported.as_str())
+                    }
+                    Export::All { .. } => None,
+                });
+                out.extend(named.filter(|n| facts.star.takes(n)));
+                self.glob_names(m, done, out);
+            }
+        }
     }
 
     /// The file an import of `specifier` from `path` names, if the pack parses it.
@@ -939,10 +1643,10 @@ fn latest<'a>(
 ) -> Option<Binding<'a>> {
     let mut found = None;
     for (binding, maybe) in bindings.flatten() {
-        match found {
-            Some(first) if !same(first, binding) => return Some(Binding::Unknown),
-            _ => found = Some(binding),
+        if found.as_ref().is_some_and(|first| !same(first, &binding)) {
+            return Some(Binding::Unknown);
         }
+        found = Some(binding);
         if !maybe {
             return found;
         }
@@ -955,7 +1659,7 @@ fn latest<'a>(
 
 /// Whether two bindings are the same one, as two `export *` must give a name for a module to
 /// export it. What is not known is the same as nothing else.
-fn same(a: Binding, b: Binding) -> bool {
+fn same(a: &Binding, b: &Binding) -> bool {
     match (a, b) {
         (Binding::Def(x), Binding::Def(y)) => x == y,
         (Binding::Module(x), Binding::Module(y)) => x == y,
@@ -1042,6 +1746,20 @@ struct Written<'a> {
     at: (&'a str, usize),
 }
 
+/// How many calls a builder chain is read through, down to what starts it.
+// ponytail: a chain of more builder calls than this is not read to its start; its calls past
+// the limit have no origin.
+pub const FLUENT_CHAIN: usize = 1024;
+
+/// Where a builder chain stops (`Code::chain_tail`): the call, whether a step above it was
+/// found only by a name match, and how many steps lead to it.
+#[derive(Clone, Copy)]
+struct Tail {
+    stop: usize,
+    matched: bool,
+    depth: usize,
+}
+
 /// What `Code::origins` follows: a constant, a parameter, a function's return values.
 #[derive(PartialEq)]
 enum Flow<'a> {
@@ -1058,6 +1776,14 @@ struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
     out: BTreeSet<(&'a str, usize)>,
+    /// The methods of the builder chains being followed, which the library they start at must
+    /// pass through (`LanguagePack::passes`).
+    steps: Vec<&'a str>,
+}
+
+/// The method a call's callee names (`x.y.get` is `get`).
+fn method(callee: &str) -> &str {
+    callee.rsplit('.').next().unwrap_or(callee)
 }
 
 /// Values evaluated across files for contract kinds: constants folded where they are
@@ -1071,6 +1797,7 @@ pub struct Code<'a> {
     resolver: &'a Resolver<'a>,
     full: &'a BTreeMap<&'a str, &'a Facts>,
     misses: RefCell<BTreeSet<&'a str>>,
+    chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -1097,6 +1824,7 @@ impl<'a> Code<'a> {
             resolver,
             full,
             misses: RefCell::new(BTreeSet::new()),
+            chains: RefCell::new(HashMap::new()),
             pack,
         }
     }
@@ -1134,7 +1862,9 @@ impl<'a> Code<'a> {
                         Imported::Namespace => String::new(),
                         Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
                         // A star import spells no name of its own.
-                        Imported::All => return None,
+                        Imported::All | Imported::Path(_) | Imported::Glob { .. } => {
+                            return None;
+                        }
                     },
                     binding: None,
                 },
@@ -1193,10 +1923,23 @@ impl<'a> Code<'a> {
         else {
             return None;
         };
+        // A crate a pack's path import (Rust's `use`) names: the whole path, as `external` spells it.
+        let pathed = self.resolver.files[path]
+            .imports
+            .iter()
+            .any(|i| matches!(i.name, Imported::Path(_)));
+        if pathed && matches!(name, Imported::Namespace) {
+            let full = self.resolver.imported_name(path, scope, chain);
+            let rest = full.strip_prefix(specifier)?;
+            let rest = rest
+                .strip_prefix('.')
+                .or_else(|| rest.is_empty().then_some(rest))?;
+            return Some((specifier, rest.to_string()));
+        }
         let mut spelled = match name {
             Imported::Namespace => String::new(),
             Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
-            Imported::All => return None,
+            Imported::All | Imported::Path(_) | Imported::Glob { .. } => return None,
         };
         if let Some(members) = members {
             if !spelled.is_empty() {
@@ -1243,6 +1986,80 @@ impl<'a> Code<'a> {
         self.full(path)?.calls.get(index)
     }
 
+    /// The value the call at `index` of `path` is made on (`Call::receiver`).
+    pub fn receiver(&self, path: &'a str, index: usize) -> Option<&'a Value> {
+        self.call(path, index)?.receiver.as_ref()
+    }
+
+    /// The values the call at `index` of `path` may return, when a function of the repository
+    /// answers it (`Exact`) or a name match does (`Inferred`, `Ambiguous`): the file and name
+    /// of each function with each value it returns.
+    pub fn returned(&self, path: &'a str, index: usize) -> Vec<(&'a str, &'a str, &'a Value)> {
+        let call = &self.resolver.files[path].calls[index];
+        let targets = match self.resolver.call(path, call) {
+            Resolution::Exact(t) | Resolution::Inferred(t) => vec![t],
+            Resolution::Ambiguous(ts) => ts,
+            Resolution::Unresolved => return Vec::new(),
+        };
+        let mut out = Vec::new();
+        for t in targets {
+            let defs = self.full(t.path).map(|f| f.defs.iter());
+            let def = defs.and_then(|mut d| d.find(|d| d.name == t.name));
+            let values = def.map(|d| d.return_values.iter()).into_iter().flatten();
+            out.extend(values.map(|v| (t.path, t.name, v)));
+        }
+        out
+    }
+
+    /// The names `path` mentions (`Facts::mentions`); `None` where the pack does not tell.
+    pub fn mentions(&self, path: &'a str) -> Option<&'a BTreeSet<String>> {
+        self.full(path)?.mentions.as_ref()
+    }
+
+    /// The scope and value of each `let` of `path` whose name is bound again or assigned again
+    /// (`Facts::rebound`).
+    pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {
+        self.full(path).map_or(&[], |f| f.rebound.as_slice())
+    }
+
+    /// The `let mut` that `name`, written in `scope` of `path`, refers to (`Facts::mutable`),
+    /// looked up from the scope outwards: the scope it is bound in and the value it holds.
+    /// A name an inner scope binds again (a closure's parameter, a `let` in a closure given to a
+    /// call, a nested function's parameter) hides the outer `let mut`: nothing is returned.
+    pub fn mutable(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a Value)> {
+        let held = &self.full(path)?.mutable;
+        let r = self.resolver;
+        let mut scope = scope;
+        loop {
+            let local = crate::qualify(scope, name);
+            if let Some(value) = held.get(&local) {
+                return Some((scope, value));
+            }
+            let param = |d: &Def| {
+                (d.params.iter()).any(|p| p.name == name || p.fields.iter().any(|f| f.name == name))
+            };
+            if r.locals[path].contains(local.as_str())
+                || r.consts[path].contains(local.as_str())
+                || r.receivers[path].contains_key(&(scope, name))
+                || r.defs[path].get(scope).is_some_and(|d| param(d))
+                || scope.is_empty()
+            {
+                return None;
+            }
+            scope = crate::parent(scope);
+        }
+    }
+
+    /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).
+    pub fn call_index(&self, path: &'a str, range: &std::ops::Range<usize>) -> Option<usize> {
+        call_at(&self.resolver.files[path].calls, range)
+    }
+
     /// Whether the pack binds `name` everywhere, as JavaScript does `fetch`.
     pub fn binds_everywhere(&self, name: &str) -> bool {
         self.resolver.globals.contains(&name)
@@ -1253,7 +2070,20 @@ impl<'a> Code<'a> {
     /// the repository binds it.
     pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
         let binding = self.resolver.binding(path, scope, callee);
-        matches!(binding, Binding::External(..)).then(|| self.resolver.imported_name(path, callee))
+        matches!(binding, Binding::External(..))
+            .then(|| self.resolver.imported_name(path, scope, callee))
+    }
+
+    /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
+    /// its head among types and modules, so a function of the file that spells like a crate
+    /// (`fn rocket()` calling `rocket::build()`) does not hide it.
+    pub fn external_of(&self, path: &'a str, call: &'a Call) -> Option<String> {
+        if !call.by_path {
+            return self.external(path, &call.scope, &call.callee);
+        }
+        let binding = self.resolver.path_binding(path, &call.scope, &call.callee);
+        matches!(binding, Binding::External(..))
+            .then(|| self.resolver.imported_name(path, &call.scope, &call.callee))
     }
 
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
@@ -1321,35 +2151,55 @@ impl<'a> Code<'a> {
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(call) => {
                 let calls = &self.resolver.files[path].calls;
-                let Some(index) = calls.iter().position(|c| c.range == call.range) else {
+                let Some(index) = call_at(calls, &call.range) else {
                     return;
                 };
-                let function = match self.resolver.call(path, &calls[index]) {
-                    Resolution::Exact(t) if !self.resolver.is_class(t) => t,
-                    _ => {
-                        trail.out.insert((path, index));
-                        return;
+                // A builder chain (`Router::new().route(..).nest(..)`) is the value it started
+                // from, down to the call that starts it or that a function of the repository
+                // answers. A step only a name match found must start at an outside constructor,
+                // whose method it is then (a method of the library wins over a name).
+                let tail = match self.pack.fluent() {
+                    true => self.chain_tail(path, index),
+                    false => Some(Tail {
+                        stop: index,
+                        matched: false,
+                        depth: 0,
+                    }),
+                };
+                let Some(Tail { stop, matched, .. }) = tail else {
+                    return;
+                };
+                let fluent = self.pack.fluent();
+                let kept = (matched || fluent).then(|| std::mem::take(&mut trail.out));
+                let mark = trail.steps.len();
+                if fluent {
+                    self.chain_steps(path, index, &mut trail.steps);
+                }
+                self.flow_from(path, stop, trail);
+                if fluent {
+                    // The methods the chain went through hand back the object they were called
+                    // on only for the library the chain starts at (`LanguagePack::passes`): a
+                    // value derived from a client (`resp.headers()`) is not a client.
+                    let steps = trail.steps.split_off(mark);
+                    trail.out.retain(|&(p, n)| {
+                        let call = &self.resolver.files[p].calls[n];
+                        match self.external_of(p, call) {
+                            Some(origin) => steps.iter().all(|m| self.pack.passes(&origin, m)),
+                            None => steps.is_empty(),
+                        }
+                    });
+                }
+                if let Some(mut kept) = kept {
+                    let outside = !matched
+                        || (trail.out.iter()).all(|&(p, n)| {
+                            let call = &self.resolver.files[p].calls[n];
+                            self.external_of(p, call).is_some()
+                        });
+                    if outside {
+                        kept.append(&mut trail.out);
                     }
-                };
-                let Some(def) = (self.full(function.path))
-                    .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-                else {
-                    return;
-                };
-                if trail.busy.contains(&Flow::Returns(function)) {
-                    return;
+                    trail.out = kept;
                 }
-                trail.busy.push(Flow::Returns(function));
-                trail.frames.push(Frame {
-                    def: function,
-                    path,
-                    index,
-                });
-                for returned in &def.return_values {
-                    self.flow(function.path, function.name, returned, trail);
-                }
-                trail.frames.pop();
-                trail.busy.pop();
             }
             Value::List(items) => {
                 for item in items {
@@ -1358,6 +2208,122 @@ impl<'a> Code<'a> {
             }
             _ => {}
         }
+    }
+
+    /// The origins of the call at `index` of `path`, where a chain stops: what a function of
+    /// the repository returns, the value the call is made on, or the call itself.
+    fn flow_from(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
+        let calls = &self.resolver.files[path].calls;
+        let function = match self.resolver.call(path, &calls[index]) {
+            Resolution::Exact(t) if !self.resolver.is_class(t) => t,
+            _ if self.pack.fluent() => match self.receiver(path, index) {
+                None => {
+                    trail.out.insert((path, index));
+                    return;
+                }
+                Some(Value::Call(_)) => return,
+                Some(other) => {
+                    trail.steps.push(method(&calls[index].callee));
+                    return self.flow(path, &calls[index].scope, other, trail);
+                }
+            },
+            _ => {
+                trail.out.insert((path, index));
+                return;
+            }
+        };
+        let Some(def) = (self.full(function.path))
+            .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
+        else {
+            return;
+        };
+        if trail.busy.contains(&Flow::Returns(function)) {
+            return;
+        }
+        trail.busy.push(Flow::Returns(function));
+        trail.frames.push(Frame {
+            def: function,
+            path,
+            index,
+        });
+        for returned in &def.return_values {
+            self.flow(function.path, function.name, returned, trail);
+        }
+        trail.frames.pop();
+        trail.busy.pop();
+    }
+
+    /// The calls of the builder chain that ends in the call at `index` of `path`, that call
+    /// first, down its receivers to where `chain_tail` stops it: a call a function of the
+    /// repository answers, or one made on no call. `None` past `FLUENT_CHAIN` calls. The one
+    /// walk down a chain: the value flow and the kinds that read a chain step by step go through
+    /// it.
+    pub fn chain(&self, path: &'a str, index: usize) -> Option<Vec<usize>> {
+        let stop = self.chain_tail(path, index)?.stop;
+        let calls = &self.resolver.files[path].calls;
+        let mut out = vec![index];
+        while out[out.len() - 1] != stop {
+            let Some(Value::Call(next)) = self.receiver(path, out[out.len() - 1]) else {
+                return None;
+            };
+            out.push(call_at(calls, &next.range)?);
+        }
+        Some(out)
+    }
+
+    /// The methods of the calls of the chain ending at `index`, above where it stops, outermost
+    /// first.
+    fn chain_steps(&self, path: &'a str, index: usize, steps: &mut Vec<&'a str>) {
+        let calls = &self.resolver.files[path].calls;
+        if let Some((_, above)) = self
+            .chain(path, index)
+            .as_deref()
+            .and_then(<[usize]>::split_last)
+        {
+            steps.extend(above.iter().map(|&at| method(&calls[at].callee)));
+        }
+    }
+
+    /// Where the builder chain ending in the call at `index` of `path` stops: the first call
+    /// down its receivers that a function of the repository answers or that is made on no
+    /// call. Each call is walked once, whatever the chain.
+    fn chain_tail(&self, path: &'a str, index: usize) -> Option<Tail> {
+        let calls = &self.resolver.files[path].calls;
+        let mut walked: Vec<(usize, bool)> = Vec::new();
+        let mut at = index;
+        let mut tail = loop {
+            if let Some(&known) = self.chains.borrow().get(&(path, at)) {
+                break known;
+            }
+            let resolution = self.resolver.call(path, &calls[at]);
+            let answered =
+                matches!(&resolution, Resolution::Exact(t) if !self.resolver.is_class(*t));
+            match (self.receiver(path, at), answered) {
+                (Some(Value::Call(next)), false) => {
+                    walked.push((at, !matches!(resolution, Resolution::Unresolved)));
+                    match call_at(calls, &next.range) {
+                        Some(next) => at = next,
+                        None => break None,
+                    }
+                }
+                _ => {
+                    break Some(Tail {
+                        stop: at,
+                        matched: false,
+                        depth: 0,
+                    });
+                }
+            }
+        };
+        for &(step, matched) in walked.iter().rev() {
+            tail = tail.filter(|t| t.depth < FLUENT_CHAIN).map(|t| Tail {
+                matched: t.matched || matched,
+                depth: t.depth + 1,
+                ..t
+            });
+            self.chains.borrow_mut().insert((path, step), tail);
+        }
+        tail
     }
 
     fn flow_name(&self, path: &'a str, scope: &'a str, name: &'a str, trail: &mut Trail<'a>) {
@@ -1604,6 +2570,11 @@ impl<'a> Code<'a> {
             Binding::Module(m) => Some(m),
             _ => None,
         }
+    }
+
+    /// Whether other packages may import the exports of `path` (`Layout::published`).
+    pub fn published(&self, path: &str) -> bool {
+        (self.resolver.published.as_ref()).is_none_or(|files| files.contains(path))
     }
 
     /// The file an import of `specifier` from `path` names, if the pack parses it.
@@ -1974,7 +2945,7 @@ mod tests {
             .map(|(path, src)| (path.clone(), pack.parse(path, src.as_bytes()).unwrap()))
             .collect();
         let files: BTreeMap<&str, &Facts> = (facts.iter()).map(|(p, f)| (p.as_str(), f)).collect();
-        let resolver = Resolver::new(&files, pack.modules(&[]).unwrap(), pack);
+        let resolver = Resolver::new(&files, pack.modules(&[], &BTreeMap::new()).unwrap(), pack);
         let call = files[main]
             .calls
             .iter()
@@ -2028,8 +2999,8 @@ mod tests {
         };
 
         for exact in [ts, py] {
-            assert!(exact(REEXPORT_DEPTH));
-            assert!(!exact(REEXPORT_DEPTH + 1));
+            assert!(exact(LINK_DEPTH));
+            assert!(!exact(LINK_DEPTH + 1));
             assert!(!exact(far));
         }
     }
@@ -2040,7 +3011,7 @@ mod tests {
 
         // `a` re-exports the `x` of `f0` through `n` files, and `b` defines its own: the module
         // that binds `x` is `a`, whose `x` is unknown past the limit, and never `b`'s.
-        let cut = REEXPORT_DEPTH + 1;
+        let cut = LINK_DEPTH + 1;
         let py_link = |p| format!("from f{p} import x\n");
         let py = |n: usize| {
             let mut sources = reexports("py", n, "def x():\n    pass\n", py_link);
@@ -2557,6 +3528,20 @@ mod tests {
     }
 
     #[test]
+    fn a_call_is_found_by_its_range_in_a_list_in_any_order() {
+        let facts = Python.parse("a.py", b"f(g(1))\nh()\n").unwrap();
+        let mut calls = facts.calls;
+        assert_eq!(calls.len(), 3);
+        for _ in 0..2 {
+            for (i, call) in calls.iter().enumerate() {
+                assert_eq!(call_at(&calls, &call.range), Some(i));
+            }
+            calls.reverse();
+        }
+        assert_eq!(call_at(&calls, &(0..1)), None);
+    }
+
+    #[test]
     fn a_family_longer_than_the_limit_is_absent() {
         // Far past the limit: a recursion down the bases that does not stop overflows the
         // stack, and families kept whole take memory quadratic in the chain.
@@ -2575,6 +3560,253 @@ mod tests {
             assert!(!exact(FAMILY_DEPTH), "reverse: {reverse}");
             assert!(!exact(n - 1), "reverse: {reverse}");
         }
+    }
+
+    /// The Rust files parsed: `(name, source)` in, facts out.
+    fn parsed(files: &[(&'static str, &str)]) -> Vec<(&'static str, Facts)> {
+        use crate::lang::rust::Rust;
+        let parse =
+            |(name, src): &(&'static str, &str)| (*name, Rust.parse(name, src.as_bytes()).unwrap());
+        files.iter().map(parse).collect()
+    }
+
+    /// A Rust resolver over files named after their modules: `crate` is `main.rs`, `mod x` is
+    /// `x.rs`, `self` the file itself, and `super` the file one level up the chain `c.rs`,
+    /// `b.rs`, `a.rs`, `main.rs`. A crate's name is no file.
+    fn resolver<'a>(files: &'a BTreeMap<&'a str, &'a Facts>) -> Resolver<'a> {
+        use crate::lang::rust::Rust;
+        let modules: Modules = Box::new(|from, specifier| match (specifier, from) {
+            ("crate", _) => vec!["main.rs".into()],
+            ("self", from) => vec![from.into()],
+            ("super", "c.rs") => vec!["b.rs".into()],
+            ("super", "b.rs") => vec!["a.rs".into()],
+            ("super", _) => vec!["main.rs".into()],
+            (s, _) => (s.strip_prefix("mod ").into_iter())
+                .map(|m| format!("{m}.rs"))
+                .collect(),
+        });
+        Resolver::new(files, modules, &Rust)
+    }
+
+    /// What each call resolves to, by `file scope callee`.
+    fn calls(files: &[(&'static str, &str)]) -> BTreeMap<String, String> {
+        let parsed = parsed(files);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let resolver = resolver(&map);
+        let mut out = BTreeMap::new();
+        for (path, facts) in &parsed {
+            for call in &facts.calls {
+                let found = match resolver.call(path, call) {
+                    Resolution::Exact(t) => format!("exact {}::{}", t.path, t.name),
+                    Resolution::Inferred(t) => format!("inferred {}::{}", t.path, t.name),
+                    Resolution::Ambiguous(_) => "ambiguous".to_string(),
+                    Resolution::Unresolved => "none".to_string(),
+                };
+                out.insert(format!("{path} {} {}", call.scope, call.callee), found);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn a_chain_of_uses_longer_than_the_limit_gives_nothing() {
+        // Far past the limit: a walk that does not stop overflows the stack.
+        let n = 3_000;
+        let mut src = String::from("fn a0() {}\n");
+        for i in 1..=n {
+            src.push_str(&format!("use a{} as a{i};\n", i - 1));
+        }
+        let last = LINK_DEPTH - 2;
+        src.push_str(&format!("fn main() {{ a{last}(); a{n}(); }}\n"));
+        let found = calls(&[("main.rs", &src)]);
+        assert_eq!(found[&format!("main.rs main a{last}")], "exact main.rs::a0");
+        assert_eq!(found[&format!("main.rs main a{n}")], "none");
+    }
+
+    #[test]
+    fn a_name_a_glob_reaches_past_the_limit_is_taken_from_no_other_glob() {
+        // `x()` in `main.rs`, where the latest glob reaches `x` through `n` modules, each
+        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too.
+        let x = |n: usize, by_name: bool| {
+            let mut files = vec![("main.rs".to_string(), String::new())];
+            let mut main = String::from("mod near;\n");
+            for i in 0..n {
+                main.push_str(&format!("mod m{i};\n"));
+                let next = match by_name {
+                    true => format!("pub use crate::m{}::x;\n", i + 1),
+                    false => format!("pub use crate::m{}::*;\n", i + 1),
+                };
+                files.push((format!("m{i}.rs"), next));
+            }
+            main.push_str(&format!(
+                "mod m{n};\nuse crate::near::*;\nuse crate::m0::*;\n"
+            ));
+            main.push_str("fn main() { x(); }\n");
+            files[0].1 = main;
+            files.push((format!("m{n}.rs"), "pub fn x() {}\n".to_string()));
+            files.push(("near.rs".to_string(), "pub fn x() {}\n".to_string()));
+            let files: Vec<(&'static str, &str)> = (files.iter())
+                .map(|(path, src)| (&*path.clone().leak(), src.as_str()))
+                .collect();
+            calls(&files)["main.rs main x"].clone()
+        };
+        for by_name in [false, true] {
+            assert_eq!(x(3, by_name), "exact m3.rs::x", "by name: {by_name}");
+            let past = x(3 * LINK_DEPTH, by_name);
+            assert!(!past.starts_with("exact"), "by name: {by_name}: {past}");
+        }
+    }
+
+    #[test]
+    fn a_glob_gives_the_public_items_alone() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod extras;\nmod prelude;\nuse crate::extras::*;\nuse crate::prelude::*;\n\
+                 fn main() { dup(); }\n",
+            ),
+            ("extras.rs", "pub fn dup() {}\n"),
+            ("prelude.rs", "fn dup() {}\npub fn greet() {}\n"),
+        ]);
+        assert_eq!(found["main.rs main dup"], "exact extras.rs::dup");
+    }
+
+    #[test]
+    fn a_crate_outside_the_repository_stays_external_in_every_form_of_its_use() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "use tokio::{self, select};\nuse serde_json::{self, json};\nuse foo::foo;\n\
+                 fn main() { tokio::spawn(f); serde_json::spawn(); foo::spawn(); \
+                 foo::foo::spawn(); }\n",
+            ),
+            ("other.rs", "pub fn spawn() {}\n"),
+        ]);
+        for call in [
+            "tokio.spawn",
+            "serde_json.spawn",
+            "foo.spawn",
+            "foo.foo.spawn",
+        ] {
+            assert_eq!(found[&format!("main.rs main {call}")], "none", "{call}");
+        }
+    }
+
+    #[test]
+    fn a_module_is_no_value_and_shares_its_name_with_an_item() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod run;\nmod lib2;\nuse run::run;\nfn main() { run(); run::run(); \
+                 lib2::x(); lib2::z(); }\n",
+            ),
+            ("run.rs", "pub fn run() {}\n"),
+            ("lib2.rs", "mod x;\npub use x::x;\npub fn z() {}\n"),
+            ("x.rs", "pub fn x() {}\n"),
+        ]);
+        assert_eq!(found["main.rs main run"], "exact run.rs::run");
+        assert_eq!(found["main.rs main run.run"], "exact run.rs::run");
+        // `mod x; pub use x::x;`: the item is what a call reaches.
+        assert_eq!(found["main.rs main lib2.x"], "exact x.rs::x");
+        assert_eq!(found["main.rs main lib2.z"], "exact lib2.rs::z");
+    }
+
+    #[test]
+    fn a_use_binds_in_the_module_that_holds_it() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod time;\nuse crate::time;\nmod m { fn f() { time::now(); } }\n\
+                 fn main() { time::now(); }\n",
+            ),
+            ("time.rs", "pub fn now() {}\n"),
+        ]);
+        assert_eq!(found["main.rs main time.now"], "exact time.rs::now");
+        // Inside `m`, `time` is a crate outside the file.
+        assert_eq!(found["main.rs m.f time.now"], "none");
+    }
+
+    #[test]
+    fn two_files_that_glob_their_parent_each_see_it() {
+        let found = calls(&[
+            ("main.rs", "mod a;\nfn main() {}\n"),
+            ("a.rs", "mod b;\npub fn helper() {}\n"),
+            ("b.rs", "use super::*;\nmod c;\n"),
+            ("c.rs", "use super::*;\nfn f() { helper(); }\n"),
+        ]);
+        assert_eq!(found["c.rs f helper"], "exact a.rs::helper");
+    }
+
+    #[test]
+    fn a_pub_use_in_a_module_written_in_place_is_a_member_of_it() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod lib2;\nfn main() { lib2::entries::secret(); lib2::entries::seal(); }\n",
+            ),
+            (
+                "lib2.rs",
+                "pub mod entries { pub use super::internal::secret; use super::internal::seal; }\n\
+                 mod internal { pub fn secret() {} pub fn seal() {} }\n",
+            ),
+        ]);
+        assert_eq!(
+            found["main.rs main lib2.entries.secret"],
+            "exact lib2.rs::internal.secret"
+        );
+        // A private `use` is the module's own.
+        assert_eq!(
+            found["main.rs main lib2.entries.seal"],
+            "inferred lib2.rs::internal.seal"
+        );
+    }
+
+    #[test]
+    fn a_used_name_is_spelled_by_the_path_it_imports() {
+        let parsed = parsed(&[(
+            "main.rs",
+            "use reqwest::Client;\nuse tokio::{self};\nuse reqwest as r;\nuse r::blocking as b;\n\
+             fn f() { use std::fs as files; }\n",
+        )]);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let resolver = resolver(&map);
+        let spelled = |scope, name| resolver.imported_name("main.rs", scope, name);
+        assert_eq!(spelled("main", "Client.new"), "reqwest.Client.new");
+        assert_eq!(spelled("", "tokio.spawn"), "tokio.spawn");
+        assert_eq!(spelled("", "b.Client.new"), "reqwest.blocking.Client.new");
+        assert_eq!(spelled("f", "files.read"), "std.fs.read");
+        assert_eq!(spelled("", "files.read"), "files.read");
+        let binding = resolver.binding("main.rs", "main", "Client.new");
+        assert!(matches!(binding, Binding::External("reqwest", _)));
+    }
+
+    #[test]
+    fn a_result_followed_past_the_limit_gives_nothing() {
+        // A result is followed inside `instance`, so `RECEIVER_DEPTH` receivers being resolved
+        // around it leave it unknown, and the cut is recorded.
+        let parsed = parsed(&[(
+            "main.rs",
+            "struct S;\nimpl S { fn new() -> Self { S } fn go(&self) {} }\n\
+             fn f() { let s = S::new(); s.go(); }\n",
+        )]);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let resolver = resolver(&map);
+        let s = |depth: usize| {
+            let mut work = Work {
+                busy: (0..depth)
+                    .map(|_| Busy::Local("main.rs", "f", "y"))
+                    .collect(),
+                ..Work::default()
+            };
+            let found = resolver.instance(Binding::Local("main.rs", "f", "s"), &mut work);
+            (
+                matches!(found, Binding::Instance(t) if t.name == "S"),
+                work.cut,
+            )
+        };
+        assert_eq!(s(0), (true, false));
+        assert_eq!(s(RECEIVER_DEPTH - 1), (true, false));
+        assert_eq!(s(RECEIVER_DEPTH), (false, true));
     }
 
     #[test]

@@ -1,0 +1,8 @@
+[package]
+name = "web-worker"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+shared-core = { workspace = true }
+kit = { package = "shared-core", version = "1" }

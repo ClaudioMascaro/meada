@@ -15,7 +15,7 @@ modules updates it.
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`clients`, below), Next.js app-router, Express,
-  FastAPI, Flask and Django providers (Next.js and Express ones each with a `Found::shape` from
+  FastAPI, Flask, Django, axum (`http::axum`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and Express ones each with a `Found::shape` from
   `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
   lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
@@ -54,7 +54,22 @@ modules updates it.
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
   (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
-  `Blueprint()`) is the call creating it, reached through `Code::origins`: a route counts only
+  `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::axum`: `route`,
+  `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
+  `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or
+  `any(h)` read by `method_router`, a closure handler an `Inline` def, the paths normalized by
+  `normalize_path`, with `{{` and `}}` of axum 0.8 kept literal, and the method the name axum gives the function; the Express rules do not run on `.rs` files; `nest` prefixes and `merge`
+  go through `prefixes` as Express mounts do, a router given to a call Meada does not read (`route_service`,
+  `fallback_service`, an outside wrapper, a name-matched method; `axum_unread`) is mounted
+  nowhere, a mount through a value it cannot read serves nothing, and a router nothing nests is
+  served at its root; `prefixes` stops at `PREFIX_DEPTH` and `PREFIX_WORK`); actix-web and Rocket (`http/rust.rs`) reuse these seams: a handler is a function a route
+  attribute sits on (`#[get]`, `#[route(path, method = "X")]`; the pack emits it as a `Call` with
+  `decorates`) or one `.route(path, web::get().to(h))` names; an `App`, `web::scope`,
+  `web::resource`, the `ServiceConfig` a `.configure(f)` function receives or a Rocket instance
+  is a mount node, a handler is one too. A handler any call names (`.service(h)`,
+  `routes![a, b]`) is served only where a mount Meada reads puts it, one no call names at its own
+  path; a scope or a mount prefix Meada cannot read serves nothing (never the root). `routes![..]`
+  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::external_of` reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate's root; `Code::mentions` tells whether a file refers to a name, which, over the handler's crate (every crate when `Code::published` says its file may be imported), decides whether an unregistered handler is served at its own path), reached through `Code::origins`: a route counts only
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,
@@ -100,7 +115,28 @@ modules updates it.
   returns. This is wider on purpose than the three binding forms spec #24 names (same scope,
   `with`, a `self` attribute), as the final review accepted: every way `Code::origins` follows
   a value counts (module constants, caller parameters, return values). A `get` on any other
-  object is nothing.
+  object is nothing. Rust clients (spec #30 #131) are the same code with two more `LIBRARIES`
+  entries: `reqwest` (modules `reqwest` and `reqwest.blocking`; clients `Client::new`,
+  `Client::builder()`, `ClientBuilder::new` and the `blocking` equivalents, a builder chain
+  followed to its constructor by `fluent`, and every method on the way listed by `passes`:
+  any other method on an outside value ends the chain) and `ureq` (module functions; clients `agent()`,
+  `Agent::new*`, `AgentBuilder::new`). The receiver of a chain (`Client::new().get(..)`,
+  `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::value_origins`. The method
+  is the name, or `request(Method::X, url)` (reqwest: a `Method` of `reqwest`, `http`, `hyper`,
+  `axum` or `actix_web`, written in full or imported with `use`) and `request("X", url)`
+  (ureq). `lang/rust/values.rs` folds the URL like any `Value`: literals, `+` (one side a
+  string), `String::from`, `.to_string()`, `.to_owned()`, `.as_str()`, `format!` and `concat!`
+  (the format string, `{}`, `{0}`, `{name}`, `{name}` captures, `name = value` arguments and
+  `{{`/`}}`; an argument that is a literal or a plain name folds, any other is a `Part::Hole`,
+  and so is a format spec such as `{:?}` or `{x:>8}`; a `format!` the file defines itself is
+  unknown), and `lang/rust/builders.rs` a `let mut` String whose block only reads it and
+  appends with `push_str`, `push` and `+=` statements: a read holds the text of the pushes
+  before it. An environment read is a `Part::Env` (`Reader::env_read`): `std::env::var("X")`,
+  `dotenvy::var("X")` (spelled in full or through the one `use` of their head, `Reader::spelled`)
+  and `env!("X")` (also as a `concat!`/`format!` argument), through `ENV_METHODS` (`unwrap*`,
+  `expect`, `?`, `trim*`, `to_string`...). An argument that mentions `env`, `var` or `dotenvy`
+  (a second read in a fallback) makes it a `Part::Hole`; `option_env!` and an `env` the file
+  defines are no read. A leading `Part::Env` is `via = env:X` in `http::locate`.
   `client_base` reads the constructor's `base_url=` and `based` joins it, with one `/`, in
   front of a relative URL (an absolute one, or one starting with a hole, is left alone);
   different constructors with different bases make the base a hole. URL and method fold like
@@ -268,7 +304,8 @@ modules updates it.
   npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
   nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
   of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
-  `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
+  `requirements*.txt` names no package, so it bounds none; a `Cargo.toml` with no `[package]`, a
+  virtual workspace root, bounds none either). `package/pypi.rs` reads a
   `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
   dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
@@ -292,3 +329,37 @@ modules updates it.
   `shared_lib.api`, then `greet`), and `Provided::member` takes a package's submodule when its
   `__init__.py` exports no such name. `surface` reads npm manifests alone: no shape crosses a
   PyPI package.
+  Cargo (spec #30): `Ecosystem::Cargo` names `Cargo.toml`. `package/cargo.rs` reads one through
+  the Rust pack's walker (`lang::rust::crates::entries`, also what the module trees use): `name`
+  and `version` of `[package]`, `main` the library root as a path of the repository (`crates::lib_root`:
+  `[lib] path`, else `src/lib.rs`, folded from the manifest's directory), `lib_name` the `[lib]
+  name` when a `use` writes something other than the package name (`crates::lib_name`, also what
+  the module trees use), and the entries of `[dependencies]`, `[dev-dependencies]` and
+  `[build-dependencies]`, also under `[target.*]`, as `Entry` with `name` the real crate
+  (`package =`), `alias` the key when renamed, `range` the version requirement and `via` where it
+  comes from: `path <manifest>` (`path` folded lexically from the manifest's directory: a path of
+  the repository, or one that starts with `../` when it leaves it), `git <identity>`
+  (`repo::normalize_remote`) or none. An entry whose declared source cannot be read (an empty or
+  mistyped `path`, `git` or `package`, an absolute `path`, both `path` and `git`) is dropped, not
+  read as a version dependency. A `workspace = true` entry is kept as `inherits`,
+  `[workspace.dependencies]` as `Summary::workspace`, `version.workspace = true` as
+  `inherits_version` and `[workspace.package] version` as `workspace_version`; `cargo::inherit`,
+  run by `index::read_manifests` over the whole list, fills each from the nearest manifest above
+  it, so a refresh equals a cold export. The consumer site names the key
+  (`<repository>::<path>::<field>::<key>`) and `Consumer::via` carries `Entry::via`, which
+  `Ecosystem::reaches` checks against the provider: a `path` of the repository only the manifest
+  at that path of the same repository, a `path` that starts with `../` only the manifest whose
+  location, `Export::root` (set by `Engine::exports`, or `Repository::root` in `link`) joined with
+  its path, folds to the same absolute location (lexical, nothing is read outside a repository,
+  no symlink is followed; a path landing in no workspace repository links to nothing), `git` only
+  the repository of that identity, a version every repository. The range is never evaluated
+  (`range unchecked`). A `use` (`Packages::extract` stores the call when `Code::imported` names a
+  crate head, `cargo::names_crate`: not `std`, `core` or `alloc`) resolves in `resolutions`
+  through the file's nearest named `Cargo.toml`: the head, hyphens as underscores, must equal the
+  key of a renamed dependency or, for one that is not renamed, the provider's library name
+  (`cargo::lib_head`: `[lib] name`, else the package name), and `Provided::resolve` then follows
+  the chain from the provider's library root through the `exported` rows of the Rust pack (`pub
+  mod`, `pub use`; an item behind a private module is not reached), `exact` with `How::CrateName`
+  (`; import crate name`) and no `ambiguous` fallback. A crate of the repository itself is
+  reached through the module tree instead, so a path or version dependency inside the repository
+  links at the manifest only.

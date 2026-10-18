@@ -1,0 +1,11 @@
+[package]
+name = "web-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared-core = "^1.1"
+extras = { package = "shared-extras", git = "https://example.com/cargo/lib.git" }
+away = { package = "shared-extras", path = "../../cargo-lib/extras" }
+ghost = { package = "shared-extras", path = "../../elsewhere/extras" }
+serde = "1"
