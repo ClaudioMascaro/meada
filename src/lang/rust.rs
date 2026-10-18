@@ -838,6 +838,14 @@ mod tests {
     }
 
     #[test]
+    fn a_main_in_an_inline_module_is_no_program() {
+        let inline = facts("mod x { pub fn main() {} }\n");
+        let files = BTreeMap::from([("src/main.rs", &inline)]);
+        let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
+        assert!(Rust.programs(&configs, &files).is_empty());
+    }
+
+    #[test]
     fn modules_in_files_are_definitions() {
         let src = "mod a;\nmod inner { #[path = \"p.rs\"] mod x; }\n";
         let defs: Vec<(String, bool)> = (facts(src).defs.into_iter())

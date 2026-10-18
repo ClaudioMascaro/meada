@@ -232,6 +232,18 @@ mod tests {
     }
 
     #[test]
+    fn a_bin_path_outside_the_repository_or_missing_is_no_root() {
+        let facts = Facts::default();
+        let files = BTreeMap::from([("api/src/lib.rs", &facts)]);
+        let configs: [(&str, &[u8]); 1] = [(
+            "api/Cargo.toml",
+            b"[package]\nname = \"a\"\n[[bin]]\npath = \"../../x.rs\"\n[[bin]]\npath = \"gone.rs\"\n",
+        )];
+        let tree = Tree::new(&configs, &files);
+        assert_eq!(tree.bins().count(), 0);
+    }
+
+    #[test]
     fn every_package_at_any_depth_is_a_crate_with_its_own_roots() {
         let facts = Facts::default();
         let files = BTreeMap::from([
