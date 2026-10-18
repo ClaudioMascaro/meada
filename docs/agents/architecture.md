@@ -248,7 +248,8 @@ one for the area a change touches.
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
 - New **entry point kind** (spec #31): a variant of `entry::EntryKind` (its `name` and `parse`
-  arms and the list `parse` searches), a finder beside `routes`, `channels`, `programs` and
+  arms and the list `parse` searches, and its name in the `processes` kinds of the export JSON
+  above, which `tests/it/docs.rs` checks), a finder beside `routes`, `channels`, `programs` and
   `exports` in `entry::find`, and the `site` its process starts from (a symbol or a code file;
   `holds` checks it). The finder reads `entry::Local`: `identity`, `files` (every file's
   `Facts`), `names`, `symbols`, `called`, `exported`, `providers` and `consumers` (`entry::Side`,
@@ -263,13 +264,14 @@ one for the area a change touches.
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
   one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
-  in `Descent::follow`, with its `Mark` and its line in `Walk::show`. A change to what is stored bumps
+  in `Descent::follow`, with its `Mark` (named in the `Mark` list of `map/queries.md`, which
+  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored bumps
   `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
-  `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
+  `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
   A pack is done when that suite passes. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
@@ -286,7 +288,7 @@ one for the area a change touches.
   `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
+- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs`: the tool list
   (descriptions plus parameter schemas) must stay within 1,000 tokens.
 - New **CLI text**: a `Msg` variant with both languages; command descriptions are set at runtime
   in `main.rs` from `Msg`.
@@ -294,7 +296,7 @@ one for the area a change touches.
 ## Invariants the code relies on
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
-  an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`),
+  an answer. A refreshed index must equal a cold index of the same files (`tests/it/freshness.rs`),
   communities and processes included: `refresh` recomputes both at its end from the stored calls
   whenever anything changed. The test-only `with_reversed_walk` (`index.rs`, hidden from the
   docs, no CLI flag or setting) reverses the walk order, the parse order and the insertion order
@@ -353,9 +355,14 @@ one for the area a change touches.
 
 ## Tests (`tests/`)
 
-- `tests/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
+- The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
+  module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
+  subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
+  it); `cargo test --test it <subject>::` runs one.
+- `tests/it/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
-  one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
+  one commit). `case` must be unique per test across every subject, since they run in parallel in
+  one process. `chain(case)` builds
   the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
   the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
   level) and handles the Kafka topic `orders.created` the gateway's `createOrder` (`PUT
@@ -409,7 +416,11 @@ one for the area a change touches.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
-  ranges are in them.
+  ranges are in them. An export golden of a test about something else goes through
+  `without_processes(export)`, which drops `processes`: only the chain's own exports
+  (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
+  `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses
+  those alone.
 - Test files by subject, the fixtures each uses and the loopback decider stub: [map/tests.md](map/tests.md).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.

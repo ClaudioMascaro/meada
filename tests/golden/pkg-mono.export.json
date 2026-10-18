@@ -214,54 +214,5 @@
       "level": "ambiguous",
       "reason": "2 providers fit; package::npm::@example/a ^1.0.0 (local 1.0.0); import main"
     }
-  ],
-  "processes": [
-    {
-      "entry_point": "example.com/pkg/mono::packages/b/src/app.ts::total",
-      "kind": "export",
-      "label": "total",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/pkg/mono",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/pkg/mono::packages/b/src/app.ts::total"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/pkg/mono",
-          "level": "exact",
-          "via": "link",
-          "node": "example.com/pkg/mono::packages/a/src/index.js::add",
-          "reason": "package::npm::@example/a workspace:* (local 1.0.0), range unchecked; import main"
-        }
-      ]
-    },
-    {
-      "entry_point": "example.com/pkg/mono::packages/c/src/use.js::sum",
-      "kind": "export",
-      "label": "sum",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/pkg/mono",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/pkg/mono::packages/c/src/use.js::sum"
-        },
-        {
-          "depth": 1,
-          "repository": "example.com/pkg/mono",
-          "level": "ambiguous",
-          "via": "call",
-          "node": "example.com/pkg/mono::packages/c/src/use.js::sum::add#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/pkg/mono::packages/a/src/index.js::add"
-          ]
-        }
-      ]
-    }
   ]
 }

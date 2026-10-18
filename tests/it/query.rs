@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::{assert_golden, fixture_repo};
 use meada::engine::Engine;

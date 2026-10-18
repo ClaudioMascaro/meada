@@ -3,12 +3,12 @@
 //! missing peer is reported apart. Each variant edits the chain after it was indexed, so
 //! `status` also shows that it refreshes before it reports.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;
 
-use common::{assert_golden, chain, decisions};
+use common::{assert_golden, chain, decisions, without_processes};
 use meada::engine::{self, Engine};
 
 type Chain = (PathBuf, PathBuf, PathBuf);
@@ -25,7 +25,10 @@ fn stale(case: &str, variant: &str, name: &str, edit: impl Fn(&Chain)) {
     let export = Engine::open(&repos.0).unwrap().export().unwrap();
 
     assert_golden(&format!("chain-web.stale-{name}.status.txt"), &status);
-    assert_golden(&format!("chain-web.stale-{name}.export.json"), &export);
+    assert_golden(
+        &format!("chain-web.stale-{name}.export.json"),
+        &without_processes(&export),
+    );
 }
 
 #[test]

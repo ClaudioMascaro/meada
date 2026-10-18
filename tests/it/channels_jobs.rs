@@ -2,11 +2,11 @@
 //! of the `Worker` of the same name, `xadd` to the function that reads the stream with
 //! `xreadgroup`, in the ioredis and node-redis styles.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 use serde_json::Value;
 
@@ -102,5 +102,5 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
     assert_eq!(links, expected);
     // `Set.add` is no producer.
     assert_eq!(json["providers"].as_array().unwrap().len(), 6);
-    assert_golden("channels-jobs-api.export.json", &export);
+    assert_golden("channels-jobs-api.export.json", &without_processes(&export));
 }

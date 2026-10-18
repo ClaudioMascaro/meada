@@ -2,11 +2,11 @@
 //! client wrappers around `fetch`, Express routers under mount prefixes, inline route
 //! handlers, and links Meada can only infer, leave ambiguous or leave out.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 
 /// The Next.js provider of `tests/fixtures/http-api`, in the case directory.
@@ -26,7 +26,7 @@ fn constants_fold_into_urls_across_files() {
 
     let export = Engine::open(&paths).unwrap().export().unwrap();
 
-    assert_golden("http-paths.export.json", &export);
+    assert_golden("http-paths.export.json", &without_processes(&export));
 }
 
 /// The Express provider of `tests/fixtures/http-express`, in the case directory.
@@ -55,7 +55,7 @@ fn wrapper_call_sites_are_consumers_through_two_levels_and_a_cycle() {
 
     let export = Engine::open(&admin).unwrap().export().unwrap();
 
-    assert_golden("http-wrappers.export.json", &export);
+    assert_golden("http-wrappers.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn express_routes_take_mount_prefixes_through_imports_at_two_depths() {
 
     let export = Engine::open(&backend).unwrap().export().unwrap();
 
-    assert_golden("http-express.export.json", &export);
+    assert_golden("http-express.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn client(case: &str) -> Engine {
 fn hostless_urls_link_inferred_to_the_one_repository_serving_them_else_ambiguous() {
     let export = client("urls_hostless").export().unwrap();
 
-    assert_golden("http-client.export.json", &export);
+    assert_golden("http-client.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn destructured_parameters_fold_like_positional_ones() {
 
     let export = Engine::open(&reports).unwrap().export().unwrap();
 
-    assert_golden("http-destructured.export.json", &export);
+    assert_golden("http-destructured.export.json", &without_processes(&export));
 }
 
 #[test]
@@ -166,5 +166,5 @@ fn a_parameter_defaulting_to_fetch_is_a_fetch_call() {
 
     let export = Engine::open(&client).unwrap().export().unwrap();
 
-    assert_golden("http-fetch-param.export.json", &export);
+    assert_golden("http-fetch-param.export.json", &without_processes(&export));
 }

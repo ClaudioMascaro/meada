@@ -4,8 +4,9 @@ Detail behind the [architecture map](../architecture.md), which keeps the flow, 
 seams, invariants and Known ceilings. The code wins over this file, and a change to these
 modules updates it.
 
-- Test files by subject: `conformance` (pack), `index` (export, schema rebuild, writes only in
-  `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+- Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
+  `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
+  `conformance` (pack), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -88,7 +89,7 @@ modules updates it.
   schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`,
   with the hostile inputs each limit stops (server variables naming each other, 200,000 nested
   block sequences, a 10,000-long reference chain, one wide schema read for many routes).
-- `tests/packages.rs` (spec #22): the package fixtures `pkg-{shared,web,api,mono,fork}` as
+- `tests/it/packages.rs` (spec #22): the package fixtures `pkg-{shared,web,api,mono,fork}` as
   siblings (`web`, `api` and `mono` name `shared` as a peer, `fork` names `mono`), through
   `Engine::export`. `shared` holds `@example/shared` and an ignored-by-rule
   `node_modules/left-pad/package.json`; `web` and `api` depend on it (`api`'s manifest has no
@@ -138,13 +139,13 @@ modules updates it.
   Ticket T4 adds `pkg-web.trace-down-outdir.txt` and `pkg-shared.trace-up-outdir.txt` (the calls
   through `@example/shared`); an invalid, hostile or edited nested `tsconfig.json` is tested the
   same way as a `package.json` (refreshed equals cold).
-- **The loopback decider stub** (`tests/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
+- **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
   once it runs out, 404 on other paths) and records every request it receives
   (`requests() -> Vec<Request {method, path, headers, body}>`, `header(name)`, `json()`).
   `Reply::chat(model, content)`, `Reply::ok(json)`, `Reply::status(code, body)`.
-  `tests/decider.rs` runs the binary with only the decider variables it sets and asserts the
+  `tests/it/decider.rs` runs the binary with only the decider variables it sets and asserts the
   key is in no output; `--show-request`, `--list`, human mode, `index`, `export`, `status` and
   the MCP server leave the stub with zero requests. Answer cases (malformed, threshold,
   `--min-p`, `--dry-run`) script the stub per test; a malformed first answer must leave the

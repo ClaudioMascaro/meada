@@ -3,7 +3,7 @@
 //! expected level, and matches its golden file. A new pack adds a fixture under
 //! `tests/fixtures/conformance-<language>/` and one test calling `conform`.
 
-mod common;
+use crate::common;
 
 use common::{assert_golden, fixture_repo};
 use meada::engine::Engine;

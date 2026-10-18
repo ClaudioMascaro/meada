@@ -2,7 +2,7 @@
 //! from the environment, the `chat` requests, `--show-request`, and the network boundary (no
 //! other command reaches the decider). Every run asserts that the key appears in no output.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;
@@ -10,7 +10,7 @@ use std::path::Path;
 use meada::engine::Engine;
 
 use common::stub::{Reply, Stub};
-use common::{HEALTH, TRACK, assert_golden, chain, fixture_repo, written};
+use common::{HEALTH, TRACK, assert_golden, chain, fixture_repo, without_processes, written};
 
 /// The key every test configures. No output of any test may contain it. The `&` lets a JSON
 /// answer write it escaped (`&`), out of reach of a redaction of the raw body.
@@ -492,7 +492,10 @@ fn chat_answers_are_written_with_the_response_model_and_p_and_replayed_as_decide
     let (cold, _, _) = chain("decider_write_cold");
     fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
-    assert_golden("chain-web.decided-chat.export.json", &export);
+    assert_golden(
+        "chain-web.decided-chat.export.json",
+        &without_processes(&export),
+    );
 }
 
 /// The `chat` answer whose message content is `content`, as the model's text.
@@ -806,7 +809,10 @@ fn decisions_asks_every_item_in_one_request_and_records_the_returned_model() {
     let (cold, _, _) = chain("decider_decisions_cold");
     fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
-    assert_golden("chain-web.decided-decisions.export.json", &export);
+    assert_golden(
+        "chain-web.decided-decisions.export.json",
+        &without_processes(&export),
+    );
 }
 
 #[test]

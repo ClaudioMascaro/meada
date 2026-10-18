@@ -1,12 +1,12 @@
 //! `meada decide` in human mode (spec #18, ADR 0006): the binary driven through scripted
 //! standard input over the chain fixture's two open items, both in `chain-web`.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;
 
-use common::{HEALTH, TRACK, assert_golden, chain, written as file};
+use common::{HEALTH, TRACK, assert_golden, chain, without_processes, written as file};
 use meada::engine::Engine;
 
 /// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
@@ -33,7 +33,10 @@ fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
     let (cold, _, _) = chain("decide_pick_cold");
     fs::write(cold.join("meada.decisions.toml"), &written).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
-    assert_golden("chain-web.decided-human.export.json", &export);
+    assert_golden(
+        "chain-web.decided-human.export.json",
+        &without_processes(&export),
+    );
 }
 
 #[test]
