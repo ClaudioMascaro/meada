@@ -265,22 +265,32 @@ struct Package {
 fn packages(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Package> {
     let mut out = Vec::new();
     for (dir, manifest) in manifests(configs) {
-        let lib = manifest.get("lib");
-        let named = |t: &toml::Value| t.get("name")?.as_str().map(String::from);
-        let Some(name) = manifest.get("package").and_then(named) else {
+        let Some(name) = (manifest.get("package")).and_then(|p| p.get("name")?.as_str()) else {
             continue;
         };
-        let lib_name = lib.and_then(named).unwrap_or_else(|| name.clone());
-        let root = (lib.and_then(|l| l.get("path")?.as_str()))
-            .map_or_else(|| join(dir, "src/lib.rs"), |p| join(dir, p));
         out.push(Package {
             dir: dir.to_string(),
-            name,
-            lib_name: lib_name.replace('-', "_"),
-            lib_root: root.filter(|r| files.contains_key(r.as_str())),
+            name: name.to_string(),
+            lib_name: lib_name(&manifest, name),
+            lib_root: lib_root(&manifest, dir).filter(|r| files.contains_key(r.as_str())),
         });
     }
     out
+}
+
+/// The name a path writes for the library of the package `name`: `[lib] name`, else the package
+/// name, hyphens turned into underscores. The one rule both the module trees and the package
+/// contracts (`package::cargo`) follow.
+pub fn lib_name(manifest: &toml::Table, name: &str) -> String {
+    let named = manifest.get("lib").and_then(|l| l.get("name")?.as_str());
+    crate_name(named.unwrap_or(name))
+}
+
+/// The root file of the library of the manifest in `dir`, as a path of the repository: `[lib]
+/// path`, else `src/lib.rs`; `None` when it leaves the repository.
+pub fn lib_root(manifest: &toml::Table, dir: &str) -> Option<String> {
+    let path = manifest.get("lib").and_then(|l| l.get("path")?.as_str());
+    join(dir, path.unwrap_or("src/lib.rs"))
 }
 
 /// The libraries of the repository each package may name, by package directory: those its

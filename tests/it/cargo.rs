@@ -104,10 +104,20 @@ fn each_dependency_form_links_to_the_crate_it_names() {
             ),
         ]
     );
-    // A path that leaves the repository, and a crate outside the workspace, link to nothing:
-    // `Cargo.lock` and crates.io are never read.
+    // A path that lands in a sibling workspace repository links to the crate at that path.
+    assert_eq!(
+        at("app/Cargo.toml::dependencies::away"),
+        [(
+            "example.com/cargo/web::app/Cargo.toml::dependencies::away",
+            extras.as_str(),
+            "exact",
+            git
+        )]
+    );
+    // A path that lands in no workspace repository, and a crate outside the workspace, link to
+    // nothing: `Cargo.lock` and crates.io are never read.
     let manifest = at("app/Cargo.toml");
-    assert_eq!(manifest.len(), 2, "{manifest:?}");
+    assert_eq!(manifest.len(), 3, "{manifest:?}");
 }
 
 #[test]
@@ -138,6 +148,11 @@ fn a_use_of_the_crate_reaches_the_item_through_its_re_exports() {
             &exact("shared-extras none (local 0.3.0)"),
         ),
         (
+            "app/src/main.rs::faraway::",
+            "extras/src/lib.rs::boost",
+            &exact("shared-extras none (local 0.3.0)"),
+        ),
+        (
             "worker/src/lib.rs::run::",
             "core/src/text.rs::greet",
             &exact("shared-core 1.0 (local 1.2.0)"),
@@ -159,9 +174,14 @@ fn a_use_of_the_crate_reaches_the_item_through_its_re_exports() {
             "{caller}"
         );
     }
-    // A path that leaves the repository and a crate outside the workspace add nothing.
-    assert!(at("app/src/main.rs::faraway::").is_empty());
-    assert!(at("app/src/main.rs::encode::").is_empty());
+    // A path that lands in no workspace repository, a crate outside the workspace, and an item
+    // behind a private module add nothing.
+    for caller in ["haunt", "encode", "peek"] {
+        assert!(
+            at(&format!("app/src/main.rs::{caller}::")).is_empty(),
+            "{caller}"
+        );
+    }
 }
 
 #[test]
@@ -263,4 +283,125 @@ fn an_edited_cargo_manifest_relinks_like_a_cold_export() {
     // The renamed key no longer matches the `use`: that call crosses no more.
     let json: Value = serde_json::from_str(&refreshed[0]).unwrap();
     assert!(links(&json, &format!("{WEB}app/src/main.rs::lift::")).is_empty());
+}
+
+/// Replaces `from` by `to` in `file` of `repo`, which must hold it.
+fn replace(repo: &Path, file: &str, from: &str, to: &str) {
+    let text = fs::read_to_string(repo.join(file)).unwrap();
+    assert!(text.contains(from), "{file} lacks {from}");
+    fs::write(repo.join(file), text.replace(from, to)).unwrap();
+}
+
+/// The `(provider, level)` pairs of the links of `json` whose consumer starts with `site`.
+fn ends<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str)> {
+    let found = links(json, site);
+    found.into_iter().map(|(_, p, l, _)| (p, l)).collect()
+}
+
+#[test]
+fn a_version_dependency_on_a_crate_two_repositories_provide_is_ambiguous() {
+    let (_, web) = pair("cargo_ambiguous");
+    fixture_repo(
+        "cargo_ambiguous",
+        "cargo-fork",
+        Some("https://example.com/cargo/fork.git"),
+    );
+    let peers = fs::read_to_string(web.join("meada.toml")).unwrap();
+    let peer = "\n[[peer]]\nrepo = \"example.com/cargo/fork\"\n";
+    fs::write(web.join("meada.toml"), peers + peer).unwrap();
+
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    let both = |from: &str| ends(&json, &format!("{WEB}{from}"));
+    let fork = "example.com/cargo/fork::Cargo.toml";
+    let core = format!("{LIB}core/Cargo.toml");
+    assert_eq!(
+        both("app/Cargo.toml::dependencies::shared-core"),
+        [(fork, "ambiguous"), (core.as_str(), "ambiguous")]
+    );
+    assert_eq!(
+        both("app/src/main.rs::welcome::"),
+        [
+            ("example.com/cargo/fork::src/lib.rs::greet", "ambiguous"),
+            (
+                "example.com/cargo/lib::core/src/text.rs::greet",
+                "ambiguous"
+            ),
+        ]
+    );
+    let said = links(
+        &json,
+        &format!("{WEB}app/Cargo.toml::dependencies::shared-core"),
+    );
+    assert!(
+        said.iter()
+            .all(|(.., r)| r.starts_with("2 providers fit; "))
+    );
+    // The git dependency still names one repository.
+    assert_eq!(
+        both("app/Cargo.toml::dependencies::extras"),
+        [("example.com/cargo/lib::extras/Cargo.toml", "exact")]
+    );
+}
+
+#[test]
+fn an_item_behind_a_private_module_is_reached_once_the_module_is_public() {
+    let (lib, web) = pair("cargo_private");
+    let peek = format!("{WEB}app/src/main.rs::peek::");
+    let before: Value = serde_json::from_str(&export(&web)).unwrap();
+    assert!(links(&before, &peek).is_empty());
+
+    replace(&lib, "core/src/lib.rs", "mod text;", "pub mod text;");
+    let after: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    assert_eq!(
+        ends(&after, &peek),
+        [("example.com/cargo/lib::core/src/text.rs::greet", "exact")]
+    );
+}
+
+#[test]
+fn a_library_name_is_what_a_use_writes_unless_the_key_renames_the_crate() {
+    let (lib, web) = pair("cargo_lib_name");
+    replace(
+        &lib,
+        "core/Cargo.toml",
+        "edition",
+        "[lib]\nname = \"core_lib\"\n#",
+    );
+    replace(&web, "app/src/main.rs", "shared_core::", "core_lib::");
+
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    let at = |caller: &str| ends(&json, &format!("{WEB}{caller}"));
+    let greet = ("example.com/cargo/lib::core/src/text.rs::greet", "exact");
+    assert_eq!(at("app/src/main.rs::welcome::"), [greet]);
+    // `use shared_core` in `worker` no longer names the library; its renamed key still does.
+    assert!(at("worker/src/lib.rs::run::").is_empty());
+    let shout = ("example.com/cargo/lib::core/src/text.rs::shout", "exact");
+    assert_eq!(at("worker/src/lib.rs::loud::"), [shout]);
+}
+
+#[test]
+fn a_version_inherited_from_the_workspace_is_the_local_version() {
+    let (lib, web) = pair("cargo_version_workspace");
+    replace(
+        &lib,
+        "Cargo.toml",
+        "\"app\"]",
+        "\"app\"]\n\n[workspace.package]\nversion = \"1.7.0\"",
+    );
+    replace(
+        &lib,
+        "core/Cargo.toml",
+        "version = \"1.2.0\"",
+        "version.workspace = true",
+    );
+
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    let site = format!("{WEB}app/Cargo.toml::dependencies::shared-core");
+    let reason = "package::cargo::shared-core ^1.1 (local 1.7.0), range unchecked";
+    let found: Vec<_> = links(&json, &site).iter().map(|l| l.3).collect();
+    assert_eq!(found, [reason]);
 }

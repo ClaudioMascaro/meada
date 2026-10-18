@@ -1123,8 +1123,12 @@ sample.package.json
 sample.Cargo.toml
 {
   "name": "sample-crate",
-  "version": "1.0.0",
   "dependencies": [
+    {
+      "field": "dependencies",
+      "name": "cousin",
+      "via": "path ../cousin/Cargo.toml"
+    },
     {
       "field": "dependencies",
       "name": "inherited",
@@ -1164,7 +1168,10 @@ sample.Cargo.toml
       "name": "inherited",
       "range": "2"
     }
-  ]
+  ],
+  "lib_name": "core_lib",
+  "inherits_version": true,
+  "workspace_version": "1.0.0"
 }
 
 sample.pyproject.toml

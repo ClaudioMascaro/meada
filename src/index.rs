@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 25;
+const SCHEMA_VERSION: i64 = 26;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -974,6 +974,9 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
 #[cfg_attr(test, derive(Default))]
 pub(crate) struct Export {
     pub(crate) repository: String,
+    /// Where the repository stands in the workspace; set by the engine, never stored or shown.
+    #[serde(skip)]
+    pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
@@ -1052,6 +1055,11 @@ pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
 }
 
 impl Export {
+    /// The repository by identity and root, as `Ecosystem::reaches` takes it.
+    pub(crate) fn place(&self) -> (&str, &Path) {
+        (&self.repository, &self.root)
+    }
+
     /// The document whose route `site` is, when `site` is a route only a document of this
     /// repository lists: `<repository>::<document path>::<METHOD> <path>`.
     pub(crate) fn document_of(&self, site: &str) -> Option<&str> {
@@ -1460,6 +1468,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         .collect();
     Ok(Export {
         repository: identity.to_string(),
+        root: PathBuf::new(),
         files,
         symbols,
         calls,

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "app/src/main.rs",
-      "hash": "2282e77d681833bab8dea0654ec8ebe162bd359cda71853edad36fb47c476767"
+      "hash": "cf77e6f9c4a15828e2c3700215936d8189a8203453d5d89735e7849537b7f682"
     },
     {
       "path": "worker/src/lib.rs",
@@ -23,8 +23,8 @@
       "id": "example.com/cargo/web::app/src/main.rs::encode",
       "span": {
         "path": "app/src/main.rs",
-        "start": 275,
-        "end": 318
+        "start": 376,
+        "end": 419
       }
     },
     {
@@ -33,6 +33,14 @@
         "path": "app/src/main.rs",
         "start": 232,
         "end": 273
+      }
+    },
+    {
+      "id": "example.com/cargo/web::app/src/main.rs::haunt",
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 275,
+        "end": 315
       }
     },
     {
@@ -49,6 +57,14 @@
         "path": "app/src/main.rs",
         "start": 74,
         "end": 102
+      }
+    },
+    {
+      "id": "example.com/cargo/web::app/src/main.rs::peek",
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 317,
+        "end": 374
       }
     },
     {
@@ -95,8 +111,8 @@
       "level": null,
       "span": {
         "path": "app/src/main.rs",
-        "start": 293,
-        "end": 315
+        "start": 394,
+        "end": 416
       }
     },
     {
@@ -108,6 +124,17 @@
         "path": "app/src/main.rs",
         "start": 258,
         "end": 271
+      }
+    },
+    {
+      "id": "example.com/cargo/web::app/src/main.rs::haunt::ghost.boost#0",
+      "caller": "example.com/cargo/web::app/src/main.rs::haunt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 299,
+        "end": 313
       }
     },
     {
@@ -130,6 +157,17 @@
         "path": "app/src/main.rs",
         "start": 90,
         "end": 99
+      }
+    },
+    {
+      "id": "example.com/cargo/web::app/src/main.rs::peek::shared_core.text.greet#0",
+      "caller": "example.com/cargo/web::app/src/main.rs::peek",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 343,
+        "end": 372
       }
     },
     {
@@ -179,6 +217,11 @@
   "consumers": [
     {
       "contract": "package::cargo::shared-extras",
+      "site": "example.com/cargo/web::app/Cargo.toml::dependencies::away",
+      "via": "path ../cargo-lib/extras/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::shared-extras",
       "site": "example.com/cargo/web::app/Cargo.toml::dependencies::extras",
       "via": "git example.com/cargo/lib"
     },
@@ -191,6 +234,11 @@
       "contract": "package::cargo::shared-core",
       "site": "example.com/cargo/web::app/src/main.rs::connect::Client.create#0",
       "via": null
+    },
+    {
+      "contract": "package::cargo::shared-extras",
+      "site": "example.com/cargo/web::app/src/main.rs::faraway::away.boost#0",
+      "via": "path ../cargo-lib/extras/Cargo.toml"
     },
     {
       "contract": "package::cargo::shared-extras",
@@ -250,6 +298,12 @@
       "manifest": "app/Cargo.toml",
       "field": "dependencies",
       "name": "shared-extras",
+      "alias": "away"
+    },
+    {
+      "manifest": "app/Cargo.toml",
+      "field": "dependencies",
+      "name": "shared-extras",
       "alias": "extras"
     },
     {
@@ -274,6 +328,14 @@
       "level": "exact",
       "how": "crateName",
       "target": "example.com/cargo/lib::core/src/api.rs::Client.create"
+    },
+    {
+      "site": "example.com/cargo/web::app/src/main.rs::faraway::away.boost#0",
+      "specifier": "away",
+      "name": "boost",
+      "level": "exact",
+      "how": "crateName",
+      "target": "example.com/cargo/lib::extras/src/lib.rs::boost"
     },
     {
       "site": "example.com/cargo/web::app/src/main.rs::lift::boost#0",
@@ -319,6 +381,13 @@
   ],
   "links": [
     {
+      "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::away",
+      "provider": "example.com/cargo/lib::extras/Cargo.toml",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked"
+    },
+    {
       "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::extras",
       "provider": "example.com/cargo/lib::extras/Cargo.toml",
       "contract": "package::cargo::shared-extras",
@@ -338,6 +407,13 @@
       "contract": "package::cargo::shared-core",
       "level": "exact",
       "reason": "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/src/main.rs::faraway::away.boost#0",
+      "provider": "example.com/cargo/lib::extras/src/lib.rs::boost",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked; import crate name"
     },
     {
       "consumer": "example.com/cargo/web::app/src/main.rs::lift::boost#0",

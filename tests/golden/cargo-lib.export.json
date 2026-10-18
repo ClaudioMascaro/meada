@@ -211,6 +211,13 @@
       "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked"
     },
     {
+      "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::away",
+      "provider": "example.com/cargo/lib::extras/Cargo.toml",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked"
+    },
+    {
       "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::extras",
       "provider": "example.com/cargo/lib::extras/Cargo.toml",
       "contract": "package::cargo::shared-extras",
@@ -230,6 +237,13 @@
       "contract": "package::cargo::shared-core",
       "level": "exact",
       "reason": "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/src/main.rs::faraway::away.boost#0",
+      "provider": "example.com/cargo/lib::extras/src/lib.rs::boost",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked; import crate name"
     },
     {
       "consumer": "example.com/cargo/web::app/src/main.rs::lift::boost#0",

@@ -19,6 +19,7 @@
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -131,19 +132,24 @@ impl Ecosystem {
     }
 
     /// Whether a dependency may reach the provider whose manifest is `provider` in the
-    /// repository `to`, from a manifest of `from`: an npm `workspace:` range keeps only the
-    /// dependent's own repository; a Cargo `path` entry only the crate at that path (`via`), a
-    /// `git` one only the repository of that remote; anything else reaches every provider.
+    /// repository `to`, from a manifest of `from` (each repository by identity and root): an npm
+    /// `workspace:` range keeps only the dependent's own repository; a Cargo `path` entry only the
+    /// crate at that path (`via`), a `git` one only the repository of that remote; anything else
+    /// reaches every provider. A Cargo path that leaves its repository (`../`) is matched
+    /// against the provider's location by the two roots, folded lexically: nothing is read.
     fn reaches(
         self,
         (via, range): (Option<&str>, Option<&str>),
-        from: &str,
-        (to, provider): (&str, &str),
+        from: (&str, &Path),
+        ((to, to_root), provider): ((&str, &Path), &str),
     ) -> bool {
         match (self, via) {
-            (Ecosystem::Npm, _) => from == to || !range.is_some_and(|r| r.starts_with(WORKSPACE)),
+            (Ecosystem::Npm, _) => from.0 == to || !range.is_some_and(|r| r.starts_with(WORKSPACE)),
             (Ecosystem::Cargo, Some(via)) => match via.split_once(' ') {
-                Some(("path", manifest)) => from == to && provider == site(from, manifest),
+                Some(("path", manifest)) if manifest.starts_with("../") => {
+                    folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
+                }
+                Some(("path", manifest)) => from.0 == to && provider == manifest,
                 Some(("git", identity)) => to == identity,
                 _ => false,
             },
@@ -270,9 +276,18 @@ pub struct Summary {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<(String, String)>,
     /// The `[workspace.dependencies]` entries of a `Cargo.toml` (Cargo only). For Cargo,
-    /// `main` is the library's root file, relative to the manifest.
+    /// `main` is the library's root file, as a path of the repository.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workspace: Vec<Entry>,
+    /// Cargo only: `[lib] name` when it differs from what a path writes for the package's name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lib_name: Option<String>,
+    /// Cargo only: `version.workspace = true`, until `cargo::inherit` fills `version`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inherits_version: bool,
+    /// Cargo only: the `[workspace.package] version` a member may inherit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_version: Option<String>,
 }
 
 /// One dependency entry of a manifest. `name` is the package the entry names.
@@ -535,6 +550,7 @@ pub fn read(src: &[u8]) -> Summary {
         roots: Vec::new(),
         scripts: Vec::new(),
         workspace: Vec::new(),
+        ..Summary::default()
     }
 }
 
@@ -551,6 +567,22 @@ fn valid_name(name: &str) -> bool {
 /// The site of the manifest at `path` of `repository`.
 fn site(repository: &str, path: &str) -> String {
     format!("{repository}::{path}")
+}
+
+/// `path` with its `.` and `..` folded without touching the file system, so a symlink never
+/// changes where it lands.
+fn folded(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            part => out.push(part),
+        }
+    }
+    out
 }
 
 /// The directory of the manifest at `path`: `.` for one at the root.
@@ -620,10 +652,10 @@ fn ways(manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
     let dir = directory(&manifest.path);
     let s = &manifest.summary;
     if Ecosystem::of(&manifest.path) == Some(Ecosystem::Cargo) {
-        // The crate is its library's root file; a subpath is a module path, followed by name.
-        let root = s.main.as_deref().and_then(|main| inside(dir, main));
-        return match (subpath, root) {
-            (".", Some(root)) => vec![(How::CrateName, vec![root])],
+        // The crate is its library's root file, a path of the repository as `cargo::read` folded
+        // it; a subpath is a module path, followed by name.
+        return match (subpath, &s.main) {
+            (".", Some(root)) => vec![(How::CrateName, vec![root.clone()])],
             _ => Vec::new(),
         };
     }
@@ -1223,12 +1255,18 @@ fn resolutions<'e>(
     let ecosystem = Ecosystem::of_source(from).unwrap_or(Ecosystem::Npm);
     let (entry, subpath) = match ecosystem {
         Ecosystem::Cargo => {
-            // The specifier is the crate a `use` names: a dependency's key, hyphens as underscores.
+            // The specifier is the crate a `use` names: the key of a renamed dependency, else
+            // the name of the library of the package it names (the package's own, with no
+            // provider to ask), hyphens as underscores.
+            let heads = |e: &Entry| match (e.alias.is_some(), providers.of(ecosystem, &e.name)) {
+                (false, of) if !of.is_empty() => (of.iter()).any(|&(m, i)| {
+                    cargo::lib_head(&exports[m].manifests[i].summary).as_deref() == Some(specifier)
+                }),
+                _ => cargo::import_name(e) == specifier,
+            };
             let entry = (owner(&exports[n].manifests, from, ecosystem))
                 .filter(|_| cargo::names_crate(specifier))
-                .and_then(|m| {
-                    (m.summary.dependencies.iter()).find(|e| cargo::import_name(e) == specifier)
-                });
+                .and_then(|m| m.summary.dependencies.iter().find(|e| heads(e)));
             (entry, ".".to_string())
         }
         _ => {
@@ -1246,12 +1284,17 @@ fn resolutions<'e>(
     let mut out = Vec::new();
     for &(m, i) in providers.of(ecosystem, &entry.name) {
         let manifest = &exports[m].manifests[i];
-        let place = (
-            &exports[m].repository,
-            site(&exports[m].repository, &manifest.path),
-        );
+        // An entry that does not rename a Cargo package reaches the libraries named as it writes.
+        let by_lib = ecosystem == Ecosystem::Cargo && entry.alias.is_none();
+        if by_lib && cargo::lib_head(&manifest.summary).as_deref() != Some(specifier) {
+            continue;
+        }
         let source = (entry.via.as_deref(), entry.range.as_deref());
-        if !ecosystem.reaches(source, &exports[n].repository, (place.0, &place.1)) {
+        if !ecosystem.reaches(
+            source,
+            exports[n].place(),
+            (exports[m].place(), &manifest.path),
+        ) {
             continue;
         }
         let at = at(m);
@@ -1455,9 +1498,8 @@ pub fn consume(exports: &mut [Export], providers: &Providers) {
                     let source = (e.via.as_deref(), e.range.as_deref());
                     let of = providers.of(ecosystem, &e.name);
                     let reaches = |&&(m, i): &&(usize, usize)| {
-                        let (to, at) = (&exports[m].repository, &exports[m].manifests[i]);
-                        let place = (to.as_str(), site(to, &at.path));
-                        ecosystem.reaches(source, &export.repository, (place.0, &place.1))
+                        let at = &exports[m].manifests[i];
+                        ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
                     };
                     if !of.iter().any(|p| reaches(&p)) {
                         continue;
@@ -1749,8 +1791,13 @@ impl ContractKind for Packages {
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
             .filter(|(repo, p)| {
+                let at = (p.site.strip_prefix(&repo.identity)).and_then(|s| s.strip_prefix("::"));
+                let (from, to) = (
+                    (&*from.identity, &*from.root),
+                    (&*repo.identity, &*repo.root),
+                );
                 p.contract == *contract
-                    && ecosystem.reaches(source, &from.identity, (&repo.identity, &p.site))
+                    && at.is_some_and(|manifest| ecosystem.reaches(source, from, (to, manifest)))
             })
             .collect();
         let (level, n) = match fits.len() {
@@ -2394,20 +2441,36 @@ mod tests {
             reason("package::pypi::a", Some(">=1"), Some("1.2")),
             "package::pypi::a >=1 (local 1.2), range unchecked"
         );
-        let (workspace, there) = ((None, Some("workspace:*")), ("b", "b::package.json"));
-        assert!(Ecosystem::Pypi.reaches(workspace, "a", there));
-        assert!(!Ecosystem::Npm.reaches(workspace, "a", there));
-        assert!(Ecosystem::Npm.reaches(workspace, "b", there));
+        let at = |id| {
+            let root = match id {
+                "a" => "/w/a",
+                "b" => "/w/b",
+                _ => "/w/x",
+            };
+            (id, Path::new(root))
+        };
+        let (workspace, there) = ((None, Some("workspace:*")), (at("b"), "package.json"));
+        assert!(Ecosystem::Pypi.reaches(workspace, at("a"), there));
+        assert!(!Ecosystem::Npm.reaches(workspace, at("a"), there));
+        assert!(Ecosystem::Npm.reaches(workspace, at("b"), there));
         // A Cargo path keeps the crate at that path of the dependent's repository, a source
         // from a remote the repository of that remote, a version every repository.
         let path = (Some("path core/Cargo.toml"), None);
-        assert!(Ecosystem::Cargo.reaches(path, "a", ("a", "a::core/Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(path, "a", ("a", "a::other/Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(path, "a", ("b", "b::core/Cargo.toml")));
+        assert!(Ecosystem::Cargo.reaches(path, at("a"), (at("a"), "core/Cargo.toml")));
+        assert!(!Ecosystem::Cargo.reaches(path, at("a"), (at("a"), "other/Cargo.toml")));
+        assert!(!Ecosystem::Cargo.reaches(path, at("a"), (at("b"), "core/Cargo.toml")));
         let remote = (Some("git example.com/org/lib"), Some("1"));
-        assert!(Ecosystem::Cargo.reaches(remote, "a", ("example.com/org/lib", "x::Cargo.toml")));
-        assert!(!Ecosystem::Cargo.reaches(remote, "a", ("b", "b::Cargo.toml")));
-        assert!(Ecosystem::Cargo.reaches((None, Some("1")), "a", ("b", "b::Cargo.toml")));
+        let lib = ("example.com/org/lib", Path::new("/w/lib"));
+        assert!(Ecosystem::Cargo.reaches(remote, at("a"), (lib, "Cargo.toml")));
+        assert!(!Ecosystem::Cargo.reaches(remote, at("a"), (at("b"), "Cargo.toml")));
+        assert!(Ecosystem::Cargo.reaches((None, Some("1")), at("a"), (at("b"), "Cargo.toml")));
+        // A path out of the repository lands where the two roots say, folded without reading.
+        let out = (Some("path ../b/core/Cargo.toml"), None);
+        assert!(Ecosystem::Cargo.reaches(out, at("a"), (at("b"), "core/Cargo.toml")));
+        assert!(!Ecosystem::Cargo.reaches(out, at("a"), (at("b"), "Cargo.toml")));
+        assert!(!Ecosystem::Cargo.reaches(out, at("a"), (at("x"), "core/Cargo.toml")));
+        let back = (Some("path ../a/core/Cargo.toml"), None);
+        assert!(Ecosystem::Cargo.reaches(back, at("a"), (at("a"), "core/Cargo.toml")));
     }
 
     #[test]
@@ -2551,6 +2614,7 @@ mod tests {
         };
         Export {
             repository: name.into(),
+            root: PathBuf::new(),
             files: (files.iter())
                 .map(|(p, _)| index::File {
                     path: p.to_string(),
