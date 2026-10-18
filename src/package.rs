@@ -241,6 +241,9 @@ pub struct Summary {
     /// The source roots a `pyproject.toml` declares, relative to its directory (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roots: Vec<String>,
+    /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scripts: Vec<(String, String)>,
 }
 
 /// One dependency entry of a manifest.
@@ -478,6 +481,7 @@ pub fn read(src: &[u8]) -> Summary {
         module: text(root.get("module")),
         main: text(root.get("main")),
         roots: Vec::new(),
+        scripts: Vec::new(),
     }
 }
 
@@ -615,6 +619,37 @@ fn python_roots(manifest: &Manifest) -> Vec<String> {
         false => roots.extend(declared.iter().map(|r| join(r))),
     }
     roots
+}
+
+/// The program entry points the console scripts of the PyPI manifests name, as the file of the
+/// script's module (the one an import of it from the package finds, `python_roots`) and the
+/// function. A script whose module is no file of the package names nothing. Sorted, without
+/// repeats.
+pub fn python_programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    for manifest in manifests {
+        let own = Ecosystem::of(&manifest.path) == Some(Ecosystem::Pypi)
+            && manifest.path.ends_with("pyproject.toml");
+        if !own {
+            continue;
+        }
+        let roots = python_roots(manifest);
+        for (module, function) in &manifest.summary.scripts {
+            let name = module.replace('.', "/");
+            let file = (roots.iter())
+                .flat_map(|root| python::files(root, &name))
+                .find(|f| files.contains(&f.as_str()));
+            // A file of a nested package is not this package's.
+            let owned = |f: &String| {
+                owner(manifests, f, Ecosystem::Pypi)
+                    .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+            };
+            found.extend(file.filter(owned).map(|f| (f, function.clone())));
+        }
+    }
+    found.sort();
+    found.dedup();
+    found
 }
 
 /// `path`, relative to the package directory `dir`, as a path of the repository; `None` when
@@ -1665,6 +1700,62 @@ mod tests {
         (s.dependencies.iter())
             .map(|e| (e.field.as_str(), e.name.as_str(), e.range.as_deref()))
             .collect()
+    }
+
+    #[test]
+    fn a_console_script_names_the_function_of_the_file_its_module_is() {
+        let pypi = |path: &str, scripts: &[(&str, &str)], roots: &[&str]| Manifest {
+            path: path.to_string(),
+            summary: Summary {
+                scripts: (scripts.iter())
+                    .map(|(m, f)| (m.to_string(), f.to_string()))
+                    .collect(),
+                roots: roots.iter().map(|r| r.to_string()).collect(),
+                ..Summary::default()
+            },
+        };
+        let all = [
+            pypi(
+                "pyproject.toml",
+                &[("app.cli", "main"), ("tool", "run")],
+                &[],
+            ),
+            pypi(
+                "lib/pyproject.toml",
+                &[("pkg", "start"), ("none", "x")],
+                &["src"],
+            ),
+            pypi(
+                "outer/pyproject.toml",
+                &[("inner", "go"), ("pkg.cli", "main")],
+                &[],
+            ),
+            pypi("outer/inner/pyproject.toml", &[], &[]),
+        ];
+        let files = [
+            "app/cli.py",
+            "tool/__init__.py",
+            "tool.py",
+            "lib/src/pkg/__init__.py",
+            "outer/inner.py",
+            "outer/pkg.py",
+            "outer/inner/pkg/cli.py",
+        ];
+
+        let found = python_programs(&all, &files);
+
+        // `tool/__init__.py` over `tool.py`, as an import finds it; the `src` root of `lib`;
+        // `none` has no file; `outer`'s `inner.py` is its own, and `pkg/cli.py` is not in
+        // `outer`'s reach.
+        assert_eq!(
+            found,
+            [
+                ("app/cli.py".to_string(), "main".to_string()),
+                ("lib/src/pkg/__init__.py".to_string(), "start".to_string()),
+                ("outer/inner.py".to_string(), "go".to_string()),
+                ("tool/__init__.py".to_string(), "run".to_string()),
+            ]
+        );
     }
 
     #[test]

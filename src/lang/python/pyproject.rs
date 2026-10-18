@@ -1,6 +1,6 @@
 //! `pyproject.toml`, parsed once for every reader of it: the source roots the Python pack
 //! resolves imports through, and the distribution and dependencies a package of the index
-//! stores (`package::pypi`). A later reader (`[project.scripts]`) adds an accessor here.
+//! stores (`package::pypi`), and the console scripts that start a program (`scripts`).
 
 use std::collections::HashSet;
 
@@ -75,6 +75,32 @@ impl Pyproject {
                 Some(Requirement::Poetry(name, version))
             });
         pep621.chain(poetry).collect()
+    }
+
+    /// The console scripts of `[project.scripts]` (else Poetry's `[tool.poetry.scripts]`) as
+    /// `(module, function)` pairs, sorted, without repeats: each `module:function` value, its
+    /// extras (`module:function [extra]`) dropped. A value that is not a dotted module, a colon
+    /// and a dotted name is left out.
+    pub fn scripts(&self) -> Vec<(String, String)> {
+        let table = (self.at(&["project", "scripts"]))
+            .or_else(|| self.at(&["tool", "poetry", "scripts"]))
+            .and_then(|t| t.as_table());
+        let dotted = |s: &str| {
+            (s.split('.')).all(|part| {
+                !part.is_empty() && part.chars().all(|c| c.is_alphanumeric() || c == '_')
+            })
+        };
+        let mut found: Vec<(String, String)> = (table.into_iter().flatten())
+            .filter_map(|(_, target)| {
+                let (module, function) = target.as_str()?.split_once(':')?;
+                let function = function.split(['[', ' ']).next()?;
+                (dotted(module) && dotted(function))
+                    .then(|| (module.to_string(), function.to_string()))
+            })
+            .collect();
+        found.sort();
+        found.dedup();
+        found
     }
 
     /// The source roots it declares besides the directory holding it: setuptools'
@@ -194,6 +220,45 @@ h = "1"
                 Poetry("k", None),
             ]
         );
+    }
+
+    #[test]
+    fn scripts_are_the_module_and_function_of_each_console_script() {
+        let p = parse(
+            r#"
+[project.scripts]
+serve = "app.cli:main"
+sync = "app.cli:main"
+extra = "tools:run [fast]"
+nested = "app.cli:Group.start"
+no-colon = "app.cli"
+no-module = ":main"
+bad-module = "app/../x:main"
+empty-part = "app..cli:main"
+not-text = 3
+"#,
+        );
+        let pair = |m: &str, f: &str| (m.to_string(), f.to_string());
+        assert_eq!(
+            p.scripts(),
+            [
+                pair("app.cli", "Group.start"),
+                pair("app.cli", "main"),
+                pair("tools", "run"),
+            ]
+        );
+    }
+
+    #[test]
+    fn poetry_scripts_count_when_there_is_no_project_table() {
+        let poetry = "[tool.poetry.scripts]\nrun = \"a:b\"\n";
+        assert_eq!(
+            parse(poetry).scripts(),
+            [("a".to_string(), "b".to_string())]
+        );
+        let both = format!("[project.scripts]\nrun = \"c:d\"\n{poetry}");
+        assert_eq!(parse(&both).scripts(), [("c".to_string(), "d".to_string())]);
+        assert!(parse("[project]\nname = \"x\"\n").scripts().is_empty());
     }
 
     #[test]

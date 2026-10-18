@@ -813,6 +813,12 @@ sample.pyproject.toml
   ],
   "roots": [
     "src"
+  ],
+  "scripts": [
+    [
+      "example.cli",
+      "main"
+    ]
   ]
 }
 

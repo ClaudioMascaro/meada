@@ -108,6 +108,7 @@ pub fn read_pyproject(src: &[u8]) -> Summary {
         version: p.version().filter(|v| !v.is_empty()).map(String::from),
         dependencies,
         roots: p.roots(),
+        scripts: p.scripts(),
         ..Summary::default()
     }
 }
@@ -277,6 +278,8 @@ Shared_Tools = { path = "../tools" }
 other = "^2"
 [tool.setuptools.packages.find]
 where = ["src"]
+[project.scripts]
+serve = "acme.cli:main"
 "#;
         let s = read_pyproject(src.as_bytes());
         assert_eq!(s.name.as_deref(), Some("acme-billing"));
@@ -290,6 +293,7 @@ where = ["src"]
             ]
         );
         assert_eq!(s.roots, ["src"]);
+        assert_eq!(s.scripts, [("acme.cli".to_string(), "main".to_string())]);
         let poetry =
             read_pyproject(b"[tool.poetry]\nname = \"shared.tools\"\nversion = \"0.3.0\"\n");
         assert_eq!(poetry.name.as_deref(), Some("shared-tools"));
