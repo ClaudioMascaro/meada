@@ -107,8 +107,9 @@ const RECEIVER_DEPTH: usize = 64;
 
 /// What resolving one name carries along: what is being resolved, the families linearized so
 /// far (while `Resolver::new` linearizes them all), and whether a receiver was cut at
-/// `RECEIVER_DEPTH` since the outermost family began. The cut counts the receivers of the walk
-/// that reached a family, so every family then being linearized gives up (`Cut`).
+/// `RECEIVER_DEPTH`, or a family a member lookup reached was cut at `FAMILY_DEPTH`, since the
+/// outermost family began. The cut counts the receivers or bases of the walk that reached a
+/// family, so every family then being linearized gives up (`Cut`).
 #[derive(Default)]
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
@@ -138,8 +139,9 @@ type Family<'a> = Option<Vec<Ancestor<'a>>>;
 const FAMILY_DEPTH: usize = 128;
 
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
-/// families being resolved, or a receiver was cut at `RECEIVER_DEPTH` (`Work::cut`): no family
-/// is kept on the way up, since the cut depends on where the walk started.
+/// families being resolved, or a receiver or a family reached through a member was cut
+/// (`Work::cut`): no family is kept on the way up, since the cut depends on where the walk
+/// started.
 struct Cut;
 
 /// The files of one language pack, resolved together.
@@ -399,10 +401,14 @@ impl<'a> Resolver<'a> {
         }
         self.lineage(class, work).unwrap_or_else(|Cut| {
             // From no other family, a cut of the bases is the class's own: longer than the
-            // limit. A receiver cut depends on the families linearized before, so the family is
-            // linearized again when asked for.
+            // limit. Reached from another family (through a member one of its bases names, as
+            // in `class Z(K.D)`), the cut counts that family's bases too, and a receiver cut
+            // depends on the families linearized before: those being linearized give up, and
+            // each is linearized again when asked for.
             if first && !work.cut {
                 work.families.insert(class, None);
+            } else {
+                work.cut = true;
             }
             None
         })
@@ -1974,6 +1980,36 @@ mod tests {
             assert!(exact(RECEIVER_DEPTH, quoted), "quoted: {quoted}");
             assert!(!exact(RECEIVER_DEPTH + 1, quoted), "quoted: {quoted}");
             assert!(!exact(far, quoted), "quoted: {quoted}");
+        }
+    }
+
+    #[test]
+    fn a_family_does_not_depend_on_the_bases_of_the_walk_that_reaches_it() {
+        // `K` (`C127`) has the longest family the limit keeps, `C0` the last of it. `Z` derives
+        // from `K.D`, the class `D` that `C0` defines, found through `K`'s family: linearized on
+        // the way from `Z`, it is one class past the limit; from `K` itself it is not.
+        let k = FAMILY_DEPTH - 1;
+        let mut head =
+            "class C0:\n    class D:\n        def m(self):\n            pass\n".to_string();
+        for i in 1..=k {
+            head.push_str(&format!("\n\nclass C{i}(C{}):\n    pass\n", i - 1));
+        }
+        let z = format!("class Z(C{k}.D):\n    pass\n");
+        let go = "def go(z: Z):\n    z.m()\n";
+        for z_first in [false, true] {
+            let src = match z_first {
+                true => format!("{z}\n{head}\n{go}"),
+                false => format!("{head}\n{z}\n{go}"),
+            };
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let call = facts.calls.iter().find(|c| c.callee == "z.m").unwrap();
+            let found = resolver.call("a.py", call);
+            assert!(
+                matches!(found, Resolution::Exact(t) if t.name == "C0.D.m"),
+                "z first: {z_first}"
+            );
         }
     }
 

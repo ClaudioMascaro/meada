@@ -476,15 +476,17 @@ one for the area a change touches.
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
   makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
   its ancestors in C3 order) longer than that is absent, so every member of the class is
-  unknown (a name match at most), and the linearization recurses no deeper down the bases.
+  unknown (a name match at most), and the linearization recurses no deeper down the bases. The
+  bases count from where the walk started, a family looked up for a member a base names
+  (`class Z(K.D)` linearizes `K`'s) included.
   `REEXPORT_DEPTH` (64): a name followed through more files than that, each re-exporting it from
   the next (`export { x } from`, `export * from`, a Python `from m import x` or `import *`), is
   unknown (a name match at most), and no other import, `export *` or submodule binds it in its
   place. `RECEIVER_DEPTH` (64): a receiver whose class is named through
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
-  The receivers count from where the walk started, so the families being linearized when one is
-  cut give up and none is kept: each is linearized again when asked for, and does not depend on
-  the walk that first reached it.
+  The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
+  a walk, the families being linearized give up and none is kept: each is linearized again when
+  asked for, and does not depend on the walk that first reached it.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or

@@ -54,6 +54,9 @@ All notable changes to Meada are recorded here. The format follows
   something from outside the repository is no longer linked `exact` to an earlier star import's
   function of that name. A Python module that star-imports one name from several modules
   re-exports the last one's, as Python binds it.
+- A class whose base is named through a member of a class with a family close to 128 classes
+  long (`class Z(K.D)`) no longer resolves its members differently depending on which class was
+  read first.
 
 ## [0.1.0] - Unreleased
 
