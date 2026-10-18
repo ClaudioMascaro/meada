@@ -79,6 +79,14 @@ impl LanguagePack for Rust {
     ) -> Option<BTreeSet<String>> {
         Some(Tree::new(configs, files).members())
     }
+
+    fn published(
+        &self,
+        configs: &[(&str, &[u8])],
+        files: &BTreeMap<&str, &Facts>,
+    ) -> Option<BTreeSet<String>> {
+        Some(Tree::new(configs, files).published())
+    }
 }
 
 /// What the items around a node make of a function in it.
@@ -114,12 +122,15 @@ struct Use {
     public: bool,
 }
 
-/// A path read once the whole file is: a call's callee or an `impl` block's type.
+/// A path read once the whole file is: a call's callee or an `impl` block's type, or a `use`
+/// (`binds` is then the qualified name it binds, which its own head does not name: `use
+/// tokio::{self}` begins with the crate).
 struct Path {
     scope: String,
     module: String,
     pure: bool,
     segments: Vec<String>,
+    binds: Option<String>,
 }
 
 /// Where a path's normalized callee goes.
@@ -131,12 +142,12 @@ enum Slot {
 
 /// What the file binds, for the paths: the qualified names of its non-method definitions
 /// (`mod` declarations included), its locals (written once each), the names its `use`
-/// declarations bind, qualified by the scope they are written in.
+/// declarations bind, qualified by the scope they are written in, and how many bind each.
 #[derive(Default)]
 struct Scan {
     defs: HashSet<String>,
     locals: HashSet<String>,
-    uses: HashSet<String>,
+    uses: HashMap<String, usize>,
 }
 
 /// What the paths of a file need besides its own items: imports of the file itself and of
@@ -149,12 +160,15 @@ struct Heads {
 
 impl Scan {
     /// Whether a scope from `scope` up to `module`, `module` included, defines or imports
-    /// `name`: what a path's head may name there (a module ends the names in scope).
-    fn defines(&self, scope: &str, module: &str, name: &str) -> bool {
-        let mut s = scope;
+    /// `name`: what a path's head may name there (a module ends the names in scope). The
+    /// `use` that `path` is does not import its own head.
+    fn defines(&self, path: &Path, name: &str) -> bool {
+        let (module, mut s) = (path.module.as_str(), path.scope.as_str());
         loop {
             let qualified = qualify(s, name);
-            if self.defs.contains(&qualified) || self.uses.contains(&qualified) {
+            let own = usize::from(path.binds.as_ref() == Some(&qualified));
+            let used = self.uses.get(&qualified).copied().unwrap_or(0);
+            if self.defs.contains(&qualified) || used > own {
                 return true;
             }
             if s.len() <= module.len() {
@@ -219,7 +233,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 bound += found.len();
                 for Leaf { segments, name } in found {
                     if let Some(name) = &name {
-                        scan.uses.insert(qualify(&scope, name));
+                        *scan.uses.entry(qualify(&scope, name)).or_default() += 1;
                         if in_module {
                             export(&mut facts, &mut public_names, public, name, &module, open);
                         }
@@ -229,6 +243,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         module: module.clone(),
                         pure,
                         segments,
+                        binds: name.as_ref().map(|n| qualify(&scope, n)),
                     };
                     imported.push(Use { path, name, public });
                 }
@@ -356,6 +371,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         module: module.clone(),
                         pure,
                         segments,
+                        binds: None,
                     };
                     paths.push((Slot::Type(at), path(ty)));
                     if let Some(Some(of)) = of.clone() {
@@ -395,6 +411,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         module: module.clone(),
                         pure,
                         segments,
+                        binds: None,
                     };
                     paths.push((Slot::Call(facts.calls.len()), path));
                 }
@@ -902,8 +919,7 @@ fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Optio
             )
         }
         _ => {
-            let defined = scan.defines(&path.scope, &path.module, head);
-            if !defined {
+            if !scan.defines(path, head) {
                 // Neither the module nor a `use` binds it: a crate outside the repository.
                 heads.externs.insert(head.to_string());
             }
@@ -1077,6 +1093,17 @@ mod tests {
         assert_eq!(facts(src).externs, ["x", "y"]);
         let src = "use y::x;\nfn f() { x::g(); }\n";
         assert_eq!(facts(src).externs, ["y"]);
+    }
+
+    #[test]
+    fn a_use_does_not_import_the_crate_its_own_path_begins_with() {
+        // `use tokio::{self}` and `use foo::foo` bind the name their path begins with, which
+        // is still a crate outside the file.
+        let src = "use tokio::{self, select};\nuse foo::foo;\nfn f() { tokio::spawn(); }\n";
+        assert_eq!(facts(src).externs, ["foo", "tokio"]);
+        // Another `use` of the name does bind it.
+        let src = "use a::tokio;\nuse tokio::{self};\n";
+        assert_eq!(facts(src).externs, ["a"]);
     }
 
     #[test]

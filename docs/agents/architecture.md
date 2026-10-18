@@ -309,12 +309,16 @@ one for the area a change touches.
   `inside` it, the module's private items too; `public`, a `pub use` also re-exports them),
   both found by `Resolver::lexical` at each enclosing scope (`imported_at`) and, for the file
   itself, by `imported` and `export`; explicit imports beat globs, and an alias or a glob
-  that reaches itself gives nothing (`Seen`). `Facts::externs` names the first segments of
+  that reaches itself gives nothing (`Seen`: the names being resolved, the globs by file, import
+  and name, and the depth of links followed, bounded by `LINK_DEPTH`). A call name is never read
+  as a `Kind::Module` (`Reading::Value`); a use path is (`Reading::Alias`). `Facts::externs` names the first segments of
   paths that nothing in the file binds (the crates outside it), resolved last in `imported`:
   a glob beats them, another crate of the repository answers through `Modules` and the rest
   is `Binding::External`. `Facts::private` lists the `exports` names `Resolver::exported`
   leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
-  crate). A block that adds members to a type written elsewhere (Rust's
+  crate), and `LanguagePack::published` (default: none) the files whose exports a pack counts
+  at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
+  library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
   (`block_member`, before the class's own names: the inherent blocks' definitions, else the
   trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
@@ -735,14 +739,21 @@ one for the area a change touches.
   is not read, and `super::` out of a file declared inside a module written in place of its
   parent reaches nothing (no marker). The `mod` imports and the synthetic ones (`crate`,
   `super`, `mod`) bind for the whole file, so they are seen inside every inline module too;
-  a `use` binds in the scope that holds it. A `use` path whose first segment nothing in the
+  a `use` binds in the scope that holds it, and the `mod` import of a declared module is not
+  seen inside a module written in place. A `use` path whose first segment nothing in the
   file binds is a crate outside it (`Facts::externs`, no marker, never name-matched), also when
   the file holds a glob that brings no such name. A glob of a module written in place from
   outside it, and of an enum or a type, bring nothing (the visibility of the items of a module
   written in place is not kept; no marker), and a glob takes `pub` items alone, so a
   `pub(crate)` item reached through one falls to a name match. `pub use` names are `pub`;
-  a crate in the workspace is reached by its name from any crate of the repository, whether
-  its `Cargo.toml` depends on it or not (no marker), and a `[dependencies]` rename is not read.
+  a crate in the workspace is reached only from a crate whose `Cargo.toml` lists it in
+  `[dependencies]`, `[dev-dependencies]` or `[build-dependencies]` (by key, or by `package =`;
+  `workspace = true` through `[workspace.dependencies]`), a binary naming the library of its own
+  package; `target.*` tables and `optional`/feature gating are not read (the dependency counts
+  as listed; no marker). Any other crate name is external. A module declared inside a module
+  written in place is not followed for exports (no marker). `LINK_DEPTH` (128, `resolve.rs`): a
+  chain of `use` aliases or globs longer than that gives nothing, so a name behind it is
+  unknown (a name match at most).
   `self::` and `super::` read inside a module that sits in a function are
   `(scoped_identifier)`, unresolved, and a `use` there binds nothing. A file's exports table
   rows are its `pub` items, `pub use` names, `pub` modules and, inside `pub` modules written

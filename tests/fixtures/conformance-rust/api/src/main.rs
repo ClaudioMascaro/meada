@@ -1,4 +1,5 @@
 mod extras;
+mod launch;
 mod prelude;
 mod ring;
 mod routes;
@@ -9,6 +10,7 @@ use crate::prelude::*;
 use crate::store::{self as stores, Store as Repo};
 use billing::{invoice::Invoice as Bill, total};
 use inner::helper as aid;
+use launch::launch;
 use ledger_core::entries as books;
 use self::nested::deep::dive;
 use std::collections::HashMap;
@@ -48,6 +50,31 @@ mod scoped {
 
     pub fn go() -> u32 {
         aid() + twice()
+    }
+}
+
+// What a `use` of the file binds is not in scope in a module written in place, nor is a
+// module of the file: both names are crates outside it there.
+mod isolated {
+    pub fn go() {
+        aid();
+    }
+
+    pub fn far() {
+        inner::helper();
+    }
+}
+
+// An item of the module beats the name a glob gives.
+mod local_wins {
+    use super::*;
+
+    fn compute() -> u32 {
+        9
+    }
+
+    pub fn go() -> u32 {
+        compute()
     }
 }
 
@@ -115,6 +142,16 @@ fn main() {
     ring::x::Loop::unheard();
     scoped::go();
     below::go();
+    isolated::go();
+    isolated::far();
+    local_wins::go();
+    // A module is no value: `launch()` is the function the `use` brings, and the path reaches
+    // the module's.
+    launch();
+    launch::launch();
+    // A `pub use` in a `pub` module written in place, and a module and an item of one name.
+    ledger_core::entries::secret();
+    ledger_core::meter();
 }
 
 // A `use` of a module is not in scope outside it.
@@ -130,6 +167,11 @@ fn within() {
 
 fn elsewhere() {
     local_aid();
+}
+
+// A parameter hides the `use` that spells its name, as a `let` does.
+fn with_param(aid: fn()) {
+    aid();
 }
 
 // A binding of the name hides the `use` that spells it.

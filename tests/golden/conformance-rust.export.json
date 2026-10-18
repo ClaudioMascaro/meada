@@ -22,8 +22,12 @@
       "hash": "76704e036fc55272924b80420a1c14c6fb0f26f88f8d34f00d815bc08b0d59ac"
     },
     {
+      "path": "api/src/launch.rs",
+      "hash": "ac30287d0c3aab4f09550e6cea7b807f29a073b60e481c7296573fba5b5cbd20"
+    },
+    {
       "path": "api/src/main.rs",
-      "hash": "05f14fae913071cdd6ccc095dfd2aef0b1f8dec13cdfc0452e87691b0bbef449"
+      "hash": "a43434aa3165c62cd8dfd518485bdddfb93f6134aca4f009ad0f8f4b87cb803d"
     },
     {
       "path": "api/src/nested/deep.rs",
@@ -95,11 +99,15 @@
     },
     {
       "path": "crates/ledger-core/src/lib.rs",
-      "hash": "0896d9597f174f6286a385d71681f478260e52294e512628834efab3c716da7c"
+      "hash": "7cfc390aab4091fa1a6ac6175f7023c68d36598ecc4be6fba96e08c785351d0b"
+    },
+    {
+      "path": "crates/ledger-core/src/meter.rs",
+      "hash": "4605f66cc7297bad147c9cad6e021188fa2ab09a987347781a0e2f7fa006f575"
     },
     {
       "path": "crates/scratch/src/lib.rs",
-      "hash": "d5684463d745fafedf22d696a7abc91676547cdbc160c0dca447ccbe6c32f987"
+      "hash": "bae9cc3be7c37deaa2fcaaec7df5d9f59500b28a574d591051ccf6afe1240926"
     }
   ],
   "symbols": [
@@ -184,67 +192,75 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/launch.rs::launch",
+      "span": {
+        "path": "api/src/launch.rs",
+        "start": 0,
+        "end": 18
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/main.rs::below",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1239,
-        "end": 1320
+        "start": 1716,
+        "end": 1797
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::below.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1274,
-        "end": 1318
+        "start": 1751,
+        "end": 1795
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 501,
-        "end": 795
+        "start": 533,
+        "end": 827
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 518,
-        "end": 555
+        "start": 550,
+        "end": 587
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 669,
-        "end": 740
+        "start": 701,
+        "end": 772
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.verify",
       "span": {
         "path": "api/src/main.rs",
-        "start": 746,
-        "end": 793
+        "start": 778,
+        "end": 825
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3011,
-        "end": 3040
+        "start": 3969,
+        "end": 3998
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::elsewhere",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2869,
-        "end": 2904
+        "start": 3716,
+        "end": 3751
       }
     },
     {
@@ -259,168 +275,232 @@
       "id": "example.com/acme/conformance::api/src/main.rs::hidden",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2963,
-        "end": 3009
+        "start": 3921,
+        "end": 3967
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner",
       "span": {
         "path": "api/src/main.rs",
-        "start": 372,
-        "end": 499
+        "start": 404,
+        "end": 531
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.helper",
       "span": {
         "path": "api/src/main.rs",
-        "start": 388,
-        "end": 428
+        "start": 420,
+        "end": 460
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.twice",
       "span": {
         "path": "api/src/main.rs",
-        "start": 434,
-        "end": 497
+        "start": 466,
+        "end": 529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::isolated",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1220,
+        "end": 1326
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::isolated.far",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1279,
+        "end": 1324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::isolated.go",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1239,
+        "end": 1273
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::launch",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 12,
+        "end": 23
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::local_wins",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1382,
+        "end": 1511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1422,
+        "end": 1459
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1465,
+        "end": 1509
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1082,
-        "end": 1170
+        "start": 1559,
+        "end": 1647
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops.f",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1137,
-        "end": 1168
+        "start": 1614,
+        "end": 1645
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::main",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1472,
-        "end": 2657
+        "start": 1949,
+        "end": 3504
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1395,
-        "end": 1470
+        "start": 1872,
+        "end": 1947
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.deep",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1436,
-        "end": 1449
+        "start": 1913,
+        "end": 1926
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.plain",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1454,
-        "end": 1468
+        "start": 1931,
+        "end": 1945
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::outside",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2710,
-        "end": 2745
+        "start": 3557,
+        "end": 3592
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::prelude",
       "span": {
         "path": "api/src/main.rs",
-        "start": 12,
-        "end": 24
+        "start": 24,
+        "end": 36
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::ring",
       "span": {
         "path": "api/src/main.rs",
-        "start": 25,
-        "end": 34
+        "start": 37,
+        "end": 46
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::routes",
       "span": {
         "path": "api/src/main.rs",
-        "start": 35,
-        "end": 46
+        "start": 47,
+        "end": 58
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::run",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3057,
-        "end": 3068
+        "start": 4015,
+        "end": 4026
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped",
       "span": {
         "path": "api/src/main.rs",
-        "start": 893,
-        "end": 1034
+        "start": 925,
+        "end": 1066
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 982,
-        "end": 1032
+        "start": 1014,
+        "end": 1064
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::start",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3042,
-        "end": 3055
+        "start": 4000,
+        "end": 4013
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::store",
       "span": {
         "path": "api/src/main.rs",
-        "start": 47,
-        "end": 57
+        "start": 59,
+        "end": 69
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::util",
       "span": {
         "path": "api/src/main.rs",
-        "start": 361,
-        "end": 370
+        "start": 393,
+        "end": 402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::with_param",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3823,
+        "end": 3862
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::within",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2792,
-        "end": 2867
+        "start": 3639,
+        "end": 3714
       }
     },
     {
@@ -827,56 +907,72 @@
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::audit",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 18,
-        "end": 42
+        "start": 123,
+        "end": 147
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 44,
-        "end": 101
+        "start": 149,
+        "end": 321
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 66,
-        "end": 81
+        "start": 286,
+        "end": 301
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.seal",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 87,
-        "end": 99
+        "start": 307,
+        "end": 319
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 103,
-        "end": 142
+        "start": 323,
+        "end": 362
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal.secret",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
-        "start": 122,
-        "end": 140
+        "start": 342,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::meter",
+      "span": {
+        "path": "crates/ledger-core/src/lib.rs",
+        "start": 0,
+        "end": 10
       }
     },
     {
       "id": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::post",
       "span": {
         "path": "crates/ledger-core/src/lib.rs",
+        "start": 105,
+        "end": 121
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/ledger-core/src/meter.rs::meter",
+      "span": {
+        "path": "crates/ledger-core/src/meter.rs",
         "start": 0,
-        "end": 16
+        "end": 17
       }
     },
     {
@@ -885,6 +981,14 @@
         "path": "crates/scratch/src/lib.rs",
         "start": 0,
         "end": 19
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach",
+      "span": {
+        "path": "crates/scratch/src/lib.rs",
+        "start": 110,
+        "end": 153
       }
     }
   ],
@@ -918,8 +1022,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1303,
-        "end": 1312
+        "start": 1780,
+        "end": 1789
       }
     },
     {
@@ -929,8 +1033,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 725,
-        "end": 734
+        "start": 757,
+        "end": 766
       }
     },
     {
@@ -940,8 +1044,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 706,
-        "end": 722
+        "start": 738,
+        "end": 754
       }
     },
     {
@@ -951,8 +1055,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 772,
-        "end": 786
+        "start": 804,
+        "end": 818
       }
     },
     {
@@ -962,8 +1066,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2890,
-        "end": 2901
+        "start": 3737,
+        "end": 3748
       }
     },
     {
@@ -973,8 +1077,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3001,
-        "end": 3006
+        "start": 3959,
+        "end": 3964
       }
     },
     {
@@ -984,8 +1088,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 466,
-        "end": 474
+        "start": 498,
+        "end": 506
       }
     },
     {
@@ -995,8 +1099,41 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 477,
-        "end": 491
+        "start": 509,
+        "end": 523
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::isolated.far::inner.helper#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::isolated.far",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1302,
+        "end": 1317
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::isolated.go::aid#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::isolated.go",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1261,
+        "end": 1266
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::local_wins.go::compute#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
+      "target": "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1494,
+        "end": 1503
       }
     },
     {
@@ -1006,8 +1143,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1158,
-        "end": 1161
+        "start": 1635,
+        "end": 1638
       }
     },
     {
@@ -1017,8 +1154,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2171,
-        "end": 2182
+        "start": 2648,
+        "end": 2659
       }
     },
     {
@@ -1028,8 +1165,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2355,
-        "end": 2369
+        "start": 2832,
+        "end": 2846
       }
     },
     {
@@ -1039,8 +1176,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2120,
-        "end": 2131
+        "start": 2597,
+        "end": 2608
       }
     },
     {
@@ -1050,8 +1187,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1872,
-        "end": 1885
+        "start": 2349,
+        "end": 2362
       }
     },
     {
@@ -1061,8 +1198,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2097,
-        "end": 2102
+        "start": 2574,
+        "end": 2579
       }
     },
     {
@@ -1072,8 +1209,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2643,
-        "end": 2654
+        "start": 3120,
+        "end": 3131
       }
     },
     {
@@ -1083,8 +1220,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2217,
-        "end": 2240
+        "start": 2694,
+        "end": 2717
       }
     },
     {
@@ -1094,8 +1231,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2188,
-        "end": 2211
+        "start": 2665,
+        "end": 2688
       }
     },
     {
@@ -1105,8 +1242,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2271,
-        "end": 2283
+        "start": 2748,
+        "end": 2760
       }
     },
     {
@@ -1116,8 +1253,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1668,
-        "end": 1689
+        "start": 2145,
+        "end": 2166
       }
     },
     {
@@ -1127,8 +1264,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2108,
-        "end": 2114
+        "start": 2585,
+        "end": 2591
       }
     },
     {
@@ -1138,8 +1275,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2461,
-        "end": 2466
+        "start": 2938,
+        "end": 2943
       }
     },
     {
@@ -1149,8 +1286,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2472,
-        "end": 2479
+        "start": 2949,
+        "end": 2956
       }
     },
     {
@@ -1160,8 +1297,74 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1647,
-        "end": 1662
+        "start": 2124,
+        "end": 2139
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::isolated.far#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::api/src/main.rs::isolated.far",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3157,
+        "end": 3172
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::isolated.go#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::api/src/main.rs::isolated.go",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3137,
+        "end": 3151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::launch#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::api/src/launch.rs::launch",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3316,
+        "end": 3324
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::launch.launch#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::api/src/launch.rs::launch",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3330,
+        "end": 3346
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::ledger_core.entries.secret#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal.secret",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3445,
+        "end": 3475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::ledger_core.meter#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::crates/ledger-core/src/meter.rs::meter",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3481,
+        "end": 3501
       }
     },
     {
@@ -1171,8 +1374,19 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2246,
-        "end": 2265
+        "start": 2723,
+        "end": 2742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::main::local_wins.go#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::main",
+      "target": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
+      "level": "exact",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3178,
+        "end": 3194
       }
     },
     {
@@ -1182,8 +1396,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1695,
-        "end": 1715
+        "start": 2172,
+        "end": 2192
       }
     },
     {
@@ -1193,8 +1407,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1721,
-        "end": 1742
+        "start": 2198,
+        "end": 2219
       }
     },
     {
@@ -1204,8 +1418,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2571,
-        "end": 2589
+        "start": 3048,
+        "end": 3066
       }
     },
     {
@@ -1215,8 +1429,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2543,
-        "end": 2565
+        "start": 3020,
+        "end": 3042
       }
     },
     {
@@ -1226,8 +1440,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2595,
-        "end": 2619
+        "start": 3072,
+        "end": 3096
       }
     },
     {
@@ -1237,8 +1451,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1600,
-        "end": 1621
+        "start": 2077,
+        "end": 2098
       }
     },
     {
@@ -1248,8 +1462,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1861,
-        "end": 1866
+        "start": 2338,
+        "end": 2343
       }
     },
     {
@@ -1259,8 +1473,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2625,
-        "end": 2637
+        "start": 3102,
+        "end": 3114
       }
     },
     {
@@ -1270,8 +1484,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1848,
-        "end": 1855
+        "start": 2325,
+        "end": 2332
       }
     },
     {
@@ -1281,8 +1495,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1891,
-        "end": 1912
+        "start": 2368,
+        "end": 2389
       }
     },
     {
@@ -1292,8 +1506,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1575,
-        "end": 1594
+        "start": 2052,
+        "end": 2071
       }
     },
     {
@@ -1303,8 +1517,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2137,
-        "end": 2152
+        "start": 2614,
+        "end": 2629
       }
     },
     {
@@ -1314,8 +1528,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2158,
-        "end": 2165
+        "start": 2635,
+        "end": 2642
       }
     },
     {
@@ -1325,8 +1539,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1627,
-        "end": 1641
+        "start": 2104,
+        "end": 2118
       }
     },
     {
@@ -1336,8 +1550,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2736,
-        "end": 2743
+        "start": 3583,
+        "end": 3590
       }
     },
     {
@@ -1347,8 +1561,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1011,
-        "end": 1016
+        "start": 1043,
+        "end": 1048
       }
     },
     {
@@ -1358,8 +1572,19 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1019,
-        "end": 1026
+        "start": 1051,
+        "end": 1058
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::with_param::aid#0",
+      "caller": "example.com/acme/conformance::api/src/main.rs::with_param",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3854,
+        "end": 3859
       }
     },
     {
@@ -1369,8 +1594,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2853,
-        "end": 2864
+        "start": 3700,
+        "end": 3711
       }
     },
     {
@@ -1655,6 +1880,17 @@
         "start": 233,
         "end": 244
       }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach::ledger_core.post#0",
+      "caller": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/scratch/src/lib.rs",
+        "start": 131,
+        "end": 150
+      }
     }
   ],
   "providers": [],
@@ -1673,24 +1909,32 @@
       "members": [
         "example.com/acme/conformance::api/extra/legacy_util.rs::legacy",
         "example.com/acme/conformance::api/src/extras.rs::dup",
+        "example.com/acme/conformance::api/src/launch.rs::launch",
+        "example.com/acme/conformance::api/src/main.rs::isolated.far",
+        "example.com/acme/conformance::api/src/main.rs::isolated.go",
         "example.com/acme/conformance::api/src/main.rs::main",
         "example.com/acme/conformance::api/src/main.rs::run",
         "example.com/acme/conformance::api/src/nested/deep.rs::dive",
         "example.com/acme/conformance::api/src/nested/plain.rs::walk",
         "example.com/acme/conformance::api/src/prelude.rs::greet",
         "example.com/acme/conformance::api/src/ring/c.rs::Gear.spin",
-        "example.com/acme/conformance::api/src/store.rs::Persist.describe",
-        "example.com/acme/conformance::api/src/store.rs::Store.Persist.persist",
-        "example.com/acme/conformance::api/src/store.rs::Store.new",
-        "example.com/acme/conformance::api/src/store.rs::reset",
-        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.new"
+        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.new",
+        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal.secret",
+        "example.com/acme/conformance::crates/ledger-core/src/meter.rs::meter"
       ]
     },
     {
       "name": "api/src#3",
       "members": [
         "example.com/acme/conformance::api/src/main.rs::below.go",
+        "example.com/acme/conformance::api/src/main.rs::checks.compute",
+        "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
         "example.com/acme/conformance::api/src/main.rs::compute",
+        "example.com/acme/conformance::api/src/main.rs::inner.helper",
+        "example.com/acme/conformance::api/src/main.rs::inner.twice",
+        "example.com/acme/conformance::api/src/main.rs::outside",
+        "example.com/acme/conformance::api/src/main.rs::scoped.go",
+        "example.com/acme/conformance::api/src/main.rs::within",
         "example.com/acme/conformance::api/src/routes/health.rs::check",
         "example.com/acme/conformance::api/src/routes/mod.rs::serve",
         "example.com/acme/conformance::api/src/store.rs::Store.save"
@@ -1699,20 +1943,28 @@
     {
       "name": "api/src#4",
       "members": [
-        "example.com/acme/conformance::api/src/main.rs::checks.compute",
-        "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
-        "example.com/acme/conformance::api/src/main.rs::inner.helper",
-        "example.com/acme/conformance::api/src/main.rs::inner.twice",
-        "example.com/acme/conformance::api/src/main.rs::outside",
-        "example.com/acme/conformance::api/src/main.rs::scoped.go",
-        "example.com/acme/conformance::api/src/main.rs::within"
+        "example.com/acme/conformance::api/src/main.rs::checks.verify",
+        "example.com/acme/conformance::api/src/main.rs::start"
       ]
     },
     {
       "name": "api/src#5",
       "members": [
-        "example.com/acme/conformance::api/src/main.rs::checks.verify",
-        "example.com/acme/conformance::api/src/main.rs::start"
+        "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
+        "example.com/acme/conformance::api/src/main.rs::local_wins.go"
+      ]
+    },
+    {
+      "name": "api/src#6",
+      "members": [
+        "example.com/acme/conformance::api/src/store.rs::Persist.describe",
+        "example.com/acme/conformance::api/src/store.rs::Store.Persist.persist",
+        "example.com/acme/conformance::api/src/store.rs::Store.empty",
+        "example.com/acme/conformance::api/src/store.rs::Store.new",
+        "example.com/acme/conformance::api/src/store.rs::reset",
+        "example.com/acme/conformance::api/src/store/disk.rs::Store.check",
+        "example.com/acme/conformance::api/src/store/disk.rs::Store.reload",
+        "example.com/acme/conformance::api/src/store/disk.rs::open"
       ]
     },
     {
@@ -1727,15 +1979,6 @@
       "members": [
         "example.com/acme/conformance::api/src/bin/sync/main.rs::main",
         "example.com/acme/conformance::api/src/bin/sync/step.rs::tick"
-      ]
-    },
-    {
-      "name": "api/src/store",
-      "members": [
-        "example.com/acme/conformance::api/src/store.rs::Store.empty",
-        "example.com/acme/conformance::api/src/store/disk.rs::Store.check",
-        "example.com/acme/conformance::api/src/store/disk.rs::Store.reload",
-        "example.com/acme/conformance::api/src/store/disk.rs::open"
       ]
     },
     {
@@ -1804,6 +2047,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/scratch/src/lib.rs::ignored"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach",
+      "kind": "export",
+      "label": "reach",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/scratch/src/lib.rs::reach"
         }
       ]
     }

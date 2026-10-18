@@ -26,10 +26,11 @@ All notable changes to Meada are recorded here. The format follows
   `use` in a module written in place or in a function binds and hides there alone, and a call
   through a `use`d name, a renamed one or a glob is `exact` when one definition is found. A
   crate outside the repository (`std`, `serde`) is external, never name-matched, and another
-  crate of the repository is reached by its name with hyphens as underscores. A crate's
-  exports are its `pub` items reachable from the root through `pub` modules and `pub use`;
-  `pub(crate)` and narrower items stay inside the crate. The index is rebuilt once (schema
-  version 24).
+  crate of the repository is reached by its name with hyphens as underscores, from a crate whose
+  `Cargo.toml` lists it as a dependency (by key or `package =`). A library's exports are its
+  `pub` items reachable from `src/lib.rs` (or `[lib] path`) through `pub` modules and `pub use`;
+  `pub(crate)` and narrower items stay inside the crate, and a binary crate exports nothing.
+  The index is rebuilt once (schema version 24).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

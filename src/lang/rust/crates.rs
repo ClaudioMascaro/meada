@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
-use crate::lang::Facts;
+use crate::lang::{Export, Facts};
 
 /// The start of the specifier of a `mod x;` declaration: `mod x`, or `mod a/b/x` inside the
 /// modules `a::b` written in place.
@@ -26,10 +26,13 @@ struct Node {
 
 pub struct Tree {
     nodes: BTreeMap<String, Node>,
-    /// The root file of each crate with a library, by the name other crates reach it by.
-    libs: HashMap<String, String>,
+    /// The libraries of the repository each crate root may name, by the name it writes:
+    /// the root file of each.
+    libs: HashMap<String, HashMap<String, String>>,
     /// The file each `mod` declaration names, by declaring file and specifier.
     children: HashMap<(String, String), String>,
+    /// The files whose `pub` items another crate can name.
+    published: BTreeSet<String>,
 }
 
 impl Tree {
@@ -38,16 +41,32 @@ impl Tree {
     pub fn new(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Tree {
         let mut tree = Tree {
             nodes: BTreeMap::new(),
-            libs: libs(configs, files),
+            libs: HashMap::new(),
             children: HashMap::new(),
+            published: BTreeSet::new(),
         };
+        let packages = packages(configs, files);
+        let dependencies = dependencies(configs, &packages);
         let mut queue = VecDeque::new();
-        for root in roots(configs, files) {
+        for (root, dir) in roots(configs, files) {
             let node = Node {
                 root: root.clone(),
                 parent: None,
                 owns_dir: true,
             };
+            let mut libs = dependencies.get(&dir).cloned().unwrap_or_default();
+            // A binary may name the library of its own package.
+            let package = packages.iter().find(|p| p.dir == dir);
+            if let Some(Package {
+                lib_name,
+                lib_root: Some(lib),
+                ..
+            }) = package
+                && *lib != root
+            {
+                libs.insert(lib_name.clone(), lib.clone());
+            }
+            tree.libs.insert(root.clone(), libs);
             if tree.nodes.insert(root.clone(), node).is_none() {
                 queue.push_back(root);
             }
@@ -73,7 +92,44 @@ impl Tree {
                 queue.push_back(child);
             }
         }
+        tree.published = tree.publish(&packages, files);
         tree
+    }
+
+    /// The files reached from a library root through `pub mod` declarations: what a crate
+    /// outside the library can name. A binary root exports nothing, and a module declared
+    /// inside a module written in place is not followed.
+    fn publish(&self, packages: &[Package], files: &BTreeMap<&str, &Facts>) -> BTreeSet<String> {
+        let roots = packages.iter().filter_map(|p| p.lib_root.clone());
+        let mut out: BTreeSet<String> = BTreeSet::new();
+        let mut queue: VecDeque<String> = roots.collect();
+        while let Some(file) = queue.pop_front() {
+            if !out.insert(file.clone()) {
+                continue;
+            }
+            let facts = files[file.as_str()];
+            for ((from, specifier), child) in &self.children {
+                if *from != file {
+                    continue;
+                }
+                let name = facts.exports.iter().find_map(|e| match e {
+                    Export::From {
+                        exported, source, ..
+                    } if source == specifier => Some(exported),
+                    _ => None,
+                });
+                if name.is_some_and(|n| !facts.private.contains(n)) {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// The files whose `pub` items are the exports of a library: its root and the files
+    /// `pub mod` declarations reach from it.
+    pub fn published(&self) -> BTreeSet<String> {
+        self.published.clone()
     }
 
     /// Every file a crate builds.
@@ -99,7 +155,10 @@ impl Tree {
                 }
                 at.map(String::from)
             }
-            name => self.libs.get(name).cloned(),
+            name => {
+                let root = self.nodes.get(from).map(|n| &n.root);
+                root.and_then(|r| self.libs.get(r)?.get(name).cloned())
+            }
         };
         found.into_iter().collect()
     }
@@ -161,46 +220,133 @@ fn join(dir: &str, rel: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// The `Cargo.toml` with a `[package]` table among `configs`, at any depth, by directory.
-fn manifests<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
-    let mut manifests: Vec<(&str, toml::Table)> = configs
+/// Every `Cargo.toml` among `configs` that parses, by directory.
+fn tables<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
+    let mut tables: Vec<(&str, toml::Table)> = configs
         .iter()
         .filter_map(|(path, src)| {
             let dir = path.strip_suffix("Cargo.toml")?;
             let dir = dir.strip_suffix('/').unwrap_or(dir);
             Some((dir, std::str::from_utf8(src).ok()?.parse().ok()?))
         })
-        .filter(|(_, manifest): &(&str, toml::Table)| manifest.contains_key("package"))
         .collect();
-    manifests.sort_by_key(|(dir, _)| *dir);
+    tables.sort_by_key(|(dir, _)| *dir);
+    tables
+}
+
+/// The `Cargo.toml` with a `[package]` table among `configs`, at any depth, by directory.
+fn manifests<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
+    let mut manifests = tables(configs);
+    manifests.retain(|(_, manifest)| manifest.contains_key("package"));
     manifests
 }
 
-/// The library root of each crate, by the name other crates write: `[lib] name`, else the
-/// package name, hyphens turned into underscores. The first manifest in path order keeps a
-/// name two crates share.
-fn libs(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> HashMap<String, String> {
-    let mut out = HashMap::new();
+/// A package of the repository: where it lives, its `[package] name`, the name a path writes
+/// for its library (`[lib] name`, else the package name, hyphens turned into underscores),
+/// and the library's root file when the walk found one.
+struct Package {
+    dir: String,
+    name: String,
+    lib_name: String,
+    lib_root: Option<String>,
+}
+
+fn packages(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Package> {
+    let mut out = Vec::new();
     for (dir, manifest) in manifests(configs) {
         let lib = manifest.get("lib");
         let named = |t: &toml::Value| t.get("name")?.as_str().map(String::from);
-        let name = (lib.and_then(named)).or_else(|| named(manifest.get("package")?));
+        let Some(name) = manifest.get("package").and_then(named) else {
+            continue;
+        };
+        let lib_name = lib.and_then(named).unwrap_or_else(|| name.clone());
         let root = (lib.and_then(|l| l.get("path")?.as_str()))
             .map_or_else(|| join(dir, "src/lib.rs"), |p| join(dir, p));
-        if let (Some(name), Some(root)) = (name, root)
-            && files.contains_key(root.as_str())
-        {
-            out.entry(name.replace('-', "_")).or_insert(root);
+        out.push(Package {
+            dir: dir.to_string(),
+            name,
+            lib_name: lib_name.replace('-', "_"),
+            lib_root: root.filter(|r| files.contains_key(r.as_str())),
+        });
+    }
+    out
+}
+
+/// The libraries of the repository each package may name, by package directory: those its
+/// `[dependencies]`, `[dev-dependencies]` and `[build-dependencies]` list (also under
+/// `[target.*]`), by key or through `package = "..."`, and `workspace = true` entries the
+/// nearest `[workspace.dependencies]` names. A dependency is named by the key when it is
+/// renamed, else by the name of its library. The first package in path order keeps a name
+/// two share.
+fn dependencies(
+    configs: &[(&str, &[u8])],
+    packages: &[Package],
+) -> HashMap<String, HashMap<String, String>> {
+    let tables = tables(configs);
+    let workspace = |dir: &str| {
+        let holds = |w: &str| w.is_empty() || dir == w || dir.starts_with(&format!("{w}/"));
+        let near = tables
+            .iter()
+            .filter(|(w, t)| holds(w) && workspace_deps(t).is_some());
+        near.max_by_key(|(w, _)| w.len())
+            .and_then(|(_, t)| workspace_deps(t))
+    };
+    let mut out: HashMap<String, HashMap<String, String>> = HashMap::new();
+    for (dir, manifest) in &tables {
+        if !manifest.contains_key("package") {
+            continue;
+        }
+        let mut lists: Vec<&toml::Table> = Vec::new();
+        for kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
+            lists.extend(manifest.get(kind).and_then(|d| d.as_table()));
+            let targets = manifest.get("target").and_then(|t| t.as_table());
+            for target in targets.into_iter().flat_map(|t| t.values()) {
+                lists.extend(target.get(kind).and_then(|d| d.as_table()));
+            }
+        }
+        for (key, spec) in lists.into_iter().flatten() {
+            let inherits = spec.get("workspace").and_then(|w| w.as_bool()) == Some(true);
+            let spec = match inherits {
+                true => workspace(dir).and_then(|w| w.get(key)).unwrap_or(spec),
+                false => spec,
+            };
+            let renamed = spec.get("package").and_then(|p| p.as_str());
+            let package = crate_name(renamed.unwrap_or(key));
+            let Some(found) = packages.iter().find(|p| crate_name(&p.name) == package) else {
+                continue;
+            };
+            let Some(root) = &found.lib_root else {
+                continue;
+            };
+            let name = match renamed {
+                Some(_) => crate_name(key),
+                None => found.lib_name.clone(),
+            };
+            out.entry(dir.to_string())
+                .or_default()
+                .entry(name)
+                .or_insert_with(|| root.clone());
         }
     }
     out
 }
 
+/// The name a path writes for a package: the hyphens turned into underscores.
+fn crate_name(name: &str) -> String {
+    name.replace('-', "_")
+}
+
+/// The `[workspace.dependencies]` table of a manifest.
+fn workspace_deps(manifest: &toml::Table) -> Option<&toml::Table> {
+    manifest.get("workspace")?.get("dependencies")?.as_table()
+}
+
 /// The crate roots, in order: per `Cargo.toml` with a `[package]` table, at any depth, by
 /// path, its library (`[lib] path`, else `src/lib.rs`), `src/main.rs`, each `[[bin]] path`,
-/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found. A workspace's
-/// members are such manifests too, so `[workspace] members` adds none.
-fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<String> {
+/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found, with the directory
+/// of the manifest. A workspace's members are such manifests too, so `[workspace] members`
+/// adds none.
+fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(String, String)> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     for (dir, manifest) in &manifests(configs) {
@@ -225,7 +371,7 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Strin
             .chain(found.map(|f| f.to_string()));
         for file in candidates {
             if files.contains_key(file.as_str()) && seen.insert(file.clone()) {
-                out.push(file);
+                out.push((file, dir.to_string()));
             }
         }
     }
@@ -268,8 +414,11 @@ mod tests {
             // A virtual manifest builds nothing of its own.
             ("virtual/Cargo.toml", b"[workspace]\nmembers = []\n"),
         ];
+        let found: Vec<String> = (roots(&configs, &files).into_iter())
+            .map(|(file, _)| file)
+            .collect();
         assert_eq!(
-            roots(&configs, &files),
+            found,
             [
                 "backend/src/lib.rs",
                 "backend/src/main.rs",
@@ -281,31 +430,95 @@ mod tests {
     }
 
     #[test]
-    fn a_library_is_reached_by_its_name_with_underscores() {
+    fn a_library_is_reached_by_the_crates_that_depend_on_it() {
         let facts = Facts::default();
         let files = BTreeMap::from([
             ("ledger-core/src/lib.rs", &facts),
+            ("ledger-core/src/main.rs", &facts),
             ("app/src/main.rs", &facts),
+            ("app/src/bin/tool.rs", &facts),
             ("other/src/x.rs", &facts),
+            ("shared/src/lib.rs", &facts),
+            ("loose/src/lib.rs", &facts),
         ]);
-        let configs: [(&str, &[u8]); 3] = [
+        let configs: [(&str, &[u8]); 6] = [
             (
                 "ledger-core/Cargo.toml",
                 b"[package]\nname = \"ledger-core\"\n",
             ),
-            ("app/Cargo.toml", b"[package]\nname = \"app\"\n"),
+            (
+                "app/Cargo.toml",
+                b"[package]\nname = \"app\"\n[dependencies]\nledger-core = { path = \"../ledger-core\" }\n\
+                  alias = { package = \"other\", path = \"../other\" }\n\
+                  shared = { workspace = true }\nserde = \"1\"\n\
+                  [dev-dependencies]\nmissing = { path = \"../missing\" }\n",
+            ),
             (
                 "other/Cargo.toml",
-                b"[package]\nname = \"o\"\n[lib]\nname = \"re-named\"\npath = \"src/x.rs\"\n",
+                b"[package]\nname = \"other\"\n[lib]\nname = \"re-named\"\npath = \"src/x.rs\"\n",
+            ),
+            ("shared/Cargo.toml", b"[package]\nname = \"shared-lib\"\n"),
+            ("loose/Cargo.toml", b"[package]\nname = \"loose\"\n"),
+            (
+                "Cargo.toml",
+                b"[workspace]\nmembers = [\"*\"]\n[workspace.dependencies]\n\
+                  shared = { package = \"shared-lib\", path = \"shared\" }\n",
             ),
         ];
         let tree = Tree::new(&configs, &files);
-        let from = "app/src/main.rs";
-        assert_eq!(tree.lookup(from, "ledger_core"), ["ledger-core/src/lib.rs"]);
-        assert_eq!(tree.lookup(from, "re_named"), ["other/src/x.rs"]);
-        // A binary is no library, and the hyphen is not part of the name a path writes.
-        assert!(tree.lookup(from, "app").is_empty());
-        assert!(tree.lookup(from, "ledger-core").is_empty());
-        assert!(tree.lookup(from, "o").is_empty());
+        // A dependency by its key, a renamed one by the key it is renamed to, one a workspace
+        // names through `workspace = true`.
+        for from in ["app/src/main.rs", "app/src/bin/tool.rs"] {
+            assert_eq!(tree.lookup(from, "ledger_core"), ["ledger-core/src/lib.rs"]);
+            assert_eq!(tree.lookup(from, "alias"), ["other/src/x.rs"]);
+            assert_eq!(tree.lookup(from, "shared"), ["shared/src/lib.rs"]);
+            // Not by the package's own name once renamed, nor by one no manifest lists, nor a
+            // binary, nor with the hyphen.
+            assert!(tree.lookup(from, "other").is_empty());
+            assert!(tree.lookup(from, "re_named").is_empty());
+            assert!(tree.lookup(from, "loose").is_empty());
+            assert!(tree.lookup(from, "ledger-core").is_empty());
+            assert!(tree.lookup(from, "serde").is_empty());
+        }
+        // A binary names the library of its own package, the library itself does not.
+        let bin = "ledger-core/src/main.rs";
+        assert_eq!(tree.lookup(bin, "ledger_core"), ["ledger-core/src/lib.rs"]);
+        assert!(
+            tree.lookup("ledger-core/src/lib.rs", "ledger_core")
+                .is_empty()
+        );
+        // A crate that lists nothing reaches nothing.
+        assert!(tree.lookup("loose/src/lib.rs", "ledger_core").is_empty());
+    }
+
+    #[test]
+    fn only_pub_modules_from_a_library_root_are_published() {
+        let parse = |src: &str| super::super::parse(src.as_bytes()).unwrap();
+        let (root, open, shut, below, main) = (
+            parse("pub mod open;\nmod shut;\npub(crate) mod narrow;\n"),
+            parse("pub mod below;\npub fn f() {}\n"),
+            parse("pub fn g() {}\n"),
+            parse("pub fn h() {}\n"),
+            parse("mod open;\npub fn main() {}\n"),
+        );
+        let files = BTreeMap::from([
+            ("lib/src/lib.rs", &root),
+            ("lib/src/open.rs", &open),
+            ("lib/src/open/below.rs", &below),
+            ("lib/src/shut.rs", &shut),
+            ("lib/src/narrow.rs", &shut),
+            ("bin/src/main.rs", &main),
+            ("bin/src/open.rs", &open),
+        ]);
+        let configs: [(&str, &[u8]); 2] = [
+            ("lib/Cargo.toml", b"[package]\nname = \"lib\"\n"),
+            ("bin/Cargo.toml", b"[package]\nname = \"bin\"\n"),
+        ];
+        let published = Tree::new(&configs, &files).published();
+        let published: Vec<&str> = published.iter().map(String::as_str).collect();
+        assert_eq!(
+            published,
+            ["lib/src/lib.rs", "lib/src/open.rs", "lib/src/open/below.rs"]
+        );
     }
 }

@@ -1369,6 +1369,18 @@ fn rust() {
             "api/src/main.rs::elsewhere",
             "api/src/main.rs::extras",
             "api/src/main.rs::hidden",
+            "api/src/main.rs::isolated",
+            "api/src/main.rs::isolated.far",
+            "api/src/main.rs::isolated.go",
+            "api/src/main.rs::launch",
+            "api/src/main.rs::local_wins",
+            "api/src/main.rs::local_wins.compute",
+            "api/src/main.rs::local_wins.go",
+            "api/src/main.rs::with_param",
+            "api/src/launch.rs::launch",
+            "crates/ledger-core/src/lib.rs::meter",
+            "crates/ledger-core/src/meter.rs::meter",
+            "crates/scratch/src/lib.rs::reach",
             "api/src/main.rs::loops",
             "api/src/main.rs::loops.f",
             "api/src/main.rs::outside",
@@ -1791,6 +1803,62 @@ fn rust() {
             ("api/src/main.rs::elsewhere::local_aid#0", None, &[]),
             ("api/src/main.rs::loops.f::a#0", None, &[]),
             ("api/src/main.rs::hidden::aid#0", None, &[]),
+            // A parameter hides the `use` that spells its name.
+            ("api/src/main.rs::with_param::aid#0", None, &[]),
+            // The file's `use`s and modules are not in scope in a module written in place: the
+            // names are crates outside the file there, never name-matched.
+            ("api/src/main.rs::isolated.go::aid#0", None, &[]),
+            ("api/src/main.rs::isolated.far::inner.helper#0", None, &[]),
+            (
+                "api/src/main.rs::main::isolated.go#0",
+                EXACT,
+                &["api/src/main.rs::isolated.go"],
+            ),
+            (
+                "api/src/main.rs::main::isolated.far#0",
+                EXACT,
+                &["api/src/main.rs::isolated.far"],
+            ),
+            // An item of the module beats what a glob gives.
+            (
+                "api/src/main.rs::local_wins.go::compute#0",
+                EXACT,
+                &["api/src/main.rs::local_wins.compute"],
+            ),
+            (
+                "api/src/main.rs::main::local_wins.go#0",
+                EXACT,
+                &["api/src/main.rs::local_wins.go"],
+            ),
+            // `mod launch; use launch::launch;`: a module is no value.
+            (
+                "api/src/main.rs::main::launch#0",
+                EXACT,
+                &["api/src/launch.rs::launch"],
+            ),
+            (
+                "api/src/main.rs::main::launch.launch#0",
+                EXACT,
+                &["api/src/launch.rs::launch"],
+            ),
+            // `mod meter; pub use meter::meter;` and a `pub use` in a `pub` module written in
+            // place, called from the other crate.
+            (
+                "api/src/main.rs::main::ledger_core.meter#0",
+                EXACT,
+                &["crates/ledger-core/src/meter.rs::meter"],
+            ),
+            (
+                "api/src/main.rs::main::ledger_core.entries.secret#0",
+                EXACT,
+                &["crates/ledger-core/src/lib.rs::internal.secret"],
+            ),
+            // `scratch` lists no dependency: `ledger_core` is outside the repository to it.
+            (
+                "crates/scratch/src/lib.rs::reach::ledger_core.post#0",
+                None,
+                &[],
+            ),
         ],
     );
     // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.
@@ -1811,7 +1879,7 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
     let mut rows = db
         .prepare(
             "SELECT path, name, file, target FROM exports WHERE path LIKE 'crates/%' \
-             OR path LIKE 'api/src/ring%' ORDER BY path, name",
+             OR path LIKE 'api/%' ORDER BY path, name",
         )
         .unwrap();
     let found: Vec<String> = rows
@@ -1825,20 +1893,9 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         .unwrap()
         .map(Result::unwrap)
         .collect();
+    // `api` has binaries alone (`src/main.rs`, `src/bin/`, a `[[bin]]`): no other crate can
+    // import them, so nothing in it is exported, whatever its `pub`s and modules say.
     let expected = [
-        "api/src/ring.rs Gear api/src/ring/c.rs Gear",
-        "api/src/ring.rs c api/src/ring/c.rs -",
-        "api/src/ring.rs d api/src/ring/d.rs -",
-        "api/src/ring.rs e api/src/ring/e.rs -",
-        "api/src/ring.rs x api/src/ring/x.rs -",
-        "api/src/ring.rs y api/src/ring/y.rs -",
-        // `pub(crate)` and private items are not exported.
-        "api/src/ring/c.rs Gear api/src/ring/c.rs Gear",
-        // The renames reach the definition three files away; a cycle reaches none.
-        "api/src/ring/d.rs Cog api/src/ring/c.rs Gear",
-        "api/src/ring/e.rs Wheel api/src/ring/c.rs Gear",
-        "api/src/ring/x.rs Loop - -",
-        "api/src/ring/y.rs Loop - -",
         // `pub use` at the root, `pub` modules and the items of a `pub` module written in
         // place; a private module and what it holds are not.
         "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
@@ -1849,8 +1906,14 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         "crates/billing/src/invoice.rs tax crates/billing/src/invoice.rs tax",
         "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
         "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
+        // A `pub use` in a `pub` module written in place is one of its members.
+        "crates/ledger-core/src/lib.rs entries.secret crates/ledger-core/src/lib.rs internal.secret",
+        // `mod meter; pub use meter::meter;`: the private module's file exports nothing, and
+        // the root gives the item.
+        "crates/ledger-core/src/lib.rs meter crates/ledger-core/src/meter.rs meter",
         "crates/ledger-core/src/lib.rs post crates/ledger-core/src/lib.rs post",
         "crates/scratch/src/lib.rs ignored crates/scratch/src/lib.rs ignored",
+        "crates/scratch/src/lib.rs reach crates/scratch/src/lib.rs reach",
     ];
     assert_eq!(found, expected);
 }

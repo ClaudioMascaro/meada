@@ -5,3 +5,6 @@ edition = "2021"
 
 [lib]
 path = "src/billing.rs"
+
+[dependencies]
+ledger-core = { path = "../ledger-core" }

@@ -412,7 +412,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .map(|(&pack, files)| {
             let language = lang::pack(pack);
             let modules = language.modules(&found_configs(pack), files)?;
-            Ok((pack, Resolver::new(files, modules, language)))
+            let published = language.published(&found_configs(pack), files);
+            Ok((
+                pack,
+                Resolver::new(files, modules, language).publishing(published),
+            ))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;

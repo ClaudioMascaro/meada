@@ -46,6 +46,18 @@ pub trait LanguagePack {
         None
     }
 
+    /// The files whose exports (the `exports` table) another package can import, when the
+    /// language says which: a Rust file's `pub` items are reachable from outside its crate
+    /// only through a library root and `pub mod` declarations, and a binary exports nothing.
+    /// `None` keeps every file.
+    fn published(
+        &self,
+        _configs: &[(&str, &[u8])],
+        _files: &BTreeMap<&str, &Facts>,
+    ) -> Option<BTreeSet<String>> {
+        None
+    }
+
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
     /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
     fn receiver(&self) -> Option<&'static str> {

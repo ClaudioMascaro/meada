@@ -251,7 +251,12 @@ modules updates it.
   `lookup` answers `crate` (the root), `self` (the file), `super` (`super::super`, through the top-level
   declarations that reached the file), a `mod` specifier (its file) and a crate's name (the
   root of its library, `[lib] name` else the package name, hyphens as underscores; a binary is
-  no library).
+  no library), reached only from the crates whose manifests list it as a dependency
+  (`Tree::libs`, per crate root; `dependencies()` reads the three tables, a `package =` rename and
+  `workspace = true`). `Tree::published` (`LanguagePack::published`) walks from each library
+  root through `pub mod` declarations (`Export::From` whose source is the specifier, not in
+  `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
+  root exports nothing (no other crate can import it), so no `export` entry point either.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a

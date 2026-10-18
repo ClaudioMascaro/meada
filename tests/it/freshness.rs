@@ -222,6 +222,21 @@ fn edit_rust(repo: &Path) {
     .unwrap();
     fs::remove_file(repo.join("api/tools/shared.rs")).unwrap();
     replace("api/Cargo.toml", "[[bin]]", "[[example]]");
+    // A `pub use` edited, an item moved to another file, a package renamed.
+    replace(
+        "crates/billing/src/billing.rs",
+        "pub use invoice::Invoice;",
+        "pub use invoice::{tax, Invoice};",
+    );
+    let lib = "crates/ledger-core/src/lib.rs";
+    replace(lib, "mod meter;\n\n", "");
+    replace(lib, "pub use meter::meter;", "pub fn meter() {}");
+    fs::remove_file(repo.join("crates/ledger-core/src/meter.rs")).unwrap();
+    replace(
+        "crates/ledger-core/Cargo.toml",
+        "name = \"ledger-core\"",
+        "name = \"ledger-kernel\"",
+    );
 }
 
 #[test]
@@ -239,6 +254,8 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     assert!(refreshed.contains("api/src/orphan.rs::lost"));
     assert!(refreshed.contains("crates/billing/src/audit.rs::record"));
     assert!(!refreshed.contains("api/tools/admin.rs"));
+    assert!(before.contains("crates/ledger-core/src/meter.rs::meter"));
+    assert!(!refreshed.contains("crates/ledger-core/src/meter.rs"));
     assert_eq!(
         refreshed,
         cold_export("fresh_rust_cold", "conformance-rust", ORIGIN, edit_rust)
