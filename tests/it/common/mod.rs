@@ -70,6 +70,23 @@ pub fn xlang(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The cross-language fixture of the Rust pack (spec #30) as siblings in one case directory:
+/// the TypeScript web app and the Rust api service (axum and reqwest), which call each other.
+pub fn xlang_rust(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-rust-web",
+            Some("https://example.com/xlang-rust/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-rust-api",
+            Some("git@example.com:xlang-rust/api.git"),
+        ),
+    )
+}
+
 /// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
 /// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
 /// gateway, whose workspace holds all four repositories.

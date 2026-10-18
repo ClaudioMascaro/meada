@@ -194,7 +194,7 @@ renomeações, globs, `pub use` e os outros crates do workspace pelo nome; as de
 não são indexadas, e contratos Rust além dos pacotes ainda não; só a configuração padrão de cada crate entra, para um alvo fixo x86_64 Linux: item sob um `#[cfg(..)]` falso, ou sob uma feature fora do `default` do `Cargo.toml`, fica de fora, e módulos `#[cfg(test)]` entram), e liga repositórios, também de uma
 linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` e, em Rust, `reqwest` e `ureq` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django e, em Rust, axum no lado que serve,
-também atrás de um gateway), pelos recursos
+também atrás de um gateway; em Rust, uma URL base lida do ambiente com `std::env::var`, `env!` ou `dotenvy::var` liga pelo `base_url_env`), pelos recursos
 declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python`), filas RabbitMQ
 (`amqplib` e, em Python, `pika`, com o `publish` numa exchange chegando às filas que os bindings
 ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3`), subjects NATS

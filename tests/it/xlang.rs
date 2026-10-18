@@ -7,7 +7,7 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, without_processes, xlang};
+use common::{assert_golden, without_processes, xlang, xlang_rust};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -109,4 +109,75 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_python_file() {
         .unwrap();
 
     assert_golden("xlang.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Rust service (spec #30): the web app (TypeScript, Next.js) reaches the
+/// api (axum) through `API_URL` and through the api's declared host; the api reaches the web
+/// app with reqwest through `WEB_URL`, read from the environment, and through its declared host.
+#[test]
+fn rust_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_rust("xlang_rust_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-rust-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+#[test]
+fn two_exports_of_the_rust_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_rust(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(export("xlang_rust_twice_a"), export("xlang_rust_twice_b"));
+}
+
+#[test]
+fn trace_down_crosses_into_rust_and_back_to_typescript() {
+    let (web, _) = xlang_rust("xlang_rust_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("xlang-rust.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_rust_and_back_to_typescript() {
+    let (web, _) = xlang_rust("xlang_rust_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-rust.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_rust_file() {
+    let (_, api) = xlang_rust("xlang_rust_uncommitted");
+    let orders = api.join("src/orders.rs");
+    let edited = fs::read_to_string(&orders)
+        .unwrap()
+        .replace("async fn reserve() {", "async fn reserve(_body: String) {");
+    fs::write(&orders, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-rust.trace-uncommitted.txt", &answer);
 }
