@@ -655,7 +655,7 @@ impl<'a> Walk<'_, 'a> {
         let widest = footer(Some(Level::Ambiguous), hops, repos, budget);
         let lines: Vec<String> = self.rows.iter().map(|r| r.text.clone()).collect();
         let room = budget.saturating_sub(render::tokens(&widest));
-        let (shown, body) = render::cut(&lines, room, budget);
+        let (shown, body) = render::cut(&lines, render::bytes(room), budget);
         let (weakest, hops, repos) = stats(&self.rows[..shown]);
         // The footer counts its own tokens: settle on the count that includes its digits.
         let mut tokens = 0;

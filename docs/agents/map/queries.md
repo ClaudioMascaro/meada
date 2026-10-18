@@ -95,11 +95,19 @@ modules updates it.
   (<kind>)`, matched by the entry point's label, the identity being what `trace` starts from.
   `context` on a symbol puts two lines right after its first line, so the budget cuts the tail
   and not them: `community: <name>` (or `none`, read from `Export::communities`) and
-  `processes: <label> (<repository>), ...` (or `none`), sorted by entry point identity.
+  `processes: <summary>: <label> (<repository>), ...` (the summary below, or `none`), sorted by entry point
+  identity.
   `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
-  node, so membership is the reachability the process walk follows. The line gets the room the
-  rest of the answer leaves under the budget (`processes_line`): the entries that fit, then
-  `+<n> more` for the rest, which alone is the least it holds. Two processes of one repository
+  node, so membership is the reachability the process walk follows. `processes_line` opens
+  with a summary whenever the symbol belongs to a process, `<n> (<k> route, <k> export; <r>
+  repositories)` (kinds in `EntryKind::ALL` order, only those with a count), then the entries
+  that fit its room, then `+<m> more` for the rest; when not even one fits, the summary is the
+  line. The room is what the budget leaves after the header and community, less the note of
+  the final cut. `context_fresh` cuts in this order: the span text first (`render::cut`, with
+  its own note; left out when not even the note fits, so the agent reads it from the file the
+  header names), then the tail (callers, callees, consumers, contracts) by
+  the usual cut; the header, community and processes lines survive it. An answer that fits
+  names every process and is cut nowhere. Two processes of one repository
   with the same label show as their `process::<identity>`.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
   variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the

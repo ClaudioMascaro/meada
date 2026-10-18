@@ -1,6 +1,6 @@
 example.com/channels/api src/orders.ts:5 createOrder
 community: none
-processes: createOrder (example.com/channels/api)
+processes: 1 (1 export; 1 repository): createOrder (example.com/channels/api)
 async function createOrder(id: string) {
   await producer.send({ topic: ORDERS_CREATED, messages: [{ key: id, value: id }] });
 }

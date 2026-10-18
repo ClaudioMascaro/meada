@@ -118,8 +118,11 @@ tagging.
   (name, repository and member count) and `process` (matched by the entry point's label: name,
   `process::` identity, entry point kind and repository). `context` on a symbol adds its
   community, or `community: none`, and the processes it belongs to, found by walking upstream
-  over the same calls and links a process expands (decided links count, ambiguous ones do not),
-  cut under the budget with a count of the rest.
+  over the same calls and links a process expands (decided links count, ambiguous ones do not).
+  The processes line opens with a summary (count, count per entry point kind, repositories),
+  then the entries that fit; under the budget the span text is cut first, ahead of the callers,
+  callees, consumers and contracts, so the line keeps its summary and as many entries as fit;
+  a span with no room for its cut note is left out, to be read from the file the header names.
 
 ### Fixed
 

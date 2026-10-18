@@ -1,6 +1,6 @@
 example.com/chain/web src/status.ts:2 health
 community: src#3
-processes: dashboard (example.com/chain/web)
+processes: 1 (1 export; 1 repository): dashboard (example.com/chain/web)
 function health() {
   return fetch("/api/health");
 }

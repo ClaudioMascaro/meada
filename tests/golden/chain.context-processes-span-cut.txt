@@ -1,0 +1,15 @@
+example.com/chain/catalog lib/long.ts:3 long
+community: lib#2
+processes: 2 (2 export; 1 repository): first (example.com/chain/catalog), second (example.com/chain/catalog)
+function long(id: string) {
+  const step1 = find(id + 1);
+  const step2 = find(id + 2);
+  const step3 = find(id + 3);
+  const step4 = find(id + 4);
+  const step5 = find(id + 5);
+… cut after 6 of 12 lines (budget 150 tokens); raise budget for more
+callers:
+example.com/chain/catalog lib/long.ts:17 first
+example.com/chain/catalog lib/long.ts:21 second
+callees:
+example.com/chain/catalog lib/products.ts:10 find

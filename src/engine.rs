@@ -663,12 +663,17 @@ impl Engine {
     }
 
     /// One symbol of the workspace: its community (`community: <name>` or `none`) and the
-    /// processes it belongs to (`processes: <label> (<repository>), ...` or `none`, found by
-    /// walking upstream, the entries that do not fit in the room the rest of the answer leaves
-    /// replaced by `+<n> more`), both right after its first line; then its span text read from
-    /// disk (only while the file still has the indexed hash), its callers and its callees.
-    /// `symbol` is an identity, `<path>::<name>` or a name; when it fits several symbols, they
-    /// are listed instead of guessed. The answer is cut at `budget` tokens.
+    /// processes it belongs to (`processes: none`, or a summary `processes: <n> (<k> route, <k>
+    /// export; <r> repositories)` and the entries that fit, `<label> (<repository>), ..., +<m>
+    /// more`, found by walking upstream), both right after its first line; then its span text
+    /// read from disk (only while the file still has the indexed hash), its callers and its
+    /// callees. `symbol` is an identity, `<path>::<name>` or a name; when it fits several
+    /// symbols, they are listed instead of guessed. The answer is cut at `budget` tokens, from
+    /// the last to give up: the first line, the community, the processes line (its summary, then
+    /// as many entries as fit), the callers, callees, consumers and contracts, and the span
+    /// text, which keeps its leading lines and ends with the cut note of `render::cut`, or is
+    /// left out when not even that note fits (the agent reads it from the file the first line
+    /// names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -737,37 +742,65 @@ impl Engine {
             .find(|c| c.members.contains(&symbol_found.id))
             .map_or("none", |c| c.name.as_str());
         let community = format!("community: {community}");
-        let mut rest = text.unwrap_or_else(|| {
-            vec![format!(
+        // Without the span text there is no span: the note is a line of the tail, kept in its
+        // output position and ahead of the callers, so the cut never rewrites it.
+        let unavailable = text.is_none().then(|| {
+            format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
-            )]
+            )
         });
-        rest.extend(relations(identity, export, &mut files, &symbol_found.id));
-        rest.extend(consumers(&exports, repos, &links, &symbol_found.id));
+        let span = text.unwrap_or_default();
+        let mut tail = Vec::from_iter(unavailable);
+        tail.extend(relations(identity, export, &mut files, &symbol_found.id));
+        tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
         let routes = Routes::new(&exports);
         let workspace = (links.as_slice(), &routes);
-        rest.extend(contracts(
+        tail.extend(contracts(
             identity,
             export,
             workspace,
             &mut files,
             symbol_found,
         ));
-        // The processes come right after the header, which the budget never cuts before the
-        // rest: the line gets the room everything else leaves.
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
         let found = graph.processes_of(&symbol_found.id);
-        let used: usize = [&header, &community]
-            .into_iter()
-            .chain(&rest)
-            .map(|l| render::line_bytes(l))
-            .sum();
+        let bytes = |lines: &[String]| lines.iter().map(|l| render::line_bytes(l)).sum::<usize>();
         let cap = render::bytes(budget.unwrap_or(render::DEFAULT_BUDGET));
-        // What the processes line may take, its own newline left out.
-        let room = cap.saturating_sub(used + render::line_bytes(""));
-        let mut lines = vec![header, community, processes_line(&found, repos, room)];
-        lines.extend(rest);
+        let head = [header, community];
+        // An answer that fits is cut nowhere, with every process named.
+        let full = processes_line(&found, repos, usize::MAX);
+        let whole: Vec<String> = (head.iter().cloned())
+            .chain([full])
+            .chain(span.iter().cloned())
+            .chain(tail.iter().cloned())
+            .collect();
+        if bytes(&whole) <= cap {
+            return Ok(render::budgeted(&whole, budget));
+        }
+        // Otherwise the cut order, from the last to give up: header, community, the processes
+        // line (its summary, then the entries that fit), the sections after the span, the span
+        // text. The processes line may take what the head leaves less the widest note the final
+        // cut can write, so that cut never reaches it.
+        let total = head.len() + 1 + span.len() + 1 + tail.len();
+        let widest = render::note(total, total, budget.unwrap_or(render::DEFAULT_BUDGET));
+        let room = cap.saturating_sub(bytes(&head) + 1 + widest.len());
+        let processes = processes_line(&found, repos, room);
+        let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
+        // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
+        // room even for the note it is left out, and the agent reads it from the file the header
+        // names.
+        let span_room = left.saturating_sub(bytes(&tail));
+        let (_, span) = render::cut(&span, span_room, budget.unwrap_or(render::DEFAULT_BUDGET));
+        let span = if span.len() > span_room {
+            String::new()
+        } else {
+            span
+        };
+        let mut lines = Vec::from(head);
+        lines.push(processes);
+        lines.extend(span.lines().map(str::to_string));
+        lines.extend(tail);
         Ok(render::budgeted(&lines, budget))
     }
 }
@@ -1104,14 +1137,32 @@ fn relative(from: &Path, to: &Path) -> String {
     }
 }
 
-/// `processes: <a>, <b>, +<n> more` for the processes `found`, or `processes: none`: the entries
-/// that fit in `room` bytes, in order, and a count of the rest, which is all the line holds when
-/// not even the first entry fits. An entry is `<label> (<repository>)`, or its `process::`
-/// identity when another process of the same repository has the same label.
+/// `processes: none`, or `processes: <n> (<k> <kind>, ...; <r> repositories)` for the processes
+/// `found`, a summary present whenever there is one, then `: ` and the entries that fit in
+/// `room` bytes, in order, and `, +<m> more` for the rest. When not even the first entry fits
+/// the summary stands alone. An entry is `<label> (<repository>)`, or its `process::` identity
+/// when another process of the same repository has the same label.
 fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: usize) -> String {
     if found.is_empty() {
         return "processes: none".into();
     }
+    let kinds: Vec<String> = (entry::EntryKind::ALL.iter())
+        .filter_map(|k| {
+            let n = found.iter().filter(|(_, e)| e.kind == *k).count();
+            (n > 0).then(|| format!("{n} {}", k.name()))
+        })
+        .collect();
+    let repositories = (found.iter().map(|(n, _)| n).collect::<HashSet<_>>()).len();
+    let summary = format!(
+        "processes: {} ({}; {repositories} {})",
+        found.len(),
+        kinds.join(", "),
+        if repositories == 1 {
+            "repository"
+        } else {
+            "repositories"
+        }
+    );
     let entries: Vec<String> = (found.iter())
         .map(|&(n, e)| {
             let same = found.iter().filter(|(m, o)| *m == n && o.label == e.label);
@@ -1122,8 +1173,8 @@ fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: us
         })
         .collect();
     let mut kept = Vec::new();
-    // The length of `processes: ` and the entries kept, joined.
-    let mut used = "processes: ".len();
+    // The length of the summary and the entries kept, joined.
+    let mut used = summary.len() + ": ".len();
     for (i, entry) in entries.iter().enumerate() {
         let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();
         let rest = entries.len() - i - 1;
@@ -1138,11 +1189,14 @@ fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: us
         kept.push(entry.clone());
         used = len;
     }
+    if kept.is_empty() {
+        return summary;
+    }
     let rest = entries.len() - kept.len();
     if rest > 0 {
         kept.push(format!("+{rest} more"));
     }
-    format!("processes: {}", kept.join(", "))
+    format!("{summary}: {}", kept.join(", "))
 }
 
 /// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.

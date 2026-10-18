@@ -28,6 +28,8 @@ fn context_names_the_community_and_the_processes_across_repositories() {
     assert_golden("chain.context-processes.txt", &answer);
 }
 
+const SPAN_CUT_BUDGET: usize = 150;
+
 const HEALTH: &str = "src/server.ts::GET /api/health";
 
 #[test]
@@ -39,7 +41,9 @@ fn a_symbol_with_no_community_says_none() {
 
     assert!(answer.contains("\ncommunity: none\n"), "{answer}");
     assert!(
-        answer.contains("\nprocesses: GET /api/health (example.com/chain/gateway)\n"),
+        answer.contains(
+            "\nprocesses: 1 (1 route; 1 repository): GET /api/health (example.com/chain/gateway)\n"
+        ),
         "{answer}"
     );
 }
@@ -57,8 +61,8 @@ fn a_decided_link_counts_and_an_ambiguous_one_does_not() {
     assert!(!before.contains("dashboard"), "{before}");
     assert!(
         after.contains(
-            "\nprocesses: GET /api/health (example.com/chain/gateway), \
-             dashboard (example.com/chain/web)\n"
+            "\nprocesses: 2 (1 route, 1 export; 2 repositories): \
+             GET /api/health (example.com/chain/gateway), dashboard (example.com/chain/web)\n"
         ),
         "{after}"
     );
@@ -82,7 +86,9 @@ fn an_ambiguous_call_is_no_membership() {
 
     assert!(cache.contains("\nprocesses: none\n"), "{cache}");
     assert!(
-        lookup.contains("\nprocesses: lookup (example.com/chain/catalog)\n"),
+        lookup.contains(
+            "\nprocesses: 1 (1 export; 1 repository): lookup (example.com/chain/catalog)\n"
+        ),
         "{lookup}"
     );
 }
@@ -98,13 +104,59 @@ fn the_processes_line_is_cut_under_the_budget_with_a_count_of_the_rest() {
 }
 
 #[test]
-fn the_processes_line_is_only_a_count_when_no_entry_fits() {
+fn the_processes_line_is_the_summary_alone_when_no_entry_fits() {
     let (_, _, catalog) = chain("community_queries_none_fit");
     let engine = Engine::open(&catalog).unwrap();
 
     let answer = engine.context("lib/products.ts::find", Some(60)).unwrap();
 
-    assert!(answer.contains("\nprocesses: +5 more\n"), "{answer}");
+    assert!(
+        answer.contains("\nprocesses: 5 (3 route, 2 export; 3 repositories)\n"),
+        "{answer}"
+    );
+}
+
+#[test]
+fn the_answer_stays_within_the_budget_and_keeps_the_summary() {
+    let (_, _, catalog) = chain("community_queries_sweep");
+    let engine = Engine::open(&catalog).unwrap();
+
+    for budget in [None, Some(90), Some(60), Some(46)] {
+        let answer = engine.context("lib/products.ts::find", budget).unwrap();
+
+        let limit = budget.unwrap_or(2_000);
+        assert!(answer.len().div_ceil(4) <= limit, "{budget:?}: {answer}");
+        let third = answer.lines().nth(2).unwrap_or_default();
+        assert!(
+            third.starts_with("processes: 5 (3 route, 2 export; 3 repositories)"),
+            "{budget:?}: {answer}"
+        );
+    }
+}
+
+#[test]
+fn a_long_body_is_cut_before_the_processes_and_the_callers() {
+    let (_, _, catalog) = chain("community_queries_span_cut");
+    let body: String = (1..=9)
+        .map(|n| format!("  const step{n} = find(id + {n});\n"))
+        .collect();
+    fs::write(
+        catalog.join("lib/long.ts"),
+        format!(
+            "import {{ find }} from \"./products\";\n\n\
+             export function long(id: string) {{\n{body}  return find(id);\n}}\n\n\
+             export function first(id: string) {{\n  return long(id);\n}}\n\n\
+             export function second(id: string) {{\n  return long(id);\n}}\n"
+        ),
+    )
+    .unwrap();
+    let engine = Engine::open(&catalog).unwrap();
+
+    let answer = engine
+        .context("lib/long.ts::long", Some(SPAN_CUT_BUDGET))
+        .unwrap();
+
+    assert_golden("chain.context-processes-span-cut.txt", &answer);
 }
 
 #[test]
@@ -129,7 +181,8 @@ fn two_processes_of_one_repository_with_the_same_label_show_their_identity() {
 
     assert!(
         answer.contains(
-            "\nprocesses: process::example.com/chain/catalog::lib/a.ts::handler, \
+            "\nprocesses: 2 (2 export; 1 repository): \
+             process::example.com/chain/catalog::lib/a.ts::handler, \
              process::example.com/chain/catalog::lib/b.ts::handler\n"
         ),
         "{answer}"

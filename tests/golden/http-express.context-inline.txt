@@ -1,6 +1,6 @@
 example.com/acme/backend src/routes/users.ts:13 register.GET /api/users/{}#1
 community: src/routes
-processes: GET /api/users/{} (example.com/acme/backend)
+processes: 1 (1 route; 1 repository): GET /api/users/{} (example.com/acme/backend)
 (req, res) => res.json(find(req.params.id))
 callers: none
 callees:

@@ -13,7 +13,7 @@ pub const DEFAULT_BUDGET: usize = 2_000;
 /// keeps the lines that fit and ends with a line saying where it stopped.
 pub fn budgeted(lines: &[String], budget: Option<usize>) -> String {
     let budget = budget.unwrap_or(DEFAULT_BUDGET);
-    cut(lines, budget, budget).1
+    cut(lines, bytes(budget), budget).1
 }
 
 /// The estimated tokens of `text`: one per four bytes, rounded up.
@@ -31,18 +31,19 @@ pub fn line_bytes(line: &str) -> usize {
     line.len() + 1
 }
 
-/// `lines` within `room` tokens, cut as `budgeted` cuts them, with the cut note naming
-/// `budget`, and how many lines it kept. `room` is below `budget` when the caller appends
-/// lines of its own.
-pub fn cut(lines: &[String], room: usize, budget: usize) -> (usize, String) {
-    let cap = bytes(room);
+/// The line that ends a cut answer: it kept `shown` of `total` lines, under `budget` tokens.
+pub(crate) fn note(shown: usize, total: usize, budget: usize) -> String {
+    format!(
+        "… cut after {shown} of {total} lines (budget {budget} tokens); raise budget for more\n"
+    )
+}
+
+/// `lines` within `cap` bytes, cut as `budgeted` cuts them, with the cut note naming `budget`
+/// tokens, and how many lines it kept. `cap` is below the budget's bytes when the caller
+/// appends lines of its own.
+pub fn cut(lines: &[String], cap: usize, budget: usize) -> (usize, String) {
     let all: usize = lines.iter().map(|l| line_bytes(l)).sum();
-    let note = |shown: usize| {
-        format!(
-            "… cut after {shown} of {} lines (budget {budget} tokens); raise budget for more\n",
-            lines.len()
-        )
-    };
+    let note = |shown: usize| note(shown, lines.len(), budget);
     let mut shown = lines.len();
     if all > cap {
         // The note's length depends on `shown`'s digits: reserve for the widest.
