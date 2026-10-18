@@ -1,0 +1,10 @@
+example.com/pkg/pylib src/shared_lib/core.py:4-5 greet
+community: src/shared_lib
+processes: 2 (2 export; 2 repositories): greet (example.com/pkg/pylib), welcome (example.com/pkg/pyweb)
+def greet(name):
+    return shout("hello " + name)
+callers: none
+callees:
+example.com/pkg/pylib src/shared_lib/text.py:1 shout
+consumers:
+example.com/pkg/pyweb app/main.py:10 welcome [range unchecked]

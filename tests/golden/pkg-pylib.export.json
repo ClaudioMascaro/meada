@@ -1,0 +1,238 @@
+{
+  "repository": "example.com/pkg/pylib",
+  "files": [
+    {
+      "path": "src/shared_lib/__init__.py",
+      "hash": "6f08e1b3091ab4d652042629c98b0f7b26935c229bab77f72d958ceebdab3994"
+    },
+    {
+      "path": "src/shared_lib/api.py",
+      "hash": "6fb98c56e60342accf8029a28f7a8ecbf95c7f0ddc839ec03a34965dbe2543f4"
+    },
+    {
+      "path": "src/shared_lib/core.py",
+      "hash": "58a788e5cc534fb049be32966fe6c0edf9a999c3d2b05ba20190d76e242b1326"
+    },
+    {
+      "path": "src/shared_lib/text.py",
+      "hash": "2206c0d8c6f7cb9dcfc75b090d55c557df0ceba60660c7fda0ac032b39d52f2d"
+    },
+    {
+      "path": "src/sl_extras/__init__.py",
+      "hash": "b13ecb2b5172d93ceed1a1187702c85d3f17df4f2fcb03ebb77e9254fc670ed9"
+    },
+    {
+      "path": "tools/sl_extras/__init__.py",
+      "hash": "7fdb3f88dbc555346871fcc2fe55cbeb326337e3cbad5d941ae17fa7b3d14638"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/api.py::Client",
+      "span": {
+        "path": "src/shared_lib/api.py",
+        "start": 42,
+        "end": 114
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/api.py::Client.create",
+      "span": {
+        "path": "src/shared_lib/api.py",
+        "start": 60,
+        "end": 114
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/api.py::fetch",
+      "span": {
+        "path": "src/shared_lib/api.py",
+        "start": 0,
+        "end": 39
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/core.py::greet",
+      "span": {
+        "path": "src/shared_lib/core.py",
+        "start": 26,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/text.py::shout",
+      "span": {
+        "path": "src/shared_lib/text.py",
+        "start": 0,
+        "end": 40
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/sl_extras/__init__.py::boost",
+      "span": {
+        "path": "src/sl_extras/__init__.py",
+        "start": 0,
+        "end": 38
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::tools/sl_extras/__init__.py::boost",
+      "span": {
+        "path": "tools/sl_extras/__init__.py",
+        "start": 0,
+        "end": 38
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/api.py::Client.create::cls#0",
+      "caller": "example.com/pkg/pylib::src/shared_lib/api.py::Client.create",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared_lib/api.py",
+        "start": 109,
+        "end": 114
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/core.py::greet::shout#0",
+      "caller": "example.com/pkg/pylib::src/shared_lib/core.py::greet",
+      "target": "example.com/pkg/pylib::src/shared_lib/text.py::shout",
+      "level": "exact",
+      "span": {
+        "path": "src/shared_lib/core.py",
+        "start": 54,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/pkg/pylib::src/shared_lib/text.py::shout::text.upper#0",
+      "caller": "example.com/pkg/pylib::src/shared_lib/text.py::shout",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared_lib/text.py",
+        "start": 28,
+        "end": 40
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::npm::shared-lib",
+      "site": "example.com/pkg/pylib::js/package.json"
+    },
+    {
+      "contract": "package::pypi::shared-lib",
+      "site": "example.com/pkg/pylib::pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::shared-tools",
+      "site": "example.com/pkg/pylib::tools/pyproject.toml"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "shared-lib",
+      "version": "1.2.0",
+      "repository": "example.com/pkg/pylib",
+      "directory": "."
+    },
+    {
+      "name": "shared-lib",
+      "version": "9.0.0",
+      "repository": "example.com/pkg/pylib",
+      "directory": "js"
+    },
+    {
+      "name": "shared-tools",
+      "version": "0.3.0",
+      "repository": "example.com/pkg/pylib",
+      "directory": "tools"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src/shared_lib",
+      "members": [
+        "example.com/pkg/pylib::src/shared_lib/core.py::greet",
+        "example.com/pkg/pylib::src/shared_lib/text.py::shout"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/pyweb::app/main.py::extra::sl_extras.boost#0",
+      "provider": "example.com/pkg/pylib::src/sl_extras/__init__.py::boost",
+      "contract": "package::pypi::shared-lib",
+      "level": "ambiguous",
+      "reason": "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked; import top-level module"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::app/main.py::extra::sl_extras.boost#0",
+      "provider": "example.com/pkg/pylib::tools/sl_extras/__init__.py::boost",
+      "contract": "package::pypi::shared-tools",
+      "level": "ambiguous",
+      "reason": "package::pypi::shared-tools ==0.3.0 (local 0.3.0), range unchecked; import top-level module"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::app/main.py::lookup::shared_lib.api.fetch#0",
+      "provider": "example.com/pkg/pylib::src/shared_lib/api.py::fetch",
+      "contract": "package::pypi::shared-lib",
+      "level": "exact",
+      "reason": "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::app/main.py::make::Client.create#0",
+      "provider": "example.com/pkg/pylib::src/shared_lib/api.py::Client.create",
+      "contract": "package::pypi::shared-lib",
+      "level": "exact",
+      "reason": "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::app/main.py::welcome::greet#0",
+      "provider": "example.com/pkg/pylib::src/shared_lib/core.py::greet",
+      "contract": "package::pypi::shared-lib",
+      "level": "exact",
+      "reason": "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::pyproject.toml::project.dependencies::shared-lib",
+      "provider": "example.com/pkg/pylib::pyproject.toml",
+      "contract": "package::pypi::shared-lib",
+      "level": "exact",
+      "reason": "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::requirements-dev.txt::requirements::shared-lib",
+      "provider": "example.com/pkg/pylib::pyproject.toml",
+      "contract": "package::pypi::shared-lib",
+      "level": "exact",
+      "reason": "package::pypi::shared-lib >=1.1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::requirements.txt::requirements::shared-tools",
+      "provider": "example.com/pkg/pylib::tools/pyproject.toml",
+      "contract": "package::pypi::shared-tools",
+      "level": "exact",
+      "reason": "package::pypi::shared-tools ==0.3.0 (local 0.3.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::worker/job.py::run::sl_extras.boost#0",
+      "provider": "example.com/pkg/pylib::tools/sl_extras/__init__.py::boost",
+      "contract": "package::pypi::shared-tools",
+      "level": "inferred",
+      "reason": "package::pypi::shared-tools ^0.3 (local 0.3.0), range unchecked; import top-level module"
+    },
+    {
+      "consumer": "example.com/pkg/pyweb::worker/pyproject.toml::tool.poetry.dependencies::shared-tools",
+      "provider": "example.com/pkg/pylib::tools/pyproject.toml",
+      "contract": "package::pypi::shared-tools",
+      "level": "exact",
+      "reason": "package::pypi::shared-tools ^0.3 (local 0.3.0), range unchecked"
+    }
+  ]
+}

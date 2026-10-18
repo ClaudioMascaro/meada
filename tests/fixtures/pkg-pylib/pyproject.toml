@@ -1,0 +1,4 @@
+[project]
+name = "Shared_Lib"
+version = "1.2.0"
+description = "The shared library: its packages live under src/."
