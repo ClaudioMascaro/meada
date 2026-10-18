@@ -636,15 +636,17 @@ pub fn python_programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, S
         let roots = python_roots(manifest);
         for (module, function) in &manifest.summary.scripts {
             let name = module.replace('.', "/");
+            // The first candidate that exists and is this package's, as `Provided::module`
+            // finds it: a file of a nested package is not.
+            let owned = |f: &String| {
+                files.contains(&f.as_str())
+                    && owner(manifests, f, Ecosystem::Pypi)
+                        .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+            };
             let file = (roots.iter())
                 .flat_map(|root| python::files(root, &name))
-                .find(|f| files.contains(&f.as_str()));
-            // A file of a nested package is not this package's.
-            let owned = |f: &String| {
-                owner(manifests, f, Ecosystem::Pypi)
-                    .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
-            };
-            found.extend(file.filter(owned).map(|f| (f, function.clone())));
+                .find(owned);
+            found.extend(file.map(|f| (f, function.clone())));
         }
     }
     found.sort();
@@ -1755,6 +1757,30 @@ mod tests {
                 ("outer/inner.py".to_string(), "go".to_string()),
                 ("tool/__init__.py".to_string(), "run".to_string()),
             ]
+        );
+    }
+
+    #[test]
+    fn a_console_script_skips_a_candidate_another_package_owns() {
+        let pypi = |path: &str, scripts: &[(&str, &str)]| Manifest {
+            path: path.to_string(),
+            summary: Summary {
+                scripts: (scripts.iter())
+                    .map(|(m, f)| (m.to_string(), f.to_string()))
+                    .collect(),
+                ..Summary::default()
+            },
+        };
+        let all = [
+            pypi("pyproject.toml", &[("inner.mod", "go")]),
+            pypi("inner/pyproject.toml", &[]),
+        ];
+        // `inner/mod.py` comes first among the roots but belongs to the nested package.
+        let files = ["inner/mod.py", "src/inner/mod.py"];
+
+        assert_eq!(
+            python_programs(&all, &files),
+            [("src/inner/mod.py".to_string(), "go".to_string())]
         );
     }
 

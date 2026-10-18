@@ -665,6 +665,12 @@ one for the area a change touches.
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
   tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
+  table form (`{ callable = "...", extras = [...] }`) is left out, and so are
+  `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the
+  scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
+  module's global of that name; only the first `__main__` of a file (a guard or a
+  `def __main__()`) counts.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

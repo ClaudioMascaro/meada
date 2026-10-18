@@ -65,28 +65,32 @@ impl LanguagePack for Python {
         {
             let mut inner = scope.clone();
             let mut inner_class = in_class;
-            // The body of a main guard, whose calls belong to the `__main__` symbol.
+            // The body of a main guard, whose calls and bindings belong to the `__main__`
+            // symbol.
+            // ponytail: a name assigned in the guard is a local of `__main__`, so it no longer
+            // rebinds the module's global of that name (it is no export or constant of the
+            // file); a script keeps its globals outside the guard in practice.
             let mut main_body = None;
             match node.kind() {
                 "if_statement" if scope.is_empty() && is_main_guard(node, src) => {
                     let body = node.child_by_field_name("consequence");
-                    if let Some(body) = body {
+                    // Only the first `__main__` counts, a guard or a `def __main__()`: the
+                    // calls of a later guard stay at the top level of the file.
+                    if let Some(body) = body.filter(|_| defined.insert(MAIN.to_string())) {
                         main_body = Some(body.id());
-                        if defined.insert(MAIN.to_string()) {
-                            facts.defs.push(Def {
-                                name: MAIN.to_string(),
-                                kind: Kind::Function,
-                                // The `if` and its body, not an `else` after it.
-                                range: node.start_byte()..body.end_byte(),
-                                params: Vec::new(),
-                                bases: Vec::new(),
-                                decorators: Vec::new(),
-                                return_values: Vec::new(),
-                                returns: None,
-                                type_params: Vec::new(),
-                            });
-                            facts.programs.push(MAIN.to_string());
-                        }
+                        facts.defs.push(Def {
+                            name: MAIN.to_string(),
+                            kind: Kind::Function,
+                            // The `if` and its body, not an `else` after it.
+                            range: node.start_byte()..body.end_byte(),
+                            params: Vec::new(),
+                            bases: Vec::new(),
+                            decorators: Vec::new(),
+                            return_values: Vec::new(),
+                            returns: None,
+                            type_params: Vec::new(),
+                        });
+                        facts.programs.push(MAIN.to_string());
                     }
                 }
                 "function_definition" | "class_definition" => {
@@ -1238,6 +1242,33 @@ mod tests {
         // Only top-level code starts the program: not a guard inside a function or a class.
         let f = facts("def f():\n    if __name__ == \"__main__\":\n        run()\n");
         assert!(f.programs.is_empty());
+    }
+
+    #[test]
+    fn only_the_first_main_symbol_of_a_file_counts() {
+        let two =
+            "if __name__ == \"__main__\":\n    one()\n\nif __name__ == \"__main__\":\n    two()\n";
+        let f = facts(two);
+
+        assert_eq!(f.programs, ["__main__"]);
+        assert_eq!(f.defs.len(), 1);
+        assert_eq!(
+            &two[f.defs[0].range.clone()],
+            "if __name__ == \"__main__\":\n    one()"
+        );
+        let scopes: Vec<(&str, &str)> = (f.calls.iter())
+            .map(|c| (c.callee.as_str(), c.scope.as_str()))
+            .collect();
+        assert_eq!(scopes, [("one", "__main__"), ("two", "")]);
+
+        // A function of that name defined first wins: the guard is no program.
+        let f = facts("def __main__():\n    one()\n\nif __name__ == \"__main__\":\n    two()\n");
+        assert!(f.programs.is_empty());
+        assert_eq!(f.defs.len(), 1);
+        let scopes: Vec<(&str, &str)> = (f.calls.iter())
+            .map(|c| (c.callee.as_str(), c.scope.as_str()))
+            .collect();
+        assert_eq!(scopes, [("one", "__main__"), ("two", "")]);
     }
 
     #[test]
