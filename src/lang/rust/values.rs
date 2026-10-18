@@ -17,7 +17,9 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use super::builders::{BUILDER_DEPTH, BUILDER_SIZE, BUILDER_WORK, Builder, size};
-use super::{DEFINITION_DEPTH, Heads, Path, Scan, field, levels, member, normalize, segments};
+use super::{
+    DEFINITION_DEPTH, Heads, PATH_DEPTH, Path, Scan, field, levels, member, normalize, segments,
+};
 use crate::lang::{Invocation, Part, Value, children, named, text};
 use crate::qualify;
 
@@ -25,6 +27,13 @@ use crate::qualify;
 /// deeper is `Unknown`.
 // ponytail: real code wraps a value a few levels; a crafted file must not recurse without end.
 pub(super) const VALUE_DEPTH: usize = 64;
+
+/// How many handlers a `routes![..]` lists, and how many `method = ".."` a `#[route]` gives; a
+/// longer list or more methods is read as nothing (`Unknown`).
+// ponytail: real code lists a few hundred handlers and nine methods at most; a crafted file
+// must not multiply them with the routes of a function.
+pub(super) const ROUTE_ITEMS: usize = 1024;
+pub(super) const ROUTE_METHODS: usize = 16;
 
 /// The HTTP methods the `Method` constants of the HTTP crates name, and those crates.
 const VERBS: &[&str] = &[
@@ -36,6 +45,9 @@ const METHOD_CRATES: &[&str] = &["reqwest", "http", "hyper", "axum", "actix_web"
 /// (a conversion of a name may be to another type: `into`, `clone`).
 const KEEPS: &[&str] = &["to_string", "to_owned", "into", "clone", "as_str", "as_ref"];
 const KEEPS_NAMES: &[&str] = &["to_string", "to_owned", "as_str"];
+
+/// Rocket's macro that lists the handlers of the routes a `mount` serves.
+const ROUTES: &str = "routes";
 
 /// The methods an environment read goes through: those that keep the text of a string
 /// (`trim_end_matches`) and those that unwrap its `Result` (`unwrap_or(fallback)` among them).
@@ -137,7 +149,7 @@ impl<'a, 't> Reader<'a, 't> {
                     Some(inner) => node = inner,
                     None => return Value::Unknown,
                 },
-                "array_expression" => {
+                "array_expression" | "tuple_expression" => {
                     let items = named(node).map(|n| self.value_at(at, n, level + 1));
                     return Value::List(items.collect());
                 }
@@ -455,6 +467,9 @@ impl<'a, 't> Reader<'a, 't> {
         let Some(name) = field(node, "macro").and_then(|m| self.macro_name(at, m)) else {
             return Value::Unknown;
         };
+        if name == ROUTES {
+            return self.routes(at, node);
+        }
         if name == "env" {
             return self
                 .env_macro(node)
@@ -485,8 +500,55 @@ impl<'a, 't> Reader<'a, 't> {
         parts.map_or(Value::Unknown, Value::Str)
     }
 
+    /// Rocket's `routes![a, b::c]`, the one macro read for what it lists: the paths of the
+    /// handlers, each as the name `normalize` gives it. An item that is no plain path is unknown.
+    fn routes(&mut self, at: &Where, node: Node<'t>) -> Value {
+        let Some(args) = named(node)
+            .find(|c| c.kind() == "token_tree")
+            .and_then(arguments)
+        else {
+            return Value::Unknown;
+        };
+        if args.len() > ROUTE_ITEMS {
+            return Value::Unknown;
+        }
+        let items: Vec<Value> = (args.iter())
+            .map(|tokens| self.route_item(at, tokens))
+            .collect();
+        Value::List(items)
+    }
+
+    /// One handler of `routes!`: `a`, or a path with `::` between identifiers.
+    fn route_item(&mut self, at: &Where, tokens: &[Node<'t>]) -> Value {
+        let mut segments = Vec::new();
+        for (n, token) in tokens.iter().enumerate().take(PATH_DEPTH * 2) {
+            match (n % 2, token.kind()) {
+                (0, "identifier" | "crate" | "self" | "super") => {
+                    segments.push(text(*token, self.src).to_string());
+                }
+                (1, "::") => {}
+                _ => return Value::Unknown,
+            }
+        }
+        // A path ends on an identifier, and a crafted one is not read past the depth limit.
+        if tokens.len().is_multiple_of(2) || tokens.len() > PATH_DEPTH * 2 {
+            return Value::Unknown;
+        }
+        match segments.len() {
+            0 => Value::Unknown,
+            1 => Value::Ref(segments.remove(0)),
+            _ => {
+                let path = self.path_of(at, segments);
+                match normalize(&path, self.scan, self.heads, false) {
+                    Some(name) => Value::Ref(name),
+                    None => Value::Unknown,
+                }
+            }
+        }
+    }
+
     /// The macro `path` names when it is the standard one: `format`, or `std::format` and its
-    /// likes. A macro the file defines, or one a `use` imports from anywhere but the standard
+    /// likes (and Rocket's `routes`, however imported). A macro the file defines, or one a `use` imports from anywhere but the standard
     /// library (`use my_macros::env;`), is another macro.
     fn macro_name(&self, at: &Where, path: Node) -> Option<String> {
         let name = match path.kind() {
@@ -497,12 +559,17 @@ impl<'a, 't> Reader<'a, 't> {
                     [krate, name] if matches!(krate.as_str(), "std" | "core" | "alloc") => {
                         name.clone()
                     }
+                    [krate, name] if krate == "rocket" && name == ROUTES => name.clone(),
                     _ => return None,
                 }
             }
             _ => return None,
         };
-        (path.kind() == "scoped_identifier" || self.std_macro(at, &name)).then_some(name)
+        let rocket = name == ROUTES
+            && self
+                .target(at, &name)
+                .is_some_and(|t| t.as_slice() == ["rocket", ROUTES]);
+        (path.kind() == "scoped_identifier" || rocket || self.std_macro(at, &name)).then_some(name)
     }
 
     /// Whether the macro `name`, written bare, is the standard one: the file defines no macro
@@ -839,6 +906,33 @@ fn char_text(node: Node, src: &[u8]) -> Vec<Part> {
 /// `scope`, makes.
 pub(super) fn inline(scope: &str, node: Node) -> String {
     qualify(scope, &format!("@{}", node.start_byte()))
+}
+
+/// The arguments of an attribute (`("/x", method = "GET")`): the string literals before the
+/// first `name = "literal"`, and those pairs as keyword arguments. Anything else is `Unknown`.
+pub(super) fn attribute(tree: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Value)>) {
+    let (mut args, mut kwargs) = (Vec::new(), Vec::new());
+    let literal = |n: &Node| match n.kind() {
+        "string_literal" | "raw_string_literal" => string(*n, src),
+        _ => Value::Unknown,
+    };
+    let mut methods = 0;
+    for tokens in arguments(tree).unwrap_or_default() {
+        match tokens.as_slice() {
+            [name, eq, value] if name.kind() == "identifier" && eq.kind() == "=" => {
+                let name = text(*name, src).to_string();
+                let value = match name == "method" && methods >= ROUTE_METHODS {
+                    true => Value::Unknown,
+                    false => literal(value),
+                };
+                methods += usize::from(name == "method");
+                kwargs.push((name, value));
+            }
+            [value] if kwargs.is_empty() => args.push(literal(value)),
+            _ => kwargs.push((String::new(), Value::Unknown)),
+        }
+    }
+    (args, kwargs)
 }
 
 /// A string literal as one text part; `Unknown` for one with an escape sequence, since its

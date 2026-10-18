@@ -251,6 +251,16 @@ pub struct Facts {
     /// of the repository by its name, else to something outside it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub externs: Vec<String>,
+    /// The crates the file brings in with `#[macro_use] extern crate x;` (Rust): their macros
+    /// and attributes are in scope in every file of the crate, as if imported.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub macro_use: Vec<String>,
+    /// The names the file writes as a value, a path or inside a macro call, apart from the
+    /// names it defines and the route attributes it carries (Rust): `None` where the pack does
+    /// not tell, or the file writes more than the pack reads. A name no file mentions is
+    /// registered by no code. Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub mentions: Option<BTreeSet<String>>,
     /// The `exports` names only the package itself sees (Rust's items that are not `pub`):
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

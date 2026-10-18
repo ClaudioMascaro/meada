@@ -222,6 +222,11 @@ modules updates it.
   module, `nonlocal x` to the nearest enclosing function that binds `x` (class bodies
   skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
   and `... | None`.
+- `lang/rust.rs` also yields `Facts::macro_use` (the crates of `#[macro_use] extern crate x;`,
+  stored) and `Facts::mentions` (the names a file writes apart from the functions it defines
+  and its route attributes; not stored, so the providers get it from the files parsed again).
+  A function does not hide the crate a path begins with (`rocket::build()` beside a
+  `fn rocket`), and a module of the same name as a function still hides the crate.
 - `lang/rust.rs` (spec #30) yields free functions (`Kind::Function`), structs, enums, unions
   and traits (`Kind::Class`), modules written in place (`Kind::Module`), methods of an `impl`
   (`Type.method`, or `Type.Trait.method` in a trait's block, `Kind::Method`) and trait methods

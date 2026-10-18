@@ -952,7 +952,12 @@ impl<'a> Resolver<'a> {
             };
             if reading.types() {
                 match defs.get_key_value(candidate.as_str()) {
-                    Some((name, def)) if def.kind != Kind::Method => {
+                    // A function is no head of a path called (`rocket::build()` beside a
+                    // `fn rocket`), though a `use` may name one.
+                    Some((name, def))
+                        if def.kind != Kind::Method
+                            && (reading == Reading::Alias || def.kind != Kind::Function) =>
+                    {
                         return Binding::Def(Target { path, name });
                     }
                     _ => {
@@ -1908,6 +1913,11 @@ impl<'a> Code<'a> {
         out
     }
 
+    /// The names `path` mentions (`Facts::mentions`); `None` where the pack does not tell.
+    pub fn mentions(&self, path: &'a str) -> Option<&'a BTreeSet<String>> {
+        self.full(path)?.mentions.as_ref()
+    }
+
     /// The scope and value of each `let` of `path` whose name is bound again or assigned again
     /// (`Facts::rebound`).
     pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {
@@ -1931,6 +1941,18 @@ impl<'a> Code<'a> {
         let binding = self.resolver.binding(path, scope, callee);
         matches!(binding, Binding::External(..))
             .then(|| self.resolver.imported_name(path, scope, callee))
+    }
+
+    /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
+    /// its head among types and modules, so a function of the file that spells like a crate
+    /// (`fn rocket()` calling `rocket::build()`) does not hide it.
+    pub fn external_of(&self, path: &'a str, call: &'a Call) -> Option<String> {
+        if !call.by_path {
+            return self.external(path, &call.scope, &call.callee);
+        }
+        let binding = self.resolver.path_binding(path, &call.scope, &call.callee);
+        matches!(binding, Binding::External(..))
+            .then(|| self.resolver.imported_name(path, &call.scope, &call.callee))
     }
 
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
@@ -2030,7 +2052,7 @@ impl<'a> Code<'a> {
                     let steps = trail.steps.split_off(mark);
                     trail.out.retain(|&(p, n)| {
                         let call = &self.resolver.files[p].calls[n];
-                        match self.external(p, &call.scope, &call.callee) {
+                        match self.external_of(p, call) {
                             Some(origin) => steps.iter().all(|m| self.pack.passes(&origin, m)),
                             None => steps.is_empty(),
                         }
@@ -2040,7 +2062,7 @@ impl<'a> Code<'a> {
                     let outside = !matched
                         || (trail.out.iter()).all(|&(p, n)| {
                             let call = &self.resolver.files[p].calls[n];
-                            self.external(p, &call.scope, &call.callee).is_some()
+                            self.external_of(p, call).is_some()
                         });
                     if outside {
                         kept.append(&mut trail.out);
