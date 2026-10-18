@@ -30,6 +30,14 @@ pub enum EntryKind {
 }
 
 impl EntryKind {
+    /// Every kind, in the order a symbol's process summary lists them.
+    pub const ALL: [EntryKind; 4] = [
+        EntryKind::Route,
+        EntryKind::Export,
+        EntryKind::Channel,
+        EntryKind::Program,
+    ];
+
     /// The name the index stores and the export shows.
     pub fn name(self) -> &'static str {
         match self {
@@ -41,14 +49,7 @@ impl EntryKind {
     }
 
     pub fn parse(name: &str) -> Option<Self> {
-        [
-            EntryKind::Route,
-            EntryKind::Export,
-            EntryKind::Channel,
-            EntryKind::Program,
-        ]
-        .into_iter()
-        .find(|k| k.name() == name)
+        Self::ALL.into_iter().find(|k| k.name() == name)
     }
 }
 

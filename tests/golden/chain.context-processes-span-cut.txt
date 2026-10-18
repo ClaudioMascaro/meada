@@ -1,0 +1,17 @@
+example.com/chain/gateway src/checkout.ts:9 createOrder
+community: src#2
+processes: 2 (1 route, 1 export; 2 repositories): PUT /api/orders/{} (example.com/chain/gateway), createOrder (example.com/chain/web)
+async function createOrder(req: Request, res: { status(code: number): { end(): void } }) {
+  const product = await productOf(req.query.product);
+… cut after 2 of 5 lines (budget 258 tokens); raise budget for more
+callers: none
+callees:
+example.com/chain/gateway src/catalog.ts:2 productOf
+example.com/chain/gateway src/events.ts:4 publish
+example.com/chain/gateway src/checkout.ts:12 (unresolved) (call_expression).end
+example.com/chain/gateway src/checkout.ts:11 (unresolved) JSON.stringify
+example.com/chain/gateway src/checkout.ts:12 (unresolved) res.status
+contracts:
+example.com/chain/gateway src/checkout.ts:9 provides http::PUT::/api/orders/{}
+example.com/chain/gateway src/checkout.ts:11 produces channel::kafka::orders.created
+example.com/chain/gateway src/checkout.ts:10 consumes http::GET::/api/products/{}
