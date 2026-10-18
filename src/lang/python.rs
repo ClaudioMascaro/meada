@@ -379,8 +379,9 @@ struct Module {
     /// Every top-level binding in statement order: a name (`Export::Local`) or a star import
     /// (`Export::All`).
     bindings: Vec<Export>,
-    /// The names of a literal `__all__`; `None` when there is none, or it is computed.
-    all: Option<Vec<String>>,
+    /// What a star import takes by `__all__`: the names of a literal one, or `Star::Computed`;
+    /// `None` when there is none.
+    all: Option<Star>,
 }
 
 impl Module {
@@ -424,9 +425,9 @@ impl Module {
         let name = text(left, src);
         self.name(name);
         if name == "__all__" {
-            self.all = node
-                .child_by_field_name("right")
-                .and_then(|right| string_list(right, src));
+            let right = node.child_by_field_name("right");
+            let names = right.and_then(|right| string_list(right, src));
+            self.all = Some(names.map_or(Star::Computed, Star::Only));
         }
     }
 
@@ -434,7 +435,7 @@ impl Module {
     /// included, as that is how a package re-exports) and its star imports' names, the last
     /// binding first, as it rebinds a name the bindings before it gave (`stars_bind`): a name
     /// once, where it was last bound, and every star import. What `import *` takes is a literal
-    /// `__all__`, else the public names; a computed `__all__` is ignored.
+    /// `__all__`, else the public names, which a computed `__all__` may take or not.
     fn exports(self) -> (Vec<Export>, Star) {
         let mut seen = HashSet::new();
         let exports = (self.bindings.into_iter().rev())
@@ -443,7 +444,7 @@ impl Module {
                 _ => true,
             })
             .collect();
-        (exports, self.all.map_or(Star::Public, Star::Only))
+        (exports, self.all.unwrap_or(Star::Public))
     }
 }
 

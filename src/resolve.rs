@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Step, Ty, Value,
+    Star, Step, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -647,18 +647,14 @@ impl<'a> Resolver<'a> {
     // *` after `def heappush`). Taking it to rebind every name loses about as many right links
     // as wrong ones on the standard library.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        for import in self.files[path].imports.iter().rev() {
-            if import.local == name {
-                return self.import(path, &import.source, &import.name, seen);
+        let given = (self.files[path].imports.iter().rev()).map(|import| match import.name {
+            _ if import.local == name => {
+                Some((self.import(path, &import.source, &import.name, seen), false))
             }
-            if matches!(import.name, Imported::All)
-                && let Some(module) = self.module(path, &import.source)
-                && let Some(found) = self.star(module, name, seen)
-            {
-                return found;
-            }
-        }
-        Binding::Unknown
+            Imported::All => self.taken(path, &import.source, name, seen),
+            _ => None,
+        });
+        latest(given, false).unwrap_or(Binding::Unknown)
     }
 
     /// The head of a callee that starts with a dotted import (`import a.b.c` binds `a.b.c`),
@@ -720,6 +716,20 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// What a star import of `source` from `path` takes as `name` (`star`), and whether it may
+    /// not take it (`Star::Computed`).
+    fn taken(
+        &self,
+        path: &'a str,
+        source: &str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<(Binding<'a>, bool)> {
+        let module = self.module(path, source)?;
+        let found = self.star(module, name, seen)?;
+        Some((found, matches!(self.files[module].star, Star::Computed)))
+    }
+
     /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         self.exports(path, name, seen).unwrap_or(Binding::Unknown)
@@ -763,7 +773,13 @@ impl<'a> Resolver<'a> {
     fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
         if self.stars_bind {
-            return (exports.iter()).find_map(|export| self.gives(path, export, name, seen));
+            let given = (exports.iter()).map(|export| match export {
+                Export::All { source } => self.taken(path, source, name, seen),
+                _ => self
+                    .gives(path, export, name, seen)
+                    .map(|found| (found, false)),
+            });
+            return latest(given, false);
         }
         let star = |export: &&Export| matches!(export, Export::All { .. });
         let mut own = (exports.iter()).filter(|export| !star(export));
@@ -807,7 +823,12 @@ impl<'a> Resolver<'a> {
     fn rebound(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let (stars, after) = self.later.get(path)?;
         let stars = &stars[..*after.get(name)?];
-        (stars.iter()).find_map(|source| self.star(self.module(path, source)?, name, seen))
+        latest(
+            stars
+                .iter()
+                .map(|source| self.taken(path, source, name, seen)),
+            true,
+        )
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
@@ -856,6 +877,30 @@ impl<'a> Resolver<'a> {
             .iter()
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
+    }
+}
+
+/// What the latest of `bindings` (the latest first) binds a name to, if one binds it: the first
+/// that gives it, unless it may not (`Resolver::taken`), when the one before it decides as well,
+/// and so on; two that differ leave the name unknown, and so does one that may not when
+/// something before them all (`before`) binds the name.
+fn latest<'a>(
+    bindings: impl Iterator<Item = Option<(Binding<'a>, bool)>>,
+    before: bool,
+) -> Option<Binding<'a>> {
+    let mut found = None;
+    for (binding, maybe) in bindings.flatten() {
+        match found {
+            Some(first) if !same(first, binding) => return Some(Binding::Unknown),
+            _ => found = Some(binding),
+        }
+        if !maybe {
+            return found;
+        }
+    }
+    match found {
+        Some(_) if before => Some(Binding::Unknown),
+        found => found,
     }
 }
 
@@ -2168,6 +2213,37 @@ mod tests {
         let main = format!("{global}from a import *\nx()\n");
         let sources = owned(&[("a.py", def), ("main.py", &main)]);
         assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+    }
+
+    #[test]
+    fn a_star_import_of_a_computed_all_rebinds_a_name_to_nothing_known() {
+        // `pkg`'s `__all__` may or may not list `x`: a star import of it rebinds `x` to `pkg`'s,
+        // or leaves the binding before it, so a call reaches neither exactly.
+        let def = "def x():\n    pass\n";
+        let pkg = (
+            "pkg.py",
+            "import core\n__all__ = core.__all__ + ['y']\ndef x():\n    pass\n",
+        );
+        let (b, core) = (("b.py", def), ("core.py", "__all__ = []\n"));
+        let call = "def f():\n    x()\n";
+        for before in [def, "from b import x\n", "from b import *\n"] {
+            let main = format!("{before}from pkg import *\n{call}");
+            let sources = owned(&[pkg, b, core, ("main.py", &main)]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            // The same through a module that binds both and is imported by name.
+            let m = format!("{before}from pkg import *\n");
+            let main = ("main.py", "from m import x\nx()\n");
+            let sources = owned(&[pkg, b, core, ("m.py", &m), main]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{m}");
+        }
+        // With nothing bound before it, `x` is `pkg`'s or no name at all.
+        let sources = owned(&[
+            pkg,
+            core,
+            ("main.py", &format!("from pkg import *\n{call}")),
+        ]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("pkg.py"));
     }
 
     #[test]

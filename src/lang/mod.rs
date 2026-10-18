@@ -242,6 +242,9 @@ pub enum Star {
     Public,
     /// Only these names: a literal `__all__`.
     Only(Vec<String>),
+    /// Some of those not starting with `_`, not known which: a computed `__all__`. A star
+    /// import may or may not take each, so what it binds is not sure to rebind a name.
+    Computed,
 }
 
 impl Star {
@@ -249,7 +252,7 @@ impl Star {
     pub fn takes(&self, name: &str) -> bool {
         match self {
             Star::ExceptDefault => name != "default",
-            Star::Public => !name.starts_with('_'),
+            Star::Public | Star::Computed => !name.starts_with('_'),
             Star::Only(names) => names.iter().any(|n| n == name),
         }
     }
