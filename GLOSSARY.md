@@ -84,6 +84,13 @@ _Avoid_: interface, integration
 A category of contract with its own matching rules, such as HTTP route, channel or package.
 _Avoid_: contract type, protocol
 
+**Package ecosystem**:
+The registry a package is published to, which decides the manifests that declare it and the
+second part of its contract: npm (`package.json`, `package::npm::<name>`) or PyPI
+(`pyproject.toml` and `requirements*.txt`, `package::pypi::<name>`). A dependency links only
+to a package of its own ecosystem, so an npm and a PyPI package of one name never link.
+_Avoid_: registry, package manager, language
+
 **Gateway prefix**:
 The rewrite a gateway applies to the paths of a repository: `prefix` is added in front, `strip`
 is removed from the start. It is declared in `[serve]`, and the **server path** of each root
@@ -193,7 +200,8 @@ _Avoid_: step, jump
 **Entry point**:
 A door into a repository: each route an HTTP handler serves (kind `route`, the handler a
 function or a file), each channel a consumer handler consumes (kind `channel`), each program
-start a language pack declares (kind `program`, a door even when called) and each exported
+start a language pack declares or a manifest names, such as a console script of a
+`pyproject.toml` (kind `program`, a door even when called) and each exported
 function or method that nothing in its repository calls, directly or through a package import
 of the same repository, an ambiguous candidate counting as a caller and a self-call not (kind
 `export`). It has an identity (the handler's identity plus, for a route or a channel, the

@@ -143,8 +143,9 @@ pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
 const MAX_NAME: usize = 214;
 
-/// The largest `package.json` read; a larger one counts as empty. Real manifests are a few
-/// kilobytes, and the stored summary and the export stay proportional to what is read.
+/// The largest manifest read (`package.json`, `pyproject.toml`, `requirements*.txt`) and the
+/// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
+/// and the stored summary and the export stay proportional to what is read.
 // ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
 const MAX_BYTES: usize = 1 << 20;
 
