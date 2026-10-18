@@ -19,3 +19,8 @@ pub fn local() {}
 /// A path of three segments is no attribute of Rocket's.
 #[rocket::local::get("/three")]
 pub fn three() {}
+
+/// The actix crate's private `bound`, written in this other crate, is no registration of it.
+pub fn elsewhere() {
+    let _ = catalog::stray::bound;
+}

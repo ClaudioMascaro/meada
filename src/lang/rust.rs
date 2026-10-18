@@ -11,7 +11,7 @@ use std::ops::Range;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Message, Modules, Param, Receiver, Star, children, named, text,
+    Layout, Message, Modules, Param, Receiver, Star, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, qualify};
@@ -19,6 +19,8 @@ use crate::{Result, qualify};
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+pub(crate) mod frameworks;
+mod mentions;
 mod messages;
 mod values;
 
@@ -52,116 +54,6 @@ const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
 
-/// The methods that hand back the object they were called on (`LanguagePack::passes`), per
-/// library: axum's `Router`, the setters of reqwest's `ClientBuilder` up to `build()`, which
-/// makes the client, and those of ureq's `AgentBuilder`.
-// ponytail: a setter not listed ends the chain, so its client is not read; add it here.
-const ROUTER: &[&str] = &[
-    "clone",
-    "route",
-    "route_service",
-    "nest",
-    "nest_service",
-    "merge",
-    "layer",
-    "route_layer",
-    "with_state",
-    "fallback",
-    "fallback_service",
-];
-/// actix-web's `App`, `Scope` and `Resource`, and Rocket's `build()` (a `Rocket`): the methods
-/// that hand back the object they were called on. A method that narrows what is served
-/// (`guard`, `Resource::to`) is left out, so what it is called on is not read.
-const APP: &[&str] = &[
-    "service",
-    "route",
-    "configure",
-    "app_data",
-    "data",
-    "data_factory",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-    "external_resource",
-];
-const SCOPE: &[&str] = &[
-    "service",
-    "route",
-    "configure",
-    "app_data",
-    "data",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-];
-const RESOURCE: &[&str] = &[
-    "route",
-    "name",
-    "app_data",
-    "data",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-];
-const ROCKET: &[&str] = &["mount", "attach", "manage", "register"];
-const CLIENT_BUILDER: &[&str] = &[
-    "clone",
-    "build",
-    "timeout",
-    "connect_timeout",
-    "read_timeout",
-    "user_agent",
-    "default_headers",
-    "redirect",
-    "referer",
-    "proxy",
-    "no_proxy",
-    "gzip",
-    "brotli",
-    "deflate",
-    "zstd",
-    "no_gzip",
-    "no_brotli",
-    "no_deflate",
-    "no_zstd",
-    "cookie_store",
-    "pool_idle_timeout",
-    "pool_max_idle_per_host",
-    "tcp_nodelay",
-    "tcp_keepalive",
-    "http1_only",
-    "http2_prior_knowledge",
-    "https_only",
-    "danger_accept_invalid_certs",
-    "danger_accept_invalid_hostnames",
-    "use_rustls_tls",
-    "use_native_tls",
-    "add_root_certificate",
-    "identity",
-    "min_tls_version",
-    "max_tls_version",
-    "connection_verbose",
-    "local_address",
-    "resolve",
-];
-const AGENT_BUILDER: &[&str] = &[
-    "clone",
-    "build",
-    "timeout",
-    "timeout_connect",
-    "timeout_read",
-    "timeout_write",
-    "user_agent",
-    "max_idle_connections",
-    "max_idle_connections_per_host",
-    "redirects",
-    "proxy",
-    "tls_config",
-    "https_only",
-    "no_delay",
-    "try_proxy_from_env",
-];
-
 /// The attributes that register the function they sit on as a route, in actix-web and Rocket:
 /// `#[get("/x")]` and its kin, and actix-web's `#[route("/x", method = "GET")]`. The pack emits
 /// them as calls that decorate the function (`Call::decorates`); any other attribute is not a
@@ -173,11 +65,6 @@ const ROUTE_ATTRIBUTES: &[&str] = &[
 /// How many route attributes one function is read with; the rest are not calls.
 // ponytail: a handler serves a handful of routes; a crafted run of a million is not read.
 const ROUTES_PER_FUNCTION: usize = 16;
-
-/// How many distinct names a file may mention before `Facts::mentions` tells nothing of it.
-// ponytail: a generated file with more is read as mentioning every name (none of its handlers
-// is then taken as unregistered); raise it if a real file reaches it.
-const MENTIONS: usize = 1 << 14;
 
 pub struct Rust;
 
@@ -222,18 +109,15 @@ impl LanguagePack for Rust {
         true
     }
 
+    fn strict(&self) -> bool {
+        true
+    }
+
     fn passes(&self, origin: &str, method: &str) -> bool {
-        let methods = match origin {
-            o if o.starts_with("axum.Router.") => ROUTER,
-            o if o.starts_with("actix_web.App.") => APP,
-            "actix_web.web.scope" => SCOPE,
-            "actix_web.web.resource" => RESOURCE,
-            "rocket.build" | "rocket.custom" => ROCKET,
-            o if o.starts_with("reqwest.") => CLIENT_BUILDER,
-            o if o.starts_with("ureq.") => AGENT_BUILDER,
-            _ => return messages::passes(origin, method),
-        };
-        methods.contains(&method)
+        match frameworks::made(origin) {
+            Some(made) => frameworks::passes(made).contains(&method),
+            None => messages::passes(origin, method),
+        }
     }
 
     fn modules(
@@ -241,41 +125,25 @@ impl LanguagePack for Rust {
         configs: &[(&str, &[u8])],
         files: &BTreeMap<&str, &Facts>,
     ) -> Result<Modules> {
-        let tree = Tree::new(configs, files);
-        Ok(Box::new(move |from, specifier| {
-            tree.lookup(from, specifier)
-        }))
+        Ok(self.layout(configs, files)?.modules)
     }
 
-    fn members(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        Some(Tree::new(configs, files).members())
+    fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
+        let tree = Tree::new(configs, files);
+        let programs = (tree.bins())
+            .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
+            .map(|bin| (bin.to_string(), MAIN.to_string()))
+            .collect();
+        Ok(Layout {
+            members: Some(tree.members()),
+            published: Some(tree.published()),
+            programs,
+            modules: Box::new(move |from, specifier| tree.lookup(from, specifier)),
+        })
     }
 
     fn messages(&self, code: &Code) -> Vec<Message> {
         messages::messages(code)
-    }
-
-    fn published(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        Some(Tree::new(configs, files).published())
-    }
-
-    fn programs(
-        &self,
-        configs: &[(&str, &[u8])],
-        files: &BTreeMap<&str, &Facts>,
-    ) -> Vec<(String, String)> {
-        (Tree::new(configs, files).bins())
-            .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
-            .map(|bin| (bin.to_string(), MAIN.to_string()))
-            .collect()
     }
 }
 
@@ -1112,7 +980,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     facts.impls.retain(|i| !i.ty.is_empty());
     facts.externs = heads.externs.into_iter().collect();
     facts.macro_use = macro_use(tree.root_node(), src);
-    facts.mentions = mentions(tree.root_node(), src);
+    facts.mentions = mentions::mentions(tree.root_node(), src);
     for (local, source) in heads.imports {
         facts.imports.push(Import {
             local,
@@ -1183,38 +1051,6 @@ fn route_attribute<'t>(item: Node<'t>, src: &[u8]) -> Option<(Vec<String>, Node<
     (segments.last())
         .is_some_and(|s| ROUTE_ATTRIBUTES.contains(&s.as_str()))
         .then_some((segments, tree))
-}
-
-/// The names the file writes as a value, a path or inside a macro call, except the names of
-/// the functions it defines and its route attributes; `None` past `MENTIONS` names.
-fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
-    let (mut out, mut cursor) = (BTreeSet::new(), root.walk());
-    loop {
-        let node = cursor.node();
-        let skip = node.kind() == "attribute_item" && route_attribute(node, src).is_some();
-        if node.kind() == "identifier" && !is_function_name(node) {
-            out.insert(text(node, src).to_string());
-            if out.len() > MENTIONS {
-                return None;
-            }
-        }
-        if !skip && cursor.goto_first_child() {
-            continue;
-        }
-        while !cursor.goto_next_sibling() {
-            if !cursor.goto_parent() {
-                return Some(out);
-            }
-        }
-    }
-}
-
-/// Whether `node` is the name a function item defines.
-fn is_function_name(node: Node) -> bool {
-    node.parent().is_some_and(|p| {
-        matches!(p.kind(), "function_item" | "function_signature_item")
-            && field(p, "name") == Some(node)
-    })
 }
 
 /// The crates the file declares with `#[macro_use] extern crate x;` at its top level.
@@ -1920,7 +1756,7 @@ mod tests {
     use super::*;
     use crate::lang::Value;
 
-    fn facts(src: &str) -> Facts {
+    pub(super) fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), "").unwrap()
     }
 
@@ -2247,7 +2083,7 @@ mod tests {
         ]);
         // `src/lib.rs` is a library root and `src/m.rs` a module: neither starts a program.
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
-        let found = Rust.programs(&configs, &files);
+        let found = Rust.layout(&configs, &files).unwrap().programs;
         assert_eq!(found, [("src/main.rs".to_string(), "main".to_string())]);
     }
 
@@ -2256,7 +2092,7 @@ mod tests {
         let inline = facts("mod x { pub fn main() {} }\n");
         let files = BTreeMap::from([("src/main.rs", &inline)]);
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
-        assert!(Rust.programs(&configs, &files).is_empty());
+        assert!(Rust.layout(&configs, &files).unwrap().programs.is_empty());
     }
 
     #[test]
@@ -2499,18 +2335,6 @@ mod tests {
         };
         assert_eq!(methods(values::ROUTE_METHODS), 0);
         assert_eq!(methods(values::ROUTE_METHODS + 3), 3);
-    }
-
-    #[test]
-    fn mentions_are_the_names_written_outside_definitions_and_route_attributes() {
-        let src = "use a::used as alias;\n#[get(\"/x\")]\nfn handler() {}\nfn other() { f(local, m![inside]); }\n";
-        let mentions = facts(src).mentions.unwrap();
-        let names: Vec<&str> = mentions.iter().map(String::as_str).collect();
-        assert_eq!(names, ["a", "alias", "f", "inside", "local", "m", "used"]);
-        let many = (0..MENTIONS + 1)
-            .map(|i| format!("fn f() {{ n{i}; }}\n"))
-            .collect::<String>();
-        assert!(facts(&many).mentions.is_none());
     }
 
     #[test]

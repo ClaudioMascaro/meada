@@ -183,9 +183,16 @@ one for the area a change touches.
   `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
   `Code::origins` then walks a chain down its receivers, by `call_at` (a call found by its byte
   range; `Code::call_index` for a kind) and `Code::receiver` (the value a call is made on).
+  `Code::chain` is that walk, memoized by `chain_tail`: the calls from one down to where the
+  flow stops (a call a function of the repository answers, or one made on no call). A kind
+  that reads a chain step by step (an axum method router, an actix-web `ServiceConfig`, a
+  Kafka record, an SQS request, redis read options) goes through it, never its own walk.
   A step no function of the repository answers passes the receiver on; one only a name match
   found does when the chain starts at a constructor of an outside crate (whose method it then
-  is), else the flow ends. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
+  is), else the flow ends. Which methods pass the object on is listed per object, with its
+  constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
+  clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
+  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
@@ -326,9 +333,12 @@ one for the area a change touches.
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
   path order, each read as a root config is (`read_config`) and folded into the configs digest on
-  every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
-  empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
-  facts besides the configs. A language whose imports name a path rather than a file (Rust's
+  every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
+  and every file the pack parsed, and which answers four things from one build (Rust's crate
+  `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
+  files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
+  and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
+  and `Layout::programs` (both below). A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -342,7 +352,7 @@ one for the area a change touches.
   a glob beats them, another crate of the repository answers through `Modules` and the rest
   is `Binding::External`. `Facts::private` lists the `exports` names `Resolver::exported`
   leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
-  crate), and `LanguagePack::published` (default: none) the files whose exports a pack counts
+  crate), and `Layout::published` (default: none) the files whose exports a pack counts
   at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
   library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
@@ -355,7 +365,10 @@ one for the area a change touches.
   one (the names around a module are not its own; the file's imports still are). A call
   written as a path sets `Call::by_path`: its head is read among types and modules alone
   (`lexical_as`, no local or parameter hides it), and a failed resolution matches functions as
-  well as methods by name. A pack that has program entry points fills
+  well as methods by name. A pack whose types are closed (`LanguagePack::strict`, Rust) has a
+  member its blocks lack on a type the receiver or the path head writes resolve to nothing
+  (`Resolver::lacks`: a derive, a blanket or outside trait), not by name, and its attribute
+  calls (`Call::decorates`) resolve to nothing, read only through `Code::external_of`. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -367,7 +380,7 @@ one for the area a change touches.
   `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
   edit re-extract) to files through `python_roots`. A form only the whole repository tells
   (Rust `fn main`, a program only in a binary target's root, which one file's `parse` cannot
-  see) is `LanguagePack::programs(configs, files)`, which `refresh` calls per pack beside
+  see) is `Layout::programs`, which `refresh` takes from each pack's `layout` beside
   `python_programs`; Rust asks the crate `Tree` for its binary roots (`Tree::bins`). The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
@@ -449,7 +462,7 @@ one for the area a change touches.
   mismatch it forgets the file's mtime, refreshes and retries once.
 - Facts resolve only among files of the same pack, and inference runs only when resolution
   fails; an import from outside the repository is never inferred. A file its pack leaves out
-  (`members`) resolves nothing and has no symbol, call or `files` row in the export.
+  (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
 ## Tests (`tests/`)
 
@@ -629,12 +642,18 @@ one for the area a change touches.
   in a `let` is not recognized. `Code::mutable` takes the value of a `let mut` bound once and
   never assigned (`Facts::mutable`, keyed by qualified name); a closure parameter, a `let` in a
   closure given to a call, a nested function's parameter or an assignment in such a closure hides it.
-  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`) is
-  walked to that many calls; a longer one is not a producer.
+  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
+  redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
+  bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
 - `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
   (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
-  be external; a root that is a repository type, a parameter, or a local with no written class
-  (a client a repository function returns) is name-matched as before.
+  be external, and so does one on a chain that starts at a call (`rocket::build().mount(..)`,
+  `Client::new().get(u)`, no `Call::root`) when that first call, the innermost one starting
+  where the chain does, is external (`Resolver::rooted_outside`, Rust only); a root that is a
+  repository type, a parameter, or a local with no written class (a client a repository
+  function returns) is name-matched as before. `self` and `Self` in an `impl` of a type from
+  outside the repository (`impl ApiExt for reqwest::Client`) are opaque too
+  (`Resolver::outside`): `self.clone()` there resolves to nothing.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
@@ -844,7 +863,10 @@ one for the area a change touches.
   pack config is), not UTF-8 or not TOML declares no crate, with no status line. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
   none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
-  `benches/` and `build.rs` are no crate roots (no marker). A file two crates reach (`mod
+  `benches/` and `build.rs` are no crate roots (no marker). The default features a file is
+  parsed with (`settings`) are those of the nearest `Cargo.toml` with a `[package]` above it,
+  read before any module tree exists, so a file another package's `#[path]` reaches is parsed
+  with its nearest package's features, not those of the crate that builds it (no marker). A file two crates reach (`mod
   util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
   first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
   is not read, and `super::` out of a file declared inside a module written in place of its
@@ -877,26 +899,36 @@ one for the area a change touches.
   that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
   a `routes![..]` listing more handlers is `Unknown`; `ROUTE_METHODS` (16): the `method = ".."`
   of a `#[route]` past that are `Unknown`, so the attribute gives no provider. `MENTIONS`
-  (16384): a file writing more distinct names has no `Facts::mentions`, so none of its names is
-  taken as unmentioned. `Facts::mentions` is not kept in the index (see `Call::args`); the
-  providers read it from the files parsed again, all of the pack's when a handler is registered by
-  no call they read.
+  (16384, `lang/rust/mentions.rs`): a file referring to more distinct names has no
+  `Facts::mentions`, so none of the handlers of its crate is taken as unmentioned.
+  `Facts::mentions` is not kept in the index (see `Call::args`); the providers read it from the
+  files parsed again, all of the pack's when a handler is registered by no call they read. A
+  mention is a name in a reference position (an expression, a receiver, a path, a `use`, a
+  macro's tokens); a pattern, a parameter or a field declaring it is none, and a local hides a
+  reference from the end of its `let` to the end of the block, a parameter in its function's
+  or closure's body, a `match`, `if let`, `while let` or `for` binding in its arm or block (an
+  `else` sees none). An item declared in a block (`const`, `static`, `fn` inside a function)
+  hides nothing, and a pattern deeper than `BINDING_DEPTH` binds nothing, so the reference
+  still counts (no marker).
 - `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
   returned lists adds, over the whole repository, to the handlers a call names; a list past it
   is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate
-  of a bare route attribute is read from the `#[macro_use] extern crate x;` of the files under
-  the same `src/`, so a package with several crate roots shares what any of them declares, and
-  it needs exactly one such crate (actix-web or Rocket). A handler is served at its own path only
-  when no file writes its name other than defining it, or in a route attribute; any other
-  mention Meada does not read as a registration (`services![..]`, `vec![..]`, `concat()`,
-  `cfg_if!`, an alias, a local of the name) means it may be registered where Meada cannot tell,
-  and then it is served nowhere. A service configuration is followed into the functions of the
+  of a bare route attribute is read from the `#[macro_use] extern crate x;` of its crate's root
+  (the `Tree`'s `crate`, wherever `[lib] path` puts it), and it needs exactly one such crate
+  (actix-web or Rocket). A handler is served at its own path only when no file of its crate
+  mentions its name (`mentions.rs` above), or of any crate when its file is one another crate
+  may import (`Code::published`, a library's `pub mod` files); any other mention Meada does not
+  read as a registration (`services![..]`, `vec![..]`, `concat()`, `cfg_if!`, an alias, a use
+  before a `let` of the name) means it may be registered where Meada cannot tell, and then it is
+  served nowhere. A file two crates reach belongs to the first (see above), so a mention in the
+  second, of a handler not published, is not counted (no marker). A service configuration is followed into the functions of the
   repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
-- `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
-  that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
-  `resolve.rs`): a builder chain (`Router::new().route(..)`) is read to that many calls down to
-  what starts it, and a call past it has no origin, so its route is no provider (the walk is
-  memoized per call, linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
+- `http.rs` (axum): `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
+  to that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
+  `resolve.rs`): a builder chain (`Router::new().route(..)`, an actix-web `ServiceConfig`'s
+  `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
+  and a call past it has no origin, so its route is no provider (the walk is memoized per call,
+  linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
   `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
@@ -934,8 +966,10 @@ one for the area a change touches.
   `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
   A value derived from a client (a response, a header map, a JSON value, the result of an
   extension trait's method) is no client: a method passes the object on only when the
-  library's list names it (`ROUTER`, `CLIENT_BUILDER`, `AGENT_BUILDER` in `lang/rust.rs`), so
-  a setter missing from the list ends the chain and its client is not read.
+  object's entry lists it (`FRAMEWORKS` in `lang/rust/frameworks.rs`, the constructors named
+  exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
+  setter missing from the list ends the chain and its client (or its router, app, scope,
+  resource or Rocket instance) is not read.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

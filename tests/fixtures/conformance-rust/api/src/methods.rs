@@ -251,3 +251,27 @@ pub fn marked_impl(p: impl Probe + Send + 'static) {
 pub fn cleared(c: &Counter) {
     c.reset();
 }
+
+// A written type whose blocks do not hold the member (a derive, a blanket or outside trait)
+// resolves to nothing: `Config`'s `default` and `clone` are another type's.
+#[derive(Default, Clone)]
+pub struct Plain;
+
+pub struct Config;
+
+impl Default for Config {
+    fn default() -> Self {
+        Config
+    }
+}
+
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config
+    }
+}
+
+pub fn derived(q: &Plain) {
+    Plain::default();
+    q.clone();
+}

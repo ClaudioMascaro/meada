@@ -9,14 +9,16 @@
 //! naming the topic or the queue handles what it receives.
 
 use crate::lang::{
-    Message, Role, Value, channel_name as name, consume, produce, publication, queue_name, topics,
+    Call, Message, Role, Value, channel_name as name, consume, produce, publication, queue_name,
+    topics,
 };
 use crate::resolve::{Code, Keywords};
 
-/// How many calls a builder chain is walked down: `FutureRecord::to(t).payload(p).key(k)` and
-/// `client.send_message().message_body(b).queue_url(u)` are a few; a crafted file's chain of
-/// thousands is not read.
-// ponytail: `Code::chain_tail` bounds the value flow the same way.
+/// How many calls of a builder chain (`Code::chain`) a form is read through:
+/// `FutureRecord::to(t).payload(p).key(k)` and `client.send_message().message_body(b).queue_url(u)`
+/// are a few; a crafted file's chain of thousands is not read.
+// ponytail: a record or a request with more setters is no form; `FLUENT_CHAIN` bounds the walk
+// itself, for the value flow.
 const CHAIN: usize = 64;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -253,32 +255,27 @@ fn client<'a>(
 /// argument written in place or a `let` holding it. Its file and position.
 fn record<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<(&'a str, usize)> {
     let send = code.call(path, n)?;
-    let (file, mut at) = call_of(code, path, &send.scope, send.args.first()?)?;
-    for _ in 0..CHAIN {
-        let call = code.call(file, at)?;
-        let origin = code.external(file, &call.scope, &call.callee);
-        let record = origin.is_some_and(|o| {
+    let (file, at) = call_of(code, path, &send.scope, send.args.first()?)?;
+    let chain = chain(code, file, at)?;
+    let at = chain.into_iter().find(|&at| {
+        let call = code.call(file, at);
+        let origin = call.and_then(|c| code.external(file, &c.scope, &c.callee));
+        origin.is_some_and(|o| {
             o.starts_with("rdkafka.")
                 && (o.ends_with(".FutureRecord.to") || o.ends_with(".BaseRecord.to"))
-        });
-        if record {
-            return Some((file, at));
-        }
-        at = down(code, file, at)?;
-    }
-    None
+        })
+    });
+    Some((file, at?))
 }
 
 /// The call that makes the aws-sdk-sqs request whose `queue_url` is the call at `n` of `path`
 /// (`client.send_message().message_body(b).queue_url(u)`), as a producer or a consumer of the
 /// queue the URL ends in.
 fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Message> {
-    let mut at = n;
-    for _ in 0..CHAIN {
-        let Some(next) = down(code, path, at) else {
-            return Vec::new();
-        };
-        at = next;
+    let Some(chain) = chain(code, path, n) else {
+        return Vec::new();
+    };
+    for at in chain.into_iter().skip(1) {
         let Some(call) = code.call(path, at) else {
             return Vec::new();
         };
@@ -302,12 +299,12 @@ fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Message> {
     Vec::new()
 }
 
-/// The call the call at `at` of `path` is made on: its receiver, when that is a call.
-fn down<'a>(code: &Code<'a>, path: &'a str, at: usize) -> Option<usize> {
-    match code.receiver(path, at)? {
-        Value::Call(inv) => code.call_index(path, &inv.range),
-        _ => None,
-    }
+/// The builder chain that ends in the call at `at` of `path` (`Code::chain`): that call and the
+/// `CHAIN` calls below it at most.
+fn chain<'a>(code: &Code<'a>, path: &'a str, at: usize) -> Option<Vec<usize>> {
+    let mut chain = code.chain(path, at)?;
+    chain.truncate(CHAIN + 1);
+    Some(chain)
 }
 
 /// The call that `value`, written in `scope` of `path`, is: written in place, or the `let`
@@ -336,26 +333,19 @@ fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
         return false;
     };
     let options = read.args.get(2);
-    let Some((file, mut at)) = options.and_then(|o| call_of(code, path, &read.scope, o)) else {
+    let Some((file, at)) = options.and_then(|o| call_of(code, path, &read.scope, o)) else {
         return false;
     };
-    let mut group = false;
-    for _ in 0..CHAIN {
-        let Some(call) = code.call(file, at) else {
-            return false;
-        };
-        group |= call.callee.ends_with(".group");
-        match down(code, file, at) {
-            Some(next) => at = next,
-            None => {
-                let origin = code.external(file, &call.scope, &call.callee);
-                let made = origin
-                    .is_some_and(|o| o.starts_with("redis.") && o.contains(".StreamReadOptions."));
-                return group && made;
-            }
-        }
-    }
-    false
+    let calls: Vec<&Call> = (chain(code, file, at).into_iter().flatten())
+        .filter_map(|at| code.call(file, at))
+        .collect();
+    let group = calls.iter().any(|c| c.callee.ends_with(".group"));
+    // The chain starts at the options' constructor, made on no call.
+    let start = calls
+        .last()
+        .filter(|c| !matches!(c.receiver, Some(Value::Call(_))));
+    let origin = start.and_then(|c| code.external(file, &c.scope, &c.callee));
+    group && origin.is_some_and(|o| o.starts_with("redis.") && o.contains(".StreamReadOptions."))
 }
 
 /// The argument at position `at`, `Undefined` when the call leaves it out.

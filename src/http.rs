@@ -8,6 +8,7 @@ use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::declared::{self, Declared, Types};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
+use crate::lang::rust::frameworks::{self, Made, REQWEST_CLIENTS, UREQ_AGENTS};
 use crate::lang::{
     Call, Depends, Export, Facts, Imported, Part, Step, Ty, Value, literal, property,
 };
@@ -708,9 +709,6 @@ const AXUM_METHODS: &[&str] = &[
     "get", "post", "put", "patch", "delete", "head", "options", "trace",
 ];
 
-/// The methods of a method router that leave the methods it serves as they are.
-const AXUM_PASSES: &[&str] = &["layer", "route_layer", "with_state", "handle_error"];
-
 /// How many calls a method router chain is read through.
 // ponytail: a route serves a handful of methods; a crafted chain is not read to its end.
 const METHOD_CHAIN: usize = 64;
@@ -719,10 +717,7 @@ const METHOD_CHAIN: usize = 64;
 fn is_axum_router<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
     let call = &code.files()[path].calls[n];
     let name = code.external_of(path, call);
-    matches!(
-        name.as_deref(),
-        Some("axum.Router.new" | "axum.Router.default")
-    )
+    name.is_some_and(|n| frameworks::made(&n) == Some(Made::Router))
 }
 
 /// The calls of the method router `value` that give a method a handler, and the method each
@@ -734,42 +729,37 @@ fn method_router<'a>(
     path: &'a str,
     value: &'a Value,
 ) -> Option<Vec<(&'a Call, String)>> {
+    let Value::Call(invocation) = value else {
+        return None;
+    };
+    let chain = code.chain(path, code.call_index(path, &invocation.range)?)?;
+    if chain.len() > METHOD_CHAIN {
+        return None;
+    }
+    let (&start, steps) = chain.split_last()?;
     let mut out = Vec::new();
-    let mut value = value;
-    for _ in 0..METHOD_CHAIN {
-        let Value::Call(invocation) = value else {
-            return None;
-        };
-        let call = code.call(path, code.call_index(path, &invocation.range)?)?;
-        let name = call.callee.rsplit('.').next()?;
-        match &call.receiver {
-            // `get(h)`, `routing::get(h)`: the function of axum that serves the method.
-            None => {
-                let external = code.external_of(path, call)?;
-                match external.strip_prefix("axum.routing.")? {
-                    "any" => out.push((call, ANY.to_string())),
-                    name if AXUM_METHODS.contains(&name) => {
-                        out.push((call, name.to_uppercase()));
-                    }
-                    "MethodRouter.new" => {}
-                    _ => return None,
-                }
-                out.reverse();
-                return Some(out);
-            }
-            Some(receiver) => {
-                match name {
-                    name if AXUM_METHODS.contains(&name) => {
-                        out.push((call, name.to_uppercase()));
-                    }
-                    name if AXUM_PASSES.contains(&name) => {}
-                    _ => return None,
-                }
-                value = receiver;
-            }
+    // `get(h)`, `routing::get(h)`: the function of axum that serves the method, made on nothing.
+    let start = code.call(path, start)?;
+    let external = code
+        .external_of(path, start)
+        .filter(|_| start.receiver.is_none())?;
+    if frameworks::made(&external) != Some(Made::MethodRouter) {
+        return None;
+    }
+    match external.strip_prefix("axum.routing.")? {
+        "any" => out.push((start, ANY.to_string())),
+        "MethodRouter.new" => {}
+        name => out.push((start, name.to_uppercase())),
+    }
+    for &at in steps.iter().rev() {
+        let call = code.call(path, at)?;
+        match call.callee.rsplit('.').next()? {
+            name if AXUM_METHODS.contains(&name) => out.push((call, name.to_uppercase())),
+            name if frameworks::passes(Made::MethodRouter).contains(&name) => {}
+            _ => return None,
         }
     }
-    None
+    Some(out)
 }
 
 /// The axum routers `value`, written in `call`, may be.
@@ -1211,24 +1201,11 @@ const LIBRARIES: &[Library] = &[
     },
     Library {
         modules: &["reqwest", "reqwest.blocking"],
-        clients: &[
-            "reqwest.Client.new",
-            "reqwest.Client.builder",
-            "reqwest.ClientBuilder.new",
-            "reqwest.blocking.Client.new",
-            "reqwest.blocking.Client.builder",
-            "reqwest.blocking.ClientBuilder.new",
-        ],
+        clients: REQWEST_CLIENTS,
     },
     Library {
         modules: &["ureq"],
-        clients: &[
-            "ureq.agent",
-            "ureq.Agent.new",
-            "ureq.Agent.new_with_defaults",
-            "ureq.Agent.new_with_config",
-            "ureq.AgentBuilder.new",
-        ],
+        clients: UREQ_AGENTS,
     },
 ];
 

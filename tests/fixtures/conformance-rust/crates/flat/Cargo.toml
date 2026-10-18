@@ -1,0 +1,10 @@
+[package]
+name = "flat"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+rocket = "0.5"

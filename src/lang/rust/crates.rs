@@ -48,10 +48,12 @@ impl Tree {
             children: HashMap::new(),
             published: BTreeSet::new(),
         };
-        let packages = packages(configs, files);
-        let dependencies = dependencies(configs, &packages);
+        // Every `Cargo.toml` is parsed once per tree.
+        let tables = tables(configs);
+        let packages = packages(&tables, files);
+        let dependencies = dependencies(&tables, &packages);
         let mut queue = VecDeque::new();
-        for (root, dir, bin) in roots(configs, files) {
+        for (root, dir, bin) in roots(&tables, files) {
             if bin {
                 tree.bins.insert(root.clone());
             }
@@ -249,19 +251,20 @@ fn tables<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
     tables
 }
 
-/// The `Cargo.toml` with a `[package]` table among `configs`, at any depth, by directory.
-fn manifests<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
-    let mut manifests = tables(configs);
-    manifests.retain(|(_, manifest)| manifest.contains_key("package"));
-    manifests
+/// The `Cargo.toml` with a `[package]` table among `tables`, at any depth, by directory.
+fn manifests<'t, 'c>(
+    tables: &'t [(&'c str, toml::Table)],
+) -> impl Iterator<Item = (&'c str, &'t toml::Table)> {
+    let packages = tables.iter().filter(|(_, t)| t.contains_key("package"));
+    packages.map(|(dir, t)| (*dir, t))
 }
 
 /// The default features of each package among `configs`, joined with commas, by directory: the
 /// `setting` its files are parsed with.
 pub fn features(configs: &[(&str, &[u8])]) -> Vec<(String, String)> {
-    (manifests(configs).into_iter())
+    (manifests(&tables(configs)))
         .map(|(dir, manifest)| {
-            let on: Vec<String> = super::cfg::defaults(&manifest).into_iter().collect();
+            let on: Vec<String> = super::cfg::defaults(manifest).into_iter().collect();
             (dir.to_string(), on.join(","))
         })
         .collect()
@@ -277,17 +280,17 @@ struct Package {
     lib_root: Option<String>,
 }
 
-fn packages(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Package> {
+fn packages(tables: &[(&str, toml::Table)], files: &BTreeMap<&str, &Facts>) -> Vec<Package> {
     let mut out = Vec::new();
-    for (dir, manifest) in manifests(configs) {
+    for (dir, manifest) in manifests(tables) {
         let Some(name) = (manifest.get("package")).and_then(|p| p.get("name")?.as_str()) else {
             continue;
         };
         out.push(Package {
             dir: dir.to_string(),
             name: name.to_string(),
-            lib_name: lib_name(&manifest, name),
-            lib_root: lib_root(&manifest, dir).filter(|r| files.contains_key(r.as_str())),
+            lib_name: lib_name(manifest, name),
+            lib_root: lib_root(manifest, dir).filter(|r| files.contains_key(r.as_str())),
         });
     }
     out
@@ -315,10 +318,9 @@ pub fn lib_root(manifest: &toml::Table, dir: &str) -> Option<String> {
 /// renamed, else by the name of its library. The first package in path order keeps a name
 /// two share.
 fn dependencies(
-    configs: &[(&str, &[u8])],
+    tables: &[(&str, toml::Table)],
     packages: &[Package],
 ) -> HashMap<String, HashMap<String, String>> {
-    let tables = tables(configs);
     let workspace = |dir: &str| {
         let holds = |w: &str| w.is_empty() || dir == w || dir.starts_with(&format!("{w}/"));
         let near = tables
@@ -328,10 +330,7 @@ fn dependencies(
             .and_then(|(_, t)| workspace_deps(t))
     };
     let mut out: HashMap<String, HashMap<String, String>> = HashMap::new();
-    for (dir, manifest) in &tables {
-        if !manifest.contains_key("package") {
-            continue;
-        }
+    for (dir, manifest) in manifests(tables) {
         for (_, key, spec) in entries(manifest) {
             let inherits = spec.get("workspace").and_then(|w| w.as_bool()) == Some(true);
             let spec = match inherits {
@@ -394,10 +393,13 @@ pub fn workspace_deps(manifest: &toml::Table) -> Option<&toml::Table> {
 /// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found, each with the
 /// directory of its manifest and whether it is a binary target (every root but the library).
 /// A workspace's members are such manifests too, so `[workspace] members` adds none.
-fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(String, String, bool)> {
+fn roots(
+    tables: &[(&str, toml::Table)],
+    files: &BTreeMap<&str, &Facts>,
+) -> Vec<(String, String, bool)> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
-    for (dir, manifest) in &manifests(configs) {
+    for (dir, manifest) in manifests(tables) {
         let at = |rel: &str| join(dir, rel);
         let path_of = |v: &toml::Value| v.get("path")?.as_str().and_then(at);
         let lib = (manifest.get("lib").and_then(path_of)).or_else(|| at("src/lib.rs"));
@@ -469,7 +471,7 @@ mod tests {
         );
         let past = &past.as_bytes()[..crate::package::MAX_BYTES + 1];
         let configs: [(&str, &[u8]); 2] = [("a/Cargo.toml", at.as_bytes()), ("b/Cargo.toml", past)];
-        let found: Vec<String> = (roots(&configs, &files).into_iter())
+        let found: Vec<String> = (roots(&tables(&configs), &files).into_iter())
             .map(|(file, _, _)| file)
             .collect();
         assert_eq!(found, ["a/src/lib.rs"]);
@@ -496,7 +498,7 @@ mod tests {
             // A virtual manifest builds nothing of its own.
             ("virtual/Cargo.toml", b"[workspace]\nmembers = []\n"),
         ];
-        let found: Vec<(String, bool)> = (roots(&configs, &files).into_iter())
+        let found: Vec<(String, bool)> = (roots(&tables(&configs), &files).into_iter())
             .map(|(file, _, bin)| (file, bin))
             .collect();
         assert_eq!(

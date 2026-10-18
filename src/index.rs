@@ -32,7 +32,7 @@ const SCHEMA_VERSION: i64 = 36;
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
 /// is NULL when it was too recent to trust. `files.facts` is what the pack parsed, as JSON
 /// (names, specifiers and byte ranges, no source text); `files.resolved` is the BLAKE3 of the
-/// file's resolved symbol and call rows, empty for a file its pack leaves out (`members`: a
+/// file's resolved symbol and call rows, empty for a file its pack leaves out (`Layout::members`: a
 /// Rust file no `mod` reaches), which has no rows and is no file of the export. `calls.target` holds the one definition an `exact` or
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
@@ -405,10 +405,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             .map(|(n, c)| (*n, c.as_slice()))
             .collect()
     };
+    // What each pack makes of the whole repository, once (`LanguagePack::layout`).
+    let mut layouts = BTreeMap::new();
     for (&pack, files) in &mut groups {
-        if let Some(keep) = lang::pack(pack).members(&found_configs(pack), files) {
+        let layout = lang::pack(pack).layout(&found_configs(pack), files)?;
+        if let Some(keep) = &layout.members {
             files.retain(|path, _| keep.contains(*path));
         }
+        layouts.insert(pack, layout);
     }
     let all: BTreeMap<&str, &Facts> = groups.values().flatten().map(|(p, f)| (*p, *f)).collect();
     // A file its pack leaves out keeps its facts, for when a change brings it in, but no rows:
@@ -424,18 +428,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             params![path],
         )?;
     }
-    let resolvers = groups
-        .iter()
-        .map(|(&pack, files)| {
-            let language = lang::pack(pack);
-            let modules = language.modules(&found_configs(pack), files)?;
-            let published = language.published(&found_configs(pack), files);
-            Ok((
-                pack,
-                Resolver::new(files, modules, language).publishing(published),
-            ))
-        })
-        .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    let mut roots: Vec<(String, String)> = Vec::new();
+    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
+    for (&pack, files) in &groups {
+        let layout = layouts.remove(&pack).expect("a layout per pack");
+        roots.extend(layout.programs);
+        let resolver = Resolver::new(files, layout.modules, lang::pack(pack));
+        resolvers.insert(pack, resolver.publishing(layout.published));
+    }
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
     // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -616,9 +616,6 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     // The programs the packs declare per file, and the console scripts of the manifests.
     let scripts = package::python_programs(&manifests, &files);
-    let roots: Vec<(String, String)> = (groups.iter())
-        .flat_map(|(&pack, files)| lang::pack(pack).programs(&found_configs(pack), files))
-        .collect();
     let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
             (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))

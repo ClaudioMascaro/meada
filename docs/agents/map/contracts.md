@@ -69,7 +69,7 @@ modules updates it.
   is a mount node, a handler is one too. A handler any call names (`.service(h)`,
   `routes![a, b]`) is served only where a mount Meada reads puts it, one no call names at its own
   path; a scope or a mount prefix Meada cannot read serves nothing (never the root). `routes![..]`
-  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::external_of` reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate; `Code::mentions` tells whether a name is written anywhere else, which decides whether an unregistered handler is served at its own path), reached through `Code::origins`: a route counts only
+  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::external_of` reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate's root; `Code::mentions` tells whether a file refers to a name, which, over the handler's crate (every crate when `Code::published` says its file may be imported), decides whether an unregistered handler is served at its own path), reached through `Code::origins`: a route counts only
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,

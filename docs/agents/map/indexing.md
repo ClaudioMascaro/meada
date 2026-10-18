@@ -25,7 +25,7 @@ modules updates it.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
   `Facts::programs` the packs set, and the console scripts of the `manifests` rows through
-  `package::python_programs`, and `LanguagePack::programs`, Rust's binary roots) and
+  `package::python_programs`, and `Layout::programs`, Rust's binary roots) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -88,10 +88,10 @@ modules updates it.
   `refresh` reads a `**/<name>` config at any depth from the walk, in path order, and any
   config through `read_config` (up to one byte past `package::MAX_BYTES`, no symbolic link,
   as a manifest is); it groups the
-  parsed files by pack, keeps the ones the pack's `members` names (default: all; a left-out
-  file keeps its `files` row and facts with an empty `resolved`, its symbol and call rows are
-  deleted, and the export and `status` skip it), and builds each `Resolver` from
-  `modules(configs, members)`. `parse` sees one file at a time; no pack
+  parsed files by pack, asks each pack once for its `layout(configs, parsed files)`, keeps the
+  files `Layout::members` names (default: all; a left-out file keeps its `files` row and facts
+  with an empty `resolved`, its symbol and call rows are deleted, and the export and `status`
+  skip it), and builds each `Resolver` from `Layout::modules` and `Layout::published`. `parse` sees one file at a time; no pack
   method touches the index. `Facts::locals` holds every name a binding makes besides definitions, `const`s and
   `Def::params` (`let`, `var`, destructuring, `catch`, `for ... of`, a nested, array or rest
   parameter pattern, any parameter of a function that is no definition), qualified by the
@@ -174,6 +174,10 @@ modules updates it.
   no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds
   it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
   for both packs.
+- `lang/rust/frameworks.rs` (`FRAMEWORKS`): per object of axum, actix-web, Rocket, reqwest and
+  ureq, the outside names of its constructors and the methods that hand it back; `RustPack::passes`
+  reads it (else `messages::passes`) and the HTTP kind asks it what a constructor makes
+  (`frameworks::made`). `VERBS` (the `Method` constants) lives there too.
 - Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
   (suffix-matched on `Code::external`) and the methods that hand back the same object
@@ -238,8 +242,9 @@ modules updates it.
   skipped). Annotations are read as written: a name, a string holding one, `Optional[...]`
   and `... | None`.
 - `lang/rust.rs` also yields `Facts::macro_use` (the crates of `#[macro_use] extern crate x;`,
-  stored) and `Facts::mentions` (the names a file writes apart from the functions it defines
-  and its route attributes; not stored, so the providers get it from the files parsed again).
+  stored) and `Facts::mentions` (`lang/rust/mentions.rs`: the names a file refers to, apart
+  from those a pattern, a parameter, a field or an item declares, a reference a local hides and
+  its route attributes; not stored, so the providers get it from the files parsed again).
   A function does not hide the crate a path begins with (`rocket::build()` beside a
   `fn rocket`), and a module of the same name as a function still hides the crate.
 - `lang/rust.rs` (spec #30) yields free functions (`Kind::Function`), structs, enums, unions
@@ -298,8 +303,9 @@ modules updates it.
   it per path, `parse_with` takes it; the index keeps it in `files.setting`): `refresh` parses a
   file again when the setting it was parsed under differs, so a toggled default feature gives
   the cold export. The decider's `function_like` reads the nearest `Cargo.toml` files from disk
-  for the same setting. `lang/rust/crates.rs` (`Tree`) is the module tree behind
-  `members` and `modules`: the crate roots of every `Cargo.toml` with a `[package]`, at any
+  for the same setting. `lang/rust/crates.rs` (`Tree`) is the module tree behind the
+  Rust `layout`, built once per refresh (each `Cargo.toml` parsed once for it; `settings` parses
+  them once more, before any file is): the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,
   `src/bin/*/main.rs`), walked breadth first
   through each file's `mod` imports (`x.rs` or `x/mod.rs` under the directory the file owns:
@@ -310,7 +316,7 @@ modules updates it.
   root of its library, `[lib] name` else the package name, hyphens as underscores; a binary is
   no library), reached only from the crates whose manifests list it as a dependency
   (`Tree::libs`, per crate root; `dependencies()` reads the three tables, a `package =` rename and
-  `workspace = true`). `Tree::published` (`LanguagePack::published`) walks from each library
+  `workspace = true`). `Tree::published` (`Layout::published`) walks from each library
   root through `pub mod` declarations (`Export::From` whose source is the specifier, not in
   `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
   root exports nothing (no other crate can import it), so no `export` entry point either.

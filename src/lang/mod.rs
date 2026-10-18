@@ -36,50 +36,28 @@ pub trait LanguagePack {
     }
 
     /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`. The shared side reads those present and hands them to `modules` and
-    /// `members`. A name starting with `**/` names every file of that name the walk finds, at
+    /// `tsconfig.json`. The shared side reads those present and hands them to `layout`. A name starting with `**/` names every file of that name the walk finds, at
     /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members).
     fn config_files(&self) -> &'static [&'static str];
 
     /// How imports name files in one repository, built from its config files as
-    /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files
-    /// (the files `members` keeps): a Rust `mod` declaration names a file by where the
-    /// declaring file sits in its crate's module tree.
+    /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
+    /// Rust `mod` declaration names a file by where the declaring file sits in its crate's
+    /// module tree. The default `layout` calls it.
     fn modules(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>)
     -> Result<Modules>;
 
-    /// The files the language builds, among those it parsed, when it says which: a Rust file
-    /// is part of a crate only when a `mod` declaration reaches it from a crate root. `None`
-    /// keeps every file. A file left out has no symbol or call, and resolves nothing.
-    fn members(
-        &self,
-        _configs: &[(&str, &[u8])],
-        _files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        None
-    }
-
-    /// The files whose exports (the `exports` table) another package can import, when the
-    /// language says which: a Rust file's `pub` items are reachable from outside its crate
-    /// only through a library root and `pub mod` declarations, and a binary exports nothing.
-    /// `None` keeps every file.
-    fn published(
-        &self,
-        _configs: &[(&str, &[u8])],
-        _files: &BTreeMap<&str, &Facts>,
-    ) -> Option<BTreeSet<String>> {
-        None
-    }
-
-    /// The program entry points only the whole repository tells, as `(file, qualified name)`
-    /// among the files `members` kept: a Rust `fn main` starts a program only in a binary
-    /// target's root, which `parse` of one file cannot know. `Facts::programs` still applies.
-    fn programs(
-        &self,
-        _configs: &[(&str, &[u8])],
-        _files: &BTreeMap<&str, &Facts>,
-    ) -> Vec<(String, String)> {
-        Vec::new()
+    /// What the config files and every parsed file of the language make of the repository,
+    /// built once per refresh (`Layout`): Rust builds its crates' module trees once for all four
+    /// answers. The default keeps every file, publishes them all and names no program, with
+    /// `modules` for how imports name files.
+    fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
+        Ok(Layout {
+            members: None,
+            modules: self.modules(configs, files)?,
+            published: None,
+            programs: Vec::new(),
+        })
     }
 
     /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
@@ -109,6 +87,15 @@ pub trait LanguagePack {
     /// of a response, `json()`, a method of a trait the repository defines) makes a different
     /// value, and the chain is not followed through it.
     fn passes(&self, _origin: &str, _method: &str) -> bool {
+        false
+    }
+
+    /// Whether the source writes everything a name of the repository is (Rust): the blocks of a
+    /// type hold every member it has there, so a member they lack on a type the receiver or the
+    /// path writes is outside the repository (a derive, a blanket or outside trait) and resolves
+    /// to nothing; and an attribute (`Call::decorates`) is a macro, no call of a function, so it
+    /// resolves to nothing too. Otherwise both fall to a name match.
+    fn strict(&self) -> bool {
         false
     }
 
@@ -180,6 +167,26 @@ pub enum Handler {
 /// (first argument) may name, most likely first. The shared side takes the first one that
 /// the pack parses.
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
+
+/// What a language makes of the whole repository (`LanguagePack::layout`), from its config files
+/// and the facts of every file it parsed.
+pub struct Layout {
+    /// The files the language builds, when it says which: a Rust file is part of a crate only
+    /// when a `mod` declaration reaches it from a crate root. `None` keeps every file. A file
+    /// left out has no symbol or call, and resolves nothing.
+    pub members: Option<BTreeSet<String>>,
+    /// How imports name files (`LanguagePack::modules`).
+    pub modules: Modules,
+    /// The files whose exports (the `exports` table) another package can import, when the
+    /// language says which: a Rust file's `pub` items are reachable from outside its crate only
+    /// through a library root and `pub mod` declarations, and a binary exports nothing. `None`
+    /// keeps every file.
+    pub published: Option<BTreeSet<String>>,
+    /// The program entry points only the whole repository tells, as `(file, qualified name)`
+    /// among the members: a Rust `fn main` starts a program only in a binary target's root,
+    /// which `parse` of one file cannot know. `Facts::programs` still applies.
+    pub programs: Vec<(String, String)>,
+}
 
 /// Every pack Meada ships, in a fixed order.
 const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust];

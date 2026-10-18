@@ -190,7 +190,7 @@ repository's crates (each `Cargo.toml` with a `[package]`, in any directory, eac
 through the module tree its `mod` declarations build, with no Rust toolchain: a file no `mod`
 reaches stays out) with its functions, types, traits, modules and `impl` methods and the calls
 written as paths (`crate::a::f()`, `Type::new()`, `Self::f()`), also through `use` (groups,
-renames, globs, `pub use` and the other workspace crates by name; method calls (`x.m()`) go through the receiver's type when the code writes it (`let`, parameter, field, `self`, function return; a `dyn Trait` or trait-bounded generic goes to the trait's method), else by name; calls inside macros are not
+renames, globs, `pub use` and the other workspace crates by name; method calls (`x.m()`) go through the receiver's type when the code writes it (`let`, parameter, field, `self`, function return; a `dyn Trait` or trait-bounded generic goes to the trait's method; a method the `impl` blocks of a repository type lack, from a `derive` or an outside trait, links to nothing, and a route attribute never links to a function), else by name; calls inside macros are not
 indexed, and the Rust contracts are packages, HTTP and channels (below); only each crate's default configuration is read, for a fixed x86_64 Linux target: an item under a false `#[cfg(..)]`, or under a feature outside the `Cargo.toml` `default`, stays out, and `mod` under `#[cfg(test)]` is in), and links repositories,
 also from one language to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp` and, in Rust, `reqwest` and `ureq`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and

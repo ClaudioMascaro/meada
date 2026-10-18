@@ -251,11 +251,16 @@ pub struct Resolver<'a> {
     impls: HashMap<Target<'a>, Vec<Block<'a>>>,
     /// The class each block adds members to, by its file and scope: what `Self` names in it.
     blocks: HashMap<(&'a str, &'a str), Target<'a>>,
+    /// The blocks that add members to a type from outside the repository, by file and scope
+    /// (`impl Trait for reqwest::Client`): what `self` and `Self` name in them is opaque.
+    outside: HashSet<(&'a str, &'a str)>,
     /// The files whose exports other packages can import, when the pack says which
-    /// (`LanguagePack::published`).
+    /// (`Layout::published`).
     published: Option<BTreeSet<String>>,
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
+    /// The pack's `LanguagePack::strict`.
+    strict: bool,
     /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
     /// them and the last of one specifier alone, and how many of them each top-level name comes
     /// before: those written after its last binding (`rebound`).
@@ -368,8 +373,10 @@ impl<'a> Resolver<'a> {
             modules,
             impls: HashMap::new(),
             blocks: HashMap::new(),
+            outside: HashSet::new(),
             published: None,
             stars_bind,
+            strict: language.strict(),
             later,
         };
         let mut work = Work::default();
@@ -387,6 +394,7 @@ impl<'a> Resolver<'a> {
         resolver.families = work.families;
         let mut impls: HashMap<Target, Vec<Block>> = HashMap::new();
         let mut blocks = HashMap::new();
+        let mut outside = HashSet::new();
         for (path, facts) in files {
             for block in &facts.impls {
                 let class = |name: &'a str| match resolver.path_binding(path, &block.within, name) {
@@ -394,6 +402,10 @@ impl<'a> Resolver<'a> {
                     _ => None,
                 };
                 let Some(ty) = class(&block.ty) else {
+                    let ty = resolver.path_binding(path, &block.within, &block.ty);
+                    if matches!(ty, Binding::External(..)) {
+                        outside.insert((*path, block.scope.as_str()));
+                    }
                     continue;
                 };
                 blocks.insert((*path, block.scope.as_str()), ty);
@@ -408,7 +420,7 @@ impl<'a> Resolver<'a> {
         impls
             .values_mut()
             .for_each(|b| b.sort_by_key(|b| b.of_trait));
-        (resolver.impls, resolver.blocks) = (impls, blocks);
+        (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
@@ -429,13 +441,16 @@ impl<'a> Resolver<'a> {
         resolver
     }
 
-    /// Limits `exported` to these files (`LanguagePack::published`); `None` keeps every file.
+    /// Limits `exported` to these files (`Layout::published`); `None` keeps every file.
     pub fn publishing(mut self, published: Option<BTreeSet<String>>) -> Self {
         self.published = published;
         self
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
+        if self.strict && call.decorates.is_some() {
+            return Resolution::Unresolved;
+        }
         let binding = match call.by_path {
             true => self.path_binding(path, &call.scope, &call.callee),
             false => self.binding(path, &call.scope, &call.callee),
@@ -444,7 +459,9 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
-            Binding::Unknown if self.owned_outside(path, call) => Resolution::Unresolved,
+            Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
+                Resolution::Unresolved
+            }
             Binding::Instance(_)
             | Binding::Module(_)
             | Binding::Const(..)
@@ -460,13 +477,78 @@ impl<'a> Resolver<'a> {
     /// last method, to something outside it, as a direct `client.send()` does. Such a call
     /// resolves to nothing, never to a repository method of the same name.
     fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
-        let (Some(root), Some((_, last))) = (&call.root, call.callee.rsplit_once('.')) else {
+        let Some((head, last)) = call.callee.rsplit_once('.') else {
             return false;
+        };
+        let Some(root) = &call.root else {
+            return self.strict && head.starts_with('(') && self.rooted_outside(path, call);
         };
         let callee = format!("{root}.{last}");
         let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
         let found = self.resolve_as(path, &call.scope, &callee, seen, work, Reading::Value);
         matches!(found, Binding::External(..))
+    }
+
+    /// Whether, in a strict pack, the call chain `call` is made on (`rocket::build().mount(..)`,
+    /// `Call::root` none)
+    /// starts at a call that reaches outside the repository: the innermost call that begins
+    /// where `call` does, a path or a name read as its own call is (a path's head among types
+    /// and modules, so a `fn rocket()` of the file does not hide the crate).
+    fn rooted_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        let calls = &self.files[path].calls;
+        let Some(at) = call_at(calls, &call.range) else {
+            return false;
+        };
+        let start = call.range.start;
+        let chain = calls[at + 1..]
+            .iter()
+            .take_while(|c| c.range.start == start);
+        let Some(root) = chain.last().filter(|c| !c.callee.starts_with('(')) else {
+            return false;
+        };
+        let binding = match root.by_path {
+            true => self.path_binding(path, &root.scope, &root.callee),
+            false => self.binding(path, &root.scope, &root.callee),
+        };
+        matches!(binding, Binding::External(..))
+    }
+
+    /// Whether, in a strict pack (`LanguagePack::strict`), the receiver or the path head of
+    /// `call` is a type of the repository the source writes (`s: Store`, `Store::`): the member
+    /// its blocks lack is outside the repository, not any member of the name.
+    fn lacks(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, _)) = call.callee.rsplit_once('.').filter(|_| self.strict) else {
+            return false;
+        };
+        let reading = match call.by_path {
+            true => Reading::Path,
+            false => Reading::Value,
+        };
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, head, seen, work, reading);
+        let found = self.instance(found, work);
+        let enclosing = head == "self" || Some(head) == self.receiver;
+        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t))
+            || (enclosing && self.in_outside_block(path, &call.scope))
+    }
+
+    /// Whether the nearest block or class around `scope` is a block of a type from outside the
+    /// repository (`outside`), whose `self` is opaque.
+    fn in_outside_block(&self, path: &'a str, scope: &str) -> bool {
+        let mut scope = scope;
+        while !scope.is_empty() {
+            if self.outside.contains(&(path, scope)) {
+                return true;
+            }
+            let class = self.defs[path]
+                .get(scope)
+                .is_some_and(|d| d.kind == Kind::Class);
+            if class || self.blocks.contains_key(&(path, scope)) {
+                return false;
+            }
+            scope = crate::parent(scope);
+        }
+        false
     }
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
@@ -2090,7 +2172,7 @@ impl<'a> Code<'a> {
                 let kept = (matched || fluent).then(|| std::mem::take(&mut trail.out));
                 let mark = trail.steps.len();
                 if fluent {
-                    self.chain_steps(path, index, stop, &mut trail.steps);
+                    self.chain_steps(path, index, &mut trail.steps);
                 }
                 self.flow_from(path, stop, trail);
                 if fluent {
@@ -2170,20 +2252,34 @@ impl<'a> Code<'a> {
         trail.busy.pop();
     }
 
-    /// The methods of the calls from `index` down to `stop` along their receivers, outermost
-    /// first.
-    fn chain_steps(&self, path: &'a str, index: usize, stop: usize, steps: &mut Vec<&'a str>) {
+    /// The calls of the builder chain that ends in the call at `index` of `path`, that call
+    /// first, down its receivers to where `chain_tail` stops it: a call a function of the
+    /// repository answers, or one made on no call. `None` past `FLUENT_CHAIN` calls. The one
+    /// walk down a chain: the value flow and the kinds that read a chain step by step go through
+    /// it.
+    pub fn chain(&self, path: &'a str, index: usize) -> Option<Vec<usize>> {
+        let stop = self.chain_tail(path, index)?.stop;
         let calls = &self.resolver.files[path].calls;
-        let mut at = index;
-        while at != stop {
-            steps.push(method(&calls[at].callee));
-            match self.receiver(path, at) {
-                Some(Value::Call(next)) => match call_at(calls, &next.range) {
-                    Some(next) => at = next,
-                    None => break,
-                },
-                _ => break,
-            }
+        let mut out = vec![index];
+        while out[out.len() - 1] != stop {
+            let Some(Value::Call(next)) = self.receiver(path, out[out.len() - 1]) else {
+                return None;
+            };
+            out.push(call_at(calls, &next.range)?);
+        }
+        Some(out)
+    }
+
+    /// The methods of the calls of the chain ending at `index`, above where it stops, outermost
+    /// first.
+    fn chain_steps(&self, path: &'a str, index: usize, steps: &mut Vec<&'a str>) {
+        let calls = &self.resolver.files[path].calls;
+        if let Some((_, above)) = self
+            .chain(path, index)
+            .as_deref()
+            .and_then(<[usize]>::split_last)
+        {
+            steps.extend(above.iter().map(|&at| method(&calls[at].callee)));
         }
     }
 
@@ -2473,6 +2569,11 @@ impl<'a> Code<'a> {
             Binding::Module(m) => Some(m),
             _ => None,
         }
+    }
+
+    /// Whether other packages may import the exports of `path` (`Layout::published`).
+    pub fn published(&self, path: &str) -> bool {
+        (self.resolver.published.as_ref()).is_none_or(|files| files.contains(path))
     }
 
     /// The file an import of `specifier` from `path` names, if the pack parses it.
