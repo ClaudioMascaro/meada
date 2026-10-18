@@ -477,7 +477,8 @@ one for the area a change touches.
   unknown (a name match at most), and the linearization recurses no deeper down the bases.
   `REEXPORT_DEPTH` (64): a name followed through more files than that, each re-exporting it from
   the next (`export { x } from`, `export * from`, a Python `from m import x` or `import *`), is
-  unknown (a name match at most). `RECEIVER_DEPTH` (64): a receiver whose class is named through
+  unknown (a name match at most), and no other import, `export *` or submodule binds it in its
+  place. `RECEIVER_DEPTH` (64): a receiver whose class is named through
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one

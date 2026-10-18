@@ -68,11 +68,14 @@ struct Caller<'a> {
 }
 
 /// What resolving one name follows through exports: the `(file, exported name)` pairs seen, as
-/// re-exports may form cycles, and how many exports deep it is now.
+/// re-exports may form cycles, how many exports deep it is now, and whether an export was cut
+/// at `REEXPORT_DEPTH`. A cut export is unknown, not absent: a module that may export the name
+/// leaves it unknown rather than let another import or module bind it.
 #[derive(Default)]
 struct Seen<'a> {
     pairs: HashSet<(&'a str, &'a str)>,
     depth: usize,
+    cut: bool,
 }
 
 impl Seen<'_> {
@@ -573,7 +576,7 @@ impl<'a> Resolver<'a> {
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
-    /// `name` only if the module takes it.
+    /// `name` only if the module takes it; one cut at `REEXPORT_DEPTH` leaves it unknown.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         for import in self.files[path].imports.iter().rev() {
             if import.local == name {
@@ -581,10 +584,12 @@ impl<'a> Resolver<'a> {
             }
             if matches!(import.name, Imported::All)
                 && let Some(module) = self.module(path, &import.source)
-                && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                    self.star(module, name, seen)
             {
-                return found;
+                match self.star(module, name, seen) {
+                    found @ (Binding::Def(_) | Binding::Module(_)) => return found,
+                    _ if seen.cut => return Binding::Unknown,
+                    _ => {}
+                }
             }
         }
         Binding::Unknown
@@ -603,7 +608,7 @@ impl<'a> Resolver<'a> {
             .map(|(at, _)| at)
             .filter(|&at| callee[..at].contains('.'))
             .find_map(|at| match self.imported(path, &callee[..at], seen) {
-                Binding::Unknown => None,
+                Binding::Unknown if !seen.cut => None,
                 found => Some((found, &callee[at + 1..])),
             })
     }
@@ -625,6 +630,7 @@ impl<'a> Resolver<'a> {
         };
         if let Imported::Member { module, .. } = name
             && matches!(found, Binding::Unknown | Binding::External(..))
+            && !seen.cut
             && let Some(module) = self.module(path, module)
         {
             return Binding::Module(module);
@@ -642,9 +648,13 @@ impl<'a> Resolver<'a> {
     }
 
     /// What `path` exports as `name`: all it lets an explicit import name. Unknown more than
-    /// `REEXPORT_DEPTH` exports deep.
+    /// `REEXPORT_DEPTH` exports deep, where `seen` records the cut.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        if seen.depth >= REEXPORT_DEPTH || !seen.pairs.insert((path, name)) {
+        if seen.depth >= REEXPORT_DEPTH {
+            seen.cut = true;
+            return Binding::Unknown;
+        }
+        if !seen.pairs.insert((path, name)) {
             return Binding::Unknown;
         }
         seen.depth += 1;
@@ -672,10 +682,12 @@ impl<'a> Resolver<'a> {
         for export in exports {
             if let Export::All { source } = export
                 && let Some(module) = self.module(path, source)
-                && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                    self.star(module, name, seen)
             {
-                return found;
+                match self.star(module, name, seen) {
+                    found @ (Binding::Def(_) | Binding::Module(_)) => return found,
+                    _ if seen.cut => return Binding::Unknown,
+                    _ => {}
+                }
             }
         }
         Binding::Unknown
@@ -1697,9 +1709,44 @@ mod tests {
         classes.join("\n\n")
     }
 
-    /// Whether a call of `x` in `main` is exact when `f0` defines it as `define`, each file
-    /// `f{i}` up to `f{n - 1}` re-exports it from the one before as `link(i - 1)` writes, and
-    /// `main` imports it from the last as `import(n - 1)` writes.
+    /// The file `f0.{ext}`, defining `x` as `define`, and the files `f{i}` up to `f{n - 1}`, each
+    /// re-exporting it from the one before as `link(i - 1)` writes.
+    fn reexports(
+        ext: &str,
+        n: usize,
+        define: &str,
+        link: impl Fn(usize) -> String,
+    ) -> Vec<(String, String)> {
+        let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
+        sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
+        sources
+    }
+
+    /// The file defining the target of the call of `callee` in `main`, when it is exact.
+    fn exact_in(
+        pack: &dyn LanguagePack,
+        sources: &[(String, String)],
+        main: &str,
+        callee: &str,
+    ) -> Option<String> {
+        let facts: Vec<(String, Facts)> = (sources.iter())
+            .map(|(path, src)| (path.clone(), pack.parse(path, src.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = (facts.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let resolver = Resolver::new(&files, pack.modules(&[]).unwrap(), pack);
+        let call = files[main]
+            .calls
+            .iter()
+            .find(|c| c.callee == callee)
+            .unwrap();
+        match resolver.call(main, call) {
+            Resolution::Exact(t) => Some(t.path.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Whether a call of `x` in `main` is exact at `f0` when `main` imports it from `f{n - 1}`
+    /// of `reexports` as `import(n - 1)` writes.
     fn reexported(
         pack: &dyn LanguagePack,
         ext: &str,
@@ -1708,18 +1755,10 @@ mod tests {
         link: impl Fn(usize) -> String,
         import: impl Fn(usize) -> String,
     ) -> bool {
-        let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
-        sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
-        sources.push((format!("main.{ext}"), import(n - 1)));
-        let facts: Vec<(String, Facts)> = (sources.iter())
-            .map(|(path, src)| (path.clone(), pack.parse(path, src.as_bytes()).unwrap()))
-            .collect();
-        let files: BTreeMap<&str, &Facts> = (facts.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let mut sources = reexports(ext, n, define, link);
         let main = format!("main.{ext}");
-        let resolver = Resolver::new(&files, pack.modules(&[]).unwrap(), pack);
-        let call = files[main.as_str()].calls.iter().find(|c| c.callee == "x");
-        let defined = format!("f0.{ext}");
-        matches!(resolver.call(&main, call.unwrap()), Resolution::Exact(t) if t.path == defined)
+        sources.push((main.clone(), import(n - 1)));
+        exact_in(pack, &sources, &main, "x") == Some(format!("f0.{ext}"))
     }
 
     #[test]
@@ -1752,6 +1791,62 @@ mod tests {
             assert!(!exact(REEXPORT_DEPTH + 1));
             assert!(!exact(far));
         }
+    }
+
+    #[test]
+    fn a_name_cut_past_the_limit_is_taken_from_no_other_module() {
+        use crate::lang::ts::TsJs;
+
+        // `a` re-exports the `x` of `f0` through `n` files, and `b` defines its own: the module
+        // that binds `x` is `a`, whose `x` is unknown past the limit, and never `b`'s.
+        let cut = REEXPORT_DEPTH + 1;
+        let py_link = |p| format!("from f{p} import x\n");
+        let py = |n: usize| {
+            let mut sources = reexports("py", n, "def x():\n    pass\n", py_link);
+            sources.extend([
+                ("a.py".into(), py_link(n - 1)),
+                ("b.py".into(), "def x():\n    pass\n".into()),
+                // The last star import binds `x`.
+                (
+                    "main.py".into(),
+                    "from b import *\nfrom a import *\nx()\n".into(),
+                ),
+            ]);
+            exact_in(&Python, &sources, "main.py", "x")
+        };
+        assert_eq!(py(2).as_deref(), Some("f0.py"));
+        assert_eq!(py(cut), None);
+
+        let ts = |n: usize| {
+            let link = |p| format!("export {{ x }} from './f{p}';\n");
+            let mut sources = reexports("ts", n, "export function x() {}\n", link);
+            sources.extend([
+                ("a.ts".into(), link(n - 1)),
+                ("b.ts".into(), "export function x() {}\n".into()),
+                // The first `export *` that has `x` exports it.
+                (
+                    "m.ts".into(),
+                    "export * from './a';\nexport * from './b';\n".into(),
+                ),
+                ("main.ts".into(), "import { x } from './m';\nx();\n".into()),
+            ]);
+            exact_in(&TsJs, &sources, "main.ts", "x")
+        };
+        assert_eq!(ts(2).as_deref(), Some("f0.ts"));
+        assert_eq!(ts(cut), None);
+
+        // `from pkg import x` names the submodule `pkg.x` only when `pkg` exports no `x`.
+        let member = |init: String| {
+            let mut sources = reexports("py", cut, "def x():\n    pass\n", py_link);
+            sources.extend([
+                ("pkg/__init__.py".into(), init),
+                ("pkg/x.py".into(), "def y():\n    pass\n".into()),
+                ("main.py".into(), "from pkg import x\nx.y()\n".into()),
+            ]);
+            exact_in(&Python, &sources, "main.py", "x.y")
+        };
+        assert_eq!(member(String::new()).as_deref(), Some("pkg/x.py"));
+        assert_eq!(member(py_link(cut - 1)), None);
     }
 
     #[test]
