@@ -185,9 +185,9 @@ Constantes fixas:
 ## Estado
 
 Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.tsx`, `.js`,
-`.jsx`, `.mjs`, `.cjs`) e Python (`.py`), lê o código Rust (`.rs`) dos crates de um workspace
-Cargo (o pacote do `Cargo.toml` da raiz e os seus `[workspace] members`, cada crate pela árvore
-de módulos que os `mod` montam, sem toolchain Rust: um arquivo que nenhum `mod` alcança fica de
+`.jsx`, `.mjs`, `.cjs`) e Python (`.py`), lê o código Rust (`.rs`) dos crates do repositório
+(cada `Cargo.toml` com `[package]`, em qualquer pasta, cada crate pela árvore de módulos que os
+`mod` montam, sem toolchain Rust: um arquivo que nenhum `mod` alcança fica de
 fora) com as suas funções, tipos, traits, módulos e métodos de `impl` e as chamadas escritas
 como caminho (`crate::a::f()`, `Tipo::new()`, `Self::f()`; as de dentro de macros não são
 indexadas, e `use`, contratos e pacotes Rust ainda não), e liga repositórios, também de uma

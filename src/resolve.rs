@@ -54,6 +54,9 @@ enum Binding<'a> {
     /// A `let`, a `catch` binding, a destructured name: it hides every name it spells, and what
     /// it holds is not known.
     Hidden,
+    /// Several definitions fit a member equally (two trait blocks of one class give it),
+    /// sorted.
+    Several(Vec<Target<'a>>),
     /// Neither scope nor import resolution knows it.
     Unknown,
 }
@@ -246,7 +249,7 @@ impl<'a> Resolver<'a> {
         let mut blocks = HashMap::new();
         for (path, facts) in files {
             for block in &facts.impls {
-                let class = |name: &'a str| match resolver.binding(path, &block.within, name) {
+                let class = |name: &'a str| match resolver.path_binding(path, &block.within, name) {
                     Binding::Def(t) if resolver.is_class(t) => Some(t),
                     _ => None,
                 };
@@ -287,8 +290,13 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
-        match self.binding(path, &call.scope, &call.callee) {
+        let binding = match call.by_path {
+            true => self.path_binding(path, &call.scope, &call.callee),
+            false => self.binding(path, &call.scope, &call.callee),
+        };
+        match binding {
             Binding::Def(t) => Resolution::Exact(t),
+            Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
             Binding::Instance(_)
             | Binding::Module(_)
@@ -305,6 +313,13 @@ impl<'a> Resolver<'a> {
         self.resolve(path, scope, callee, &mut Seen::new(), &mut Work::default())
     }
 
+    /// `binding` of a path (Rust's `store::Store::new`, `Call::by_path`): its head names a
+    /// module or a type, which a local or a parameter of the same name does not hide.
+    fn path_binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
+        let (seen, work) = (&mut Seen::new(), &mut Work::default());
+        self.resolve_as(path, scope, callee, seen, work, true)
+    }
+
     /// What a callee-like name (`a.b.c`) written in `scope` refers to. A member of a class, or
     /// of a receiver whose class the source writes, is looked up through the class's family.
     fn resolve(
@@ -315,13 +330,26 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
+        self.resolve_as(path, scope, callee, seen, work, false)
+    }
+
+    /// `resolve`, its head read among types and modules alone when `types` (a path).
+    fn resolve_as(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+        types: bool,
+    ) -> Binding<'a> {
         let (mut binding, members) = self.dotted(path, callee, seen).unwrap_or_else(|| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             let binding = match head {
                 _ if Some(head) == self.receiver => self.class(path, scope),
                 _ if Some(head) == self.base_receiver => Binding::Unknown,
                 _ if head.starts_with('(') => Binding::Unknown,
-                _ => self.lexical(path, scope, head, seen),
+                _ => self.lexical_as(path, scope, head, seen, types),
             };
             (binding, members)
         });
@@ -330,22 +358,23 @@ impl<'a> Resolver<'a> {
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
                     self.member(t, member, work)
                 }
-                Binding::Def(t) => {
-                    let qualified = format!("{}.{member}", t.name);
-                    match self.def(t.path, &qualified) {
-                        // A module written in place may import a whole file under it (Rust's
-                        // `mod inner { mod x; }` binds `inner.x`).
-                        Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
-                            let mut imports = self.files[t.path].imports.iter().rev();
-                            match imports.find(|i| i.local == qualified) {
-                                Some(i) => self.import(t.path, &i.source, &i.name, seen),
-                                None => Binding::Unknown,
-                            }
+                Binding::Def(t) => match self.def(t.path, &format!("{}.{member}", t.name)) {
+                    // A module declared in its file (Rust's `mod store;`) is the file an
+                    // import of its name binds: its members are what that file exports.
+                    Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
+                        let mut imports = self.files[t.path].imports.iter().rev();
+                        match imports.find(|i| i.local == t.name) {
+                            Some(i) => match self.import(t.path, &i.source, &i.name, seen) {
+                                Binding::Module(m) => self.export(m, member, seen),
+                                _ => Binding::Unknown,
+                            },
+                            None => Binding::Unknown,
                         }
-                        found => found,
                     }
-                }
+                    found => found,
+                },
                 Binding::Module(m) => self.export(m, member, seen),
+                Binding::Several(_) => Binding::Unknown,
                 other => other,
             };
         }
@@ -412,6 +441,9 @@ impl<'a> Resolver<'a> {
             let Ancestor::Class(c) = ancestor else {
                 return Binding::Unknown;
             };
+            if let Some(found) = self.block_member(c, member) {
+                return found;
+            }
             let qualified = format!("{}.{member}", c.name);
             if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
                 return Binding::Def(Target { path: c.path, name });
@@ -419,16 +451,13 @@ impl<'a> Resolver<'a> {
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
             }
-            if let Some(found) = self.block_member(c, member) {
-                return found;
-            }
         }
         Binding::Unknown
     }
 
-    /// `member` of `class` in its blocks (`Facts::impls`): an inherent block's first, else the
-    /// one trait's block that defines it or whose trait gives it a default body. Several
-    /// traits giving it leave it unknown; none, `None`.
+    /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
+    /// trait blocks' that define it or whose trait gives it a default body. Several definitions
+    /// at that step are `Several` (two `impl From<_>` blocks, two traits); none, `None`.
     fn block_member(&self, class: Target<'a>, member: &str) -> Option<Binding<'a>> {
         let blocks = self.impls.get(&class)?;
         let find = |path: &'a str, scope: &str| {
@@ -436,19 +465,20 @@ impl<'a> Resolver<'a> {
             let (name, _) = self.defs[path].get_key_value(qualified.as_str())?;
             Some(Target { path, name })
         };
-        let inherent = blocks.iter().filter(|b| !b.of_trait);
-        if let Some(t) = inherent.filter_map(|b| find(b.path, b.scope)).next() {
-            return Some(Binding::Def(t));
-        }
-        let traits = blocks.iter().filter(|b| b.of_trait);
-        let found: BTreeSet<Target> = traits
-            .filter_map(|b| find(b.path, b.scope).or_else(|| find(b.of?.path, b.of?.name)))
-            .collect();
-        match found.into_iter().collect::<Vec<_>>()[..] {
+        let one = |found: BTreeSet<Target<'a>>| match found.into_iter().collect::<Vec<_>>()[..] {
             [] => None,
             [one] => Some(Binding::Def(one)),
-            _ => Some(Binding::Unknown),
+            ref several => Some(Binding::Several(several.to_vec())),
+        };
+        let inherent = blocks.iter().filter(|b| !b.of_trait);
+        let found = one(inherent.filter_map(|b| find(b.path, b.scope)).collect());
+        if found.is_some() {
+            return found;
         }
+        let traits = blocks.iter().filter(|b| b.of_trait);
+        one(traits
+            .filter_map(|b| find(b.path, b.scope).or_else(|| find(b.of?.path, b.of?.name)))
+            .collect())
     }
 
     /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
@@ -587,7 +617,8 @@ impl<'a> Resolver<'a> {
     /// binding, which hides the name; else what it defines, its constants, its parameters, its
     /// receivers), then the top level, then the file's imports. Methods are not lexical
     /// bindings, and a class body's names are in scope only for the statements written directly
-    /// in it, not for its methods or nested classes.
+    /// in it, not for its methods or nested classes. A module written in place (`Kind::Module`)
+    /// ends the climb: the names around it are not its own, only the file's imports are.
     fn lexical(
         &self,
         path: &'a str,
@@ -595,11 +626,25 @@ impl<'a> Resolver<'a> {
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
+        self.lexical_as(path, scope, name, seen, false)
+    }
+
+    /// `lexical`, among types and modules alone when `types`: no local, parameter or receiver
+    /// (a value) hides a path's head.
+    fn lexical_as(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        types: bool,
+    ) -> Binding<'a> {
         let defs = &self.defs[path];
         let mut scope = Some(scope);
         let mut first = true;
         while let Some(s) = scope {
-            scope = (!s.is_empty()).then(|| crate::parent(s));
+            let module = defs.get(s).is_some_and(|d| d.kind == Kind::Module);
+            scope = (!s.is_empty() && !module).then(|| crate::parent(s));
             let class_body = !first && defs.get(s).is_some_and(|d| d.kind == Kind::Class);
             first = false;
             if class_body {
@@ -610,6 +655,14 @@ impl<'a> Resolver<'a> {
             } else {
                 format!("{s}.{name}")
             };
+            if types {
+                match defs.get_key_value(candidate.as_str()) {
+                    Some((name, def)) if def.kind != Kind::Method => {
+                        return Binding::Def(Target { path, name });
+                    }
+                    _ => continue,
+                }
+            }
             // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
             // it hides every name it spells, outer ones and those of its own definition (a
             // definition, constant or parameter it may shadow in a block alike).

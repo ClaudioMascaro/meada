@@ -52,10 +52,13 @@ one for the area a change touches.
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
   other expression becomes `(<node kind>)`. A Rust path is dotted like a chain (`crate::a::f`
-  is `crate.a.f`, `Type::new` is `Type.new`), its `self::` and in-file `super::` read from the
-  module they name (`super::f` out of an inline module is `f`).
+  is `crate.a.f`, `Type::new` is `Type.new`); its `self::` and a `super::` that stays in the
+  file are read from the file's top under the keyword `mod` (`self::f` in `inner` is
+  `mod.inner.f`, `super::f` out of `inner` is `mod.f`).
 - Rust qualified names use `.` as well: `Type.method` (an inherent `impl`), `Type.Trait.method`
-  (a trait's `impl`), `Trait.method` (a default body), `inner.helper` (an inline module).
+  (a trait's `impl`), `Trait.method` (a default body), `inner.helper` (an inline module); a
+  later block that gives a name already given a method is `Type.Trait#2.method` (`impl From<A>`
+  then `impl From<B>`). A module, inline or declared with `mod x;`, is a symbol of its file.
 - Inline handlers: a pack emits anonymous function arguments (and functions written in an
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
@@ -295,17 +298,22 @@ one for the area a change touches.
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved. A language whose files are not all built, or whose imports name files by
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
-  three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, read
-  and folded into the configs digest on every refresh), `members` (the files it builds; the
-  rest keep their facts in `files` with an empty `resolved` and no rows, and leave the export)
-  and `modules`, which sees the members' facts besides the configs. A block that adds members
-  to a type written elsewhere (Rust's `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of,
-  within}`), which `Resolver::member` (`block_member`: inherent blocks first, then the one
-  trait block or trait default body that has the member) and `Resolver::class` (`Self` inside a
-  block) read; a module written in place is `Kind::Module` (its functions are name-match
-  candidates like top-level ones, and a whole-file import under it, `inner.x`, is a member of
-  it); a call written as a path sets `Call::by_path`, so a failed resolution matches functions
-  as well as methods by name. A pack that has program entry points fills
+  three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
+  path order, each stat'ed against `MAX_CONFIG`, read and folded into the configs digest on
+  every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
+  empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
+  facts besides the configs. A block that adds members to a type written elsewhere (Rust's
+  `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
+  (`block_member`, before the class's own names: the inherent blocks' definitions, else the
+  trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
+  an `ambiguous` call with exactly those candidates) and `Resolver::class` (`Self` inside a
+  block) read. A module is `Kind::Module`: its functions are name-match candidates like
+  top-level ones, a `Kind::Module` that an import of its own name binds to a file (Rust's `mod
+  store;`) has that file's exports as members, and `Resolver::lexical` does not climb past
+  one (the names around a module are not its own; the file's imports still are). A call
+  written as a path sets `Call::by_path`: its head is read among types and modules alone
+  (`lexical_as`, no local or parameter hides it), and a failed resolution matches functions as
+  well as methods by name. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -702,24 +710,24 @@ one for the area a change touches.
   `def __main__()`) counts.
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
-  member chain in a callee is its node kind. `lang/rust/crates.rs`: `MAX_MANIFEST` (1 MiB): a
-  larger `Cargo.toml`, or one that is not UTF-8 or not TOML, declares no crate. Crates are the
-  root `Cargo.toml`'s package and its `[workspace] members` (literal paths and `*` within a
-  segment, minus `exclude`); a repository without a root `Cargo.toml` builds no Rust file, and
-  `tests/`, `examples/`, `benches/` and `build.rs` are no crate roots (no marker). A file two
-  crates reach (`mod util;` in both `lib.rs` and `main.rs`) belongs to the first by root order
-  (the library first), so its `crate::` names that root (no marker). `#[path]` on a module
-  written in place is not read, and `super::` out of a file declared inside a module written in
-  place of its parent reaches nothing (no marker). Imports bind for the whole file: the `mod`
-  declarations of a module written in place are imported under it (`inner.x`), and an outside
-  crate a path names is a synthetic import of its first segment (`std`, `String`) only when
-  neither the file's items nor any `use` (a glob included) binds it. `self::` and `super::`
-  within the file are read as a plain name from the module they name: one a scope in between
-  binds too is left unresolved (`(scoped_identifier)`), and one read inside a function's
-  nested module too. A method of a trait's block is found through the type only when no
-  inherent block has it and exactly one trait's block (or its trait's default body) does. A
-  file's `pub` items are its public set (`Facts::star`), whatever the visibility of the modules
-  above it. Calls inside macro invocations are not indexed.
+  member chain in a callee is its node kind, and an `impl` type behind more references names
+  no type. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
+  `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
+  line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
+  a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
+  none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
+  `benches/` and `build.rs` are no crate roots (no marker). A file two crates reach (`mod
+  util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
+  first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
+  is not read, and `super::` out of a file declared inside a module written in place of its
+  parent reaches nothing (no marker). Imports bind for the whole file, so the `mod` imports and
+  the synthetic ones (`crate`, `super`, `mod`, an outside crate's first segment: `std`,
+  `String`, added only when neither the module's items nor any `use`, a glob included, binds
+  it) are seen inside every inline module too; `use` declarations are not imports yet, so a
+  call through one is a name match at most. `self::` and `super::` read inside a module that
+  sits in a function are `(scoped_identifier)`, unresolved. A file's `pub` items are its
+  public set (`Facts::star`), whatever the visibility of the modules above it. Calls inside
+  macro invocations are not indexed.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

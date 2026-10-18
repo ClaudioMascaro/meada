@@ -958,3 +958,14 @@ fn the_export_does_not_depend_on_the_order_files_are_found() {
 
     assert_eq!(reversed, normal);
 }
+
+#[test]
+fn a_rust_export_does_not_depend_on_the_order_files_and_manifests_are_found() {
+    let repo = fixture_repo("fresh_order_rust", "conformance-rust", ORIGIN);
+    let normal = Engine::open(&repo).unwrap().export().unwrap();
+
+    let repo = fixture_repo("fresh_order_rust_reversed", "conformance-rust", ORIGIN);
+    let reversed = meada::with_reversed_walk(|| Engine::open(&repo).unwrap().export().unwrap());
+
+    assert_eq!(reversed, normal);
+}

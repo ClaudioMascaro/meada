@@ -14,10 +14,6 @@ pub const MOD: &str = "mod ";
 /// `path a/b|p` inside the modules `a::b` written in place.
 pub const PATH: &str = "path ";
 
-/// The largest `Cargo.toml` read; a larger one declares nothing.
-// ponytail: a manifest is a few KiB; the limit keeps a crafted one from costing memory.
-const MAX_MANIFEST: usize = 1 << 20;
-
 /// A crate file reached from a root: its root, the file whose top-level `mod` declaration
 /// reached it (none for a root, or for a module declared inside a module written in place),
 /// and whether its `mod` declarations name files in its own directory (a root, a `mod.rs`, a
@@ -35,8 +31,8 @@ pub struct Tree {
 }
 
 impl Tree {
-    /// The module trees of the crates the root `Cargo.toml` declares: its own package and each
-    /// workspace member with one, among `configs` (every `Cargo.toml`, by path).
+    /// The module trees of the crates, one per `Cargo.toml` with a `[package]` among `configs`
+    /// (every `Cargo.toml` the walk found, by path).
     pub fn new(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Tree {
         let mut tree = Tree {
             nodes: BTreeMap::new(),
@@ -82,11 +78,13 @@ impl Tree {
         self.nodes.keys().cloned().collect()
     }
 
-    /// The file `specifier` names from `from`: `crate` its crate root, `super` (`super::super`)
-    /// the module declaring it (and so on up), a `mod` declaration's specifier its file.
+    /// The file `specifier` names from `from`: `crate` its crate root, `self` itself, `super`
+    /// (`super::super`) the module declaring it (and so on up), a `mod` declaration's specifier
+    /// its file.
     pub fn lookup(&self, from: &str, specifier: &str) -> Vec<String> {
         let found = match specifier {
             "crate" => self.nodes.get(from).map(|n| n.root.clone()),
+            "self" => self.nodes.contains_key(from).then(|| from.to_string()),
             s if s.starts_with(MOD) || s.starts_with(PATH) => self
                 .children
                 .get(&(from.to_string(), s.to_string()))
@@ -160,42 +158,27 @@ fn join(dir: &str, rel: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// The crate roots, in order: per crate (the root package, then the members by directory),
-/// its library (`[lib] path` or `src/lib.rs`), `src/main.rs`, each `[[bin]] path`, then
-/// `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found.
+/// The crate roots, in order: per `Cargo.toml` with a `[package]` table, at any depth, by
+/// path, its library (`[lib] path`, else `src/lib.rs`), `src/main.rs`, each `[[bin]] path`,
+/// then `src/bin/*.rs` and `src/bin/*/main.rs`; only those the walk found. A workspace's
+/// members are such manifests too, so `[workspace] members` adds none.
 fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<String> {
-    let manifests: BTreeMap<&str, toml::Table> = configs
+    let mut manifests: Vec<(&str, toml::Table)> = configs
         .iter()
-        .filter(|(_, src)| src.len() <= MAX_MANIFEST)
         .filter_map(|(path, src)| {
-            let dir = path.strip_suffix("Cargo.toml")?.trim_end_matches('/');
+            let dir = path.strip_suffix("Cargo.toml")?;
+            let dir = dir.strip_suffix('/').unwrap_or(dir);
             Some((dir, std::str::from_utf8(src).ok()?.parse().ok()?))
         })
+        .filter(|(_, manifest): &(&str, toml::Table)| manifest.contains_key("package"))
         .collect();
-    let Some(root) = manifests.get("") else {
-        return Vec::new();
-    };
-    let strings = |table: &toml::Table, key: &str| -> Vec<String> {
-        let list = table.get(key).and_then(|v| v.as_array());
-        let items = list.into_iter().flatten().filter_map(|v| v.as_str());
-        items.map(String::from).collect()
-    };
-    let workspace = root.get("workspace").and_then(|w| w.as_table());
-    let members = workspace.map(|w| strings(w, "members")).unwrap_or_default();
-    let exclude = workspace.map(|w| strings(w, "exclude")).unwrap_or_default();
-    let crates = manifests.iter().filter(|(dir, manifest)| {
-        manifest.contains_key("package")
-            && (dir.is_empty()
-                || (members.iter().any(|m| matches(m, dir))
-                    && !exclude.iter().any(|e| within(e, dir))))
-    });
+    manifests.sort_by_key(|(dir, _)| *dir);
     let mut out = Vec::new();
-    for (dir, manifest) in crates {
+    let mut seen = BTreeSet::new();
+    for (dir, manifest) in &manifests {
         let at = |rel: &str| join(dir, rel);
         let path_of = |v: &toml::Value| v.get("path")?.as_str().and_then(at);
-        let lib = manifest
-            .get("lib")
-            .map_or_else(|| at("src/lib.rs"), path_of);
+        let lib = (manifest.get("lib").and_then(path_of)).or_else(|| at("src/lib.rs"));
         let bins = manifest.get("bin").and_then(|b| b.as_array());
         let declared = bins.into_iter().flatten().filter_map(path_of);
         let src_bin = at("src/bin").unwrap_or_default();
@@ -213,7 +196,7 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Strin
             .chain(declared)
             .chain(found.map(|f| f.to_string()));
         for file in candidates {
-            if files.contains_key(file.as_str()) && !out.contains(&file) {
+            if files.contains_key(file.as_str()) && seen.insert(file.clone()) {
                 out.push(file);
             }
         }
@@ -221,63 +204,9 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<Strin
     out
 }
 
-/// Whether a `[workspace] members` pattern names the directory `dir`: segment by segment,
-/// `*` matching any run of characters within one.
-fn matches(pattern: &str, dir: &str) -> bool {
-    let Some(pattern) = join("", pattern) else {
-        return false;
-    };
-    let pattern: Vec<&str> = pattern.split('/').collect();
-    let dir: Vec<&str> = dir.split('/').collect();
-    pattern.len() == dir.len() && pattern.iter().zip(&dir).all(|(p, d)| glob(p, d))
-}
-
-/// Whether `name` fits the wildcard `pattern` (`*` any run of bytes), in time linear in their
-/// product whatever the stars.
-fn glob(pattern: &str, name: &str) -> bool {
-    let (p, n) = (pattern.as_bytes(), name.as_bytes());
-    let (mut i, mut j, mut star, mut mark) = (0, 0, None, 0);
-    while j < n.len() {
-        if p.get(i) == Some(&b'*') {
-            (star, mark, i) = (Some(i), j, i + 1);
-        } else if p.get(i) == Some(&n[j]) {
-            (i, j) = (i + 1, j + 1);
-        } else if let Some(s) = star {
-            (i, mark) = (s + 1, mark + 1);
-            j = mark;
-        } else {
-            return false;
-        }
-    }
-    p[i..].iter().all(|&c| c == b'*')
-}
-
-/// Whether the `exclude` entry `path` holds the directory `dir`.
-fn within(path: &str, dir: &str) -> bool {
-    join("", path).is_some_and(|p| dir == p || dir.starts_with(&format!("{p}/")))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn member_patterns_match_one_segment_per_star() {
-        let cases = [
-            ("crates/*", "crates/billing", true),
-            ("crates/*", "crates/billing/inner", false),
-            ("./api", "api", true),
-            ("api/", "api", true),
-            ("svc-*", "svc-web", true),
-            ("svc-*", "web", false),
-            ("*-api", "web-api", true),
-            ("../api", "api", false),
-            ("/api", "api", false),
-        ];
-        for (pattern, dir, expected) in cases {
-            assert_eq!(matches(pattern, dir), expected, "{pattern} on {dir}");
-        }
-    }
 
     #[test]
     fn paths_stay_inside_the_repository() {
@@ -291,13 +220,35 @@ mod tests {
     }
 
     #[test]
-    fn a_manifest_past_the_size_limit_declares_no_crate() {
+    fn every_package_at_any_depth_is_a_crate_with_its_own_roots() {
         let facts = Facts::default();
-        let files = BTreeMap::from([("src/lib.rs", &facts)]);
-        let manifest = "[package]\nname = \"a\"\n";
-        let big = format!("{manifest}{}", " ".repeat(MAX_MANIFEST));
-        let roots_of = |src: &str| roots(&[("Cargo.toml", src.as_bytes())], &files);
-        assert_eq!(roots_of(manifest), ["src/lib.rs"]);
-        assert!(roots_of(&big).is_empty());
+        let files = BTreeMap::from([
+            ("backend/src/lib.rs", &facts),
+            ("backend/src/main.rs", &facts),
+            ("backend/src/bin/sync/main.rs", &facts),
+            ("backend/src/bin/tool.rs", &facts),
+            ("src-tauri/src/main.rs", &facts),
+            ("virtual/src/lib.rs", &facts),
+        ]);
+        let configs: [(&str, &[u8]); 3] = [
+            // A `[lib]` table with no `path` keeps `src/lib.rs`.
+            (
+                "backend/Cargo.toml",
+                b"[package]\nname = \"b\"\n[lib]\nproc-macro = true\n",
+            ),
+            ("src-tauri/Cargo.toml", b"[package]\nname = \"t\"\n"),
+            // A virtual manifest builds nothing of its own.
+            ("virtual/Cargo.toml", b"[workspace]\nmembers = []\n"),
+        ];
+        assert_eq!(
+            roots(&configs, &files),
+            [
+                "backend/src/lib.rs",
+                "backend/src/main.rs",
+                "backend/src/bin/sync/main.rs",
+                "backend/src/bin/tool.rs",
+                "src-tauri/src/main.rs",
+            ]
+        );
     }
 }

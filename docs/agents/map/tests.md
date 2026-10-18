@@ -9,13 +9,17 @@ modules updates it.
   `conformance` (pack; for Python also its HTTP providers and consumers
   and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
   `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
-  (`src/main.rs` with `mod.rs`, `<name>.rs` and `#[path]` modules, inline modules, `self::`,
-  `super::` and `crate::`, `src/bin/tool.rs`, a `[[bin]]` at `tools/admin.rs`, an inherent
-  `impl` in another file than its struct, a trait's `impl` and a default body, a `println!`
-  whose call is not indexed, a closure, and `orphan.rs`, which no `mod` reaches) and
-  `crates/billing` (`[lib] path`, a path call through a `use` matched by name), with
-  `crates/scratch` excluded; `freshness` moves a `mod`, declares the orphan, adds a module and
-  drops the `[[bin]]`), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
+  (`src/main.rs` with `mod.rs`, `<name>.rs` and `#[path]` modules, inline modules holding a
+  `mod x;` and a `#[path]` one, `self::`, `super::` past a module's own name and `crate::`, a
+  `let` named like the module a path names, `src/bin/tool.rs`, `src/bin/sync/main.rs`, a
+  `[[bin]]` at `tools/admin.rs`, an inherent `impl` in another file than its struct, a trait's
+  `impl` and a default body, two traits giving `label` and two `impl From<_>` blocks
+  (`ambiguous`), a `#[cfg(test)] mod tests` that does not see the file's `Store`, a
+  `println!` whose call is not indexed, a closure, and `orphan.rs`, which no `mod` reaches) and
+  `crates/billing` (`[lib] path`, a path call through a `use` matched by name), and
+  `crates/scratch`, which the workspace's `exclude` names and is a crate all the same;
+  `freshness` moves a `mod`, declares the orphan, adds a module and drops the `[[bin]]`, and
+  exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
   and over a Kafka topic: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export

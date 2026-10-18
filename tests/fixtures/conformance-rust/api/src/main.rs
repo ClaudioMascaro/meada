@@ -19,7 +19,7 @@ mod checks {
     }
 
     // `super::compute` names the file's `compute`, which this module's own hides from a
-    // plain name: it is left unresolved rather than linked to the wrong one.
+    // plain name.
     pub fn run_checks() -> u32 {
         super::compute() + compute()
     }
@@ -29,18 +29,28 @@ mod checks {
     }
 }
 
+// A `mod` declaration and a `#[path]` inside a module written in place.
+mod nested {
+    #[path = "deep.rs"]
+    pub mod deep;
+    pub mod plain;
+}
+
 fn main() {
-    let s = store::Store::new();
-    routes::serve(&s);
+    // A `let` of the module's name does not hide the module a path names.
+    let store = store::Store::new();
+    routes::serve(&store);
     util::legacy();
     inner::helper();
     crate::store::reset();
+    nested::deep::dive();
+    nested::plain::walk();
     // Calls inside a macro invocation are not indexed.
     println!("{}", compute());
     let run = || start();
     run();
     String::new();
-    std::mem::drop(s);
+    std::mem::drop(store);
 }
 
 fn compute() -> u32 {

@@ -28,7 +28,12 @@ const DEFINITION_DEPTH: usize = 128;
 // ponytail: real code destructures a few levels; the recursion must stay shallow.
 const BINDING_DEPTH: usize = 64;
 
-/// How many segments of a path or a member chain a callee keeps; a longer one is its node kind.
+/// The head of a path read from the file's own top (`self::`, and `super::` that stays in the
+/// file): an import of the file itself. A keyword, so no name of the code is spelled so.
+const SELF: &str = "mod";
+
+/// How many segments of a path or a member chain a callee keeps, and how many references an
+/// `impl` block's type is read through; a longer one is its node kind, or names nothing.
 // ponytail: real paths hold a handful of segments; the limit keeps a crafted one cheap.
 const PATH_DEPTH: usize = 256;
 
@@ -109,42 +114,31 @@ enum Slot {
     Trait(usize),
 }
 
-/// What the file binds, for the paths: the qualified names of its non-method definitions, its
-/// locals and its `mod` declarations, each function's parameters, and the names its `use`
+/// What the file binds, for the paths: the qualified names of its non-method definitions
+/// (`mod` declarations included), its locals (written once each), and the names its `use`
 /// declarations bind (or that one of them is a glob).
 #[derive(Default)]
 struct Scan {
     defs: HashSet<String>,
     locals: HashSet<String>,
-    mods: HashSet<String>,
-    params: HashMap<String, Vec<String>>,
     uses: HashSet<String>,
     glob: bool,
 }
 
 impl Scan {
-    /// Whether `scope` binds `name` itself.
-    fn binds(&self, scope: &str, name: &str) -> bool {
-        let q = qualify(scope, name);
-        self.defs.contains(&q)
-            || self.locals.contains(&q)
-            || self.mods.contains(&q)
-            || self
-                .params
-                .get(scope)
-                .is_some_and(|p| p.iter().any(|p| p == name))
-    }
-
-    /// Whether a scope from `scope` up to `target`, `target` left out, binds `name`.
-    fn hides(&self, scope: &str, target: &str, name: &str) -> bool {
+    /// Whether a scope from `scope` up to `module`, `module` included, defines `name`: what a
+    /// path's head may name there (a module ends the names in scope).
+    fn defines(&self, scope: &str, module: &str, name: &str) -> bool {
         let mut s = scope;
-        while s.len() > target.len() {
-            if self.binds(s, name) {
+        loop {
+            if self.defs.contains(&qualify(s, name)) {
                 return true;
+            }
+            if s.len() <= module.len() {
+                return false;
             }
             s = crate::parent(s);
         }
-        false
     }
 }
 
@@ -158,6 +152,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut scan = Scan::default();
     let mut paths: Vec<(Slot, Path)> = Vec::new();
     let mut defined = HashSet::new();
+    // The last `#n` given to the blocks of each scope.
+    let mut suffixes: HashMap<String, usize> = HashMap::new();
     let mut public = Vec::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Visit {
@@ -215,8 +211,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     if kind == Kind::Function {
                         scan.defs.insert(qualified.clone());
                     }
-                    let names = params.iter().map(|p| p.name.clone()).collect();
-                    scan.params.insert(qualified.clone(), names);
                     facts.defs.push(Def {
                         params,
                         ..def(&qualified, kind, node)
@@ -250,8 +244,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 // Directly in a module: not in a function, an `impl` or a trait.
                 let in_module = pure && scope == module && matches!(body, Body::Items);
                 if field(node, "body").is_none() {
-                    if in_module {
-                        declare(&mut facts, &mut scan, &mut public, node, &module, name, src);
+                    let qualified = qualify(&module, name);
+                    if in_module && !deep && defined.insert(qualified.clone()) {
+                        scan.defs.insert(qualified);
+                        declare(&mut facts, &mut public, node, &module, name, src);
                     }
                     continue;
                 }
@@ -281,9 +277,25 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 else {
                     continue;
                 };
-                let mut block = qualify(&scope, &last(&ty, ty_node));
+                let mut base = qualify(&scope, &last(&ty, ty_node));
                 if let (Some(of), Some(n)) = (&of, trait_node) {
-                    block = qualify(&block, &last(of, n));
+                    base = qualify(&base, &last(of, n));
+                }
+                // Two blocks giving one name a method (`impl From<A> for E`, `impl From<B>
+                // for E`) are two scopes: the later one is `E.From#2`.
+                let methods: Vec<&str> = (field(node, "body").into_iter())
+                    .flat_map(named)
+                    .filter(|n| n.kind() == "function_item")
+                    .filter_map(|f| field(f, "name").map(|n| text(n, src)))
+                    .collect();
+                let mut block = base.clone();
+                let next = suffixes.entry(base.clone()).or_insert(1);
+                while methods
+                    .iter()
+                    .any(|m| defined.contains(&qualify(&block, m)))
+                {
+                    *next += 1;
+                    block = format!("{base}#{next}");
                 }
                 if let Some(ty) = ty {
                     let at = facts.impls.len();
@@ -445,7 +457,6 @@ fn export(facts: &mut Facts, public: &mut Vec<String>, node: Node, name: &str, s
 /// under `module.x`, which the file exports when it is at the top level.
 fn declare(
     facts: &mut Facts,
-    scan: &mut Scan,
     public: &mut Vec<String>,
     node: Node,
     module: &str,
@@ -458,7 +469,8 @@ fn declare(
         None => format!("{MOD}{}", qualify(&chain, name).replace('.', "/")),
     };
     let local = qualify(module, name);
-    scan.mods.insert(local.clone());
+    // The module is a definition of its own, the declaration's span (`search` finds it).
+    facts.defs.push(def(&local, Kind::Module, node));
     if module.is_empty() {
         facts.exports.push(Export::From {
             exported: name.to_string(),
@@ -637,11 +649,16 @@ fn segments(node: Node, src: &[u8]) -> Option<Vec<String>> {
 
 /// The path an `impl` block's type or trait is written as (`Store`, `super::Store`, `&Store`,
 /// `Store<T>`); `None` for a type that names no item (a tuple, a slice, a function).
+/// References past `PATH_DEPTH` (`& & & Store`) name nothing.
 fn type_path(node: Node, src: &[u8]) -> Option<Vec<String>> {
-    match node.kind() {
-        "reference_type" | "pointer_type" => type_path(field(node, "type")?, src),
-        _ => segments(node, src),
+    let mut at = node;
+    for _ in 0..PATH_DEPTH {
+        match at.kind() {
+            "reference_type" | "pointer_type" => at = field(at, "type")?,
+            _ => return segments(at, src),
+        }
     }
+    None
 }
 
 /// A method call's callee: the member chain of identifiers (`self.store.save`), any other
@@ -676,10 +693,10 @@ fn member(node: Node, src: &[u8]) -> String {
 }
 
 /// A path as a callee-like name the shared resolution reads (`crate.a.f`, `super.f`,
-/// `Self.f`, `inner.x.f`), with the imports it needs (`crate`, `super`, an outside crate).
-/// `self::` and `super::` within the file read the path from the module they name, as a plain
-/// name; `None` when a scope between hides its first segment, or it is read where modules are
-/// not all the way up.
+/// `Self.f`, `mod.inner.f`), with the imports it needs (`crate`, `super`, `mod` for the file
+/// itself, an outside crate). `self::` and `super::` within the file are read from the file's
+/// top (`mod.<module>.<rest>`), so no name between hides them; `None` where they are read in a
+/// module inside a function, whose place in the file no path names.
 fn normalize(
     path: &Path,
     scan: &Scan,
@@ -698,8 +715,7 @@ fn normalize(
                 return None;
             }
             let skip = usize::from(head == "self");
-            let ups = segments[skip..]
-                .iter()
+            let ups = (segments[skip..].iter())
                 .take_while(|s| *s == "super")
                 .count();
             let rest = &segments[skip + ups..];
@@ -712,35 +728,24 @@ fn normalize(
                 synthetic.insert((local.clone(), vec!["super"; up].join("::")));
                 return Some(format!("{local}.{}", rest.join(".")));
             }
-            let target = module[..module.len() - ups].join(".");
-            if scan.hides(&path.scope, &target, &rest[0]) {
-                return None;
-            }
-            Some(within(&target, rest, scan))
+            synthetic.insert((SELF.into(), "self".into()));
+            let target = &module[..module.len() - ups];
+            let anchored = [SELF].iter().chain(target).map(|s| s.to_string());
+            Some(
+                anchored
+                    .chain(rest.iter().cloned())
+                    .collect::<Vec<_>>()
+                    .join("."),
+            )
         }
         _ => {
-            let module = &path.module;
-            let declared = path.pure && scan.mods.contains(&qualify(module, head));
-            if declared && !scan.hides(&path.scope, module, head) {
-                return Some(within(module, segments, scan));
-            }
-            let visible = scan.hides(&path.scope, "", head) || scan.binds("", head);
-            if !visible && !scan.uses.contains(head) && !scan.glob {
-                // Neither the file nor a `use` binds it: a crate outside the repository.
+            let defined = scan.defines(&path.scope, &path.module, head);
+            if !defined && !scan.uses.contains(head) && !scan.glob {
+                // Neither the module nor a `use` binds it: a crate outside the repository.
                 synthetic.insert((head.to_string(), head.to_string()));
             }
             Some(segments.join("."))
         }
-    }
-}
-
-/// `rest` read from `module`: a module it declares with `mod` is imported under
-/// `module.<name>`, anything else is found by name from the call's scope.
-fn within(module: &str, rest: &[String], scan: &Scan) -> String {
-    let joined = rest.join(".");
-    match !module.is_empty() && scan.mods.contains(&qualify(module, &rest[0])) {
-        true => format!("{module}.{joined}"),
-        false => joined,
     }
 }
 
@@ -764,9 +769,9 @@ mod tests {
                    <T as Tr>::f(); g::<u8>(); s.m.n(); f().m(); }\n";
         let found = callees(src);
         let expected = [
-            ("inner.x.f", true),
-            ("h", true),
-            ("k", true),
+            ("x.f", true),
+            ("mod.inner.h", true),
+            ("mod.k", true),
             ("crate.a.f", true),
             ("super.super.k", true),
             ("a.f", true),
@@ -788,6 +793,7 @@ mod tests {
             ("inner.x", "mod inner/x"),
             ("Vec", "Vec"),
             ("crate", "crate"),
+            ("mod", "self"),
             ("super.super", "super::super"),
         ];
         let pairs: Vec<(String, String)> = pairs
@@ -798,9 +804,42 @@ mod tests {
     }
 
     #[test]
-    fn a_hidden_first_segment_leaves_the_path_unresolved() {
+    fn super_out_of_an_inline_module_is_read_from_the_file_top() {
         let src = "fn k() {}\nmod t { fn k() {} fn g() { super::k(); } }\n";
-        assert_eq!(callees(src)[0].0, "(scoped_identifier)");
+        assert_eq!(callees(src)[0].0, "mod.k");
+    }
+
+    #[test]
+    fn modules_in_files_are_definitions() {
+        let src = "mod a;\nmod inner { #[path = \"p.rs\"] mod x; }\n";
+        let defs: Vec<(String, bool)> = (facts(src).defs.into_iter())
+            .map(|d| (d.name, d.kind == Kind::Module))
+            .collect();
+        let expected = [("a", true), ("inner", true), ("inner.x", true)];
+        let expected: Vec<(String, bool)> =
+            expected.iter().map(|(n, m)| (n.to_string(), *m)).collect();
+        assert_eq!(defs, expected);
+        assert_eq!(facts(src).imports[1].source, "path inner|p.rs");
+    }
+
+    #[test]
+    fn blocks_giving_one_name_a_method_are_scopes_of_their_own() {
+        let src = "struct E;\nimpl From<A> for E { fn from() {} }\n\
+                   impl From<B> for E { fn from() {} }\nimpl E { fn a() {} }\nimpl E { fn b() {} }\n";
+        let facts = facts(src);
+        let names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["E", "E.From.from", "E.From#2.from", "E.a", "E.b"]);
+        let scopes: Vec<&str> = facts.impls.iter().map(|i| i.scope.as_str()).collect();
+        assert_eq!(scopes, ["E.From", "E.From#2", "E", "E"]);
+    }
+
+    #[test]
+    fn references_past_the_path_limit_name_no_type() {
+        let refs = "& ".repeat(PATH_DEPTH + 1);
+        let src = format!("struct S;\nimpl {refs}S {{ fn m() {{}} }}\n");
+        assert!(facts(&src).impls.is_empty());
+        let src = format!("struct S;\nimpl {} S {{ fn m() {{}} }}\n", "& ".repeat(3));
+        assert_eq!(facts(&src).impls[0].ty, "S");
     }
 
     #[test]

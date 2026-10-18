@@ -17,6 +17,18 @@ pub trait Persist {
     }
 }
 
+pub trait Named {
+    fn label(&self) -> u32 {
+        1
+    }
+}
+
+pub trait Tagged {
+    fn label(&self) -> u32 {
+        2
+    }
+}
+
 impl Store {
     pub fn new() -> Self {
         Self::empty()
@@ -36,7 +48,37 @@ impl Persist for Store {
     }
 }
 
+impl Named for Store {}
+
+impl Tagged for Store {}
+
+impl From<u32> for Store {
+    fn from(n: u32) -> Self {
+        Store { n }
+    }
+}
+
+impl From<u8> for Store {
+    fn from(n: u8) -> Self {
+        Store { n: n.into() }
+    }
+}
+
 pub fn reset() {
     Store::new();
     Persist::describe();
+    // Two traits give `label`, two `impl From<_>` blocks give `from`: neither is exact.
+    Store::label(&Store { n: 0 });
+    Store::from(1u8);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::Store;
+
+    // The file's own `Store` is not in scope here: no exact link to it.
+    fn t() {
+        Store::new();
+    }
 }

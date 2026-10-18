@@ -1352,11 +1352,15 @@ fn python() {
 #[test]
 fn rust() {
     const MAIN: &str = "api/src/main.rs";
-    const STORE: &str = "api/src/store.rs";
     conform(
         "conformance-rust",
         &[
+            "api/extra/legacy_util.rs::Store",
+            "api/extra/legacy_util.rs::Store.new",
             "api/extra/legacy_util.rs::legacy",
+            "api/src/bin/sync/main.rs::main",
+            "api/src/bin/sync/main.rs::step",
+            "api/src/bin/sync/step.rs::tick",
             "api/src/bin/tool.rs::helper",
             "api/src/bin/tool.rs::helper.go",
             "api/src/bin/tool.rs::main",
@@ -1369,24 +1373,44 @@ fn rust() {
             "api/src/main.rs::inner.helper",
             "api/src/main.rs::inner.twice",
             "api/src/main.rs::main",
+            "api/src/main.rs::nested",
+            "api/src/main.rs::nested.deep",
+            "api/src/main.rs::nested.plain",
+            "api/src/main.rs::routes",
             "api/src/main.rs::run",
             "api/src/main.rs::start",
+            "api/src/main.rs::store",
+            "api/src/main.rs::util",
+            "api/src/nested/deep.rs::dive",
+            "api/src/nested/plain.rs::walk",
             "api/src/routes/health.rs::check",
+            "api/src/routes/mod.rs::health",
             "api/src/routes/mod.rs::serve",
             "api/src/store.rs::Mode",
+            "api/src/store.rs::Named",
+            "api/src/store.rs::Named.label",
             "api/src/store.rs::Persist",
             "api/src/store.rs::Persist.describe",
             "api/src/store.rs::Store",
+            "api/src/store.rs::Store.From#2.from",
+            "api/src/store.rs::Store.From.from",
             "api/src/store.rs::Store.Persist.persist",
             "api/src/store.rs::Store.empty",
             "api/src/store.rs::Store.new",
             "api/src/store.rs::Store.save",
+            "api/src/store.rs::Tagged",
+            "api/src/store.rs::Tagged.label",
+            "api/src/store.rs::disk",
             "api/src/store.rs::reset",
+            "api/src/store.rs::tests",
+            "api/src/store.rs::tests.t",
             "api/src/store/disk.rs::Store.check",
             "api/src/store/disk.rs::Store.reload",
             "api/src/store/disk.rs::open",
             "api/tools/admin.rs::main",
+            "api/tools/admin.rs::shared",
             "api/tools/shared.rs::ping",
+            "crates/billing/src/billing.rs::invoice",
             "crates/billing/src/billing.rs::total",
             "crates/billing/src/billing.rs::util",
             "crates/billing/src/billing.rs::util.round",
@@ -1394,6 +1418,8 @@ fn rust() {
             "crates/billing/src/invoice.rs::Invoice.amount",
             "crates/billing/src/invoice.rs::Invoice.new",
             "crates/billing/src/invoice.rs::tax",
+            // A package the workspace's `exclude` lists is still a crate of the repository.
+            "crates/scratch/src/lib.rs::ignored",
         ],
         &[],
         &[
@@ -1404,7 +1430,7 @@ fn rust() {
                 &["api/src/main.rs::inner.helper"],
             ),
             (
-                "api/src/main.rs::inner.twice::helper#1",
+                "api/src/main.rs::inner.twice::mod.inner.helper#0",
                 EXACT,
                 &["api/src/main.rs::inner.helper"],
             ),
@@ -1413,23 +1439,25 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::inner.helper"],
             ),
-            // `super::` out of an inline module; the one its module hides stays unresolved.
+            // `super::` out of an inline module is read from the file's top, past the
+            // module's own `compute`.
             (
-                "api/src/main.rs::checks.verify::start#0",
+                "api/src/main.rs::checks.verify::mod.start#0",
                 EXACT,
                 &["api/src/main.rs::start"],
             ),
             (
-                "api/src/main.rs::checks.run_checks::(scoped_identifier)#0",
-                None,
-                &[],
+                "api/src/main.rs::checks.run_checks::mod.compute#0",
+                EXACT,
+                &["api/src/main.rs::compute"],
             ),
             (
                 "api/src/main.rs::checks.run_checks::compute#0",
                 EXACT,
                 &["api/src/main.rs::checks.compute"],
             ),
-            // `<name>.rs`, `mod.rs` and `#[path]` modules, and `crate::`.
+            // `<name>.rs`, `mod.rs` and `#[path]` modules, those declared inside an inline
+            // module, and `crate::`; a `let` of a module's name does not hide it.
             (
                 "api/src/main.rs::main::store.Store.new#0",
                 EXACT,
@@ -1449,6 +1477,16 @@ fn rust() {
                 "api/src/main.rs::main::crate.store.reset#0",
                 EXACT,
                 &["api/src/store.rs::reset"],
+            ),
+            (
+                "api/src/main.rs::main::nested.deep.dive#0",
+                EXACT,
+                &["api/src/nested/deep.rs::dive"],
+            ),
+            (
+                "api/src/main.rs::main::nested.plain.walk#0",
+                EXACT,
+                &["api/src/nested/plain.rs::walk"],
             ),
             // A closure's call belongs to the function around it; the closure's binding hides
             // the function of its name.
@@ -1522,6 +1560,33 @@ fn rust() {
                 EXACT,
                 &["api/src/store.rs::Persist.describe"],
             ),
+            // Two traits' default bodies, two blocks of one trait: each one fits.
+            (
+                "api/src/store.rs::reset::Store.label#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/store.rs::Named.label",
+                    "api/src/store.rs::Tagged.label",
+                ],
+            ),
+            (
+                "api/src/store.rs::reset::Store.from#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/store.rs::Store.From#2.from",
+                    "api/src/store.rs::Store.From.from",
+                ],
+            ),
+            // An inline module does not see the file's own `Store`: a name match only.
+            (
+                "api/src/store.rs::tests.t::Store.new#0",
+                AMBIGUOUS,
+                &[
+                    "api/extra/legacy_util.rs::Store.new",
+                    "api/src/store.rs::Store.new",
+                    "crates/billing/src/invoice.rs::Invoice.new",
+                ],
+            ),
             (
                 "api/src/store/disk.rs::Store.reload::open#0",
                 EXACT,
@@ -1532,11 +1597,16 @@ fn rust() {
                 EXACT,
                 &["api/src/store/disk.rs::Store.check"],
             ),
-            // Crate roots from `src/bin/` and `[[bin]]`.
+            // Crate roots from `src/bin/`, `src/bin/<name>/main.rs` and `[[bin]]`.
             (
                 "api/src/bin/tool.rs::main::helper.go#0",
                 EXACT,
                 &["api/src/bin/tool.rs::helper.go"],
+            ),
+            (
+                "api/src/bin/sync/main.rs::main::step.tick#0",
+                EXACT,
+                &["api/src/bin/sync/step.rs::tick"],
             ),
             (
                 "api/tools/admin.rs::main::shared.ping#0",
@@ -1572,8 +1642,6 @@ fn rust() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(!export.contains(&format!("{MAIN}::main::compute#")));
     assert!(!export.contains("orphan.rs"));
-    assert!(!export.contains("scratch"));
-    assert!(export.contains(&format!("{STORE}::Store.Persist.persist")));
 }
 
 /// The Python conformance fixture's export, and its providers (contract, site) whose site is

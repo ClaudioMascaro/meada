@@ -649,6 +649,24 @@ sample.rs
 {
   "defs": [
     {
+      "name": "disk",
+      "kind": "Module",
+      "range": {
+        "start": 72,
+        "end": 81
+      },
+      "params": []
+    },
+    {
+      "name": "util",
+      "kind": "Module",
+      "range": {
+        "start": 109,
+        "end": 122
+      },
+      "params": []
+    },
+    {
       "name": "Store",
       "kind": "Class",
       "range": {
@@ -753,6 +771,11 @@ sample.rs
       "name": "Namespace"
     },
     {
+      "local": "mod",
+      "source": "self",
+      "name": "Namespace"
+    },
+    {
       "local": "std",
       "source": "std",
       "name": "Namespace"
@@ -840,7 +863,7 @@ sample.rs
     },
     {
       "scope": "inner.helper",
-      "callee": "open",
+      "callee": "mod.open",
       "range": {
         "start": 551,
         "end": 564

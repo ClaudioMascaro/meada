@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 22;
+const SCHEMA_VERSION: i64 = 23;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -307,22 +307,22 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|p| !packs.contains_key(p.as_str()))
         .collect();
 
-    // Config files, read whole on every refresh: they are few and small. A `**/` name takes
-    // every file of that name the walk found.
+    // Config files, read whole on every refresh: they are few and small (`read_config`). A
+    // `**/` name takes every file of that name the walk found, in path order.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
-            let paths: Vec<(&str, PathBuf)> = match name.strip_prefix("**/") {
+            let paths: BTreeMap<&str, PathBuf> = match name.strip_prefix("**/") {
                 Some(file) => (all.iter())
                     .filter(|(path, _)| path.rsplit('/').next() == Some(file))
                     .map(|(path, abs)| (path.as_str(), abs.clone()))
                     .collect(),
-                None => vec![(name, root.join(name))],
+                None => BTreeMap::from([(name, root.join(name))]),
             };
             for (path, abs) in paths {
-                if let Ok(src) = fs::read(abs) {
+                if let Some(src) = read_config(&abs) {
                     digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
                     digest.update(&src);
                     found.push((path, src));
@@ -822,6 +822,20 @@ pub fn with_reversed_walk<T>(f: impl FnOnce() -> T) -> T {
 
 /// Every file under `root` but what `.gitignore` excludes, sorted (reversed under
 /// [`with_reversed_walk`]).
+/// The largest config file a pack is handed (`tsconfig.json`, `pyproject.toml`, each
+/// `Cargo.toml`); a larger one is not read, as if absent, with no status line.
+// ponytail: configs are a few KiB; the limit keeps a crafted one from being read and hashed
+// on every refresh.
+const MAX_CONFIG: u64 = 1 << 20;
+
+/// The bytes of the config file at `abs`, stat'ed first: `None` when it is missing, unreadable
+/// or larger than `MAX_CONFIG`.
+fn read_config(abs: &Path) -> Option<Vec<u8>> {
+    (fs::metadata(abs).ok()?.len() <= MAX_CONFIG)
+        .then(|| fs::read(abs).ok())
+        .flatten()
+}
+
 fn walk(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
         .require_git(false)
@@ -1495,8 +1509,21 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
+    use super::{MAX_CONFIG, SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
     use crate::{document, lang, package};
+
+    #[test]
+    fn a_config_past_the_size_limit_is_not_read() {
+        let dir = std::env::temp_dir().join(format!("meada-config-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let (at, past) = (dir.join("at.toml"), dir.join("past.toml"));
+        fs::write(&at, vec![b' '; MAX_CONFIG as usize]).unwrap();
+        fs::write(&past, vec![b' '; MAX_CONFIG as usize + 1]).unwrap();
+        assert_eq!(read_config(&at).map(|s| s.len()), Some(MAX_CONFIG as usize));
+        assert_eq!(read_config(&past), None);
+        assert_eq!(read_config(&dir.join("missing.toml")), None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {
