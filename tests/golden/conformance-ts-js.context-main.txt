@@ -1,4 +1,4 @@
-example.com/acme/conformance src/app.ts:8 main
+example.com/acme/conformance src/app.ts:8-23 main
 community: src
 processes: 1 (1 export; 1 repository): main (example.com/acme/conformance)
 function main(shape: Shape): void {

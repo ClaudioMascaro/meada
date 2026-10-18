@@ -1,4 +1,4 @@
-example.com/channels/api src/dynamic.ts:4 replay
+example.com/channels/api src/dynamic.ts:4-6 replay
 community: none
 processes: 1 (1 export; 1 repository): replay (example.com/channels/api)
 async function replay(id: string) {

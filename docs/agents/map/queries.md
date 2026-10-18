@@ -93,10 +93,11 @@ modules updates it.
   (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
   name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>
   (<kind>)`, matched by the entry point's label, the identity being what `trace` starts from.
-  `context` on a symbol puts two lines right after its first line, so the budget cuts the tail
-  and not them: `community: <name>` (or `none`, read from `Export::communities`) and
-  `processes: <summary>: <label> (<repository>), ...` (the summary below, or `none`), sorted by entry point
-  identity.
+  `context` on a symbol opens with `<repository> <path>:<start>-<end> <name>` (`<path>:<start>`
+  when the span text is unavailable, `<path>` when the file cannot be read), and puts two lines
+  right after it, so the budget cuts the tail and not them: `community: <name>` (or `none`, read
+  from `Export::communities`) and `processes: <summary>: <label> (<repository>), ...` (the
+  summary below, or `none`), sorted by entry point identity.
   `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
   node, so membership is the reachability the process walk follows. `processes_line` opens
   with a summary whenever the symbol belongs to a process, `<n> (<k> route, <k> export; <r>
@@ -104,8 +105,8 @@ modules updates it.
   that fit its room, then `+<m> more` for the rest; when not even one fits, the summary is the
   line. The room is what the budget leaves after the header and community, less the note of
   the final cut. `context_fresh` cuts in this order: the span text first (`render::cut`, with
-  its own note; left out when not even the note fits, so the agent reads it from the file the
-  header names), then the tail (callers, callees, consumers, contracts) by
+  its own note; left out when not even the note fits, so the agent reads it from the lines the
+  header's range names), then the tail (callers, callees, consumers, contracts) by
   the usual cut; the header, community and processes lines survive it. An answer that fits
   names every process and is cut nowhere. Two processes of one repository
   with the same label show as their `process::<identity>`.

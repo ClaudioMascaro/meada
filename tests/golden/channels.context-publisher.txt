@@ -1,4 +1,4 @@
-example.com/channels/api src/amqp.ts:17 announce
+example.com/channels/api src/amqp.ts:17-21 announce
 community: none
 processes: 1 (1 export; 1 repository): announce (example.com/channels/api)
 async function announce(id: string) {

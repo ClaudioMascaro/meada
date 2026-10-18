@@ -1,4 +1,4 @@
-example.com/chain/catalog lib/long.ts:3 long
+example.com/chain/catalog lib/long.ts:3-14 long
 community: lib#2
 processes: 2 (2 export; 1 repository): first (example.com/chain/catalog), second (example.com/chain/catalog)
 function long(id: string) {
