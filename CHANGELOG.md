@@ -28,7 +28,7 @@ All notable changes to Meada are recorded here. The format follows
   with the range as written and `range unchecked`. A Python import of one of its modules crosses
   into the provider's symbols: `exact` through the distribution's own name, `inferred` through
   another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
-  package of one name never link. The index is rebuilt once (schema version 22).
+  package of one name never link. The index is rebuilt once (schema version 23).
 - Python program entry points, each with its process: the `if __name__ == "__main__":` block of a
   file (symbol `__main__`, its range the `if` block) and each function a `[project.scripts]`
   (or Poetry `[tool.poetry.scripts]`) target names, mapped to its file through the package's
@@ -56,6 +56,9 @@ All notable changes to Meada are recorded here. The format follows
   something from outside the repository is no longer linked `exact` to an earlier star import's
   function of that name. A Python module that star-imports one name from several modules
   re-exports the last one's, as Python binds it.
+- A Python name defined or assigned before a star import of a module of the repository that
+  exports it (`def x(): ...`, then `from a import *`) is linked to that module's, as Python
+  rebinds it, and no longer to the earlier definition.
 - A class whose base is named through a member of a class with a family close to 128 classes
   long (`class Z(K.D)`) no longer resolves its members differently depending on which class was
   read first.

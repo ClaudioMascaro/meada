@@ -168,10 +168,11 @@ modules updates it.
   for both packs.
 - `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
   two definitions of one name, spans a decorated definition with its decorators, and exports
-  every module-level name (imports included), as an explicit import or `m.x` sees them, then
-  its star imports, the last first since it rebinds the names of those before (the resolver
-  takes the first `Export::All` that exports a name); what `import *` takes is `Facts::star`:
-  the public names, or a literal `__all__` alone.
+  every module-level name (imports included), as an explicit import or `m.x` sees them, and
+  its star imports, last binding first, since a later one rebinds the name (`stars_bind`: the
+  resolver takes the first export that gives a name, so a star import after a definition
+  rebinds it when its module exports it); what `import *` takes is `Facts::star`: the public
+  names, or a literal `__all__` alone.
   Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots

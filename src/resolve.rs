@@ -167,6 +167,12 @@ pub struct Resolver<'a> {
     /// functions and classes by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
     modules: Modules,
+    /// The pack's `LanguagePack::stars_bind`.
+    stars_bind: bool,
+    /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
+    /// them, and how many of them each top-level name comes before: those written after its
+    /// last binding (`rebound`).
+    later: HashMap<&'a str, (Vec<&'a str>, HashMap<&'a str, usize>)>,
 }
 
 impl<'a> Resolver<'a> {
@@ -215,6 +221,22 @@ impl<'a> Resolver<'a> {
             }
         }
         by_name.values_mut().for_each(|targets| targets.sort());
+        let stars_bind = language.stars_bind();
+        let later = (files.iter().filter(|_| stars_bind))
+            .filter_map(|(path, facts)| {
+                let (mut stars, mut after) = (Vec::new(), HashMap::new());
+                for export in &facts.exports {
+                    match export {
+                        Export::All { source } => stars.push(source.as_str()),
+                        Export::Local { exported, .. } if !stars.is_empty() => {
+                            after.insert(exported.as_str(), stars.len());
+                        }
+                        _ => {}
+                    }
+                }
+                (!stars.is_empty()).then_some((*path, (stars, after)))
+            })
+            .collect();
         let mut resolver = Self {
             files,
             defs,
@@ -228,6 +250,8 @@ impl<'a> Resolver<'a> {
             callers: HashMap::new(),
             by_name,
             modules,
+            stars_bind,
+            later,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -534,7 +558,8 @@ impl<'a> Resolver<'a> {
 
     /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
     /// binding, which hides the name; else what it defines, its constants, its parameters, its
-    /// receivers), then the top level, then the file's imports. Methods are not lexical
+    /// receivers), then the top level (where a star import written after every other binding
+    /// of the name may rebind it, `rebound`), then the file's imports. Methods are not lexical
     /// bindings, and a class body's names are in scope only for the statements written directly
     /// in it, not for its methods or nested classes.
     fn lexical(
@@ -553,6 +578,11 @@ impl<'a> Resolver<'a> {
             first = false;
             if class_body {
                 continue;
+            }
+            if s.is_empty()
+                && let Some(found) = self.rebound(path, name, seen)
+            {
+                return found;
             }
             let candidate = if s.is_empty() {
                 name.to_string()
@@ -600,6 +630,11 @@ impl<'a> Resolver<'a> {
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
     /// `name` only if the module exports it (`star`), to whatever it is there.
+    // ponytail: a star import from outside the repository (`from numpy import *`) is taken to
+    // bind nothing, here, in `rebound` and in `own_export`, since what it takes is not known: a
+    // name it rebinds stays linked to the import or definition before it (`from _heapq import
+    // *` after `def heappush`). Taking it to rebind every name loses about as many right links
+    // as wrong ones on the standard library.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         for import in self.files[path].imports.iter().rev() {
             if import.local == name {
@@ -690,27 +725,51 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// `exports`, once `path` and `name` are seen. The first `export *` that exports `name`
-    /// exports it: a pack lists them in the order its language lets them bind it.
+    /// `exports`, once `path` and `name` are seen. Where stars bind (`stars_bind`), the exports
+    /// are listed last binding first, and the first that gives `name` exports it. Otherwise
+    /// the module's own export of the name decides, else the first `export *` that exports it.
     fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
-        for export in exports {
-            match export {
-                Export::Local { exported, local } if exported == name => {
-                    return Some(self.lexical(path, "", local, seen));
-                }
-                Export::From {
-                    exported,
-                    source,
-                    name: imported,
-                } if exported == name => return Some(self.import(path, source, imported, seen)),
-                _ => {}
-            }
+        if self.stars_bind {
+            return (exports.iter()).find_map(|export| self.gives(path, export, name, seen));
         }
-        exports.iter().find_map(|export| match export {
+        let star = |export: &&Export| matches!(export, Export::All { .. });
+        let mut own = (exports.iter()).filter(|export| !star(export));
+        if let Some(found) = own.find_map(|export| self.gives(path, export, name, seen)) {
+            return Some(found);
+        }
+        (exports.iter().filter(star)).find_map(|export| self.gives(path, export, name, seen))
+    }
+
+    /// What one export of `path` gives `name`, if it gives it.
+    fn gives(
+        &self,
+        path: &'a str,
+        export: &'a Export,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<Binding<'a>> {
+        match export {
+            Export::Local { exported, local } if exported == name => {
+                Some(self.lexical(path, "", local, seen))
+            }
+            Export::From {
+                exported,
+                source,
+                name: imported,
+            } if exported == name => Some(self.import(path, source, imported, seen)),
             Export::All { source } => self.star(self.module(path, source)?, name, seen),
             _ => None,
-        })
+        }
+    }
+
+    /// Where stars bind (`stars_bind`), what a star import written after every other top-level
+    /// binding of `name` in `path` binds it to (`later`), the last first, when its module exports
+    /// the name (one from outside the repository binds nothing, `imported`).
+    fn rebound(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
+        let (stars, after) = self.later.get(path)?;
+        let stars = &stars[..*after.get(name)?];
+        (stars.iter()).find_map(|source| self.star(self.module(path, source)?, name, seen))
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
@@ -1926,6 +1985,74 @@ mod tests {
             exact_in(&Python, &sources, "main.py", "x").as_deref(),
             Some("a.py")
         );
+    }
+
+    fn owned(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        (pairs.iter())
+            .map(|(p, s)| (p.to_string(), s.to_string()))
+            .collect()
+    }
+
+    #[test]
+    #[ignore = "an outside star import is taken to bind nothing (ponytail in Resolver::imported)"]
+    fn a_star_import_from_outside_the_repository_hides_the_bindings_before_it() {
+        // `numpy` is no file of the repository, so what `from numpy import *` binds is not
+        // known: it may rebind `x`, and a call of `x` after it reaches no import or definition
+        // before it.
+        let b = ("b.py", "def x():\n    pass\n");
+        for main in [
+            "from b import *\nfrom numpy import *\nx()\n",
+            "from b import x\nfrom numpy import *\nx()\n",
+            "def x():\n    pass\nfrom numpy import *\nx()\n",
+        ] {
+            let sources = owned(&[b, ("main.py", main)]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+        }
+        // The same through a module that star-imports both and is imported by name.
+        let sources = owned(&[
+            b,
+            ("m.py", "from b import *\nfrom numpy import *\n"),
+            ("main.py", "from m import x\nx()\n"),
+        ]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+        // An import after it binds the name again.
+        for main in [
+            "from numpy import *\nfrom b import *\nx()\n",
+            "from numpy import *\nfrom b import x\nx()\n",
+        ] {
+            let sources = owned(&[b, ("main.py", main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("b.py"), "{main}");
+        }
+    }
+
+    #[test]
+    fn a_star_import_after_a_definition_rebinds_its_name() {
+        // `a` exports `x`, so `from a import *` after `def x()` rebinds `x` to `a`'s, for a call
+        // after it and for a call in a function, which runs once the module is loaded.
+        let def = "def x():\n    pass\n";
+        let a = ("a.py", def);
+        for call in ["x()\n", "def f():\n    x()\n"] {
+            let main = format!("{def}from a import *\n{call}");
+            let sources = owned(&[a, ("main.py", &main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("a.py"), "{main}");
+        }
+        // The same through a module that defines `x`, then star-imports `a`.
+        let m = format!("{def}from a import *\n");
+        let sources = owned(&[a, ("m.py", &m), ("main.py", "from m import x\nx()\n")]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("a.py"));
+        // A definition after the star import rebinds the name again, and a star import of a
+        // module that exports no `x` leaves the definition.
+        let after = format!("from a import *\n{def}x()\n");
+        let none = ("a.py", "def y():\n    pass\n");
+        let before = format!("{def}from a import *\nx()\n");
+        for (a, main) in [(a, &after), (none, &before)] {
+            let sources = owned(&[a, ("main.py", main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("main.py"), "{main}");
+        }
     }
 
     #[test]

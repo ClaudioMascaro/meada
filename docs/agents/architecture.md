@@ -286,7 +286,9 @@ one for the area a change touches.
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
-  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
+  Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
+  argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
@@ -483,7 +485,10 @@ one for the area a change touches.
   `REEXPORT_DEPTH` (64): a name followed through more files than that, each re-exporting it from
   the next (`export { x } from`, `export * from`, a Python `from m import x` or `import *`), is
   unknown (a name match at most), and no other import, `export *` or submodule binds it in its
-  place. `RECEIVER_DEPTH` (64): a receiver whose class is named through
+  place. A star import from outside the repository (`from numpy import *`) is taken to bind
+  nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
+  import or definition before it, as with the standard library's accelerator modules (`from
+  _heapq import *` after `def heappush`). `RECEIVER_DEPTH` (64): a receiver whose class is named through
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`), holds an unknown class.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when

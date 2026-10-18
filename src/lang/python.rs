@@ -135,7 +135,7 @@ impl LanguagePack for Python {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
                         if scope.is_empty() {
-                            module.names.push(name.to_string());
+                            module.name(name);
                         }
                         if defined.insert(inner.clone()) {
                             if !is_class {
@@ -308,6 +308,10 @@ impl LanguagePack for Python {
         messages::messages(code)
     }
 
+    fn stars_bind(&self) -> bool {
+        true
+    }
+
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
         // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
         // nothing, and indexing carries on.
@@ -349,22 +353,31 @@ struct Visit<'t> {
 /// What a module binds at its top level, which makes up its exports.
 #[derive(Default)]
 struct Module {
-    names: Vec<String>,
+    /// Every top-level binding in statement order: a name (`Export::Local`) or a star import
+    /// (`Export::All`).
+    bindings: Vec<Export>,
     /// The names of a literal `__all__`; `None` when there is none, or it is computed.
     all: Option<Vec<String>>,
-    /// The modules `from m import *` brings in.
-    stars: Vec<String>,
 }
 
 impl Module {
     fn import(&mut self, imports: &[Import]) {
         for import in imports {
             match import.name {
-                Imported::All => self.stars.push(import.source.clone()),
-                _ if !import.local.contains('.') => self.names.push(import.local.clone()),
+                Imported::All => self.bindings.push(Export::All {
+                    source: import.source.clone(),
+                }),
+                _ if !import.local.contains('.') => self.name(&import.local),
                 _ => {}
             }
         }
+    }
+
+    fn name(&mut self, name: &str) {
+        self.bindings.push(Export::Local {
+            exported: name.to_string(),
+            local: name.to_string(),
+        });
     }
 
     fn assign(&mut self, node: Node, src: &[u8]) {
@@ -375,7 +388,7 @@ impl Module {
             return;
         }
         let name = text(left, src);
-        self.names.push(name.to_string());
+        self.name(name);
         if name == "__all__" {
             self.all = node
                 .child_by_field_name("right")
@@ -385,22 +398,16 @@ impl Module {
 
     /// What an explicit import or an attribute access names: every module-level name (imports
     /// included, as that is how a package re-exports) and its star imports' names, the last
-    /// star import first, as it rebinds the names of those before it. What `import *` takes is
-    /// a literal `__all__`, else the public names; a computed `__all__` is ignored.
+    /// binding first, as it rebinds a name the bindings before it gave (`stars_bind`): a name
+    /// once, where it was last bound, and every star import. What `import *` takes is a literal
+    /// `__all__`, else the public names; a computed `__all__` is ignored.
     fn exports(self) -> (Vec<Export>, Star) {
         let mut seen = HashSet::new();
-        let exports = (self.names.into_iter())
-            .filter(|n| seen.insert(n.clone()))
-            .map(|name| Export::Local {
-                exported: name.clone(),
-                local: name,
+        let exports = (self.bindings.into_iter().rev())
+            .filter(|e| match e {
+                Export::Local { exported, .. } => seen.insert(exported.clone()),
+                _ => true,
             })
-            .chain(
-                self.stars
-                    .into_iter()
-                    .rev()
-                    .map(|source| Export::All { source }),
-            )
             .collect();
         (exports, self.all.map_or(Star::Public, Star::Only))
     }
