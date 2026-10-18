@@ -23,7 +23,7 @@
     },
     {
       "path": "api/src/gated.rs",
-      "hash": "47b39fa1c5e5faf97ec3d4072d51290ad2def95459c8fbae87e98e682d34f1c1"
+      "hash": "79b74729bc4b32e847afc0aaecea6cb06cf718fc666c6d4399ff25469682a174"
     },
     {
       "path": "api/src/launch.rs",
@@ -31,11 +31,19 @@
     },
     {
       "path": "api/src/main.rs",
-      "hash": "d5443cc49a90921a731c49de27133289c4754034b7f3b93d8d860b69a8fde564"
+      "hash": "32255f8a415eb502f6414fc4e92c4cdae801a6e2ffc89e3328d22508a87ba2d5"
     },
     {
       "path": "api/src/methods.rs",
       "hash": "8416d0903ddecd37a093f5a4920bf9d88b3ce4fa1727ce505a4269d7ed23eb9b"
+    },
+    {
+      "path": "api/src/mock.rs",
+      "hash": "6356eae732aa5eb7a9deee9056a34507afb09cae2c048cf54664cd97643fbae2"
+    },
+    {
+      "path": "api/src/native.rs",
+      "hash": "d5795ab6defa2b4083bc4454f0456b592fda4227439433a60cdfc811b764b729"
     },
     {
       "path": "api/src/nested/deep.rs",
@@ -48,6 +56,10 @@
     {
       "path": "api/src/prelude.rs",
       "hash": "740440f0f73e63dcf6f139608adc0757d941c54bbae4726984dfd244e9411334"
+    },
+    {
+      "path": "api/src/real.rs",
+      "hash": "6356eae732aa5eb7a9deee9056a34507afb09cae2c048cf54664cd97643fbae2"
     },
     {
       "path": "api/src/ring.rs",
@@ -232,6 +244,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::connect",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 1039,
+        "end": 1073
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/gated.rs::on_linux",
       "span": {
         "path": "api/src/gated.rs",
@@ -240,19 +260,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::outside_tests",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 472,
+        "end": 497
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/gated.rs::tests",
       "span": {
         "path": "api/src/gated.rs",
-        "start": 881,
-        "end": 943
+        "start": 1150,
+        "end": 1212
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/gated.rs::tests.helper",
       "span": {
         "path": "api/src/gated.rs",
-        "start": 897,
-        "end": 941
+        "start": 1166,
+        "end": 1210
       }
     },
     {
@@ -283,64 +311,64 @@
       "id": "example.com/acme/conformance::api/src/main.rs::below",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1810,
-        "end": 1891
+        "start": 1949,
+        "end": 2030
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::below.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1845,
-        "end": 1889
+        "start": 1984,
+        "end": 2028
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 627,
-        "end": 921
+        "start": 766,
+        "end": 1060
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 644,
-        "end": 681
+        "start": 783,
+        "end": 820
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 795,
-        "end": 866
+        "start": 934,
+        "end": 1005
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.verify",
       "span": {
         "path": "api/src/main.rs",
-        "start": 872,
-        "end": 919
+        "start": 1011,
+        "end": 1058
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4063,
-        "end": 4092
+        "start": 4202,
+        "end": 4231
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::elsewhere",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3810,
-        "end": 3845
+        "start": 3949,
+        "end": 3984
       }
     },
     {
@@ -355,248 +383,280 @@
       "id": "example.com/acme/conformance::api/src/main.rs::gated",
       "span": {
         "path": "api/src/main.rs",
-        "start": 12,
-        "end": 22
+        "start": 64,
+        "end": 74
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::hidden",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4015,
-        "end": 4061
+        "start": 4154,
+        "end": 4200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::imp",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 75,
+        "end": 83
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner",
       "span": {
         "path": "api/src/main.rs",
-        "start": 498,
-        "end": 625
+        "start": 637,
+        "end": 764
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.helper",
       "span": {
         "path": "api/src/main.rs",
-        "start": 514,
-        "end": 554
+        "start": 653,
+        "end": 693
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.twice",
       "span": {
         "path": "api/src/main.rs",
-        "start": 560,
-        "end": 623
+        "start": 699,
+        "end": 762
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1314,
-        "end": 1420
+        "start": 1453,
+        "end": 1559
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.far",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1373,
-        "end": 1418
+        "start": 1512,
+        "end": 1557
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1333,
-        "end": 1367
+        "start": 1472,
+        "end": 1506
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::launch",
       "span": {
         "path": "api/src/main.rs",
-        "start": 23,
-        "end": 34
+        "start": 84,
+        "end": 95
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1476,
-        "end": 1605
+        "start": 1615,
+        "end": 1744
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1516,
-        "end": 1553
+        "start": 1655,
+        "end": 1692
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1559,
-        "end": 1603
+        "start": 1698,
+        "end": 1742
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1653,
-        "end": 1741
+        "start": 1792,
+        "end": 1880
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops.f",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1708,
-        "end": 1739
+        "start": 1847,
+        "end": 1878
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::main",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2043,
-        "end": 3598
+        "start": 2182,
+        "end": 3737
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::methods",
       "span": {
         "path": "api/src/main.rs",
-        "start": 76,
-        "end": 88
+        "start": 215,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::mock",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 109,
+        "end": 118
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::native",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 152,
+        "end": 163
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1966,
-        "end": 2041
+        "start": 2105,
+        "end": 2180
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.deep",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2007,
-        "end": 2020
+        "start": 2146,
+        "end": 2159
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.plain",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2025,
-        "end": 2039
+        "start": 2164,
+        "end": 2178
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::outside",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3651,
-        "end": 3686
+        "start": 3790,
+        "end": 3825
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::prelude",
       "span": {
         "path": "api/src/main.rs",
-        "start": 89,
-        "end": 101
+        "start": 228,
+        "end": 240
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::real",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 164,
+        "end": 173
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::ring",
       "span": {
         "path": "api/src/main.rs",
-        "start": 102,
-        "end": 111
+        "start": 241,
+        "end": 250
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::routes",
       "span": {
         "path": "api/src/main.rs",
-        "start": 112,
-        "end": 123
+        "start": 251,
+        "end": 262
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::run",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4109,
-        "end": 4120
+        "start": 4248,
+        "end": 4259
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1019,
-        "end": 1160
+        "start": 1158,
+        "end": 1299
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1108,
-        "end": 1158
+        "start": 1247,
+        "end": 1297
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::start",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4094,
-        "end": 4107
+        "start": 4233,
+        "end": 4246
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::store",
       "span": {
         "path": "api/src/main.rs",
-        "start": 124,
-        "end": 134
+        "start": 263,
+        "end": 273
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::util",
       "span": {
         "path": "api/src/main.rs",
-        "start": 487,
-        "end": 496
+        "start": 626,
+        "end": 635
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::with_param",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3917,
-        "end": 3956
+        "start": 4056,
+        "end": 4095
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::within",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3733,
-        "end": 3808
+        "start": 3872,
+        "end": 3947
       }
     },
     {
@@ -1008,6 +1068,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/mock.rs::client",
+      "span": {
+        "path": "api/src/mock.rs",
+        "start": 0,
+        "end": 18
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/native.rs::counter",
+      "span": {
+        "path": "api/src/native.rs",
+        "start": 0,
+        "end": 19
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/nested/deep.rs::dive",
       "span": {
         "path": "api/src/nested/deep.rs",
@@ -1037,6 +1113,14 @@
         "path": "api/src/prelude.rs",
         "start": 0,
         "end": 17
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/real.rs::client",
+      "span": {
+        "path": "api/src/real.rs",
+        "start": 0,
+        "end": 18
       }
     },
     {
@@ -1528,14 +1612,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::connect::client#0",
+      "caller": "example.com/acme/conformance::api/src/gated.rs::connect",
+      "target": "example.com/acme/conformance::api/src/real.rs::client",
+      "level": "exact",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 1062,
+        "end": 1070
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/gated.rs::tests.helper::mod.always#0",
       "caller": "example.com/acme/conformance::api/src/gated.rs::tests.helper",
       "target": "example.com/acme/conformance::api/src/gated.rs::always",
       "level": "exact",
       "span": {
         "path": "api/src/gated.rs",
-        "start": 919,
-        "end": 934
+        "start": 1188,
+        "end": 1203
       }
     },
     {
@@ -1545,8 +1640,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1874,
-        "end": 1883
+        "start": 2013,
+        "end": 2022
       }
     },
     {
@@ -1556,8 +1651,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 851,
-        "end": 860
+        "start": 990,
+        "end": 999
       }
     },
     {
@@ -1567,8 +1662,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 832,
-        "end": 848
+        "start": 971,
+        "end": 987
       }
     },
     {
@@ -1578,8 +1673,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 898,
-        "end": 912
+        "start": 1037,
+        "end": 1051
       }
     },
     {
@@ -1589,8 +1684,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3831,
-        "end": 3842
+        "start": 3970,
+        "end": 3981
       }
     },
     {
@@ -1600,8 +1695,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 4053,
-        "end": 4058
+        "start": 4192,
+        "end": 4197
       }
     },
     {
@@ -1611,8 +1706,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 592,
-        "end": 600
+        "start": 731,
+        "end": 739
       }
     },
     {
@@ -1622,8 +1717,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 603,
-        "end": 617
+        "start": 742,
+        "end": 756
       }
     },
     {
@@ -1633,8 +1728,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1396,
-        "end": 1411
+        "start": 1535,
+        "end": 1550
       }
     },
     {
@@ -1644,8 +1739,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1355,
-        "end": 1360
+        "start": 1494,
+        "end": 1499
       }
     },
     {
@@ -1655,8 +1750,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1588,
-        "end": 1597
+        "start": 1727,
+        "end": 1736
       }
     },
     {
@@ -1666,8 +1761,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1729,
-        "end": 1732
+        "start": 1868,
+        "end": 1871
       }
     },
     {
@@ -1677,8 +1772,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2742,
-        "end": 2753
+        "start": 2881,
+        "end": 2892
       }
     },
     {
@@ -1688,8 +1783,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2926,
-        "end": 2940
+        "start": 3065,
+        "end": 3079
       }
     },
     {
@@ -1699,8 +1794,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2691,
-        "end": 2702
+        "start": 2830,
+        "end": 2841
       }
     },
     {
@@ -1710,8 +1805,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2443,
-        "end": 2456
+        "start": 2582,
+        "end": 2595
       }
     },
     {
@@ -1721,8 +1816,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2668,
-        "end": 2673
+        "start": 2807,
+        "end": 2812
       }
     },
     {
@@ -1732,8 +1827,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3214,
-        "end": 3225
+        "start": 3353,
+        "end": 3364
       }
     },
     {
@@ -1743,8 +1838,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2788,
-        "end": 2811
+        "start": 2927,
+        "end": 2950
       }
     },
     {
@@ -1754,8 +1849,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2759,
-        "end": 2782
+        "start": 2898,
+        "end": 2921
       }
     },
     {
@@ -1765,8 +1860,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2842,
-        "end": 2854
+        "start": 2981,
+        "end": 2993
       }
     },
     {
@@ -1776,8 +1871,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2239,
-        "end": 2260
+        "start": 2378,
+        "end": 2399
       }
     },
     {
@@ -1787,8 +1882,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2679,
-        "end": 2685
+        "start": 2818,
+        "end": 2824
       }
     },
     {
@@ -1798,8 +1893,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3032,
-        "end": 3037
+        "start": 3171,
+        "end": 3176
       }
     },
     {
@@ -1809,8 +1904,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3043,
-        "end": 3050
+        "start": 3182,
+        "end": 3189
       }
     },
     {
@@ -1820,8 +1915,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2218,
-        "end": 2233
+        "start": 2357,
+        "end": 2372
       }
     },
     {
@@ -1831,8 +1926,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3251,
-        "end": 3266
+        "start": 3390,
+        "end": 3405
       }
     },
     {
@@ -1842,8 +1937,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3231,
-        "end": 3245
+        "start": 3370,
+        "end": 3384
       }
     },
     {
@@ -1853,8 +1948,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3410,
-        "end": 3418
+        "start": 3549,
+        "end": 3557
       }
     },
     {
@@ -1864,8 +1959,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3424,
-        "end": 3440
+        "start": 3563,
+        "end": 3579
       }
     },
     {
@@ -1875,8 +1970,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3539,
-        "end": 3569
+        "start": 3678,
+        "end": 3708
       }
     },
     {
@@ -1886,8 +1981,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3575,
-        "end": 3595
+        "start": 3714,
+        "end": 3734
       }
     },
     {
@@ -1897,8 +1992,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2817,
-        "end": 2836
+        "start": 2956,
+        "end": 2975
       }
     },
     {
@@ -1908,8 +2003,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3272,
-        "end": 3288
+        "start": 3411,
+        "end": 3427
       }
     },
     {
@@ -1919,8 +2014,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2266,
-        "end": 2286
+        "start": 2405,
+        "end": 2425
       }
     },
     {
@@ -1930,8 +2025,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2292,
-        "end": 2313
+        "start": 2431,
+        "end": 2452
       }
     },
     {
@@ -1941,8 +2036,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3142,
-        "end": 3160
+        "start": 3281,
+        "end": 3299
       }
     },
     {
@@ -1952,8 +2047,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3114,
-        "end": 3136
+        "start": 3253,
+        "end": 3275
       }
     },
     {
@@ -1963,8 +2058,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3166,
-        "end": 3190
+        "start": 3305,
+        "end": 3329
       }
     },
     {
@@ -1974,8 +2069,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2171,
-        "end": 2192
+        "start": 2310,
+        "end": 2331
       }
     },
     {
@@ -1985,8 +2080,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2432,
-        "end": 2437
+        "start": 2571,
+        "end": 2576
       }
     },
     {
@@ -1996,8 +2091,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3196,
-        "end": 3208
+        "start": 3335,
+        "end": 3347
       }
     },
     {
@@ -2007,8 +2102,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2419,
-        "end": 2426
+        "start": 2558,
+        "end": 2565
       }
     },
     {
@@ -2018,8 +2113,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2462,
-        "end": 2483
+        "start": 2601,
+        "end": 2622
       }
     },
     {
@@ -2029,8 +2124,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2146,
-        "end": 2165
+        "start": 2285,
+        "end": 2304
       }
     },
     {
@@ -2040,8 +2135,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2708,
-        "end": 2723
+        "start": 2847,
+        "end": 2862
       }
     },
     {
@@ -2051,8 +2146,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2729,
-        "end": 2736
+        "start": 2868,
+        "end": 2875
       }
     },
     {
@@ -2062,8 +2157,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2198,
-        "end": 2212
+        "start": 2337,
+        "end": 2351
       }
     },
     {
@@ -2073,8 +2168,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3677,
-        "end": 3684
+        "start": 3816,
+        "end": 3823
       }
     },
     {
@@ -2084,8 +2179,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1137,
-        "end": 1142
+        "start": 1276,
+        "end": 1281
       }
     },
     {
@@ -2095,8 +2190,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1145,
-        "end": 1152
+        "start": 1284,
+        "end": 1291
       }
     },
     {
@@ -2106,8 +2201,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3948,
-        "end": 3953
+        "start": 4087,
+        "end": 4092
       }
     },
     {
@@ -2117,8 +2212,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3794,
-        "end": 3805
+        "start": 3933,
+        "end": 3944
       }
     },
     {
@@ -3140,13 +3235,22 @@
     {
       "name": "api/src#10",
       "members": [
+        "example.com/acme/conformance::api/src/methods.rs::modular",
+        "example.com/acme/conformance::api/src/methods.rs::opened",
+        "example.com/acme/conformance::api/src/methods.rs::reopened",
+        "example.com/acme/conformance::api/src/store.rs::Store.save"
+      ]
+    },
+    {
+      "name": "api/src#11",
+      "members": [
         "example.com/acme/conformance::api/src/methods.rs::outside",
         "example.com/acme/conformance::api/src/methods.rs::pick",
         "example.com/acme/conformance::api/src/methods.rs::shadowed"
       ]
     },
     {
-      "name": "api/src#11",
+      "name": "api/src#12",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::wrap",
         "example.com/acme/conformance::api/src/methods.rs::wrapped"
@@ -3192,6 +3296,13 @@
     {
       "name": "api/src#4",
       "members": [
+        "example.com/acme/conformance::api/src/gated.rs::connect",
+        "example.com/acme/conformance::api/src/real.rs::client"
+      ]
+    },
+    {
+      "name": "api/src#5",
+      "members": [
         "example.com/acme/conformance::api/src/main.rs::below.go",
         "example.com/acme/conformance::api/src/main.rs::checks.compute",
         "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
@@ -3206,7 +3317,7 @@
       ]
     },
     {
-      "name": "api/src#5",
+      "name": "api/src#6",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Build.make",
         "example.com/acme/conformance::api/src/methods.rs::Build.seed",
@@ -3215,7 +3326,7 @@
       ]
     },
     {
-      "name": "api/src#6",
+      "name": "api/src#7",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Build.seed",
         "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
@@ -3235,7 +3346,7 @@
       ]
     },
     {
-      "name": "api/src#7",
+      "name": "api/src#8",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
         "example.com/acme/conformance::api/src/methods.rs::Counter.read",
@@ -3252,20 +3363,11 @@
       ]
     },
     {
-      "name": "api/src#8",
+      "name": "api/src#9",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
         "example.com/acme/conformance::api/src/methods.rs::cleared",
         "example.com/acme/conformance::api/src/methods.rs::named"
-      ]
-    },
-    {
-      "name": "api/src#9",
-      "members": [
-        "example.com/acme/conformance::api/src/methods.rs::modular",
-        "example.com/acme/conformance::api/src/methods.rs::opened",
-        "example.com/acme/conformance::api/src/methods.rs::reopened",
-        "example.com/acme/conformance::api/src/store.rs::Store.save"
       ]
     },
     {

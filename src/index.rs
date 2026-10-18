@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 28;
+const SCHEMA_VERSION: i64 = 29;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -68,7 +68,7 @@ const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    facts TEXT NOT NULL, resolved TEXT NOT NULL
+    facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
@@ -162,7 +162,7 @@ struct Stored {
     mtime: Option<i64>,
     size: i64,
     resolved: String,
-    /// `Facts::setting` of the stored facts.
+    /// `files.setting`: `Facts::setting` of the stored facts.
     setting: String,
 }
 
@@ -237,7 +237,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         }
     };
     let stored: HashMap<String, Stored> = tx
-        .prepare("SELECT path, hash, mtime, size, resolved, COALESCE(CASE WHEN json_valid(facts) THEN json_extract(facts, '$.setting') END, '') FROM files")?
+        .prepare("SELECT path, hash, mtime, size, resolved, setting FROM files")?
         .query_map([], |r| {
             Ok((
                 r.get(0)?,
@@ -854,7 +854,7 @@ const MAX_CONFIG: u64 = 1 << 20;
 
 /// The bytes of the config file at `abs`, stat'ed first: `None` when it is missing, unreadable
 /// or larger than `MAX_CONFIG`.
-fn read_config(abs: &Path) -> Option<Vec<u8>> {
+pub(crate) fn read_config(abs: &Path) -> Option<Vec<u8>> {
     (fs::metadata(abs).ok()?.len() <= MAX_CONFIG)
         .then(|| fs::read(abs).ok())
         .flatten()
@@ -881,13 +881,14 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
 /// its contracts with the repository's, and links are derived from contracts when queried.
 fn write_file(tx: &Transaction, p: &Parsed) -> Result<()> {
     tx.execute(
-        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '')",
+        "INSERT OR REPLACE INTO files VALUES (?1, ?2, ?3, ?4, ?5, '', ?6)",
         params![
             p.path,
             p.hash,
             p.mtime,
             p.size,
-            serde_json::to_string(&p.facts)?
+            serde_json::to_string(&p.facts)?,
+            p.facts.setting
         ],
     )?;
     Ok(())

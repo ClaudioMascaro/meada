@@ -30,10 +30,12 @@ All notable changes to Meada are recorded here. The format follows
   predicate is false), so the result never depends on the machine. An item under a
   `#[cfg(..)]` that is false is left out, `all`, `any` and `not` included; `feature = "x"` holds
   for the features in the crate's `[features] default`, followed through features that enable
-  others. A `mod x;` that is cfg-false does not read its file. `#[cfg(test)]` modules stay
-  (so `cfg(not(test))` items go), and `#[cfg_attr(..)]` leaves the item in. Toggling a default
+  others (`x/feat` also enables an optional dependency `x`). A `mod x;` that is cfg-false does
+  not read its file, and neither does one whose file opens with a false `#![cfg(..)]`.
+  `test` is false (`cfg(not(test))` items are indexed), but a `mod` under exactly `#[cfg(test)]`
+  is indexed too; `#[cfg_attr(..)]` leaves the item in. Toggling a default
   feature in `Cargo.toml` parses the crate's files again. The index is rebuilt once (schema
-  version 28).
+  version 29).
 - A Rust language pack (`.rs`, spec #30, first ticket): the repository's crates (each
   `Cargo.toml` with a `[package]`, at any depth, a workspace's members included), each built
   from its roots (`src/lib.rs` or `[lib] path`, `src/main.rs`, `src/bin/`, `[[bin]] path`)

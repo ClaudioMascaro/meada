@@ -240,6 +240,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The last `#n` given to the blocks of each scope.
     let mut suffixes: HashMap<String, usize> = HashMap::new();
     let mut public_names = Vec::new();
+    // The `#[path]` value of each item that has one, by node id.
+    let mut renamed: HashMap<usize, String> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Visit {
         node: tree.root_node(),
@@ -258,9 +260,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         open,
     }) = stack.pop()
     {
-        if !compiled(node, &features, src) {
-            continue;
-        }
         let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
         // Directly in a module (the file's or one written in place): not in a function, an
         // `impl` or a trait.
@@ -412,7 +411,15 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     let qualified = qualify(&module, name);
                     if in_module && !deep && defined.insert(qualified.clone()) {
                         scan.defs.insert(qualified);
-                        declare(&mut facts, &mut public_names, node, &module, name, src);
+                        declare(
+                            &mut facts,
+                            &mut public_names,
+                            node,
+                            renamed.get(&node.id()),
+                            &module,
+                            name,
+                            src,
+                        );
                     }
                     continue;
                 }
@@ -579,7 +586,13 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
         }
         let (scope, module, pure, body, open) = inner;
-        let kids: Vec<Node> = children(node).collect();
+        let kids = match node.kind() {
+            "source_file" if inner_off(node, &features, src) => {
+                facts.unbuilt = true;
+                Vec::new()
+            }
+            _ => built(node, &features, src, &mut renamed),
+        };
         stack.extend(kids.into_iter().rev().map(|child| Visit {
             node: child,
             scope: scope.clone(),
@@ -734,40 +747,19 @@ fn export(
     }
 }
 
-/// Whether every `#[cfg(..)]` written on the node holds (`cfg`). A `#[cfg_attr(..)]` only adds
-/// attributes, so it never leaves the item out.
-fn compiled(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
-    let mut at = node.prev_named_sibling();
-    while let Some(sibling) = at {
-        match sibling.kind() {
-            "attribute_item" => {
-                let attribute = named(sibling).find(|n| n.kind() == "attribute");
-                let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
-                let condition = condition.filter(|c| c.trim_start().starts_with('('));
-                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features)) {
-                    return false;
-                }
-            }
-            "line_comment" | "block_comment" => {}
-            _ => return true,
-        }
-        at = sibling.prev_named_sibling();
-    }
-    true
-}
-
 /// A `mod x;` declaration in `module` (empty at the top level): an import of the file it names
 /// under `module.x`, which the file exports when it is at the top level.
 fn declare(
     facts: &mut Facts,
     public: &mut Vec<String>,
     node: Node,
+    path: Option<&String>,
     module: &str,
     name: &str,
     src: &[u8],
 ) {
     let chain = module.replace('.', "/");
-    let source = match path_attribute(node, src) {
+    let source = match path {
         Some(value) => format!("{PATH}{chain}|{value}"),
         None => format!("{MOD}{}", qualify(&chain, name).replace('.', "/")),
     };
@@ -792,33 +784,94 @@ fn declare(
     });
 }
 
-/// The value of a `#[path = "..."]` attribute written on the item, if it is a plain string.
-fn path_attribute(node: Node, src: &[u8]) -> Option<String> {
-    let mut at = node.prev_named_sibling();
-    while let Some(sibling) = at {
-        match sibling.kind() {
+/// The children of `node` that are built, in one pass over the list (a sibling lookup per
+/// child would be quadratic in a flat file): the `#[cfg(..)]` attributes before a child decide
+/// it, and so does an inner `#![cfg(..)]` of a module written in place. A `#[path]` value
+/// goes to `paths` under the id of the item it sits on. A `#[cfg_attr(..)]` only adds
+/// attributes, so it never leaves an item out.
+fn built<'t>(
+    node: Node<'t>,
+    features: &BTreeSet<String>,
+    src: &[u8],
+    paths: &mut HashMap<usize, String>,
+) -> Vec<Node<'t>> {
+    let mut out = Vec::new();
+    let (mut on, mut test, mut path) = (true, false, None);
+    for child in children(node) {
+        match child.kind() {
             "attribute_item" => {
-                let attribute = named(sibling).find(|n| n.kind() == "attribute")?;
-                let is_path = named(attribute)
-                    .next()
-                    .is_some_and(|n| text(n, src) == "path");
-                let value = field(attribute, "value").filter(|_| is_path);
-                if let Some(value) = value.filter(|v| v.kind() == "string_literal") {
-                    let parts: Vec<Node> = named(value).collect();
-                    return match parts[..] {
-                        [part] if part.kind() == "string_content" => {
-                            Some(text(part, src).to_string())
-                        }
-                        _ => None,
-                    };
+                let (holds, only_test) = attribute_holds(child, features, src);
+                (on, test) = (on && holds, test || only_test);
+                path = path_value(child, src).or(path);
+            }
+            "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
+            _ => {
+                // Test modules are indexed; any other item under `#[cfg(test)]` is not.
+                let kept = on && (!test || child.kind() == "mod_item");
+                if kept && !inner_off(child, features, src) {
+                    if let Some(value) = path {
+                        paths.insert(child.id(), value);
+                    }
+                    out.push(child);
+                }
+                (on, test, path) = (true, false, None);
+            }
+        }
+    }
+    out
+}
+
+/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, and whether it is exactly
+/// `#[cfg(test)]`.
+fn attribute_holds(item: Node, features: &BTreeSet<String>, src: &[u8]) -> (bool, bool) {
+    let attribute = named(item).find(|n| n.kind() == "attribute");
+    let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
+    let condition = condition.filter(|c| c.trim_start().starts_with('('));
+    let condition = condition.map(str::trim_start);
+    let holds = condition.is_none_or(|c| cfg::holds(c, features));
+    (holds, condition.is_some_and(cfg::only_test))
+}
+
+/// Whether the file or the module written in place that `node` is (or holds as its body) opens
+/// with an inner `#![cfg(..)]` that does not hold.
+fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
+    let body = match node.kind() {
+        "mod_item" => field(node, "body"),
+        _ => Some(node),
+    };
+    let Some(body) = body.filter(|b| matches!(b.kind(), "source_file" | "declaration_list")) else {
+        return false;
+    };
+    let mut cursor = body.walk();
+    for inner in body.named_children(&mut cursor) {
+        match inner.kind() {
+            "inner_attribute_item" => {
+                let attribute = named(inner).find(|n| n.kind() == "attribute");
+                let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
+                let condition = condition.filter(|c| c.trim_start().starts_with('('));
+                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features)) {
+                    return true;
                 }
             }
             "line_comment" | "block_comment" => {}
-            _ => return None,
+            _ => return false,
         }
-        at = sibling.prev_named_sibling();
     }
-    None
+    false
+}
+
+/// The value of a `#[path = "..."]` attribute item, if it is a plain string.
+fn path_value(item: Node, src: &[u8]) -> Option<String> {
+    let attribute = named(item).find(|n| n.kind() == "attribute")?;
+    let is_path = named(attribute)
+        .next()
+        .is_some_and(|n| text(n, src) == "path");
+    let value = field(attribute, "value").filter(|v| is_path && v.kind() == "string_literal")?;
+    let parts: Vec<Node> = named(value).collect();
+    match parts[..] {
+        [part] if part.kind() == "string_content" => Some(text(part, src).to_string()),
+        _ => None,
+    }
 }
 
 /// A parameter, and the names its pattern binds when it is no plain name.
@@ -1395,8 +1448,44 @@ mod tests {
             let facts = parse(src.as_bytes(), setting).unwrap();
             facts.defs.into_iter().map(|d| d.name).collect()
         };
-        assert_eq!(names(""), ["b", "c", "S", "S.e", "t", "t.f"]);
-        assert_eq!(names("x"), ["b", "m", "c", "S", "S.e", "t", "t.f"]);
+        assert_eq!(names(""), ["b", "c", "S", "S.d", "S.e", "t", "t.f"]);
+        assert_eq!(names("x"), ["b", "m", "c", "S", "S.d", "S.e", "t", "t.f"]);
+    }
+
+    #[test]
+    fn cfg_test_keeps_modules_and_nothing_else() {
+        let src = "#[cfg(test)]\nuse crate::mock::client;\n#[cfg(test)]\nfn helper() {}\n\
+                   #[cfg(test)]\nmod t { fn f() {} }\n#[cfg(all(test, unix))]\nmod u {}\n";
+        let facts = facts(src);
+        let names: Vec<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["t", "t.f"]);
+        assert!(facts.imports.iter().all(|i| i.local != "client"));
+    }
+
+    #[test]
+    fn an_inner_cfg_that_is_false_leaves_out_the_file_or_the_module() {
+        let file = facts("#![cfg(windows)]\nfn a() {}\n");
+        assert!(file.unbuilt && file.defs.is_empty());
+        let file = facts("// note\n#![cfg(unix)]\nfn a() {}\n");
+        assert!(!file.unbuilt && file.defs.len() == 1);
+        let src = "mod m {\n#![cfg(windows)]\nfn a() {}\n}\nmod n {\n#![cfg(unix)]\nfn b() {}\n}\n";
+        let names: Vec<String> = facts(src).defs.into_iter().map(|d| d.name).collect();
+        assert_eq!(names, ["n", "n.b"]);
+    }
+
+    #[test]
+    fn a_flat_file_and_a_run_of_attributes_parse_in_linear_time() {
+        let mut src = String::new();
+        for n in 0..30_000 {
+            src += &format!("#[cfg(unix)]\nfn f{n}() {{}}\n");
+        }
+        src += &"#[a]\n".repeat(30_000);
+        src += "#[cfg(windows)]\nfn last() {}\n";
+        let start = std::time::Instant::now();
+        let facts = facts(&src);
+        assert_eq!(facts.defs.len(), 30_000);
+        // Quadratic sibling lookups took minutes here.
+        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
     }
 
     #[test]

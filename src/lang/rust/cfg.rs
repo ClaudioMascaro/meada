@@ -1,8 +1,12 @@
 //! Conditional compilation (spec #30): whether a `#[cfg(..)]` predicate holds for the one
 //! target Meada indexes, `x86_64` Linux, with the default features of the crate. Nothing
 //! depends on the machine that runs Meada, and a predicate this module does not know is false.
+//! `test` is false, as in a build of the crate itself. The one predicate `cfg(test)` holds
+//! (`holds`), for the caller to keep test modules and nothing else under it (`only_test`).
 
 use std::collections::BTreeSet;
+
+use super::crates::entries;
 
 /// How deep `all`, `any` and `not` may nest in one predicate; a deeper one is false.
 // ponytail: real predicates nest two or three levels; the reader recurses once per level, so a
@@ -18,6 +22,9 @@ pub const FEATURES: usize = 4096;
 /// Whether the text after `cfg`, `(unix, not(feature = "x"))` with its parentheses, holds with
 /// `features` enabled. A malformed or too deep predicate is false.
 pub fn holds(predicate: &str, features: &BTreeSet<String>) -> bool {
+    if only_test(predicate) {
+        return true;
+    }
     let mut at = Reader {
         tokens: tokens(predicate),
         next: 0,
@@ -26,9 +33,21 @@ pub fn holds(predicate: &str, features: &BTreeSet<String>) -> bool {
     at.open() && at.predicate(0) == Some(true) && at.close() && at.next == at.tokens.len()
 }
 
+/// Whether the predicate is exactly `(test)`.
+pub fn only_test(predicate: &str) -> bool {
+    predicate.split_whitespace().collect::<String>() == "(test)"
+}
+
 /// The default features of a manifest: `default`, the names it lists, and the ones those enable
 /// in turn. Entries `dep:x` and `x/feat` enable no feature of this crate and are ignored.
 pub fn defaults(manifest: &toml::Table) -> BTreeSet<String> {
+    let optional: BTreeSet<&str> = (entries(manifest).into_iter())
+        .filter(|(kind, _, spec)| {
+            *kind != "dev-dependencies"
+                && spec.get("optional").and_then(|o| o.as_bool()) == Some(true)
+        })
+        .map(|(_, key, _)| key)
+        .collect();
     let table = manifest.get("features").and_then(|f| f.as_table());
     let mut out = BTreeSet::new();
     let mut queue = vec!["default".to_string()];
@@ -37,13 +56,36 @@ pub fn defaults(manifest: &toml::Table) -> BTreeSet<String> {
             continue;
         }
         let listed = table.and_then(|t| t.get(&name)?.as_array());
-        for entry in listed.into_iter().flatten().filter_map(|e| e.as_str()) {
-            if !entry.contains(['/', ':']) {
-                queue.push(entry.to_string());
+        let listed: Vec<&str> = listed
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.as_str())
+            .collect();
+        for entry in &listed {
+            match entry.split_once('/') {
+                // `x/feat` also enables the feature `x` of an optional dependency that no
+                // `dep:x` entry names; `x?/feat` does not.
+                Some((dep, _)) if optional.contains(dep) => {
+                    let named = listed_anywhere(table, dep);
+                    if !named {
+                        queue.push(dep.to_string());
+                    }
+                }
+                Some(_) => {}
+                None if entry.contains(':') => {}
+                None => queue.push(entry.to_string()),
             }
         }
     }
     out
+}
+
+/// Whether some feature lists `dep:<dep>`.
+fn listed_anywhere(table: Option<&toml::Table>, dep: &str) -> bool {
+    let want = format!("dep:{dep}");
+    (table.into_iter().flat_map(|t| t.values()))
+        .filter_map(|v| v.as_array())
+        .any(|list| list.iter().any(|e| e.as_str() == Some(want.as_str())))
 }
 
 #[derive(PartialEq)]
@@ -127,7 +169,7 @@ impl Reader<'_, '_> {
             return Some(self.pair(name, value));
         }
         if !self.open() {
-            return Some(matches!(name, "unix" | "test" | "debug_assertions"));
+            return Some(matches!(name, "unix" | "debug_assertions" | "true"));
         }
         if depth >= PREDICATE_DEPTH {
             return None;
@@ -156,7 +198,11 @@ impl Reader<'_, '_> {
             | ("target_arch", "x86_64")
             | ("target_pointer_width", "64")
             | ("target_endian", "little")
-            | ("target_env", "gnu") => true,
+            | ("target_env", "gnu")
+            | ("target_vendor", "unknown")
+            | ("panic", "unwind")
+            | ("target_has_atomic", "8" | "16" | "32" | "64" | "ptr")
+            | ("target_feature", "sse" | "sse2" | "fxsr") => true,
             _ => false,
         }
     }
@@ -175,6 +221,15 @@ mod tests {
         for yes in [
             "(unix)",
             "(test)",
+            "(  test )",
+            "(not(test))",
+            "(true)",
+            "(not(false))",
+            "(target_has_atomic = \"64\")",
+            "(target_has_atomic = \"ptr\")",
+            "(target_feature = \"sse2\")",
+            "(target_vendor = \"unknown\")",
+            "(panic = \"unwind\")",
             "(debug_assertions)",
             "(target_os = \"linux\")",
             "(target_family = \"unix\")",
@@ -193,7 +248,10 @@ mod tests {
             "(feature = \"tls\")",
             "(panic = \"abort\")",
             "(made_up)",
-            "(true)",
+            "(false)",
+            "(all(test, unix))",
+            "(target_has_atomic = \"128\")",
+            "(target_feature = \"avx512f\")",
         ] {
             assert!(!on(no), "{no}");
         }
@@ -206,7 +264,6 @@ mod tests {
         assert!(on("(any(windows, unix,))"));
         assert!(!on("(any(windows, feature = \"tls\"))"));
         assert!(on("(not(windows))"));
-        assert!(!on("(not(test))"));
         assert!(on("(all())"));
         assert!(!on("(any())"));
         assert!(on("(not(any(windows, all(unix, feature = \"tls\"))))"));
@@ -247,6 +304,23 @@ mod tests {
         let found: Vec<String> = defaults(&table).into_iter().collect();
         assert_eq!(found, ["default", "net", "wire"]);
         assert_eq!(defaults(&manifest("[package]\nname = \"p\"\n")).len(), 1);
+    }
+
+    #[test]
+    fn a_feature_of_an_optional_dependency_enables_the_dependency() {
+        let head = "[dependencies]\nserde = { version = \"1\", optional = true }\nlog = \"1\"\n";
+        let names = |features: &str| -> Vec<String> {
+            defaults(&manifest(&format!("{head}[features]\n{features}")))
+                .into_iter()
+                .collect()
+        };
+        assert_eq!(names("default = [\"serde/std\"]\n"), ["default", "serde"]);
+        assert_eq!(names("default = [\"serde?/std\"]\n"), ["default"]);
+        assert_eq!(
+            names("default = [\"serde/std\", \"x\"]\nx = [\"dep:serde\"]\n"),
+            ["default", "x"]
+        );
+        assert_eq!(names("default = [\"log/std\"]\n"), ["default"]);
     }
 
     #[test]

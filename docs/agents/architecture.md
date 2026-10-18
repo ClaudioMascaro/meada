@@ -299,7 +299,10 @@ one for the area a change touches.
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
   `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
-  A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
+  A pack is done when that suite passes. A pack whose facts depend on its config files
+  (Rust's default features) also gives `settings` (a string per file path, stored as
+  `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
+  changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
@@ -393,7 +396,8 @@ one for the area a change touches.
   `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
-  never its source text), and what a
+  never its source text), the names of the Cargo features a Rust crate enables by default
+  (`files.setting`, a comma-separated list per file, from `[features] default`), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the

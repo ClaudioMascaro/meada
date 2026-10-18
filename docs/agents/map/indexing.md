@@ -257,14 +257,23 @@ modules updates it.
   preceding `#[cfg(..)]` attributes are not all true (`compiled`), for the fixed target
   `x86_64` Linux (`unix`, `target_os = "linux"`, `target_family = "unix"`,
   `target_arch = "x86_64"`, `target_pointer_width = "64"`, `target_endian = "little"`,
-  `target_env = "gnu"`, `debug_assertions`, `test`; any other predicate is false) and the
-  crate's default features: `[features] default` followed through features that enable others
-  (`dep:x` and `x/feat` entries ignored). So `#[cfg(test)]` modules are indexed and
-  `cfg(not(test))` items are not; `#[cfg_attr]` is no skip; a cfg-false `mod x;` makes no
-  import, so its file is no member. The features reach `parse` as `Facts::setting`
-  (`LanguagePack::settings` gives it per path, `parse_with` takes it): `refresh` parses a file
-  again when the setting it was parsed under differs, so a toggled default feature gives the
-  cold export. A crate-level `#![cfg(..)]` is not read. `lang/rust/crates.rs` (`Tree`) is the module tree behind
+  `target_env = "gnu"`, `target_vendor = "unknown"`, `panic = "unwind"`, `debug_assertions`,
+  `target_has_atomic` (8 to 64, `ptr`), `target_feature` (`sse`, `sse2`, `fxsr`), the literal
+  `true`; `test` and any other predicate are false) and the crate's default features:
+  `[features] default` followed through features that enable others (`dep:x` entries ignored;
+  `x/feat` enables the feature `x` of an optional dependency that no `dep:x` names, `x?/feat`
+  does not). `test` is false, as in a build of the crate: `cfg(not(test))` items are indexed.
+  The exception is a predicate that is exactly `test`: a `mod` under it is indexed, any other
+  item under it is not (a `#[cfg(test)] use` would shadow the production one).
+  `#[cfg_attr]` is no skip; a cfg-false `mod x;` makes no import, so its file is no member.
+  `built` decides the children of a node in one pass over the list, carrying the pending
+  attributes (and the `#[path]` value) forward. An inner `#![cfg(..)]` that is false drops the
+  module written in place, or the whole file (`Facts::unbuilt`, which keeps it out of the
+  module tree). The features reach `parse` as `Facts::setting` (`LanguagePack::settings` gives
+  it per path, `parse_with` takes it; the index keeps it in `files.setting`): `refresh` parses a
+  file again when the setting it was parsed under differs, so a toggled default feature gives
+  the cold export. The decider's `function_like` reads the nearest `Cargo.toml` files from disk
+  for the same setting. `lang/rust/crates.rs` (`Tree`) is the module tree behind
   `members` and `modules`: the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,
   `src/bin/*/main.rs`), walked breadth first

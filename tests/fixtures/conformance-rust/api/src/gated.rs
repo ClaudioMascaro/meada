@@ -42,6 +42,21 @@ impl Gauge {
 #[cfg(windows)]
 use std::os::windows::io::RawHandle;
 
+// The production client and its test double: both are kept, a call names neither alone.
+#[cfg(not(test))]
+use crate::real::client;
+#[cfg(test)]
+use crate::mock::client;
+
+pub fn connect() {
+    client();
+}
+
+mod platform {
+    #![cfg(windows)]
+    pub fn handle() {}
+}
+
 #[cfg(test)]
 mod tests {
     fn helper() {

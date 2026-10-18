@@ -1,7 +1,7 @@
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    facts TEXT NOT NULL, resolved TEXT NOT NULL
+    facts TEXT NOT NULL, resolved TEXT NOT NULL, setting TEXT NOT NULL
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);

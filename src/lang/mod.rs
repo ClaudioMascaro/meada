@@ -223,6 +223,10 @@ pub struct Facts {
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
+    /// Whether the file opens with an inner `#![cfg(..)]` that is false for the target: it is
+    /// left out of the crate, as if no `mod` reached it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unbuilt: bool,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
