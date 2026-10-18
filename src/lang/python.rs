@@ -69,7 +69,7 @@ impl LanguagePack for Python {
         // The decorator calls not yet met, by node, and the definition each one decorates.
         let mut decorators: HashMap<usize, String> = HashMap::new();
         // The bare-name decorators of each definition not yet met.
-        let mut bare: HashMap<String, Vec<String>> = HashMap::new();
+        let mut bare_names: HashMap<String, Vec<String>> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -125,7 +125,7 @@ impl LanguagePack for Python {
                     let name = node.child_by_field_name("name");
                     let params = parameters(node).into_iter().filter_map(|(name, _)| name);
                     for name in name.into_iter().chain(params) {
-                        locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
                     }
                     inner_flat = true;
                 }
@@ -152,7 +152,7 @@ impl LanguagePack for Python {
                                 range: span(node),
                                 params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
-                                decorators: bare.remove(&inner).unwrap_or_default(),
+                                decorators: bare_names.remove(&inner).unwrap_or_default(),
                                 return_values: Vec::new(),
                                 returns: None,
                                 type_params: Vec::new(),
@@ -178,7 +178,7 @@ impl LanguagePack for Python {
                                     decorators.insert(call.id(), def.clone());
                                 }
                                 Some(e) if matches!(e.kind(), "identifier" | "attribute") => {
-                                    let names = bare.entry(def.clone()).or_default();
+                                    let names = bare_names.entry(def.clone()).or_default();
                                     names.push(callee(e, src));
                                 }
                                 _ => {}
@@ -219,7 +219,12 @@ impl LanguagePack for Python {
                         // In a function or a class, the import also hides an outer binding.
                         for import in &facts.imports[first..] {
                             if !import.local.contains('.') && import.local != "*" {
-                                locals.bind(&scope, &import.local, Class::Imported, How::Assigned);
+                                locals.bind(
+                                    &scope,
+                                    &import.local,
+                                    Class::Imported,
+                                    Evidence::Assigned,
+                                );
                             }
                         }
                     }
@@ -245,7 +250,7 @@ impl LanguagePack for Python {
                     };
                     let target = node.child_by_field_name(field);
                     for target in target.map(targets).unwrap_or_default() {
-                        locals.target(target, &scope, Class::Unknown, How::Assigned, src);
+                        locals.target(target, &scope, Class::Unknown, Evidence::Assigned, src);
                     }
                 }
                 "case_clause" => {
@@ -254,14 +259,19 @@ impl LanguagePack for Python {
                         captures(pattern, 0, &mut found);
                     }
                     for name in found {
-                        locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
                     }
                 }
                 // A lambda's calls belong to the enclosing scope, which its parameters bind.
                 "lambda" => {
                     for (name, _) in parameters(node) {
                         if let Some(name) = name {
-                            locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                            locals.bind(
+                                &scope,
+                                text(name, src),
+                                Class::Unknown,
+                                Evidence::Assigned,
+                            );
                         }
                     }
                 }
@@ -526,10 +536,10 @@ fn parameters(node: Node) -> Vec<(Option<Node>, Option<Node>)> {
         .collect()
 }
 
-/// How a name got its class. An annotation decides over the other ways; two other bindings
-/// that disagree leave the class unknown.
+/// What a binding tells of the class of its name. An annotation decides over the other ways;
+/// two other bindings that disagree leave the class unknown.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum How {
+enum Evidence {
     /// A parameter without an annotation: its argument is not known.
     Param,
     Assigned,
@@ -541,7 +551,7 @@ enum How {
 #[derive(Default)]
 struct Locals {
     /// Every binding as written, in source order: its scope, name, class and how.
-    written: Vec<(String, String, Class, How)>,
+    written: Vec<(String, String, Class, Evidence)>,
     /// The receiver parameter (`self`, `cls`) of each method, by the method's scope.
     receivers: HashMap<String, String>,
     /// The names a scope declares `global` (`true`) or `nonlocal` (`false`).
@@ -553,7 +563,7 @@ struct Locals {
 }
 
 impl Locals {
-    fn bind(&mut self, scope: &str, name: &str, class: Class, how: How) {
+    fn bind(&mut self, scope: &str, name: &str, class: Class, how: Evidence) {
         (self.written).push((scope.to_string(), name.to_string(), class, how));
     }
 
@@ -561,7 +571,7 @@ impl Locals {
     /// method binds `self`, also from a function nested in the method. An attribute of any
     /// other object is not a binding.
     // ponytail: a write from outside the class (`obj.x = ...`) is not seen.
-    fn target(&mut self, node: Node, scope: &str, class: Class, how: How, src: &[u8]) {
+    fn target(&mut self, node: Node, scope: &str, class: Class, how: Evidence, src: &[u8]) {
         match node.kind() {
             "identifier" => self.bind(scope, text(node, src), class, how),
             "attribute" => {
@@ -596,11 +606,11 @@ impl Locals {
             };
             if n == 0 && receiver {
                 self.receivers.insert(scope.to_string(), name.to_string());
-                self.bind(scope, name, Class::Enclosing, How::Annotated);
+                self.bind(scope, name, Class::Enclosing, Evidence::Annotated);
             } else if let Some(annotation) = annotation {
-                self.bind(scope, name, class(annotation, src), How::Annotated);
+                self.bind(scope, name, class(annotation, src), Evidence::Annotated);
             } else {
-                self.bind(scope, name, Class::Unknown, How::Param);
+                self.bind(scope, name, Class::Unknown, Evidence::Param);
             }
         }
     }
@@ -618,7 +628,13 @@ impl Locals {
         let at = self.written.len();
         let right = node.child_by_field_name("right");
         if let Some(annotation) = node.child_by_field_name("type") {
-            self.target(left, scope, class(annotation, src), How::Annotated, src);
+            self.target(
+                left,
+                scope,
+                class(annotation, src),
+                Evidence::Annotated,
+                src,
+            );
         } else {
             let constructed = match (node.kind(), left.kind(), right) {
                 ("assignment", "identifier", Some(right)) if right.kind() == "call" => {
@@ -628,7 +644,7 @@ impl Locals {
             };
             let class = constructed.map_or(Class::Unknown, Class::Named);
             for target in targets(left) {
-                self.target(target, scope, class.clone(), How::Assigned, src);
+                self.target(target, scope, class.clone(), Evidence::Assigned, src);
             }
         }
         // A name bound by `name = value` holds that value. So does a `self` attribute, but
@@ -658,11 +674,11 @@ impl Locals {
             (Some(call), Some(name)) => {
                 let class = constructor(call, src).map_or(Class::Unknown, Class::Named);
                 self.values.push((self.written.len(), value(call, src)));
-                self.bind(scope, text(name, src), class, How::Assigned);
+                self.bind(scope, text(name, src), class, Evidence::Assigned);
             }
             _ => {
                 for target in targets(alias) {
-                    self.target(target, scope, Class::Unknown, How::Assigned, src);
+                    self.target(target, scope, Class::Unknown, Evidence::Assigned, src);
                 }
             }
         }
@@ -737,7 +753,7 @@ impl Locals {
                 }
             }
         };
-        let annotated = |how| how == How::Annotated;
+        let annotated = |how| how == Evidence::Annotated;
         let homes: Vec<(String, String)> = (self.written.iter())
             .map(|(scope, name, ..)| (home(scope, name), name.clone()))
             .collect();
@@ -753,7 +769,7 @@ impl Locals {
                 ty: None,
             })
             .collect();
-        let mut bound: BTreeMap<(String, String), (Class, How)> = BTreeMap::new();
+        let mut bound: BTreeMap<(String, String), (Class, Evidence)> = BTreeMap::new();
         for (key, (_, _, class, how)) in homes.iter().zip(&self.written) {
             let key = key.clone();
             let merged = match bound.remove(&key) {
@@ -766,7 +782,7 @@ impl Locals {
             bound.insert(key, merged);
         }
         let locals = (bound.into_iter())
-            .filter(|(_, (_, how))| *how != How::Param)
+            .filter(|(_, (_, how))| *how != Evidence::Param)
             .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
         (locals, consts)

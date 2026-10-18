@@ -519,7 +519,7 @@ fn prefixes<'a>(
 /// cannot be read. A path parameter written in the literal (`{id}`, `<int:id>`) stays one.
 // ponytail: a prefix or path that depends on a parameter is not read through the callers, as
 // `Code::expand` reads a client wrapper's URL; it yields no route.
-fn text(value: Value) -> Option<String> {
+fn path_literal(value: Value) -> Option<String> {
     match value {
         Value::Str(parts) => literal(&parts),
         _ => None,
@@ -771,7 +771,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         let call = code.call(path, n)?;
         match call.keyword(framework(router)?.0.prefix) {
             None => Some(String::new()),
-            Some(prefix) => text(code.value(path, &call.scope, prefix)),
+            Some(prefix) => path_literal(code.value(path, &call.scope, prefix)),
         }
     };
     let mut mounts = Mounts::new();
@@ -815,8 +815,10 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                 for child in children {
                     let segment = match given.clone() {
                         None => own(child),
-                        Some(given) if kind.replaces => text(given),
-                        Some(given) => text(given).zip(own(child)).map(|(g, o)| join(&g, &o)),
+                        Some(given) if kind.replaces => path_literal(given),
+                        Some(given) => path_literal(given)
+                            .zip(own(child))
+                            .map(|(g, o)| join(&g, &o)),
                     };
                     mounts.entry(child).or_default().push((at, segment));
                 }
@@ -835,7 +837,8 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         let Some(call) = code.call(path, n) else {
             continue;
         };
-        let Some(route) = (call.args.first()).and_then(|p| text(code.value(path, &call.scope, p)))
+        let Some(route) =
+            (call.args.first()).and_then(|p| path_literal(code.value(path, &call.scope, p)))
         else {
             continue;
         };
@@ -1293,7 +1296,8 @@ fn urlconf<'a>(
         let Some(call) = code.call(path, n) else {
             continue;
         };
-        let route = (call.args.first()).and_then(|r| text(code.value(path, &call.scope, r)));
+        let route =
+            (call.args.first()).and_then(|r| path_literal(code.value(path, &call.scope, r)));
         let route = match regex {
             true => route.and_then(|p| regex_route(&p)),
             false => route,
