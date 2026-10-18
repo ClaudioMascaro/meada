@@ -43,7 +43,8 @@ modules updates it.
   so `.gitignore` does not hide it; a listed path that is not a file, or that has a symbolic
   link in any segment (`plain_file`; the walk follows none either), has no row. `export` loads
   `Export::documents` (`Document {path, summary}`, path order). `refresh_stamped(tx, table, ...)`
-  is the shared pass behind `documents` and `manifests` (spec #22): the `manifests` table (path,
+  is the shared pass behind `documents` and `manifests` (spec #22), reading each file up to one
+  byte past its reader's size limit (`read_up_to`): the `manifests` table (path,
   hash, mtime, size, `summary` as `package::Summary` JSON) holds every `package.json`,
   `pyproject.toml` and `requirements*.txt` the walk finds (`manifests_found`, through
   `package::is_manifest`; `package::read_manifest` reads each by its ecosystem; any path with a

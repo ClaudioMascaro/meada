@@ -253,7 +253,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "documents",
         &documents_found(root, &all, serve),
         now,
-        |abs| fs::read(abs),
+        |abs| read_up_to(abs, document::MAX_BYTES),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
     refresh_stamped(
@@ -261,7 +261,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "manifests",
         &manifests_found(&all),
         now,
-        read_manifest,
+        |abs| read_up_to(abs, package::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
@@ -687,19 +687,21 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
-/// The pack config file `name` at the repository root, read as `read_manifest` reads one. Like
-/// the walk, the read goes through no symbolic link.
+/// The pack config file `name` at the repository root, read as a manifest is (`read_up_to`).
+/// Like the walk, the read goes through no symbolic link.
 fn read_config(root: &Path, name: &str) -> Option<Vec<u8>> {
-    read_manifest(&plain_file(root, name)?).ok()
+    read_up_to(&plain_file(root, name)?, package::MAX_BYTES).ok()
 }
 
-/// A manifest or pack config file, read up to one byte past `package::MAX_BYTES`: its reader
-/// takes a file that large as invalid whatever the rest holds, so the rest is never read, and
-/// what was read stands for the whole file wherever it is hashed.
-fn read_manifest(abs: &Path) -> std::io::Result<Vec<u8>> {
+/// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
+/// the rest holds (`package::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
+/// for a provider document): the rest is never read, and what was read stands for the whole
+/// file wherever it is hashed.
+fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {
     let mut src = Vec::new();
-    let limit = package::MAX_BYTES as u64 + 1;
-    fs::File::open(abs)?.take(limit).read_to_end(&mut src)?;
+    fs::File::open(abs)?
+        .take(max as u64 + 1)
+        .read_to_end(&mut src)?;
     Ok(src)
 }
 

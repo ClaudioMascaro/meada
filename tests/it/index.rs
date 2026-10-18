@@ -149,6 +149,39 @@ fn a_root_tsconfig_that_is_invalid_or_linked_declares_no_paths() {
 }
 
 #[test]
+fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
+    // One byte past `document::MAX_BYTES`, the size limit of a provider document.
+    let read = (16 << 20) + 1;
+    let document = |repo: &Path| {
+        let valid = fs::read_to_string(repo.join("openapi.json")).unwrap();
+        let oversized = format!("{valid}{}", " ".repeat(read));
+        fs::write(repo.join("openapi.json"), &oversized).unwrap();
+        oversized
+    };
+    let cold = fixture_repo("oversized_document_cold", "documents-shapes", None);
+    let warm = fixture_repo("oversized_document_warm", "documents-shapes", None);
+    let before = Engine::open(&warm).unwrap().export().unwrap();
+    document(&cold);
+    let oversized = document(&warm);
+
+    let refreshed = Engine::open(&warm).unwrap().export().unwrap();
+
+    assert_ne!(refreshed, before);
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+    // The document row hashes what was read.
+    let db = rusqlite::Connection::open(warm.join(".meada/index.db")).unwrap();
+    let hash: String = db
+        .query_row(
+            "SELECT hash FROM documents WHERE path = 'openapi.json'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let prefix = blake3::hash(&oversized.as_bytes()[..read]);
+    assert_eq!(hash, prefix.to_hex().to_string());
+}
+
+#[test]
 fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
     // One byte past `package::MAX_BYTES`, the size limit of every manifest and config.
     let read = (1 << 20) + 1;

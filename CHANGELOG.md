@@ -44,6 +44,8 @@ All notable changes to Meada are recorded here. The format follows
 - A manifest or config larger than 1 MiB (`package.json`, `pyproject.toml`,
   `requirements*.txt`, `tsconfig.json`) is no longer read whole on every refresh: only its first
   1 MiB and one byte are read, and it still counts as empty.
+- A provider document (OpenAPI, AsyncAPI) larger than 16 MiB is no longer read and parsed
+  whole: only its first 16 MiB and one byte are read, and `meada status` reports it unreadable.
 - A name re-exported through a crafted chain of thousands of files no longer overflows the
   stack while indexing: past 64 files it is unknown, and no other import or `export *` binds
   it instead.

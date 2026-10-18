@@ -456,8 +456,9 @@ one for the area a change touches.
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `tsconfig.json`, `jsconfig.json`) is read up to one
-  byte past `package::MAX_BYTES` (`read_manifest`), which its reader takes as invalid whatever
-  the rest holds, so the `manifests` hash and the config digest are of what was read. A root
+  byte past `package::MAX_BYTES`, and a provider document up to one byte past
+  `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
+  holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A root
   pack config is read through no symbolic link (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
@@ -666,7 +667,9 @@ one for the area a change touches.
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
-  larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
+  larger parts are unreadable or open. `mod.rs`: `MAX_BYTES` (16 MiB, above the largest public
+  single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
+  document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
   marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
