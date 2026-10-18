@@ -52,6 +52,11 @@ pub async fn two_reads() {
     let _ = reqwest::get(other + "/macro-fallback").await;
 }
 
+/// A read in the middle of the URL is no base: a hole.
+pub async fn mid_url() {
+    let _ = reqwest::get(format!("https://api.example.com/{}/mid", env!("MID_URL"))).await;
+}
+
 /// `option_env!` is not read.
 pub async fn optional() {
     let base = option_env!("OPTIONAL_URL").unwrap_or("https://api.example.com");

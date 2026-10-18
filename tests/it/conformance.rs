@@ -1570,6 +1570,7 @@ fn rust() {
             "crates/worker/src/env.rs::function_import",
             "crates/worker/src/env.rs::imported",
             "crates/worker/src/env.rs::macros",
+            "crates/worker/src/env.rs::mid_url",
             "crates/worker/src/env.rs::optional",
             "crates/worker/src/env.rs::two_reads",
             "crates/worker/src/lib.rs::agents",
@@ -1589,6 +1590,11 @@ fn rust() {
             "crates/worker/src/modules.rs::lookalikes",
             "crates/worker/src/not_env.rs::env",
             "crates/worker/src/not_env.rs::env.var",
+            "crates/worker/src/not_env.rs::foreign",
+            "crates/worker/src/not_env.rs::foreign.read",
+            "crates/worker/src/not_env.rs::hidden",
+            "crates/worker/src/not_env.rs::hidden.closure",
+            "crates/worker/src/not_env.rs::hidden.parameter",
             "crates/worker/src/not_env.rs::other",
             "crates/worker/src/not_env.rs::other.bare",
             "crates/worker/src/not_env.rs::own_module",
@@ -2727,18 +2733,34 @@ fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
         ("http::GET::/two", "", &site("two_reads", 0)),
         ("http::GET::/macro-fallback", "", &site("two_reads", 1)),
         ("http::GET::/optional", "", &site("optional", 0)),
+        // A read in the middle of the URL is a hole in the path, not the base.
+        (
+            "http::GET::/{}/mid",
+            "host:api.example.com",
+            &site("mid_url", 0),
+        ),
     ]);
     assert_eq!(rust_clients("rust_http_env", "env.rs"), expected);
 }
 
 #[test]
 fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
-    let site = |function: &str| format!("crates/worker/src/not_env.rs::{function}::reqwest.get#0");
+    let site2 = |function: &str, n: usize| {
+        format!("crates/worker/src/not_env.rs::{function}::reqwest.get#{n}")
+    };
+    let site = |function: &str| site2(function, 0);
     let expected = triples(&[
         // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
         // hole, not a variable.
         ("http::GET::/own", "", &site("own_module")),
         ("http::GET::/bare", "", &site("other.bare")),
+        // A parameter or a closure named `var` hides `use std::env::var`.
+        ("http::GET::/parameter", "", &site("hidden.parameter")),
+        ("http::GET::/closure", "", &site("hidden.closure")),
+        // A `var`, an `env!` and a `format!` imported from a path outside `std`.
+        ("http::GET::/foreign", "", &site("foreign.read")),
+        ("http::GET::/macro", "", &site2("foreign.read", 1)),
+        ("unresolved", "", &site2("foreign.read", 2)),
     ]);
     assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
 }

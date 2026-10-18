@@ -114,8 +114,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_python_file() {
 /// The same chain with a Rust service (spec #30): the web app (TypeScript, Next.js) reaches the
 /// api (axum) through `API_URL` and through the api's declared host; the api reaches the web
 /// app with reqwest through `WEB_URL`, read from the environment, and through its declared host.
-/// A channel between the two (ticket #134) joins here: `src/events.ts` in the web app and
-/// `src/events.rs` in the api, with a golden for each side.
 #[test]
 fn rust_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_rust("xlang_rust_export");

@@ -175,7 +175,7 @@
     },
     {
       "path": "crates/worker/src/env.rs",
-      "hash": "5bf30ce3c2efd216e724bb4b2bccb67e52a6cbebb6dfe8d85f918a2e166741b8"
+      "hash": "c3d65968193fc52f15f450867627dec0f72db672484eb1b70f1eeb5aeb90279f"
     },
     {
       "path": "crates/worker/src/lib.rs",
@@ -187,7 +187,7 @@
     },
     {
       "path": "crates/worker/src/not_env.rs",
-      "hash": "3df80b6451e97164c6e222b0752838aefd2f556de6d9f5af670f0bd80e7ad0e4"
+      "hash": "542b59e4b4281b3d14845bdbc016c8ce15544544e16cf32a7c4e236fa2278d0a"
     },
     {
       "path": "crates/worker/src/settings.rs",
@@ -2284,11 +2284,19 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/env.rs::mid_url",
+      "span": {
+        "path": "crates/worker/src/env.rs",
+        "start": 2152,
+        "end": 2270
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/env.rs::optional",
       "span": {
         "path": "crates/worker/src/env.rs",
-        "start": 2127,
-        "end": 2295
+        "start": 2303,
+        "end": 2471
       }
     },
     {
@@ -2441,6 +2449,46 @@
         "path": "crates/worker/src/not_env.rs",
         "start": 93,
         "end": 183
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 981,
+        "end": 1416
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 1157,
+        "end": 1414
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 533,
+        "end": 979
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 806,
+        "end": 977
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 626,
+        "end": 755
       }
     },
     {
@@ -6811,14 +6859,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/env.rs::mid_url::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/env.rs::mid_url",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/env.rs",
+        "start": 2189,
+        "end": 2261
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/env.rs::optional::(macro_invocation).unwrap_or#0",
       "caller": "example.com/acme/conformance::crates/worker/src/env.rs::optional",
       "target": null,
       "level": null,
       "span": {
         "path": "crates/worker/src/env.rs",
-        "start": 2168,
-        "end": 2232
+        "start": 2344,
+        "end": 2408
       }
     },
     {
@@ -6828,8 +6887,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/env.rs",
-        "start": 2246,
-        "end": 2286
+        "start": 2422,
+        "end": 2462
       }
     },
     {
@@ -7043,6 +7102,94 @@
         "path": "crates/worker/src/modules.rs",
         "start": 783,
         "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 1195,
+        "end": 1240
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 1264,
+        "end": 1318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#2",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 1342,
+        "end": 1401
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::var#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+      "target": "example.com/acme/conformance::crates/worker/src/not_env.rs::env.var",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 1208,
+        "end": 1226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 919,
+        "end": 964
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure::var#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure",
+      "target": "example.com/acme/conformance::crates/worker/src/not_env.rs::env.var",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 932,
+        "end": 950
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 697,
+        "end": 742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter::var#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter",
+      "target": "example.com/acme/conformance::crates/worker/src/not_env.rs::env.var",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/not_env.rs",
+        "start": 710,
+        "end": 726
       }
     },
     {
@@ -7992,6 +8139,11 @@
       "via": "env:CONCAT_URL"
     },
     {
+      "contract": "http::GET::/{}/mid",
+      "site": "example.com/acme/conformance::crates/worker/src/env.rs::mid_url::reqwest.get#0",
+      "via": "host:api.example.com"
+    },
+    {
       "contract": "http::GET::/optional",
       "site": "example.com/acme/conformance::crates/worker/src/env.rs::optional::reqwest.get#0",
       "via": null
@@ -8025,6 +8177,31 @@
       "contract": "http::GET::/items",
       "site": "example.com/acme/conformance::crates/worker/src/modules.rs::items::client.get#0",
       "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/foreign",
+      "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/macro",
+      "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#1",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#2",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/closure",
+      "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure::reqwest.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/parameter",
+      "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter::reqwest.get#0",
+      "via": null
     },
     {
       "contract": "http::GET::/bare",
@@ -8465,6 +8642,9 @@
       "name": "crates/worker/src#3",
       "members": [
         "example.com/acme/conformance::crates/worker/src/not_env.rs::env.var",
+        "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read",
+        "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure",
+        "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter",
         "example.com/acme/conformance::crates/worker/src/not_env.rs::own_module"
       ]
     },

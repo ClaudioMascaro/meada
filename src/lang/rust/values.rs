@@ -309,6 +309,10 @@ impl<'a, 't> Reader<'a, 't> {
         'a: 's,
     {
         let head = segments.first()?;
+        // A parameter, a `let` or a closure binding hides what a bare name imports.
+        if segments.len() == 1 && self.bound(at, head) {
+            return None;
+        }
         match self
             .scan
             .defines(&self.path_of(at, segments.to_vec()), head)
@@ -324,6 +328,25 @@ impl<'a, 't> Reader<'a, 't> {
                 )
             }
             false => Some(segments.iter().map(String::as_str).collect()),
+        }
+    }
+
+    /// Whether a parameter or a binding of `name` is in scope at `at`, up to its module.
+    fn bound(&self, at: &Where, name: &str) -> bool {
+        let mut scope = at.scope.as_str();
+        loop {
+            if self.scan.locals.contains(&qualify(scope, name))
+                || self
+                    .scan
+                    .params
+                    .contains(&(scope.to_string(), name.to_string()))
+            {
+                return true;
+            }
+            if scope.len() <= at.module.len() {
+                return false;
+            }
+            scope = crate::parent(scope);
         }
     }
 
@@ -361,11 +384,8 @@ impl<'a, 't> Reader<'a, 't> {
                 self.env_read(at, named(node).next()?, depth + 1)
             }
             "macro_invocation" => {
-                let name = self.macro_name(field(node, "macro")?)?;
-                if name == "env" && !self.scan.macros.contains(&name) {
-                    return self.env_macro(node);
-                }
-                None
+                let name = self.macro_name(at, field(node, "macro")?)?;
+                (name == "env").then(|| self.env_macro(node))?
             }
             "call_expression" => {
                 let function = field(node, "function")?;
@@ -432,15 +452,15 @@ impl<'a, 't> Reader<'a, 't> {
     /// that is a literal or a plain name folds; any other is a hole, and so is a name with a
     /// format spec. A macro of another name, or one the file defines, is unknown.
     fn macro_value(&mut self, at: &Where, node: Node<'t>) -> Value {
-        let Some(name) = field(node, "macro").and_then(|m| self.macro_name(m)) else {
+        let Some(name) = field(node, "macro").and_then(|m| self.macro_name(at, m)) else {
             return Value::Unknown;
         };
-        if name == "env" && !self.scan.macros.contains(&name) {
+        if name == "env" {
             return self
                 .env_macro(node)
                 .map_or(Value::Unknown, |e| Value::Str(vec![e]));
         }
-        if !FORMATS.contains(&name.as_str()) || self.scan.macros.contains(&name) {
+        if !FORMATS.contains(&name.as_str()) {
             return Value::Unknown;
         }
         let Some(args) = named(node)
@@ -465,8 +485,10 @@ impl<'a, 't> Reader<'a, 't> {
         parts.map_or(Value::Unknown, Value::Str)
     }
 
-    /// The macro `path` names: `format`, or `std::format` and its likes.
-    fn macro_name(&self, path: Node) -> Option<String> {
+    /// The macro `path` names when it is the standard one: `format`, or `std::format` and its
+    /// likes. A macro the file defines, or one a `use` imports from anywhere but the standard
+    /// library (`use my_macros::env;`), is another macro.
+    fn macro_name(&self, at: &Where, path: Node) -> Option<String> {
         let name = match path.kind() {
             "identifier" => text(path, self.src).to_string(),
             "scoped_identifier" => {
@@ -480,7 +502,25 @@ impl<'a, 't> Reader<'a, 't> {
             }
             _ => return None,
         };
-        Some(name)
+        (path.kind() == "scoped_identifier" || self.std_macro(at, &name)).then_some(name)
+    }
+
+    /// Whether the macro `name`, written bare, is the standard one: the file defines no macro
+    /// of the name, and no `use` in scope imports another (`use std::env;` imports std's).
+    fn std_macro(&self, at: &Where, name: &str) -> bool {
+        if self.scan.macros.contains(name) {
+            return false;
+        }
+        if !self
+            .scan
+            .defines(&self.path_of(at, vec![name.to_string()]), name)
+        {
+            return true;
+        }
+        matches!(
+            self.target(at, name).map(Vec::as_slice),
+            Some([krate, last]) if matches!(krate.as_str(), "std" | "core" | "alloc") && last == name
+        )
     }
 
     /// The parts of a format string filled with `args` (the first is the string).
@@ -568,7 +608,7 @@ impl<'a, 't> Reader<'a, 't> {
         if let [name, bang, tree] = nodes
             && [name.kind(), bang.kind(), tree.kind()] == ["identifier", "!", "token_tree"]
             && text(*name, self.src) == "env"
-            && !self.scan.macros.contains("env")
+            && self.std_macro(at, "env")
         {
             return vec![self.env_name(*tree).map_or(Part::Hole, Part::Env)];
         }
