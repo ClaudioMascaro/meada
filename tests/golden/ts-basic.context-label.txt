@@ -1,4 +1,4 @@
-example.com/acme/web src/view.tsx:1 label
+example.com/acme/web src/view.tsx:1-3 label
 community: src#3
 processes: 1 (1 export; 1 repository): Badge (example.com/acme/web)
 function label(n: number): string {

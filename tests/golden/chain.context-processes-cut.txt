@@ -1,4 +1,4 @@
-example.com/chain/catalog lib/products.ts:10 find
+example.com/chain/catalog lib/products.ts:10-12 find
 community: lib
 processes: 5 (3 route, 2 export; 3 repositories): GET /api/products/{} (example.com/chain/catalog), PUT /api/orders/{} (example.com/chain/gateway), GET /api/orders (example.com/chain/gateway), +2 more
 callers:

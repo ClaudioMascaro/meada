@@ -667,13 +667,15 @@ impl Engine {
     /// export; <r> repositories)` and the entries that fit, `<label> (<repository>), ..., +<m>
     /// more`, found by walking upstream), both right after its first line; then its span text
     /// read from disk (only while the file still has the indexed hash), its callers and its
-    /// callees. `symbol` is an identity, `<path>::<name>` or a name; when it fits several
+    /// callees. The first line is `<repository> <path>:<start>-<end> <name>`, the span's range
+    /// in its file; `<path>:<start>` when the span text is unavailable, `<path>` when the file
+    /// cannot be read. `symbol` is an identity, `<path>::<name>` or a name; when it fits several
     /// symbols, they are listed instead of guessed. The answer is cut at `budget` tokens, from
     /// the last to give up: the first line, the community, the processes line (its summary, then
     /// as many entries as fit), the callers, callees, consumers and contracts, and the span
     /// text, which keeps its leading lines and ends with the cut note of `render::cut`, or is
-    /// left out when not even that note fits (the agent reads it from the file the first line
-    /// names).
+    /// left out when not even that note fits (the agent reads it from the lines the first
+    /// line's range names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -736,7 +738,17 @@ impl Engine {
         let mut files = Files::new(&repo.root);
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
-        let header = line(identity, &mut files, symbol_found, name);
+        let header = match &text {
+            // The range holds exactly the lines the cut note counts (`render::cut` takes its
+            // `<m>` from `span.len()`), so a cut or omitted span is read from those lines.
+            Some((first, span)) => format!(
+                "{identity} {}:{first}-{} {name}",
+                symbol_found.span.path,
+                first + span.len().saturating_sub(1)
+            ),
+            // The stored offsets no longer describe the file.
+            None => line(identity, &mut files, symbol_found, name),
+        };
         let links = self.links(&exports);
         let community = (export.communities.iter())
             .find(|c| c.members.contains(&symbol_found.id))
@@ -750,7 +762,7 @@ impl Engine {
                 symbol_found.span.path
             )
         });
-        let span = text.unwrap_or_default();
+        let span = text.map(|(_, span)| span).unwrap_or_default();
         let mut tail = Vec::from_iter(unavailable);
         tail.extend(relations(identity, export, &mut files, &symbol_found.id));
         tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
@@ -788,8 +800,8 @@ impl Engine {
         let processes = processes_line(&found, repos, room);
         let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
         // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
-        // room even for the note it is left out, and the agent reads it from the file the header
-        // names.
+        // room even for the note it is left out, and the agent reads it from the lines the
+        // header's range names.
         let span_room = left.saturating_sub(bytes(&tail));
         let (_, span) = render::cut(&span, span_room, budget.unwrap_or(render::DEFAULT_BUDGET));
         let span = if span.len() > span_room {
@@ -922,8 +934,9 @@ fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
     lines
 }
 
-/// The span's lines, or `None` when its file under `root` no longer has the indexed hash.
-fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<Vec<String>> {
+/// The span's first line in its file and its lines, or `None` when its file under `root` no
+/// longer has the indexed hash.
+fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Vec<String>)> {
     let path = &symbol.span.path;
     let indexed = export
         .files
@@ -935,12 +948,11 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<Vec<String
         .filter(|src| indexed.is_some_and(|h| blake3::hash(src).to_hex().as_str() == h.as_str()));
     let src = text?;
     let span = src.get(symbol.span.start as usize..symbol.span.end as usize)?;
-    Some(
-        String::from_utf8_lossy(span)
-            .lines()
-            .map(str::to_string)
-            .collect(),
-    )
+    let lines = String::from_utf8_lossy(span)
+        .lines()
+        .map(str::to_string)
+        .collect();
+    Some((render::line_of(&src, symbol.span.start), lines))
 }
 
 /// `callers:` and `callees:` of the symbol `id`, inside the repository `identity`.
@@ -1217,4 +1229,41 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
     let mut lines = vec![format!("{name}:")];
     lines.extend(items);
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::Engine;
+
+    #[test]
+    fn a_span_changed_since_indexing_keeps_the_start_alone_in_the_first_line() {
+        let dir = std::env::temp_dir().join(format!("meada-engine-stale-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("a.ts"),
+            "export function add() {\n  return 1;\n}\n",
+        )
+        .unwrap();
+        let engine = Engine::open(&dir).unwrap();
+        engine.refresh().unwrap();
+        // The retry of `context` would refresh the index: ask without it, as a race would.
+        fs::write(
+            dir.join("a.ts"),
+            "export function add() {\n  return 2;\n}\n",
+        )
+        .unwrap();
+
+        let answer = engine.context_fresh("add", None, false).unwrap();
+
+        let first = format!("{} a.ts:1 add", engine.identity);
+        assert_eq!(answer.lines().next(), Some(first.as_str()), "{answer}");
+        assert!(
+            answer.contains("(span text unavailable: a.ts changed since indexing)"),
+            "{answer}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
