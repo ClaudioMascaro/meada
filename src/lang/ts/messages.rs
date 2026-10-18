@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::lang::{
-    Handler, Message, Role, Value, channel_name as name, literal, property, queue_name,
+    Handler, Message, Role, Value, channel_name as name, literal, property, publication, queue_name,
 };
 use crate::resolve::Code;
 
@@ -154,11 +154,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     for (site, at, (exchange, key)) in code.expand(path, n, &|a, _| read(a)) {
                         // The empty exchange is the queue named by the key; one that cannot
                         // be evaluated leaves the producer unresolved.
-                        let (name, role) = match exchange {
-                            Some(e) if e.is_empty() => (key, Role::Producer),
-                            Some(exchange) => (key, Role::Publish { exchange }),
-                            None => (None, Role::Producer),
-                        };
+                        let (name, role) = publication(exchange, key);
                         let (path, call) = (site.into(), at);
                         out.push(Message {
                             broker: "amqp",

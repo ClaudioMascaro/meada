@@ -191,15 +191,15 @@ Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.
 fora) com as suas funções, tipos, traits, módulos e métodos de `impl` e as chamadas escritas
 como caminho (`crate::a::f()`, `Tipo::new()`, `Self::f()`), também por `use` (grupos,
 renomeações, globs, `pub use` e os outros crates do workspace pelo nome; as de método (`x.m()`) pelo tipo do receptor quando o código o escreve (`let`, parâmetro, campo, `self`, retorno de função; um `dyn Trait` ou genérico com trait vai ao método do trait), senão pelo nome; as de dentro de macros
-não são indexadas, e contratos Rust além dos pacotes ainda não; só a configuração padrão de cada crate entra, para um alvo fixo x86_64 Linux: item sob um `#[cfg(..)]` falso, ou sob uma feature fora do `default` do `Cargo.toml`, fica de fora, e módulos `#[cfg(test)]` entram), e liga repositórios, também de uma
+não são indexadas, e os contratos Rust são os pacotes, o HTTP e os canais (abaixo); só a configuração padrão de cada crate entra, para um alvo fixo x86_64 Linux: item sob um `#[cfg(..)]` falso, ou sob uma feature fora do `default` do `Cargo.toml`, fica de fora, e módulos `#[cfg(test)]` entram), e liga repositórios, também de uma
 linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` e, em Rust, `reqwest` e `ureq` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django e, em Rust, axum, actix-web e Rocket no lado que serve,
 também atrás de um gateway; em Rust, uma URL base lida do ambiente com `std::env::var`, `env!` ou `dotenvy::var` liga pelo `base_url_env`), pelos recursos
-declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python`), filas RabbitMQ
-(`amqplib` e, em Python, `pika`, com o `publish` numa exchange chegando às filas que os bindings
-ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3`), subjects NATS
-(`nats` e, em Python, `nats-py`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
-(`ioredis`, `node-redis` e, em Python, `redis-py`), com o produtor ligado ao handler de cada consumidor, inclusive
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python` e, em Rust, `rdkafka`), filas RabbitMQ
+(`amqplib` e, em Python, `pika` e, em Rust, `lapin`, com o `publish` numa exchange chegando às filas que os bindings
+ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3` e, em Rust, `aws-sdk-sqs`), subjects NATS
+(`nats` e, em Python, `nats-py` e, em Rust, `async-nats`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
+(`ioredis`, `node-redis` e, em Python, `redis-py` e, em Rust, o crate `redis`), com o produtor ligado ao handler de cada consumidor, inclusive
 no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus documentos OpenAPI
 (3.0 e 3.1) e AsyncAPI (2.x e 3.0), achados pelo nome ou listados em `[serve] documents`: as rotas
 e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o

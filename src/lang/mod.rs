@@ -2,14 +2,14 @@
 //! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
 //! A pack never touches the index or other files.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
 
 use crate::Result;
-use crate::resolve::Code;
+use crate::resolve::{Code, Keywords};
 
 pub mod python;
 pub mod rust;
@@ -221,6 +221,12 @@ pub struct Facts {
     /// somewhere unread. Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub rebound: Vec<(String, Value)>,
+    /// The qualified name and value of each `let mut` of a plain name that nothing else binds
+    /// or assigns (Rust). It is no constant, since a method may change what it holds (a
+    /// `String` is pushed to), but an object it holds is still the one its call made: the flow
+    /// of a client reads it (`Code::mutable`). Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub mutable: HashMap<String, Value>,
     /// Every other name a binding makes, qualified like `Const::name` by the definition whose
     /// body or parameters hold it (a function that is no definition lends its names to the
     /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
@@ -546,6 +552,12 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
+    /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
+    /// them. An outside type owns the whole chain, so the resolver reads the call as one on
+    /// that name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
     /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
     /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
     /// index, like `args`.
@@ -754,13 +766,100 @@ pub fn queue_name(url: Option<&Value>) -> Option<Option<String>> {
         Some(Value::Ref(_)) => return None,
         _ => return Some(None),
     };
-    match parts.last() {
-        Some(Part::Text(tail)) if tail.contains('/') => {
-            let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
-            Some(queue.map(String::from))
-        }
-        _ if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
-        _ => Some(None),
+    // The literal text at the end: a name folded into the URL leaves two text parts side by side.
+    let mut tail: Vec<&str> = (parts.iter().rev())
+        .map_while(|p| match p {
+            Part::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect();
+    tail.reverse();
+    let tail = tail.concat();
+    if tail.contains('/') {
+        let queue = tail.rsplit('/').next().filter(|q| !q.is_empty());
+        return Some(queue.map(String::from));
+    }
+    match parts.iter().any(|p| matches!(p, Part::Ref(_))) {
+        true => None,
+        false => Some(None),
+    }
+}
+
+/// What a form reads of a call's arguments: the channel names.
+pub type Read<'a> = &'a dyn Fn(&[Value], &Keywords) -> Option<Vec<Option<String>>>;
+
+/// A producer per name read at each site an expansion found.
+pub fn produce<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: Read,
+) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .flat_map(|(site, at, names)| {
+            names.into_iter().map(move |name| Message {
+                broker,
+                name,
+                path: site.into(),
+                call: at,
+                role: Role::Producer,
+            })
+        })
+        .collect()
+}
+
+/// A consumer per name read at each site an expansion found: the call's own `handler`, else
+/// the function the site is in (a polling client).
+pub fn consume<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: Read,
+    handler: Option<Handler>,
+) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .flat_map(|(site, at, names)| {
+            let handler = handler.clone().unwrap_or_else(|| Handler::Def {
+                path: site.into(),
+                name: code.files()[site].calls[at].scope.clone(),
+            });
+            names.into_iter().map(move |name| Message {
+                broker,
+                name,
+                path: site.into(),
+                call: at,
+                role: Role::Consumer(handler.clone()),
+            })
+        })
+        .collect()
+}
+
+/// A Kafka topic name (see `channel_name`). A name that starts with `^` is a regular expression
+/// that picks topics at run time, so it names none.
+pub fn topic(value: &Value) -> Option<Option<String>> {
+    Some(channel_name(value)?.filter(|t| !t.starts_with('^')))
+}
+
+/// The topics of a list of them, or of the one a value gives. `None` when one depends on a
+/// parameter (a client wrapper); a name that is not a literal string is unresolved (`None` in
+/// the list).
+pub fn topics(value: &Value) -> Option<Vec<Option<String>>> {
+    match value {
+        Value::List(items) => items.iter().map(topic).collect(),
+        value => Some(vec![topic(value)?]),
+    }
+}
+
+/// A publish to the exchange `exchange` with the routing key `key`, as its name and role: the
+/// empty exchange is the queue named by the key; one that cannot be evaluated leaves the
+/// producer unresolved.
+pub fn publication(exchange: Option<String>, key: Option<String>) -> (Option<String>, Role) {
+    match exchange {
+        Some(e) if e.is_empty() => (key, Role::Producer),
+        Some(exchange) => (key, Role::Publish { exchange }),
+        None => (None, Role::Producer),
     }
 }
 

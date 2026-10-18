@@ -444,6 +444,7 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
+            Binding::Unknown if self.owned_outside(path, call) => Resolution::Unresolved,
             Binding::Instance(_)
             | Binding::Module(_)
             | Binding::Const(..)
@@ -452,6 +453,20 @@ impl<'a> Resolver<'a> {
             | Binding::Hidden
             | Binding::Unknown => self.infer(&call.callee, call.by_path),
         }
+    }
+
+    /// Whether a method called on a call chain (`client.get(u).send()`) belongs to a type from
+    /// outside the repository: the name the chain starts at (`Call::root`) resolves, with the
+    /// last method, to something outside it, as a direct `client.send()` does. Such a call
+    /// resolves to nothing, never to a repository method of the same name.
+    fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        let (Some(root), Some((_, last))) = (&call.root, call.callee.rsplit_once('.')) else {
+            return false;
+        };
+        let callee = format!("{root}.{last}");
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, &callee, seen, work, Reading::Value);
+        matches!(found, Binding::External(..))
     }
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
@@ -1922,6 +1937,39 @@ impl<'a> Code<'a> {
     /// (`Facts::rebound`).
     pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {
         self.full(path).map_or(&[], |f| f.rebound.as_slice())
+    }
+
+    /// The `let mut` that `name`, written in `scope` of `path`, refers to (`Facts::mutable`),
+    /// looked up from the scope outwards: the scope it is bound in and the value it holds.
+    /// A name an inner scope binds again (a closure's parameter, a `let` in a closure given to a
+    /// call, a nested function's parameter) hides the outer `let mut`: nothing is returned.
+    pub fn mutable(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a Value)> {
+        let held = &self.full(path)?.mutable;
+        let r = self.resolver;
+        let mut scope = scope;
+        loop {
+            let local = crate::qualify(scope, name);
+            if let Some(value) = held.get(&local) {
+                return Some((scope, value));
+            }
+            let param = |d: &Def| {
+                (d.params.iter()).any(|p| p.name == name || p.fields.iter().any(|f| f.name == name))
+            };
+            if r.locals[path].contains(local.as_str())
+                || r.consts[path].contains(local.as_str())
+                || r.receivers[path].contains_key(&(scope, name))
+                || r.defs[path].get(scope).is_some_and(|d| param(d))
+                || scope.is_empty()
+            {
+                return None;
+            }
+            scope = crate::parent(scope);
+        }
     }
 
     /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).

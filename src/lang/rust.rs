@@ -11,13 +11,15 @@ use std::ops::Range;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Modules, Param, Receiver, Star, children, named, text,
+    Message, Modules, Param, Receiver, Star, children, named, text,
 };
+use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+mod messages;
 mod values;
 
 use crates::{MOD, PATH, Tree};
@@ -229,7 +231,7 @@ impl LanguagePack for Rust {
             "rocket.build" | "rocket.custom" => ROCKET,
             o if o.starts_with("reqwest.") => CLIENT_BUILDER,
             o if o.starts_with("ureq.") => AGENT_BUILDER,
-            _ => return false,
+            _ => return messages::passes(origin, method),
         };
         methods.contains(&method)
     }
@@ -251,6 +253,10 @@ impl LanguagePack for Rust {
         files: &BTreeMap<&str, &Facts>,
     ) -> Option<BTreeSet<String>> {
         Some(Tree::new(configs, files).members())
+    }
+
+    fn messages(&self, code: &Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn published(
@@ -423,6 +429,11 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
+    // The names a `let mut` of a plain name declares.
+    let mut mut_lets: HashSet<String> = HashSet::new();
+    // The scope and name of each assignment: it changes the nearest binding of the name, which
+    // an enclosing scope may hold (a closure given to a call is a scope of its own).
+    let mut assigned: Vec<(String, String)> = Vec::new();
     // The Strings a function builds, by scope and name, and the names two of them share.
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
@@ -614,6 +625,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 kwargs,
                                 decorates: Some(qualified.clone()),
                                 by_path,
+                                root: None,
                                 receiver: None,
                                 arg_types: Vec::new(),
                                 uses: Vec::new(),
@@ -826,6 +838,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     kwargs: Vec::new(),
                     decorates: None,
                     by_path,
+                    root: chain_root(function, src),
                     receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
@@ -859,6 +872,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 // It is a constant too, if nothing else binds the name in its scope.
                 let local = qualify(&scope, &name);
                 *bindings.entry(local.clone()).or_default() += 1 + usize::from(mutable(node));
+                if mutable(node) {
+                    mut_lets.insert(local.clone());
+                }
                 if let Some(value) = field(node, "value") {
                     let at = Where {
                         scope: scope.clone(),
@@ -894,6 +910,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         };
                         let local = qualify(&scope, text(pattern, src));
                         *bindings.entry(local.clone()).or_default() += usize::from(mutable(node));
+                        if mutable(node) {
+                            mut_lets.insert(local.clone());
+                        }
                         let put = Put::Let(local);
                         held.push(Held {
                             at,
@@ -906,8 +925,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             // A name assigned again is not a constant.
             "assignment_expression" | "compound_assignment_expr" => {
                 if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
-                    let local = qualify(&scope, text(left, src));
-                    *bindings.entry(local).or_default() += 1;
+                    assigned.push((scope.clone(), text(left, src).to_string()));
                 }
             }
             // A closure given to a call is a definition of its own: the shared side names it
@@ -964,6 +982,18 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             open,
             arg: node.kind() == "arguments",
         }));
+    }
+    for (scope, name) in assigned {
+        let mut at = scope.as_str();
+        let home = loop {
+            let local = qualify(at, &name);
+            if bindings.contains_key(&local) || at.is_empty() {
+                break local;
+            }
+            at = crate::parent(at);
+        };
+        // A name nothing binds is counted where it is written, as it always was.
+        *bindings.entry(home).or_default() += 1;
     }
     let mut heads = Heads::default();
     for Use { path, name, public } in &imported {
@@ -1026,6 +1056,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             Put::Let(name) => {
                 let value = reader.value(&at, node);
+                // Declared `mut` once, and bound or assigned nowhere else.
+                if bindings.get(&name) == Some(&2) && mut_lets.contains(&name) {
+                    facts.mutable.insert(name.clone(), value.clone());
+                }
                 facts
                     .rebound
                     .push((crate::parent(&name).to_string(), value));
@@ -1786,6 +1820,39 @@ fn member(node: Node, src: &[u8]) -> String {
     }
     parts.reverse();
     parts.join(".")
+}
+
+/// The name a method call on a call chain starts at (`Call::root`): `client` for
+/// `client.get(u).send()` and `client.get(u)?.send()`, `None` for a call on anything else.
+fn chain_root(function: Node, src: &[u8]) -> Option<String> {
+    if function.kind() != "field_expression" {
+        return None;
+    }
+    let mut at = field(function, "value")?;
+    if !matches!(
+        at.kind(),
+        "call_expression" | "try_expression" | "await_expression"
+    ) {
+        return None;
+    }
+    for _ in 0..PATH_DEPTH {
+        at = match at.kind() {
+            "try_expression" | "await_expression" | "parenthesized_expression" => {
+                at.named_child(0)?
+            }
+            "call_expression" => match field(at, "function")? {
+                f if f.kind() == "field_expression" => field(f, "value")?,
+                _ => return None,
+            },
+            _ => break,
+        };
+    }
+    let root = match at.kind() {
+        "identifier" | "self" => text(at, src).to_string(),
+        "field_expression" => member(at, src),
+        _ => return None,
+    };
+    (!root.starts_with('(')).then_some(root)
 }
 
 /// A path as a callee-like name the shared resolution reads (`crate.a.f`, `super.f`,
