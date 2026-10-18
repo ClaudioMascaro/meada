@@ -406,7 +406,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         module: module.clone(),
                         pure,
                     };
-                    if let Some(value) = field(node, "value") {
+                    // A `static mut` is written to elsewhere: it holds no known value.
+                    if let Some(value) = field(node, "value").filter(|_| !mutable(node)) {
                         let put = Put::Item(qualify(&scope, name));
                         held.push(Held {
                             at,
@@ -612,7 +613,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 let class = Class::Unknown;
                 // It is a constant too, if nothing else binds the name in its scope.
                 let local = qualify(&scope, &name);
-                *bindings.entry(local.clone()).or_default() += 1;
+                *bindings.entry(local.clone()).or_default() += 1 + usize::from(mutable(node));
                 if let Some(value) = field(node, "value") {
                     let at = Where {
                         scope: scope.clone(),
@@ -636,7 +637,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if let Some(pattern) = field(node, "pattern") {
                     bind(pattern, 0, &mut locals, src);
                     // A `let` of a plain name is a constant if nothing else binds the name in
-                    // its scope (`let mut` is a `mut_pattern`, and is not).
+                    // its scope: a `let mut` is a second binding, as an assignment is.
                     let value = field(node, "value");
                     if let (true, Some(value), "identifier") =
                         (node.kind() == "let_declaration", value, pattern.kind())
@@ -646,13 +647,22 @@ fn parse(src: &[u8]) -> Result<Facts> {
                             module: module.clone(),
                             pure,
                         };
-                        let put = Put::Let(qualify(&scope, text(pattern, src)));
+                        let local = qualify(&scope, text(pattern, src));
+                        *bindings.entry(local.clone()).or_default() += usize::from(mutable(node));
+                        let put = Put::Let(local);
                         held.push(Held {
                             at,
                             node: value,
                             put,
                         });
                     }
+                }
+            }
+            // A name assigned again is not a constant.
+            "assignment_expression" | "compound_assignment_expr" => {
+                if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
+                    let local = qualify(&scope, text(left, src));
+                    *bindings.entry(local).or_default() += 1;
                 }
             }
             // A closure given to a call is a definition of its own: the shared side names it
@@ -1036,6 +1046,11 @@ enum How {
     Type(Vec<String>),
     /// The span of the call (`Call::range`).
     Call(Range<usize>),
+}
+
+/// Whether a `let` or `static` is `mut`.
+fn mutable(node: Node) -> bool {
+    children(node).any(|c| c.kind() == "mutable_specifier")
 }
 
 fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
@@ -1451,6 +1466,16 @@ mod tests {
         };
         assert!(read(values::VALUE_DEPTH - 1));
         assert!(!read(values::VALUE_DEPTH));
+    }
+
+    #[test]
+    fn a_let_bound_once_and_never_assigned_is_a_constant() {
+        let src = "fn f(c: bool) {\n    let once = \"/a\";\n    let mut mutable = \"/b\";\n\
+                   let mut again = \"/c\";\n    again = \"/d\";\n    let plain = \"/e\";\n\
+                   let twice = \"/f\";\n    if c { twice = \"/g\"; }\n}\n";
+        let mut found: Vec<String> = facts(src).consts.into_iter().map(|c| c.name).collect();
+        found.sort();
+        assert_eq!(found, ["f.once", "f.plain"]);
     }
 
     #[test]

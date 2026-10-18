@@ -1543,6 +1543,20 @@ fn rust() {
             "crates/web/src/lib.rs::items",
             "crates/web/src/lib.rs::legacy",
             "crates/web/src/lib.rs::legacy.router",
+            "crates/web/src/lib.rs::Builder",
+            "crates/web/src/lib.rs::Builder.routes",
+            "crates/web/src/lib.rs::hop",
+            "crates/web/src/lib.rs::reassigned",
+            "crates/web/src/lib.rs::reassigned_items",
+            "crates/web/src/lib.rs::reassigned_items.router",
+            "crates/web/src/lib.rs::renamed",
+            "crates/web/src/lib.rs::renamed.router",
+            "crates/web/src/lib.rs::served",
+            "crates/web/src/lib.rs::services",
+            "crates/web/src/lib.rs::services.fallback",
+            "crates/web/src/lib.rs::services.router",
+            "crates/web/src/lib.rs::services.wrapped",
+            "crates/web/src/lib.rs::wrapper",
             "crates/web/src/lib.rs::late",
             "crates/web/src/lib.rs::late.router",
             "crates/web/src/lib.rs::local",
@@ -2223,6 +2237,17 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
         // A router a function receives and returns, mounted under a literal.
         ("http::GET::/admin/stats", "crates/web/src/admin.rs::stats"),
         ("http::GET::/legacy/old", "crates/web/src/health.rs::check"),
+        // `{{raw}}` is the literal `{raw}`, not a parameter.
+        ("http::GET::/{raw}", "crates/web/src/health.rs::check"),
+        // The method is axum's name for the function, not the file's.
+        (
+            "http::GET::/alias/renamed",
+            "crates/web/src/health.rs::check",
+        ),
+        (
+            "http::ANY::/alias/renamed-any",
+            "crates/web/src/health.rs::echo",
+        ),
         ("http::POST::/admin/reset", "crates/web/src/admin.rs::reset"),
         // `orphans::router` is nested under a prefix that is a parameter: no provider at
         // `/never`, under any prefix.
@@ -2254,6 +2279,27 @@ fn an_axum_method_router_chain_past_the_limit_is_not_read() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(export.contains("http::GET::/short"));
     assert!(!export.contains("http::GET::/long"));
+}
+
+/// A chain of thousands of `route` calls is read in one pass and only as far as the limit: the
+/// routes near its start are providers, the ones past it are not.
+#[test]
+fn a_long_axum_chain_is_read_up_to_its_limit() {
+    let repo = fixture_repo("rust_axum_long", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/web/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod long;\n{lib}")).unwrap();
+    let routes: String = (0..3000)
+        .map(|i| format!("        .route(\"/r{i}\", get(h))\n"))
+        .collect();
+    let long = format!(
+        "use axum::Router;\nuse axum::routing::get;\n\
+         pub fn router() -> Router {{\n    Router::new()\n{routes}}}\nfn h() {{}}\n"
+    );
+    std::fs::write(src.join("long.rs"), long).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/r10\""));
+    assert!(!export.contains("http::GET::/r2999\""));
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
@@ -2309,11 +2355,16 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         "crates/web/src/items.rs router crates/web/src/items.rs router",
         "crates/web/src/items.rs show crates/web/src/items.rs show",
         "crates/web/src/items.rs update crates/web/src/items.rs update",
+        "crates/web/src/lib.rs Builder crates/web/src/lib.rs Builder",
         "crates/web/src/lib.rs Holder crates/web/src/lib.rs Holder",
         "crates/web/src/lib.rs admin crates/web/src/admin.rs -",
         "crates/web/src/lib.rs app crates/web/src/lib.rs app",
+        "crates/web/src/lib.rs hop crates/web/src/lib.rs hop",
         "crates/web/src/lib.rs items crates/web/src/items.rs -",
+        "crates/web/src/lib.rs reassigned crates/web/src/lib.rs reassigned",
+        "crates/web/src/lib.rs served crates/web/src/lib.rs served",
         "crates/web/src/lib.rs unread crates/web/src/lib.rs unread",
+        "crates/web/src/lib.rs wrapper crates/web/src/lib.rs wrapper",
     ];
     assert_eq!(found, expected);
 }

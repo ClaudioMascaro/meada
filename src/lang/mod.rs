@@ -81,10 +81,12 @@ pub trait LanguagePack {
         None
     }
 
-    /// Whether a method call that resolves to nothing in the repository hands back the value
+    /// Whether a method call that no function of the repository answers hands back the value
     /// it was called on, as a builder does (`Router::new().route(..)` in Rust): `Code::origins`
-    /// then follows the call's `receiver`. A language whose methods return anything stays
-    /// with the call as the origin.
+    /// then follows the call's `receiver`. A method that resolves to nothing does; one only a
+    /// name match found does when the chain starts at a constructor of an outside crate, whose
+    /// method it then is, and ends the flow otherwise. A language whose methods return
+    /// anything stays with the call as the origin.
     fn fluent(&self) -> bool {
         false
     }

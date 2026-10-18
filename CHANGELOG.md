@@ -67,7 +67,12 @@ All notable changes to Meada are recorded here. The format follows
   nowhere; a router nothing nests is served at its root. The Rust pack now emits call
   arguments, constants, return values and closures as values, and a call in a builder chain
   keeps its receiver (`Call::receiver`), so the value flow follows `Router::new().route(..)`.
-  The index is rebuilt once (schema version 28).
+  A router handed to a call Meada does not read (`route_service`, `fallback_service`, an
+  outside function wrapping it, a method found only by name) is served nowhere, a `let mut` or
+  a name assigned again holds no known value, `{{` and `}}` stay literal braces, and the method
+  of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
+  nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
+  once (schema version 28).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

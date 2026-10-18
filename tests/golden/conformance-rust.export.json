@@ -131,7 +131,7 @@
     },
     {
       "path": "crates/web/src/lib.rs",
-      "hash": "7809270ed73698aea6c50ca29c5b4e8706379b7f87292a5d9a193f2dab886db8"
+      "hash": "3c9d623601f102280504bbad321d605201f8b508a5c16977b31f72450a413534"
     },
     {
       "path": "crates/web/src/local.rs",
@@ -1560,19 +1560,35 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::Builder",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2183,
+        "end": 2202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2223,
+        "end": 2324
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::Holder",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1168,
-        "end": 1209
+        "start": 1258,
+        "end": 1299
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1229,
-        "end": 1426
+        "start": 1319,
+        "end": 1516
       }
     },
     {
@@ -1588,7 +1604,7 @@
       "span": {
         "path": "crates/web/src/lib.rs",
         "start": 311,
-        "end": 823
+        "end": 913
       }
     },
     {
@@ -1616,6 +1632,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::hop",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2328,
+        "end": 2423
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::items",
       "span": {
         "path": "crates/web/src/lib.rs",
@@ -1627,32 +1651,32 @@
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::late",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1001,
-        "end": 1166
+        "start": 1091,
+        "end": 1256
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::late.router",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1067,
-        "end": 1164
+        "start": 1157,
+        "end": 1254
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::legacy",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1430,
-        "end": 1596
+        "start": 1520,
+        "end": 1686
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::legacy.router",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1498,
-        "end": 1594
+        "start": 1588,
+        "end": 1684
       }
     },
     {
@@ -1667,16 +1691,16 @@
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::orphans",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1598,
-        "end": 1767
+        "start": 3649,
+        "end": 3818
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::orphans.router",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1667,
-        "end": 1765
+        "start": 3718,
+        "end": 3816
       }
     },
     {
@@ -1688,11 +1712,99 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3351,
+        "end": 3647
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3167,
+        "end": 3349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3245,
+        "end": 3347
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1688,
+        "end": 2027
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1849,
+        "end": 2025
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3019,
+        "end": 3165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2425,
+        "end": 2824
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2602,
+        "end": 2710
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.router",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2495,
+        "end": 2596
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2716,
+        "end": 2822
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::unread",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 825,
-        "end": 999
+        "start": 915,
+        "end": 1089
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2826,
+        "end": 3017
       }
     },
     {
@@ -3515,14 +3627,47 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2264,
+        "end": 2318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2264,
+        "end": 2277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2299,
+        "end": 2317
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount::late.router#0",
       "caller": "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
       "target": "example.com/acme/conformance::crates/web/src/lib.rs::late.router",
       "level": "exact",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1404,
-        "end": 1418
+        "start": 1494,
+        "end": 1508
       }
     },
     {
@@ -3532,8 +3677,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1378,
-        "end": 1419
+        "start": 1468,
+        "end": 1509
       }
     },
     {
@@ -3544,7 +3689,7 @@
       "span": {
         "path": "crates/web/src/lib.rs",
         "start": 529,
-        "end": 663
+        "end": 710
       }
     },
     {
@@ -3554,8 +3699,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 669,
-        "end": 729
+        "start": 716,
+        "end": 776
       }
     },
     {
@@ -3587,8 +3732,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 669,
-        "end": 770
+        "start": 716,
+        "end": 911
       }
     },
     {
@@ -3598,8 +3743,19 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 669,
-        "end": 706
+        "start": 716,
+        "end": 817
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::app::(call_expression).nest#4",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::app",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 716,
+        "end": 753
       }
     },
     {
@@ -3609,8 +3765,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 669,
-        "end": 821
+        "start": 716,
+        "end": 868
       }
     },
     {
@@ -3632,11 +3788,22 @@
       "span": {
         "path": "crates/web/src/lib.rs",
         "start": 529,
-        "end": 631
+        "end": 678
       }
     },
     {
       "id": "example.com/acme/conformance::crates/web/src/lib.rs::app::(call_expression).route#2",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::app",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 529,
+        "end": 631
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::app::(call_expression).route#3",
       "caller": "example.com/acme/conformance::crates/web/src/lib.rs::app",
       "target": null,
       "level": null,
@@ -3675,8 +3842,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 669,
-        "end": 682
+        "start": 716,
+        "end": 729
       }
     },
     {
@@ -3686,8 +3853,8 @@
       "level": "exact",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 754,
-        "end": 769
+        "start": 801,
+        "end": 816
       }
     },
     {
@@ -3708,8 +3875,8 @@
       "level": "exact",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 647,
-        "end": 662
+        "start": 694,
+        "end": 709
       }
     },
     {
@@ -3732,6 +3899,17 @@
         "path": "crates/web/src/lib.rs",
         "start": 569,
         "end": 587
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::app::get#2",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::app",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 659,
+        "end": 677
       }
     },
     {
@@ -3763,8 +3941,52 @@
       "level": "exact",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 804,
-        "end": 820
+        "start": 851,
+        "end": 867
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::app::renamed.router#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::app",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "level": "exact",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 893,
+        "end": 910
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::hop::(call_expression).nest#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::hop",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2376,
+        "end": 2421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::hop::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::hop",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2376,
+        "end": 2389
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::hop::pair.0.routes#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::hop",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+      "level": "inferred",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2405,
+        "end": 2420
       }
     },
     {
@@ -3774,8 +3996,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1103,
-        "end": 1158
+        "start": 1193,
+        "end": 1248
       }
     },
     {
@@ -3785,8 +4007,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1103,
-        "end": 1116
+        "start": 1193,
+        "end": 1206
       }
     },
     {
@@ -3796,8 +4018,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1132,
-        "end": 1157
+        "start": 1222,
+        "end": 1247
       }
     },
     {
@@ -3807,8 +4029,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1534,
-        "end": 1588
+        "start": 1624,
+        "end": 1678
       }
     },
     {
@@ -3818,8 +4040,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1534,
-        "end": 1547
+        "start": 1624,
+        "end": 1637
       }
     },
     {
@@ -3829,8 +4051,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1562,
-        "end": 1587
+        "start": 1652,
+        "end": 1677
       }
     },
     {
@@ -3840,8 +4062,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1703,
-        "end": 1759
+        "start": 3754,
+        "end": 3810
       }
     },
     {
@@ -3851,8 +4073,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1703,
-        "end": 1716
+        "start": 3754,
+        "end": 3767
       }
     },
     {
@@ -3862,8 +4084,327 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 1733,
-        "end": 1758
+        "start": 3784,
+        "end": 3809
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::(call_expression).merge#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3562,
+        "end": 3645
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::(call_expression).nest#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3562,
+        "end": 3625
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3487,
+        "end": 3500
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::Router.new#1",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3562,
+        "end": 3575
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::app.route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3512,
+        "end": 3556
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3537,
+        "end": 3555
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned::reassigned_items.router#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router",
+      "level": "exact",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3598,
+        "end": 3624
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3281,
+        "end": 3341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3281,
+        "end": 3294
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3315,
+        "end": 3340
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1885,
+        "end": 2019
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router::(call_expression).route#1",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1885,
+        "end": 1958
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1885,
+        "end": 1898
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router::all#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1994,
+        "end": 2018
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router::fetch#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 1930,
+        "end": 1957
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served::(call_expression).fallback_service#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3051,
+        "end": 3163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served::(call_expression).route_service#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3051,
+        "end": 3115
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3051,
+        "end": 3064
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served::services.fallback#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+      "level": "exact",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3142,
+        "end": 3162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::served::services.router#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::services.router",
+      "level": "exact",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 3096,
+        "end": 3114
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2640,
+        "end": 2704
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2640,
+        "end": 2653
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2678,
+        "end": 2703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.router::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2531,
+        "end": 2590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.router::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2531,
+        "end": 2544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.router::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2564,
+        "end": 2589
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped::(call_expression).route#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2753,
+        "end": 2816
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2753,
+        "end": 2766
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped::get#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2790,
+        "end": 2815
       }
     },
     {
@@ -3873,8 +4414,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 952,
-        "end": 997
+        "start": 1042,
+        "end": 1087
       }
     },
     {
@@ -3884,8 +4425,8 @@
       "level": null,
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 952,
-        "end": 965
+        "start": 1042,
+        "end": 1055
       }
     },
     {
@@ -3895,8 +4436,52 @@
       "level": "exact",
       "span": {
         "path": "crates/web/src/lib.rs",
-        "start": 979,
-        "end": 996
+        "start": 1069,
+        "end": 1086
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper::(call_expression).nest#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2940,
+        "end": 3015
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper::Router.new#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2940,
+        "end": 2953
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper::services.wrapped#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "target": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+      "level": "exact",
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2994,
+        "end": 3013
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper::std.convert.identity#0",
+      "caller": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/web/src/lib.rs",
+        "start": 2971,
+        "end": 3014
       }
     },
     {
@@ -3924,6 +4509,10 @@
   ],
   "providers": [
     {
+      "contract": "http::ANY::/alias/renamed-any",
+      "site": "example.com/acme/conformance::crates/web/src/health.rs::echo"
+    },
+    {
       "contract": "http::ANY::/echo",
       "site": "example.com/acme/conformance::crates/web/src/health.rs::echo"
     },
@@ -3938,6 +4527,10 @@
     {
       "contract": "http::GET::/admin/stats",
       "site": "example.com/acme/conformance::crates/web/src/admin.rs::stats"
+    },
+    {
+      "contract": "http::GET::/alias/renamed",
+      "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
     },
     {
       "contract": "http::GET::/api/ping",
@@ -3973,6 +4566,10 @@
     },
     {
       "contract": "http::GET::/legacy/old",
+      "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
+    },
+    {
+      "contract": "http::GET::/{raw}",
       "site": "example.com/acme/conformance::crates/web/src/health.rs::check"
     },
     {
@@ -4294,25 +4891,55 @@
         "example.com/acme/conformance::crates/web/src/files.rs::router",
         "example.com/acme/conformance::crates/web/src/items.rs::router",
         "example.com/acme/conformance::crates/web/src/lib.rs::app",
-        "example.com/acme/conformance::crates/web/src/lib.rs::legacy.router"
+        "example.com/acme/conformance::crates/web/src/lib.rs::legacy.router",
+        "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router"
       ]
     },
     {
       "name": "crates/web/src#2",
+      "members": [
+        "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes",
+        "example.com/acme/conformance::crates/web/src/lib.rs::hop"
+      ]
+    },
+    {
+      "name": "crates/web/src#3",
       "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::Holder.mount",
         "example.com/acme/conformance::crates/web/src/lib.rs::late.router"
       ]
     },
     {
-      "name": "crates/web/src#3",
+      "name": "crates/web/src#4",
       "members": [
         "example.com/acme/conformance::crates/web/src/lib.rs::orphans.router",
         "example.com/acme/conformance::crates/web/src/lib.rs::unread"
       ]
     },
     {
-      "name": "crates/web/src#4",
+      "name": "crates/web/src#5",
+      "members": [
+        "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+        "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router"
+      ]
+    },
+    {
+      "name": "crates/web/src#6",
+      "members": [
+        "example.com/acme/conformance::crates/web/src/lib.rs::served",
+        "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback",
+        "example.com/acme/conformance::crates/web/src/lib.rs::services.router"
+      ]
+    },
+    {
+      "name": "crates/web/src#7",
+      "members": [
+        "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped",
+        "example.com/acme/conformance::crates/web/src/lib.rs::wrapper"
+      ]
+    },
+    {
+      "name": "crates/web/src#8",
       "members": [
         "example.com/acme/conformance::crates/web/src/local.rs::Router",
         "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
@@ -4903,6 +5530,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::crates/web/src/health.rs::check::http::GET::/alias/renamed",
+      "kind": "route",
+      "label": "GET /alias/renamed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/health.rs::check"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::crates/web/src/health.rs::check::http::GET::/health",
       "kind": "route",
       "label": "GET /health",
@@ -4927,6 +5568,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/web/src/health.rs::check"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/health.rs::check::http::GET::/{raw}",
+      "kind": "route",
+      "label": "GET /{raw}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/health.rs::check"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/health.rs::echo::http::ANY::/alias/renamed-any",
+      "kind": "route",
+      "label": "ANY /alias/renamed-any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/health.rs::echo"
         }
       ]
     },
@@ -5263,6 +5932,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::crates/web/src/lib.rs::legacy.router"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::renamed.router"
         }
       ]
     },
@@ -5277,6 +5953,76 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::crates/web/src/lib.rs::app.GET /api/ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::hop",
+      "kind": "export",
+      "label": "hop",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::hop"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::Builder.routes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned",
+      "kind": "export",
+      "label": "reassigned",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::reassigned_items.router"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::served",
+      "kind": "export",
+      "label": "served",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::served"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::services.router"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::services.fallback"
         }
       ]
     },
@@ -5298,6 +6044,27 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::crates/web/src/lib.rs::orphans.router"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper",
+      "kind": "export",
+      "label": "wrapper",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::wrapper"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::crates/web/src/lib.rs::services.wrapped"
         }
       ]
     }

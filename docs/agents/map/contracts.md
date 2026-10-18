@@ -58,9 +58,11 @@ modules updates it.
   `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
   `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or
   `any(h)` read by `method_router`, a closure handler an `Inline` def, the paths normalized by
-  `normalize_path`; the Express rules do not run on `.rs` files; `nest` prefixes and `merge`
-  go through `prefixes` as Express mounts do, a mount through a value Meada cannot read serves
-  nothing, and a router nothing nests is served at its root), reached through `Code::origins`: a route counts only
+  `normalize_path`, with `{{` and `}}` of axum 0.8 kept literal, and the method the name axum gives the function; the Express rules do not run on `.rs` files; `nest` prefixes and `merge`
+  go through `prefixes` as Express mounts do, a router given to a call Meada does not read (`route_service`,
+  `fallback_service`, an outside wrapper, a name-matched method; `axum_unread`) is mounted
+  nowhere, a mount through a value it cannot read serves nothing, and a router nothing nests is
+  served at its root; `prefixes` stops at `PREFIX_DEPTH` and `PREFIX_WORK`), reached through `Code::origins`: a route counts only
   on a receiver that traces back to its framework's constructor (`Code::external`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,
