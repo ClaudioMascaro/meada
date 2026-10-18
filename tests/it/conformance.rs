@@ -1411,7 +1411,16 @@ fn rust() {
             "crates/actix/src/orders.rs::ping",
             "crates/actix/src/orders.rs::show",
             "crates/actix/src/orders.rs::update",
+            "crates/actix/src/stray.rs::Bounds",
+            "crates/actix/src/stray.rs::binding",
+            "crates/actix/src/stray.rs::bound",
+            "crates/actix/src/stray.rs::early",
+            "crates/actix/src/stray.rs::early_then_bound",
             "crates/actix/src/stray.rs::Holder",
+            "crates/flat/lib.rs::pages",
+            "crates/flat/lib.rs::serve",
+            "crates/flat/pages.rs::page",
+            "crates/rocket/src/stray.rs::elsewhere",
             "crates/actix/src/stray.rs::elsewhere",
             "crates/actix/src/stray.rs::elsewhere.get",
             "crates/actix/src/stray.rs::held",
@@ -2577,10 +2586,17 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::GET::/tools/audit",
             "crates/actix/src/admin.rs::audit",
         ),
-        // Written nowhere but where it is defined: its own path, no prefix. Handlers that code
-        // Meada does not read (`services!`, `vec!`, `cfg_if!`, an alias, a local of the name)
-        // mentions are possibly registered there: served nowhere.
+        // Written nowhere in its crate but where it is defined: its own path, no prefix. Its
+        // name bound (a `let`, a parameter, a field), a reference a local of the name hides and
+        // a mention in another crate register nothing. Handlers that code Meada does not read
+        // (`services!`, `vec!`, `cfg_if!`, a reference before a `let` of the name) mentions are
+        // possibly registered there: served nowhere.
         ("http::GET::/stray/{}", "crates/actix/src/stray.rs::lonely"),
+        ("http::GET::/bound", "crates/actix/src/stray.rs::bound"),
+        (
+            "http::GET::/shadowed",
+            "crates/actix/src/stray.rs::shadowed",
+        ),
         // A configuration passed on to the function a function calls.
         (
             "http::GET::/more/extras",
@@ -2629,6 +2645,40 @@ fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
         ("http::GET::/hello/{}", "crates/greeter/src/names.rs::named"),
     ]);
     assert_eq!(actual, expected);
+}
+
+/// A library whose root is not under `src/` (`[lib] path = "lib.rs"`) reads `#[macro_use]` from
+/// that root, as its crate's module tree says.
+#[test]
+fn rust_macro_use_follows_the_crate_root_wherever_it_is() {
+    let (_, actual) = providers("rust_flat", "conformance-rust", "crates/flat/");
+    let expected = pairs(&[
+        ("http::GET::/flat/page", "crates/flat/pages.rs::page"),
+        ("package::cargo::flat", "crates/flat/Cargo.toml"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// A file writing more names than `Facts::mentions` keeps makes only its own crate's handlers
+/// possibly registered: one in another crate leaves the unregistered handler at its own path.
+#[test]
+fn a_file_past_the_mentions_limit_hides_only_its_own_crate() {
+    let many: String = (0..20_000).map(|i| format!("    n{i};\n")).collect();
+    let big = format!("pub fn big() {{\n{many}}}\n");
+    let lonely = "\"http::GET::/stray/{}\"";
+    for (krate, served) in [("rocket", true), ("actix", false)] {
+        let repo = fixture_repo(
+            &format!("rust_mentions_{krate}"),
+            "conformance-rust",
+            Some(ORIGIN),
+        );
+        let src = repo.join(format!("crates/{krate}/src"));
+        let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+        std::fs::write(src.join("lib.rs"), format!("mod big;\n{lib}")).unwrap();
+        std::fs::write(src.join("big.rs"), &big).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_eq!(export.contains(lonely), served, "a big file in {krate}");
+    }
 }
 
 /// The constants and returns the handlers of a call are expanded from share one budget: a list
@@ -3134,6 +3184,7 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         "crates/billing/src/billing.rs total crates/billing/src/billing.rs total",
         "crates/billing/src/invoice.rs Invoice crates/billing/src/invoice.rs Invoice",
         "crates/billing/src/invoice.rs tax crates/billing/src/invoice.rs tax",
+        "crates/flat/lib.rs serve crates/flat/lib.rs serve",
         "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
         "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
         // A `pub use` in a `pub` module written in place is one of its members.

@@ -2500,6 +2500,11 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Whether other packages may import the exports of `path` (`LanguagePack::published`).
+    pub fn published(&self, path: &str) -> bool {
+        (self.resolver.published.as_ref()).is_none_or(|files| files.contains(path))
+    }
+
     /// The file an import of `specifier` from `path` names, if the pack parses it.
     pub fn import_file(&self, path: &str, specifier: &str) -> Option<&'a str> {
         self.resolver.module(path, specifier)

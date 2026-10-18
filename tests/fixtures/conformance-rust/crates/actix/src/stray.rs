@@ -32,3 +32,30 @@ mod elsewhere {
 
 #[elsewhere::get("/not-a-route")]
 pub async fn plain() {}
+
+/// Its name is only bound in this crate (a `let`, a parameter, a closure's parameter, a field)
+/// and written in another crate: nothing registers it, so it is served at its own path.
+#[get("/bound")]
+pub async fn bound() {}
+
+pub struct Bounds {
+    bound: u8,
+}
+
+pub fn binding(bound: u8) -> u8 {
+    let raise = |bound: u8| bound + 1;
+    let Bounds { bound: _ } = Bounds { bound };
+    let bound = raise(bound);
+    bound
+}
+
+/// Written before a `let` of its name: the mention counts, so it may be registered where Meada
+/// cannot tell, and it is served nowhere.
+#[get("/early")]
+pub async fn early() {}
+
+pub fn early_then_bound(app: actix_web::App<()>, make: fn() -> u8) {
+    app.service(early);
+    let early = make();
+    let _ = early;
+}

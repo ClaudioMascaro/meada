@@ -19,6 +19,7 @@ use crate::{Result, qualify};
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+mod mentions;
 mod messages;
 mod values;
 
@@ -173,11 +174,6 @@ const ROUTE_ATTRIBUTES: &[&str] = &[
 /// How many route attributes one function is read with; the rest are not calls.
 // ponytail: a handler serves a handful of routes; a crafted run of a million is not read.
 const ROUTES_PER_FUNCTION: usize = 16;
-
-/// How many distinct names a file may mention before `Facts::mentions` tells nothing of it.
-// ponytail: a generated file with more is read as mentioning every name (none of its handlers
-// is then taken as unregistered); raise it if a real file reaches it.
-const MENTIONS: usize = 1 << 14;
 
 pub struct Rust;
 
@@ -1116,7 +1112,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     facts.impls.retain(|i| !i.ty.is_empty());
     facts.externs = heads.externs.into_iter().collect();
     facts.macro_use = macro_use(tree.root_node(), src);
-    facts.mentions = mentions(tree.root_node(), src);
+    facts.mentions = mentions::mentions(tree.root_node(), src);
     for (local, source) in heads.imports {
         facts.imports.push(Import {
             local,
@@ -1187,38 +1183,6 @@ fn route_attribute<'t>(item: Node<'t>, src: &[u8]) -> Option<(Vec<String>, Node<
     (segments.last())
         .is_some_and(|s| ROUTE_ATTRIBUTES.contains(&s.as_str()))
         .then_some((segments, tree))
-}
-
-/// The names the file writes as a value, a path or inside a macro call, except the names of
-/// the functions it defines and its route attributes; `None` past `MENTIONS` names.
-fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
-    let (mut out, mut cursor) = (BTreeSet::new(), root.walk());
-    loop {
-        let node = cursor.node();
-        let skip = node.kind() == "attribute_item" && route_attribute(node, src).is_some();
-        if node.kind() == "identifier" && !is_function_name(node) {
-            out.insert(text(node, src).to_string());
-            if out.len() > MENTIONS {
-                return None;
-            }
-        }
-        if !skip && cursor.goto_first_child() {
-            continue;
-        }
-        while !cursor.goto_next_sibling() {
-            if !cursor.goto_parent() {
-                return Some(out);
-            }
-        }
-    }
-}
-
-/// Whether `node` is the name a function item defines.
-fn is_function_name(node: Node) -> bool {
-    node.parent().is_some_and(|p| {
-        matches!(p.kind(), "function_item" | "function_signature_item")
-            && field(p, "name") == Some(node)
-    })
 }
 
 /// The crates the file declares with `#[macro_use] extern crate x;` at its top level.
@@ -1924,7 +1888,7 @@ mod tests {
     use super::*;
     use crate::lang::Value;
 
-    fn facts(src: &str) -> Facts {
+    pub(super) fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), "").unwrap()
     }
 
@@ -2503,18 +2467,6 @@ mod tests {
         };
         assert_eq!(methods(values::ROUTE_METHODS), 0);
         assert_eq!(methods(values::ROUTE_METHODS + 3), 3);
-    }
-
-    #[test]
-    fn mentions_are_the_names_written_outside_definitions_and_route_attributes() {
-        let src = "use a::used as alias;\n#[get(\"/x\")]\nfn handler() {}\nfn other() { f(local, m![inside]); }\n";
-        let mentions = facts(src).mentions.unwrap();
-        let names: Vec<&str> = mentions.iter().map(String::as_str).collect();
-        assert_eq!(names, ["a", "alias", "f", "inside", "local", "m", "used"]);
-        let many = (0..MENTIONS + 1)
-            .map(|i| format!("fn f() {{ n{i}; }}\n"))
-            .collect::<String>();
-        assert!(facts(&many).mentions.is_none());
     }
 
     #[test]

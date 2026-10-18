@@ -1,3 +1,4 @@
-`serve` fits 2 symbols; pass one of:
+`serve` fits 3 symbols; pass one of:
 example.com/acme/conformance api/src/routes/mod.rs:5 api/src/routes/mod.rs::serve
+example.com/acme/conformance crates/flat/lib.rs:9 crates/flat/lib.rs::serve
 example.com/acme/conformance crates/rocket/src/hiding.rs:23 crates/rocket/src/hiding.rs::serve

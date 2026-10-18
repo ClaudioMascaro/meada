@@ -11,7 +11,7 @@
 //! names is served at its own path, with no prefix.
 
 use std::cell::{Cell, OnceCell};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::{
     ANY, CallAt, METHOD_CHAIN, Mounts, PARAM, handler_site, join, normalize_path, path_literal,
@@ -89,8 +89,9 @@ struct Web<'c, 'a> {
     routes: Vec<Route<'a>>,
     /// What `items` may still visit.
     work: Cell<usize>,
-    /// The names some file of the repository mentions; `None` when a file's are unknown.
-    mentioned: OnceCell<Option<BTreeSet<&'a str>>>,
+    /// The names the files of each crate mention, by crate root; `None` for a crate one of
+    /// whose files does not tell.
+    mentioned: OnceCell<HashMap<&'a str, Option<BTreeSet<&'a str>>>>,
 }
 
 /// `path` with each `{name}` or `{name:regex}` as one parameter, whatever the regex holds;
@@ -144,36 +145,42 @@ impl<'c, 'a> Web<'c, 'a> {
         left >= n
     }
 
-    /// Whether code Meada does not read may register the function named `name`: some file
-    /// of the repository writes the name, other than as the name of a function it defines or
-    /// among its route attributes, or does not say what it writes.
-    fn mentioned(&self, name: &str) -> bool {
-        let all = self.mentioned.get_or_init(|| {
-            let mut names = BTreeSet::new();
-            for &path in self.code.files().keys() {
-                names.extend(self.code.mentions(path)?.iter().map(String::as_str));
-            }
-            Some(names)
-        });
-        let name = name.rsplit('.').next().unwrap_or(name);
-        all.as_ref().is_none_or(|names| names.contains(name))
+    /// The root of the crate `path` belongs to, as its module tree says (`crate`).
+    fn root(&self, path: &'a str) -> &'a str {
+        self.code.import_file(path, "crate").unwrap_or(path)
     }
 
-    /// The crate a bare route attribute comes from, when `#[macro_use] extern crate x;` of its
-    /// crate brings it in.
-    // ponytail: a crate is the files under one `src/`; a package with several crate roots
-    // shares what any of them declares.
-    fn macro_use(&self, path: &str) -> Option<&'a str> {
-        let dir = |p: &str| {
-            p.find("/src/")
-                .or_else(|| p.starts_with("src/").then_some(0))
-        };
-        let package = &path[..dir(path)?];
-        let files = self.code.files();
-        let declared = files
-            .iter()
-            .filter(|(p, _)| dir(p).is_some_and(|d| &p[..d] == package));
-        let krates = declared.flat_map(|(_, f)| f.macro_use.iter());
+    /// Whether code Meada does not read may register the function `name` of `path`: a file of
+    /// its crate (of any crate, when the file is one another crate may import) mentions the
+    /// name (`Facts::mentions`), or does not say what it mentions.
+    fn mentioned(&self, path: &'a str, name: &str) -> bool {
+        let crates = self.mentioned.get_or_init(|| {
+            let mut crates: HashMap<&str, Option<BTreeSet<&str>>> = HashMap::new();
+            for &file in self.code.files().keys() {
+                let names = crates
+                    .entry(self.root(file))
+                    .or_insert(Some(BTreeSet::new()));
+                match (names, self.code.mentions(file)) {
+                    (Some(names), Some(found)) => names.extend(found.iter().map(String::as_str)),
+                    (names, _) => *names = None,
+                }
+            }
+            crates
+        });
+        let name = name.rsplit('.').next().unwrap_or(name);
+        let mentions =
+            |names: &Option<BTreeSet<&str>>| names.as_ref().is_none_or(|n| n.contains(name));
+        match self.code.published(path) {
+            true => crates.values().any(mentions),
+            false => crates.get(self.root(path)).is_none_or(mentions),
+        }
+    }
+
+    /// The crate a bare route attribute comes from, when the `#[macro_use] extern crate x;` of
+    /// its crate's root brings it in.
+    fn macro_use(&self, path: &'a str) -> Option<&'a str> {
+        let root = self.code.files().get(self.root(path))?;
+        let krates = root.macro_use.iter();
         let mut krates = krates.filter(|k| matches!(k.as_str(), "actix_web" | "rocket"));
         let first = krates.next()?;
         krates.next().is_none().then_some(first.as_str())
@@ -624,7 +631,7 @@ impl<'c, 'a> Web<'c, 'a> {
         // served at its own path; one that some code mentions without Meada reading a
         // registration may be registered there, so it is served nowhere.
         let root = |place: Place<'a>| match place {
-            Place::Handler(_, name) => (!self.mentioned(name)).then(String::new),
+            Place::Handler(path, name) => (!self.mentioned(path, name)).then(String::new),
             Place::Made(_) | Place::Config(..) => {
                 (matches!(self.kind(place), Some(Kind::App | Kind::Rocket))).then(String::new)
             }
