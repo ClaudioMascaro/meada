@@ -761,7 +761,7 @@ fn axum_path(path: &str) -> String {
 /// app and is served at its root; one a mount puts under a prefix Meada cannot read, or that
 /// is mounted on a router it cannot read, is served nowhere. A handler is the function the
 /// route names (a closure is an inline handler); any other handler leaves the route at its file.
-// ponytail: a router held by `let mut` or reassigned, `route_service` and `nest_service`, and
+// ponytail: a router held by `let mut` or reassigned, `route_service`, and
 // `on(MethodFilter, h)` are not followed; the routes on them are not providers.
 fn axum(code: &Code) -> Vec<Found> {
     if !code.pack().extensions().contains(&"rs") {
@@ -772,7 +772,7 @@ fn axum(code: &Code) -> Vec<Found> {
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
             let member = call.callee.rsplit('.').next().unwrap_or_default();
-            if !matches!(member, "route" | "nest" | "merge") {
+            if !matches!(member, "route" | "nest" | "nest_service" | "merge") {
                 continue;
             }
             let Some(call) = code.call(path, n) else {
@@ -796,9 +796,9 @@ fn axum(code: &Code) -> Vec<Found> {
                         routes.push((path, at, axum_path(&route), handlers.clone()));
                     }
                 }
-                ("nest" | "merge", args) => {
+                ("nest" | "nest_service" | "merge", args) => {
                     let (prefix, child) = match (member, args) {
-                        ("nest", [prefix, child]) => {
+                        ("nest" | "nest_service", [prefix, child]) => {
                             let prefix = code.value(path, &call.scope, prefix);
                             (path_literal(prefix), child)
                         }

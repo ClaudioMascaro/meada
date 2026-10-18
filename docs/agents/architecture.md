@@ -769,7 +769,12 @@ one for the area a change touches.
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names
   no type; `USE_BINDINGS` (4096): the names the `use` declarations of a file bind, the rest
-  bind nothing. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
+  bind nothing; `VALUE_DEPTH` (64): a value nested deeper in wrappers (`(x)`, `&x`, `x?`) and
+  arrays is `Unknown` from there. A call inside a value is a stub (its callee and span), so a
+  builder chain costs one value per call. A closure written as an argument of a call is a
+  `Kind::Inline` definition; any other closure is not, and neither is a `let mut`, a name bound
+  twice in its scope, or a destructuring a constant. A string literal with an escape sequence is
+  `Unknown`. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
   `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
   line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
@@ -802,6 +807,13 @@ one for the area a change touches.
   file gives that file's public names; whether the file itself is reachable from the crate's
   root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
   are not indexed.
+- `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
+  that many calls, a longer one gives its route no provider. A router held by `let mut` or
+  reassigned, `route_service`, `on(MethodFilter, h)` and a method router held in
+  a variable are not followed. A router nothing mounts is served at its root, so one mounted
+  through a call Meada does not read (`fallback_service`, a function taking the router) is
+  served at the root too (no marker); a mount whose prefix cannot be read, or on a router
+  Meada cannot read, serves nothing.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

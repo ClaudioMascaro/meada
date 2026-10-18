@@ -2,6 +2,7 @@ pub mod admin;
 mod files;
 mod health;
 pub mod items;
+mod local;
 mod prefix;
 
 use axum::Router;
@@ -25,11 +26,42 @@ pub fn app() -> Router {
         .nest(API, api)
         .merge(public)
         .nest("/admin", admin::router())
+        .nest_service("/legacy", legacy::router())
 }
 
 pub fn unread(prefix: &str) -> Router {
     // The prefix is a parameter: what is mounted there is served under no prefix.
     Router::new().nest(prefix, orphans::router())
+}
+
+mod late {
+    use axum::Router;
+    use axum::routing::get;
+
+    pub fn router() -> Router {
+        Router::new().route("/late", get(super::health::check))
+    }
+}
+
+pub struct Holder {
+    router: Router,
+}
+
+impl Holder {
+    pub fn mount(&mut self) {
+        // The router this is mounted on is a field: Meada cannot read it, so `late` is
+        // served nowhere.
+        self.router.nest("/held", late::router());
+    }
+}
+
+mod legacy {
+    use axum::Router;
+    use axum::routing::get;
+
+    pub fn router() -> Router {
+        Router::new().route("/old", get(super::health::check))
+    }
 }
 
 mod orphans {

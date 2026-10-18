@@ -194,7 +194,7 @@ renames, globs, `pub use` and the other workspace crates by name; method calls (
 indexed, and Rust contracts other than packages are not there yet), and links repositories,
 also from one language to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
-Django on the serving side, also behind a gateway), through
+Django and, in Rust, axum on the serving side, also behind a gateway), through
 the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
 `confluent-kafka` and `kafka-python`), RabbitMQ queues (`amqplib` and, in Python, `pika`, with a
 `publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK

@@ -610,6 +610,22 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     How::Call(range) => returned.push((facts.receivers.len(), range)),
                 }
                 let class = Class::Unknown;
+                // It is a constant too, if nothing else binds the name in its scope.
+                let local = qualify(&scope, &name);
+                *bindings.entry(local.clone()).or_default() += 1;
+                if let Some(value) = field(node, "value") {
+                    let at = Where {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                    };
+                    let put = Put::Let(local);
+                    held.push(Held {
+                        at,
+                        node: value,
+                        put,
+                    });
+                }
                 facts.receivers.push(Receiver {
                     scope: scope.clone(),
                     name,
@@ -1423,6 +1439,18 @@ mod tests {
     fn callees(src: &str) -> Vec<(String, bool)> {
         let calls = facts(src).calls.into_iter();
         calls.map(|c| (c.callee, c.by_path)).collect()
+    }
+
+    #[test]
+    fn a_value_nested_past_the_depth_limit_is_unknown() {
+        let read = |n: usize| {
+            let src = format!("const X: &str = {}\"a\"{};\n", "(".repeat(n), ")".repeat(n));
+            let facts = facts(&src);
+            let x = facts.consts.into_iter().find(|c| c.name == "X").unwrap();
+            matches!(x.value, crate::lang::Value::Str(_))
+        };
+        assert!(read(values::VALUE_DEPTH - 1));
+        assert!(!read(values::VALUE_DEPTH));
     }
 
     #[test]

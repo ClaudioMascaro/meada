@@ -1519,6 +1519,40 @@ fn rust() {
             "crates/billing/src/invoice.rs::tax",
             // A package the workspace's `exclude` lists is still a crate of the repository.
             "crates/scratch/src/lib.rs::ignored",
+            "crates/web/src/admin.rs::mount",
+            "crates/web/src/admin.rs::reset",
+            "crates/web/src/admin.rs::router",
+            "crates/web/src/admin.rs::stats",
+            "crates/web/src/files.rs::read",
+            "crates/web/src/files.rs::router",
+            "crates/web/src/health.rs::check",
+            "crates/web/src/health.rs::echo",
+            "crates/web/src/items.rs::create",
+            "crates/web/src/items.rs::list",
+            "crates/web/src/items.rs::remove",
+            "crates/web/src/items.rs::router",
+            "crates/web/src/items.rs::show",
+            "crates/web/src/items.rs::update",
+            "crates/web/src/lib.rs::Holder",
+            "crates/web/src/lib.rs::Holder.mount",
+            "crates/web/src/lib.rs::admin",
+            "crates/web/src/lib.rs::app",
+            "crates/web/src/lib.rs::app.GET /api/ping",
+            "crates/web/src/lib.rs::files",
+            "crates/web/src/lib.rs::health",
+            "crates/web/src/lib.rs::items",
+            "crates/web/src/lib.rs::legacy",
+            "crates/web/src/lib.rs::legacy.router",
+            "crates/web/src/lib.rs::late",
+            "crates/web/src/lib.rs::late.router",
+            "crates/web/src/lib.rs::local",
+            "crates/web/src/lib.rs::orphans",
+            "crates/web/src/lib.rs::orphans.router",
+            "crates/web/src/lib.rs::prefix",
+            "crates/web/src/lib.rs::unread",
+            "crates/web/src/local.rs::Router",
+            "crates/web/src/local.rs::Router.get",
+            "crates/web/src/local.rs::wire",
         ],
         // `fn main` of each binary target: `src/main.rs`, `src/bin/`, a `[[bin]] path`.
         &[
@@ -2150,7 +2184,8 @@ fn rust() {
 /// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
 /// built in another module, one router under two prefixes, chained method routers, `any`, a
 /// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot
-/// read is served nowhere.
+/// read, or on a router held in a field, is served nowhere, and an Express-spelled `Router` of
+/// the crate's own is no provider.
 #[test]
 fn rust_axum_routes_are_providers_under_every_prefix() {
     let (_, actual) = providers("rust_axum", "conformance-rust", "crates/web/src/");
@@ -2187,6 +2222,7 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
         ("http::GET::/blobs/{}", "crates/web/src/files.rs::read"),
         // A router a function receives and returns, mounted under a literal.
         ("http::GET::/admin/stats", "crates/web/src/admin.rs::stats"),
+        ("http::GET::/legacy/old", "crates/web/src/health.rs::check"),
         ("http::POST::/admin/reset", "crates/web/src/admin.rs::reset"),
         // `orphans::router` is nested under a prefix that is a parameter: no provider at
         // `/never`, under any prefix.
@@ -2198,6 +2234,26 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
     expected.extend(items("/api/v2"));
     expected.sort();
     assert_eq!(actual, expected);
+}
+
+/// A method router chain longer than the limit read is no provider; the same router with a
+/// short chain is.
+#[test]
+fn an_axum_method_router_chain_past_the_limit_is_not_read() {
+    let repo = fixture_repo("rust_axum_chain", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/web/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod chain;\n{lib}")).unwrap();
+    let layers = ".layer(())".repeat(70);
+    let chain = format!(
+        "use axum::Router;\nuse axum::routing::get;\n\
+         pub fn router() -> Router {{\n    Router::new()\n        .route(\"/short\", get(h).layer(()))\n        \
+         .route(\"/long\", get(h){layers})\n}}\nfn h() {{}}\n"
+    );
+    std::fs::write(src.join("chain.rs"), chain).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/short"));
+    assert!(!export.contains("http::GET::/long"));
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
@@ -2246,6 +2302,18 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         "crates/ledger-core/src/lib.rs post crates/ledger-core/src/lib.rs post",
         "crates/scratch/src/lib.rs ignored crates/scratch/src/lib.rs ignored",
         "crates/scratch/src/lib.rs reach crates/scratch/src/lib.rs reach",
+        "crates/web/src/admin.rs router crates/web/src/admin.rs router",
+        "crates/web/src/items.rs create crates/web/src/items.rs create",
+        "crates/web/src/items.rs list crates/web/src/items.rs list",
+        "crates/web/src/items.rs remove crates/web/src/items.rs remove",
+        "crates/web/src/items.rs router crates/web/src/items.rs router",
+        "crates/web/src/items.rs show crates/web/src/items.rs show",
+        "crates/web/src/items.rs update crates/web/src/items.rs update",
+        "crates/web/src/lib.rs Holder crates/web/src/lib.rs Holder",
+        "crates/web/src/lib.rs admin crates/web/src/admin.rs -",
+        "crates/web/src/lib.rs app crates/web/src/lib.rs app",
+        "crates/web/src/lib.rs items crates/web/src/items.rs -",
+        "crates/web/src/lib.rs unread crates/web/src/lib.rs unread",
     ];
     assert_eq!(found, expected);
 }

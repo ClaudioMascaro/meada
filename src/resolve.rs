@@ -2324,6 +2324,20 @@ mod tests {
     }
 
     #[test]
+    fn a_call_is_found_by_its_range_in_a_list_in_any_order() {
+        let facts = Python.parse("a.py", b"f(g(1))\nh()\n").unwrap();
+        let mut calls = facts.calls;
+        assert_eq!(calls.len(), 3);
+        for _ in 0..2 {
+            for (i, call) in calls.iter().enumerate() {
+                assert_eq!(call_at(&calls, &call.range), Some(i));
+            }
+            calls.reverse();
+        }
+        assert_eq!(call_at(&calls, &(0..1)), None);
+    }
+
+    #[test]
     fn a_family_longer_than_the_limit_is_absent() {
         // Far past the limit: a recursion down the bases that does not stop overflows the
         // stack, and families kept whole take memory quadratic in the chain.

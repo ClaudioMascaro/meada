@@ -968,11 +968,17 @@ sample.rs
       }
     }
   ],
-  "consts": [],
+  "consts": [
+    {
+      "name": "Store.empty.run"
+    },
+    {
+      "name": "save.made"
+    }
+  ],
   "locals": [
     "Store.empty.name",
-    "Store.empty.size",
-    "Store.empty.run"
+    "Store.empty.size"
   ],
   "receivers": [
     {
