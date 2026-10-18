@@ -245,6 +245,10 @@ pub enum Class {
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
+    /// What this path (`Store`, or `store::Store` as `store.Store`), written as a type, names:
+    /// an instance of that class. Its head is read among types and modules, so a local or a
+    /// parameter of the same name does not hide it (Rust's `store: store::Store`).
+    Type(String),
     /// What the function this callee-like name gives, called in the scope, returns: the class
     /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
     /// repository stays outside; a function with no written result is unknown.

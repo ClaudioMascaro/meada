@@ -3,6 +3,8 @@
 // is `ambiguous` for the first two and `inferred` for the last.
 use std::collections::HashMap;
 
+use crate::store;
+
 pub trait Probe {
     fn probe(&self) -> u32;
 
@@ -179,4 +181,73 @@ pub fn retyped(c: &Counter) {
 pub fn blocks(items: Vec<Gauge>) {
     let c = &items[0];
     c.read();
+}
+
+// `Self` in a trait's default body is the type the call named, not the trait.
+pub trait Build: Sized {
+    fn make() -> Self {
+        Self::seed()
+    }
+
+    fn seed() -> Self;
+
+    fn run(&self) {}
+}
+
+impl Build for Counter {
+    fn seed() -> Self {
+        Counter::new()
+    }
+
+    fn run(&self) {}
+}
+
+pub fn built_by_default() {
+    let c = Counter::make();
+    c.run();
+}
+
+// A result that is a type parameter is whatever the caller passes: no class.
+pub fn wrap<T: Probe>(t: T) -> T {
+    t
+}
+
+pub fn wrapped(c: Counter) {
+    let w = wrap(c);
+    w.probe();
+}
+
+// A parameter whose type names no item, and a `let` of the same name: neither is trusted.
+pub fn sliced(c: &[Counter]) {
+    c.read();
+    let c: Gauge = fresh();
+}
+
+// A type is read among types and modules: the parameter `store` does not hide the module.
+pub fn opened() -> store::Store {
+    store::Store::new()
+}
+
+pub fn modular(store: store::Store) {
+    store.save();
+}
+
+pub fn reopened() {
+    let client: store::Store = opened();
+    client.save();
+    let again = opened();
+    again.save();
+}
+
+// Marker traits add no method: the one other bound is the trait.
+pub fn marked<T: Probe + Send>(p: &T) {
+    p.summary();
+}
+
+pub fn marked_impl(p: impl Probe + Send + 'static) {
+    p.probe();
+}
+
+pub fn cleared(c: &Counter) {
+    c.reset();
 }

@@ -1455,6 +1455,22 @@ fn rust() {
             "api/src/methods.rs::retyped",
             "api/src/methods.rs::shadowed",
             "api/src/methods.rs::shared",
+            "api/src/methods.rs::Build",
+            "api/src/methods.rs::Build.make",
+            "api/src/methods.rs::Build.run",
+            "api/src/methods.rs::Build.seed",
+            "api/src/methods.rs::Counter.Build.run",
+            "api/src/methods.rs::Counter.Build.seed",
+            "api/src/methods.rs::wrap",
+            "api/src/methods.rs::opened",
+            "api/src/methods.rs::modular",
+            "api/src/methods.rs::reopened",
+            "api/src/methods.rs::built_by_default",
+            "api/src/methods.rs::wrapped",
+            "api/src/methods.rs::sliced",
+            "api/src/methods.rs::cleared",
+            "api/src/methods.rs::marked",
+            "api/src/methods.rs::marked_impl",
             "api/src/store.rs::Persist.persist",
             "api/src/main.rs::nested",
             "api/src/main.rs::nested.deep",
@@ -2050,6 +2066,77 @@ fn rust() {
                     "api/src/methods.rs::Counter.bump",
                     "api/src/methods.rs::Gauge.bump",
                 ],
+            ),
+            // `Self` of a trait's default body is the type the call named, not the trait; a type
+            // parameter as a result names no class; a parameter whose type names no item hides a `let`.
+            (
+                "api/src/methods.rs::Build.make::Self.seed#0",
+                EXACT,
+                &["api/src/methods.rs::Build.seed"],
+            ),
+            (
+                "api/src/methods.rs::Counter.Build.seed::Counter.new#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.new"],
+            ),
+            (
+                "api/src/methods.rs::built_by_default::Counter.make#0",
+                EXACT,
+                &["api/src/methods.rs::Build.make"],
+            ),
+            (
+                "api/src/methods.rs::built_by_default::c.run#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.Build.run"],
+            ),
+            (
+                "api/src/methods.rs::wrapped::w.probe#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.Probe.probe",
+                    "api/src/methods.rs::Gauge.Probe.probe",
+                    "api/src/methods.rs::Probe.probe",
+                ],
+            ),
+            (
+                "api/src/methods.rs::sliced::c.read#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.read",
+                    "api/src/methods.rs::Gauge.read",
+                ],
+            ),
+            // A type is read among types and modules: a parameter named like the module does not hide it.
+            (
+                "api/src/methods.rs::modular::store.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/methods.rs::reopened::client.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            (
+                "api/src/methods.rs::reopened::again.save#0",
+                EXACT,
+                &["api/src/store.rs::Store.save"],
+            ),
+            // Marker traits (`Send`, `Sync`, `Unpin`, `Sized`) and lifetimes are not a second bound.
+            (
+                "api/src/methods.rs::marked::p.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            (
+                "api/src/methods.rs::marked_impl::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::cleared::c.reset#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.reset"],
             ),
         ],
     );

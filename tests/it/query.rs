@@ -155,6 +155,11 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
         "conformance-rust.context-bump.txt",
         &engine.context("Counter.bump", None).unwrap(),
     );
+    // A method with one name in the repository: `exact` by the type, `inferred` by name alone.
+    assert_golden(
+        "conformance-rust.context-reset.txt",
+        &engine.context("Counter.reset", None).unwrap(),
+    );
 }
 
 #[test]

@@ -167,6 +167,8 @@ struct Scan {
     defs: HashSet<String>,
     locals: HashSet<String>,
     uses: HashMap<String, usize>,
+    /// The plain names the parameters of each function bind, as `(function, name)`.
+    params: HashSet<(String, String)>,
 }
 
 /// What the paths of a file need besides its own items: imports of the file itself and of
@@ -290,6 +292,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     .into_iter())
                 .map(|p| (p.param, p.names))
                 .unzip();
+                scan.params.extend(
+                    (params.iter())
+                        .filter(|p| !p.name.is_empty())
+                        .map(|p| (qualified.clone(), p.name.clone())),
+                );
                 for local in bound.iter().flatten().map(|n| qualify(&qualified, n)) {
                     if scan.locals.insert(local.clone()) {
                         facts.locals.push(local);
@@ -306,7 +313,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         segments,
                         binds: None,
                     };
-                    if let Some(result) = field(node, "return_type").and_then(|t| written(t, src)) {
+                    // A type parameter as the result names no class: it is the caller's type.
+                    let result = field(node, "return_type").and_then(|t| written(t, src, false));
+                    if let Some(result) = result {
                         paths.push((Slot::Result(facts.defs.len()), path(result)));
                     }
                     if kind == Kind::Method && has_self(node) {
@@ -493,9 +502,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 });
             }
             // A `let` of a plain name whose type is written, or whose value is a call, is a
-            // receiver (`Facts::receivers`): another binding of the name in the scope hides it.
-            "let_declaration" if !deep && typed_let(node, src).is_some() => {
-                let (name, how) = typed_let(node, src).unwrap();
+            // receiver (`Facts::receivers`), unless a parameter of the function binds the name
+            // too: the two cannot tell which a call reaches, so the name is a local.
+            "let_declaration"
+                if !deep
+                    && typed_let(node, src)
+                        .is_some_and(|(name, _)| !scan.params.contains(&(scope.clone(), name))) =>
+            {
+                let Some((name, how)) = typed_let(node, src) else {
+                    continue;
+                };
                 match how {
                     How::Type(segments) => {
                         let path = Path {
@@ -581,9 +597,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             Slot::Type(at) => facts.impls[*at].ty = callee.unwrap_or_default(),
             Slot::Trait(at) => facts.impls[*at].of = Some(callee.unwrap_or_default()),
             Slot::Named(at) => {
-                facts.receivers[*at].class = callee.map_or(Class::Unknown, Class::Named);
+                facts.receivers[*at].class = callee.map_or(Class::Unknown, Class::Type);
             }
-            Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Named),
+            Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Type),
         }
     }
     // A `let` holding a call: the function it names, when the call is a path or a bare name.
@@ -819,7 +835,7 @@ fn typed_parameters(function: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
             let name = field(p, "pattern").filter(|n| n.kind() == "identifier")?;
             Some((
                 text(name, src).to_string(),
-                written(field(p, "type")?, src)?,
+                written(field(p, "type")?, src, true)?,
             ))
         })
         .collect()
@@ -834,7 +850,7 @@ fn fields(item: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
     declared
         .filter_map(|f| {
             let name = text(field(f, "name")?, src).to_string();
-            Some((name, written(field(f, "type")?, src)?))
+            Some((name, written(field(f, "type")?, src, true)?))
         })
         .collect()
 }
@@ -850,7 +866,7 @@ fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
     let pattern = field(node, "pattern").filter(|p| p.kind() == "identifier")?;
     let name = text(pattern, src).to_string();
     if let Some(ty) = field(node, "type") {
-        return Some((name, How::Type(written(ty, src)?)));
+        return Some((name, How::Type(written(ty, src, true)?)));
     }
     // Only a call of a name or a path: the function it calls is what the call's own callee says.
     let value = field(node, "value").filter(|v| v.kind() == "call_expression")?;
@@ -866,8 +882,9 @@ fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
 /// The path of the item a written type names: `&T` and `&mut T` name `T`; `dyn Trait`, `impl
 /// Trait` and a type parameter bounded by one trait name that trait, so a call on it stops at
 /// the trait's method. `None` for a type that names no single item: a tuple, a slice, a
-/// function, a parameter bounded by several traits or by none.
-fn written(ty: Node, src: &[u8]) -> Option<Vec<String>> {
+/// function, a parameter bounded by several traits or by none. With `generic` false a type
+/// parameter names nothing (a function's result: it is whatever its caller passes).
+fn written(ty: Node, src: &[u8], generic: bool) -> Option<Vec<String>> {
     let mut at = ty;
     for _ in 0..PATH_DEPTH {
         return match at.kind() {
@@ -875,9 +892,14 @@ fn written(ty: Node, src: &[u8]) -> Option<Vec<String>> {
                 at = field(at, "type")?;
                 continue;
             }
-            "dynamic_type" | "abstract_type" => only_bound(&[field(at, "trait")?], src),
+            "dynamic_type" | "abstract_type" | "bounded_type" => only_bound(&[at], src),
+            // `(dyn A + Send)`: a parenthesized type is a tuple of one.
+            "tuple_type" if at.child_count() == 3 && at.named_child_count() == 1 => {
+                at = at.named_child(0)?;
+                continue;
+            }
             "type_identifier" => match parameter(at, text(at, src), src) {
-                Some(bound) => bound,
+                Some(bound) => bound.filter(|_| generic),
                 None => Some(vec![text(at, src).to_string()]),
             },
             "primitive_type" => Some(vec![text(at, src).to_string()]),
@@ -896,16 +918,32 @@ fn written(ty: Node, src: &[u8]) -> Option<Vec<String>> {
 }
 
 /// The path of the one trait among `bounds` (a `+` list is a `bounded_type`), ignoring
-/// lifetimes and `?Sized`; `None` for none or several.
+/// lifetimes, `?Sized` and the marker traits `Send`, `Sync`, `Unpin` and `Sized`, which add no
+/// method; `None` for none or several.
 fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
+    // `A + B + 'c` nests: `(A + B) + 'c`.
     let mut found = Vec::new();
-    for bound in bounds {
+    let mut pending: Vec<Node> = bounds.to_vec();
+    while let Some(bound) = pending.pop() {
+        if found.len() + pending.len() >= PATH_DEPTH {
+            return None;
+        }
         match bound.kind() {
-            "bounded_type" => found.extend(named(*bound)),
-            _ => found.push(*bound),
+            "bounded_type" => pending.extend(named(bound)),
+            // The first bound of `impl A + B` and `dyn A + B` is the type's own `trait`.
+            "dynamic_type" | "abstract_type" => pending.extend(field(bound, "trait")),
+            _ => found.push(bound),
         }
     }
     found.retain(|b| !matches!(b.kind(), "lifetime" | "removed_trait_bound" | "use_bounds"));
+    let marker = |b: &Node| {
+        let path = segments(*b, src).unwrap_or_default();
+        let std =
+            path.len() == 1 || matches!(path.first().map(String::as_str), Some("std" | "core"));
+        let last = path.last().map(String::as_str);
+        std && matches!(last, Some("Send" | "Sync" | "Unpin" | "Sized"))
+    };
+    found.retain(|b| !marker(b));
     match found[..] {
         [one]
             if matches!(
@@ -1455,7 +1493,7 @@ mod tests {
             .map(|r| {
                 let class = match r.class {
                     Class::Enclosing => "Self".to_string(),
-                    Class::Named(n) => n,
+                    Class::Named(n) | Class::Type(n) => n,
                     Class::Returned(n) => format!("{n}()"),
                     Class::Imported => "imported".into(),
                     Class::Unknown => "?".into(),
@@ -1487,7 +1525,7 @@ mod tests {
         assert_eq!(receivers(src), expected);
         let results: Vec<String> = (facts(src).defs.into_iter())
             .filter_map(|d| match d.result? {
-                Class::Named(n) => Some(format!("{} -> {n}", d.name)),
+                Class::Type(n) => Some(format!("{} -> {n}", d.name)),
                 _ => None,
             })
             .collect();
@@ -1505,8 +1543,13 @@ mod tests {
                    fn f(x: &dyn m::P, y: impl P + Send) {}\n\
                    struct W<T: P> { inner: T }\n\
                    impl<T: P> W<T> { fn g(&self, t: T) {} }\n\
-                   fn h<T>(x: T) {}\n";
-        // Several bounds, none and a member of a parameter name no type.
+                   fn h<T>(x: T) {}\n\
+                   fn i<T: P + Send + 'a>(x: &T, y: &(dyn P + Sync)) {}\n\
+                   fn j(x: impl P + Send + 'static) {}\n\
+                   fn k<T: P>(x: T) -> T { x }\n\
+                   fn l(x: &[u8]) { let x: Y = make(); let z: Z = make(); }\n";
+        // Several bounds, none and a member of a parameter name no type; marker traits and
+        // lifetimes are no bound; a `let` of a parameter's name is a local, not a receiver.
         let expected = [
             "W inner = P",
             "W.g self = Self",
@@ -1515,8 +1558,17 @@ mod tests {
             "c x = P",
             "d x = P",
             "f x = m.P",
+            "f y = P",
+            "i x = P",
+            "i y = P",
+            "j x = P",
+            "k x = P",
+            "l z = Z",
         ];
         assert_eq!(receivers(src), expected);
+        let results = (facts(src).defs.into_iter()).filter(|d| d.result.is_some());
+        assert_eq!(results.count(), 0, "a type parameter is no result class");
+        assert_eq!(facts(src).locals, ["l.x"]);
     }
 
     #[test]
