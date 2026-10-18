@@ -1913,6 +1913,11 @@ impl<'a> Code<'a> {
         out
     }
 
+    /// The names `path` mentions (`Facts::mentions`); `None` where the pack does not tell.
+    pub fn mentions(&self, path: &'a str) -> Option<&'a BTreeSet<String>> {
+        self.full(path)?.mentions.as_ref()
+    }
+
     /// The scope and value of each `let` of `path` whose name is bound again or assigned again
     /// (`Facts::rebound`).
     pub fn rebound(&self, path: &'a str) -> &'a [(String, Value)] {

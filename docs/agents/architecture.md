@@ -35,8 +35,8 @@ one for the area a change touches.
   language adapter and the TS/JS, Python and Rust packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
-  resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
+- `contract.rs`, `http.rs`, `http/rust.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers), resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
   #24 and #30). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
@@ -859,7 +859,24 @@ one for the area a change touches.
   are not indexed.
 - `lang/rust.rs` (spec #30, actix-web and Rocket): `ROUTES_PER_FUNCTION` (16): a function with
   more route attributes (`#[get("/x")]`, `#[route(..)]`) than that has the first ones as calls
-  that decorate it (`Call::decorates`), the rest nothing.
+  that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
+  a `routes![..]` listing more handlers is `Unknown`; `ROUTE_METHODS` (16): the `method = ".."`
+  of a `#[route]` past that are `Unknown`, so the attribute gives no provider. `MENTIONS`
+  (16384): a file writing more distinct names has no `Facts::mentions`, so none of its names is
+  taken as unmentioned. `Facts::mentions` is not kept in the index (see `Call::args`); the
+  providers read it from the files parsed again, all of the pack's when a handler is registered by
+  no call they read.
+- `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
+  returned lists adds, over the whole repository, to the handlers a call names; a list past it
+  is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate
+  of a bare route attribute is read from the `#[macro_use] extern crate x;` of the files under
+  the same `src/`, so a package with several crate roots shares what any of them declares, and
+  it needs exactly one such crate (actix-web or Rocket). A handler is served at its own path only
+  when no file writes its name other than defining it, or in a route attribute; any other
+  mention Meada does not read as a registration (`services![..]`, `vec![..]`, `concat()`,
+  `cfg_if!`, an alias, a local of the name) means it may be registered where Meada cannot tell,
+  and then it is served nowhere. A service configuration is followed into the functions of the
+  repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
 - `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
   that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
   `resolve.rs`): a builder chain (`Router::new().route(..)`) is read to that many calls down to

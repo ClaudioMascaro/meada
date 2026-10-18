@@ -12,6 +12,18 @@ pub fn tools(cfg: &mut web::ServiceConfig) {
     cfg.service(audit);
 }
 
+/// Passes its configuration on: what the function it calls registers is served where this one
+/// is mounted.
+pub fn more(cfg: &mut web::ServiceConfig) {
+    extras(cfg);
+}
+
+fn extras(cfg: &mut web::ServiceConfig) {
+    cfg.route("/extras", web::get().to(extra));
+}
+
+async fn extra() {}
+
 pub fn prefix() -> String {
     std::env::var("ADMIN_PREFIX").unwrap_or_default()
 }

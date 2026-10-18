@@ -1,5 +1,6 @@
 mod accounts;
 mod admin;
+mod macros;
 mod orders;
 mod stray;
 
@@ -21,6 +22,8 @@ pub async fn serve_catalog() -> std::io::Result<()> {
             .service(orders::item())
             .configure(admin::routes)
             .service(web::scope("/tools").configure(admin::tools))
+            // A configuration passed on to the functions a function calls.
+            .service(web::scope("/more").configure(admin::more))
             // The prefix is read at run time: what is mounted there is served nowhere.
             .service(web::scope(&admin::prefix()).service(admin::unreadable))
     })

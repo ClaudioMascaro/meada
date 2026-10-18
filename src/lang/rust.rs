@@ -172,6 +172,11 @@ const ROUTE_ATTRIBUTES: &[&str] = &[
 // ponytail: a handler serves a handful of routes; a crafted run of a million is not read.
 const ROUTES_PER_FUNCTION: usize = 16;
 
+/// How many distinct names a file may mention before `Facts::mentions` tells nothing of it.
+// ponytail: a generated file with more is read as mentioning every name (none of its handlers
+// is then taken as unregistered); raise it if a real file reaches it.
+const MENTIONS: usize = 1 << 14;
+
 pub struct Rust;
 
 impl LanguagePack for Rust {
@@ -652,8 +657,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     continue;
                 };
                 let qualified = qualify(&scope, name);
+                // A function and a type of one name live in different namespaces.
+                scan.defs.insert(qualified.clone());
+                scan.functions.remove(&qualified);
                 if defined.insert(qualified.clone()) {
-                    scan.defs.insert(qualified.clone());
                     facts.defs.push(def(&qualified, Kind::Class, node));
                     if node.kind() == "struct_item" {
                         for (name, segments) in fields(node, src) {
@@ -687,8 +694,11 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 };
                 if field(node, "body").is_none() {
                     let qualified = qualify(&module, name);
+                    if in_module && !deep {
+                        scan.defs.insert(qualified.clone());
+                        scan.functions.remove(&qualified);
+                    }
                     if in_module && !deep && defined.insert(qualified.clone()) {
-                        scan.defs.insert(qualified);
                         declare(
                             &mut facts,
                             &mut public_names,
@@ -706,8 +716,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     // around it.
                 } else {
                     let qualified = qualify(&scope, name);
+                    scan.defs.insert(qualified.clone());
+                    scan.functions.remove(&qualified);
                     if defined.insert(qualified.clone()) {
-                        scan.defs.insert(qualified.clone());
                         facts.defs.push(def(&qualified, Kind::Module, node));
                         if in_module {
                             let is_pub = is_pub(node, src);
@@ -1066,6 +1077,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // A type or trait no path names reaches no class.
     facts.impls.retain(|i| !i.ty.is_empty());
     facts.externs = heads.externs.into_iter().collect();
+    facts.macro_use = macro_use(tree.root_node(), src);
+    facts.mentions = mentions(tree.root_node(), src);
     for (local, source) in heads.imports {
         facts.imports.push(Import {
             local,
@@ -1114,12 +1127,7 @@ fn route_attributes<'t>(node: Node<'t>, src: &[u8]) -> Vec<(Node<'t>, Vec<String
         match item.kind() {
             "line_comment" | "block_comment" => {}
             "attribute_item" => {
-                let attribute = named(item).find(|n| n.kind() == "attribute");
-                if let Some(attribute) = attribute
-                    && let Some(tree) = field(attribute, "arguments")
-                    && let Some(path) = named(attribute).next()
-                    && let Some(segments) = segments(path, src)
-                    && (segments.last()).is_some_and(|s| ROUTE_ATTRIBUTES.contains(&s.as_str()))
+                if let Some((segments, tree)) = route_attribute(item, src)
                     && out.len() < ROUTES_PER_FUNCTION
                 {
                     out.push((item, segments, tree));
@@ -1130,6 +1138,67 @@ fn route_attributes<'t>(node: Node<'t>, src: &[u8]) -> Vec<(Node<'t>, Vec<String
         at = item.prev_sibling();
     }
     out.reverse();
+    out
+}
+
+/// The segments of the path and the argument tokens of a route attribute item.
+fn route_attribute<'t>(item: Node<'t>, src: &[u8]) -> Option<(Vec<String>, Node<'t>)> {
+    let attribute = named(item).find(|n| n.kind() == "attribute")?;
+    let tree = field(attribute, "arguments")?;
+    let segments = segments(named(attribute).next()?, src)?;
+    (segments.last())
+        .is_some_and(|s| ROUTE_ATTRIBUTES.contains(&s.as_str()))
+        .then_some((segments, tree))
+}
+
+/// The names the file writes as a value, a path or inside a macro call, except the names of
+/// the functions it defines and its route attributes; `None` past `MENTIONS` names.
+fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
+    let (mut out, mut cursor) = (BTreeSet::new(), root.walk());
+    loop {
+        let node = cursor.node();
+        let skip = node.kind() == "attribute_item" && route_attribute(node, src).is_some();
+        if node.kind() == "identifier" && !is_function_name(node) {
+            out.insert(text(node, src).to_string());
+            if out.len() > MENTIONS {
+                return None;
+            }
+        }
+        if !skip && cursor.goto_first_child() {
+            continue;
+        }
+        while !cursor.goto_next_sibling() {
+            if !cursor.goto_parent() {
+                return Some(out);
+            }
+        }
+    }
+}
+
+/// Whether `node` is the name a function item defines.
+fn is_function_name(node: Node) -> bool {
+    node.parent().is_some_and(|p| {
+        matches!(p.kind(), "function_item" | "function_signature_item")
+            && field(p, "name") == Some(node)
+    })
+}
+
+/// The crates the file declares with `#[macro_use] extern crate x;` at its top level.
+fn macro_use(root: Node, src: &[u8]) -> Vec<String> {
+    let (mut out, mut marked) = (Vec::new(), false);
+    for item in named(root) {
+        match item.kind() {
+            "line_comment" | "block_comment" => {}
+            "attribute_item" => marked |= text(item, src).replace(' ', "") == "#[macro_use]",
+            "extern_crate_declaration" => {
+                if let Some(name) = field(item, "name").filter(|_| marked) {
+                    out.push(text(name, src).to_string());
+                }
+                marked = false;
+            }
+            _ => marked = false,
+        }
+    }
     out
 }
 
@@ -1782,6 +1851,7 @@ fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Optio
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Value;
 
     fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), "").unwrap()
@@ -2324,6 +2394,72 @@ mod tests {
         let calls = facts(&src).calls;
         let decorating = calls.iter().filter(|c| c.decorates.as_deref() == Some("h"));
         assert_eq!(decorating.count(), ROUTES_PER_FUNCTION);
+    }
+
+    /// The value the second argument of the `mount` call of `src` holds.
+    fn mounted(src: &str) -> Value {
+        let calls = facts(src).calls;
+        let call = calls.into_iter().find(|c| c.callee.ends_with("mount"));
+        call.unwrap().args.into_iter().nth(1).unwrap()
+    }
+
+    #[test]
+    fn routes_and_methods_past_their_limits_are_not_read() {
+        let routes = |n: usize| {
+            let items: Vec<String> = (0..n).map(|i| format!("h{i}")).collect();
+            format!(
+                "fn f(b: B) {{ b.mount(\"/\", routes![{}]); }}\n",
+                items.join(", ")
+            )
+        };
+        assert!(matches!(
+            mounted(&routes(values::ROUTE_ITEMS)),
+            Value::List(_)
+        ));
+        assert!(matches!(
+            mounted(&routes(values::ROUTE_ITEMS + 1)),
+            Value::Unknown
+        ));
+        let methods = |n: usize| {
+            let given = vec!["method = \"GET\""; n].join(", ");
+            let src = format!("#[route(\"/x\", {given})]\nfn h() {{}}\n");
+            let calls = facts(&src).calls;
+            let unread = calls[0]
+                .kwargs
+                .iter()
+                .filter(|(_, v)| matches!(v, Value::Unknown));
+            unread.count()
+        };
+        assert_eq!(methods(values::ROUTE_METHODS), 0);
+        assert_eq!(methods(values::ROUTE_METHODS + 3), 3);
+    }
+
+    #[test]
+    fn mentions_are_the_names_written_outside_definitions_and_route_attributes() {
+        let src = "use a::used as alias;\n#[get(\"/x\")]\nfn handler() {}\nfn other() { f(local, m![inside]); }\n";
+        let mentions = facts(src).mentions.unwrap();
+        let names: Vec<&str> = mentions.iter().map(String::as_str).collect();
+        assert_eq!(names, ["a", "alias", "f", "inside", "local", "m", "used"]);
+        let many = (0..MENTIONS + 1)
+            .map(|i| format!("fn f() {{ n{i}; }}\n"))
+            .collect::<String>();
+        assert!(facts(&many).mentions.is_none());
+    }
+
+    #[test]
+    fn a_macro_use_extern_crate_is_declared_only_when_marked() {
+        let src = "#[macro_use]\nextern crate rocket;\nextern crate other;\n";
+        assert_eq!(facts(src).macro_use, ["rocket"]);
+        let src = "#[macro_use] // here\nextern crate rocket;\nuse x::y;\n#[macro_use]\nmod m;\nextern crate z;\n";
+        assert_eq!(facts(src).macro_use, ["rocket"]);
+    }
+
+    #[test]
+    fn a_module_hides_the_crate_of_its_name_whatever_function_shares_it() {
+        let src = "fn store() {}\nmod store { pub fn get() {} }\nfn f() { store::get(); }\n";
+        assert!(facts(src).externs.is_empty());
+        let src = "mod store { pub fn get() {} }\nfn store() {}\nfn f() { store::get(); }\n";
+        assert!(facts(src).externs.is_empty());
     }
 
     #[test]

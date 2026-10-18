@@ -1355,6 +1355,32 @@ fn rust() {
     conform(
         "conformance-rust",
         &[
+            "crates/actix/src/admin.rs::extra",
+            "crates/actix/src/admin.rs::extras",
+            "crates/actix/src/admin.rs::more",
+            "crates/actix/src/lib.rs::macros",
+            "crates/actix/src/macros.rs::conditional",
+            "crates/actix/src/macros.rs::listed",
+            "crates/actix/src/macros.rs::scoped",
+            "crates/actix/src/macros.rs::via_cfg_if",
+            "crates/actix/src/macros.rs::via_services",
+            "crates/actix/src/macros.rs::via_vec",
+            "crates/greeter/src/main.rs::index",
+            "crates/greeter/src/main.rs::names",
+            "crates/greeter/src/main.rs::rocket",
+            "crates/greeter/src/names.rs::named",
+            "crates/rocket/src/hiding.rs::rocket",
+            "crates/rocket/src/hiding.rs::rocket.Builder",
+            "crates/rocket/src/hiding.rs::rocket.Builder.mount",
+            "crates/rocket/src/hiding.rs::rocket.build",
+            "crates/rocket/src/hiding.rs::serve",
+            "crates/rocket/src/joined.rs::documented",
+            "crates/rocket/src/joined.rs::joined_a",
+            "crates/rocket/src/joined.rs::joined_b",
+            "crates/rocket/src/lib.rs::hiding",
+            "crates/rocket/src/lib.rs::joined",
+            "crates/rocket/src/stray.rs::local",
+            "crates/rocket/src/stray.rs::three",
             "crates/actix/src/accounts.rs::api",
             "crates/actix/src/accounts.rs::create",
             "crates/actix/src/accounts.rs::files",
@@ -2479,12 +2505,14 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::GET::/tools/audit",
             "crates/actix/src/admin.rs::audit",
         ),
-        // Never registered: its own path, no prefix.
+        // Written nowhere but where it is defined: its own path, no prefix. Handlers that code
+        // Meada does not read (`services!`, `vec!`, `cfg_if!`, an alias, a local of the name)
+        // mentions are possibly registered there: served nowhere.
         ("http::GET::/stray/{}", "crates/actix/src/stray.rs::lonely"),
-        // Its name is a local where it is "registered": nothing registers it.
+        // A configuration passed on to the function a function calls.
         (
-            "http::GET::/shadowed",
-            "crates/actix/src/stray.rs::shadowed",
+            "http::GET::/more/extras",
+            "crates/actix/src/admin.rs::extra",
         ),
     ]);
     assert_eq!(actual, expected);
@@ -2517,6 +2545,43 @@ fn rust_rocket_routes_are_providers_under_their_mount() {
         ("http::GET::/stray", "crates/rocket/src/stray.rs::lonely"),
     ]);
     assert_eq!(actual, expected);
+}
+
+/// Rocket's canonical form (spec #30): `#[macro_use] extern crate rocket;` brings its attributes
+/// into every module of the crate, bare.
+#[test]
+fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
+    let (_, actual) = providers("rust_greeter", "conformance-rust", "crates/greeter/src/");
+    let expected = pairs(&[
+        ("http::GET::/hello", "crates/greeter/src/main.rs::index"),
+        ("http::GET::/hello/{}", "crates/greeter/src/names.rs::named"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// The constants and returns the handlers of a call are expanded from share one budget: a list
+/// that fits is served under its scope, the same list past the budget is read no further.
+#[test]
+fn an_actix_list_expanded_past_the_work_budget_is_not_read() {
+    let repo = fixture_repo("rust_actix_work", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/actix/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod big;\n{lib}")).unwrap();
+    let n = 5000;
+    let handlers: String = (0..n)
+        .map(|i| format!("#[get(\"/h{i}\")]\nasync fn h{i}() {{}}\n"))
+        .collect();
+    let names: Vec<String> = (0..n).map(|i| format!("h{i}")).collect();
+    let big = format!(
+        "use actix_web::{{get, web, App}};\n{handlers}const ALL: [u8; {n}] = [{}];\n\
+         pub fn a() -> App<()> {{ App::new().service(web::scope(\"/a\").service(ALL)) }}\n\
+         pub fn b() -> App<()> {{ App::new().service(web::scope(\"/b\").service(ALL)) }}\n",
+        names.join(", ")
+    );
+    std::fs::write(src.join("big.rs"), big).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/a/h0\""));
+    assert!(!export.contains("http::GET::/b/h0\""));
 }
 
 /// A method router chain longer than the limit read is no provider; the same router with a

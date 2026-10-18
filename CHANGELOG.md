@@ -86,12 +86,17 @@ All notable changes to Meada are recorded here. The format follows
   `.route(path, web::get().to(h))` provides `http::<METHOD>::<path>`, served under the prefixes of
   what registers it: `App::new().service(h)`, nested `web::scope(prefix)`, `web::resource(path)`,
   a `.configure(f)` function, and Rocket's `build().mount(prefix, routes![a, b])`. They go
-  through the same mounts and prefixes as axum. A handler nothing registers is served at its own
-  path; a scope or mount prefix Meada cannot read, or a handler it cannot resolve exactly, is
-  served nowhere. `{id}`, `{tail:.*}`, `<id>`, `<path..>` and `?<q>` are params. The Rust pack
+  through the same mounts and prefixes as axum. A handler no code writes other than defining it
+  is served at its own path; one that code Meada does not read mentions (`services![..]`,
+  `vec![..]`, `concat()`, `cfg_if!`, an alias) may be registered there, and is served nowhere,
+  as it is under a scope or mount prefix Meada cannot read. `.route(path, web::get().to(h))`
+  with a handler Meada cannot resolve is still a provider, at the file site: the path and the
+  method are certain, the handler is unknown. A `ServiceConfig` passed on to another function
+  is followed; `#[macro_use] extern crate rocket;` brings Rocket's attributes into every
+  module of the crate. `{id}`, `{tail:.*}`, `<id>`, `<path..>` and `?<q>` are params. The Rust pack
   now emits route attributes as calls that decorate their function, and reads `routes![..]`. A
   crate path (`rocket::build()`) is no longer hidden by a function of the file with the same
-  name. The index is rebuilt once (schema version 34).
+  name. The index is rebuilt once (schema version 35).
 - Rust axum providers (spec #30): a route of a `Router::new()` chain (`route`, `nest`, `merge`)
   provides `http::<METHOD>::<path>`; `get(a).post(b)` gives one provider per method, `any` gives
   `ANY`, and a closure handler is an inline route. A router is served under every prefix it is

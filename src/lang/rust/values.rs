@@ -28,6 +28,13 @@ use crate::qualify;
 // ponytail: real code wraps a value a few levels; a crafted file must not recurse without end.
 pub(super) const VALUE_DEPTH: usize = 64;
 
+/// How many handlers a `routes![..]` lists, and how many `method = ".."` a `#[route]` gives; a
+/// longer list or more methods is read as nothing (`Unknown`).
+// ponytail: real code lists a few hundred handlers and nine methods at most; a crafted file
+// must not multiply them with the routes of a function.
+pub(super) const ROUTE_ITEMS: usize = 1024;
+pub(super) const ROUTE_METHODS: usize = 16;
+
 /// The HTTP methods the `Method` constants of the HTTP crates name, and those crates.
 const VERBS: &[&str] = &[
     "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE",
@@ -502,6 +509,9 @@ impl<'a, 't> Reader<'a, 't> {
         else {
             return Value::Unknown;
         };
+        if args.len() > ROUTE_ITEMS {
+            return Value::Unknown;
+        }
         let items: Vec<Value> = (args.iter())
             .map(|tokens| self.route_item(at, tokens))
             .collect();
@@ -906,10 +916,17 @@ pub(super) fn attribute(tree: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Val
         "string_literal" | "raw_string_literal" => string(*n, src),
         _ => Value::Unknown,
     };
+    let mut methods = 0;
     for tokens in arguments(tree).unwrap_or_default() {
         match tokens.as_slice() {
             [name, eq, value] if name.kind() == "identifier" && eq.kind() == "=" => {
-                kwargs.push((text(*name, src).to_string(), literal(value)));
+                let name = text(*name, src).to_string();
+                let value = match name == "method" && methods >= ROUTE_METHODS {
+                    true => Value::Unknown,
+                    false => literal(value),
+                };
+                methods += usize::from(name == "method");
+                kwargs.push((name, value));
             }
             [value] if kwargs.is_empty() => args.push(literal(value)),
             _ => kwargs.push((String::new(), Value::Unknown)),

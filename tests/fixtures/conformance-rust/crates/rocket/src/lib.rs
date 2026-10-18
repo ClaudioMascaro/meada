@@ -1,3 +1,5 @@
+mod hiding;
+mod joined;
 mod pages;
 mod posts;
 mod stray;
@@ -21,6 +23,11 @@ fn rocket() -> _ {
             ],
         )
         .mount("/legacy", posts::legacy())
+        .mount(
+            "/joined",
+            [routes![joined::joined_a], routes![joined::joined_b]].concat(),
+        )
+        .mount("/docs", rocket_okapi::openapi_get_routes![joined::documented])
         // The prefix is read at run time: what is mounted there is served nowhere.
         .mount(stray::base(), routes![stray::moved])
 }

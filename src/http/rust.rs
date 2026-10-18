@@ -10,6 +10,7 @@
 //! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
 //! names is served at its own path, with no prefix.
 
+use std::cell::{Cell, OnceCell};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
@@ -22,6 +23,12 @@ use crate::resolve::{Code, scope_of};
 
 /// The methods of a `ServiceConfig` that hand it back.
 const CONFIG_PASSES: &[&str] = &["service", "route", "configure", "app_data", "data"];
+
+/// How many values the expansions of `items` (constants, the functions a call answers) may add,
+/// over every call of the repository; past it a list is read no further.
+// ponytail: a crafted repository must not make every call expand a long constant; what is
+// left unread is taken as registered where Meada does not see it, so it is served nowhere.
+const ITEM_WORK: usize = 1 << 14;
 
 /// The methods `actix_web::web` has a route builder for: `web::get()`, `web::post()`.
 const METHODS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "trace"];
@@ -80,6 +87,10 @@ struct Web<'c, 'a> {
     handlers: BTreeMap<(&'a str, &'a str), Handler>,
     mounts: Mounts<'a, Place<'a>>,
     routes: Vec<Route<'a>>,
+    /// What `items` may still visit.
+    work: Cell<usize>,
+    /// The names some file of the repository mentions; `None` when a file's are unknown.
+    mentioned: OnceCell<Option<BTreeSet<&'a str>>>,
 }
 
 /// `path` with each `{name}` or `{name:regex}` as one parameter, whatever the regex holds;
@@ -121,7 +132,51 @@ impl<'c, 'a> Web<'c, 'a> {
             handlers: BTreeMap::new(),
             mounts: Mounts::new(),
             routes: Vec::new(),
+            work: Cell::new(ITEM_WORK),
+            mentioned: OnceCell::new(),
         }
+    }
+
+    /// Takes `n` from the budget of `items`; false once it is spent.
+    fn charge(&self, n: usize) -> bool {
+        let left = self.work.get();
+        self.work.set(left.saturating_sub(n));
+        left >= n
+    }
+
+    /// Whether code Meada does not read may register the function named `name`: some file
+    /// of the repository writes the name, other than as the name of a function it defines or
+    /// among its route attributes, or does not say what it writes.
+    fn mentioned(&self, name: &str) -> bool {
+        let all = self.mentioned.get_or_init(|| {
+            let mut names = BTreeSet::new();
+            for &path in self.code.files().keys() {
+                names.extend(self.code.mentions(path)?.iter().map(String::as_str));
+            }
+            Some(names)
+        });
+        let name = name.rsplit('.').next().unwrap_or(name);
+        all.as_ref().is_none_or(|names| names.contains(name))
+    }
+
+    /// The crate a bare route attribute comes from, when `#[macro_use] extern crate x;` of its
+    /// crate brings it in.
+    // ponytail: a crate is the files under one `src/`; a package with several crate roots
+    // shares what any of them declares.
+    fn macro_use(&self, path: &str) -> Option<&'a str> {
+        let dir = |p: &str| {
+            p.find("/src/")
+                .or_else(|| p.starts_with("src/").then_some(0))
+        };
+        let package = &path[..dir(path)?];
+        let files = self.code.files();
+        let declared = files
+            .iter()
+            .filter(|(p, _)| dir(p).is_some_and(|d| &p[..d] == package));
+        let krates = declared.flat_map(|(_, f)| f.macro_use.iter());
+        let mut krates = krates.filter(|k| matches!(k.as_str(), "actix_web" | "rocket"));
+        let first = krates.next()?;
+        krates.next().is_none().then_some(first.as_str())
     }
 
     /// What the call `at` makes, when it makes an app, a scope, a resource or a Rocket instance.
@@ -221,7 +276,11 @@ impl<'c, 'a> Web<'c, 'a> {
                     let before = out.len();
                     for (at_path, name, value) in returned {
                         if function.is_some_and(|t| (t.path, t.name) == (at_path, name)) {
-                            out.extend(leaves(value).into_iter().map(|v| (at_path, name, v)));
+                            let held = leaves(value);
+                            if !self.charge(held.len()) {
+                                break;
+                            }
+                            out.extend(held.into_iter().map(|v| (at_path, name, v)));
                         }
                     }
                     if out.len() == before {
@@ -230,8 +289,11 @@ impl<'c, 'a> Web<'c, 'a> {
                 }
                 Value::Ref(name) => match code.constant(path, scope, name) {
                     Some(((at, name), held)) => {
-                        let held = leaves(held).into_iter();
-                        out.extend(held.map(|v| (at, scope_of(name), v)));
+                        let held = leaves(held);
+                        if !self.charge(held.len()) {
+                            break;
+                        }
+                        out.extend(held.into_iter().map(|v| (at, scope_of(name), v)));
                     }
                     None => out.push((path, scope, leaf)),
                 },
@@ -250,17 +312,25 @@ impl<'c, 'a> Web<'c, 'a> {
                 let Some(def) = &call.decorates else {
                     continue;
                 };
-                let Some(name) = code.external_of(path, call) else {
+                let Some(call_at) = code.call(path, n) else {
                     continue;
                 };
-                let (framework, attribute) = match name.split_once('.') {
-                    Some(("actix_web", attribute)) => (Framework::Actix, attribute),
-                    Some(("rocket", attribute)) => (Framework::Rocket, attribute),
+                // A bare attribute no `use` binds comes from the crate `#[macro_use]` names.
+                let bare = (!call.by_path
+                    && code.definition(path, &call.scope, &call.callee).is_none())
+                .then(|| self.macro_use(path))
+                .flatten()
+                .map(|krate| format!("{krate}.{}", call.callee));
+                let Some(name) = code.external_of(path, call).or(bare) else {
+                    continue;
+                };
+                let parts: Vec<&str> = name.split('.').collect();
+                let (framework, attribute) = match parts.as_slice() {
+                    ["actix_web", attribute] => (Framework::Actix, *attribute),
+                    ["rocket", attribute] => (Framework::Rocket, *attribute),
                     _ => continue,
                 };
-                let Some(call) = code.call(path, n) else {
-                    continue;
-                };
+                let call = call_at;
                 let Some(first) = call.args.first() else {
                     continue;
                 };
@@ -343,6 +413,11 @@ impl<'c, 'a> Web<'c, 'a> {
                     continue;
                 }
                 for arg in &call.args {
+                    // Only a name, a call or a list holding one can name a handler.
+                    let mut names = leaves(arg).into_iter();
+                    if !names.any(|l| matches!(l, Value::Ref(_) | Value::Call(_))) {
+                        continue;
+                    }
                     for item in self.items(path, &call.scope, arg) {
                         let Value::Ref(name) = item.2 else {
                             continue;
@@ -355,6 +430,7 @@ impl<'c, 'a> Web<'c, 'a> {
                         }
                     }
                 }
+                self.pass_config(path, call);
                 let member = call.callee.rsplit('.').next().unwrap_or_default();
                 if !matches!(member, "service" | "route" | "configure" | "mount") {
                     continue;
@@ -369,6 +445,35 @@ impl<'c, 'a> Web<'c, 'a> {
                     "configure" => self.configure(path, call, &parents),
                     _ => self.rocket(path, call, &parents),
                 }
+            }
+        }
+    }
+
+    /// `f(cfg)`: the service configuration a function passes on to a function of the repository
+    /// (answered exactly) that takes one there is mounted where the first is.
+    fn pass_config(&mut self, path: &'a str, call: &'a Call) {
+        let code = self.code;
+        let (scope, plain) = (call.scope.as_str(), call.receiver.is_none());
+        let Some(target) = code.definition(path, scope, &call.callee).filter(|_| plain) else {
+            return;
+        };
+        let defs = code.files()[target.path].defs.iter();
+        let Some(params) = defs
+            .into_iter()
+            .find(|d| d.name == target.name)
+            .map(|d| &d.params)
+        else {
+            return;
+        };
+        for (arg, param) in call.args.iter().zip(params) {
+            if self.configuration(path, scope, arg)
+                && self.config(target.path, target.name, &param.name)
+            {
+                let (child, parent) = (
+                    Place::Config(target.path, target.name),
+                    Place::Config(path, scope),
+                );
+                self.mount(child, &[parent], &Some(String::new()));
             }
         }
     }
@@ -515,10 +620,11 @@ impl<'c, 'a> Web<'c, 'a> {
     fn found(&self) -> Vec<Found> {
         let code = self.code;
         // An app and a Rocket instance nothing mounts are served at their root; a scope, a
-        // resource or a configuration, only where a mount puts it. An unregistered handler is
-        // served at its own path.
+        // resource or a configuration, only where a mount puts it. A handler no code mentions is
+        // served at its own path; one that some code mentions without Meada reading a
+        // registration may be registered there, so it is served nowhere.
         let root = |place: Place<'a>| match place {
-            Place::Handler(..) => Some(String::new()),
+            Place::Handler(_, name) => (!self.mentioned(name)).then(String::new),
             Place::Made(_) | Place::Config(..) => {
                 (matches!(self.kind(place), Some(Kind::App | Kind::Rocket))).then(String::new)
             }
