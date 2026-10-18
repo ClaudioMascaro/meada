@@ -253,6 +253,14 @@ pub enum Class {
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
+    /// What this path (`Store`, or `store::Store` as `store.Store`), written as a type, names:
+    /// an instance of that class. Its head is read among types and modules, so a local or a
+    /// parameter of the same name does not hide it (Rust's `store: store::Store`).
+    Type(String),
+    /// What the function this callee-like name gives, called in the scope, returns: the class
+    /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
+    /// repository stays outside; a function with no written result is unknown.
+    Returned(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -388,6 +396,11 @@ pub struct Def {
     /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
     #[serde(skip)]
     pub type_params: Vec<String>,
+    /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
+    /// Trait`), as a callee-like name resolved from the function's own scope: what a call to
+    /// it gives (`Class::Returned`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<Class>,
 }
 
 #[derive(Serialize, Deserialize)]

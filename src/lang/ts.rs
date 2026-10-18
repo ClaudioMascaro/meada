@@ -93,6 +93,7 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
+                    result: None,
                     name: inner.clone(),
                     kind,
                     range,

@@ -302,6 +302,7 @@ mod tests {
                 return_values: Vec::new(),
                 returns: None,
                 type_params: Vec::new(),
+                result: None,
             });
         }
         let files = BTreeMap::from([("cmd.py", &facts)]);
@@ -342,6 +343,7 @@ mod tests {
                 return_values: Vec::new(),
                 returns: None,
                 type_params: Vec::new(),
+                result: None,
             });
             exported.push(Exported {
                 path: "cmd.py".into(),

@@ -131,6 +131,12 @@ impl<'a> Seen<'a> {
 // must not overflow the stack. A pack with longer chains raises the limit with the stack.
 const LINK_DEPTH: usize = 128;
 
+/// How many calls whose result a receiver takes (`Class::Returned`) one resolution follows into
+/// one another. A deeper chain gives nothing.
+// ponytail: a result is the class its function writes, so real chains are one or two deep; the
+// limit keeps a crafted repository from recursing through thousands of functions.
+const RETURN_DEPTH: usize = 64;
+
 /// What a name is read as.
 #[derive(Clone, Copy, PartialEq)]
 enum Reading {
@@ -171,6 +177,8 @@ enum Busy<'a> {
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
+    /// How many `returned` are being resolved.
+    returns: usize,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -534,11 +542,75 @@ impl<'a> Resolver<'a> {
         let found = match class {
             Class::Enclosing => self.class(path, scope),
             Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Type(class) => {
+                let (seen, reading) = (&mut Seen::new(), Reading::Path);
+                self.resolve_as(path, scope, class, seen, work, reading)
+            }
+            Class::Returned(callee) => self.returned(path, scope, callee, work),
             Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
             Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
+            external @ Binding::External(..) => external,
+            _ => Binding::Unknown,
+        }
+    }
+
+    /// What a call to `callee`, written in `scope`, gives: the class its definition writes as
+    /// its result (`Def::result`), the class itself for a constructor, or something outside the
+    /// repository for a call that reaches outside. A call that is not exact gives nothing known.
+    fn returned(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
+        if work.returns >= RETURN_DEPTH {
+            return Binding::Unknown;
+        }
+        work.returns += 1;
+        let found = self.result(path, scope, callee, work);
+        work.returns -= 1;
+        found
+    }
+
+    fn result(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
+        let (seen, path_reading) = (&mut Seen::new(), Reading::Path);
+        let by_path = callee.rsplit_once('.');
+        let reading = if by_path.is_some() {
+            path_reading
+        } else {
+            Reading::Value
+        };
+        let called = self.resolve_as(path, scope, callee, seen, work, reading);
+        match called {
+            Binding::Def(t) if self.is_class(t) => Binding::Def(t),
+            Binding::Def(t) => match &self.defs[t.path][t.name].result {
+                // `Self` is the type the call named (`Counter` in `Counter::make()`), not the
+                // trait whose default body the call found.
+                Some(Class::Type(class)) if class == "Self" => {
+                    let Some((ty, _)) = by_path else {
+                        return Binding::Unknown;
+                    };
+                    match self.resolve_as(path, scope, ty, &mut Seen::new(), work, path_reading) {
+                        Binding::Def(c) if self.is_class(c) => Binding::Def(c),
+                        _ => Binding::Unknown,
+                    }
+                }
+                Some(Class::Type(class)) => {
+                    let seen = &mut Seen::new();
+                    self.resolve_as(t.path, t.name, class, seen, work, path_reading)
+                }
+                _ => Binding::Unknown,
+            },
             external @ Binding::External(..) => external,
             _ => Binding::Unknown,
         }
@@ -2454,5 +2526,26 @@ mod tests {
         assert_eq!(spelled("", "files.read"), "files.read");
         let binding = resolver.binding("main.rs", "main", "Client.new");
         assert!(matches!(binding, Binding::External("reqwest", _)));
+    }
+
+    #[test]
+    fn a_result_followed_past_the_limit_gives_nothing() {
+        let parsed = parsed(&[(
+            "main.rs",
+            "struct S;\nimpl S { fn new() -> Self { S } fn go(&self) {} }\n\
+             fn f() { let s = S::new(); s.go(); }\n",
+        )]);
+        let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let resolver = resolver(&map);
+        let new = |returns| {
+            let mut work = Work {
+                returns,
+                ..Work::default()
+            };
+            resolver.returned("main.rs", "f", "S.new", &mut work)
+        };
+        assert!(matches!(new(0), Binding::Def(t) if t.name == "S"));
+        assert!(matches!(new(RETURN_DEPTH - 1), Binding::Def(t) if t.name == "S"));
+        assert!(matches!(new(RETURN_DEPTH), Binding::Unknown));
     }
 }

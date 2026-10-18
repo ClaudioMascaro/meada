@@ -533,6 +533,13 @@ one for the area a change touches.
   makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
   its ancestors in C3 order) longer than that is absent, so every member of the class is
   unknown (a name match at most), and the linearization recurses no deeper down the bases.
+- `resolve.rs` (Rust receivers): `RETURN_DEPTH` (64): a `let` that takes the class of a call's
+  result (`Class::Returned`) follows at most that many such results into one another; deeper
+  gives nothing (a name match at most).
+- `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
+  declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
+  ancestors); past it a type names nothing and a parameter is taken as declared with no bound,
+  so no repository type is guessed.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper

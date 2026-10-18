@@ -48,6 +48,16 @@ All notable changes to Meada are recorded here. The format follows
   `pub` items reachable from `src/lib.rs` (or `[lib] path`) through `pub` modules and `pub use`;
   `pub(crate)` and narrower items stay inside the crate, and a binary crate exports nothing.
   The index is rebuilt once (schema version 24).
+- Rust method calls (spec #30): `x.m()` reaches the method in the `impl` blocks of the
+  receiver's type, `exact` when one fits, when the type is written in the source: a `let` with
+  a type or holding a call of a function whose return type is written (`Self` included), a
+  parameter (`&T`, `&mut T`), a field through `self.field`, or `self`. A method of `impl Trait
+  for Type` is found through the type; a `dyn Trait`, an `impl Trait` or a generic bounded by
+  one trait stops at the trait's method (required methods of a trait are symbols now) and never
+  searches the implementations. A receiver whose type is not written goes by name, `inferred`
+  with one candidate and `ambiguous` with every one; a type from outside the repository (`std`,
+  another crate) is opaque, and its methods are not matched by name. The index is rebuilt once
+  (schema version 25).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.
