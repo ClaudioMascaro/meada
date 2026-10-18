@@ -149,6 +149,12 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
         "conformance-rust.context-serve.txt",
         &engine.context("serve", None).unwrap(),
     );
+    // A method's callers by the receiver's type (a `let`, a parameter, a field, `self`, a
+    // function's return type) at `exact`, and by name alone at `ambiguous`.
+    assert_golden(
+        "conformance-rust.context-bump.txt",
+        &engine.context("Counter.bump", None).unwrap(),
+    );
 }
 
 #[test]

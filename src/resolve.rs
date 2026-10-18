@@ -522,11 +522,39 @@ impl<'a> Resolver<'a> {
         let found = match class {
             Class::Enclosing => self.class(path, scope),
             Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Returned(callee) => self.returned(path, scope, callee, work),
             Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
             Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
+            external @ Binding::External(..) => external,
+            _ => Binding::Unknown,
+        }
+    }
+
+    /// What a call to `callee`, written in `scope`, gives: the class its definition writes as
+    /// its result (`Def::result`), the class itself for a constructor, or something outside the
+    /// repository for a call that reaches outside. A call that is not exact gives nothing known.
+    fn returned(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
+        let called = match callee.contains('.') {
+            true => self.path_binding(path, scope, callee),
+            false => self.resolve(path, scope, callee, &mut Seen::new(), work),
+        };
+        match called {
+            Binding::Def(t) if self.is_class(t) => Binding::Def(t),
+            Binding::Def(t) => match &self.defs[t.path][t.name].result {
+                Some(Class::Named(class)) => {
+                    self.resolve(t.path, t.name, class, &mut Seen::new(), work)
+                }
+                _ => Binding::Unknown,
+            },
             external @ Binding::External(..) => external,
             _ => Binding::Unknown,
         }

@@ -41,6 +41,8 @@ mod inner {
 }
 
 pub fn save(store: &Store) {
+    let made = Store::new("x");
     store.flush();
+    made.flush();
     println!("{}", inner::helper());
 }

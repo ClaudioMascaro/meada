@@ -7,8 +7,8 @@ pub fn serve(store: &Store) {
     store.save();
 }
 callers:
-example.com/acme/conformance api/src/main.rs:110 main
+example.com/acme/conformance api/src/main.rs:111 main
 callees:
 example.com/acme/conformance api/src/routes/health.rs:1 check
-example.com/acme/conformance api/src/store.rs:42 Store.save [inferred: one method named save]
-example.com/acme/conformance api/src/main.rs:183 compute
+example.com/acme/conformance api/src/store.rs:42 Store.save
+example.com/acme/conformance api/src/main.rs:184 compute

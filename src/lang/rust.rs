@@ -7,9 +7,11 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use tree_sitter::{Node, Parser};
 
+use std::ops::Range;
+
 use super::{
-    Binds, Call, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack, Modules, Param,
-    Star, children, named, text,
+    Binds, Call, Class, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack, Modules,
+    Param, Receiver, Star, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -151,6 +153,10 @@ enum Slot {
     Call(usize),
     Type(usize),
     Trait(usize),
+    /// The class of this receiver, a type the source writes.
+    Named(usize),
+    /// The class this function returns, a type the source writes.
+    Result(usize),
 }
 
 /// What the file binds, for the paths: the qualified names of its non-method definitions
@@ -201,6 +207,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut facts = Facts::default();
     let mut scan = Scan::default();
     let mut paths: Vec<(Slot, Path)> = Vec::new();
+    // The receivers a `let` gives by the call it holds, with the call's span.
+    let mut returned: Vec<(usize, Range<usize>)> = Vec::new();
     let mut imported: Vec<Use> = Vec::new();
     let mut bound = 0;
     let mut defined = HashSet::new();
@@ -262,13 +270,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 }
                 continue;
             }
+            // A required method of a trait is a definition of its own; a foreign function is none.
+            "function_signature_item" if deep || !matches!(body, Body::Trait(_)) => continue,
             "function_item" if deep => {
                 locals.extend(field(node, "name").map(|n| text(n, src).to_string()));
                 for param in parameters(node, src) {
                     locals.extend(param.names);
                 }
             }
-            "function_item" => {
+            "function_item" | "function_signature_item" => {
                 let Some(name) = field(node, "name").map(|n| text(n, src)) else {
                     continue;
                 };
@@ -289,6 +299,31 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     if kind == Kind::Function {
                         scan.defs.insert(qualified.clone());
                     }
+                    let path = |segments| Path {
+                        scope: qualified.clone(),
+                        module: module.clone(),
+                        pure,
+                        segments,
+                        binds: None,
+                    };
+                    if let Some(result) = field(node, "return_type").and_then(|t| written(t, src)) {
+                        paths.push((Slot::Result(facts.defs.len()), path(result)));
+                    }
+                    if kind == Kind::Method && has_self(node) {
+                        facts.receivers.push(Receiver {
+                            scope: qualified.clone(),
+                            name: "self".into(),
+                            class: Class::Enclosing,
+                        });
+                    }
+                    for (name, segments) in typed_parameters(node, src) {
+                        paths.push((Slot::Named(facts.receivers.len()), path(segments)));
+                        facts.receivers.push(Receiver {
+                            scope: qualified.clone(),
+                            name,
+                            class: Class::Unknown,
+                        });
+                    }
                     facts.defs.push(Def {
                         params,
                         ..def(&qualified, kind, node)
@@ -308,6 +343,23 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if defined.insert(qualified.clone()) {
                     scan.defs.insert(qualified.clone());
                     facts.defs.push(def(&qualified, Kind::Class, node));
+                    if node.kind() == "struct_item" {
+                        for (name, segments) in fields(node, src) {
+                            let path = Path {
+                                scope: qualified.clone(),
+                                module: module.clone(),
+                                pure,
+                                segments,
+                                binds: None,
+                            };
+                            paths.push((Slot::Named(facts.receivers.len()), path));
+                            facts.receivers.push(Receiver {
+                                scope: qualified.clone(),
+                                name,
+                                class: Class::Unknown,
+                            });
+                        }
+                    }
                     if in_module {
                         let is_pub = is_pub(node, src);
                         export(&mut facts, &mut public_names, is_pub, name, &module, open);
@@ -440,6 +492,30 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     uses: Vec::new(),
                 });
             }
+            // A `let` of a plain name whose type is written, or whose value is a call, is a
+            // receiver (`Facts::receivers`): another binding of the name in the scope hides it.
+            "let_declaration" if !deep && typed_let(node, src).is_some() => {
+                let (name, how) = typed_let(node, src).unwrap();
+                match how {
+                    How::Type(segments) => {
+                        let path = Path {
+                            scope: scope.clone(),
+                            module: module.clone(),
+                            pure,
+                            segments,
+                            binds: None,
+                        };
+                        paths.push((Slot::Named(facts.receivers.len()), path));
+                    }
+                    How::Call(range) => returned.push((facts.receivers.len(), range)),
+                }
+                let class = Class::Unknown;
+                facts.receivers.push(Receiver {
+                    scope: scope.clone(),
+                    name,
+                    class,
+                });
+            }
             "let_declaration" | "for_expression" | "let_condition" | "match_arm" => {
                 if let Some(pattern) = field(node, "pattern") {
                     bind(pattern, 0, &mut locals, src);
@@ -504,8 +580,43 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             Slot::Type(at) => facts.impls[*at].ty = callee.unwrap_or_default(),
             Slot::Trait(at) => facts.impls[*at].of = Some(callee.unwrap_or_default()),
+            Slot::Named(at) => {
+                facts.receivers[*at].class = callee.map_or(Class::Unknown, Class::Named);
+            }
+            Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Named),
         }
     }
+    // A `let` holding a call: the function it names, when the call is a path or a bare name.
+    let callees: HashMap<&Range<usize>, &str> = (facts.calls.iter())
+        .filter(|c| c.by_path || !c.callee.contains('.'))
+        .filter(|c| !c.callee.starts_with('('))
+        .map(|c| (&c.range, c.callee.as_str()))
+        .collect();
+    for (at, range) in returned {
+        facts.receivers[at].class = match callees.get(&range) {
+            Some(callee) => Class::Returned(callee.to_string()),
+            None => Class::Unknown,
+        };
+    }
+    // One receiver per scope and name: bindings that disagree leave its class unknown.
+    let mut seen: HashMap<(String, String), usize> = HashMap::new();
+    let mut receivers: Vec<Receiver> = Vec::new();
+    for receiver in std::mem::take(&mut facts.receivers) {
+        match seen.get(&(receiver.scope.clone(), receiver.name.clone())) {
+            Some(&at) if receivers[at].class != receiver.class => {
+                receivers[at].class = Class::Unknown;
+            }
+            Some(_) => {}
+            None => {
+                seen.insert(
+                    (receiver.scope.clone(), receiver.name.clone()),
+                    receivers.len(),
+                );
+                receivers.push(receiver);
+            }
+        }
+    }
+    facts.receivers = receivers;
     // A type or trait no path names reaches no class.
     facts.impls.retain(|i| !i.ty.is_empty());
     facts.externs = heads.externs.into_iter().collect();
@@ -542,6 +653,7 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
         return_values: Vec::new(),
         returns: None,
         type_params: Vec::new(),
+        result: None,
     }
 }
 
@@ -687,6 +799,167 @@ fn parameters(function: Node, src: &[u8]) -> Vec<Parameter> {
         }
     }
     out
+}
+
+/// Whether the function takes `self`.
+fn has_self(function: Node) -> bool {
+    let list = field(function, "parameters");
+    list.is_some_and(|l| named(l).any(|p| p.kind() == "self_parameter"))
+}
+
+/// The parameters named by a plain identifier whose type the source writes, with the path of
+/// that type.
+fn typed_parameters(function: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
+    let Some(list) = field(function, "parameters") else {
+        return Vec::new();
+    };
+    let typed = named(list).filter(|p| p.kind() == "parameter");
+    typed
+        .filter_map(|p| {
+            let name = field(p, "pattern").filter(|n| n.kind() == "identifier")?;
+            Some((
+                text(name, src).to_string(),
+                written(field(p, "type")?, src)?,
+            ))
+        })
+        .collect()
+}
+
+/// The named fields of a struct whose type the source writes, with the path of that type.
+fn fields(item: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
+    let Some(list) = field(item, "body").filter(|b| b.kind() == "field_declaration_list") else {
+        return Vec::new();
+    };
+    let declared = named(list).filter(|f| f.kind() == "field_declaration");
+    declared
+        .filter_map(|f| {
+            let name = text(field(f, "name")?, src).to_string();
+            Some((name, written(field(f, "type")?, src)?))
+        })
+        .collect()
+}
+
+/// What a `let` of a plain name gives its receiver: the type it writes, or the call it holds.
+enum How {
+    Type(Vec<String>),
+    /// The span of the call (`Call::range`).
+    Call(Range<usize>),
+}
+
+fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
+    let pattern = field(node, "pattern").filter(|p| p.kind() == "identifier")?;
+    let name = text(pattern, src).to_string();
+    if let Some(ty) = field(node, "type") {
+        return Some((name, How::Type(written(ty, src)?)));
+    }
+    // Only a call of a name or a path: the function it calls is what the call's own callee says.
+    let value = field(node, "value").filter(|v| v.kind() == "call_expression")?;
+    let function = field(value, "function")?;
+    let function = match function.kind() {
+        "generic_function" => field(function, "function")?,
+        _ => function,
+    };
+    matches!(function.kind(), "identifier" | "scoped_identifier")
+        .then(|| (name, How::Call(value.byte_range())))
+}
+
+/// The path of the item a written type names: `&T` and `&mut T` name `T`; `dyn Trait`, `impl
+/// Trait` and a type parameter bounded by one trait name that trait, so a call on it stops at
+/// the trait's method. `None` for a type that names no single item: a tuple, a slice, a
+/// function, a parameter bounded by several traits or by none.
+fn written(ty: Node, src: &[u8]) -> Option<Vec<String>> {
+    let mut at = ty;
+    for _ in 0..PATH_DEPTH {
+        return match at.kind() {
+            "reference_type" => {
+                at = field(at, "type")?;
+                continue;
+            }
+            "dynamic_type" | "abstract_type" => only_bound(&[field(at, "trait")?], src),
+            "type_identifier" => match parameter(at, text(at, src), src) {
+                Some(bound) => bound,
+                None => Some(vec![text(at, src).to_string()]),
+            },
+            "primitive_type" => Some(vec![text(at, src).to_string()]),
+            "scoped_type_identifier" | "generic_type" => {
+                let path = segments(at, src)?;
+                // `T::Item`: a member of a type parameter names nothing here.
+                match parameter(at, &path[0], src) {
+                    Some(_) => None,
+                    None => Some(path),
+                }
+            }
+            _ => None,
+        };
+    }
+    None
+}
+
+/// The path of the one trait among `bounds` (a `+` list is a `bounded_type`), ignoring
+/// lifetimes and `?Sized`; `None` for none or several.
+fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
+    let mut found = Vec::new();
+    for bound in bounds {
+        match bound.kind() {
+            "bounded_type" => found.extend(named(*bound)),
+            _ => found.push(*bound),
+        }
+    }
+    found.retain(|b| !matches!(b.kind(), "lifetime" | "removed_trait_bound" | "use_bounds"));
+    match found[..] {
+        [one]
+            if matches!(
+                one.kind(),
+                "type_identifier" | "scoped_type_identifier" | "generic_type"
+            ) =>
+        {
+            segments(one, src)
+        }
+        _ => None,
+    }
+}
+
+/// The type parameter `name` as the items around `node` declare it: `Some` of the one trait it
+/// is bounded by (in `<T: Trait>` or a `where` clause), or of `None` when it has no single
+/// bound; `None` when no item around declares it, so the name is a type.
+fn parameter(node: Node, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> {
+    let mut at = node.parent();
+    // ponytail: blocks nest deeper than items; past the limit the name is taken as a type
+    // parameter with no bound, so no repository type is guessed.
+    for _ in 0..PATH_DEPTH {
+        let item = at?;
+        at = item.parent();
+        if !matches!(
+            item.kind(),
+            "function_item"
+                | "function_signature_item"
+                | "impl_item"
+                | "trait_item"
+                | "struct_item"
+                | "enum_item"
+        ) {
+            continue;
+        }
+        let declared = field(item, "type_parameters").into_iter().flat_map(named);
+        let mut declared = declared
+            .filter(|p| p.kind() == "type_parameter")
+            .filter(|p| field(*p, "name").is_some_and(|n| text(n, src) == name));
+        let Some(declared) = declared.next() else {
+            continue;
+        };
+        let mut bounds: Vec<Node> = (field(declared, "bounds").into_iter())
+            .flat_map(named)
+            .collect();
+        let clause = named(item).find(|c| c.kind() == "where_clause");
+        for predicate in clause.into_iter().flat_map(named) {
+            let left = field(predicate, "left");
+            if left.is_some_and(|l| l.kind() == "type_identifier" && text(l, src) == name) {
+                bounds.extend(field(predicate, "bounds").into_iter().flat_map(named));
+            }
+        }
+        return Some(only_bound(&bounds, src));
+    }
+    Some(None)
 }
 
 /// The names a pattern binds, `BINDING_DEPTH` levels deep: not the type a struct or tuple
@@ -1174,5 +1447,86 @@ mod tests {
             "}".repeat(BINDING_DEPTH + 8)
         );
         assert!(facts(&format!("use {nested};\n")).imports.is_empty());
+    }
+
+    /// The receivers as `scope name = class`, sorted.
+    fn receivers(src: &str) -> Vec<String> {
+        let mut found: Vec<String> = (facts(src).receivers.into_iter())
+            .map(|r| {
+                let class = match r.class {
+                    Class::Enclosing => "Self".to_string(),
+                    Class::Named(n) => n,
+                    Class::Returned(n) => format!("{n}()"),
+                    Class::Imported => "imported".into(),
+                    Class::Unknown => "?".into(),
+                };
+                format!("{} {} = {class}", r.scope, r.name)
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn written_types_make_receivers() {
+        let src = "struct S { a: A, b: (A, B), c: &'a mut m::C }\n\
+                   impl S { fn f(&self, x: &mut X, (y, z): (Y, Z), n: u8) -> Self { \
+                   let w: W = make(); let v = Y::new(); let u = self.g(); let t = z(); } }\n\
+                   trait T { fn r(&self) -> impl Q; }\n";
+        let expected = [
+            "S a = A",
+            "S c = m.C",
+            "S.f n = u8",
+            "S.f self = Self",
+            "S.f t = z()",
+            "S.f v = Y.new()",
+            "S.f w = W",
+            "S.f x = X",
+            "T.r self = Self",
+        ];
+        assert_eq!(receivers(src), expected);
+        let results: Vec<String> = (facts(src).defs.into_iter())
+            .filter_map(|d| match d.result? {
+                Class::Named(n) => Some(format!("{} -> {n}", d.name)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(results, ["S.f -> Self", "T.r -> Q"]);
+    }
+
+    #[test]
+    fn type_parameters_name_their_one_bound_and_hide_a_type_of_their_name() {
+        let src = "struct A;\n\
+                   fn a<A: P>(x: &A) {}\n\
+                   fn b<T: P + Q>(x: T) {}\n\
+                   fn c<T: ?Sized + 'a + P>(x: &T) {}\n\
+                   fn d<T>(x: T) where T: P {}\n\
+                   fn e<T: P>(x: T::Item) {}\n\
+                   fn f(x: &dyn m::P, y: impl P + Send) {}\n\
+                   struct W<T: P> { inner: T }\n\
+                   impl<T: P> W<T> { fn g(&self, t: T) {} }\n\
+                   fn h<T>(x: T) {}\n";
+        // Several bounds, none and a member of a parameter name no type.
+        let expected = [
+            "W inner = P",
+            "W.g self = Self",
+            "W.g t = P",
+            "a x = P",
+            "c x = P",
+            "d x = P",
+            "f x = m.P",
+        ];
+        assert_eq!(receivers(src), expected);
+    }
+
+    #[test]
+    fn a_parameter_declared_past_the_limit_is_no_type() {
+        let blocks = "{ ".repeat(PATH_DEPTH + 8);
+        let src = format!(
+            "struct T;\nfn f<T: P>() {{ {blocks} let x: T = y(); {} }}\n",
+            "}".repeat(PATH_DEPTH + 8)
+        );
+        // The walk gives up before it finds the declaration: `T` is no type, so no receiver.
+        assert!(receivers(&src).is_empty());
     }
 }

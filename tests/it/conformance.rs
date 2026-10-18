@@ -1419,6 +1419,43 @@ fn rust() {
             "api/src/main.rs::inner.helper",
             "api/src/main.rs::inner.twice",
             "api/src/main.rs::main",
+            "api/src/main.rs::methods",
+            "api/src/methods.rs::Counter",
+            "api/src/methods.rs::Counter.Probe.probe",
+            "api/src/methods.rs::Counter.bump",
+            "api/src/methods.rs::Counter.new",
+            "api/src/methods.rs::Counter.read",
+            "api/src/methods.rs::Counter.reset",
+            "api/src/methods.rs::Counter.twice",
+            "api/src/methods.rs::Dash",
+            "api/src/methods.rs::Dash.mark",
+            "api/src/methods.rs::Dash.tick",
+            "api/src/methods.rs::Gauge",
+            "api/src/methods.rs::Gauge.Probe.probe",
+            "api/src/methods.rs::Gauge.bump",
+            "api/src/methods.rs::Gauge.insert",
+            "api/src/methods.rs::Gauge.new",
+            "api/src/methods.rs::Gauge.read",
+            "api/src/methods.rs::Probe",
+            "api/src/methods.rs::Probe.probe",
+            "api/src/methods.rs::Probe.summary",
+            "api/src/methods.rs::annotated",
+            "api/src/methods.rs::blocks",
+            "api/src/methods.rs::bounded",
+            "api/src/methods.rs::built",
+            "api/src/methods.rs::dynamic",
+            "api/src/methods.rs::exclusive",
+            "api/src/methods.rs::fresh",
+            "api/src/methods.rs::generic",
+            "api/src/methods.rs::named",
+            "api/src/methods.rs::opaque_impl",
+            "api/src/methods.rs::outside",
+            "api/src/methods.rs::pick",
+            "api/src/methods.rs::probed",
+            "api/src/methods.rs::retyped",
+            "api/src/methods.rs::shadowed",
+            "api/src/methods.rs::shared",
+            "api/src/store.rs::Persist.persist",
             "api/src/main.rs::nested",
             "api/src/main.rs::nested.deep",
             "api/src/main.rs::nested.plain",
@@ -1567,7 +1604,7 @@ fn rust() {
             ),
             (
                 "api/src/routes/mod.rs::serve::store.save#0",
-                INFERRED,
+                EXACT,
                 &["api/src/store.rs::Store.save"],
             ),
             (
@@ -1864,6 +1901,155 @@ fn rust() {
                 "crates/scratch/src/lib.rs::reach::ledger_core.post#0",
                 None,
                 &[],
+            ),
+            // Method calls: the receiver's type is written on a `let`, a parameter (`&T`, `&mut T`),
+            // a field through `self`, or `self` itself; one fit is `exact`.
+            (
+                "api/src/methods.rs::annotated::c.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::shared::c.read#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.read"],
+            ),
+            (
+                "api/src/methods.rs::exclusive::g.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.counter.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.gauge.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.bump"],
+            ),
+            (
+                "api/src/methods.rs::Dash.tick::self.counter.twice#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.twice"],
+            ),
+            (
+                "api/src/methods.rs::Counter.twice::self.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::Counter.twice::self.bump#1",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            // `self` in a trait's block, and in the default body of a trait.
+            (
+                "api/src/methods.rs::Counter.Probe.probe::self.read#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.read"],
+            ),
+            (
+                "api/src/methods.rs::Probe.summary::self.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            // The type is the declared return type of the function the `let` calls, `Self` included.
+            (
+                "api/src/methods.rs::built::c.bump#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.bump"],
+            ),
+            (
+                "api/src/methods.rs::built::g.read#0",
+                EXACT,
+                &["api/src/methods.rs::Gauge.read"],
+            ),
+            // Methods of `impl Trait for Type` are found through the type, with the trait's defaults.
+            (
+                "api/src/methods.rs::probed::c.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Counter.Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::probed::c.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            // A `dyn Trait`, a bounded generic and an `impl Trait` stop at the trait's method: no
+            // implementation is searched.
+            (
+                "api/src/methods.rs::dynamic::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::generic::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            (
+                "api/src/methods.rs::bounded::p.summary#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.summary"],
+            ),
+            (
+                "api/src/methods.rs::opaque_impl::p.probe#0",
+                EXACT,
+                &["api/src/methods.rs::Probe.probe"],
+            ),
+            // The type is not written (a `for` binding): the call goes by name.
+            (
+                "api/src/methods.rs::named::c.reset#0",
+                INFERRED,
+                &["api/src/methods.rs::Counter.reset"],
+            ),
+            (
+                "api/src/methods.rs::named::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
+            ),
+            (
+                "api/src/methods.rs::blocks::c.read#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.read",
+                    "api/src/methods.rs::Gauge.read",
+                ],
+            ),
+            // A type from outside the repository is opaque: `insert` is not `Gauge.insert`.
+            ("api/src/methods.rs::outside::m.insert#0", None, &[]),
+            ("api/src/methods.rs::outside::made.insert#0", None, &[]),
+            (
+                "api/src/methods.rs::Dash.mark::self.marks.insert#0",
+                None,
+                &[],
+            ),
+            (
+                "api/src/methods.rs::Gauge.insert::self.marks.insert#0",
+                None,
+                &[],
+            ),
+            // A binding of the name that disagrees with the typed one leaves it to the name match.
+            (
+                "api/src/methods.rs::shadowed::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
+            ),
+            (
+                "api/src/methods.rs::retyped::c.bump#0",
+                AMBIGUOUS,
+                &[
+                    "api/src/methods.rs::Counter.bump",
+                    "api/src/methods.rs::Gauge.bump",
+                ],
             ),
         ],
     );

@@ -27,7 +27,11 @@
     },
     {
       "path": "api/src/main.rs",
-      "hash": "a43434aa3165c62cd8dfd518485bdddfb93f6134aca4f009ad0f8f4b87cb803d"
+      "hash": "cc9123a0b5e6e0f966a35899d807811bcc7e5a4530b252cc44bedae26697cbe3"
+    },
+    {
+      "path": "api/src/methods.rs",
+      "hash": "dd0fff9e2f1fe798987ec95ca4f8d7d778cfae204be3b962438a01b0457a49aa"
     },
     {
       "path": "api/src/nested/deep.rs",
@@ -203,64 +207,64 @@
       "id": "example.com/acme/conformance::api/src/main.rs::below",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1716,
-        "end": 1797
+        "start": 1729,
+        "end": 1810
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::below.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1751,
-        "end": 1795
+        "start": 1764,
+        "end": 1808
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 533,
-        "end": 827
+        "start": 546,
+        "end": 840
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 550,
-        "end": 587
+        "start": 563,
+        "end": 600
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 701,
-        "end": 772
+        "start": 714,
+        "end": 785
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.verify",
       "span": {
         "path": "api/src/main.rs",
-        "start": 778,
-        "end": 825
+        "start": 791,
+        "end": 838
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3969,
-        "end": 3998
+        "start": 3982,
+        "end": 4011
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::elsewhere",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3716,
-        "end": 3751
+        "start": 3729,
+        "end": 3764
       }
     },
     {
@@ -275,56 +279,56 @@
       "id": "example.com/acme/conformance::api/src/main.rs::hidden",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3921,
-        "end": 3967
+        "start": 3934,
+        "end": 3980
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner",
       "span": {
         "path": "api/src/main.rs",
-        "start": 404,
-        "end": 531
+        "start": 417,
+        "end": 544
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.helper",
       "span": {
         "path": "api/src/main.rs",
-        "start": 420,
-        "end": 460
+        "start": 433,
+        "end": 473
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.twice",
       "span": {
         "path": "api/src/main.rs",
-        "start": 466,
-        "end": 529
+        "start": 479,
+        "end": 542
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1220,
-        "end": 1326
+        "start": 1233,
+        "end": 1339
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.far",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1279,
-        "end": 1324
+        "start": 1292,
+        "end": 1337
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1239,
-        "end": 1273
+        "start": 1252,
+        "end": 1286
       }
     },
     {
@@ -339,84 +343,52 @@
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1382,
-        "end": 1511
+        "start": 1395,
+        "end": 1524
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1422,
-        "end": 1459
+        "start": 1435,
+        "end": 1472
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1465,
-        "end": 1509
+        "start": 1478,
+        "end": 1522
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1559,
-        "end": 1647
+        "start": 1572,
+        "end": 1660
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops.f",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1614,
-        "end": 1645
+        "start": 1627,
+        "end": 1658
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::main",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1949,
-        "end": 3504
+        "start": 1962,
+        "end": 3517
       }
     },
     {
-      "id": "example.com/acme/conformance::api/src/main.rs::nested",
-      "span": {
-        "path": "api/src/main.rs",
-        "start": 1872,
-        "end": 1947
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::api/src/main.rs::nested.deep",
-      "span": {
-        "path": "api/src/main.rs",
-        "start": 1913,
-        "end": 1926
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::api/src/main.rs::nested.plain",
-      "span": {
-        "path": "api/src/main.rs",
-        "start": 1931,
-        "end": 1945
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::api/src/main.rs::outside",
-      "span": {
-        "path": "api/src/main.rs",
-        "start": 3557,
-        "end": 3592
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::api/src/main.rs::prelude",
+      "id": "example.com/acme/conformance::api/src/main.rs::methods",
       "span": {
         "path": "api/src/main.rs",
         "start": 24,
@@ -424,83 +396,403 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::api/src/main.rs::ring",
+      "id": "example.com/acme/conformance::api/src/main.rs::nested",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1885,
+        "end": 1960
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::nested.deep",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1926,
+        "end": 1939
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::nested.plain",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 1944,
+        "end": 1958
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::outside",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 3570,
+        "end": 3605
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::prelude",
       "span": {
         "path": "api/src/main.rs",
         "start": 37,
-        "end": 46
+        "end": 49
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/main.rs::ring",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 50,
+        "end": 59
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::routes",
       "span": {
         "path": "api/src/main.rs",
-        "start": 47,
-        "end": 58
+        "start": 60,
+        "end": 71
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::run",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4015,
-        "end": 4026
+        "start": 4028,
+        "end": 4039
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped",
       "span": {
         "path": "api/src/main.rs",
-        "start": 925,
-        "end": 1066
+        "start": 938,
+        "end": 1079
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1014,
-        "end": 1064
+        "start": 1027,
+        "end": 1077
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::start",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4000,
-        "end": 4013
+        "start": 4013,
+        "end": 4026
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::store",
       "span": {
         "path": "api/src/main.rs",
-        "start": 59,
-        "end": 69
+        "start": 72,
+        "end": 82
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::util",
       "span": {
         "path": "api/src/main.rs",
-        "start": 393,
-        "end": 402
+        "start": 406,
+        "end": 415
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::with_param",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3823,
-        "end": 3862
+        "start": 3836,
+        "end": 3875
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::within",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3639,
-        "end": 3714
+        "start": 3652,
+        "end": 3727
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 396,
+        "end": 433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1263,
+        "end": 1313
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 700,
+        "end": 754
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.new",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 638,
+        "end": 694
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.read",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 760,
+        "end": 811
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 817,
+        "end": 843
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.twice",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 849,
+        "end": 922
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 506,
+        "end": 617
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.mark",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1959,
+        "end": 2063
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.tick",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1746,
+        "end": 1862
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 435,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.Probe.probe",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1344,
+        "end": 1394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.bump",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1061,
+        "end": 1086
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.insert",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1150,
+        "end": 1230
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.new",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 943,
+        "end": 1055
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.read",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1092,
+        "end": 1144
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Probe",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 288,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 310,
+        "end": 333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Probe.summary",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 339,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::annotated",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1558,
+        "end": 1631
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::blocks",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3291,
+        "end": 3364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::bounded",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2605,
+        "end": 2669
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::built",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2157,
+        "end": 2252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::dynamic",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2503,
+        "end": 2551
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::exclusive",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1679,
+        "end": 1728
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::fresh",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1398,
+        "end": 1442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::generic",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2553,
+        "end": 2603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::named",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2776,
+        "end": 2877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::opaque_impl",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2671,
+        "end": 2723
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::outside",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2948,
+        "end": 3085
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::pick",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1444,
+        "end": 1474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::probed",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2337,
+        "end": 2398
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::retyped",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3216,
+        "end": 3289
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::shadowed",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3148,
+        "end": 3214
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::shared",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1633,
+        "end": 1677
       }
     },
     {
@@ -669,6 +961,14 @@
         "path": "api/src/store.rs",
         "start": 132,
         "end": 170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/store.rs::Persist.persist",
+      "span": {
+        "path": "api/src/store.rs",
+        "start": 108,
+        "end": 126
       }
     },
     {
@@ -1022,8 +1322,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1780,
-        "end": 1789
+        "start": 1793,
+        "end": 1802
       }
     },
     {
@@ -1033,8 +1333,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 757,
-        "end": 766
+        "start": 770,
+        "end": 779
       }
     },
     {
@@ -1044,8 +1344,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 738,
-        "end": 754
+        "start": 751,
+        "end": 767
       }
     },
     {
@@ -1055,8 +1355,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 804,
-        "end": 818
+        "start": 817,
+        "end": 831
       }
     },
     {
@@ -1066,8 +1366,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3737,
-        "end": 3748
+        "start": 3750,
+        "end": 3761
       }
     },
     {
@@ -1077,8 +1377,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3959,
-        "end": 3964
+        "start": 3972,
+        "end": 3977
       }
     },
     {
@@ -1088,8 +1388,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 498,
-        "end": 506
+        "start": 511,
+        "end": 519
       }
     },
     {
@@ -1099,8 +1399,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 509,
-        "end": 523
+        "start": 522,
+        "end": 536
       }
     },
     {
@@ -1110,8 +1410,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1302,
-        "end": 1317
+        "start": 1315,
+        "end": 1330
       }
     },
     {
@@ -1121,8 +1421,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1261,
-        "end": 1266
+        "start": 1274,
+        "end": 1279
       }
     },
     {
@@ -1132,8 +1432,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1494,
-        "end": 1503
+        "start": 1507,
+        "end": 1516
       }
     },
     {
@@ -1143,8 +1443,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1635,
-        "end": 1638
+        "start": 1648,
+        "end": 1651
       }
     },
     {
@@ -1154,8 +1454,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2648,
-        "end": 2659
+        "start": 2661,
+        "end": 2672
       }
     },
     {
@@ -1165,8 +1465,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2832,
-        "end": 2846
+        "start": 2845,
+        "end": 2859
       }
     },
     {
@@ -1176,8 +1476,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2597,
-        "end": 2608
+        "start": 2610,
+        "end": 2621
       }
     },
     {
@@ -1187,8 +1487,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2349,
-        "end": 2362
+        "start": 2362,
+        "end": 2375
       }
     },
     {
@@ -1198,8 +1498,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2574,
-        "end": 2579
+        "start": 2587,
+        "end": 2592
       }
     },
     {
@@ -1209,8 +1509,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3120,
-        "end": 3131
+        "start": 3133,
+        "end": 3144
       }
     },
     {
@@ -1220,8 +1520,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2694,
-        "end": 2717
+        "start": 2707,
+        "end": 2730
       }
     },
     {
@@ -1231,8 +1531,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2665,
-        "end": 2688
+        "start": 2678,
+        "end": 2701
       }
     },
     {
@@ -1242,8 +1542,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2748,
-        "end": 2760
+        "start": 2761,
+        "end": 2773
       }
     },
     {
@@ -1253,8 +1553,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2145,
-        "end": 2166
+        "start": 2158,
+        "end": 2179
       }
     },
     {
@@ -1264,8 +1564,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2585,
-        "end": 2591
+        "start": 2598,
+        "end": 2604
       }
     },
     {
@@ -1275,8 +1575,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2938,
-        "end": 2943
+        "start": 2951,
+        "end": 2956
       }
     },
     {
@@ -1286,8 +1586,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2949,
-        "end": 2956
+        "start": 2962,
+        "end": 2969
       }
     },
     {
@@ -1297,8 +1597,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2124,
-        "end": 2139
+        "start": 2137,
+        "end": 2152
       }
     },
     {
@@ -1308,8 +1608,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3157,
-        "end": 3172
+        "start": 3170,
+        "end": 3185
       }
     },
     {
@@ -1319,8 +1619,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3137,
-        "end": 3151
+        "start": 3150,
+        "end": 3164
       }
     },
     {
@@ -1330,8 +1630,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3316,
-        "end": 3324
+        "start": 3329,
+        "end": 3337
       }
     },
     {
@@ -1341,8 +1641,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3330,
-        "end": 3346
+        "start": 3343,
+        "end": 3359
       }
     },
     {
@@ -1352,8 +1652,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3445,
-        "end": 3475
+        "start": 3458,
+        "end": 3488
       }
     },
     {
@@ -1363,8 +1663,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3481,
-        "end": 3501
+        "start": 3494,
+        "end": 3514
       }
     },
     {
@@ -1374,8 +1674,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2723,
-        "end": 2742
+        "start": 2736,
+        "end": 2755
       }
     },
     {
@@ -1385,8 +1685,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3178,
-        "end": 3194
+        "start": 3191,
+        "end": 3207
       }
     },
     {
@@ -1396,8 +1696,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2172,
-        "end": 2192
+        "start": 2185,
+        "end": 2205
       }
     },
     {
@@ -1407,8 +1707,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2198,
-        "end": 2219
+        "start": 2211,
+        "end": 2232
       }
     },
     {
@@ -1418,8 +1718,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3048,
-        "end": 3066
+        "start": 3061,
+        "end": 3079
       }
     },
     {
@@ -1429,8 +1729,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3020,
-        "end": 3042
+        "start": 3033,
+        "end": 3055
       }
     },
     {
@@ -1440,8 +1740,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3072,
-        "end": 3096
+        "start": 3085,
+        "end": 3109
       }
     },
     {
@@ -1451,8 +1751,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2077,
-        "end": 2098
+        "start": 2090,
+        "end": 2111
       }
     },
     {
@@ -1462,8 +1762,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2338,
-        "end": 2343
+        "start": 2351,
+        "end": 2356
       }
     },
     {
@@ -1473,8 +1773,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3102,
-        "end": 3114
+        "start": 3115,
+        "end": 3127
       }
     },
     {
@@ -1484,8 +1784,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2325,
-        "end": 2332
+        "start": 2338,
+        "end": 2345
       }
     },
     {
@@ -1495,8 +1795,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2368,
-        "end": 2389
+        "start": 2381,
+        "end": 2402
       }
     },
     {
@@ -1506,8 +1806,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2052,
-        "end": 2071
+        "start": 2065,
+        "end": 2084
       }
     },
     {
@@ -1517,8 +1817,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2614,
-        "end": 2629
+        "start": 2627,
+        "end": 2642
       }
     },
     {
@@ -1528,8 +1828,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2635,
-        "end": 2642
+        "start": 2648,
+        "end": 2655
       }
     },
     {
@@ -1539,8 +1839,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2104,
-        "end": 2118
+        "start": 2117,
+        "end": 2131
       }
     },
     {
@@ -1550,8 +1850,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3583,
-        "end": 3590
+        "start": 3596,
+        "end": 3603
       }
     },
     {
@@ -1561,8 +1861,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1043,
-        "end": 1048
+        "start": 1056,
+        "end": 1061
       }
     },
     {
@@ -1572,8 +1872,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1051,
-        "end": 1058
+        "start": 1064,
+        "end": 1071
       }
     },
     {
@@ -1583,8 +1883,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3854,
-        "end": 3859
+        "start": 3867,
+        "end": 3872
       }
     },
     {
@@ -1594,8 +1894,442 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3700,
-        "end": 3711
+        "start": 3713,
+        "end": 3724
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe::self.read#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.read",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1296,
+        "end": 1307
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.twice::self.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Counter.twice",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 883,
+        "end": 894
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Counter.twice::self.bump#1",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Counter.twice",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 904,
+        "end": 915
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.mark::self.label.len#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Dash.mark",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2040,
+        "end": 2056
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.mark::self.marks.insert#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Dash.mark",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2005,
+        "end": 2030
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.tick::self.counter.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Dash.tick",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1779,
+        "end": 1798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.tick::self.counter.twice#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Dash.tick",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.twice",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1835,
+        "end": 1855
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Dash.tick::self.gauge.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Dash.tick",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Gauge.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1808,
+        "end": 1825
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.Probe.probe::self.read#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Gauge.Probe.probe",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Gauge.read",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1377,
+        "end": 1388
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.insert::self.marks.insert#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Gauge.insert",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1198,
+        "end": 1223
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Gauge.new::HashMap.new#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Gauge.new",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1024,
+        "end": 1038
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Probe.summary::self.probe#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::Probe.summary",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 374,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::annotated::Counter.new#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::annotated",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.new",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1600,
+        "end": 1614
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::annotated::c.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::annotated",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1620,
+        "end": 1628
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::blocks::c.read#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::blocks",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.read",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.read"
+      ],
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3353,
+        "end": 3361
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::bounded::p.summary#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::bounded",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.summary",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2655,
+        "end": 2666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::built::Counter.new#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::built",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.new",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2186,
+        "end": 2200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::built::c.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::built",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2206,
+        "end": 2214
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::built::fresh#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::built",
+      "target": "example.com/acme/conformance::api/src/methods.rs::fresh",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2228,
+        "end": 2235
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::built::g.read#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::built",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Gauge.read",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2241,
+        "end": 2249
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::dynamic::p.probe#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::dynamic",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2539,
+        "end": 2548
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::exclusive::g.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::exclusive",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Gauge.bump",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1717,
+        "end": 1725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::fresh::Gauge.new#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::fresh",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Gauge.new",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1428,
+        "end": 1440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::generic::p.probe#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::generic",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2591,
+        "end": 2600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::named::c.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::named",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.bump"
+      ],
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2841,
+        "end": 2849
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::named::c.reset#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::named",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
+      "level": "inferred",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2859,
+        "end": 2868
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::opaque_impl::p.probe#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::opaque_impl",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2711,
+        "end": 2720
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::outside::HashMap.new#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3040,
+        "end": 3054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::outside::m.insert#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3007,
+        "end": 3023
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::outside::made.insert#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3060,
+        "end": 3082
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::outside::pick#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::outside",
+      "target": "example.com/acme/conformance::api/src/methods.rs::pick",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3072,
+        "end": 3078
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::probed::c.probe#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::probed",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2369,
+        "end": 2378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::probed::c.summary#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::probed",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Probe.summary",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 2384,
+        "end": 2395
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::retyped::c.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::retyped",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.bump"
+      ],
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3278,
+        "end": 3286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::retyped::fresh#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::retyped",
+      "target": "example.com/acme/conformance::api/src/methods.rs::fresh",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3265,
+        "end": 3272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::shadowed::c.bump#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::shadowed",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.bump"
+      ],
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3203,
+        "end": 3211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::shadowed::pick#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::shadowed",
+      "target": "example.com/acme/conformance::api/src/methods.rs::pick",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 3191,
+        "end": 3197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::shared::c.read#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::shared",
+      "target": "example.com/acme/conformance::api/src/methods.rs::Counter.read",
+      "level": "exact",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 1666,
+        "end": 1674
       }
     },
     {
@@ -1635,7 +2369,7 @@
       "id": "example.com/acme/conformance::api/src/routes/mod.rs::serve::store.save#0",
       "caller": "example.com/acme/conformance::api/src/routes/mod.rs::serve",
       "target": "example.com/acme/conformance::api/src/store.rs::Store.save",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "api/src/routes/mod.rs",
         "start": 116,
@@ -1905,6 +2639,13 @@
       ]
     },
     {
+      "name": "api/src#10",
+      "members": [
+        "example.com/acme/conformance::api/src/store.rs::Persist.describe",
+        "example.com/acme/conformance::api/src/store.rs::Store.Persist.persist"
+      ]
+    },
+    {
       "name": "api/src#2",
       "members": [
         "example.com/acme/conformance::api/extra/legacy_util.rs::legacy",
@@ -1918,7 +2659,13 @@
         "example.com/acme/conformance::api/src/nested/plain.rs::walk",
         "example.com/acme/conformance::api/src/prelude.rs::greet",
         "example.com/acme/conformance::api/src/ring/c.rs::Gear.spin",
+        "example.com/acme/conformance::api/src/store.rs::Store.new",
+        "example.com/acme/conformance::api/src/store.rs::reset",
+        "example.com/acme/conformance::crates/billing/src/billing.rs::total",
+        "example.com/acme/conformance::crates/billing/src/billing.rs::util.round",
+        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.amount",
         "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.new",
+        "example.com/acme/conformance::crates/billing/src/invoice.rs::tax",
         "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal.secret",
         "example.com/acme/conformance::crates/ledger-core/src/meter.rs::meter"
       ]
@@ -1957,14 +2704,49 @@
     {
       "name": "api/src#6",
       "members": [
-        "example.com/acme/conformance::api/src/store.rs::Persist.describe",
-        "example.com/acme/conformance::api/src/store.rs::Store.Persist.persist",
-        "example.com/acme/conformance::api/src/store.rs::Store.empty",
-        "example.com/acme/conformance::api/src/store.rs::Store.new",
-        "example.com/acme/conformance::api/src/store.rs::reset",
-        "example.com/acme/conformance::api/src/store/disk.rs::Store.check",
-        "example.com/acme/conformance::api/src/store/disk.rs::Store.reload",
-        "example.com/acme/conformance::api/src/store/disk.rs::open"
+        "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
+        "example.com/acme/conformance::api/src/methods.rs::Counter.read",
+        "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
+        "example.com/acme/conformance::api/src/methods.rs::Probe.summary",
+        "example.com/acme/conformance::api/src/methods.rs::bounded",
+        "example.com/acme/conformance::api/src/methods.rs::dynamic",
+        "example.com/acme/conformance::api/src/methods.rs::generic",
+        "example.com/acme/conformance::api/src/methods.rs::opaque_impl",
+        "example.com/acme/conformance::api/src/methods.rs::probed",
+        "example.com/acme/conformance::api/src/methods.rs::shared"
+      ]
+    },
+    {
+      "name": "api/src#7",
+      "members": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
+        "example.com/acme/conformance::api/src/methods.rs::Counter.new",
+        "example.com/acme/conformance::api/src/methods.rs::Counter.twice",
+        "example.com/acme/conformance::api/src/methods.rs::Dash.tick",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.Probe.probe",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.bump",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.new",
+        "example.com/acme/conformance::api/src/methods.rs::Gauge.read",
+        "example.com/acme/conformance::api/src/methods.rs::annotated",
+        "example.com/acme/conformance::api/src/methods.rs::built",
+        "example.com/acme/conformance::api/src/methods.rs::exclusive",
+        "example.com/acme/conformance::api/src/methods.rs::fresh",
+        "example.com/acme/conformance::api/src/methods.rs::retyped"
+      ]
+    },
+    {
+      "name": "api/src#8",
+      "members": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
+        "example.com/acme/conformance::api/src/methods.rs::named"
+      ]
+    },
+    {
+      "name": "api/src#9",
+      "members": [
+        "example.com/acme/conformance::api/src/methods.rs::outside",
+        "example.com/acme/conformance::api/src/methods.rs::pick",
+        "example.com/acme/conformance::api/src/methods.rs::shadowed"
       ]
     },
     {
@@ -1982,19 +2764,19 @@
       ]
     },
     {
+      "name": "api/src/store",
+      "members": [
+        "example.com/acme/conformance::api/src/store.rs::Store.empty",
+        "example.com/acme/conformance::api/src/store/disk.rs::Store.check",
+        "example.com/acme/conformance::api/src/store/disk.rs::Store.reload",
+        "example.com/acme/conformance::api/src/store/disk.rs::open"
+      ]
+    },
+    {
       "name": "api/tools",
       "members": [
         "example.com/acme/conformance::api/tools/admin.rs::main",
         "example.com/acme/conformance::api/tools/shared.rs::ping"
-      ]
-    },
-    {
-      "name": "crates/billing/src",
-      "members": [
-        "example.com/acme/conformance::crates/billing/src/billing.rs::total",
-        "example.com/acme/conformance::crates/billing/src/billing.rs::util.round",
-        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.amount",
-        "example.com/acme/conformance::crates/billing/src/invoice.rs::tax"
       ]
     },
     {
@@ -2144,7 +2926,7 @@
         {
           "depth": 2,
           "repository": "example.com/acme/conformance",
-          "level": "inferred",
+          "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::api/src/store.rs::Store.save"
         },

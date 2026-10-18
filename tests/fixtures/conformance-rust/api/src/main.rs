@@ -1,5 +1,6 @@
 mod extras;
 mod launch;
+mod methods;
 mod prelude;
 mod ring;
 mod routes;
