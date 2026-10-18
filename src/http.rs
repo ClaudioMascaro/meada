@@ -16,6 +16,8 @@ use crate::resolve::{Code, Expanded, Frame, Target, scope_of};
 use crate::shape::{self, Import, Shape, Source, under};
 use crate::workspace::Repository;
 
+mod rust;
+
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
 
@@ -473,7 +475,7 @@ type CallAt<'a> = (&'a str, usize);
 
 /// For each router, the routers it is mounted on and the segment the mount puts before its
 /// routes, `None` when it cannot be read.
-type Mounts<'a> = BTreeMap<CallAt<'a>, Vec<(CallAt<'a>, Option<String>)>>;
+type Mounts<'a, N = CallAt<'a>> = BTreeMap<N, Vec<(N, Option<String>)>>;
 
 /// `prefix` and `path` joined with one `/`.
 fn join(prefix: &str, path: &str) -> String {
@@ -497,22 +499,22 @@ const PREFIX_WORK: usize = 4096;
 /// prefix of the router it is mounted on, or its `root` prefix when nothing mounts it (`None`
 /// when such a router is not served). A prefix that cannot be read adds none, and a router
 /// mounted too deep or through too many mounts (`PREFIX_DEPTH`, `PREFIX_WORK`) has none.
-fn prefixes<'a>(
-    router: CallAt<'a>,
-    mounts: &Mounts<'a>,
-    root: &dyn Fn(CallAt<'a>) -> Option<String>,
-    seen: &mut Vec<CallAt<'a>>,
+fn prefixes<'a, N: Copy + Ord>(
+    router: N,
+    mounts: &Mounts<'a, N>,
+    root: &dyn Fn(N) -> Option<String>,
+    seen: &mut Vec<N>,
 ) -> Vec<String> {
     let mut work = PREFIX_WORK;
     prefixes_within(router, mounts, root, seen, &mut work).unwrap_or_default()
 }
 
 /// `prefixes`, `None` when `work` mounts do not cover it.
-fn prefixes_within<'a>(
-    router: CallAt<'a>,
-    mounts: &Mounts<'a>,
-    root: &dyn Fn(CallAt<'a>) -> Option<String>,
-    seen: &mut Vec<CallAt<'a>>,
+fn prefixes_within<'a, N: Copy + Ord>(
+    router: N,
+    mounts: &Mounts<'a, N>,
+    root: &dyn Fn(N) -> Option<String>,
+    seen: &mut Vec<N>,
     work: &mut usize,
 ) -> Option<Vec<String>> {
     let Some(parents) = mounts.get(&router) else {
@@ -716,7 +718,7 @@ const METHOD_CHAIN: usize = 64;
 /// Whether the call `router` creates an axum router.
 fn is_axum_router<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
     let call = &code.files()[path].calls[n];
-    let name = code.external(path, &call.scope, &call.callee);
+    let name = code.external_of(path, call);
     matches!(
         name.as_deref(),
         Some("axum.Router.new" | "axum.Router.default")
@@ -743,7 +745,7 @@ fn method_router<'a>(
         match &call.receiver {
             // `get(h)`, `routing::get(h)`: the function of axum that serves the method.
             None => {
-                let external = code.external(path, &call.scope, &call.callee)?;
+                let external = code.external_of(path, call)?;
                 match external.strip_prefix("axum.routing.")? {
                     "any" => out.push((call, ANY.to_string())),
                     name if AXUM_METHODS.contains(&name) => {
@@ -948,27 +950,40 @@ fn axum(code: &Code) -> Vec<Found> {
         for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = axum_literal(&normalize_path(&join(&prefix, &route)));
             for (call, method) in &handlers {
-                let scope = &call.scope;
-                let site = match call.args.first() {
-                    Some(Value::Function(def)) => Site::Inline {
-                        path: path.into(),
-                        def: def.clone(),
-                        name: format!("{method} {full}"),
-                    },
-                    Some(Value::Ref(name)) => match code.definition(path, scope, name) {
-                        Some(t) => Site::Def {
-                            path: t.path.into(),
-                            name: t.name.into(),
-                        },
-                        None => Site::File(path.into()),
-                    },
-                    _ => Site::File(path.into()),
-                };
+                let site = handler_site(code, path, &call.scope, call.args.first(), method, &full);
                 found.push(provider(site, format!("http::{method}::{full}")));
             }
         }
     }
     found
+}
+
+/// Where the route `method` `full` of a handler written in `scope` of `path` starts a trace: a
+/// closure is an inline handler named for its route, a function of the repository the function,
+/// and anything else the file.
+fn handler_site<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    handler: Option<&'a Value>,
+    method: &str,
+    full: &str,
+) -> Site {
+    match handler {
+        Some(Value::Function(def)) => Site::Inline {
+            path: path.into(),
+            def: def.clone(),
+            name: format!("{method} {full}"),
+        },
+        Some(Value::Ref(name)) => match code.definition(path, scope, name) {
+            Some(t) => Site::Def {
+                path: t.path.into(),
+                name: t.name.into(),
+            },
+            None => Site::File(path.into()),
+        },
+        _ => Site::File(path.into()),
+    }
 }
 
 /// A method mounting an app or a router (the child) on the one it is called on.
@@ -1754,6 +1769,7 @@ impl ContractKind for Http {
         found.extend(clients(code));
         found.extend(express(code, &mut literals));
         found.extend(axum(code));
+        found.extend(rust::providers(code));
         found.extend(decorated(code));
         found.extend(django(code));
         found

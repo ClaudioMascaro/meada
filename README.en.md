@@ -194,7 +194,7 @@ renames, globs, `pub use` and the other workspace crates by name; method calls (
 indexed, and Rust contracts other than packages are not there yet; only each crate's default configuration is read, for a fixed x86_64 Linux target: an item under a false `#[cfg(..)]`, or under a feature outside the `Cargo.toml` `default`, stays out, and `mod` under `#[cfg(test)]` is in), and links repositories,
 also from one language to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp` and, in Rust, `reqwest` and `ureq`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
-Django and, in Rust, axum on the serving side, also behind a gateway; in Rust, a base URL read from the environment with `std::env::var`, `env!` or `dotenvy::var` links through `base_url_env`), through
+Django and, in Rust, axum, actix-web and Rocket on the serving side, also behind a gateway; in Rust, a base URL read from the environment with `std::env::var`, `env!` or `dotenvy::var` links through `base_url_env`), through
 the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
 `confluent-kafka` and `kafka-python` and, in Rust, `rdkafka`), RabbitMQ queues (`amqplib` and, in Python, `pika` and, in Rust, `lapin`, with a
 `publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK

@@ -1355,6 +1355,86 @@ fn rust() {
     conform(
         "conformance-rust",
         &[
+            "crates/actix/src/admin.rs::extra",
+            "crates/actix/src/admin.rs::extras",
+            "crates/actix/src/admin.rs::more",
+            "crates/actix/src/lib.rs::macros",
+            "crates/actix/src/macros.rs::conditional",
+            "crates/actix/src/macros.rs::listed",
+            "crates/actix/src/macros.rs::scoped",
+            "crates/actix/src/macros.rs::via_cfg_if",
+            "crates/actix/src/macros.rs::via_services",
+            "crates/actix/src/macros.rs::via_vec",
+            "crates/greeter/src/main.rs::index",
+            "crates/greeter/src/main.rs::names",
+            "crates/greeter/src/main.rs::rocket",
+            "crates/greeter/src/names.rs::named",
+            "crates/rocket/src/hiding.rs::rocket",
+            "crates/rocket/src/hiding.rs::rocket.Builder",
+            "crates/rocket/src/hiding.rs::rocket.Builder.mount",
+            "crates/rocket/src/hiding.rs::rocket.build",
+            "crates/rocket/src/hiding.rs::serve",
+            "crates/rocket/src/joined.rs::documented",
+            "crates/rocket/src/joined.rs::joined_a",
+            "crates/rocket/src/joined.rs::joined_b",
+            "crates/rocket/src/lib.rs::hiding",
+            "crates/rocket/src/lib.rs::joined",
+            "crates/rocket/src/stray.rs::local",
+            "crates/rocket/src/stray.rs::three",
+            "crates/actix/src/accounts.rs::api",
+            "crates/actix/src/accounts.rs::create",
+            "crates/actix/src/accounts.rs::files",
+            "crates/actix/src/accounts.rs::list",
+            "crates/actix/src/accounts.rs::remove",
+            "crates/actix/src/accounts.rs::show",
+            "crates/actix/src/accounts.rs::sync",
+            "crates/actix/src/admin.rs::audit",
+            "crates/actix/src/admin.rs::dashboard",
+            "crates/actix/src/admin.rs::prefix",
+            "crates/actix/src/admin.rs::routes",
+            "crates/actix/src/admin.rs::status",
+            "crates/actix/src/admin.rs::tools",
+            "crates/actix/src/admin.rs::unreadable",
+            "crates/actix/src/lib.rs::accounts",
+            "crates/actix/src/lib.rs::admin",
+            "crates/actix/src/lib.rs::orders",
+            "crates/actix/src/lib.rs::serve_catalog",
+            "crates/actix/src/lib.rs::serve_catalog.PUT /inline",
+            "crates/actix/src/lib.rs::stray",
+            "crates/actix/src/orders.rs::collection",
+            "crates/actix/src/orders.rs::create",
+            "crates/actix/src/orders.rs::echo",
+            "crates/actix/src/orders.rs::item",
+            "crates/actix/src/orders.rs::item.DELETE /orders/{}",
+            "crates/actix/src/orders.rs::list",
+            "crates/actix/src/orders.rs::ping",
+            "crates/actix/src/orders.rs::show",
+            "crates/actix/src/orders.rs::update",
+            "crates/actix/src/stray.rs::Holder",
+            "crates/actix/src/stray.rs::elsewhere",
+            "crates/actix/src/stray.rs::elsewhere.get",
+            "crates/actix/src/stray.rs::held",
+            "crates/actix/src/stray.rs::lonely",
+            "crates/actix/src/stray.rs::plain",
+            "crates/actix/src/stray.rs::plug",
+            "crates/actix/src/stray.rs::rebind",
+            "crates/actix/src/stray.rs::shadowed",
+            "crates/rocket/src/lib.rs::pages",
+            "crates/rocket/src/lib.rs::posts",
+            "crates/rocket/src/lib.rs::rocket",
+            "crates/rocket/src/lib.rs::stray",
+            "crates/rocket/src/pages.rs::about",
+            "crates/rocket/src/pages.rs::index",
+            "crates/rocket/src/posts.rs::create",
+            "crates/rocket/src/posts.rs::files",
+            "crates/rocket/src/posts.rs::legacy",
+            "crates/rocket/src/posts.rs::list",
+            "crates/rocket/src/posts.rs::old",
+            "crates/rocket/src/posts.rs::search",
+            "crates/rocket/src/posts.rs::show",
+            "crates/rocket/src/stray.rs::base",
+            "crates/rocket/src/stray.rs::lonely",
+            "crates/rocket/src/stray.rs::moved",
             "api/extra/legacy_util.rs::Store",
             "api/extra/legacy_util.rs::Store.new",
             "api/extra/legacy_util.rs::legacy",
@@ -2416,6 +2496,152 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
     assert_eq!(actual, expected);
 }
 
+/// The actix-web service of the Rust fixture (spec #30): attribute routes (`route` with several
+/// methods included) registered bare, in a tuple, in nested scopes and through a function that
+/// returns a scope; route builders on the app, resources and the service configurations
+/// `.configure` takes. A prefix read at run time serves nothing, a handler no call names is
+/// served at its own path, one a call names on a receiver Meada cannot read is served nowhere,
+/// and another crate's `get` attribute is no route.
+#[test]
+fn rust_actix_routes_are_providers_under_every_mount() {
+    let (_, actual) = providers("rust_actix", "conformance-rust", "crates/actix/src/");
+    let expected = pairs(&[
+        // Attributes registered bare and in a tuple.
+        ("http::GET::/accounts", "crates/actix/src/accounts.rs::list"),
+        (
+            "http::POST::/accounts",
+            "crates/actix/src/accounts.rs::create",
+        ),
+        (
+            "http::DELETE::/accounts/{}",
+            "crates/actix/src/accounts.rs::remove",
+        ),
+        // A scope nested in a scope; the handler is not served at the root as well.
+        (
+            "http::GET::/v1/admin/accounts/{}",
+            "crates/actix/src/accounts.rs::show",
+        ),
+        // A function that returns a scope, `#[route]` with two methods, `{tail:.*}`.
+        (
+            "http::PUT::/api/accounts/{}/sync",
+            "crates/actix/src/accounts.rs::sync",
+        ),
+        (
+            "http::PATCH::/api/accounts/{}/sync",
+            "crates/actix/src/accounts.rs::sync",
+        ),
+        (
+            "http::GET::/api/files/{}",
+            "crates/actix/src/accounts.rs::files",
+        ),
+        // Route builders on the app.
+        ("http::GET::/ping", "crates/actix/src/orders.rs::ping"),
+        ("http::ANY::/echo", "crates/actix/src/orders.rs::echo"),
+        (
+            "http::PUT::/inline",
+            "crates/actix/src/lib.rs::serve_catalog.PUT /inline",
+        ),
+        // Resources.
+        ("http::GET::/orders", "crates/actix/src/orders.rs::list"),
+        ("http::POST::/orders", "crates/actix/src/orders.rs::create"),
+        (
+            "http::PATCH::/orders/{}",
+            "crates/actix/src/orders.rs::update",
+        ),
+        ("http::HEAD::/orders/{}", "crates/actix/src/orders.rs::show"),
+        (
+            "http::DELETE::/orders/{}",
+            "crates/actix/src/orders.rs::item.DELETE /orders/{}",
+        ),
+        // `.configure(f)`: what `f` registers, with and without a scope around the call.
+        ("http::GET::/status", "crates/actix/src/admin.rs::status"),
+        (
+            "http::GET::/admin/dashboard",
+            "crates/actix/src/admin.rs::dashboard",
+        ),
+        (
+            "http::GET::/tools/audit",
+            "crates/actix/src/admin.rs::audit",
+        ),
+        // Written nowhere but where it is defined: its own path, no prefix. Handlers that code
+        // Meada does not read (`services!`, `vec!`, `cfg_if!`, an alias, a local of the name)
+        // mentions are possibly registered there: served nowhere.
+        ("http::GET::/stray/{}", "crates/actix/src/stray.rs::lonely"),
+        // A configuration passed on to the function a function calls.
+        (
+            "http::GET::/more/extras",
+            "crates/actix/src/admin.rs::extra",
+        ),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// The Rocket service of the Rust fixture (spec #30): attribute routes listed by `routes!` under
+/// each `mount` prefix, a function that returns the list, `<id>`, `<path..>` and a query part.
+/// A prefix read at run time serves nothing, and an unmounted handler is served at its own path.
+#[test]
+fn rust_rocket_routes_are_providers_under_their_mount() {
+    let (_, actual) = providers("rust_rocket", "conformance-rust", "crates/rocket/src/");
+    let expected = pairs(&[
+        ("http::GET::/", "crates/rocket/src/pages.rs::index"),
+        ("http::GET::/about", "crates/rocket/src/pages.rs::about"),
+        ("http::GET::/posts", "crates/rocket/src/posts.rs::list"),
+        ("http::GET::/posts/{}", "crates/rocket/src/posts.rs::show"),
+        ("http::POST::/posts", "crates/rocket/src/posts.rs::create"),
+        (
+            "http::GET::/posts/search",
+            "crates/rocket/src/posts.rs::search",
+        ),
+        (
+            "http::GET::/posts/files/{}",
+            "crates/rocket/src/posts.rs::files",
+        ),
+        (
+            "http::GET::/legacy/old/{}",
+            "crates/rocket/src/posts.rs::old",
+        ),
+        ("http::GET::/stray", "crates/rocket/src/stray.rs::lonely"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// Rocket's canonical form (spec #30): `#[macro_use] extern crate rocket;` brings its attributes
+/// into every module of the crate, bare.
+#[test]
+fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
+    let (_, actual) = providers("rust_greeter", "conformance-rust", "crates/greeter/src/");
+    let expected = pairs(&[
+        ("http::GET::/hello", "crates/greeter/src/main.rs::index"),
+        ("http::GET::/hello/{}", "crates/greeter/src/names.rs::named"),
+    ]);
+    assert_eq!(actual, expected);
+}
+
+/// The constants and returns the handlers of a call are expanded from share one budget: a list
+/// that fits is served under its scope, the same list past the budget is read no further.
+#[test]
+fn an_actix_list_expanded_past_the_work_budget_is_not_read() {
+    let repo = fixture_repo("rust_actix_work", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/actix/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod big;\n{lib}")).unwrap();
+    let n = 5000;
+    let handlers: String = (0..n)
+        .map(|i| format!("#[get(\"/h{i}\")]\nasync fn h{i}() {{}}\n"))
+        .collect();
+    let names: Vec<String> = (0..n).map(|i| format!("h{i}")).collect();
+    let big = format!(
+        "use actix_web::{{get, web, App}};\n{handlers}const ALL: [u8; {n}] = [{}];\n\
+         pub fn a() -> App<()> {{ App::new().service(web::scope(\"/a\").service(ALL)) }}\n\
+         pub fn b() -> App<()> {{ App::new().service(web::scope(\"/b\").service(ALL)) }}\n",
+        names.join(", ")
+    );
+    std::fs::write(src.join("big.rs"), big).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/a/h0\""));
+    assert!(!export.contains("http::GET::/b/h0\""));
+}
+
 /// A method router chain longer than the limit read is no provider; the same router with a
 /// short chain is.
 #[test]
@@ -2887,6 +3113,7 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
     let expected = [
         // `pub use` at the root, `pub` modules and the items of a `pub` module written in
         // place; a private module and what it holds are not.
+        "crates/actix/src/lib.rs serve_catalog crates/actix/src/lib.rs serve_catalog",
         "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
         "crates/billing/src/billing.rs invoice crates/billing/src/invoice.rs -",
         "crates/billing/src/billing.rs settle crates/billing/src/billing.rs settle",

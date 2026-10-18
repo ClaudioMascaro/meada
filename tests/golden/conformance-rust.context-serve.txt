@@ -1,14 +1,3 @@
-example.com/acme/conformance api/src/routes/mod.rs:5-9 serve
-community: api/src#5
-processes: 1 (1 program; 1 repository): main (example.com/acme/conformance)
-pub fn serve(store: &Store) {
-    health::check();
-    super::compute();
-    store.save();
-}
-callers:
-example.com/acme/conformance api/src/main.rs:124 main
-callees:
-example.com/acme/conformance api/src/routes/health.rs:1 check
-example.com/acme/conformance api/src/store.rs:42 Store.save
-example.com/acme/conformance api/src/main.rs:197 compute
+`serve` fits 2 symbols; pass one of:
+example.com/acme/conformance api/src/routes/mod.rs:5 api/src/routes/mod.rs::serve
+example.com/acme/conformance crates/rocket/src/hiding.rs:23 crates/rocket/src/hiding.rs::serve
