@@ -75,6 +75,7 @@ fn entries(field: &str, found: impl Iterator<Item = (String, Option<String>)>) -
             field: field.to_string(),
             name,
             range,
+            ..Entry::default()
         })
         .collect();
     entries.sort_by(|a, b| a.name.cmp(&b.name));

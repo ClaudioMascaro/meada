@@ -1,0 +1,277 @@
+{
+  "repository": "example.com/cargo/lib",
+  "files": [
+    {
+      "path": "app/src/main.rs",
+      "hash": "445d47e9d8bd1d493a14658ec13e67db015b12168c651f429d11d7c24227e0c8"
+    },
+    {
+      "path": "core/src/api.rs",
+      "hash": "28b4459cf8eaf4faeb3007679c177d6cda4a2485ffe3f858a7cfb3db02714761"
+    },
+    {
+      "path": "core/src/lib.rs",
+      "hash": "49f4e099a4626fb7de5fdf002697ed77d4477d80d6a5518841d911dc7fa6714f"
+    },
+    {
+      "path": "core/src/text.rs",
+      "hash": "42a7fea882ddf1a62b7004754b4e4246ab9f1fd7a363b0fe78c675fc119fb427"
+    },
+    {
+      "path": "extras/src/lib.rs",
+      "hash": "d2b1b723c96a1da21b2ab10dca0ec2f6c58e9705891f86fe541432c520866db6"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/cargo/lib::app/src/main.rs::main",
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 25,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/api.rs::Client",
+      "span": {
+        "path": "core/src/api.rs",
+        "start": 0,
+        "end": 18
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/api.rs::Client.create",
+      "span": {
+        "path": "core/src/api.rs",
+        "start": 38,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/lib.rs::api",
+      "span": {
+        "path": "core/src/lib.rs",
+        "start": 0,
+        "end": 12
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/lib.rs::text",
+      "span": {
+        "path": "core/src/lib.rs",
+        "start": 13,
+        "end": 22
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/text.rs::greet",
+      "span": {
+        "path": "core/src/text.rs",
+        "start": 0,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/text.rs::shout",
+      "span": {
+        "path": "core/src/text.rs",
+        "start": 76,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::extras/src/lib.rs::boost",
+      "span": {
+        "path": "extras/src/lib.rs",
+        "start": 0,
+        "end": 31
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/cargo/lib::app/src/main.rs::main::greet#0",
+      "caller": "example.com/cargo/lib::app/src/main.rs::main",
+      "target": "example.com/cargo/lib::core/src/text.rs::greet",
+      "level": "exact",
+      "span": {
+        "path": "app/src/main.rs",
+        "start": 41,
+        "end": 53
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/text.rs::greet::shout#0",
+      "caller": "example.com/cargo/lib::core/src/text.rs::greet",
+      "target": "example.com/cargo/lib::core/src/text.rs::shout",
+      "level": "exact",
+      "span": {
+        "path": "core/src/text.rs",
+        "start": 41,
+        "end": 72
+      }
+    },
+    {
+      "id": "example.com/cargo/lib::core/src/text.rs::shout::text.to_uppercase#0",
+      "caller": "example.com/cargo/lib::core/src/text.rs::shout",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "core/src/text.rs",
+        "start": 117,
+        "end": 136
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::cargo::inner-app",
+      "site": "example.com/cargo/lib::app/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::shared-core",
+      "site": "example.com/cargo/lib::core/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::shared-extras",
+      "site": "example.com/cargo/lib::extras/Cargo.toml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::cargo::shared-core",
+      "site": "example.com/cargo/lib::app/Cargo.toml::dependencies::shared-core",
+      "via": "path core/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::shared-extras",
+      "site": "example.com/cargo/lib::app/Cargo.toml::dependencies::shared-extras",
+      "via": "path extras/Cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "name": "inner-app",
+      "version": "0.1.0",
+      "repository": "example.com/cargo/lib",
+      "directory": "app",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "shared-core",
+      "version": "1.2.0",
+      "repository": "example.com/cargo/lib",
+      "directory": "core",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "shared-extras",
+      "version": "0.3.0",
+      "repository": "example.com/cargo/lib",
+      "directory": "extras",
+      "ecosystem": "cargo"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "app/Cargo.toml",
+      "field": "dependencies",
+      "name": "shared-core",
+      "range": "1.2"
+    },
+    {
+      "manifest": "app/Cargo.toml",
+      "field": "dependencies",
+      "name": "shared-extras"
+    }
+  ],
+  "communities": [
+    {
+      "name": "core/src",
+      "members": [
+        "example.com/cargo/lib::app/src/main.rs::main",
+        "example.com/cargo/lib::core/src/text.rs::greet",
+        "example.com/cargo/lib::core/src/text.rs::shout"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/cargo/lib::app/Cargo.toml::dependencies::shared-core",
+      "provider": "example.com/cargo/lib::core/Cargo.toml",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core 1.2 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/lib::app/Cargo.toml::dependencies::shared-extras",
+      "provider": "example.com/cargo/lib::extras/Cargo.toml",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::extras",
+      "provider": "example.com/cargo/lib::extras/Cargo.toml",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/Cargo.toml::dependencies::shared-core",
+      "provider": "example.com/cargo/lib::core/Cargo.toml",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/src/main.rs::connect::Client.create#0",
+      "provider": "example.com/cargo/lib::core/src/api.rs::Client.create",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/src/main.rs::lift::boost#0",
+      "provider": "example.com/cargo/lib::extras/src/lib.rs::boost",
+      "contract": "package::cargo::shared-extras",
+      "level": "exact",
+      "reason": "package::cargo::shared-extras none (local 0.3.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::app/src/main.rs::welcome::greet#0",
+      "provider": "example.com/cargo/lib::core/src/text.rs::greet",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::worker/Cargo.toml::dependencies::kit",
+      "provider": "example.com/cargo/lib::core/Cargo.toml",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core 1 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/web::worker/Cargo.toml::dependencies::shared-core",
+      "provider": "example.com/cargo/lib::core/Cargo.toml",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core 1.0 (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/cargo/web::worker/src/lib.rs::loud::kit.shout#0",
+      "provider": "example.com/cargo/lib::core/src/text.rs::shout",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core 1 (local 1.2.0), range unchecked; import crate name"
+    },
+    {
+      "consumer": "example.com/cargo/web::worker/src/lib.rs::run::shared_core.greet#0",
+      "provider": "example.com/cargo/lib::core/src/text.rs::greet",
+      "contract": "package::cargo::shared-core",
+      "level": "exact",
+      "reason": "package::cargo::shared-core 1.0 (local 1.2.0), range unchecked; import crate name"
+    }
+  ]
+}

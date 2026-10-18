@@ -36,8 +36,8 @@ one for the area a change touches.
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
-  resource and channel kinds. `package.rs`: npm and PyPI packages as contracts (specs #22 and
-  #24). Detail:
+  resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
+  #24 and #30). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -82,7 +82,9 @@ one for the area a change touches.
   and entry points are unique by identity. The stored export entry points are candidates:
   `Engine::exports` drops, after `package::import`, each one that is the target of an import
   from its own repository (a monorepo), at any level.
-- Package: `package::npm::<name>` or `package::pypi::<name>` (the PEP 503 normalized name),
+- Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
+  `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
+  a renamed crate has its own site),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -186,12 +188,12 @@ one for the area a change touches.
   routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
   keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
   (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
-  `flag`; PyPI's is never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
+  `flag`; PyPI's and Cargo's are never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
   range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
-  its file's (`Ecosystem::of_source`; none for a `.rs` file until Cargo is an ecosystem, so
-  `Packages::extract` stores no import row for it), and resolving the import into the provider is the
+  its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file), and resolving the import into the provider is the
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
-  `pypi_resolutions`, `Provided::module`). A change to what is stored bumps `SCHEMA_VERSION`.
+  `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to a
+  dependency key, then `Provided::resolve` from the crate's library root, `How::CrateName`). A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors

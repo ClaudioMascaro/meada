@@ -214,7 +214,7 @@ fn declared(
 
 /// `rel` joined to the directory `dir`, `.` and `..` folded: `None` when it is absolute or
 /// leaves the repository.
-fn join(dir: &str, rel: &str) -> Option<String> {
+pub fn join(dir: &str, rel: &str) -> Option<String> {
     if rel.starts_with('/') || rel.contains('\\') {
         return None;
     }
@@ -307,15 +307,7 @@ fn dependencies(
         if !manifest.contains_key("package") {
             continue;
         }
-        let mut lists: Vec<&toml::Table> = Vec::new();
-        for kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
-            lists.extend(manifest.get(kind).and_then(|d| d.as_table()));
-            let targets = manifest.get("target").and_then(|t| t.as_table());
-            for target in targets.into_iter().flat_map(|t| t.values()) {
-                lists.extend(target.get(kind).and_then(|d| d.as_table()));
-            }
-        }
-        for (key, spec) in lists.into_iter().flatten() {
+        for (_, key, spec) in entries(manifest) {
             let inherits = spec.get("workspace").and_then(|w| w.as_bool()) == Some(true);
             let spec = match inherits {
                 true => workspace(dir).and_then(|w| w.get(key)).unwrap_or(spec),
@@ -342,13 +334,33 @@ fn dependencies(
     out
 }
 
+/// Every dependency entry of a manifest as `(table, key, spec)`: those of `[dependencies]`,
+/// `[dev-dependencies]` and `[build-dependencies]`, each kind's plain table before the ones
+/// under `[target.*]`. The one reader of the entries: the module trees and the package
+/// contracts (`package::cargo`) both walk it.
+pub fn entries(manifest: &toml::Table) -> Vec<(&'static str, &str, &toml::Value)> {
+    let mut found = Vec::new();
+    let targets = manifest.get("target").and_then(|t| t.as_table());
+    for kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        let plain = manifest.get(kind).and_then(|d| d.as_table());
+        let nested = targets.into_iter().flat_map(|t| t.values());
+        let lists = plain
+            .into_iter()
+            .chain(nested.filter_map(|t| t.get(kind)?.as_table()));
+        for (key, spec) in lists.flatten() {
+            found.push((kind, key.as_str(), spec));
+        }
+    }
+    found
+}
+
 /// The name a path writes for a package: the hyphens turned into underscores.
-fn crate_name(name: &str) -> String {
+pub fn crate_name(name: &str) -> String {
     name.replace('-', "_")
 }
 
 /// The `[workspace.dependencies]` table of a manifest.
-fn workspace_deps(manifest: &toml::Table) -> Option<&toml::Table> {
+pub fn workspace_deps(manifest: &toml::Table) -> Option<&toml::Table> {
     manifest.get("workspace")?.get("dependencies")?.as_table()
 }
 

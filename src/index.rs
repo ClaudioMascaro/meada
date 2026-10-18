@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 24;
+const SCHEMA_VERSION: i64 = 25;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -1501,6 +1501,8 @@ fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Con
             }),
         }
     }
+    // A Cargo member's `workspace = true` entries read from a manifest above it.
+    package::cargo::inherit(&mut manifests);
     Ok((manifests, tsconfigs))
 }
 
@@ -1597,6 +1599,7 @@ mod tests {
         let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
         for (name, path) in [
+            ("sample.Cargo.toml", "Cargo.toml"),
             ("sample.pyproject.toml", "pyproject.toml"),
             ("sample.requirements.txt", "requirements.txt"),
         ] {

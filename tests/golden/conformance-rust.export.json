@@ -1893,8 +1893,88 @@
       }
     }
   ],
-  "providers": [],
-  "consumers": [],
+  "providers": [
+    {
+      "contract": "package::cargo::api",
+      "site": "example.com/acme/conformance::api/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::billing",
+      "site": "example.com/acme/conformance::crates/billing/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::ledger-core",
+      "site": "example.com/acme/conformance::crates/ledger-core/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::scratch",
+      "site": "example.com/acme/conformance::crates/scratch/Cargo.toml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::cargo::billing",
+      "site": "example.com/acme/conformance::api/Cargo.toml::dependencies::billing",
+      "via": "path crates/billing/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::ledger-core",
+      "site": "example.com/acme/conformance::api/Cargo.toml::dependencies::ledger-core",
+      "via": "path crates/ledger-core/Cargo.toml"
+    },
+    {
+      "contract": "package::cargo::ledger-core",
+      "site": "example.com/acme/conformance::crates/billing/Cargo.toml::dependencies::ledger-core",
+      "via": "path crates/ledger-core/Cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "name": "api",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "api",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "billing",
+      "version": "0.2.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "crates/billing",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "ledger-core",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "crates/ledger-core",
+      "ecosystem": "cargo"
+    },
+    {
+      "name": "scratch",
+      "version": "0.0.0",
+      "repository": "example.com/acme/conformance",
+      "directory": "crates/scratch",
+      "ecosystem": "cargo"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "api/Cargo.toml",
+      "field": "dependencies",
+      "name": "billing"
+    },
+    {
+      "manifest": "api/Cargo.toml",
+      "field": "dependencies",
+      "name": "ledger-core"
+    },
+    {
+      "manifest": "crates/billing/Cargo.toml",
+      "field": "dependencies",
+      "name": "ledger-core"
+    }
+  ],
   "communities": [
     {
       "name": "api/src",
@@ -2006,7 +2086,29 @@
       ]
     }
   ],
-  "links": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::api/Cargo.toml::dependencies::billing",
+      "provider": "example.com/acme/conformance::crates/billing/Cargo.toml",
+      "contract": "package::cargo::billing",
+      "level": "exact",
+      "reason": "package::cargo::billing none (local 0.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::api/Cargo.toml::dependencies::ledger-core",
+      "provider": "example.com/acme/conformance::crates/ledger-core/Cargo.toml",
+      "contract": "package::cargo::ledger-core",
+      "level": "exact",
+      "reason": "package::cargo::ledger-core none (local 0.1.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::crates/billing/Cargo.toml::dependencies::ledger-core",
+      "provider": "example.com/acme/conformance::crates/ledger-core/Cargo.toml",
+      "contract": "package::cargo::ledger-core",
+      "level": "exact",
+      "reason": "package::cargo::ledger-core none (local 0.1.0), range unchecked"
+    }
+  ],
   "processes": [
     {
       "entry_point": "example.com/acme/conformance::api/src/bin/sync/main.rs::main",

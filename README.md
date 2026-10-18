@@ -191,7 +191,7 @@ Versão 0.1, a primeira. Indexa repositórios TypeScript e JavaScript (`.ts`, `.
 fora) com as suas funções, tipos, traits, módulos e métodos de `impl` e as chamadas escritas
 como caminho (`crate::a::f()`, `Tipo::new()`, `Self::f()`), também por `use` (grupos,
 renomeações, globs, `pub use` e os outros crates do workspace pelo nome; as de dentro de macros
-não são indexadas, e contratos e pacotes Rust ainda não), e liga repositórios, também de uma
+não são indexadas, e contratos Rust além dos pacotes ainda não), e liga repositórios, também de uma
 linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django no lado que serve,
 também atrás de um gateway), pelos recursos
@@ -220,8 +220,16 @@ manda, e cada dependência de `[project] dependencies`, `[tool.poetry.dependenci
 `range unchecked` (faixas PyPI não são conferidas); um `import` de um módulo desse pacote
 atravessa até o código do provedor, `exact` quando o módulo tem o nome da distribuição,
 `inferred` quando é só um módulo de topo dela e `ambiguous` quando várias o expõem. Um pacote
-npm e um PyPI de mesmo nome nunca se ligam. Não lê lockfile nem consulta o registro npm ou o
-PyPI. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). O `meada export` traz as comunidades de cada repositório: grupos de símbolos que se chamam mais entre si do que com o resto, achados pelo algoritmo de Leiden sem nada aleatório e só com aritmética inteira, e nomeados pela pasta onde vive a maioria dos seus membros (`src`, `src#2`), iguais em toda máquina. Cada ligação tem o nível `exact`,
+npm e um PyPI de mesmo nome nunca se ligam. Em Rust, cada `Cargo.toml` com `[package] name` (cada
+membro de um workspace Cargo é um provedor) vira o contrato `package::cargo::<nome>`, e cada
+entrada de `[dependencies]`, `[dev-dependencies]` e `[build-dependencies]` se liga a ele: por
+`path`, ao crate dessa pasta no mesmo repositório (nunca a outro); por `git`, ao repositório cuja
+identidade é a URL normalizada; por versão, ao provedor de mesmo nome no workspace; `package =`
+dá o nome real de uma dependência renomeada e `workspace = true` lê `[workspace.dependencies]`.
+A ligação é `exact`, com a faixa como escrita e `range unchecked` (faixas Cargo não são
+conferidas), e um `use` do crate chega aos itens públicos do provedor pelos seus `pub use`, também
+`exact`, com `; import crate name` no fim da razão. Uma dependência fora do workspace não aparece.
+Não lê lockfile (`Cargo.lock` incluído) nem consulta o registro npm, o PyPI ou o crates.io. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). O `meada export` traz as comunidades de cada repositório: grupos de símbolos que se chamam mais entre si do que com o resto, achados pelo algoritmo de Leiden sem nada aleatório e só com aritmética inteira, e nomeados pela pasta onde vive a maioria dos seus membros (`src`, `src#2`), iguais em toda máquina. Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
 aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`, e uma rota que o Meada não sabe onde é servida fica fora do mapa em vez de
 ser adivinhada. Clusters de

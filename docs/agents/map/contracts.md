@@ -268,7 +268,8 @@ modules updates it.
   npm and a PyPI package of one name never link, and `nearest` takes the ecosystem (a file's
   nearest `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package
   of its `owner`: the nearest `package.json`, or the nearest `pyproject.toml` (a
-  `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
+  `requirements*.txt` names no package, so it bounds none; a `Cargo.toml` with no `[package]`, a
+  virtual workspace root, bounds none either). `package/pypi.rs` reads a
   `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
   dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
@@ -292,3 +293,27 @@ modules updates it.
   `shared_lib.api`, then `greet`), and `Provided::member` takes a package's submodule when its
   `__init__.py` exports no such name. `surface` reads npm manifests alone: no shape crosses a
   PyPI package.
+  Cargo (spec #30): `Ecosystem::Cargo` names `Cargo.toml`. `package/cargo.rs` reads one through
+  the Rust pack's walker (`lang::rust::crates::entries`, also what the module trees use): `name`
+  and `version` of `[package]`, `main` the library root (`[lib] path`, else `src/lib.rs`, relative
+  to the manifest), and the entries of `[dependencies]`, `[dev-dependencies]` and
+  `[build-dependencies]`, also under `[target.*]`, as `Entry` with `name` the real crate
+  (`package =`), `alias` the key when renamed, `range` the version requirement and `via` where it
+  comes from: `path <manifest>` (`path` joined to the manifest's directory; one that leaves the
+  repository drops the entry), `git <identity>` (`repo::normalize_remote`) or none. A
+  `workspace = true` entry is kept as `inherits` and `[workspace.dependencies]` as
+  `Summary::workspace`; `cargo::inherit`, run by `index::read_manifests` over the whole list,
+  fills each from the nearest manifest above it, so a refresh equals a cold export. The consumer
+  site names the key (`<repository>::<path>::<field>::<key>`) and `Consumer::via` carries
+  `Entry::via`, which `Ecosystem::reaches` checks against the provider: `path` only the manifest
+  at that path of the same repository, `git` only the repository of that identity, a version
+  every repository. The range is never evaluated (`range unchecked`). A `use` (`Packages::extract`
+  stores the call when `Code::imported` names a crate head, `cargo::names_crate`: not `std`,
+  `core` or `alloc`) resolves in `resolutions` through the file's nearest named `Cargo.toml`:
+  the head, hyphens as underscores, must equal a dependency's key, and `Provided::resolve` then
+  follows the chain from the provider's library root through the `exported` rows of the Rust
+  pack (`pub mod`, `pub use`), `exact` with `How::CrateName` (`; import crate name`) and no
+  `ambiguous` fallback. A crate of the repository itself is reached through the module tree
+  instead, so a path or version dependency inside the repository links at the manifest only.
+  Limits: a `[lib] name` that differs from the package name is not matched by a `use`, and
+  `version.workspace = true` leaves the provider's version `none`.
