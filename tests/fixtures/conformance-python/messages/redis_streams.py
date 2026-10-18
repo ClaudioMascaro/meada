@@ -5,13 +5,16 @@ import os
 import redis
 import redis.asyncio as aioredis
 from not_redis import Redis as FakeRedis
-from redis import Redis
+from redis import Redis, StrictRedis
 
 from .topics import ORDERS, SHIPMENTS
 
 client = redis.Redis(host="redis")
 pool = aioredis.Redis(host="redis")
 imported = Redis.from_url("redis://redis")
+legacy = StrictRedis(host="redis")
+by_url = redis.from_url("redis://redis")
+async_by_url = aioredis.from_url("redis://redis")
 fake = FakeRedis()
 
 
@@ -21,6 +24,13 @@ def append_all():
     client.xadd(name=SHIPMENTS, fields={"id": "1"})
     pool.xadd(f"{SHIPMENTS}.eu", {"id": "1"})
     imported.xadd("returns", {"id": "1"})
+
+
+def append_more():
+    # The other ways to make a client: the old class name and `from_url` of each module.
+    legacy.xadd("legacy", {"id": "1"})
+    by_url.xadd("by-url", {"id": "1"})
+    async_by_url.xadd("async-by-url", {"id": "1"})
 
 
 # A client wrapper: each call site of `append` produces, with its stream.

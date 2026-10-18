@@ -483,11 +483,13 @@ one for the area a change touches.
   makes the `Worker` handles).
 - `lang/python/messages.rs`: a client is traced to its constructor by `Code::origins` (a name its
   scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
-  value a function returns), with one level of `channel()` or `client()` above it (a pika
-  channel of a connection, a boto3 client of a session); deeper factories, a client held in a
-  container and a module imported under another path (`kafka.producer.KafkaProducer`) are not
-  recognized. A boto3 client counts for SQS when its service is the literal `"sqs"` (a name or
-  constant is not followed). A pika `queue_bind` whose queue, exchange or routing key is left out
+  value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
+  `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
+  `client()` above it (a pika channel of a connection, a boto3 client of a session); deeper
+  factories, a client held in a container and a module imported under another path
+  (`kafka.producer.KafkaProducer`) are not recognized. A boto3 client counts for SQS when its
+  service is the literal `"sqs"` (a name or constant is not followed). A topic that starts with
+  `^` is a regular expression, so it is an unresolved name. A pika `queue_bind` whose queue, exchange or routing key is left out
   or not a literal is dropped. A callback is a handler when it is a definition of the repository
   (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
@@ -628,7 +630,9 @@ one for the area a change touches.
 - `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
   scanning the calls of every repository, once per link (no marker); an index by call id waits
   for a workspace that makes this slow.
-- `lang/python.rs`: only the root `pyproject.toml` is read, and only the setuptools and Poetry
+- `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
+  `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
+  stack. Only the root `pyproject.toml` is read, and only the setuptools and Poetry
   root declarations. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name

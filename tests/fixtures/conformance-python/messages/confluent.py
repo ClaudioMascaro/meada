@@ -42,6 +42,13 @@ def consume_refunds():
     return consumer.poll(1.0)
 
 
+def consume_pattern():
+    # A topic that starts with `^` is a regular expression: it names no topic.
+    consumer = Consumer({"group.id": "patterns"})
+    consumer.subscribe(["^orders\\..*"])
+    return consumer.poll(1.0)
+
+
 def produce_unknown():
     # A topic read from the environment cannot be evaluated: an unresolved producer.
     producer.produce(os.environ["TOPIC"], b"{}")

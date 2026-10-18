@@ -38,6 +38,15 @@ def send_session():
     queues.send_message(QueueUrl=f"{REGION_URL}/session", MessageBody="{}")
 
 
+def send_chained():
+    # Clients written as a chain of calls: a client of a session made in place, and a method
+    # called on a client made in place. The service decides, as for any client.
+    chained = boto3.Session(region_name="eu-west-1").client("sqs")
+    chained.send_message(QueueUrl=f"{REGION_URL}/chained", MessageBody="{}")
+    boto3.client("sqs").send_message(QueueUrl=f"{REGION_URL}/inline", MessageBody="{}")
+    boto3.client("s3").send_message(QueueUrl=f"{REGION_URL}/other", MessageBody="{}")
+
+
 def receive_jobs():
     # The function that receives handles.
     return sqs.receive_message(QueueUrl=JOBS, MaxNumberOfMessages=10)

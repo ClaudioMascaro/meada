@@ -18,11 +18,14 @@ const BOTO3_CLIENTS: [&str; 3] = [
     "boto3.Session.client",
     "boto3.session.Session.client",
 ];
-const REDIS_CLIENTS: [&str; 4] = [
+const REDIS_CLIENTS: [&str; 7] = [
     "redis.Redis",
+    "redis.StrictRedis",
     "redis.Redis.from_url",
+    "redis.from_url",
     "redis.asyncio.Redis",
     "redis.asyncio.Redis.from_url",
+    "redis.asyncio.from_url",
 ];
 /// The methods of a client that a form is made of.
 const METHODS: [&str; 12] = [
@@ -41,6 +44,8 @@ const METHODS: [&str; 12] = [
 ];
 /// The calls on a client that make another one: a connection's channel, a session's client.
 const FACTORIES: [&str; 2] = ["channel", "client"];
+/// The callee of a call made on the result of another call, `pika.BlockingConnection(p).channel()`.
+const CALL: &str = "(call)";
 
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value], &Keywords) -> Option<Vec<Option<String>>>;
@@ -65,22 +70,25 @@ struct Maker<'a> {
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
+        let kafka = facts.imports.iter().any(|i| i.source == "kafka");
         for (n, call) in facts.calls.iter().enumerate() {
             let (receiver, method) = (call.callee.rsplit_once('.')).unwrap_or(("", &call.callee));
-            // kafka-python consumers take their topics from the constructor.
-            if method == "KafkaConsumer" {
-                if imported(code, path, &call.scope, &call.callee).as_deref()
+            // kafka-python consumers take their topics from the constructor, however it is
+            // imported.
+            if kafka
+                && imported(code, path, &call.scope, &call.callee).as_deref()
                     == Some(KAFKA_CONSUMER)
-                {
-                    let read = |a: &[Value], _: &Keywords| a.iter().map(name).collect();
-                    out.extend(consume(code, path, n, "kafka", &read, None));
-                }
+            {
+                let read = |a: &[Value], _: &Keywords| a.iter().map(topic).collect();
+                out.extend(consume(code, path, n, "kafka", &read, None));
                 continue;
             }
-            if receiver.is_empty() || receiver.starts_with('(') || !METHODS.contains(&method) {
+            // The receiver is a name, or a call written in place: `boto3.client("sqs").send_message`.
+            let written = receiver == CALL || !receiver.starts_with('(');
+            if receiver.is_empty() || !written || !METHODS.contains(&method) {
                 continue;
             }
-            let makers = makers(code, path, &call.scope, receiver, true);
+            let makers = receivers(code, path, call, true);
             let Some(client) = makers.iter().find_map(client) else {
                 continue;
             };
@@ -91,7 +99,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     }));
                 }
                 (Client::KafkaConsumer, "subscribe") => {
-                    let read = |a: &[Value], k: &Keywords| names(arg(a, k, 0, "topics"));
+                    let read = |a: &[Value], k: &Keywords| topics(arg(a, k, 0, "topics"));
                     out.extend(consume(code, path, n, "kafka", &read, None));
                 }
                 (Client::Sqs, "send_message" | "send_message_batch") => {
@@ -190,39 +198,56 @@ fn client(maker: &Maker) -> Option<Client> {
     })
 }
 
-/// The calls that made the client `receiver` may be, written in `path` within `scope`: the
-/// constructors and factories of a package outside the repository. A call that is a method of
-/// another client (`connection.channel()`) is named after the constructor of that one, a level
+/// The calls that made the client `form` is called on, written in `path`: the constructors and
+/// factories of a package outside the repository that its receiver traces back to, or the
+/// receiver itself when it is a call written in place. A factory (a connection's `channel()`, a
+/// session's `client()`) is named after the constructor of the client it is called on, a level
 /// deep.
-// ponytail: only one level of client factories is followed (a channel of a connection, a client
-// of a session).
-fn makers<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    scope: &'a str,
-    receiver: &'a str,
-    through: bool,
-) -> Vec<Maker<'a>> {
-    let mut found = Vec::new();
-    for (at, i) in code.origins(path, scope, receiver) {
-        let Some(call) = code.call(at, i) else {
-            continue;
-        };
-        if let Some(name) = imported(code, at, &call.scope, &call.callee) {
-            found.push(Maker { name, call });
-            continue;
-        }
-        let Some((inner, method)) = call.callee.rsplit_once('.') else {
-            continue;
-        };
-        if through && FACTORIES.contains(&method) {
-            for made in makers(code, at, &call.scope, inner, false) {
-                let name = format!("{}.{method}", made.name);
-                found.push(Maker { name, call });
-            }
-        }
+// ponytail: only one level of client factories is followed.
+fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) -> Vec<Maker<'a>> {
+    let receiver = form.callee.rsplit_once('.').map_or("", |(r, _)| r);
+    let made: Vec<(&'a str, &'a Call)> = if receiver == CALL {
+        head(code, path, form)
+            .map(|call| (path, call))
+            .into_iter()
+            .collect()
+    } else {
+        (code.origins(path, &form.scope, receiver).into_iter())
+            .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
+            .collect()
+    };
+    (made.into_iter())
+        .flat_map(|(at, call)| made_by(code, at, call, through))
+        .collect()
+}
+
+/// The client the call `call` made, written in `at`: a constructor of a package outside the
+/// repository, or a factory on a client that one made.
+fn made_by<'a>(code: &Code<'a>, at: &'a str, call: &'a Call, through: bool) -> Vec<Maker<'a>> {
+    if let Some(name) = imported(code, at, &call.scope, &call.callee) {
+        return vec![Maker { name, call }];
     }
-    found
+    let method = call.callee.rsplit_once('.').map(|(_, method)| method);
+    match method {
+        Some(method) if through && FACTORIES.contains(&method) => {
+            (receivers(code, at, call, false).into_iter())
+                .map(|made| Maker {
+                    name: format!("{}.{method}", made.name),
+                    call,
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// The call that `form`, a method called on a call written in place (`X(...).method()`), is
+/// called on: the last to end of the calls that start where `form` does, inside it.
+fn head<'a>(code: &Code<'a>, path: &'a str, form: &Call) -> Option<&'a Call> {
+    let (at, _) = (code.files()[path].calls.iter().enumerate())
+        .filter(|(_, c)| c.range.start == form.range.start && c.range.end < form.range.end)
+        .max_by_key(|(_, c)| c.range.end)?;
+    code.call(path, at)
 }
 
 /// What `callee`, written in `scope` of `path`, names in a package outside the repository,
@@ -318,13 +343,19 @@ fn one(args: &[Value], kwargs: &Keywords, at: usize, key: &str) -> Option<Vec<Op
     Some(vec![arg_name(args, kwargs, at, key)?])
 }
 
-/// The channel names of a list of them, or of the one a value gives. `None` when one depends on
-/// a parameter (a client wrapper); a name that is not a literal string is unresolved (`None`
-/// in the list).
-fn names(value: &Value) -> Option<Vec<Option<String>>> {
+/// A Kafka topic name (see `channel_name`). A name that starts with `^` is a regular expression
+/// that picks topics at run time, so it names none.
+fn topic(value: &Value) -> Option<Option<String>> {
+    Some(name(value)?.filter(|t| !t.starts_with('^')))
+}
+
+/// The topics of a list of them, or of the one a value gives. `None` when one depends on a
+/// parameter (a client wrapper); a name that is not a literal string is unresolved (`None` in
+/// the list).
+fn topics(value: &Value) -> Option<Vec<Option<String>>> {
     match value {
-        Value::List(items) => items.iter().map(name).collect(),
-        value => Some(vec![name(value)?]),
+        Value::List(items) => items.iter().map(topic).collect(),
+        value => Some(vec![topic(value)?]),
     }
 }
 

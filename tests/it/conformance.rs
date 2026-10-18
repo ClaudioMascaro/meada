@@ -566,6 +566,7 @@ fn python() {
             "messages/confluent.py::Counter",
             "messages/confluent.py::Counter.produce",
             "messages/confluent.py::consume_orders",
+            "messages/confluent.py::consume_pattern",
             "messages/confluent.py::consume_refunds",
             "messages/confluent.py::emit",
             "messages/confluent.py::emit_refund",
@@ -577,6 +578,7 @@ fn python() {
             "messages/kafka_python.py::Relay.__init__",
             "messages/kafka_python.py::Relay.forward",
             "messages/kafka_python.py::idle",
+            "messages/kafka_python.py::listen_alias",
             "messages/kafka_python.py::listen_invoices",
             "messages/kafka_python.py::listen_retries",
             "messages/kafka_python.py::not_sent",
@@ -615,10 +617,12 @@ fn python() {
             "messages/pika_amqp.py::on_task",
             "messages/pika_amqp.py::queue",
             "messages/pika_amqp.py::record",
+            "messages/pika_amqp.py::send_chained",
             "messages/pika_amqp.py::send_mail",
             "messages/redis_streams.py::append",
             "messages/redis_streams.py::append_all",
             "messages/redis_streams.py::append_audit",
+            "messages/redis_streams.py::append_more",
             "messages/redis_streams.py::append_unknown",
             "messages/redis_streams.py::not_streamed",
             "messages/redis_streams.py::read_many",
@@ -639,6 +643,7 @@ fn python() {
             "messages/sqs_boto.py::receive_session",
             "messages/sqs_boto.py::receive_unknown",
             "messages/sqs_boto.py::send_batch",
+            "messages/sqs_boto.py::send_chained",
             "messages/sqs_boto.py::send_job",
             "messages/sqs_boto.py::send_session",
             "methods.py::Base",
@@ -2388,6 +2393,8 @@ fn python_kafka_clients_are_channel_producers_and_consumers() {
                 "",
                 &confluent("consume_refunds")
             ),
+            // A topic that starts with `^` is a regular expression, so it names no topic.
+            ("channel::kafka", "", &confluent("consume_pattern")),
         ])
     );
 
@@ -2417,6 +2424,8 @@ fn python_kafka_clients_are_channel_producers_and_consumers() {
             ("channel::kafka::invoices", "", &kafka("listen_invoices")),
             ("channel::kafka::audits", "", &kafka("listen_invoices")),
             ("channel::kafka::retries", "", &kafka("listen_retries")),
+            // A constructor imported under another name.
+            ("channel::kafka::alias", "", &kafka("listen_alias")),
         ])
     );
 
@@ -2509,6 +2518,15 @@ fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
                 "channel::amqp::reports",
                 &rabbit("Worker.enqueue::self.channel.basic_publish#0")
             ),
+            // Clients written as a chain of calls.
+            (
+                "channel::amqp::chained",
+                &rabbit("send_chained::sender.basic_publish#0")
+            ),
+            (
+                "channel::amqp::inline",
+                &rabbit("send_chained::(call).basic_publish#0")
+            ),
         ])
     );
     // A lambda is no definition: the function that consumes handles.
@@ -2579,6 +2597,15 @@ fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
             (
                 "channel::sqs::session",
                 &sqs("send_session::queues.send_message#0")
+            ),
+            // Clients written as a chain of calls; the one made for `"s3"` is no producer.
+            (
+                "channel::sqs::chained",
+                &sqs("send_chained::chained.send_message#0")
+            ),
+            (
+                "channel::sqs::inline",
+                &sqs("send_chained::(call).send_message#0")
             ),
         ])
     );
@@ -2767,6 +2794,19 @@ fn python_redis_streams_are_channel_producers_and_consumers() {
                 &redis("append_audit::append#0")
             ),
             ("channel::redis", &redis("append_unknown::client.xadd#0")),
+            // The old class name, and `from_url` of `redis` and of `redis.asyncio`.
+            (
+                "channel::redis::legacy",
+                &redis("append_more::legacy.xadd#0")
+            ),
+            (
+                "channel::redis::by-url",
+                &redis("append_more::by_url.xadd#0")
+            ),
+            (
+                "channel::redis::async-by-url",
+                &redis("append_more::async_by_url.xadd#0")
+            ),
         ])
     );
     assert_eq!(

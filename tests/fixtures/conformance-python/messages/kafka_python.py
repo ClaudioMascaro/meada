@@ -2,6 +2,7 @@
 
 import kafka
 from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer as KC
 from not_kafka import KafkaProducer as FakeProducer
 
 producer = KafkaProducer(bootstrap_servers="kafka:9092")
@@ -36,6 +37,11 @@ def listen_retries():
     consumer = kafka.KafkaConsumer(bootstrap_servers="kafka:9092")
     consumer.subscribe(topics=["retries"])
     return consumer
+
+
+def listen_alias():
+    # A constructor imported under another name.
+    return KC("alias", bootstrap_servers="kafka:9092")
 
 
 def idle():

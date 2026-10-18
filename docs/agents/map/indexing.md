@@ -145,15 +145,18 @@ modules updates it.
   names the constructor it reached from the file's imports (`Code::imported`:
   `confluent_kafka.Producer`, however it is imported; `Code::external` also answers for a method
   of a typed local, so it is not used). One `channel()` or `client()` above a constructor is
-  followed (`pika.BlockingConnection.channel`, `boto3.Session.client`). Forms: confluent-kafka
+  followed (`pika.BlockingConnection.channel`, `boto3.Session.client`), also when the client is a
+  call written in place (`boto3.client("sqs").send_message(...)`): `head` takes the call that
+  starts where the outer one does and ends last inside it, since the callee of such a call is
+  `(call).method`. A `KafkaConsumer` is told by its resolved name, so an alias counts. Forms: confluent-kafka
   `Producer.produce(topic)` and `Consumer.subscribe(topics)`; kafka-python `KafkaProducer.send(topic)`,
-  the topics a `KafkaConsumer(...)` constructor takes and `subscribe(topics=)`; pika
+  the topics a `KafkaConsumer(...)` constructor takes and `subscribe(topics=)` (a `^` topic is a regular expression, so it is unresolved); pika
   `basic_publish(exchange, routing_key)` (the empty exchange is a producer of the key),
   `basic_consume(queue, on_message_callback)` and `queue_bind(queue, exchange, routing_key)`;
   boto3 `send_message`, `send_message_batch` and `receive_message` with `QueueUrl=` on a client
   made for `"sqs"`; nats-py `publish(subject)` and `subscribe(subject, cb=)` on `nats.connect()`
   or `nats.aio.client.Client()`; redis-py `xadd(name)` and the keys of `xreadgroup(...,
-  streams={...})` on `Redis` (`redis` or `redis.asyncio`, also `Redis.from_url`). A polling
+  streams={...})` on `Redis` or `StrictRedis` (`redis` or `redis.asyncio`, also `from_url`). A polling
   client's handler is the function that subscribes. The pack's `value` reads `await x` as `x`
   (a traced `nc = await nats.connect()`) and a dict literal as `Value::Object` (a key that is
   no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds

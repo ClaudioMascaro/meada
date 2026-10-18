@@ -84,6 +84,16 @@ def send_mail():
         sender.basic_publish("", "mail", b"{}")
 
 
+def send_chained():
+    # Clients written as a chain of calls: a channel made in place, and a method called on a
+    # channel made in place.
+    sender = pika.BlockingConnection(pika.ConnectionParameters("rabbit")).channel()
+    sender.basic_publish("", "chained", b"{}")
+    pika.BlockingConnection(pika.ConnectionParameters("rabbit")).channel().basic_publish(
+        "", "inline", b"{}"
+    )
+
+
 class Worker:
     def __init__(self):
         self.connection = BlockingConnection(pika.ConnectionParameters("rabbit"))
