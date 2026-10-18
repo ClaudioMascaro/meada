@@ -426,6 +426,11 @@ sample.py
       "local": "*",
       "source": ".models",
       "name": "All"
+    },
+    {
+      "local": "*",
+      "source": ".extras",
+      "name": "All"
     }
   ],
   "exports": [
@@ -475,6 +480,11 @@ sample.py
       "Local": {
         "exported": "main",
         "local": "main"
+      }
+    },
+    {
+      "All": {
+        "source": ".extras"
       }
     },
     {

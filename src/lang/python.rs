@@ -384,9 +384,9 @@ impl Module {
     }
 
     /// What an explicit import or an attribute access names: every module-level name (imports
-    /// included, as that is how a package re-exports) and its star imports' names. What
-    /// `import *` takes is a literal `__all__`, else the public names; a computed `__all__` is
-    /// ignored.
+    /// included, as that is how a package re-exports) and its star imports' names, the last
+    /// star import first, as it rebinds the names of those before it. What `import *` takes is
+    /// a literal `__all__`, else the public names; a computed `__all__` is ignored.
     fn exports(self) -> (Vec<Export>, Star) {
         let mut seen = HashSet::new();
         let exports = (self.names.into_iter())
@@ -395,7 +395,12 @@ impl Module {
                 exported: name.clone(),
                 local: name,
             })
-            .chain(self.stars.into_iter().map(|source| Export::All { source }))
+            .chain(
+                self.stars
+                    .into_iter()
+                    .rev()
+                    .map(|source| Export::All { source }),
+            )
             .collect();
         (exports, self.all.map_or(Star::Public, Star::Only))
     }

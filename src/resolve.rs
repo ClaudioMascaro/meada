@@ -69,8 +69,8 @@ struct Caller<'a> {
 
 /// What resolving one name follows through exports: the `(file, exported name)` pairs seen, as
 /// re-exports may form cycles, how many exports deep it is now, and whether an export was cut
-/// at `REEXPORT_DEPTH`. A cut export is unknown, not absent: a module that may export the name
-/// leaves it unknown rather than let another import or module bind it.
+/// at `REEXPORT_DEPTH`. A cut export is unknown, not absent (`Resolver::exports`): a module
+/// that may export the name leaves it unknown rather than let another import or module bind it.
 #[derive(Default)]
 struct Seen<'a> {
     pairs: HashSet<(&'a str, &'a str)>,
@@ -593,7 +593,7 @@ impl<'a> Resolver<'a> {
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
-    /// `name` only if the module takes it; one cut at `REEXPORT_DEPTH` leaves it unknown.
+    /// `name` only if the module exports it (`star`), to whatever it is there.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         for import in self.files[path].imports.iter().rev() {
             if import.local == name {
@@ -601,12 +601,9 @@ impl<'a> Resolver<'a> {
             }
             if matches!(import.name, Imported::All)
                 && let Some(module) = self.module(path, &import.source)
+                && let Some(found) = self.star(module, name, seen)
             {
-                match self.star(module, name, seen) {
-                    found @ (Binding::Def(_) | Binding::Module(_)) => return found,
-                    _ if seen.cut => return Binding::Unknown,
-                    _ => {}
-                }
+                return found;
             }
         }
         Binding::Unknown
@@ -655,24 +652,31 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// What a star import of `path` takes as `name`.
-    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+    /// What a star import of `path` takes as `name` (`exports`).
+    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         if self.files[path].star.takes(name) {
-            self.export(path, name, seen)
+            self.exports(path, name, seen)
         } else {
-            Binding::Unknown
+            None
         }
     }
 
-    /// What `path` exports as `name`: all it lets an explicit import name. Unknown more than
-    /// `REEXPORT_DEPTH` exports deep, where `seen` records the cut.
+    /// What `path` exports as `name`: all it lets an explicit import name.
     fn export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+        self.exports(path, name, seen).unwrap_or(Binding::Unknown)
+    }
+
+    /// `export`, or `None` when `path` exports no `name`, so that another star may bind it. An
+    /// export of what is not known (a constant, something from outside the repository, an
+    /// export cut more than `REEXPORT_DEPTH` exports deep, where `seen` records the cut) is
+    /// still the name's: no other star binds it.
+    fn exports(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         if seen.depth >= REEXPORT_DEPTH {
             seen.cut = true;
-            return Binding::Unknown;
+            return Some(Binding::Unknown);
         }
         if !seen.pairs.insert((path, name)) {
-            return Binding::Unknown;
+            return None;
         }
         seen.depth += 1;
         let found = self.own_export(path, name, seen);
@@ -680,34 +684,27 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// `export`, once `path` and `name` are seen.
-    fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
+    /// `exports`, once `path` and `name` are seen. The first `export *` that exports `name`
+    /// exports it: a pack lists them in the order its language lets them bind it.
+    fn own_export(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
         for export in exports {
             match export {
                 Export::Local { exported, local } if exported == name => {
-                    return self.lexical(path, "", local, seen);
+                    return Some(self.lexical(path, "", local, seen));
                 }
                 Export::From {
                     exported,
                     source,
                     name: imported,
-                } if exported == name => return self.import(path, source, imported, seen),
+                } if exported == name => return Some(self.import(path, source, imported, seen)),
                 _ => {}
             }
         }
-        for export in exports {
-            if let Export::All { source } = export
-                && let Some(module) = self.module(path, source)
-            {
-                match self.star(module, name, seen) {
-                    found @ (Binding::Def(_) | Binding::Module(_)) => return found,
-                    _ if seen.cut => return Binding::Unknown,
-                    _ => {}
-                }
-            }
-        }
-        Binding::Unknown
+        exports.iter().find_map(|export| match export {
+            Export::All { source } => self.star(self.module(path, source)?, name, seen),
+            _ => None,
+        })
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
@@ -1864,6 +1861,65 @@ mod tests {
         };
         assert_eq!(member(String::new()).as_deref(), Some("pkg/x.py"));
         assert_eq!(member(py_link(cut - 1)), None);
+    }
+
+    #[test]
+    fn a_star_that_binds_a_name_to_no_function_hides_the_stars_before_it() {
+        use crate::lang::ts::TsJs;
+
+        let src = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+            (pairs.iter())
+                .map(|(p, s)| (p.to_string(), s.to_string()))
+                .collect()
+        };
+        // `a` binds `x` to a constant, to something from outside the repository, or to a name
+        // it binds twice; `b` defines `def x()`. The last star import binds `x` to `a`'s, which
+        // no call reaches exactly, and never to `b`'s.
+        for a in ["x = 1\n", "from os import x\n", "x = f()\nx = g()\n"] {
+            let b = "def x():\n    pass\n";
+            let imported = src(&[
+                ("a.py", a),
+                ("b.py", b),
+                ("main.py", "from b import *\nfrom a import *\nx()\n"),
+            ]);
+            assert_eq!(exact_in(&Python, &imported, "main.py", "x"), None, "{a}");
+            // The same through a module that star-imports both and is imported by name.
+            let exported = src(&[
+                ("a.py", a),
+                ("b.py", b),
+                ("m.py", "from b import *\nfrom a import *\n"),
+                ("main.py", "from m import x\nx()\n"),
+            ]);
+            assert_eq!(exact_in(&Python, &exported, "main.py", "x"), None, "{a}");
+        }
+        // The first `export *` that has `x` exports it.
+        for a in ["export const x = 1;\n", "export { x } from 'ext';\n"] {
+            let sources = src(&[
+                ("a.ts", a),
+                ("b.ts", "export function x() {}\n"),
+                ("m.ts", "export * from './a';\nexport * from './b';\n"),
+                ("main.ts", "import { x } from './m';\nx();\n"),
+            ]);
+            assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None, "{a}");
+        }
+    }
+
+    #[test]
+    fn the_last_star_import_of_a_module_exports_the_name() {
+        // `m` star-imports `b`, then `a`: the later rebinds `x`, so `from m import x` is `a`'s.
+        let def = "def x():\n    pass\n";
+        let sources: Vec<(String, String)> = [
+            ("a.py", def),
+            ("b.py", def),
+            ("m.py", "from b import *\nfrom a import *\n"),
+            ("main.py", "from m import x\nx()\n"),
+        ]
+        .map(|(p, s)| (p.to_string(), s.to_string()))
+        .into();
+        assert_eq!(
+            exact_in(&Python, &sources, "main.py", "x").as_deref(),
+            Some("a.py")
+        );
     }
 
     #[test]
