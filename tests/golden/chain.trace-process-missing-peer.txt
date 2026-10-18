@@ -1,0 +1,13 @@
+process dashboard
+example.com/chain/web src/dashboard.ts:4 dashboard
+  example.com/chain/web src/status.ts:2 health
+    →[inferred: host unresolved; the only repository serving it is example.com/chain/gateway] example.com/chain/gateway src/server.ts:7 GET /api/health
+  example.com/chain/web src/status.ts:7 track
+    example.com/chain/web src/status.ts:8 (unresolved) fetch
+  example.com/chain/web src/orders.ts:5 listOrders
+    example.com/chain/web src/api/client.ts:4 request
+    →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/gateway src/orders.ts:5 listOrders
+      example.com/chain/gateway src/catalog.ts:2 productOf
+      example.com/chain/gateway src/orders.ts:6 consumes http::GET::/api/products/{}, no provider
+chain: inferred · 2 hops · 2 repos · 229 tokens
+missing peer: example.com/chain/catalog, named by example.com/chain/gateway

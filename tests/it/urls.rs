@@ -1,0 +1,212 @@
+//! URLs as real code builds them (spec #3, HTTP contract kind): paths in imported constants,
+//! client wrappers around `fetch`, Express routers under mount prefixes, inline route
+//! handlers, and links Meada can only infer, leave ambiguous or leave out.
+
+use crate::common;
+
+use std::path::PathBuf;
+
+use common::{assert_golden, fixture_repo, without_processes};
+use meada::engine::{Direction, Engine, Start};
+
+/// The Next.js provider of `tests/fixtures/http-api`, in the case directory.
+fn api(case: &str) -> PathBuf {
+    fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"))
+}
+
+#[test]
+fn constants_fold_into_urls_across_files() {
+    let case = "urls_constants";
+    let paths = fixture_repo(
+        case,
+        "http-paths",
+        Some("https://example.com/acme/paths.git"),
+    );
+    api(case);
+
+    let export = Engine::open(&paths).unwrap().export().unwrap();
+
+    assert_golden("http-paths.export.json", &without_processes(&export));
+}
+
+/// The Express provider of `tests/fixtures/http-express`, in the case directory.
+fn backend(case: &str) -> PathBuf {
+    fixture_repo(
+        case,
+        "http-express",
+        Some("https://example.com/acme/backend.git"),
+    )
+}
+
+/// The client wrapper consumer of `tests/fixtures/http-wrappers`, in the case directory.
+fn wrappers(case: &str) -> PathBuf {
+    fixture_repo(
+        case,
+        "http-wrappers",
+        Some("https://example.com/acme/admin.git"),
+    )
+}
+
+#[test]
+fn wrapper_call_sites_are_consumers_through_two_levels_and_a_cycle() {
+    let case = "urls_wrappers";
+    let admin = wrappers(case);
+    backend(case);
+
+    let export = Engine::open(&admin).unwrap().export().unwrap();
+
+    assert_golden("http-wrappers.export.json", &without_processes(&export));
+}
+
+#[test]
+fn wrapper_expansion_climbs_only_calls_that_resolved_exactly() {
+    let repo = fixture_repo(
+        "urls_wrappers_by_name",
+        "http-wrappers-by-name",
+        Some("https://example.com/acme/portal.git"),
+    );
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .filter_map(|c| c["contract"].as_str())
+        .collect();
+    consumers.sort();
+    // `this.get("/orders")` is exact; `store.get("/reports")` (receiver of unknown class),
+    // `api.get("/list")` (a `new Api()` constant, still a name match) and `fetchJson("/bare")`
+    // (no import binds it) are name matches, so none names a path (the wrappers read where they
+    // stand have no readable contract).
+    assert_eq!(consumers, ["http::GET::/orders"]);
+}
+
+#[test]
+fn express_routes_take_mount_prefixes_through_imports_at_two_depths() {
+    let case = "urls_express";
+    let backend = backend(case);
+    wrappers(case);
+
+    let export = Engine::open(&backend).unwrap().export().unwrap();
+
+    assert_golden("http-express.export.json", &without_processes(&export));
+}
+
+#[test]
+fn inline_handlers_are_definitions_named_by_method_and_full_path() {
+    let engine = Engine::open(&backend("urls_inline")).unwrap();
+
+    assert_golden(
+        "http-express.search-inline.txt",
+        &engine.search("GET /api/users", None, None).unwrap(),
+    );
+    assert_golden(
+        "http-express.context-inline.txt",
+        &engine
+            .context("register.GET /api/users/{}#1", None)
+            .unwrap(),
+    );
+}
+
+/// The consumer of `tests/fixtures/http-client`, with both providers next to it.
+fn client(case: &str) -> Engine {
+    let client = fixture_repo(
+        case,
+        "http-client",
+        Some("https://example.com/acme/client.git"),
+    );
+    api(case);
+    backend(case);
+    Engine::open(&client).unwrap()
+}
+
+#[test]
+fn hostless_urls_link_inferred_to_the_one_repository_serving_them_else_ambiguous() {
+    let export = client("urls_hostless").export().unwrap();
+
+    assert_golden("http-client.export.json", &without_processes(&export));
+}
+
+#[test]
+fn an_unresolved_consumer_shows_in_search_and_context_but_never_links() {
+    let engine = client("urls_unresolved");
+
+    assert_golden(
+        "http-client.search-unresolved.txt",
+        &engine.search("unresolved", Some("contract"), None).unwrap(),
+    );
+    assert_golden(
+        "http-client.context-dynamic.txt",
+        &engine.context("dynamic", None).unwrap(),
+    );
+}
+
+#[test]
+fn destructured_parameters_fold_like_positional_ones() {
+    let case = "urls_destructured";
+    let reports = fixture_repo(
+        case,
+        "http-destructured",
+        Some("https://example.com/acme/portal.git"),
+    );
+
+    let export = Engine::open(&reports).unwrap().export().unwrap();
+
+    assert_golden("http-destructured.export.json", &without_processes(&export));
+}
+
+#[test]
+fn a_parameter_defaulting_to_fetch_is_a_fetch_call() {
+    let case = "urls_fetch_param";
+    let client = fixture_repo(
+        case,
+        "http-fetch-param",
+        Some("https://example.com/acme/portal.git"),
+    );
+
+    let export = Engine::open(&client).unwrap().export().unwrap();
+
+    assert_golden("http-fetch-param.export.json", &without_processes(&export));
+}
+
+#[test]
+fn a_route_of_every_method_links_a_consumer_of_any_method() {
+    let case = "urls_any_method";
+    let client = fixture_repo(
+        case,
+        "http-any-client",
+        Some("https://example.com/acme/client.git"),
+    );
+    fixture_repo(
+        case,
+        "conformance-python",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&client).unwrap();
+
+    assert_golden(
+        "http-any-client.export.json",
+        &without_processes(&engine.export().unwrap()),
+    );
+    // A route named with any method starts at the provider of every method.
+    let up = engine.trace(Start::From("POST /health"), Direction::Up, None);
+    assert_golden("http-any-client.trace-up.txt", &up.unwrap());
+    let items = engine.open_items().unwrap();
+    // The peer's own unresolved calls are items too: only the client's are read here.
+    let candidates: Vec<&str> = (items
+        .iter()
+        .filter(|i| i.repository == "example.com/acme/client"))
+    .flat_map(|i| &i.candidates)
+    .map(|c| c.contract.as_str())
+    .collect();
+    assert_eq!(
+        candidates,
+        [
+            "http::ANY::/about",
+            "http::ANY::/contact",
+            "http::ANY::/health",
+            "http::ANY::/vintage/{}",
+            "http::PUT::/members/{}"
+        ]
+    );
+}

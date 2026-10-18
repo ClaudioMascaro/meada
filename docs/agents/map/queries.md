@@ -89,6 +89,38 @@ modules updates it.
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
   `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
   package name are no call for a person to decide.
+- Communities and processes in `search` and `context` (spec #31): `search` kind `community`
+  (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
+  name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>
+  (<kind>)`, matched by the entry point's label, the identity being what `trace` starts from.
+  `context` on a symbol puts two lines right after its first line, so the budget cuts the tail
+  and not them: `community: <name>` (or `none`, read from `Export::communities`) and
+  `processes: <summary>: <label> (<repository>), ...` (the summary below, or `none`), sorted by entry point
+  identity.
+  `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
+  node, so membership is the reachability the process walk follows. `processes_line` opens
+  with a summary whenever the symbol belongs to a process, `<n> (<k> route, <k> export; <r>
+  repositories)` (kinds in `EntryKind::ALL` order, only those with a count), then the entries
+  that fit its room, then `+<m> more` for the rest; when not even one fits, the summary is the
+  line. The room is what the budget leaves after the header and community, less the note of
+  the final cut. `context_fresh` cuts in this order: the span text first (`render::cut`, with
+  its own note; left out when not even the note fits, so the agent reads it from the file the
+  header names), then the tail (callers, callees, consumers, contracts) by
+  the usual cut; the header, community and processes lines survive it. An answer that fits
+  names every process and is cut nowhere. Two processes of one repository
+  with the same label show as their `process::<identity>`.
+- `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own
+  variant beside `Walk`, which `trace` down keeps as is) and returns `Vec<Step>`: depth, the
+  repository, how it was reached (`Via`: the entry, a call, a link), the level, the node and a
+  `Mark` (`cycle`, `seen`, `ambiguous`, `unresolved`, `no-provider`, `produces` or `consumes`
+  for an unresolved channel side, `depth-limit`; `tests/it/docs.rs` checks every variant is here).
+  `Walk::show` renders a step in the chain's line grammar (`trace` from `process::<identity>`,
+  found in `Graph::entry_points`: first line `process <label>`, then the steps, then the
+  `finish` footer), and `Graph::export_process` turns the same steps into `Export::processes`.
+  Children of a step are `Graph::edges` (calls in source order, then identity, then what each
+  call reaches); an ambiguous call or link is one step listing its candidates; a symbol is expanded at its first
+  occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
+  points themselves are in `entry.rs`.
 - `trace.rs`: `Graph` over all exports and links, depth-first `Walk`, chain footer. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
   down and back going up; a call-site consumer the other way. A channel link (producer call,

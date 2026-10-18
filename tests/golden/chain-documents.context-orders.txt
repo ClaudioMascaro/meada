@@ -1,4 +1,6 @@
 example.com/chain/gateway src/orders.ts:5 listOrders
+community: src
+processes: 2 (1 route, 1 export; 2 repositories): GET /api/orders (example.com/chain/gateway), dashboard (example.com/chain/web)
 async function listOrders(req: Request, res: { json(body: unknown): void }) {
   const product = await productOf(req.query.product);
   res.json([{ id: "o1", product }]);

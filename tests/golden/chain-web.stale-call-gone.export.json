@@ -176,6 +176,29 @@
       "via": "env:GATEWAY_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/chain/web::src/api/client.ts::request",
+        "example.com/chain/web::src/orders.ts::createOrder"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/chain/web::src/dashboard.ts::cancel",
+        "example.com/chain/web::src/orders.ts::cancelOrder"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/chain/web::src/dashboard.ts::dashboard",
+        "example.com/chain/web::src/orders.ts::listOrders"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",

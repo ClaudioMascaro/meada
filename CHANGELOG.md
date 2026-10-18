@@ -113,6 +113,30 @@ tagging.
 - A release workflow built with cargo-dist: from a version tag it builds binaries for Linux,
   macOS and Windows on x86_64 and arm64 and a shell installer, published to GitHub Releases.
   The crate is ready for `cargo install meada`.
+- Communities (spec #31): each repository's index holds groups of symbols that call each other
+  more than they call the rest, over its calls at `exact` or `inferred`, found with Leiden made
+  deterministic (fixed visit order and tie breaking, 128-bit integer arithmetic, no iteration
+  cap) and named after the most common directory of their members (`src`, `src#2`). `meada
+  export` carries them per repository, each with its sorted members. A symbol whose only such
+  call is to itself or comes from top-level code is a community of its own. No model names them.
+- Entry points and processes: each route a handler serves, each channel a consumer handler
+  consumes (kind `channel`, labelled `channel::kafka::orders.created`; an unresolved side too,
+  labelled `channel::kafka (unresolved)`) and each exported function or method that nothing in
+  its repository calls is an entry point (kind `route`, `channel` or `export`), stored in the
+  index. `trace` from `process::<entry point identity>` renders the call tree that entry point
+  sets in motion, across repositories, under the token budget; an ambiguous call is one
+  step listing its candidates, and a symbol is expanded once. `meada export` carries each
+  repository's `processes`. A language pack can declare program entry points (kind `program`);
+  the TypeScript and JavaScript pack declares none.
+- Communities and processes in `search` and `context`: `search` takes the kinds `community`
+  (name, repository and member count) and `process` (matched by the entry point's label: name,
+  `process::` identity, entry point kind and repository). `context` on a symbol adds its
+  community, or `community: none`, and the processes it belongs to, found by walking upstream
+  over the same calls and links a process expands (decided links count, ambiguous ones do not).
+  The processes line opens with a summary (count, count per entry point kind, repositories),
+  then the entries that fit; under the budget the span text is cut first, ahead of the callers,
+  callees, consumers and contracts, so the line keeps its summary and as many entries as fit;
+  a span with no room for its cut note is left out, to be read from the file the header names.
 
 ### Fixed
 
@@ -142,6 +166,25 @@ and JavaScript files), median of three runs on a 16-thread Linux laptop:
 
 At today's 664 files: 1.3 s, 23.6 MB and 0.26 s. Tokens count 4 bytes each, as the answer budget
 does. These numbers gate 1.0, not this release.
+
+Communities and processes (spec #31) were measured on 2026-10-17 on the same repository, at the
+same commit and at that day's 692 files. The runs used release builds of `main` just before and
+just after the spec, each a median of three runs on a 16-thread Linux laptop with 7.2 GiB of
+RAM. MB here means 10^6 bytes.
+
+| Metric | Target | 634 files, before → after | 692 files, before → after |
+| --- | --- | --- | --- |
+| Cold index time | ≤ 7 s | 1.81 s → 1.80 s | 2.20 s → 2.12 s |
+| Cold index size | ≤ 37 MB | 22.7 MB → 23.0 MB | 26.8 MB → 27.1 MB |
+| Single-file reindex | ≤ 1 s | 0.74 s → 0.76 s | 0.89 s → 0.92 s |
+| Tool list | ≤ 1k tokens | | 620 tokens |
+| Default answer | ≤ 2k tokens | | 1,996 tokens, the largest of 11 answers |
+
+The tool list counts the whole `tools/list` result as compact JSON. Among the 11 answers are
+`context` on the three most-called symbols, each with its community and process membership,
+and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 s to a reindex.
+The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
+692 files it is close to its target.
 
 [Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0

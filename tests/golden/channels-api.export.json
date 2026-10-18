@@ -509,6 +509,22 @@
       "site": "example.com/channels/api::src/amqp.ts::announce::channel.publish#1"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
+        "example.com/channels/api::src/audit.ts::store"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/channels/api::src/dynamic.ts::announce",
+        "example.com/channels/api::src/dynamic.ts::currentRegion"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",

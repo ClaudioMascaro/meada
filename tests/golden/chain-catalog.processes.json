@@ -1,0 +1,73 @@
+[
+  {
+    "entry_point": "example.com/chain/catalog::app/api/events/route.ts::POST::http::POST::/api/events",
+    "kind": "route",
+    "label": "POST /api/events",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/catalog::app/api/events/route.ts::POST",
+        "repository": "example.com/chain/catalog",
+        "via": "entry"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/catalog::app/api/health/route.ts::GET::http::GET::/api/health",
+    "kind": "route",
+    "label": "GET /api/health",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/catalog::app/api/health/route.ts::GET",
+        "repository": "example.com/chain/catalog",
+        "via": "entry"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::http::GET::/api/products/{}",
+    "kind": "route",
+    "label": "GET /api/products/{}",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "repository": "example.com/chain/catalog",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::parent",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 3,
+        "level": "exact",
+        "mark": "cycle",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::find",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      }
+    ]
+  }
+]

@@ -1,4 +1,6 @@
 example.com/xlang/inventory inventory/jobs.py:16 restock
+community: none
+processes: 1 (1 export; 1 repository): restock (example.com/xlang/inventory)
 def restock(sku):
     # A consumer linked through the declared host, next to one Meada leaves unresolved:
     # `str.format` is not folded.

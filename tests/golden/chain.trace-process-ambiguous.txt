@@ -1,0 +1,4 @@
+process lookup
+example.com/chain/catalog lib/ambiguous.ts:13 lookup
+  example.com/chain/catalog lib/ambiguous.ts:14 source.get [ambiguous]: example.com/chain/catalog::lib/ambiguous.ts::Cache.get, example.com/chain/catalog::lib/ambiguous.ts::Store.get
+chain: ambiguous · 0 hops · 1 repos · 76 tokens

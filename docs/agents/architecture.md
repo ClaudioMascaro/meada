@@ -22,7 +22,9 @@ one for the area a change touches.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it renders `search` and `context`. `items.rs`: open
-  items, derived in one place. `trace.rs`: the `Graph`, the walk and the chain footer.
+  items, derived in one place. `trace.rs`: the `Graph`, the walk, the chain footer and the
+  process walk (`Graph::process`, the step list `trace` renders and the export carries).
+  `entry.rs`: entry points (spec #31), found when an index is written.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
   `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
@@ -31,7 +33,8 @@ one for the area a change touches.
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
   language adapter and the TS/JS and Python packs. `resolve.rs`: calls to definitions (`Resolver`), values
-  and receivers (`Code`). Detail: [map/indexing.md](map/indexing.md).
+  and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
+  #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait and the HTTP,
   resource and channel kinds. `package.rs`: npm packages as contracts (spec #22). Detail:
   [map/contracts.md](map/contracts.md).
@@ -52,6 +55,25 @@ one for the area a change touches.
   options object argument) as `Kind::Inline` named `@<byte offset>`; `Names` renames the ones a
   kind claims, to `<METHOD> <full path>` for a route or `<broker> <channel names>` for a channel
   handler (`#<n>` from the second equal name), and folds the rest into the enclosing symbol.
+- Entry point (spec #31, `entry.rs`): a route is `<handler symbol>::<contract>`, such as
+  `example.com/chain/gateway::src/orders.ts::listOrders::http::GET::/api/orders` (the handler's
+  identity, then the contract identifier; an inline handler keeps its synthetic symbol, as in
+  `example.com/chain/gateway::src/server.ts::GET /api/health::http::GET::/api/health`); an export
+  is the exported function or method's own symbol identity. Its label is `<METHOD> <path>` for a
+  route and the qualified name for an export or a program entry point (kind `program`, the
+  symbol's own identity too, declared by the language pack and a door even when called; it wins
+  over an export of the same symbol). A process is addressed as `process::<entry point
+  identity>` and named by the label. A route whose handler is a file with no function of its own
+  (`export const GET = withAuth(...)`) is a route entry point at the file's identity
+  (`<repository>::<path>`), its process starting from the file's top-level calls; a side only
+  a document lists has none. A channel is `<handler symbol>::<channel contract>`
+  (`example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created`),
+  labelled by the channel identifier (an unresolved side as `channel::kafka (unresolved)`), kind
+  `channel`; a channel handler is no export entry point. A handler serving several routes or
+  channels has an entry point per contract,
+  and entry points are unique by identity. The stored export entry points are candidates:
+  `Engine::exports` drops, after `package::import`, each one that is the target of an import
+  from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, provided at `<repository>::<manifest path>` (such as
   `example.com/pkg/shared::package.json`) and consumed at `<repository>::<manifest
   path>::<field>::<name>`. Both sites hold a `::`, which `Engine::export` needs to keep their links.
@@ -62,12 +84,25 @@ one for the area a change touches.
   (`Export::document_of` recognises it). Document channel side: `<repository>::<document
   path>::<broker> send|receive <name>`, a provider (`send`) or a consumer (`receive`) only a
   document lists, such as `example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created`.
+- Community: its repository identity plus its name, the most common parent directory of its
+  members' files (`src`, `.` for the root). The second and later communities of the
+  repository with that name, by smallest member identity, take `#2`, `#3`, skipping any `#n`
+  another community is already named (a directory `src#2`), so the name is unique.
 - Contract: `<prefix>::...`, `http::GET::/users/{}`, `resource::postgres::orders`,
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
   is `{}`. A provider of every method is `http::ANY::<path>`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
-  publishes, packages, dependencies, imports, links}`; `imports` (absent when empty) lists each
+  publishes, packages, dependencies, imports, communities, links, processes}`;
+  `communities` (absent when empty) lists each community as `{name, members}`, by name, with
+  its sorted member identities; `processes` (absent when
+  empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
+  `kind` being `route`, `export`, `channel` or `program`, each step `{depth, level, repository, via, node, ...}`: `via`
+  is `entry`, `call` or `link` (a link step has the link's `reason`), `node` the symbol, file
+  or side reached (a note's call site), and `mark` (`cycle`, `seen`, `depth-limit`, `ambiguous` with its
+  `candidates`, `unresolved`, `no-provider` with its `contract`, `produces` or `consumes` of an
+  unresolved channel) when the step is not a plain node; steps are in walk order and cross
+  repositories; `imports` (absent when empty) lists each
   call resolved into a package as `{site, specifier, name, level, how, target}`, by site then
   target, where `level` is the import's own level (how certain the entry and the name were), not
   the hop's: the link from that call carries the hop's level, the weaker of it and the package
@@ -213,21 +248,54 @@ one for the area a change touches.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
+- New **entry point kind** (spec #31): a variant of `entry::EntryKind` (its `name` and `parse`
+  arms and the list `parse` searches, and its name in the `processes` kinds of the export JSON
+  above, which `tests/it/docs.rs` checks), a finder beside `routes`, `channels`, `programs` and
+  `exports` in `entry::find`, and the `site` its process starts from (a symbol or a code file;
+  `holds` checks it). The finder reads `entry::Local`: `identity`, `files` (every file's
+  `Facts`), `names`, `symbols`, `called`, `exported`, `providers` and `consumers` (`entry::Side`,
+  a `site` and a `contract`) and `programs` (`entry::Program`, a `file` and a definition name). A
+  kind that needs a fact not there adds a field to `Local` and fills it in `index::refresh`,
+  where `Local` is built after the contracts and the `exports` rows are written, just before
+  `entry::find` stores its result; a new fact a pack declares is a `Facts` field first (as
+  `programs` is). A kind the stored rows already name needs no schema change; a new column does
+  (`SCHEMA_VERSION`). Export entry points are filtered again at query time
+  (`entry::drop_imported_exports`): only `export` is dropped, never another kind. The walk (`Graph::process`),
+  `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
+  stored entry points. A process is walked on demand from the stored calls and the links of the
+  query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
+  one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
+  in `Descent::follow`, with its `Mark` (named in the `Mark` list of `map/queries.md`, which
+  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored bumps
+  `SCHEMA_VERSION`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
 - New **language pack**: add it to `PACKS` in `lang/mod.rs`, a fixture
-  `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/conformance.rs`.
+  `tests/fixtures/conformance-<language>/` and one `conform(...)` test in `tests/it/conformance.rs`.
   A pack is done when that suite passes. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
   star import takes) and `Param::binds` (which argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
-  would have resolved.
+  would have resolved. A pack that has program entry points fills
+  `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
+  `Def::name` of each definition that starts a program; each becomes an entry point of kind
+  `program`, labelled by its qualified name, and the conformance test lists them. Where the
+  entry point is top-level code, `parse` yields a definition for that code (the calls it makes
+  belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
+  golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
+  which names a function of another file) needs a repository-level step that the pack adds in
+  its own ticket, feeding `entry::Local::programs` with `entry::Program`s. The forms per language are spec #31 "Program entry points per language
+  pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
+  target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
+  top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
+  an `@main` type and `main.swift` as symbol `main`; Rust `fn main` in `src/main.rs` and
+  `src/bin/`. TS/JS declares none.
 - New **config key**: add the field to `Config`. Parse errors name file,
   line and dotted key by re-parsing the TOML for spans (`config::describe`).
-- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/mcp.rs`: the tool list
+- New **MCP tool**: `mcp.rs`, one `Engine` method, and watch `tests/it/mcp.rs`: the tool list
   (descriptions plus parameter schemas) must stay within 1,000 tokens.
 - New **CLI text**: a `Msg` variant with both languages; command descriptions are set at runtime
   in `main.rs` from `Msg`.
@@ -235,7 +303,13 @@ one for the area a change touches.
 ## Invariants the code relies on
 
 - Determinism: all export lists are sorted, hashes are BLAKE3, no clock or random value reaches
-  an answer. A refreshed index must equal a cold index of the same files (`tests/freshness.rs`).
+  an answer. A refreshed index must equal a cold index of the same files (`tests/it/freshness.rs`),
+  communities and processes included: `refresh` recomputes both at its end from the stored calls
+  whenever anything changed. The test-only `with_reversed_walk` (`index.rs`, hidden from the
+  docs, no CLI flag or setting) reverses the walk order, the parse order and the insertion order
+  of the `symbols`, `calls` and `candidates` rows, and the chain's export must stay
+  byte-identical. The in-memory order is normalized by path (`BTreeMap`s), so the switch covers
+  nothing beyond that. Indexing runs on one thread, so there is no worker count to vary.
 - `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
   a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
   `tests/golden/schema.v<version>.txt` (the facts of each pack's
@@ -264,7 +338,9 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
-  the definition, constant, type or file they name). `Call::args`,
+  the definition, constant, type or file they name), the `entry_points` table (spec #31:
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
+  each community's name and member identities (`communities`, spec #31). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
@@ -286,9 +362,14 @@ one for the area a change touches.
 
 ## Tests (`tests/`)
 
-- `tests/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
+- The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
+  module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
+  subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
+  it); `cargo test --test it <subject>::` runs one.
+- `tests/it/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
-  one commit). `case` must be unique per test, since tests run in parallel. `chain(case)` builds
+  one commit). `case` must be unique per test across every subject, since they run in parallel in
+  one process. `chain(case)` builds
   the three-repository chain as siblings, plus `chain-worker` (`worker(sibling)`), which reads
   the `postgres` `orders` resource the gateway writes (the catalog reads it at repository
   level) and handles the Kafka topic `orders.created` the gateway's `createOrder` (`PUT
@@ -342,7 +423,11 @@ one for the area a change touches.
 - **Golden files** live in `tests/golden/<fixture>.<what>.{txt,json}` and are compared with
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review. `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
-  ranges are in them.
+  ranges are in them. An export golden of a test about something else goes through
+  `without_processes(export)`, which drops `processes`: only the chain's own exports
+  (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
+  `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses
+  those alone.
 - Test files by subject, the fixtures each uses and the loopback decider stub: [map/tests.md](map/tests.md).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
@@ -553,6 +638,34 @@ one for the area a change touches.
   but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
   client takes the base of every caller that passes one, and several different bases make it a
   hole.
+- `entry.rs`: an export entry point is a function, or a method of an exported class (a
+  constructor excepted), that the `exports` rows name and no call reaches in its repository,
+  an ambiguous candidate counting as a caller and a self-call not; a call through a package
+  import of its own repository counts too, but only at query time (`Engine::exports`), so the
+  stored rows over-list in a monorepo. A method of a class that is not exported, a
+  default-exported anonymous function and an export the resolver cannot place are not found (no
+  marker). A route handler Meada could not find (an Express handler passed as a parameter) has
+  no entry point.
+- `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
+  candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
+  up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
+  branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
+  expanded, so a longer call chain is cut. `Graph::processes_of` (the processes `context` lists)
+  walks upstream with no depth limit, so on chains deeper than `PROCESS_DEPTH` membership and
+  trees can disagree: a node past depth 256 is no step of the tree, and the limit can hide a
+  node shallower than that, through `Seen`. E reaches X at depth 255, so X expands and each of
+  its callees, Y among them, is a `depth-limit` step at 256 whose own callee Z is no step; a
+  later direct E to X shows X as seen, so Y is not expanded there either, yet `processes_of(Z)`
+  lists E.
+- `community.rs`: Leiden has no iteration cap (spec #31 asks for none). Each pass that changes
+  anything either moves a node to a community with a strictly positive modularity gain, which
+  raises the modularity, an integer here (`i128`, no floating point), so no partition repeats,
+  or merges subcommunities and shrinks the graph, which cannot happen forever; so the loop ends.
+  The work grows with the repository's calls and passes (no marker).
+- `engine.rs`: `context` builds `trace::Graph` and calls `Graph::processes_of` for every symbol
+  it answers about: a reverse map of every edge of the workspace (every call and link) is built
+  per call, with no cache, so the cost follows the workspace's size, not the symbol's (no
+  marker).
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 - No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).

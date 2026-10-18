@@ -1959,6 +1959,8 @@ mod tests {
             bindings: Vec::new(),
             documents: Vec::new(),
             publishes: Vec::new(),
+            entry_points: Vec::new(),
+            processes: Vec::new(),
             manifests: vec![manifest("package.json", manifest_json)],
             tsconfigs: (config.then(|| Config {
                 path: "tsconfig.json".into(),
@@ -1972,6 +1974,7 @@ mod tests {
             packages: Vec::new(),
             dependencies: Vec::new(),
             import_calls: Vec::new(),
+            communities: Vec::new(),
             exported: (files.iter())
                 .map(|(p, _)| row(p, Some("S"), Some(p), Some("S")))
                 .collect(),

@@ -1,4 +1,6 @@
 example.com/chain/web src/status.ts:7 track
+community: src#3
+processes: 1 (1 export; 1 repository): dashboard (example.com/chain/web)
 function track(event: { url: string }) {
   return fetch(event.url, { method: "POST" });
 }

@@ -1,0 +1,58 @@
+[
+  {
+    "entry_point": "example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created",
+    "kind": "channel",
+    "label": "channel::kafka::orders.created",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+        "repository": "example.com/chain/worker",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/worker::src/notify.ts::notify",
+        "repository": "example.com/chain/worker",
+        "via": "call"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/worker::src/consumer.ts::start",
+    "kind": "export",
+    "label": "start",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/worker::src/consumer.ts::start",
+        "repository": "example.com/chain/worker",
+        "via": "entry"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/worker::src/jobs.ts::settleOrders",
+    "kind": "export",
+    "label": "settleOrders",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/worker::src/jobs.ts::settleOrders",
+        "repository": "example.com/chain/worker",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/worker::src/notify.ts::notify",
+        "repository": "example.com/chain/worker",
+        "via": "call"
+      }
+    ]
+  }
+]

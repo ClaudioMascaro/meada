@@ -739,6 +739,23 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "src/routes",
+      "members": [
+        "example.com/acme/backend::src/routes/users.ts::find",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1"
+      ]
+    },
+    {
+      "name": "src/routes#2",
+      "members": [
+        "example.com/acme/backend::src/routes/users.ts::list",
+        "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",

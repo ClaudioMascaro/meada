@@ -252,6 +252,16 @@
       "via": "env:INVENTORY_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/xlang/storefront::src/inventory.ts::reserveStock",
+        "example.com/xlang/storefront::src/inventory.ts::stockLevel",
+        "example.com/xlang/storefront::src/sync.ts::syncInventory"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/xlang/inventory::inventory/jobs.py::refresh_prices::requests.get#0",

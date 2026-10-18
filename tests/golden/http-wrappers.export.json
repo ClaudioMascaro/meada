@@ -219,6 +219,32 @@
       "via": "env:BACKEND_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/admin::src/http.ts::backoff",
+        "example.com/acme/admin::src/http.ts::retry",
+        "example.com/acme/admin::src/users.ts::listUsersPatiently"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/admin::src/http.ts::get",
+        "example.com/acme/admin::src/users.ts::listUsers",
+        "example.com/acme/admin::src/users.ts::listUsersTyped"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/admin::src/http.ts::remove",
+        "example.com/acme/admin::src/http.ts::request",
+        "example.com/acme/admin::src/users.ts::deleteUser"
+      ]
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/admin::src/users.ts::deleteUser::remove#0",
