@@ -96,6 +96,12 @@ enum Busy<'a> {
     Family(Target<'a>),
 }
 
+/// The most receivers a class is followed through, each naming its class through the next
+/// (`x: y.C`, `x = y.C()`); deeper, the class is unknown.
+// ponytail: real receivers name their class through a few others; the limit keeps a crafted
+// chain of thousands of parameters from overflowing the stack.
+const RECEIVER_DEPTH: usize = 64;
+
 /// What resolving one name carries along: what is being resolved, and the families
 /// linearized so far (while `Resolver::new` linearizes them all).
 #[derive(Default)]
@@ -305,8 +311,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// What a parameter or a local holds, as far as the source writes its class: an instance
-    /// of a class of the repository, something from outside it, or unknown. Other bindings
-    /// stay as they are.
+    /// of a class of the repository, something from outside it, or unknown (also more than
+    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
     fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
         let (path, scope, name) = match binding {
             Binding::Param(f, n, field) => {
@@ -332,7 +338,10 @@ impl<'a> Resolver<'a> {
             return self.imported(path, name, &mut Seen::new());
         }
         let key = Busy::Local(path, scope, name);
-        if work.busy.contains(&key) {
+        let depth = (work.busy.iter())
+            .filter(|b| matches!(b, Busy::Local(..)))
+            .count();
+        if depth >= RECEIVER_DEPTH || work.busy.contains(&key) {
             return Binding::Unknown;
         }
         work.busy.push(key);
@@ -1763,6 +1772,40 @@ mod tests {
             assert!(exact(FAMILY_DEPTH - 1), "reverse: {reverse}");
             assert!(!exact(FAMILY_DEPTH), "reverse: {reverse}");
             assert!(!exact(n - 1), "reverse: {reverse}");
+        }
+    }
+
+    #[test]
+    fn a_class_annotated_deeper_than_the_limit_is_unknown() {
+        // Whether `x0.m()` is exact when `n` parameters of `f` each take their class from the
+        // next one's (`x0: x1.C`), quoted or not, and the last is `K`, whose member `C` is a
+        // class that derives from `K` and so has it as a member too.
+        let exact = |n: usize, quoted: bool| {
+            let annotation = |i: usize| match (i + 1 == n, quoted) {
+                (true, _) => "K".to_string(),
+                (false, true) => format!("\"x{}.C\"", i + 1),
+                (false, false) => format!("x{}.C", i + 1),
+            };
+            let params: Vec<String> = (0..n).map(|i| format!("x{i}: {}", annotation(i))).collect();
+            let src = format!(
+                "class K:\n    class C(K):\n        def m(self):\n            pass\n\n\
+                 def f({}):\n    x0.m()\n",
+                params.join(", ")
+            );
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let call = facts.calls.iter().find(|c| c.callee == "x0.m").unwrap();
+            matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "K.C.m")
+        };
+
+        // Far past the limit: a recursion through receivers that does not stop overflows the
+        // stack.
+        let far = 5_000;
+        for quoted in [false, true] {
+            assert!(exact(RECEIVER_DEPTH, quoted), "quoted: {quoted}");
+            assert!(!exact(RECEIVER_DEPTH + 1, quoted), "quoted: {quoted}");
+            assert!(!exact(far, quoted), "quoted: {quoted}");
         }
     }
 }
