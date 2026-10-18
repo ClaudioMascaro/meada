@@ -23,6 +23,19 @@ All notable changes to Meada are recorded here. The format follows
   outside the workspace adds nothing, and so does one whose `path`, `git` or `package` is empty
   or mistyped; `Cargo.lock` and crates.io are never read. The index is rebuilt once (schema
   version 26).
+- Rust conditional compilation (spec #30): only the default configuration of a crate is
+  indexed, for a fixed `x86_64` Linux target (`unix`, `target_os = "linux"`,
+  `target_family = "unix"`, `target_arch = "x86_64"`, `target_pointer_width = "64"`,
+  `target_endian = "little"`, `target_env = "gnu"`, `debug_assertions`, `test`; any other
+  predicate is false), so the result never depends on the machine. An item under a
+  `#[cfg(..)]` that is false is left out, `all`, `any` and `not` included; `feature = "x"` holds
+  for the features in the crate's `[features] default`, followed through features that enable
+  others (`x/feat` also enables an optional dependency `x`). A `mod x;` that is cfg-false does
+  not read its file, and neither does one whose file opens with a false `#![cfg(..)]`.
+  `test` is false (`cfg(not(test))` items are indexed), but a `mod` under exactly `#[cfg(test)]`
+  is indexed too; `#[cfg_attr(..)]` leaves the item in. Toggling a default
+  feature in `Cargo.toml` parses the crate's files again. The index is rebuilt once (schema
+  version 29).
 - A Rust language pack (`.rs`, spec #30, first ticket): the repository's crates (each
   `Cargo.toml` with a `[package]`, at any depth, a workspace's members included), each built
   from its roots (`src/lib.rs` or `[lib] path`, `src/main.rs`, `src/bin/`, `[[bin]] path`)
@@ -72,7 +85,7 @@ All notable changes to Meada are recorded here. The format follows
   a name assigned again holds no known value, `{{` and `}}` stay literal braces, and the method
   of `get as fetch` is `GET`. `prefixes` (also Express, FastAPI and Flask) reads a router
   nested past 64 mounts, or through more than 4096, as served nowhere. The index is rebuilt
-  once (schema version 28).
+  once (schema version 30).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

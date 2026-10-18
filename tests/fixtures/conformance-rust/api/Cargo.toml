@@ -11,3 +11,10 @@ path = "tools/admin.rs"
 billing = { path = "../crates/billing" }
 ledger-core = { path = "../crates/ledger-core" }
 serde = "1"
+
+[features]
+default = ["net", "json"]
+net = ["wire", "serde/std"]
+wire = []
+json = []
+metrics = ["wire"]

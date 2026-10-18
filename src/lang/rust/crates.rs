@@ -196,9 +196,7 @@ fn declared(
             (format!("{stem}.rs"), false),
             (format!("{stem}/mod.rs"), true),
         ];
-        let (child, owns) = candidates
-            .into_iter()
-            .find(|(c, _)| files.contains_key(c.as_str()))?;
+        let (child, owns) = candidates.into_iter().find(|(c, _)| built(files, c))?;
         return Some((child, owns, top));
     }
     let (chain, value) = specifier.strip_prefix(PATH)?.split_once('|')?;
@@ -207,9 +205,12 @@ fn declared(
         "" => join(dir, value)?,
         chain => join(&join(&base, chain)?, value)?,
     };
-    files
-        .contains_key(child.as_str())
-        .then_some((child, true, chain.is_empty()))
+    built(files, &child).then_some((child, true, chain.is_empty()))
+}
+
+/// Whether the walk found `file` and its crate builds it (`Facts::unbuilt`).
+fn built(files: &BTreeMap<&str, &Facts>, file: &str) -> bool {
+    files.get(file).is_some_and(|f| !f.unbuilt)
 }
 
 /// `rel` joined to the directory `dir`, `.` and `..` folded: `None` when it is absolute or
@@ -250,6 +251,17 @@ fn manifests<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)>
     let mut manifests = tables(configs);
     manifests.retain(|(_, manifest)| manifest.contains_key("package"));
     manifests
+}
+
+/// The default features of each package among `configs`, joined with commas, by directory: the
+/// `setting` its files are parsed with.
+pub fn features(configs: &[(&str, &[u8])]) -> Vec<(String, String)> {
+    (manifests(configs).into_iter())
+        .map(|(dir, manifest)| {
+            let on: Vec<String> = super::cfg::defaults(&manifest).into_iter().collect();
+            (dir.to_string(), on.join(","))
+        })
+        .collect()
 }
 
 /// A package of the repository: where it lives, its `[package] name`, the name a path writes
@@ -403,7 +415,7 @@ fn roots(configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Vec<(Stri
             .chain(found.map(|f| f.to_string()));
         let candidates = (lib.into_iter().map(|f| (f, false))).chain(bins.map(|f| (f, true)));
         for (file, bin) in candidates {
-            if files.contains_key(file.as_str()) && seen.insert(file.clone()) {
+            if built(files, &file) && seen.insert(file.clone()) {
                 out.push((file, dir.to_string(), bin));
             }
         }
@@ -538,7 +550,7 @@ mod tests {
 
     #[test]
     fn only_pub_modules_from_a_library_root_are_published() {
-        let parse = |src: &str| super::super::parse(src.as_bytes()).unwrap();
+        let parse = |src: &str| super::super::parse(src.as_bytes(), "").unwrap();
         let (root, open, shut, below, main) = (
             parse("pub mod open;\nmod shut;\npub(crate) mod narrow;\n"),
             parse("pub mod below;\npub fn f() {}\n"),

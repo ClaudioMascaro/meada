@@ -1368,6 +1368,25 @@ fn rust() {
             "api/src/main.rs::below.go",
             "api/src/main.rs::elsewhere",
             "api/src/main.rs::extras",
+            "api/src/main.rs::gated",
+            "api/src/main.rs::imp",
+            "api/src/main.rs::mock",
+            "api/src/main.rs::native",
+            "api/src/main.rs::real",
+            "api/src/mock.rs::client",
+            "api/src/native.rs::counter",
+            "api/src/real.rs::client",
+            "api/src/gated.rs::connect",
+            "api/src/gated.rs::outside_tests",
+            "api/src/gated.rs::Gauge",
+            "api/src/gated.rs::Gauge.plain",
+            "api/src/gated.rs::Gauge.unix_method",
+            "api/src/gated.rs::always",
+            "api/src/gated.rs::on_linux",
+            "api/src/gated.rs::through_net",
+            "api/src/gated.rs::tests",
+            "api/src/gated.rs::tests.helper",
+            "api/src/gated.rs::unix_without_metrics",
             "api/src/main.rs::hidden",
             "api/src/main.rs::isolated",
             "api/src/main.rs::isolated.far",
@@ -1594,6 +1613,12 @@ fn rust() {
             ),
             // `super::` out of an inline module is read from the file's top, past the
             // module's own `compute`.
+            // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
+            (
+                "api/src/gated.rs::connect::client#0",
+                EXACT,
+                &["api/src/real.rs::client"],
+            ),
             (
                 "api/src/main.rs::checks.verify::mod.start#0",
                 EXACT,

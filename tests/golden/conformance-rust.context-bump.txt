@@ -1,5 +1,5 @@
 example.com/acme/conformance api/src/methods.rs:37-39 Counter.bump
-community: api/src#5
+community: api/src#7
 processes: none
 pub fn bump(&mut self) {
         self.hits += 1;
