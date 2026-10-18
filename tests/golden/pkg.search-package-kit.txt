@@ -1,0 +1,1 @@
+example.com/pkg/shared kit @example/kit@2.1.0 (consumers: 3)

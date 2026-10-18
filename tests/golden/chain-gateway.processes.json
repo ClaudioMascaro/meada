@@ -1,0 +1,205 @@
+[
+  {
+    "entry_point": "example.com/chain/gateway::src/checkout.ts::createOrder::http::PUT::/api/orders/{}",
+    "kind": "route",
+    "label": "PUT /api/orders/{}",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/gateway::src/checkout.ts::createOrder",
+        "repository": "example.com/chain/gateway",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/gateway::src/catalog.ts::productOf",
+        "repository": "example.com/chain/gateway",
+        "via": "call"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "reason": "host catalog.example.com is served by example.com/chain/catalog",
+        "repository": "example.com/chain/catalog",
+        "via": "link"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 3,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::parent",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 4,
+        "level": "exact",
+        "mark": "cycle",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 3,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::find",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/gateway::src/events.ts::publish",
+        "repository": "example.com/chain/gateway",
+        "via": "call"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+        "reason": "channel::kafka::orders.created",
+        "repository": "example.com/chain/worker",
+        "via": "link"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/worker::src/notify.ts::notify",
+        "repository": "example.com/chain/worker",
+        "via": "call"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/gateway::src/orders.ts::cancelOrder::http::DELETE::/api/orders/{}",
+    "kind": "route",
+    "label": "DELETE /api/orders/{}",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+        "repository": "example.com/chain/gateway",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "declared",
+        "node": "example.com/chain/catalog",
+        "reason": "resource::postgres::orders",
+        "repository": "example.com/chain/catalog",
+        "via": "link"
+      },
+      {
+        "depth": 1,
+        "level": "declared",
+        "node": "example.com/chain/worker::src/jobs.ts::settleOrders",
+        "reason": "resource::postgres::orders",
+        "repository": "example.com/chain/worker",
+        "via": "link"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/worker::src/notify.ts::notify",
+        "repository": "example.com/chain/worker",
+        "via": "call"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/gateway::src/orders.ts::listOrders::http::GET::/api/orders",
+    "kind": "route",
+    "label": "GET /api/orders",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/gateway::src/orders.ts::listOrders",
+        "repository": "example.com/chain/gateway",
+        "via": "entry"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/gateway::src/catalog.ts::productOf",
+        "repository": "example.com/chain/gateway",
+        "via": "call"
+      },
+      {
+        "depth": 1,
+        "level": "exact",
+        "node": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "reason": "host catalog.example.com is served by example.com/chain/catalog",
+        "repository": "example.com/chain/catalog",
+        "via": "link"
+      },
+      {
+        "depth": 2,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 3,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::parent",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 4,
+        "level": "exact",
+        "mark": "cycle",
+        "node": "example.com/chain/catalog::lib/products.ts::load",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      },
+      {
+        "depth": 3,
+        "level": "exact",
+        "node": "example.com/chain/catalog::lib/products.ts::find",
+        "repository": "example.com/chain/catalog",
+        "via": "call"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/gateway::src/routes.ts::POST /api/events::http::POST::/api/events",
+    "kind": "route",
+    "label": "POST /api/events",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/gateway::src/routes.ts::POST /api/events",
+        "repository": "example.com/chain/gateway",
+        "via": "entry"
+      }
+    ]
+  },
+  {
+    "entry_point": "example.com/chain/gateway::src/server.ts::GET /api/health::http::GET::/api/health",
+    "kind": "route",
+    "label": "GET /api/health",
+    "steps": [
+      {
+        "depth": 0,
+        "level": null,
+        "node": "example.com/chain/gateway::src/server.ts::GET /api/health",
+        "repository": "example.com/chain/gateway",
+        "via": "entry"
+      }
+    ]
+  }
+]

@@ -1,0 +1,4 @@
+channel::kafka::orders.created
+  example.com/channels/api producer src/orders.ts:6 createOrder
+  example.com/channels/billing consumer src/listen.ts:10 listen.kafka orders.created billing.invoices
+  example.com/channels/worker consumer src/consumer.ts:11 handleOrder

@@ -1,0 +1,4 @@
+channel::kafka (unresolved)
+  example.com/channels/api producer src/dynamic.ts:10 announce
+  example.com/channels/api producer src/dynamic.ts:5 replay
+  example.com/channels/worker consumer src/pattern.ts:12 seen

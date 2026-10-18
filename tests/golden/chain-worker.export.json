@@ -2,6 +2,10 @@
   "repository": "example.com/chain/worker",
   "files": [
     {
+      "path": "src/consumer.ts",
+      "hash": "4437c724399621bc7b02085f4d7a93c821cf8626cfb5b9251fa4935b21e7e82f"
+    },
+    {
       "path": "src/jobs.ts",
       "hash": "811ccc3cc9dc740ea8b33852f6199c06536f9e73b1f06d3b35559aa33386c45e"
     },
@@ -11,6 +15,22 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 418,
+        "end": 521
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::start",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 207,
+        "end": 345
+      }
+    },
     {
       "id": "example.com/chain/worker::src/jobs.ts::settleOrders",
       "span": {
@@ -29,6 +49,61 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::Kafka#0",
+      "caller": "example.com/chain/worker::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 83,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::kafka.consumer#0",
+      "caller": "example.com/chain/worker::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 160,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::onOrderCreated::notify#0",
+      "caller": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "target": "example.com/chain/worker::src/notify.ts::notify",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 497,
+        "end": 518
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::start::consumer.run#0",
+      "caller": "example.com/chain/worker::src/consumer.ts::start",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 297,
+        "end": 342
+      }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::start::consumer.subscribe#0",
+      "caller": "example.com/chain/worker::src/consumer.ts::start",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 240,
+        "end": 287
+      }
+    },
     {
       "id": "example.com/chain/worker::src/jobs.ts::settleOrders::notify#0",
       "caller": "example.com/chain/worker::src/jobs.ts::settleOrders",
@@ -55,18 +130,98 @@
   "providers": [],
   "consumers": [
     {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "via": null
+    },
+    {
       "contract": "resource::postgres::orders",
       "site": "example.com/chain/worker::src/jobs.ts::settleOrders",
       "via": null
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+        "example.com/chain/worker::src/jobs.ts::settleOrders",
+        "example.com/chain/worker::src/notify.ts::notify"
+      ]
+    }
+  ],
   "links": [
+    {
+      "consumer": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "provider": "example.com/chain/gateway::src/checkout.ts::createOrder::publish#0",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
     {
       "consumer": "example.com/chain/worker::src/jobs.ts::settleOrders",
       "provider": "example.com/chain/gateway::src/orders.ts::cancelOrder",
       "contract": "resource::postgres::orders",
       "level": "declared",
       "reason": "resource::postgres::orders"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/worker::src/consumer.ts::onOrderCreated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/worker::src/consumer.ts::start",
+      "kind": "export",
+      "label": "start",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/worker::src/consumer.ts::start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/chain/worker::src/jobs.ts::settleOrders",
+      "kind": "export",
+      "label": "settleOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/chain/worker",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/chain/worker::src/jobs.ts::settleOrders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/chain/worker",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/chain/worker::src/notify.ts::notify"
+        }
+      ]
     }
   ]
 }

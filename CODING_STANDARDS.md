@@ -1,0 +1,70 @@
+# Coding standards
+
+Judgement rules for writing and reviewing Meada code: what `cargo fmt`, `clippy`, the tests and
+the hooks cannot check. The `code-review` skill and every per-ticket reviewer apply them to a
+diff. Terms are `GLOSSARY.md`'s; the module map is `docs/agents/architecture.md`.
+
+## Certain or absent
+
+A link, provider or consumer Meada cannot place with certainty stays out of the map (spec #24,
+user story 22). A wrong `exact` link and a provider at a wrong path are the worst failures: an
+agent believes them and acts on them. A missing one is an open item that a person or `meada
+decide` closes. A rule that cannot tell yields nothing, or a name match at `inferred` or
+`ambiguous`; a guess never becomes `exact`, a provider or a consumer.
+
+## Probes
+
+A change to resolution, a contract kind or a language pack is checked against every probe that
+applies to it. Each applicable probe has a fixture case in the change's tests; a missing one is
+a review finding.
+
+- **Hidden names.** Every binding form that rebinds an outer name hides it in its scope: in
+  Python `with ... as`, `except ... as`, `:=`, comprehension targets, lambda parameters,
+  `global` and `nonlocal`, `match`/`case` captures, an import inside a function or class,
+  compound targets (unpacking, `self.x` inside one), names a closure captures; in TypeScript
+  parameters, `catch` bindings and destructuring. A call after the rebinding resolves through
+  the inner binding, or by name match, and never to the outer definition.
+- **Opaque outside.** A base class or a receiver whose class comes from outside the repository
+  stays opaque: its members resolve to nothing, and reaching it before a repository class in the
+  method order leaves the member unknown.
+- **Unread mounts.** A router, blueprint or URLconf whose mount Meada does not read (an import
+  that does not resolve, an `include()` or `include_router` whose argument cannot be read)
+  yields no provider for that mount: its routes are neither guessed at the root nor under a
+  guessed prefix.
+- **Name-matched hops.** A call resolved only by a name match (`inferred` or `ambiguous`) never
+  feeds a contract, since it may be on any object or reach another function: wrapper expansion
+  and the value flow that finds routers and clients (through constants, arguments and return
+  values) climb `exact` hops alone.
+- **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
+  f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
+  parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
+
+## Hostile input
+
+A reader of a file the repository holds (a provider document, a config, a source file) treats
+its bytes as **hostile**: a crafted file ends as a `meada status` line or an open part, and
+indexing carries on.
+
+- Recursion over nested input stops at a depth limit; deeper parts are open, or the file is
+  unreadable at that line.
+- Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
+  substitution runs once over the original text.
+- A path read from a file or a config stays inside the repository root: relative, without `..`,
+  and through no symlink.
+- Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
+  `docs/agents/architecture.md` (`tests/it/docs.rs` checks the name is there), and a unit test
+  feeds it an input past the limit.
+
+## Docs move with the capability
+
+A change users can see (a language, a framework, a contract kind, a command or MCP behavior)
+updates, in the same PR, the README "Estado" section (`README.md`, with `README.en.md` and
+`README.es.md` as `AGENTS.md` requires) and `CHANGELOG.md` under its unreleased version.
+
+A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
+in the same change:
+
+- A value the index now stores (a table, a column, a field of a stored summary) joins the list
+  of the invariant "The index holds no source text and no values, apart from ...".
+- A step a kind runs outside `ContractKind` (a workspace pass in `Engine::exports`, a rule in
+  `items.rs`, a rendering hook in `engine.rs`) is named under "Seams and what extends them".

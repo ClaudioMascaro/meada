@@ -1,0 +1,3 @@
+# A second package named like the monorepo's: another repository, another identity.
+[[peer]]
+repo = "example.com/pkg/mono"

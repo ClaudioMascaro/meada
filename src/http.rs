@@ -1,12 +1,17 @@
 //! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
 //! A contract is `http::<METHOD>::<normalized path>`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::contract::{ContractKind, Found, Level, Link, Site};
-use crate::index::{Consumer, Export as IndexExport, Provider};
-use crate::lang::{Call, Export, Part, Value};
-use crate::resolve::{Code, Target};
+use crate::channel::Routes;
+use crate::config::gateway_path;
+use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::declared::{self, Declared, Types};
+use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
+use crate::lang::{Call, Depends, Export, Part, Step, Ty, Value, literal, property};
+use crate::literals::{Handler, Literals};
+use crate::resolve::{Code, Expanded, Frame, Target};
+use crate::shape::{self, Import, Shape, Source, under};
 use crate::workspace::Repository;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
@@ -67,9 +72,6 @@ fn next_route(path: &str) -> Option<String> {
     Some(format!("/{}", segments.join("/")))
 }
 
-/// What a reader needs depends on a parameter of the enclosing function: a client wrapper.
-struct Depends;
-
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
 /// read: its method (`None` when unknown) and the literal fragments of its path.
@@ -99,6 +101,134 @@ fn fetch(args: &[Value]) -> Option<Read> {
         method,
         fragments: texts,
     })
+}
+
+/// The consumer shape of the `fetch` at `call` (spec #23): the field paths read from the
+/// parsed body of its response, by the function making the call and by each client wrapper
+/// `frames` climbs from it to the consumer's site, which reads what the one below returns.
+/// The body is the result of `.json()` on the response; a wrapper returns the response, the
+/// body or a part of the body. `None` when nothing is read.
+fn response_reads<'a>(
+    code: &Code<'a>,
+    types: &mut Types,
+    call: (&'a str, usize),
+    frames: &[Frame<'a>],
+) -> Option<Shape> {
+    /// What a value is: the response, or the body below a path (`Body(vec![])`: all of it).
+    #[derive(Clone, PartialEq)]
+    enum Got<'s> {
+        Response,
+        Body(Vec<&'s Step>),
+    }
+    let site = frames.last().map_or(call.0, |f| f.path);
+    let mut out = Shape::new(Source::Reads(site.to_string()));
+    let (mut got, mut at) = (Got::Response, call);
+    // The types the wrapper below declares for the body with its own type parameters, by path:
+    // its call gives the arguments that stand for them. And that wrapper.
+    let mut generic: Vec<(String, &'a Ty)> = Vec::new();
+    let mut wrapper: Option<Target<'a>> = None;
+    for level in 0..=frames.len() {
+        let mut returned = Vec::new();
+        let mut deferred: Vec<(String, &'a Ty)> = Vec::new();
+        // Where the call `at` is written; a call that is not there reads nothing.
+        let scope = code.files().get(at.0).and_then(|f| f.calls.get(at.1));
+        let scope = scope.map(|c| c.scope.as_str());
+        for steps in code.uses(at.0, at.1)? {
+            let (mut path, rest) = match (&got, steps.first()) {
+                (Got::Response, Some(Step::Return)) if steps.len() == 1 => {
+                    returned.push(Got::Response);
+                    continue;
+                }
+                (Got::Response, Some(Step::Call(m))) if m == "json" => (Vec::new(), &steps[1..]),
+                (Got::Response, _) => continue,
+                (Got::Body(path), _) => (path.clone(), &steps[..]),
+            };
+            // A read stops at a method call: `name.toUpperCase()` reads `name`.
+            let read = (rest.iter())
+                .take_while(|s| matches!(s, Step::Field(_) | Step::Element))
+                .count();
+            path.extend(&rest[..read]);
+            let base = written(&path);
+            for prefix in shape::prefixes(&base) {
+                out.list(prefix.to_string(), false, false);
+            }
+            match rest.get(read) {
+                Some(Step::Return) => returned.push(Got::Body(path)),
+                // The type declares what the value holds: the scope is the call's.
+                Some(Step::Typed(ty)) if ty.has_param() => deferred.push((base, ty)),
+                Some(Step::Typed(ty)) => {
+                    let Some(scope) = scope else { continue };
+                    let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
+                    typed(&mut out, &base, listed);
+                }
+                // The wrapper's type parameters, given here, stand in the types it declared.
+                Some(Step::Argument(tys)) => {
+                    let (Some(scope), Some(wrapper)) = (scope, wrapper) else {
+                        continue;
+                    };
+                    let names = code.type_params(wrapper.path, wrapper.name);
+                    let args = declared::Args {
+                        names,
+                        tys,
+                        at: (at.0, scope),
+                    };
+                    for (base, ty) in &generic {
+                        let listed = types
+                            .read_with(code, at.0, scope, ty, Some(args))
+                            .unwrap_or_default();
+                        typed(&mut out, base, listed);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(frame) = frames.get(level) else {
+            break;
+        };
+        // The frame calls the function making the call `at`, which returns one thing.
+        returned.dedup();
+        match <[Got; 1]>::try_from(returned) {
+            Ok([one]) if frame.def.path == at.0 && Some(frame.def.name) == scope => {
+                // A return type that is a type parameter of the wrapper declares what it returns.
+                if let (Got::Body(path), Some(ty)) = (&one, code.returns(at.0, frame.def.name))
+                    && ty.has_param()
+                {
+                    deferred.push((written(path), ty));
+                }
+                got = one;
+            }
+            _ => break,
+        }
+        (generic, wrapper) = (deferred, Some(frame.def));
+        at = (frame.path, frame.index);
+    }
+    out.fields.remove("");
+    (!out.fields.is_empty() || !out.imports.is_empty()).then_some(out)
+}
+
+/// Adds the fields a declared type lists, below `base`, to a consumer's `shape`, with the types
+/// and schemas of a package it names for the query to fill.
+fn typed(shape: &mut Shape, base: &str, listed: Declared) {
+    for (field, optional) in listed.fields {
+        shape.list(under(base, &field), optional, true);
+    }
+    for import in listed.imports {
+        let at = under(base, &import.at);
+        shape.imports.insert(Import { at, ..import });
+    }
+}
+
+/// The field path `steps` (fields and elements) read: `items[].id`.
+fn written(steps: &[&Step]) -> String {
+    let mut out = String::new();
+    for step in steps {
+        match step {
+            Step::Field(name) if out.is_empty() => out += name,
+            Step::Field(name) => out += &format!(".{name}"),
+            _ => out += "[]",
+        }
+    }
+    out
 }
 
 /// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
@@ -132,10 +262,11 @@ pub fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
-/// The contract `provider` serves at its gateway path, when `[serve]` rewrites its route.
-pub(crate) fn gateway_contract(provider: &Provider) -> Option<String> {
-    let (method, _) = route(&provider.contract)?;
-    Some(contract(method, provider.gateway.as_deref()?))
+/// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
+pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
+    let method = route(&provider.contract).map(|(method, _)| method);
+    (provider.gateways.iter())
+        .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
 }
 
 /// Whether a provider of the route `provided` serves the route `wanted`: the same route, or
@@ -145,10 +276,49 @@ pub(crate) fn fits(provided: &str, wanted: &str) -> bool {
         || matches!((route(provided), route(wanted)), (Some((ANY, p)), Some((_, w))) if p == w)
 }
 
-/// Whether `provider` serves `contract`, by its code path or by its gateway path.
+/// Whether `provider` serves `contract`, by its own path or by a gateway path.
 pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
     fits(&provider.contract, contract)
-        || gateway_contract(provider).is_some_and(|g| fits(&g, contract))
+        || gateway_contracts(provider).any(|(g, _)| fits(&g, contract))
+}
+
+/// Sets the drift (spec #23) of every HTTP link of `links` with a single provider (any level
+/// but `ambiguous`) and a shape on both sides: the consumer's at its call site, and that of the
+/// provider at the link's provider site serving the link's contract. Run on the links of the
+/// whole workspace once the decisions are replayed, so everything reading links sees it.
+pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
+    // A call site holds one consumer per contract it reaches (a wrapper fetching two routes);
+    // the same contract from several hosts (`via`) counts only when they read alike.
+    let mut consumers: HashMap<(&str, Option<&str>), Vec<Option<&Shape>>> = HashMap::new();
+    for c in exports.iter().flat_map(|e| &e.consumers) {
+        let key = (c.site.as_str(), c.contract.as_deref());
+        consumers.entry(key).or_default().push(c.shape.as_ref());
+    }
+    let read = |site, contract| match consumers.get(&(site, contract))?.as_slice() {
+        [first, rest @ ..] if rest.iter().all(|s| s == first) => *first,
+        _ => None,
+    };
+    let mut providers: HashMap<&str, Vec<&Provider>> = HashMap::new();
+    for p in exports.iter().flat_map(|e| &e.providers) {
+        if p.shape.is_some() && route(&p.contract).is_some() {
+            providers.entry(p.site.as_str()).or_default().push(p);
+        }
+    }
+    for link in links {
+        if link.level == Level::Ambiguous || route(&link.contract).is_none() {
+            continue;
+        }
+        // A decided link of an unresolved consumer carries the provider's contract.
+        let site = link.consumer.as_str();
+        let Some(consumer) = read(site, Some(&link.contract)).or_else(|| read(site, None)) else {
+            continue;
+        };
+        let served = (providers.get(link.provider.as_str()).into_iter().flatten())
+            .find(|p| serves(p, &link.contract));
+        if let Some(provider) = served.and_then(|p| p.shape.as_ref()) {
+            link.drift = shape::drift(provider, consumer);
+        }
+    }
 }
 
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
@@ -219,7 +389,7 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         return Ok(Some("GET".into()));
     };
     let value = match init {
-        Value::Object(properties) => match method_property(properties)? {
+        Value::Object(properties) => match property(properties, "method")? {
             Some(value) => value,
             None => return Ok(Some("GET".into())),
         },
@@ -232,38 +402,6 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         Value::Undefined => Ok(Some("GET".into())),
         _ => Ok(None),
     }
-}
-
-/// The value of the last `method` of an object, as in JavaScript, through spreads.
-fn method_property(properties: &[(String, Value)]) -> Result<Option<&Value>, Depends> {
-    static UNKNOWN: Value = Value::Unknown;
-    for (key, value) in properties.iter().rev() {
-        match (key.as_str(), value) {
-            ("method", value) => return Ok(Some(value)),
-            ("...", Value::Object(inner)) => {
-                if let Some(found) = method_property(inner)? {
-                    return Ok(Some(found));
-                }
-            }
-            ("...", Value::Undefined) => {}
-            ("...", Value::Ref(_)) => return Err(Depends),
-            // A spread of something unknown may hide a method.
-            ("...", _) => return Ok(Some(&UNKNOWN)),
-            _ => {}
-        }
-    }
-    Ok(None)
-}
-
-/// The text of `parts` when every part is literal.
-fn literal(parts: &[Part]) -> Option<String> {
-    parts
-        .iter()
-        .map(|p| match p {
-            Part::Text(t) => Some(t.as_str()),
-            _ => None,
-        })
-        .collect()
 }
 
 /// The methods a list of literal strings names (`methods=["GET", "post"]`), upper-cased; none
@@ -283,17 +421,21 @@ fn methods(list: Value) -> Vec<String> {
 /// A provider of `contract` at `site`.
 fn provider(site: Site, contract: String) -> Found {
     Found {
+        role: Role::Provider,
         site,
         contract: Some(contract),
         via: None,
         method: None,
         fragments: Vec::new(),
+        shape: None,
     }
 }
 
-/// The consumer at the call `index` of `path`, as `read` reads it.
-fn consumer(path: &str, index: usize, read: Read) -> Found {
+/// The consumer at the call `index` of `path`, as `read` reads it, with the shape it reads of
+/// the response (spec #23), if any.
+fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found {
     Found {
+        role: Role::Consumer,
         site: Site::Call {
             path: path.into(),
             index,
@@ -302,6 +444,7 @@ fn consumer(path: &str, index: usize, read: Read) -> Found {
         via: read.via,
         method: read.method,
         fragments: read.fragments,
+        shape,
     }
 }
 
@@ -392,11 +535,27 @@ fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
             .is_none_or(|name| name.starts_with("express."))
 }
 
+/// The shape the handler `name` of `path` gives its route from what the code returns (spec
+/// #23): the one place that picks the source of a code route's shape. The sources come in the
+/// order of ADR 0009, a document merged later in `declare`, then the zod schema the response
+/// is parsed with or typed with, then the returned literals.
+fn provider_shape(
+    code: &Code,
+    literals: &mut Literals,
+    path: &str,
+    name: &str,
+    kind: Handler,
+) -> Option<Shape> {
+    let responses = literals.responses(code, path, name, kind)?;
+    (literals.types().zod().returned(code, &responses, name))
+        .or_else(|| literals.shape(code, &responses))
+}
+
 /// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on an app or a
 /// router, under every prefix of `app.use(prefix, router)` mounts, at any depth. The app or
 /// router is followed through constants, imports, arguments and return values.
 // ponytail: `router.route(path)` chains and `require` are not followed.
-fn express(code: &Code) -> Vec<Found> {
+fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
     let routers = |path, scope, name| -> Vec<CallAt> {
         let origins = code.origins(path, scope, name).into_iter();
         origins.filter(|&r| is_express(code, r)).collect()
@@ -426,9 +585,31 @@ fn express(code: &Code) -> Vec<Found> {
             let Some(args) = code.args(path, n) else {
                 continue;
             };
-            let (prefix, rest) = match args.first().map(|a| code.value(path, &call.scope, a)) {
-                Some(Value::Str(parts)) => (literal(&parts), &args[1..]),
-                _ => (Some(String::new()), args),
+            let first = args.first().map(|a| (a, code.value(path, &call.scope, a)));
+            let (prefix, rest) = match first {
+                Some((_, Value::Str(parts))) => (literal(&parts), &args[1..]),
+                // A router or a handler first: the mount has no path.
+                None | Some((_, Value::Call(_) | Value::Function(_) | Value::New(..))) => {
+                    (Some(String::new()), args)
+                }
+                Some((Value::Ref(name), _))
+                    if code.definition(path, &call.scope, name).is_some() =>
+                {
+                    (Some(String::new()), args)
+                }
+                // A router reached through arguments and return values has no path either.
+                Some((first, _))
+                    if (code.value_origins(path, &call.scope, first).into_iter())
+                        .any(|c| is_express(code, c)) =>
+                {
+                    (Some(String::new()), args)
+                }
+                // Anything else may be a path Meada cannot read (a parameter, a member of an
+                // imported object): what it mounts is served under no prefix.
+                // ponytail: so is a router mounted after a package's middleware passed uncalled
+                // (`app.use(requireAuth, router)`); tell package handlers from package strings
+                // through `Code::origin` if that loses routes that matter.
+                _ => (None, &args[1..]),
             };
             for arg in rest {
                 let children = code.value_origins(path, &call.scope, arg).into_iter();
@@ -452,6 +633,14 @@ fn express(code: &Code) -> Vec<Found> {
         let Some(route) = literal(&parts) else {
             continue;
         };
+        // The handler's literals (spec #23), read once for every prefix it is mounted under.
+        let target = match handler {
+            Value::Function(def) => Some((path, def.as_str())),
+            Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
+            _ => None,
+        };
+        let shape = target
+            .and_then(|(at, name)| provider_shape(code, literals, at, name, Handler::Express));
         let root = |_: CallAt| Some(String::new());
         for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
             let full = normalize_path(&join(&prefix, &route));
@@ -470,7 +659,10 @@ fn express(code: &Code) -> Vec<Found> {
                 },
                 _ => Site::File(path.into()),
             };
-            found.push(provider(site, contract(&method, &full)));
+            found.push(Found {
+                shape: shape.clone(),
+                ..provider(site, contract(&method, &full))
+            });
         }
     }
     found
@@ -822,7 +1014,7 @@ fn clients(code: &Code) -> Vec<Found> {
                 fetch(&[url, method.unwrap_or(Value::Unknown)])
             };
             for (site, at, read) in code.expand(path, n, &read) {
-                found.push(consumer(site, at, read));
+                found.push(consumer(site, at, read, None));
             }
         }
     }
@@ -1153,7 +1345,9 @@ impl ContractKind for Http {
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         // `fetch` is a consumer only where the language binds it everywhere.
-        let global = code.is_global("fetch");
+        let global = code.binds_everywhere("fetch");
+        // One reader of each shape source for the whole extraction: each budget per file once.
+        let mut literals = Literals::default();
         for (&path, facts) in code.files() {
             for (n, call) in facts.calls.iter().enumerate() {
                 let is_fetch = global
@@ -1162,8 +1356,15 @@ impl ContractKind for Http {
                 if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                     continue;
                 }
-                for (site, at, read) in code.expand(path, n, &|args, _| fetch(args)) {
-                    found.push(consumer(site, at, read));
+                let expanded = code.expand_frames(path, n, &|args, _| fetch(args));
+                for Expanded {
+                    site: (site, at),
+                    frames,
+                    found: read,
+                } in expanded
+                {
+                    let shape = response_reads(code, literals.types(), (path, n), &frames);
+                    found.push(consumer(site, at, read, shape));
                 }
             }
             let Some(route) = next_route(path) else {
@@ -1177,30 +1378,115 @@ impl ContractKind for Http {
                     continue;
                 }
                 // `export const GET = withAuth(...)` defines no function: the file serves it.
-                let site = if facts.defs.iter().any(|d| d.name == *local) {
-                    Site::Def {
+                let defined = facts.defs.iter().any(|d| d.name == *local);
+                let (site, shape) = if defined {
+                    let site = Site::Def {
                         path: path.into(),
                         name: local.clone(),
-                    }
+                    };
+                    (
+                        site,
+                        provider_shape(code, &mut literals, path, local, Handler::Next),
+                    )
                 } else {
-                    Site::File(path.into())
+                    (Site::File(path.into()), None)
                 };
-                found.push(provider(site, contract(exported, &route)));
+                found.push(Found {
+                    shape,
+                    ..provider(site, contract(exported, &route))
+                });
             }
         }
         found.extend(clients(code));
-        found.extend(express(code));
+        found.extend(express(code, &mut literals));
         found.extend(decorated(code));
         found.extend(django(code));
         found
     }
 
+    /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
+    /// hosts. A document route with the contract of a code route merges into it: the code
+    /// keeps the handler. Any other is a provider of its own, without a handler, at
+    /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
+    /// already listed adds nothing of its own.
+    ///
+    /// Each document listing a route gives it its own gateway forms: one per `servers` path of
+    /// the document (the server path as the prefix, with the `[serve]` strip), or the `[serve]`
+    /// form when the document has no server path. A code route keeps its `[serve]` form and
+    /// adds those of the documents listing it. The hosts of every HTTP provider are the
+    /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        let serve = &repo.config.serve;
+        let code: HashSet<String> = (export.providers.iter())
+            .map(|p| p.contract.clone())
+            .collect();
+        let mut listed = code.clone();
+        let mut documented = Vec::new();
+        let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
+        // The first document by path listing a route gives its shape, merged or not.
+        let mut shapes = HashMap::new();
+        for doc in &export.documents {
+            let prefixes = (doc.summary.servers.iter())
+                .map(|s| s.path.as_str())
+                .filter(|p| !p.is_empty());
+            let prefixes: Vec<&str> = prefixes.collect();
+            for route in &doc.summary.routes {
+                let contract = route.contract();
+                shapes.entry(contract.clone()).or_insert(&route.shape);
+                let found: Vec<(String, String)> = match prefixes.is_empty() {
+                    true => serve.gateway_path(&route.path).into_iter().collect(),
+                    false => (prefixes.iter())
+                        .filter_map(|p| gateway_path(Some(p), serve.strip.as_deref(), &route.path))
+                        .collect(),
+                };
+                let own = forms.entry(contract.clone()).or_default();
+                for (path, reason) in found {
+                    let form = Gateway { path, reason };
+                    if !own.contains(&form) {
+                        own.push(form);
+                    }
+                }
+                if listed.insert(contract.clone()) {
+                    let site = format!("{}::{}::{}", repo.identity, doc.path, route.label());
+                    documented.push(Provider {
+                        contract,
+                        site,
+                        ..Provider::default()
+                    });
+                }
+            }
+        }
+        export.providers.extend(documented);
+        index::sort_providers(&mut export.providers);
+        let mut hosts: Vec<String> = serve.hosts.iter().map(|h| h.to_lowercase()).collect();
+        let servers = export.documents.iter().flat_map(|d| &d.summary.servers);
+        hosts.extend(servers.filter_map(|s| s.host.clone()));
+        hosts.sort();
+        hosts.dedup();
         for p in &mut export.providers {
-            let path = route(&p.contract).map(|(_, path)| path);
-            p.gateway = path
-                .and_then(|path| repo.config.serve.gateway_path(path))
-                .map(|g| g.0);
+            let Some((_, path)) = route(&p.contract) else {
+                continue;
+            };
+            // A document's shape wins over the one the code gives.
+            if let Some(Some(shape)) = shapes.get(&p.contract) {
+                p.shape = Some(shape.clone());
+            }
+            let served = serve
+                .gateway_path(path)
+                .map(|(path, reason)| Gateway { path, reason });
+            let from_documents = forms.get(&p.contract).cloned().unwrap_or_default();
+            // The `[serve]` form first: a code route has it, a documented one when a document
+            // without server paths lists it.
+            let served =
+                served.filter(|s| code.contains(&p.contract) || from_documents.contains(s));
+            p.gateway = served.as_ref().map(|s| s.path.clone());
+            p.gateways = served.into_iter().collect();
+            for form in from_documents {
+                if !p.gateways.contains(&form) {
+                    p.gateways.push(form);
+                }
+            }
+            p.hosts = hosts.clone();
         }
     }
 
@@ -1209,6 +1495,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
+        _routes: &Routes,
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -1222,11 +1509,8 @@ impl ContractKind for Http {
                 if fits(&p.contract, contract) {
                     return Some((m, p, None));
                 }
-                if !gateway_contract(p).is_some_and(|g| fits(&g, contract)) {
-                    return None;
-                }
-                let (_, reason) = m.config.serve.gateway_path(route(&p.contract)?.1)?;
-                Some((m, p, Some(reason)))
+                let (_, reason) = gateway_contracts(p).find(|(g, _)| fits(g, contract))?;
+                Some((m, p, Some(reason.to_string())))
             })
             .collect();
         let direct: Vec<&str> = (serving.iter())
@@ -1242,7 +1526,9 @@ impl ContractKind for Http {
             .unwrap_or_default();
         let (fits, level, reason): (Vec<_>, _, _) =
             if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving.filter(|(m, ..)| m.config.serves(host)).collect();
+                let fits = serving
+                    .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+                    .collect();
                 (fits, Level::Exact, format!("host {host} is served by"))
             } else if let (Some(var), false) = (var, peers.is_empty()) {
                 let fits = serving
@@ -1297,6 +1583,7 @@ impl ContractKind for Http {
                     reason,
                     by: None,
                     p: None,
+                    drift: None,
                 }
             })
             .collect()

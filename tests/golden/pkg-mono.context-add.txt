@@ -1,0 +1,11 @@
+example.com/pkg/mono packages/a/src/index.js:1 add
+community: none
+processes: 1 (1 export; 1 repository): total (example.com/pkg/mono)
+function add(a, b) {
+  return a + b;
+}
+callers: none
+callees: none
+consumers:
+example.com/pkg/mono packages/b/src/app.ts:4 total [range unchecked]
+example.com/pkg/mono packages/c/src/use.js:4 sum [ambiguous]

@@ -39,6 +39,8 @@ write tools; one index per repository; determinism) live in
 - Decisions are recorded as ADRs in `docs/adr/`.
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
 - Repository map in `docs/agents/architecture.md`: read it before exploring or changing code.
+- Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a
+  contract kind or a language pack.
 
 ## Agent skills
 

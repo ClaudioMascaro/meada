@@ -1,0 +1,13 @@
+example.com/pkg/shared kit/src/greet.ts:1 greet
+community: kit/src
+processes: 4 (4 export; 3 repositories): report (example.com/pkg/api), greet (example.com/pkg/shared), smoke (example.com/pkg/web), caught (example.com/pkg/web)
+function greet(name: string): string {
+  return shout(`hello ${name}`);
+}
+callers: none
+callees:
+example.com/pkg/shared kit/src/greet.ts:5 shout
+consumers:
+example.com/pkg/api src/report.js:4 report [range unchecked]
+example.com/pkg/web e2e/smoke.ts:5 smoke
+example.com/pkg/web src/app.ts:10 welcome [range mismatch]

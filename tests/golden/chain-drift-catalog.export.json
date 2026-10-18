@@ -1,0 +1,2053 @@
+{
+  "repository": "example.com/chain/catalog",
+  "files": [
+    {
+      "path": "app/api/batches/route.ts",
+      "hash": "ecd0d1e9e9d005e2f2f7458c5a0a50cf381f4ea70fb55d789c5c31c7fa0950ba"
+    },
+    {
+      "path": "app/api/cached/route.ts",
+      "hash": "28715cb31c5ac0a8a141362a4b37e10ba35aac1f7e61d17692b203723b756b37"
+    },
+    {
+      "path": "app/api/comments/route.ts",
+      "hash": "21f771386e86c21a46598fa7a459c26e7949265ef63ea0822bb7af8262f51434"
+    },
+    {
+      "path": "app/api/comments/summary/route.ts",
+      "hash": "f13209650211ef95e6e68e160c585f887ae9d48782375a814da7046c8056f1d9"
+    },
+    {
+      "path": "app/api/events/route.ts",
+      "hash": "4f0ad679a8252cc48bdb12fd490508b2eec987596bd7ea1d3473bb4e7c7b205d"
+    },
+    {
+      "path": "app/api/health/route.ts",
+      "hash": "fc112243d7c86477ef19dd4a789114daeb1179870fd562faef220175aef990a6"
+    },
+    {
+      "path": "app/api/labels/route.ts",
+      "hash": "c8692e7453c22404109eae4d607a4215b4e46c5fafeb678e5e84ac5a2d60550a"
+    },
+    {
+      "path": "app/api/offers/route.ts",
+      "hash": "63d16bdec148a7c67cd6e0237c341637c2e50ad4774f5c9ddc6ff68c98adb84b"
+    },
+    {
+      "path": "app/api/ping/route.ts",
+      "hash": "5bf91b3280e39b8b124fce21bf39339433cc29fc47be74e63f0a537773fefb8e"
+    },
+    {
+      "path": "app/api/products/[id]/route.ts",
+      "hash": "faa5f3dcd718e5dd3c0013b2c54f4cb5a09ef452aeb565b31841ab562b29bef1"
+    },
+    {
+      "path": "app/api/profiles/route.ts",
+      "hash": "33b6d942e658d9bf2f9e7e1e97d89d87b670c8663bc41f046072ab33e5d93ff9"
+    },
+    {
+      "path": "app/api/quotes/route.ts",
+      "hash": "4a4219c5fd711a8d3782022536e785d26747a4a62809195ffb89a0a2adb2de4e"
+    },
+    {
+      "path": "app/api/receipts/route.ts",
+      "hash": "3925bfad8bb6be36efcf4aff16303eab2d564d1a85e9fab7e9c92a6206eb0522"
+    },
+    {
+      "path": "app/api/reviews/route.ts",
+      "hash": "fa0d44648c655dc433e5a961e316b5facf8cdb26d18a3afe5ae7be6bb5b8d802"
+    },
+    {
+      "path": "app/api/stock/[sku]/route.ts",
+      "hash": "155788061b32d59a48680bcda5ac8acd19f73a430d664c2ed1f38fa35916a174"
+    },
+    {
+      "path": "app/api/stock/route.ts",
+      "hash": "eb8a2eed86e7e5d569a05e84ed0c301336ac3fd5106376da14a11d0dabe9e830"
+    },
+    {
+      "path": "app/api/tags/route.ts",
+      "hash": "0bf53b3379efc3690ba299223b1e22e2c79b2311fd98e3511a3b224642d5ac84"
+    },
+    {
+      "path": "app/api/tickets/route.ts",
+      "hash": "13ed9327517ec0cf58d11d682feea2194a0eafb36f3cc5e13e434e2e168dd19e"
+    },
+    {
+      "path": "lib/limits.ts",
+      "hash": "81b1df392b965b76af52f4feeca986a8d3ea06201dd6c3e5e2c4809d804a6947"
+    },
+    {
+      "path": "lib/products.ts",
+      "hash": "2ede1b6743ae3a01020d1b39b8ec7d50218d4140a954f4e19959915ec59b6ce2"
+    },
+    {
+      "path": "lib/schemas.ts",
+      "hash": "f5e722312e61c2e0455419892c71c63337a8e1505e25363d5bd52c44b2f5d9c0"
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "hash": "91321652fff70fc12ec7136e52f399bd52f76a9daf577a0bb8dd4df248adb3c6"
+    },
+    {
+      "path": "packages/contracts/src/quote.ts",
+      "hash": "b3c2a0b06b138ede61ea01a81b3c1208c6dc333be68e402e241a9d113df55d55"
+    },
+    {
+      "path": "packages/contracts/src/receipt.ts",
+      "hash": "bf2d0a72bd511d5f6a76b9b1e2396db6442b66c4c7af71134897563c862917ac"
+    },
+    {
+      "path": "packages/contracts/src/shelf.ts",
+      "hash": "d183b840681106fb8bc0e1193a2cb2099206dedce1e7a37366faebc8bffa8e02"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "span": {
+        "path": "app/api/batches/route.ts",
+        "start": 148,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 214,
+        "end": 389
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 45,
+        "end": 108
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 244,
+        "end": 456
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 526,
+        "end": 792
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 241,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/events/route.ts::POST",
+      "span": {
+        "path": "app/api/events/route.ts",
+        "start": 7,
+        "end": 72
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "span": {
+        "path": "app/api/health/route.ts",
+        "start": 7,
+        "end": 54
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 241,
+        "end": 365
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 192,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "span": {
+        "path": "app/api/ping/route.ts",
+        "start": 103,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 57,
+        "end": 182
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 402,
+        "end": 480
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "span": {
+        "path": "app/api/quotes/route.ts",
+        "start": 203,
+        "end": 282
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "span": {
+        "path": "app/api/receipts/route.ts",
+        "start": 118,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "span": {
+        "path": "app/api/reviews/route.ts",
+        "start": 93,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 29,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 218,
+        "end": 390
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 455,
+        "end": 586
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 179,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 168,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::find",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 277,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 81,
+        "end": 185
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::parent",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 187,
+        "end": 275
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/chain/catalog::app/api/batches/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/batches/route.ts",
+        "start": 180,
+        "end": 288
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::(new_expression).searchParams.has#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 259,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 318,
+        "end": 353
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::URL#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 259,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::GET::ok#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "level": "exact",
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 368,
+        "end": 386
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/cached/route.ts::ok::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/cached/route.ts::ok",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/cached/route.ts",
+        "start": 82,
+        "end": 105
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::Comments.parse#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 296,
+        "end": 324
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 337,
+        "end": 364
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::NextResponse.json#1",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 389,
+        "end": 449
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 317,
+        "end": 323
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::Comment.safeParse#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 583,
+        "end": 622
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 660,
+        "end": 727
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::NextResponse.json#1",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 742,
+        "end": 789
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::request.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 607,
+        "end": 621
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 321,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::summarize#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 345,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/events/route.ts::POST::Response#0",
+      "caller": "example.com/chain/catalog::app/api/events/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/events/route.ts",
+        "start": 34,
+        "end": 69
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/health/route.ts::GET::Response#0",
+      "caller": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/health/route.ts",
+        "start": 33,
+        "end": 51
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 303,
+        "end": 362
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::C.Quote.parse#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 242,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 224,
+        "end": 270
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/offers/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/offers/route.ts",
+        "start": 262,
+        "end": 268
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/ping/route.ts::GET::Response.json#0",
+      "caller": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/ping/route.ts",
+        "start": 135,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::Response.json#0",
+      "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 146,
+        "end": 179
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "exact",
+      "span": {
+        "path": "app/api/products/[id]/route.ts",
+        "start": 160,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 434,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::Page.parse#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 452,
+        "end": 476
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 469,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.array#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 354,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.number#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 379,
+        "end": 389
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 226,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#1",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 286,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#2",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 336,
+        "end": 392
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 243,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#1",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#2",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 303,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/quotes/route.ts",
+        "start": 235,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET::Quote.parse#0",
+      "caller": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/quotes/route.ts",
+        "start": 253,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/quotes/route.ts",
+        "start": 271,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/receipts/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/receipts/route.ts",
+        "start": 150,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/reviews/route.ts::GET::Response#0",
+      "caller": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/reviews/route.ts",
+        "start": 186,
+        "end": 221
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/reviews/route.ts::GET::Response.json#0",
+      "caller": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/reviews/route.ts",
+        "start": 236,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/reviews/route.ts::GET::request.headers.get#0",
+      "caller": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/reviews/route.ts",
+        "start": 139,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET::Response.json#0",
+      "caller": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 202,
+        "end": 258
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET::Response.json#1",
+      "caller": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 273,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET::SKUS.includes#0",
+      "caller": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 117,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::HISTORY.map#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 352,
+        "end": 381
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 250,
+        "end": 387
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::POST::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 542,
+        "end": 583
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::POST::request.json#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 517,
+        "end": 531
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 242,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::NextResponse.json#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 200,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::Ticket.parse#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 218,
+        "end": 244
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET::load#0",
+      "caller": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "inferred",
+      "span": {
+        "path": "app/api/tickets/route.ts",
+        "start": 237,
+        "end": 243
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load::find#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::load",
+      "target": "example.com/chain/catalog::lib/products.ts::find",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 174,
+        "end": 182
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::load::parent#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::load",
+      "target": "example.com/chain/catalog::lib/products.ts::parent",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 154,
+        "end": 171
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/products.ts::parent::load#0",
+      "caller": "example.com/chain/catalog::lib/products.ts::parent",
+      "target": "example.com/chain/catalog::lib/products.ts::load",
+      "level": "exact",
+      "span": {
+        "path": "lib/products.ts",
+        "start": 241,
+        "end": 272
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).min#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 177,
+        "end": 194
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).nullish#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 246,
+        "end": 286
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).optional#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 204,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.array#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 204,
+        "end": 223
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.array#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 347,
+        "end": 363
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.number#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 407,
+        "end": 417
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.number#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 428,
+        "end": 438
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 139,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 246,
+        "end": 276
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.object#2",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 389,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.record#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 296,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 156,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#1",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 177,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#2",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 212,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#3",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 263,
+        "end": 273
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::z.string#4",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 305,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.object#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 297,
+        "end": 343
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.string#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 312,
+        "end": 322
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.string#1",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 330,
+        "end": 340
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.number#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 131,
+        "end": 141
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.object#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 96,
+        "end": 144
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.string#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/quote.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 112,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/shelf.ts::Object.freeze#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/shelf.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/contracts/src/shelf.ts",
+        "start": 216,
+        "end": 242
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/api/batches",
+      "site": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/batches/route.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].id",
+          "items[].owner",
+          "items[].owner.name",
+          "items[].qty",
+          "page",
+          "page.number"
+        ],
+        "scalars": [
+          "items[].id",
+          "items[].owner.name",
+          "items[].qty",
+          "page.number"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/cached",
+      "site": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/cached/route.ts"
+        },
+        "fields": [
+          "cached"
+        ],
+        "open": [
+          ""
+        ],
+        "scalars": [
+          "cached"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments",
+      "site": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/route.ts"
+        },
+        "fields": [
+          "[]",
+          "[].author",
+          "[].author.name",
+          "[].id",
+          "[].meta",
+          "[].tags",
+          "[].tags[]",
+          "[].title"
+        ],
+        "open": [
+          "[].meta"
+        ],
+        "scalars": [
+          "[].author.name",
+          "[].id",
+          "[].tags[]",
+          "[].title"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/comments/summary",
+      "site": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/summary/route.ts"
+        },
+        "fields": [
+          "average",
+          "count"
+        ],
+        "scalars": [
+          "average",
+          "count"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/health",
+      "site": "example.com/chain/catalog::app/api/health/route.ts::GET"
+    },
+    {
+      "contract": "http::GET::/api/labels",
+      "site": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/labels/route.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.title",
+          "ok"
+        ],
+        "open": [
+          "labels"
+        ],
+        "scalars": [
+          "labels.title",
+          "ok"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/offers",
+      "site": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/offers/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "scalars": [
+          "price",
+          "sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/ping",
+      "site": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/ping/route.ts"
+        },
+        "fields": [
+          "ok"
+        ],
+        "scalars": [
+          "ok"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/products/{}",
+      "site": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/products/[id]/route.ts"
+        },
+        "fields": [],
+        "open": [
+          ""
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/profiles",
+      "site": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/profiles/route.ts"
+        },
+        "fields": [
+          "items",
+          "items[]",
+          "items[].address",
+          "items[].address.city",
+          "items[].id",
+          "items[].name",
+          "total"
+        ],
+        "scalars": [
+          "items[].address.city",
+          "items[].id",
+          "items[].name",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/quotes",
+      "site": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/quotes/route.ts"
+        },
+        "fields": [
+          "price",
+          "sku"
+        ],
+        "scalars": [
+          "price",
+          "sku"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/receipts",
+      "site": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/receipts/route.ts"
+        },
+        "fields": [
+          "id",
+          "total"
+        ],
+        "scalars": [
+          "id",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/reviews",
+      "site": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/reviews/route.ts"
+        },
+        "fields": [
+          "count",
+          "stars"
+        ],
+        "scalars": [
+          "count",
+          "stars"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/stock/route.ts"
+        },
+        "fields": [
+          "count",
+          "history",
+          "name",
+          "sku",
+          "tags",
+          "tags[]",
+          "tags[].label"
+        ],
+        "open": [
+          "history"
+        ],
+        "scalars": [
+          "count",
+          "name",
+          "sku",
+          "tags[].label"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/stock/{}",
+      "site": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/stock/[sku]/route.ts"
+        },
+        "fields": [
+          "count",
+          "sku"
+        ],
+        "open": [
+          "sku"
+        ],
+        "scalars": [
+          "count"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tags",
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "shape": {
+        "source": {
+          "literals": "app/api/tags/route.ts"
+        },
+        "fields": [
+          "labels",
+          "labels.color",
+          "name"
+        ],
+        "open": [
+          "labels"
+        ],
+        "scalars": [
+          "labels.color",
+          "name"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/api/tickets",
+      "site": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "shape": {
+        "source": {
+          "zod": "app/api/tickets/route.ts"
+        },
+        "fields": [
+          "id",
+          "seat"
+        ],
+        "scalars": [
+          "id",
+          "seat"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/comments",
+      "site": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "shape": {
+        "source": {
+          "zod": "app/api/comments/route.ts"
+        },
+        "fields": [
+          "author",
+          "author.name",
+          "id",
+          "meta",
+          "tags",
+          "tags[]",
+          "title"
+        ],
+        "open": [
+          "meta"
+        ],
+        "scalars": [
+          "author.name",
+          "id",
+          "tags[]",
+          "title"
+        ]
+      }
+    },
+    {
+      "contract": "http::POST::/api/events",
+      "site": "example.com/chain/catalog::app/api/events/route.ts::POST"
+    },
+    {
+      "contract": "http::POST::/api/stock",
+      "site": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "shape": {
+        "source": {
+          "literals": "app/api/stock/route.ts"
+        },
+        "fields": [
+          "ok"
+        ],
+        "open": [
+          ""
+        ],
+        "scalars": [
+          "ok"
+        ]
+      }
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/catalog::packages/contracts/package.json"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::postgres::orders",
+      "site": "example.com/chain/catalog",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "@chain/contracts",
+      "version": "1.0.0",
+      "repository": "example.com/chain/catalog",
+      "directory": "packages/contracts"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@chain/contracts",
+      "range": "workspace:*"
+    }
+  ],
+  "communities": [
+    {
+      "name": "app/api/cached",
+      "members": [
+        "example.com/chain/catalog::app/api/cached/route.ts::GET",
+        "example.com/chain/catalog::app/api/cached/route.ts::ok"
+      ]
+    },
+    {
+      "name": "lib",
+      "members": [
+        "example.com/chain/catalog::app/api/comments/route.ts::GET",
+        "example.com/chain/catalog::app/api/offers/route.ts::GET",
+        "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+        "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+        "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+        "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+        "example.com/chain/catalog::lib/products.ts::find",
+        "example.com/chain/catalog::lib/products.ts::load",
+        "example.com/chain/catalog::lib/products.ts::parent"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
+      "provider": "example.com/chain/catalog::packages/contracts/package.json",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts workspace:* (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/chain/gateway::package.json::dependencies::@chain/contracts",
+      "provider": "example.com/chain/catalog::packages/contracts/package.json",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/checkout.ts::createOrder::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
+      "provider": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
+      "contract": "http::GET::/api/products/{}",
+      "level": "exact",
+      "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::package.json::dependencies::@chain/contracts",
+      "provider": "example.com/chain/catalog::packages/contracts/package.json",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::handed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::ids::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].owner.email": "inferred",
+          "items[].weight": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "page.size": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::quantities::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].note": "inferred",
+          "items[].sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/batches/route.ts::GET",
+      "contract": "http::GET::/api/batches",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::comments::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "contract": "http::GET::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "[].rating": "inferred"
+        },
+        "unchecked": {
+          "[].meta.stars": "[].meta"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::submit::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "contract": "http::POST::/api/comments",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "rating": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/comments.ts::summary::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "contract": "http::GET::/api/comments/summary",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "total": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::cast::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].address.zip": "exact",
+          "items[].nickname": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::counts::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::pages::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "pages": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::plain::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "items[].nickname": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact",
+          "items[].rank": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::searched::search#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "count": "exact"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
+      "provider": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "contract": "http::GET::/api/profiles",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "data": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/labels.ts::labels::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "contract": "http::GET::/api/labels",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "status": "inferred"
+        },
+        "unchecked": {
+          "labels.other": "labels",
+          "labels.title": "labels"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/ping/route.ts::GET",
+      "contract": "http::GET::/api/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "price": "inferred",
+          "sku": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::offer::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/offers/route.ts::GET",
+      "contract": "http::GET::/api/offers",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "discount": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::quote::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
+      "contract": "http::GET::/api/quotes",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "discount": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "paidAt": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
+      "contract": "http::GET::/api/receipts",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::tags::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "contract": "http::GET::/api/tags",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "title": "inferred"
+        },
+        "unchecked": {
+          "labels.size": "labels"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
+      "contract": "http::GET::/api/tickets",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "row": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/health/route.ts::GET",
+      "contract": "http::GET::/api/health",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::cached::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/cached/route.ts::GET",
+      "contract": "http::GET::/api/cached",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "unchecked": {
+          "cached": "",
+          "nothing": "",
+          "user": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::one::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/stock/{}",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "error": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::restock::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/route.ts::POST",
+      "contract": "http::POST::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "unchecked": {
+          "whatever": ""
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
+      "contract": "http::GET::/api/reviews",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "votes": "inferred"
+        }
+      }
+    },
+    {
+      "consumer": "example.com/chain/web::src/stock.ts::stock::fetch#0",
+      "provider": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog",
+      "drift": {
+        "missing": {
+          "weight": "inferred"
+        },
+        "unchecked": {
+          "history[]": "history"
+        }
+      }
+    }
+  ]
+}

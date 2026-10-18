@@ -1,0 +1,9 @@
+{
+  // Only the two options that map build output back to source are kept.
+  "extends": "./base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "src",
+    "strict": true,
+  },
+}

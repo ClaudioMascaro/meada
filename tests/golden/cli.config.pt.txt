@@ -1,1 +1,1 @@
-meada: <repo>/meada.toml:2: `serve.documents` não existe na v0.1; a trilha A a adiciona (documentos OpenAPI e AsyncAPI)
+meada: <repo>/meada.toml:2: `serve.domains` não é uma chave do meada.toml

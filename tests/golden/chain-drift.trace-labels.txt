@@ -1,0 +1,3 @@
+example.com/chain/catalog app/api/labels/route.ts:13 GET
+  →[inferred: base URL from CATALOG_URL, a base_url_env of peer example.com/chain/catalog] example.com/chain/web src/labels.ts:6 labels drift: missing status
+chain: inferred · 1 hops · 2 repos · 67 tokens

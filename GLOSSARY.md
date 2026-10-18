@@ -22,14 +22,23 @@ _Avoid_: snippet, line range
 
 **Language pack**:
 What Meada knows about one language: the file extensions it handles and the tree-sitter
-queries that read what one file defines, imports, exports and calls. It never touches the index
-or other files. A pack is done when it passes the conformance suite over its fixture.
+queries that read what one file defines, imports, exports and calls, and the producer and
+consumer calls of the message libraries it knows. It never touches the index. A pack is done when it passes the conformance suite over its fixture.
 _Avoid_: plugin, parser, grammar
 
 **Language adapter**:
 The seam between a language pack and Meada's shared scope and import resolution, which
 connects each call to the definitions it reaches and gives the call a level.
 _Avoid_: driver, frontend, bridge
+
+**Community**:
+A group of symbols in one repository that call each other more than they call the rest, found
+deterministically from the calls at `exact` or `inferred` and named after their most common
+directory (`src`, `src#2` when another community of the repository has that name too). Every
+symbol in at least one such call, as caller or callee, is a member, so one whose only such call
+is to itself, or comes from top-level code, is a community of its own; a symbol in no such call
+belongs to none.
+_Avoid_: cluster, module, component
 
 ### Across repositories
 
@@ -61,25 +70,62 @@ _Avoid_: dynamic call, unknown call
 
 **Client wrapper**:
 A function whose call to an HTTP client (`fetch`, or `requests`, `httpx` or `aiohttp` in
-Python) takes its URL or method from the function's own parameters. Each call site of the wrapper is a consumer, read with its
+Python) or a message client (a Kafka producer) takes its URL, method or channel name from the
+function's own parameters. Each call site of the wrapper is a consumer or producer, read with its
 arguments in place of the parameters, through any number of wrapper levels.
 _Avoid_: API client, helper, fetcher
 
 **Contract**:
-What one repository exposes and another depends on, such as an HTTP route, a queue, a package or
-a shared resource.
+What one repository exposes and another depends on, such as an HTTP route, a channel, a package
+or a shared resource.
 _Avoid_: interface, integration
 
 **Contract kind**:
-A category of contract with its own matching rules, such as HTTP route, queue or package.
+A category of contract with its own matching rules, such as HTTP route, channel or package.
 _Avoid_: contract type, protocol
 
 **Gateway prefix**:
-The rewrite a gateway applies to the paths of a repository, declared in `[serve]`: `prefix` is
-added in front, `strip` is removed from the start. A route is also matched by its gateway path
-(the prefix followed by its code path without the stripped part); a link made that way is
+The rewrite a gateway applies to the paths of a repository: `prefix` is added in front, `strip`
+is removed from the start. It is declared in `[serve]`, and the **server path** of each root
+`servers` URL of a provider document (`/gw` in `https://api.example.com/gw`) is a prefix too,
+for that document's routes, with the `[serve]` strip. A route is also matched by its gateway
+path (the prefix followed by its code path without the stripped part); a link made that way is
 inferred and its reason names the rewrite. Within one repository a code path match wins.
 _Avoid_: base path, path rewrite
+
+**Provider document**:
+An OpenAPI or AsyncAPI file of a repository with a `[serve]` table, found by its name or listed
+in `[serve] documents`. Its routes and channel sides are provider contracts of the repository,
+each merged into the code side with the same contract when there is one; what it states of a
+payload is the side's shape.
+_Avoid_: spec file, schema file, contract file
+
+**Documented only**:
+A route or channel side that only a provider document lists, with no handler or producing call
+in the code. It shows as `<document> (documented only)` in search, context and trace, and a
+trace does not enter it.
+_Avoid_: virtual route, phantom side
+
+**Shape**:
+What a contract carries in its payload, recorded as a set of field paths: dotted, with array
+elements written `[]` (`items[].id`), and `[]` first for a payload that is itself an array
+(`[].id`). What is recorded is presence, the fields known to be scalars and, for a consumer,
+the fields its type marks optional; types are never compared. A part of a shape can be **open**, meaning
+Meada cannot list its fields, such as an object that allows any extra property or a schema
+behind an external reference; anything below an open part may be present. A shape names its
+source, such as the provider document it was read from, and has one form whatever that source
+is.
+_Avoid_: schema, payload type, body
+
+**Drift**:
+A field path in a consumer's shape that the shape of the provider it links to does not contain:
+a field the consumer reads that the provider no longer returns. Paths are compared from the
+root; one that reaches an open part of the provider's shape is not checked and never drift.
+Each drifting path carries its own level, `exact` when the provider's shape and the consumer's
+path are both declared (a document, a schema, a type) and `inferred` when either comes from
+what code does (field reads, returned literals), while the link keeps its level. `trace`,
+`context`, `search` and `meada status` show it.
+_Avoid_: breaking change, mismatch, schema diff
 
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content
@@ -90,6 +136,35 @@ _Avoid_: datastore
 The sides of a resource: what writes it (a provider of its contract) and what reads it (a
 consumer). Each is a `via` symbol of the entry, or the repository as a whole.
 _Avoid_: producer, subscriber
+
+**Channel**:
+A queue or topic of a broker, identified by its broker kind and its name as evaluated:
+`channel::kafka::orders.created`. The same name under two broker kinds is two channels; broker
+clusters are not modelled, so one name of one kind is one channel across the workspace. Every
+consumer of a channel links to every producer of it, in the same repository too. A Redis stream
+is a channel of the broker kind `redis`.
+_Avoid_: queue (for the kind), topic (for the kind), stream (for the kind)
+
+**Producer**:
+The provider side of a channel: the call that sends to it, or the call site of a client wrapper
+that leads to one. Its consumer side is the handler of the messages, the function a subscription
+names. Messages go from producer to handler, so `trace` goes down that way. A RabbitMQ publish
+to a named exchange is a producer of no channel by itself: it produces to each queue a binding
+routes it to.
+_Avoid_: publisher, sender, writer
+
+**Unresolved side**:
+A producer or consumer of a channel whose name Meada could not evaluate, such as a topic read
+from the environment. Its contract names only the broker kind (`channel::kafka`), it shows as
+`(unresolved)` in search, context, trace and the export, and it is never linked nor an open item.
+_Avoid_: hole, dynamic channel
+
+**Binding**:
+A RabbitMQ `bindQueue(queue, exchange, pattern)`: neither side of a channel, but the rule that
+sends a publish to an exchange to a queue whose pattern matches the routing key. Bindings from
+any repository of the workspace apply, whatever the exchange type. The match is `exact` when the
+pattern is the key and `inferred` for a wildcard.
+_Avoid_: route, subscription
 
 **Repository-level**:
 A resource side that is the repository as a whole, because its entry names no `via` symbol the
@@ -114,6 +189,24 @@ _Avoid_: path, flow
 **Hop**:
 One link in a chain.
 _Avoid_: step, jump
+
+**Entry point**:
+A door into a repository: each route an HTTP handler serves (kind `route`, the handler a
+function or a file), each channel a consumer handler consumes (kind `channel`), each program
+start a language pack declares (kind `program`, a door even when called) and each exported
+function or method that nothing in its repository calls, directly or through a package import
+of the same repository, an ambiguous candidate counting as a caller and a self-call not (kind
+`export`). It has an identity (the handler's identity plus, for a route or a channel, the
+contract), a kind and a label (`GET /users/{}`, or the qualified name). No score or threshold
+picks entry points: every one has its process.
+_Avoid_: root, entrypoint, main
+
+**Process**:
+The ordered call tree one entry point sets in motion: its calls inside a repository at every
+level and its links to other repositories, ending at leaves, an ambiguous call or link (one
+step listing its candidates), an unresolved consumer, a cycle or a missing peer. It is addressed as `process::<entry point identity>`, named by its entry
+point's label, and walked on demand from the stored calls and links, never stored.
+_Avoid_: flow, workflow, execution path
 
 ### Decisions
 

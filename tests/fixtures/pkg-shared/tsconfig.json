@@ -1,0 +1,7 @@
+{
+  // The build writes `src/` to `dist/`; `extends` is not followed.
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+  },
+}

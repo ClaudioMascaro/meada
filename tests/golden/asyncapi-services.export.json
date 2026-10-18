@@ -1,0 +1,302 @@
+{
+  "repository": "example.com/asyncapi/services",
+  "files": [
+    {
+      "path": "src/kafka.ts",
+      "hash": "0ef626f15c14cf09c04e1ac0b5a70c640e71dcc50aec30db885dbd764f9cb7b2"
+    },
+    {
+      "path": "src/queues.ts",
+      "hash": "967d953d6dc2e6e454c8ee0ce7669843c7500f351e3a15d71a64c7c34eb6f0ca"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 211,
+        "end": 400
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 409,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 595,
+        "end": 733
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::cancel",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 489,
+        "end": 597
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::onInvoice",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 307,
+        "end": 365
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::ship",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 374,
+        "end": 480
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::work",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 225,
+        "end": 305
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::Kafka#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 48,
+        "end": 108
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::kafka.consumer#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 127,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::kafka.producer#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 185,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen::consumer.run#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 359,
+        "end": 397
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen::consumer.subscribe#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 245,
+        "end": 292
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen::consumer.subscribe#1",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 302,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment::producer.send#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 652,
+        "end": 730
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::amqp.connect#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 54,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::cancel::Buffer.from#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::cancel",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 574,
+        "end": 593
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::cancel::channel.sendToQueue#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::cancel",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 531,
+        "end": 594
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::connection.createChannel#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 110,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::ship::Buffer.from#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::ship",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 457,
+        "end": 476
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::ship::channel.sendToQueue#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::ship",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 414,
+        "end": 477
+      }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::work::channel.consume#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/queues.ts",
+        "start": 257,
+        "end": 302
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::amqp::shipments.cancelled",
+      "site": "example.com/asyncapi/services::src/queues.ts::cancel::channel.sendToQueue#0"
+    },
+    {
+      "contract": "channel::amqp::shipments.requested",
+      "site": "example.com/asyncapi/services::src/queues.ts::ship::channel.sendToQueue#0"
+    },
+    {
+      "contract": "channel::kafka::payments.requested",
+      "site": "example.com/asyncapi/services::src/kafka.ts::requestPayment::producer.send#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.updated",
+      "site": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::invoices.issued",
+      "site": "example.com/asyncapi/services::src/queues.ts::onInvoice",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/asyncapi/events::asyncapi.yaml::kafka receive payments.requested",
+      "provider": "example.com/asyncapi/services::src/kafka.ts::requestPayment::producer.send#0",
+      "contract": "channel::kafka::payments.requested",
+      "level": "exact",
+      "reason": "channel::kafka::payments.requested"
+    },
+    {
+      "consumer": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp receive shipments.requested",
+      "provider": "example.com/asyncapi/services::src/queues.ts::ship::channel.sendToQueue#0",
+      "contract": "channel::amqp::shipments.requested",
+      "level": "exact",
+      "reason": "channel::amqp::shipments.requested"
+    },
+    {
+      "consumer": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+      "provider": "example.com/asyncapi/services::src/queues.ts::cancel::channel.sendToQueue#0",
+      "contract": "channel::amqp::shipments.cancelled",
+      "level": "exact",
+      "reason": "channel::amqp::shipments.cancelled"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "provider": "example.com/asyncapi/events::asyncapi.yaml::kafka send orders.created",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "provider": "example.com/asyncapi/events::src/emit.ts::announceUpdate::producer.send#0",
+      "contract": "channel::kafka::orders.updated",
+      "level": "exact",
+      "reason": "channel::kafka::orders.updated"
+    },
+    {
+      "consumer": "example.com/asyncapi/services::src/queues.ts::onInvoice",
+      "provider": "example.com/asyncapi/events::billing.asyncapi.yaml::amqp send invoices.issued",
+      "contract": "channel::amqp::invoices.issued",
+      "level": "exact",
+      "reason": "channel::amqp::invoices.issued"
+    }
+  ]
+}

@@ -1,20 +1,26 @@
 //! The query engine: opens a workspace from a directory and answers over its indexes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use crate::channel::Routes;
 use crate::contract::{self, Level, Link};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
+use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
-use crate::render::{Files, REPOSITORY_LEVEL, callee, label, mark, unresolved};
+use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, unresolved};
+use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
-use crate::workspace::{Missing, Workspace};
-use crate::{Result, decisions, index, items, render, repo, resource, trace};
+use crate::workspace::{Missing, Repository, Workspace};
+use crate::{
+    Result, channel, decisions, document, drift_view, http, index, items, package, render, repo,
+    resource, trace,
+};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -69,9 +75,11 @@ impl Engine {
     /// contracts at query time, so links that touch a changed file follow it.
     pub fn refresh(&self) -> Result<()> {
         for peer in &self.workspace.repos[1..] {
-            index::refresh(&index::open(&peer.root)?, &peer.root, &peer.identity)?;
+            let db = index::open(&peer.root)?;
+            index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
-        index::refresh(&self.db, &self.root, &self.identity)
+        let here = &self.workspace.repos[0];
+        index::refresh(&self.db, &self.root, &self.identity, &here.config.serve)
     }
 
     /// The canonical export of the repository where Meada runs: its whole index, plus the
@@ -80,11 +88,17 @@ impl Engine {
         self.refresh()?;
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
-        let (links, mut evaluations) = self.links_and_decisions(&exports);
-        let links = links.into_iter();
+        let (all, mut evaluations) = self.links_and_decisions(&exports);
+        // The processes cross repositories: they walk every link, not only the local ones.
+        let graph = trace::Graph::new(&self.workspace, &exports, &all);
+        let processes = (exports[0].entry_points.iter())
+            .map(|e| graph.export_process(e))
+            .collect();
+        let links = all.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
         let mut export = exports.swap_remove(0);
+        export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
         Ok(serde_json::to_string_pretty(&export)? + "\n")
@@ -94,7 +108,7 @@ impl Engine {
     /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
         let repos = self.workspace.repos.iter().enumerate();
-        repos
+        let mut exports = repos
             .map(|(n, m)| {
                 let mut export = index::export(&self.db, &schema(n), &m.identity)?;
                 for kind in contract::KINDS {
@@ -102,7 +116,26 @@ impl Engine {
                 }
                 Ok(export)
             })
-            .collect()
+            .collect::<Result<Vec<_>>>()?;
+        // Dependency entries need every repository's packages, so they come after all declares.
+        let providers = package::Providers::new(&exports);
+        package::consume(&mut exports, &providers);
+        // Imports of a package resolve into its provider, wherever it lives.
+        package::import(&mut exports, &providers);
+        // The stored entry points are candidates: a call that reaches an export through a
+        // package import of its own repository (a monorepo) makes it no door, at any level. An
+        // entry point of another kind stays one.
+        for export in &mut exports {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            entry::drop_imported_exports(&mut export.entry_points, &imported);
+        }
+        // Shapes imported from a package fill from the shapes it keeps (issue #175).
+        package::shapes(&mut exports, &providers);
+        Ok(exports)
     }
 
     /// Every link of the workspace, sorted.
@@ -110,10 +143,14 @@ impl Engine {
         self.links_and_decisions(exports).0
     }
 
-    /// Every link of the workspace, sorted, with the decisions replayed, and the decisions of
-    /// each repository that did not apply, in workspace order.
+    /// Every link of the workspace, sorted, with the decisions replayed and the drift of each
+    /// HTTP link (`http::drift`), and the decisions of each repository that did not apply, in
+    /// workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
-        decisions::replay(self.core_links(exports), &self.workspace, exports)
+        let (mut links, evaluations) =
+            decisions::replay(self.core_links(exports), &self.workspace, exports);
+        http::drift(&mut links, exports);
+        (links, evaluations)
     }
 
     /// Every link of the workspace as the core derives it from the stored contracts, before
@@ -125,13 +162,14 @@ impl Engine {
             .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
+        let routes = Routes::new(exports);
         let mut links = Vec::new();
         for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
-                links.extend(kind.link(consumer, from, &providers));
+                links.extend(kind.link(consumer, from, &providers, &routes));
             }
         }
         links
@@ -145,18 +183,26 @@ impl Engine {
     }
 
     /// `decision_report`, with, for each repository of the workspace, in workspace order, the
-    /// status lines about its resources: a `via` that names no symbol, and a resource no link
-    /// reaches.
+    /// status lines about its resources (a `via` that names no symbol, a resource no link
+    /// reaches) and its documents (one ignored, a route listed twice).
     pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
         self.refresh()?;
         let exports = self.exports()?;
         let (links, evaluations) = self.links_and_decisions(&exports);
-        let repos = self.workspace.repos.iter();
-        let resources = repos
-            .zip(&exports)
-            .map(|(repo, export)| resource::report(repo, export, &links))
+        let repos = &self.workspace.repos;
+        let entries = drift_view::entries(repos, &exports, &links);
+        let drift = drift_view::counts(repos, &entries);
+        let lines = (repos.iter().zip(&exports).zip(drift))
+            .map(|((repo, export), drift)| {
+                let mut lines = resource::report(repo, export, &links);
+                lines.extend(document::report(repo, export));
+                if drift > 0 {
+                    lines.push(Msg::Drift(drift).text());
+                }
+                lines
+            })
             .collect();
-        Ok((evaluations, resources))
+        Ok((evaluations, lines))
     }
 
     /// The decisions of the repository where Meada runs that are stale or waiting.
@@ -248,12 +294,33 @@ impl Engine {
     /// Symbols of the workspace whose name matches `query` case-insensitively, and contracts
     /// whose identifier or route path does, one line each: exact first, then prefix, then
     /// substring, ties by identity. `kind` keeps only `symbol`, `contract`, `route` (HTTP
-    /// contract) or `resource` (a declared resource, matched by kind and id) matches; `ambiguous` and `unresolved` list the open items whose enclosing
+    /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
+    /// by broker kind and name) matches; `document` lists the documents read, matched by path
+    /// or title (see `search_documents`); `package` lists the packages, matched by name (see
+    /// `search_packages`); `community` lists the communities, matched by name, and `process`
+    /// the processes, matched by their entry point's label (`search_communities`,
+    /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
+    /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         if let Some(item_kind) = kind.and_then(ItemKind::parse) {
             return self.search_items(query, item_kind, budget);
+        }
+        if kind == Some("document") {
+            return self.search_documents(query, budget);
+        }
+        if kind == Some("package") {
+            return self.search_packages(query, budget);
+        }
+        if kind == Some("drift") {
+            return self.search_drift(query, budget);
+        }
+        if kind == Some("community") {
+            return self.search_communities(query, budget);
+        }
+        if kind == Some("process") {
+            return self.search_processes(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match kind {
@@ -262,9 +329,10 @@ impl Engine {
             Some("contract") => (false, Some("")),
             Some("route") => (false, Some("http::")),
             Some("resource") => (false, Some(resource::PREFIX)),
+            Some("channel") => (false, Some(channel::PREFIX)),
             Some(other) => {
-                let valid =
-                    "`symbol`, `contract`, `route`, `resource`, `ambiguous` or `unresolved`";
+                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
+                             `drift`, `community`, `process`, `ambiguous` or `unresolved`";
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -308,11 +376,15 @@ impl Engine {
                     continue;
                 }
                 // A route path ranks against the path part: `/users` is exact for
-                // `http::GET::/users`. A resource ranks against its kind and its id.
+                // `http::GET::/users`. A resource ranks against its kind and its id, a channel
+                // against its broker kind and its name.
                 let lower = contract.to_lowercase();
                 let (kind, id) = match lower.strip_prefix(resource::PREFIX) {
                     Some(rest) => rest.split_once("::").unzip(),
-                    None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
+                    None => match channel::parse(&lower) {
+                        Some((broker, name)) => (Some(broker), name),
+                        None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
+                    },
                 };
                 let Some(r) = [Some(lower.as_str()), kind, id]
                     .into_iter()
@@ -332,22 +404,136 @@ impl Engine {
                 let location = match span {
                     Some(span) => files.at(&span.path, span.start),
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
-                    // A route file that serves the contract with no function of its own.
-                    None => site
-                        .rsplit_once("::")
-                        .map_or(site.as_str(), |(_, p)| p)
-                        .to_string(),
+                    None => match export.document_of(site) {
+                        // A route or channel side only a document lists.
+                        Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
+                        None => package::place(&repo.identity, site).unwrap_or_else(|| {
+                            // A route file that serves the contract with no function of its own.
+                            site.rsplit_once("::")
+                                .map_or(site.as_str(), |(_, p)| p)
+                                .to_string()
+                        }),
+                    },
                 };
-                let line = format!("{} {location} {contract}", repo.identity);
+                let line = format!("{} {location} {}", repo.identity, channel::shown(&contract));
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
+    /// as `<repository> <path> (<format> <version>, routes: <n>) <title>`.
+    fn search_documents(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, path to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for (export, repo) in self.exports()?.iter().zip(&self.workspace.repos) {
+            for doc in &export.documents {
+                let Some(shown) = doc.summary.shown() else {
+                    continue;
+                };
+                let title = doc.summary.title.as_deref();
+                let path = doc.path.to_lowercase();
+                let title_lower = title.map(str::to_lowercase);
+                let Some(r) = [Some(path.as_str()), title_lower.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|n| rank(n, &needle))
+                    .min()
+                else {
+                    continue;
+                };
+                let title = title.map_or(String::new(), |t| format!(" {t}"));
+                let line = format!("{} {} ({shown}){title}", repo.identity, doc.path);
+                hits.push((r, format!("{} {}", repo.identity, doc.path), line));
+            }
         }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The drift (spec #23) whose route path or missing field path matches `query`, one line
+    /// per missing path, as `<repository> <path>:<line> <caller> <route> missing <path>
+    /// (<level>)`.
+    fn search_drift(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
+        let hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The packages (spec #22) whose name matches `query`, one line each, as `<repository>
+    /// <directory> <name>@<version> (consumers: <n>)`, the version left out when the manifest
+    /// has none. The consumers are the dependency entries linked to the package, at any level.
+    fn search_packages(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let links = self.links(&exports);
+        let mut entries: HashMap<&str, usize> = HashMap::new();
+        for link in &links {
+            *entries.entry(&link.provider).or_default() += 1;
+        }
+        let needle = query.to_lowercase();
+        // (rank, repository and directory to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in &exports {
+            for p in &export.packages {
+                let Some(r) = rank(&p.name.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let name = match &p.version {
+                    Some(version) => format!("{}@{version}", p.name),
+                    None => p.name.clone(),
+                };
+                let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
+                let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
+                hits.push((r, format!("{} {}", p.repository, p.directory), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
+    /// <name> (members: <n>)`.
+    fn search_communities(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, repository and name to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for c in &export.communities {
+                let Some(r) = rank(&c.name.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, n) = (&export.repository, c.members.len());
+                let line = format!("{repository} {} (members: {n})", c.name);
+                hits.push((r, format!("{repository} {}", c.name), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
+    }
+
+    /// The processes (spec #31) whose entry point's label matches `query`, one line each, as
+    /// `<repository> <label> process::<identity> (<kind>)`: the identity `trace` starts from.
+    fn search_processes(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let needle = query.to_lowercase();
+        // (rank, identity to break ties, line)
+        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        for export in self.exports()? {
+            for e in &export.entry_points {
+                let Some(r) = rank(&e.label.to_lowercase(), &needle) else {
+                    continue;
+                };
+                let (repository, kind) = (&export.repository, e.kind.name());
+                let line = format!("{repository} {} process::{} ({kind})", e.label, e.identity);
+                hits.push((r, e.identity.clone(), line));
+            }
+        }
+        Ok(hits_answer(query, hits, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -379,54 +565,115 @@ impl Engine {
             );
             hits.push((r, item.id, line));
         }
-        hits.sort();
-        if hits.is_empty() {
-            return Ok(format!("no matches for `{query}`\n"));
-        }
-        let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
-        Ok(render::budgeted(&lines, budget))
+        Ok(hits_answer(query, hits, budget))
     }
 
-    /// The resource `contract`: one line per writer and reader across the workspace, writers
-    /// first, as `<repository> <role> <path>:<line> <name>`, or `<repository> <role>
-    /// (repository-level)` for a side declared with no `via`.
-    fn resource_sides(&self, exports: &[Export], contract: &str) -> Vec<String> {
-        let mut sides: Vec<(bool, String)> = Vec::new();
+    /// The resource, channel or route `contract`: one line per provider and consumer across the
+    /// workspace, providers first, as `<repository> <role> <path>:<line> <name>`, where `role`
+    /// is `writer` or `reader` (a resource, `<name>` its `via` symbol), `producer` or
+    /// `consumer` (a channel, `<name>` the symbol around the producing call, or the handler) or
+    /// `provider` (a route, `<name>` its handler; its consumers are calls, which `trace` and
+    /// the `contracts:` of their symbols show, so `consumer` is `None` and they are left out).
+    /// A side only a document lists is `<repository> <role> <document> (documented only)`;
+    /// the shape a document gives a side follows it, `response` for a route and `payload`
+    /// for a channel.
+    /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
+    /// the top level of a file `<repository> <role> <path> (top level)`. A channel also lists
+    /// the sides linked to it through another name, each followed by `[<level>: <reason>]`:
+    /// the producers a consumer's wildcard pattern matches, the wildcard consumers that match
+    /// it, and the publishes its bindings route to it, then the bindings themselves.
+    fn contract_sides(
+        &self,
+        exports: &[Export],
+        contract: &str,
+        (provider, consumer): (&str, Option<&str>),
+        what: &str,
+    ) -> Vec<String> {
+        let carried = match http::route(contract) {
+            Some(_) => "response",
+            None => "payload",
+        };
+        let routes = Routes::new(exports);
+        // How a side reaches `contract`: its own (no tag), a match through another name, or
+        // not at all.
+        let tag = |own: bool, matched: Option<(Level, String)>| match own {
+            true => Some(String::new()),
+            false => matched.map(|(level, reason)| format!(" [{}: {reason}]", level.name())),
+        };
+        // Providers, then consumers, then the bindings that reach a queue; each with the lines
+        // of the payload shape a document gives it.
+        let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
-            let writers =
-                (export.providers.iter()).map(|p| (p.contract.as_str(), &p.site, "writer"));
-            let readers = export
-                .consumers
-                .iter()
-                .filter_map(|c| Some((c.contract.as_deref()?, &c.site, "reader")));
-            for (_, site, role) in writers.chain(readers).filter(|(c, ..)| *c == contract) {
-                let place = match export.symbols.iter().find(|s| s.id == *site) {
-                    Some(s) => {
-                        let at = files.at(&s.span.path, s.span.start);
-                        format!("{at} {}", label(&s.id))
-                    }
-                    None => REPOSITORY_LEVEL.into(),
+            // Each side that reaches `contract`: its site, order, role words, tag and shape.
+            let provided = export.providers.iter().filter_map(|p| {
+                let tag = tag(p.contract == contract, channel::fits(&p.contract, contract))?;
+                Some((&p.site, 0, String::from(provider), tag, &p.shape))
+            });
+            let published = export.publishes.iter().filter_map(|q| {
+                let tag = tag(false, routes.reached(q).remove(contract))?;
+                Some((&q.site, 0, String::from(provider), tag, &None))
+            });
+            let consumed = export.consumers.iter().filter_map(|c| {
+                let (own, consumer) = (c.contract.as_ref()?, consumer?);
+                let tag = tag(own == contract, channel::fits(contract, own))?;
+                Some((&c.site, 1, String::from(consumer), tag, &c.shape))
+            });
+            let bound = (export.bindings.iter().filter(|b| b.contract == contract)).map(|b| {
+                let role = format!("binding {} {}", b.exchange, b.pattern);
+                (&b.site, 2, role, String::new(), &None)
+            });
+            let all = provided.chain(published).chain(consumed).chain(bound);
+            for (site, order, role, tag, shape) in all {
+                let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
+                    let at = files.at(&s.span.path, s.span.start);
+                    format!("{at} {}", label(&s.id))
+                } else if let Some(c) = export.calls.iter().find(|c| c.id == *site) {
+                    let at = files.at(&c.span.path, c.span.start);
+                    let name = export.symbols.iter().find(|s| s.id == c.caller);
+                    format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
+                } else if *site == repo.identity {
+                    REPOSITORY_LEVEL.into()
+                } else if let Some(doc) = export.document_of(site) {
+                    // A side only a document lists.
+                    format!("{doc} {DOCUMENTED_ONLY}")
+                } else if let Some(place) = package::place(&repo.identity, site) {
+                    // A dependency entry of a manifest.
+                    place
+                } else {
+                    format!("{} (top level)", label(site))
                 };
-                sides.push((
-                    role == "reader",
-                    format!("{} {role} {place}", repo.identity),
-                ));
+                let shape = shape.as_ref();
+                let shape =
+                    shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, carried));
+                let line = format!("{} {role} {place}{tag}", repo.identity);
+                sides.push((order, line, shape));
             }
         }
         if sides.is_empty() {
-            return vec![format!("no resource matches `{contract}`")];
+            return vec![format!("no {what} matches `{contract}`")];
         }
         sides.sort();
-        let mut lines = vec![contract.to_string()];
-        lines.extend(sides.into_iter().map(|(_, line)| format!("  {line}")));
+        let mut lines = vec![channel::shown(contract)];
+        for (_, line, shape) in sides {
+            lines.push(format!("  {line}"));
+            lines.extend(shape.into_iter().map(|l| format!("    {l}")));
+        }
         lines
     }
 
-    /// One symbol of the workspace: its span text read from disk (only while the file still
-    /// has the indexed hash), its callers and its callees. `symbol` is an identity,
-    /// `<path>::<name>` or a name; when it fits several symbols, they are listed instead of
-    /// guessed. The answer is cut at `budget` tokens.
+    /// One symbol of the workspace: its community (`community: <name>` or `none`) and the
+    /// processes it belongs to (`processes: none`, or a summary `processes: <n> (<k> route, <k>
+    /// export; <r> repositories)` and the entries that fit, `<label> (<repository>), ..., +<m>
+    /// more`, found by walking upstream), both right after its first line; then its span text
+    /// read from disk (only while the file still has the indexed hash), its callers and its
+    /// callees. `symbol` is an identity, `<path>::<name>` or a name; when it fits several
+    /// symbols, they are listed instead of guessed. The answer is cut at `budget` tokens, from
+    /// the last to give up: the first line, the community, the processes line (its summary, then
+    /// as many entries as fit), the callers, callees, consumers and contracts, and the span
+    /// text, which keeps its leading lines and ends with the cut note of `render::cut`, or is
+    /// left out when not even that note fits (the agent reads it from the file the first line
+    /// names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         self.context_fresh(symbol, budget, true)
@@ -435,11 +682,23 @@ impl Engine {
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
-        if symbol.starts_with(resource::PREFIX) {
-            return Ok(render::budgeted(
-                &self.resource_sides(&exports, symbol),
-                budget,
-            ));
+        // A contract listed by its sides, as `search` prints it; a route by its providers.
+        let contract = channel::typed(symbol);
+        if let Some(kind) = contract::kind_of(contract) {
+            let roles = match (kind.sides(), http::route(contract)) {
+                (Some((provider, consumer)), _) => Some((provider, Some(consumer))),
+                (None, Some(_)) => Some(("provider", None)),
+                (None, None) => None,
+            };
+            if let Some(roles) = roles {
+                let mut lines = self.contract_sides(&exports, contract, roles, kind.prefix());
+                if http::route(contract).is_some() {
+                    let links = self.links(&exports);
+                    let entries = drift_view::entries(repos, &exports, &links);
+                    lines.extend(drift_view::consumers(repos, &entries, contract));
+                }
+                return Ok(render::budgeted(&lines, budget));
+            }
         }
         let suffix = format!("::{symbol}");
         let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())
@@ -477,45 +736,126 @@ impl Engine {
         let mut files = Files::new(&repo.root);
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
-        let mut lines = vec![line(identity, &mut files, symbol_found, name)];
-        lines.extend(text.unwrap_or_else(|| {
-            vec![format!(
+        let header = line(identity, &mut files, symbol_found, name);
+        let links = self.links(&exports);
+        let community = (export.communities.iter())
+            .find(|c| c.members.contains(&symbol_found.id))
+            .map_or("none", |c| c.name.as_str());
+        let community = format!("community: {community}");
+        // Without the span text there is no span: the note is a line of the tail, kept in its
+        // output position and ahead of the callers, so the cut never rewrites it.
+        let unavailable = text.is_none().then(|| {
+            format!(
                 "(span text unavailable: {} changed since indexing)",
                 symbol_found.span.path
-            )]
-        }));
-        lines.extend(relations(identity, export, &mut files, &symbol_found.id));
-        let links = self.links(&exports);
-        lines.extend(contracts(
+            )
+        });
+        let span = text.unwrap_or_default();
+        let mut tail = Vec::from_iter(unavailable);
+        tail.extend(relations(identity, export, &mut files, &symbol_found.id));
+        tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
+        let routes = Routes::new(&exports);
+        let workspace = (links.as_slice(), &routes);
+        tail.extend(contracts(
             identity,
             export,
-            &links,
+            workspace,
             &mut files,
             symbol_found,
         ));
+        let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        let found = graph.processes_of(&symbol_found.id);
+        let bytes = |lines: &[String]| lines.iter().map(|l| render::line_bytes(l)).sum::<usize>();
+        let cap = render::bytes(budget.unwrap_or(render::DEFAULT_BUDGET));
+        let head = [header, community];
+        // An answer that fits is cut nowhere, with every process named.
+        let full = processes_line(&found, repos, usize::MAX);
+        let whole: Vec<String> = (head.iter().cloned())
+            .chain([full])
+            .chain(span.iter().cloned())
+            .chain(tail.iter().cloned())
+            .collect();
+        if bytes(&whole) <= cap {
+            return Ok(render::budgeted(&whole, budget));
+        }
+        // Otherwise the cut order, from the last to give up: header, community, the processes
+        // line (its summary, then the entries that fit), the sections after the span, the span
+        // text. The processes line may take what the head leaves less the widest note the final
+        // cut can write, so that cut never reaches it.
+        let total = head.len() + 1 + span.len() + 1 + tail.len();
+        let widest = render::note(total, total, budget.unwrap_or(render::DEFAULT_BUDGET));
+        let room = cap.saturating_sub(bytes(&head) + 1 + widest.len());
+        let processes = processes_line(&found, repos, room);
+        let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
+        // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
+        // room even for the note it is left out, and the agent reads it from the file the header
+        // names.
+        let span_room = left.saturating_sub(bytes(&tail));
+        let (_, span) = render::cut(&span, span_room, budget.unwrap_or(render::DEFAULT_BUDGET));
+        let span = if span.len() > span_room {
+            String::new()
+        } else {
+            span
+        };
+        let mut lines = Vec::from(head);
+        lines.push(processes);
+        lines.extend(span.lines().map(str::to_string));
+        lines.extend(tail);
         Ok(render::budgeted(&lines, budget))
     }
 }
 
-/// `contracts:` with what `symbol` provides and the contracts its calls consume, unresolved
-/// ones included, each followed by its decided links (`links` are the workspace's); nothing
-/// when it has none.
+/// `contracts:` with what `symbol` provides, the channels it produces to (a publish to a named
+/// exchange, then each queue the bindings route it to) and the contracts its calls consume,
+/// unresolved ones included, each followed by its decided links; `links` and `routes` are the
+/// workspace's. Nothing when it has none.
 fn contracts(
     identity: &str,
     export: &Export,
-    links: &[Link],
+    (links, routes): (&[Link], &Routes),
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
-    let mut lines: Vec<String> = export
-        .providers
-        .iter()
-        .filter(|p| p.site == symbol.id)
-        .map(|p| line(identity, files, symbol, &format!("provides {}", p.contract)))
-        .collect();
-    // A resource reader is a symbol, not a call site.
+    let mut lines = Vec::new();
+    for p in export.providers.iter().filter(|p| p.site == symbol.id) {
+        lines.push(line(
+            identity,
+            files,
+            symbol,
+            &format!("provides {}", p.contract),
+        ));
+        lines.extend(
+            p.shape
+                .as_ref()
+                .map_or_else(Vec::new, |s| shape_lines(identity, s, "response")),
+        );
+    }
+    // A channel producer is a call site: the symbol around it produces.
+    for call in export.calls.iter().filter(|c| c.caller == symbol.id) {
+        let produced = export
+            .providers
+            .iter()
+            .filter(|p| p.site == call.id && p.contract.starts_with(channel::PREFIX));
+        let location = files.at(&call.span.path, call.span.start);
+        for provider in produced {
+            let contract = channel::shown(&provider.contract);
+            lines.push(format!("{identity} {location} produces {contract}"));
+        }
+        for publish in export.publishes.iter().filter(|q| q.site == call.id) {
+            let (exchange, key) = (&publish.exchange, &publish.key);
+            lines.push(format!("{identity} {location} publishes {exchange} {key}"));
+            for (queue, (level, reason)) in routes.reached(publish) {
+                let level = level.name();
+                lines.push(format!(
+                    "{identity} {location} produces {queue} [{level}: {reason}]"
+                ));
+            }
+        }
+    }
+    // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
     for contract in readers.filter_map(|c| c.contract.as_ref()) {
+        let contract = channel::shown(contract);
         lines.push(line(
             identity,
             files,
@@ -557,6 +897,29 @@ fn contracts(
         return lines;
     }
     section("contracts", lines)
+}
+
+/// What a route's response (or a channel's payload: `what`) carries, after its `provides` line:
+/// the fields and the parts left open, each line naming where the shape comes from.
+fn shape_lines(identity: &str, shape: &Shape, what: &str) -> Vec<String> {
+    let at = shape.source.at();
+    let list = |paths: &BTreeSet<String>| {
+        let paths: Vec<&str> = paths.iter().map(|p| shape::shown(p)).collect();
+        paths.join(", ")
+    };
+    let fields = list(&shape.fields);
+    let mut lines = vec![
+        format!("{identity} {at} {what} fields: {fields}")
+            .trim_end()
+            .to_string(),
+    ];
+    if !shape.open.is_empty() {
+        lines.push(format!(
+            "{identity} {at} {what} open: {}",
+            list(&shape.open)
+        ));
+    }
+    lines
 }
 
 /// The span's lines, or `None` when its file under `root` no longer has the indexed hash.
@@ -633,6 +996,54 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     lines
 }
 
+/// `consumers:` with the calls that reach `symbol` through a package import (spec #22), from
+/// any repository of the workspace, as `<repository> <path>:<line> <caller>`, then ` [<level>,
+/// <range flag>]` when the link is not exact or the dependency's range does not plainly accept
+/// the package's version. Nothing when there are none.
+fn consumers(
+    exports: &[Export],
+    repos: &[Repository],
+    links: &[Link],
+    symbol: &str,
+) -> Vec<String> {
+    let mut reached = package::reached(exports, links, symbol);
+    reached.sort_by_key(|r| {
+        (
+            &repos[r.repository].identity,
+            &r.call.span.path,
+            r.call.span.start,
+        )
+    });
+    let lines: Vec<String> = reached
+        .iter()
+        .map(|r| {
+            let repo = &repos[r.repository];
+            let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
+            let caller = &r.call.caller;
+            let caller = match exports[r.repository]
+                .symbols
+                .iter()
+                .any(|s| s.id == *caller)
+            {
+                true => label(caller),
+                false => "(top level)",
+            };
+            let level = (r.level != Level::Exact).then(|| r.level.name());
+            let flag = r.flag.map(package::Flag::words);
+            let tags: Vec<&str> = level.into_iter().chain(flag).collect();
+            let tags = match tags.is_empty() {
+                true => String::new(),
+                false => format!(" [{}]", tags.join(", ")),
+            };
+            format!("{} {location} {caller}{tags}", repo.identity)
+        })
+        .collect();
+    match lines.is_empty() {
+        true => lines,
+        false => section("consumers", lines),
+    }
+}
+
 /// `<repository> <path>:<line> <name>` for a symbol's definition.
 fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> String {
     let location = files.at(&symbol.span.path, symbol.span.start);
@@ -682,7 +1093,7 @@ pub fn status(dir: &Path) -> Result<String> {
 }
 
 /// 0 when `name` is `needle`, 1 when it starts with it, 2 when it contains it.
-fn rank(name: &str, needle: &str) -> Option<u8> {
+pub(crate) fn rank(name: &str, needle: &str) -> Option<u8> {
     match () {
         _ if name == needle => Some(0),
         _ if name.starts_with(needle) => Some(1),
@@ -716,6 +1127,78 @@ fn relative(from: &Path, to: &Path) -> String {
     } else {
         parts.join("/")
     }
+}
+
+/// `processes: none`, or `processes: <n> (<k> <kind>, ...; <r> repositories)` for the processes
+/// `found`, a summary present whenever there is one, then `: ` and the entries that fit in
+/// `room` bytes, in order, and `, +<m> more` for the rest. When not even the first entry fits
+/// the summary stands alone. An entry is `<label> (<repository>)`, or its `process::` identity
+/// when another process of the same repository has the same label.
+fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: usize) -> String {
+    if found.is_empty() {
+        return "processes: none".into();
+    }
+    let kinds: Vec<String> = (entry::EntryKind::ALL.iter())
+        .filter_map(|k| {
+            let n = found.iter().filter(|(_, e)| e.kind == *k).count();
+            (n > 0).then(|| format!("{n} {}", k.name()))
+        })
+        .collect();
+    let repositories = (found.iter().map(|(n, _)| n).collect::<HashSet<_>>()).len();
+    let summary = format!(
+        "processes: {} ({}; {repositories} {})",
+        found.len(),
+        kinds.join(", "),
+        if repositories == 1 {
+            "repository"
+        } else {
+            "repositories"
+        }
+    );
+    let entries: Vec<String> = (found.iter())
+        .map(|&(n, e)| {
+            let same = found.iter().filter(|(m, o)| *m == n && o.label == e.label);
+            match same.count() {
+                1 => format!("{} ({})", e.label, repos[n].identity),
+                _ => format!("process::{}", e.identity),
+            }
+        })
+        .collect();
+    let mut kept = Vec::new();
+    // The length of the summary and the entries kept, joined.
+    let mut used = summary.len() + ": ".len();
+    for (i, entry) in entries.iter().enumerate() {
+        let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();
+        let rest = entries.len() - i - 1;
+        let more = if rest > 0 {
+            format!(", +{rest} more").len()
+        } else {
+            0
+        };
+        if len + more > room {
+            break;
+        }
+        kept.push(entry.clone());
+        used = len;
+    }
+    if kept.is_empty() {
+        return summary;
+    }
+    let rest = entries.len() - kept.len();
+    if rest > 0 {
+        kept.push(format!("+{rest} more"));
+    }
+    format!("{summary}: {}", kept.join(", "))
+}
+
+/// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.
+fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<usize>) -> String {
+    hits.sort();
+    if hits.is_empty() {
+        return format!("no matches for `{query}`\n");
+    }
+    let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
+    render::budgeted(&lines, budget)
 }
 
 /// `name:` followed by the items, or `name: none`.

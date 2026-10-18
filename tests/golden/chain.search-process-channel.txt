@@ -1,0 +1,1 @@
+example.com/chain/worker channel::kafka::orders.created process::example.com/chain/worker::src/consumer.ts::onOrderCreated::channel::kafka::orders.created (channel)

@@ -1,0 +1,7 @@
+process GET /api/products/{}
+example.com/chain/catalog app/api/products/[id]/route.ts:3 GET
+  example.com/chain/catalog lib/products.ts:2 load
+    example.com/chain/catalog lib/products.ts:6 parent
+      example.com/chain/catalog lib/products.ts:2 load (cycle)
+    example.com/chain/catalog lib/products.ts:10 find
+chain: exact · 0 hops · 1 repos · 91 tokens

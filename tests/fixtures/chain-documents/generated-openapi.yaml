@@ -1,0 +1,11 @@
+openapi: 3.1.0
+info:
+  title: Generated, and gitignored
+  version: "1.0"
+# Under the gitignored `generated/`, and listed in `[serve] documents`: read all the same.
+paths:
+  /api/generated:
+    get:
+      responses:
+        "200":
+          description: Listed, so read

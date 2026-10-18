@@ -1,0 +1,11 @@
+{
+  "name": "@example/kit",
+  "version": "2.1.0",
+  "main": "./src/legacy.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "require": "./dist/index.cjs" },
+    "./format": "./src/format.ts",
+    "./utils/*": { "import": "./src/utils/*.ts" },
+    "./internal/*": null
+  }
+}

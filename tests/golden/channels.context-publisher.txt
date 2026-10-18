@@ -1,0 +1,22 @@
+example.com/channels/api src/amqp.ts:17 announce
+community: none
+processes: 1 (1 export; 1 repository): announce (example.com/channels/api)
+async function announce(id: string) {
+  channel.publish("events", "order.created", Buffer.from(id));
+  channel.publish("events", "order.shipped", Buffer.from(id));
+  channel.publish("events", "order.refunded", Buffer.from(id));
+}
+callers: none
+callees:
+example.com/channels/api src/amqp.ts:18 (unresolved) Buffer.from
+example.com/channels/api src/amqp.ts:19 (unresolved) Buffer.from
+example.com/channels/api src/amqp.ts:20 (unresolved) Buffer.from
+example.com/channels/api src/amqp.ts:18 (unresolved) channel.publish
+example.com/channels/api src/amqp.ts:19 (unresolved) channel.publish
+example.com/channels/api src/amqp.ts:20 (unresolved) channel.publish
+contracts:
+example.com/channels/api src/amqp.ts:18 publishes events order.created
+example.com/channels/api src/amqp.ts:18 produces channel::amqp::audit [exact: channel::amqp::audit binding events order.created]
+example.com/channels/api src/amqp.ts:19 publishes events order.shipped
+example.com/channels/api src/amqp.ts:19 produces channel::amqp::shipments [inferred: channel::amqp::shipments binding events *.shipped]
+example.com/channels/api src/amqp.ts:20 publishes events order.refunded

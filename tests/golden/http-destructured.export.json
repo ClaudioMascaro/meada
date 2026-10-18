@@ -209,5 +209,36 @@
       "via": "env:SERVICE_URL"
     }
   ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/portal::src/call.ts::call",
+        "example.com/acme/portal::src/call.ts::forward",
+        "example.com/acme/portal::src/call.ts::listReports"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/portal::src/call.ts::createReport",
+        "example.com/acme/portal::src/call.ts::post"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/portal::src/call.ts::fetchAll",
+        "example.com/acme/portal::src/call.ts::listAll"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/acme/portal::src/call.ts::putReport",
+        "example.com/acme/portal::src/call.ts::send"
+      ]
+    }
+  ],
   "links": []
 }

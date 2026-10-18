@@ -1,0 +1,2 @@
+channel::kafka::orders
+  example.com/channels/api producer src/amqp.ts:13 kafkaOrder

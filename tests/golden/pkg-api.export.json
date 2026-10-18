@@ -1,0 +1,175 @@
+{
+  "repository": "example.com/pkg/api",
+  "files": [
+    {
+      "path": "src/label.js",
+      "hash": "1b7683f656642a6df050d9b7aa87a215030df58b9f7a1454c21914dcf7284695"
+    },
+    {
+      "path": "src/report.js",
+      "hash": "82b77eab26002f91d6f06c4e83fd47a2c2e775d7c294c77afcc01f514586962f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/api::src/label.js::label",
+      "span": {
+        "path": "src/label.js",
+        "start": 53,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/pkg/api::src/report.js::report",
+      "span": {
+        "path": "src/report.js",
+        "start": 46,
+        "end": 90
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "caller": "example.com/pkg/api::src/label.js::label",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/label.js",
+        "start": 84,
+        "end": 98
+      }
+    },
+    {
+      "id": "example.com/pkg/api::src/report.js::report::greet#0",
+      "caller": "example.com/pkg/api::src/report.js::report",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/report.js",
+        "start": 75,
+        "end": 87
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/shared",
+      "site": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@example/kit",
+      "site": "example.com/pkg/api::src/report.js::report::greet#0",
+      "via": null
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/kit",
+      "range": "2.x"
+    },
+    {
+      "manifest": "package.json",
+      "field": "dependencies",
+      "name": "@example/shared",
+      "range": "1.1.0"
+    },
+    {
+      "manifest": "package.json",
+      "field": "optionalDependencies",
+      "name": "@example/shared"
+    },
+    {
+      "manifest": "package.json",
+      "field": "peerDependencies",
+      "name": "@example/shared",
+      "range": ">=1.0.0"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "specifier": "@example/shared",
+      "name": "normalize",
+      "level": "inferred",
+      "how": "outDir",
+      "target": "example.com/pkg/shared::src/text.ts::normalize"
+    },
+    {
+      "site": "example.com/pkg/api::src/report.js::report::greet#0",
+      "specifier": "@example/kit",
+      "name": "greet",
+      "level": "exact",
+      "how": "exports",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::greet"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/kit",
+      "provider": "example.com/pkg/shared::kit/package.json",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::dependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::optionalDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared none (local 1.2.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/api::package.json::peerDependencies::@example/shared",
+      "provider": "example.com/pkg/shared::package.json",
+      "contract": "package::npm::@example/shared",
+      "level": "exact",
+      "reason": "package::npm::@example/shared >=1.0.0 (local 1.2.0)"
+    },
+    {
+      "consumer": "example.com/pkg/api::src/label.js::label::normalize#0",
+      "provider": "example.com/pkg/shared::src/text.ts::normalize",
+      "contract": "package::npm::@example/shared",
+      "level": "inferred",
+      "reason": "package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch; import outDir"
+    },
+    {
+      "consumer": "example.com/pkg/api::src/report.js::report::greet#0",
+      "provider": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "contract": "package::npm::@example/kit",
+      "level": "exact",
+      "reason": "package::npm::@example/kit 2.x (local 2.1.0); import exports"
+    }
+  ]
+}

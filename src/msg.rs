@@ -5,6 +5,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::decisions::Cause;
+use crate::document::Format;
 
 static PT: AtomicBool = AtomicBool::new(false);
 
@@ -41,16 +42,80 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
-    KeyMissing(&'a str),
-    KeyLater {
-        key: &'a str,
-        release: &'a str,
+    /// The missing reads of the repository's consumers against the routes they call (spec #23).
+    Drift(usize),
+    DocumentUnreadable {
+        path: &'a str,
+        line: usize,
+        error: &'a str,
     },
+    /// A document that counts: its format and version, and how many routes (OpenAPI) or
+    /// channels (AsyncAPI) it lists.
+    DocumentRead {
+        path: &'a str,
+        format: Format,
+        version: &'a str,
+        count: usize,
+    },
+    /// A path `[serve] documents` lists that is not a file.
+    DocumentMissing {
+        path: &'a str,
+    },
+    /// `found` is the format field and version the document has, such as `swagger 2.0`.
+    DocumentFormat {
+        path: &'a str,
+        found: Option<&'a str>,
+    },
+    /// `found` is the format field and version the document has, such as `asyncapi 1.2.0`.
+    DocumentAsyncFormat {
+        path: &'a str,
+        found: Option<&'a str>,
+    },
+    /// A channel on a server with this protocol, which has no broker kind: ignored.
+    DocumentProtocol {
+        path: &'a str,
+        protocol: &'a str,
+    },
+    /// A channel name with parameters: ignored.
+    DocumentParameters {
+        path: &'a str,
+        channel: &'a str,
+    },
+    /// An AsyncAPI document with channels and no root `servers`: its channels are ignored.
+    DocumentNoServers {
+        path: &'a str,
+    },
+    /// A server a channel uses has no `protocol`: its channels are ignored on it.
+    DocumentNoProtocol {
+        path: &'a str,
+        server: &'a str,
+    },
+    /// A channel lists a server the document does not have.
+    DocumentUnknownServer {
+        path: &'a str,
+        channel: &'a str,
+        server: &'a str,
+    },
+    DuplicateRoute {
+        route: &'a str,
+        path: &'a str,
+        first: &'a str,
+    },
+    ExternalRef {
+        path: &'a str,
+        reference: &'a str,
+    },
+    /// A path item that is a reference to another file or a URL.
+    ExternalPathItem {
+        path: &'a str,
+        reference: &'a str,
+    },
+    KeyMissing(&'a str),
+    NotInRepository(&'a str),
     KeyUnknown {
         key: &'a str,
         file: &'a str,
     },
-    TrackA,
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
@@ -181,18 +246,100 @@ impl Msg<'_> {
                 format!("{contract} is unlinked: no writer and reader in different repositories"),
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
             ),
+            Msg::Drift(n) => pick(
+                format!("shape drift, missing reads: {n}"),
+                format!("drift de formato, leituras ausentes: {n}"),
+            ),
+            Msg::DocumentUnreadable { path, line, error } => pick(
+                format!("{path}:{line}: unreadable document ({error}), ignored"),
+                format!("{path}:{line}: documento ilegível ({error}), ignorado"),
+            ),
+            Msg::DocumentRead {
+                path,
+                format,
+                version,
+                count,
+            } => {
+                let name = format.name();
+                match format {
+                    Format::Asyncapi => pick(
+                        format!("{path}: {name} {version}, channels: {count}"),
+                        format!("{path}: {name} {version}, canais: {count}"),
+                    ),
+                    Format::Openapi => pick(
+                        format!("{path}: {name} {version}, routes: {count}"),
+                        format!("{path}: {name} {version}, rotas: {count}"),
+                    ),
+                }
+            }
+            Msg::DocumentMissing { path } => pick(
+                format!("{path}: listed in `serve.documents`, not found"),
+                format!("{path}: listado em `serve.documents`, não encontrado"),
+            ),
+            Msg::DocumentFormat { path, found } => pick(
+                format!(
+                    "{path}: not OpenAPI 3.0 or 3.1 ({}), ignored",
+                    found.unwrap_or("no `openapi` field")
+                ),
+                format!(
+                    "{path}: não é OpenAPI 3.0 nem 3.1 ({}), ignorado",
+                    found.unwrap_or("sem o campo `openapi`")
+                ),
+            ),
+            Msg::DocumentAsyncFormat { path, found } => pick(
+                format!(
+                    "{path}: not AsyncAPI 2.x or 3.0 ({}), ignored",
+                    found.unwrap_or("no `asyncapi` field")
+                ),
+                format!(
+                    "{path}: não é AsyncAPI 2.x nem 3.0 ({}), ignorado",
+                    found.unwrap_or("sem o campo `asyncapi`")
+                ),
+            ),
+            Msg::DocumentProtocol { path, protocol } => pick(
+                format!("{path}: server protocol `{protocol}` has no broker kind, its channels are ignored"),
+                format!("{path}: o protocolo `{protocol}` do servidor não tem tipo de broker, seus canais são ignorados"),
+            ),
+            Msg::DocumentParameters { path, channel } => pick(
+                format!("{path}: channel `{channel}` has parameters, ignored"),
+                format!("{path}: o canal `{channel}` tem parâmetros, ignorado"),
+            ),
+            Msg::DocumentNoServers { path } => pick(
+                format!("{path}: no root `servers`, so no channel has a broker kind: its channels are ignored"),
+                format!("{path}: sem `servers` na raiz, nenhum canal tem tipo de broker: seus canais são ignorados"),
+            ),
+            Msg::DocumentNoProtocol { path, server } => pick(
+                format!("{path}: server `{server}` has no `protocol`, its channels are ignored"),
+                format!("{path}: o servidor `{server}` não tem `protocol`, seus canais são ignorados"),
+            ),
+            Msg::DocumentUnknownServer {
+                path,
+                channel,
+                server,
+            } => pick(
+                format!("{path}: channel `{channel}` names server `{server}`, which the document does not have, ignored there"),
+                format!("{path}: o canal `{channel}` cita o servidor `{server}`, que o documento não tem, ignorado ali"),
+            ),
+            Msg::DuplicateRoute { route, path, first } => pick(
+                format!("{route} in {path} is also in {first}: one route"),
+                format!("{route} em {path} também está em {first}: uma rota só"),
+            ),
+            Msg::ExternalRef { path, reference } => pick(
+                format!("{path}: external reference {reference} not followed, its part of the shape is open"),
+                format!("{path}: referência externa {reference} não seguida, sua parte do shape fica aberta"),
+            ),
+            Msg::ExternalPathItem { path, reference } => pick(
+                format!("{path}: external path item reference {reference} not followed, its routes are not read"),
+                format!("{path}: referência externa de path item {reference} não seguida, suas rotas não são lidas"),
+            ),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
-            Msg::KeyLater { key, release } => pick(
-                format!("`{key}` is not in v0.1; {release}"),
-                format!("`{key}` não existe na v0.1; {release}"),
+            Msg::NotInRepository(path) => pick(
+                format!("`{path}` is not a path inside the repository"),
+                format!("`{path}` não é um caminho dentro do repositório"),
             ),
             Msg::KeyUnknown { key, file } => pick(
                 format!("`{key}` is not a {file} key"),
                 format!("`{key}` não é uma chave do {file}"),
-            ),
-            Msg::TrackA => pick(
-                "track A adds it (OpenAPI and AsyncAPI documents)".into(),
-                "a trilha A a adiciona (documentos OpenAPI e AsyncAPI)".into(),
             ),
             Msg::NotLowercase(value) => pick(
                 format!(

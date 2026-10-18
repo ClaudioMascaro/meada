@@ -1,0 +1,30 @@
+{
+  "repository": "example.com/pkg/fork",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "package::npm::@example/a",
+      "site": "example.com/pkg/fork::packages/a/package.json"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "@example/a",
+      "version": "3.0.0",
+      "repository": "example.com/pkg/fork",
+      "directory": "packages/a"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/mono::packages/c/package.json::dependencies::@example/a",
+      "provider": "example.com/pkg/fork::packages/a/package.json",
+      "contract": "package::npm::@example/a",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::npm::@example/a ^1.0.0 (local 3.0.0), range mismatch"
+    }
+  ]
+}

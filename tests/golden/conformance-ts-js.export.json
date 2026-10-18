@@ -14,6 +14,58 @@
       "hash": "673e8154604d801ca80ebeb8abbe955d0c4f4dbf982ec42de7c4d48ab40e0ae9"
     },
     {
+      "path": "src/messages/bullmq.ts",
+      "hash": "4bf78146495d4c891ddee523d307d2aa2ce62ef67c2656e58a6d5bcb50f978da"
+    },
+    {
+      "path": "src/messages/consume.ts",
+      "hash": "81fe0162e5e032340bc2617b7cf538ab41cee7f69e96470efd28b128944a5770"
+    },
+    {
+      "path": "src/messages/exchanges.ts",
+      "hash": "e6406018817b66fbc2d6deb667490d6c3a7a207f9b2d9422b748939f743075b9"
+    },
+    {
+      "path": "src/messages/handlers.ts",
+      "hash": "7df9c2bf5e63547bc93a3f74808d8cfb9d3d74a8d5e6b7f1e686be499fc908bc"
+    },
+    {
+      "path": "src/messages/kafka.ts",
+      "hash": "7e0a0d1488ee1fabd6d67953b00dafb41bb955d82ebbf3f5c829f4523a0c3c12"
+    },
+    {
+      "path": "src/messages/nats.ts",
+      "hash": "d527f67791a7320ca1febc46312a710598f1a0594d689ff62e6ef865d455de38"
+    },
+    {
+      "path": "src/messages/produce.ts",
+      "hash": "99b8351f01efc5d943a36fc7b3be58161c9ebb3f1e9f442e3740e05efa017beb"
+    },
+    {
+      "path": "src/messages/queues.ts",
+      "hash": "b237b401fe4804a7e9f64d9f3b9ca4753d3bc5fe7affa29620fab00258a1e851"
+    },
+    {
+      "path": "src/messages/rabbit.ts",
+      "hash": "b45fee15c400c3b715f35e6c7aeacaafb64dda50eaa80dfd0bc384d463233243"
+    },
+    {
+      "path": "src/messages/redis.ts",
+      "hash": "6208c15ff0bc423434a921a7f9c978bd84af3f9ed3152599d2784b18509a3f34"
+    },
+    {
+      "path": "src/messages/sqs.ts",
+      "hash": "7e0e05de55f344098ba3cedf30574b8b6623d268295fb5780879ef5731df85cd"
+    },
+    {
+      "path": "src/messages/topics.ts",
+      "hash": "98db0d23d9c687597bb5767087188bf5035c4194f58d5e287f6c081b0de3ab95"
+    },
+    {
+      "path": "src/shadow.ts",
+      "hash": "4189eb78482f9feafe4bb8732c1e27b66e88e17a37a136347ff1673fe29c828e"
+    },
+    {
       "path": "src/shapes/circle.ts",
       "hash": "0d6a842df74ebec2b924f1aa6a06a82dde7147fe6dc3a686fa9165053f32883e"
     },
@@ -101,6 +153,662 @@
         "path": "src/math.ts",
         "start": 141,
         "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 755,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 513,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 827,
+        "end": 895
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1427,
+        "end": 1485
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::record",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1536,
+        "end": 1587
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1487,
+        "end": 1534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1280,
+        "end": 1360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 984,
+        "end": 1080
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1089,
+        "end": 1196
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1155,
+        "end": 1192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 239,
+        "end": 443
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 381,
+        "end": 434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 752,
+        "end": 1027
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 509,
+        "end": 682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 618,
+        "end": 673
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1132,
+        "end": 1210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1219,
+        "end": 1280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1282,
+        "end": 1333
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 637,
+        "end": 898
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::bind",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 156,
+        "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::listen",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 368,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 958,
+        "end": 1014
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 900,
+        "end": 956
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 1016,
+        "end": 1075
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "span": {
+        "path": "src/messages/handlers.ts",
+        "start": 7,
+        "end": 65
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1176,
+        "end": 1266
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1268,
+        "end": 1339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 347,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::record",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1341,
+        "end": 1392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 920,
+        "end": 1016
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 552,
+        "end": 605
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 678,
+        "end": 859
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 746,
+        "end": 795
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 494,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 611,
+        "end": 674
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emitRefund",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 683,
+        "end": 734
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1294,
+        "end": 1405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 204,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 813,
+        "end": 987
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::retry",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 996,
+        "end": 1046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 169,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 474,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::queue",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 378,
+        "end": 465
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::record",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 971,
+        "end": 1022
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::work",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 612,
+        "end": 767
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 667,
+        "end": 712
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 863,
+        "end": 969
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 880,
+        "end": 962
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendBilling",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 971,
+        "end": 1020
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1100,
+        "end": 1192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 465,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 666,
+        "end": 803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2162,
+        "end": 2306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1942,
+        "end": 2046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2055,
+        "end": 2107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1294,
+        "end": 1461
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1752,
+        "end": 1897
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1470,
+        "end": 1580
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1633,
+        "end": 1743
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1826,
+        "end": 1940
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1652,
+        "end": 1817
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1759,
+        "end": 1808
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1046,
+        "end": 1173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1182,
+        "end": 1254
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2068,
+        "end": 2229
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1942,
+        "end": 1998
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1441,
+        "end": 1564
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1331,
+        "end": 1432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::record",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2231,
+        "end": 2282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 575,
+        "end": 787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 844,
+        "end": 971
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1066,
+        "end": 1183
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 257,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::helper",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 151,
+        "end": 192
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::hoisted",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 539,
+        "end": 603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::listed",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 808,
+        "end": 874
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::looped",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 366,
+        "end": 457
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::nested",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 712,
+        "end": 799
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::plain",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 201,
+        "end": 248
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::rebound",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 466,
+        "end": 530
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::twice",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 956,
+        "end": 1057
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 612,
+        "end": 703
       }
     },
     {
@@ -389,6 +1097,1568 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::FakeQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 363,
+        "end": 384
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Queue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 200,
+        "end": 250
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Queue#1",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 315,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::Set#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 399,
+        "end": 416
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::bull.Queue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 265,
+        "end": 297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 797,
+        "end": 815
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::dynamic.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 610,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::fake.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 643,
+        "end": 662
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 551,
+        "end": 570
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 580,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::seen.add#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 666,
+        "end": 681
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice::enqueue#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 855,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice::enqueue#1",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 875,
+        "end": 892
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq::FakeWorker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1452,
+        "end": 1482
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic::Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1315,
+        "end": 1357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs::Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1016,
+        "end": 1077
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu::record#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "target": "example.com/acme/conformance::src/messages/bullmq.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1176,
+        "end": 1187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::startMail::bull.Worker#0",
+      "caller": "example.com/acme/conformance::src/messages/bullmq.ts::startMail",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 1121,
+        "end": 1193
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::record#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 412,
+        "end": 427
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders::consumer.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 349,
+        "end": 440
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders::consumer.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 280,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 803,
+        "end": 863
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::kafka.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 884,
+        "end": 923
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::payments.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 984,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumePayments::payments.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 933,
+        "end": 974
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds::record#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 653,
+        "end": 666
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds::auditor.run#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 600,
+        "end": 679
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds::auditor.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 551,
+        "end": 590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listen::retrier.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1179,
+        "end": 1207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/consume.ts::listenRetries::listen#0",
+      "caller": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "target": "example.com/acme/conformance::src/messages/consume.ts::listen",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/consume.ts",
+        "start": 1260,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::Buffer.from#0",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 702,
+        "end": 719
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::Buffer.from#1",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 765,
+        "end": 782
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::Buffer.from#2",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 816,
+        "end": 833
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::Buffer.from#3",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 877,
+        "end": 894
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 661,
+        "end": 720
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 724,
+        "end": 783
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#2",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 787,
+        "end": 834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#3",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 838,
+        "end": 895
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::bind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 188,
+        "end": 239
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#1",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::bind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 249,
+        "end": 295
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#2",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::bind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 305,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::listen::channel.consume#0",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 402,
+        "end": 435
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::listen::channel.consume#1",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 445,
+        "end": 479
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::listen::channel.consume#2",
+      "caller": "example.com/acme/conformance::src/messages/exchanges.ts::listen",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 489,
+        "end": 529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 84,
+        "end": 147
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 216,
+        "end": 253
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.consumer#1",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 278,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka.producer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 174,
+        "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafkajs.Kafka#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 381,
+        "end": 446
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::other.consumer#0",
+      "caller": "example.com/acme/conformance::src/messages/kafka.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 471,
+        "end": 507
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::connect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 131,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::fakeConnect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 245,
+        "end": 260
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::nats.connect#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 186,
+        "end": 224
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished::bus.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1236,
+        "end": 1263
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished::fake.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1204,
+        "end": 1232
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 373,
+        "end": 399
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 403,
+        "end": 439
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 443,
+        "end": 478
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 951,
+        "end": 981
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::nc.subscribe#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 985,
+        "end": 1013
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 580,
+        "end": 602
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>::record#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "target": "example.com/acme/conformance::src/messages/nats.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 773,
+        "end": 788
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest::nc.subscribe#0",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 707,
+        "end": 801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest::nc.subscribe#1",
+      "caller": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 805,
+        "end": 856
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::Fake#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1221,
+        "end": 1246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::deliver::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 552,
+        "end": 599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emit::deliver#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::deliver",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 651,
+        "end": 671
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::emitRefund",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::emit",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 716,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::fake.producer#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1269,
+        "end": 1284
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced::fakeProducer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1362,
+        "end": 1402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced::transport.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1321,
+        "end": 1358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 242,
+        "end": 292
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 302,
+        "end": 349
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 359,
+        "end": 418
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay::producer.send#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 946,
+        "end": 984
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::relay::relay#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 905,
+        "end": 931
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0",
+      "caller": "example.com/acme/conformance::src/messages/produce.ts::retry",
+      "target": "example.com/acme/conformance::src/messages/produce.ts::relay",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1024,
+        "end": 1043
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue::Buffer.from#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 225,
+        "end": 242
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue::Buffer.from#1",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 282,
+        "end": 299
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue::channel.sendToQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 198,
+        "end": 243
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue::confirming.sendToQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 247,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports::queue#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+      "target": "example.com/acme/conformance::src/messages/queues.ts::queue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 511,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::queue::Buffer.from#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::queue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 444,
+        "end": 461
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::queue::channel.sendToQueue#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::queue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 418,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks::record#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+      "target": "example.com/acme/conformance::src/messages/queues.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 692,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::work::channel.consume#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 644,
+        "end": 713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::work::confirming.consume#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::work",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 723,
+        "end": 764
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::workReports::channel.consume#0",
+      "caller": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 931,
+        "end": 966
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::amqp.connect#0",
+      "caller": "example.com/acme/conformance::src/messages/rabbit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 54,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::connection.createChannel#0",
+      "caller": "example.com/acme/conformance::src/messages/rabbit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 185,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::connection.createConfirmChannel#0",
+      "caller": "example.com/acme/conformance::src/messages/rabbit.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 245,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::IORedis#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 189,
+        "end": 202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::Redis#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 218,
+        "end": 246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::append::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 923,
+        "end": 959
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendBilling",
+      "target": "example.com/acme/conformance::src/messages/redis.ts::append",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1000,
+        "end": 1017
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1141,
+        "end": 1189
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 506,
+        "end": 544
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 554,
+        "end": 599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 709,
+        "end": 751
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 761,
+        "end": 800
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::createClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 263,
+        "end": 277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::fakeClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 332,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::noderedis.createClient#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 293,
+        "end": 317
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis::fake.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2243,
+        "end": 2303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis::fake.xadd#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2198,
+        "end": 2233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::read::client.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1983,
+        "end": 2043
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readBilling::read#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "target": "example.com/acme/conformance::src/messages/redis.ts::read",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 2089,
+        "end": 2104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::ioredis.xreadgroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1334,
+        "end": 1458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readMany::other.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1789,
+        "end": 1894
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNamed::named.xreadgroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1508,
+        "end": 1577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis::client.xReadGroup#0",
+      "caller": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 1675,
+        "end": 1740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::SQSClient#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 308,
+        "end": 325
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit::Consumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1861,
+        "end": 1937
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail::record#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "target": "example.com/acme/conformance::src/messages/sqs.ts::record",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1786,
+        "end": 1801
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail::Consumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1686,
+        "end": 1814
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue::SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1104,
+        "end": 1169
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueue::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1092,
+        "end": 1170
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling",
+      "target": "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1219,
+        "end": 1251
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued::Fake#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2093,
+        "end": 2140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::notQueued::FakeConsumer.create#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 2144,
+        "end": 2226
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::ReceiveMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1496,
+        "end": 1560
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1484,
+        "end": 1561
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::ReceiveMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1383,
+        "end": 1428
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 1371,
+        "end": 1429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 622,
+        "end": 683
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 706,
+        "end": 783
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 610,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::client.send#1",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 694,
+        "end": 784
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 904,
+        "end": 967
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::client.send#0",
+      "caller": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 892,
+        "end": 968
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again::Error#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::again",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1127,
+        "end": 1141
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::again::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::again",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1168,
+        "end": 1176
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught::Error#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 301,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::caught::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::caught",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 342,
+        "end": 350
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::hoisted::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::hoisted",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 592,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::listed::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::listed",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 863,
+        "end": 871
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::looped::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::looped",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 446,
+        "end": 454
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::nested::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::nested",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 788,
+        "end": 796
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::plain::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::plain",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "exact",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 237,
+        "end": 245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::rebound::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::rebound",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 519,
+        "end": 527
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::twice::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::twice",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 1046,
+        "end": 1054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shadow.ts::unparenthesized::helper#0",
+      "caller": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
+      "target": "example.com/acme/conformance::src/shadow.ts::helper",
+      "level": "inferred",
+      "span": {
+        "path": "src/shadow.ts",
+        "start": 678,
+        "end": 686
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area::square#0",
       "caller": "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
       "target": "example.com/acme/conformance::src/math.ts::square",
@@ -419,6 +2689,17 @@
         "path": "src/shapes/shape.ts",
         "start": 155,
         "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit::Shape#0",
+      "caller": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+      "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+      "level": "exact",
+      "span": {
+        "path": "src/shapes/shape.ts",
+        "start": 57,
+        "end": 68
       }
     },
     {
@@ -466,7 +2747,2380 @@
       }
     }
   ],
-  "providers": [],
-  "consumers": [],
-  "links": []
+  "providers": [
+    {
+      "contract": "channel::amqp::invoices",
+      "site": "example.com/acme/conformance::src/messages/queues.ts::enqueue::confirming.sendToQueue#0"
+    },
+    {
+      "contract": "channel::amqp::reports",
+      "site": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports::queue#0"
+    },
+    {
+      "contract": "channel::amqp::tasks",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#2"
+    },
+    {
+      "contract": "channel::amqp::tasks",
+      "site": "example.com/acme/conformance::src/messages/queues.ts::enqueue::channel.sendToQueue#0"
+    },
+    {
+      "contract": "channel::bullmq",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::dynamic.add#0"
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0"
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0"
+    },
+    {
+      "contract": "channel::bullmq::mail-eu",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0"
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1"
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2"
+    },
+    {
+      "contract": "channel::kafka::payments",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0"
+    },
+    {
+      "contract": "channel::kafka::refunds",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0"
+    },
+    {
+      "contract": "channel::kafka::retries",
+      "site": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0"
+    },
+    {
+      "contract": "channel::nats::jobs.audit.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0"
+    },
+    {
+      "contract": "channel::nats::jobs.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0"
+    },
+    {
+      "contract": "channel::nats::jobs.eu.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1"
+    },
+    {
+      "contract": "channel::redis",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic::ioredis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0"
+    },
+    {
+      "contract": "channel::redis::events.audit",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0"
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0"
+    },
+    {
+      "contract": "channel::redis::returns",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0"
+    },
+    {
+      "contract": "channel::redis::shipments",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0"
+    },
+    {
+      "contract": "channel::sqs::audit",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::billing",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0"
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::mail",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::bullmq",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "via": null
+    },
+    {
+      "contract": "channel::bullmq::jobs",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "via": null
+    },
+    {
+      "contract": "channel::bullmq::mail-eu",
+      "site": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.created",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::refunds",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::retries",
+      "site": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::alerts",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::audit",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::shipments",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::invoices",
+      "site": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "via": null
+    },
+    {
+      "contract": "channel::kafka::payments",
+      "site": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.audit.>",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.*.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.created",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.*",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "via": null
+    },
+    {
+      "contract": "channel::nats::jobs.>",
+      "site": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::tasks",
+      "site": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::reports",
+      "site": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::events.audit",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::orders",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::returns",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::billing",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "via": null
+    },
+    {
+      "contract": "channel::redis::shipments",
+      "site": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::mail",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::audit",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::billing",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "via": null
+    }
+  ],
+  "bindings": [
+    {
+      "contract": "channel::amqp::alerts",
+      "exchange": "events",
+      "pattern": "order.#",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#1"
+    },
+    {
+      "contract": "channel::amqp::audit",
+      "exchange": "events",
+      "pattern": "order.created",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#0"
+    },
+    {
+      "contract": "channel::amqp::shipments",
+      "exchange": "events",
+      "pattern": "*.shipped",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::bind::channel.bindQueue#2"
+    }
+  ],
+  "publishes": [
+    {
+      "exchange": "events",
+      "key": "order.created",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0"
+    },
+    {
+      "exchange": "events",
+      "key": "order.shipped",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1"
+    },
+    {
+      "exchange": "events",
+      "key": "refund.paid",
+      "site": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#3"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/conformance::src/app.ts::main",
+        "example.com/acme/conformance::src/legacy.cjs::legacy",
+        "example.com/acme/conformance::src/math.ts::add",
+        "example.com/acme/conformance::src/math.ts::double",
+        "example.com/acme/conformance::src/math.ts::scale",
+        "example.com/acme/conformance::src/math.ts::scale.times",
+        "example.com/acme/conformance::src/math.ts::square",
+        "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
+        "example.com/acme/conformance::src/util/log.js::default"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/conformance::src/shadow.ts::again",
+        "example.com/acme/conformance::src/shadow.ts::caught",
+        "example.com/acme/conformance::src/shadow.ts::helper",
+        "example.com/acme/conformance::src/shadow.ts::hoisted",
+        "example.com/acme/conformance::src/shadow.ts::listed",
+        "example.com/acme/conformance::src/shadow.ts::looped",
+        "example.com/acme/conformance::src/shadow.ts::nested",
+        "example.com/acme/conformance::src/shadow.ts::plain",
+        "example.com/acme/conformance::src/shadow.ts::rebound",
+        "example.com/acme/conformance::src/shadow.ts::twice",
+        "example.com/acme/conformance::src/shadow.ts::unparenthesized"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/conformance::src/util/format.mjs::format",
+        "example.com/acme/conformance::src/view.tsx::render"
+      ]
+    },
+    {
+      "name": "src/messages",
+      "members": [
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice"
+      ]
+    },
+    {
+      "name": "src/messages#10",
+      "members": [
+        "example.com/acme/conformance::src/messages/redis.ts::append",
+        "example.com/acme/conformance::src/messages/redis.ts::appendBilling"
+      ]
+    },
+    {
+      "name": "src/messages#11",
+      "members": [
+        "example.com/acme/conformance::src/messages/redis.ts::read",
+        "example.com/acme/conformance::src/messages/redis.ts::readBilling"
+      ]
+    },
+    {
+      "name": "src/messages#12",
+      "members": [
+        "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+        "example.com/acme/conformance::src/messages/sqs.ts::record"
+      ]
+    },
+    {
+      "name": "src/messages#13",
+      "members": [
+        "example.com/acme/conformance::src/messages/sqs.ts::enqueue",
+        "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling"
+      ]
+    },
+    {
+      "name": "src/messages#2",
+      "members": [
+        "example.com/acme/conformance::src/messages/bullmq.ts::record",
+        "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu"
+      ]
+    },
+    {
+      "name": "src/messages#3",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+        "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+        "example.com/acme/conformance::src/messages/consume.ts::record"
+      ]
+    },
+    {
+      "name": "src/messages#4",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::listen",
+        "example.com/acme/conformance::src/messages/consume.ts::listenRetries"
+      ]
+    },
+    {
+      "name": "src/messages#5",
+      "members": [
+        "example.com/acme/conformance::src/messages/nats.ts::record",
+        "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
+      ]
+    },
+    {
+      "name": "src/messages#6",
+      "members": [
+        "example.com/acme/conformance::src/messages/produce.ts::deliver",
+        "example.com/acme/conformance::src/messages/produce.ts::emit",
+        "example.com/acme/conformance::src/messages/produce.ts::emitRefund"
+      ]
+    },
+    {
+      "name": "src/messages#7",
+      "members": [
+        "example.com/acme/conformance::src/messages/produce.ts::relay",
+        "example.com/acme/conformance::src/messages/produce.ts::retry"
+      ]
+    },
+    {
+      "name": "src/messages#8",
+      "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+        "example.com/acme/conformance::src/messages/queues.ts::queue"
+      ]
+    },
+    {
+      "name": "src/messages#9",
+      "members": [
+        "example.com/acme/conformance::src/messages/queues.ts::record",
+        "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
+      ]
+    },
+    {
+      "name": "src/shapes",
+      "members": [
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.area",
+        "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue::jobs.add#0",
+      "contract": "channel::bullmq::jobs",
+      "level": "exact",
+      "reason": "channel::bullmq::jobs"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::jobs.add#0",
+      "contract": "channel::bullmq::jobs",
+      "level": "exact",
+      "reason": "channel::bullmq::jobs"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+      "provider": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::mail.add#0",
+      "contract": "channel::bullmq::mail-eu",
+      "level": "exact",
+      "reason": "channel::bullmq::mail-eu"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#1",
+      "contract": "channel::kafka::orders.created",
+      "level": "exact",
+      "reason": "channel::kafka::orders.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#2",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::emitRefund::emit#0",
+      "contract": "channel::kafka::refunds",
+      "level": "exact",
+      "reason": "channel::kafka::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::retry::relay#0",
+      "contract": "channel::kafka::retries",
+      "level": "exact",
+      "reason": "channel::kafka::retries"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert",
+      "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0",
+      "contract": "channel::amqp::alerts",
+      "level": "inferred",
+      "reason": "channel::amqp::alerts binding events order.#"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert",
+      "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1",
+      "contract": "channel::amqp::alerts",
+      "level": "inferred",
+      "reason": "channel::amqp::alerts binding events order.#"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit",
+      "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#0",
+      "contract": "channel::amqp::audit",
+      "level": "exact",
+      "reason": "channel::amqp::audit binding events order.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment",
+      "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#1",
+      "contract": "channel::amqp::shipments",
+      "level": "inferred",
+      "reason": "channel::amqp::shipments binding events *.shipped"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "provider": "example.com/acme/conformance::src/messages/produce.ts::produceAll::producer.send#0",
+      "contract": "channel::kafka::payments",
+      "level": "exact",
+      "reason": "channel::kafka::payments"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+      "provider": "example.com/acme/conformance::src/messages/queues.ts::enqueue::confirming.sendToQueue#0",
+      "contract": "channel::amqp::invoices",
+      "level": "exact",
+      "reason": "channel::amqp::invoices"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.audit.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.audit.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.created",
+      "level": "exact",
+      "reason": "channel::nats::jobs.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "contract": "channel::nats::jobs.*.created",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.eu.created wildcard jobs.*.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.*.created",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.*.created"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.*",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.created wildcard jobs.*"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#0",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::nc.publish#1",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.eu.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+      "provider": "example.com/acme/conformance::src/messages/nats.ts::publishAll::other.publish#0",
+      "contract": "channel::nats::jobs.>",
+      "level": "inferred",
+      "reason": "channel::nats::jobs.audit.created wildcard jobs.>"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+      "provider": "example.com/acme/conformance::src/messages/exchanges.ts::announce::channel.publish#2",
+      "contract": "channel::amqp::tasks",
+      "level": "exact",
+      "reason": "channel::amqp::tasks"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+      "provider": "example.com/acme/conformance::src/messages/queues.ts::enqueue::channel.sendToQueue#0",
+      "contract": "channel::amqp::tasks",
+      "level": "exact",
+      "reason": "channel::amqp::tasks"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+      "provider": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports::queue#0",
+      "contract": "channel::amqp::reports",
+      "level": "exact",
+      "reason": "channel::amqp::reports"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "contract": "channel::redis::billing",
+      "level": "exact",
+      "reason": "channel::redis::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::named.xadd#0",
+      "contract": "channel::redis::events.audit",
+      "level": "exact",
+      "reason": "channel::redis::events.audit"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis::ioredis.xadd#0",
+      "contract": "channel::redis::orders",
+      "level": "exact",
+      "reason": "channel::redis::orders"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::other.xAdd#0",
+      "contract": "channel::redis::returns",
+      "level": "exact",
+      "reason": "channel::redis::returns"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendBilling::append#0",
+      "contract": "channel::redis::billing",
+      "level": "exact",
+      "reason": "channel::redis::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+      "provider": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis::client.xAdd#0",
+      "contract": "channel::redis::shipments",
+      "level": "exact",
+      "reason": "channel::redis::shipments"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#1",
+      "contract": "channel::sqs::mail",
+      "level": "exact",
+      "reason": "channel::sqs::mail"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace::aws.SendMessageCommand#0",
+      "contract": "channel::sqs::audit",
+      "level": "exact",
+      "reason": "channel::sqs::audit"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling::enqueue#0",
+      "contract": "channel::sqs::billing",
+      "level": "exact",
+      "reason": "channel::sqs::billing"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+      "provider": "example.com/acme/conformance::src/messages/sqs.ts::sendJob::SendMessageCommand#0",
+      "contract": "channel::sqs::jobs",
+      "level": "exact",
+      "reason": "channel::sqs::jobs"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/app.ts::main",
+      "kind": "export",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/app.ts::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::add"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::double"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::add",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::scale"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::double",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::scale.times"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/math.ts::square"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/util/format.mjs::format"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/util/log.js::default"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shapes/shape.ts::Shape"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shapes/shape.ts::Shape.area"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/app.ts::main::shape.area#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/shapes/circle.ts::Circle.area",
+            "example.com/acme/conformance::src/shapes/shape.ts::Shape.area"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/legacy.cjs::legacy"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/app.ts::main::render#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::src/view.tsx::render",
+            "example.com/acme/conformance::src/widget.jsx::render"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+      "kind": "export",
+      "label": "enqueueAll",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "reason": "channel::bullmq::jobs"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu",
+          "reason": "channel::bullmq::mail-eu"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::record"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll::dynamic.add#0",
+          "mark": "produces",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+      "kind": "export",
+      "label": "enqueueTwice",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "reason": "channel::bullmq::jobs"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
+      "kind": "export",
+      "label": "notBullmq",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::runJob::channel::bullmq",
+      "kind": "channel",
+      "label": "channel::bullmq (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::runJob::channel::bullmq::jobs",
+      "kind": "channel",
+      "label": "channel::bullmq::jobs",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
+          "mark": "consumes",
+          "contract": "channel::bullmq"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
+      "kind": "export",
+      "label": "startDynamic",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs",
+      "kind": "export",
+      "label": "startJobs",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startJobs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startMail",
+      "kind": "export",
+      "label": "startMail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startMail"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu::channel::bullmq::mail-eu",
+      "kind": "channel",
+      "label": "channel::bullmq::mail-eu",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/bullmq.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
+      "kind": "export",
+      "label": "consumeOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::channel::kafka::orders.created",
+      "kind": "channel",
+      "label": "channel::kafka::orders.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped::channel::kafka::orders.shipped",
+      "kind": "channel",
+      "label": "channel::kafka::orders.shipped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
+      "kind": "export",
+      "label": "consumePayments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumePayments"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+      "kind": "export",
+      "label": "consumeRefunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds::channel::kafka::refunds",
+      "kind": "channel",
+      "label": "channel::kafka::refunds",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/consume.ts::listenRetries::channel::kafka::retries",
+      "kind": "channel",
+      "label": "channel::kafka::retries",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::listenRetries"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::listen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
+      "kind": "export",
+      "label": "announce",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::announce"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert",
+          "reason": "channel::amqp::alerts binding events order.#"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit",
+          "reason": "channel::amqp::audit binding events order.created"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment",
+          "reason": "channel::amqp::shipments binding events *.shipped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+          "reason": "channel::amqp::tasks"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::bind",
+      "kind": "export",
+      "label": "bind",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::bind"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::listen",
+      "kind": "export",
+      "label": "listen",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::listen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert::channel::amqp::alerts",
+      "kind": "channel",
+      "label": "channel::amqp::alerts",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAlert"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit::channel::amqp::audit",
+      "kind": "channel",
+      "label": "channel::amqp::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment::channel::amqp::shipments",
+      "kind": "channel",
+      "label": "channel::amqp::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/exchanges.ts::onShipment"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/handlers.ts::onPayment::channel::amqp::invoices",
+      "kind": "channel",
+      "label": "channel::amqp::invoices",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/handlers.ts::onPayment"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/handlers.ts::onPayment::channel::kafka::payments",
+      "kind": "channel",
+      "label": "channel::kafka::payments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/handlers.ts::onPayment"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
+      "kind": "export",
+      "label": "notPublished",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::notPublished"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::onAudit::channel::nats::jobs.audit.>",
+      "kind": "channel",
+      "label": "channel::nats::jobs.audit.>",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+      "kind": "export",
+      "label": "publishAll",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::publishAll"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+          "reason": "channel::nats::jobs.created"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+          "reason": "channel::nats::jobs.created wildcard jobs.*"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>",
+          "reason": "channel::nats::jobs.created wildcard jobs.>"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::record"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+          "reason": "channel::nats::jobs.audit.created wildcard jobs.audit.>"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::channel::nats::jobs.*.created",
+      "kind": "channel",
+      "label": "channel::nats::jobs.*.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle::channel::nats::jobs.created",
+      "kind": "channel",
+      "label": "channel::nats::jobs.created",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne::channel::nats::jobs.*",
+      "kind": "channel",
+      "label": "channel::nats::jobs.*",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeOne"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest",
+      "kind": "export",
+      "label": "subscribeRest",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>::channel::nats::jobs.>",
+      "kind": "channel",
+      "label": "channel::nats::jobs.>",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/nats.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/produce.ts::emitRefund",
+      "kind": "export",
+      "label": "emitRefund",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::emitRefund"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::emit"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::deliver"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
+          "reason": "channel::kafka::refunds"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
+      "kind": "export",
+      "label": "notProduced",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::notProduced"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/produce.ts::produceAll",
+      "kind": "export",
+      "label": "produceAll",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::produceAll"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+          "reason": "channel::kafka::payments"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
+          "reason": "channel::kafka::orders.created"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/produce.ts::retry",
+      "kind": "export",
+      "label": "retry",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::retry"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::relay"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/produce.ts::relay",
+          "mark": "cycle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+          "reason": "channel::kafka::retries"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/consume.ts::listen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
+      "kind": "export",
+      "label": "enqueue",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::enqueue"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks",
+          "reason": "channel::amqp::tasks"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::record"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/handlers.ts::onPayment",
+          "reason": "channel::amqp::invoices"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports",
+      "kind": "export",
+      "label": "enqueueReports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::enqueueReports"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::queue"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::workReports",
+          "reason": "channel::amqp::reports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::work",
+      "kind": "export",
+      "label": "work",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::work"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks::channel::amqp::tasks",
+      "kind": "channel",
+      "label": "channel::amqp::tasks",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/queues.ts::workReports::channel::amqp::reports",
+      "kind": "channel",
+      "label": "channel::amqp::reports",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/queues.ts::workReports"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::appendBilling",
+      "kind": "export",
+      "label": "appendBilling",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::appendBilling"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::append"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readBilling",
+          "reason": "channel::redis::billing"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::read"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readNamed",
+          "reason": "channel::redis::billing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic",
+      "kind": "export",
+      "label": "appendDynamic",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::appendDynamic::ioredis.xadd#0",
+          "mark": "produces",
+          "contract": "channel::redis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis",
+      "kind": "export",
+      "label": "appendIoredis",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::appendIoredis"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readIoredis",
+          "reason": "channel::redis::orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+          "reason": "channel::redis::orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
+      "kind": "export",
+      "label": "appendNodeRedis",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis",
+          "reason": "channel::redis::shipments"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readMany",
+          "reason": "channel::redis::returns"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
+      "kind": "export",
+      "label": "notRedis",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::notRedis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readBilling::channel::redis::billing",
+      "kind": "channel",
+      "label": "channel::redis::billing",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readBilling"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::read"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::channel::redis::events.audit",
+      "kind": "channel",
+      "label": "channel::redis::events.audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readIoredis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readIoredis::channel::redis::orders",
+      "kind": "channel",
+      "label": "channel::redis::orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readIoredis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readMany::channel::redis::orders",
+      "kind": "channel",
+      "label": "channel::redis::orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readMany"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readMany::channel::redis::returns",
+      "kind": "channel",
+      "label": "channel::redis::returns",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readMany"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNamed::channel::redis::billing",
+      "kind": "channel",
+      "label": "channel::redis::billing",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readNamed"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis::channel::redis::shipments",
+      "kind": "channel",
+      "label": "channel::redis::shipments",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/redis.ts::readNodeRedis"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",
+      "kind": "export",
+      "label": "consumeAudit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail",
+      "kind": "export",
+      "label": "consumeMail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail::channel::sqs::mail",
+      "kind": "channel",
+      "label": "channel::sqs::mail",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling",
+      "kind": "export",
+      "label": "enqueueBilling",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::enqueueBilling"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::enqueue"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling",
+          "reason": "channel::sqs::billing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::notQueued",
+      "kind": "export",
+      "label": "notQueued",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::notQueued"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::onAudit::channel::sqs::audit",
+      "kind": "channel",
+      "label": "channel::sqs::audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::onAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling::channel::sqs::billing",
+      "kind": "channel",
+      "label": "channel::sqs::billing",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::receiveBilling"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs::channel::sqs::jobs",
+      "kind": "channel",
+      "label": "channel::sqs::jobs",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::sendJob",
+      "kind": "export",
+      "label": "sendJob",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::sendJob"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::receiveJobs",
+          "reason": "channel::sqs::jobs"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
+          "reason": "channel::sqs::mail"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::record"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace",
+      "kind": "export",
+      "label": "sendThroughNamespace",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::sendThroughNamespace"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/messages/sqs.ts::onAudit",
+          "reason": "channel::sqs::audit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::again",
+      "kind": "export",
+      "label": "again",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::again"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::caught",
+      "kind": "export",
+      "label": "caught",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::caught"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::hoisted",
+      "kind": "export",
+      "label": "hoisted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::hoisted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::listed",
+      "kind": "export",
+      "label": "listed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::listed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::looped",
+      "kind": "export",
+      "label": "looped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::looped"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::nested",
+      "kind": "export",
+      "label": "nested",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::nested"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::plain",
+      "kind": "export",
+      "label": "plain",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::plain"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::rebound",
+      "kind": "export",
+      "label": "rebound",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::rebound"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::twice",
+      "kind": "export",
+      "label": "twice",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::twice"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/shadow.ts::unparenthesized",
+      "kind": "export",
+      "label": "unparenthesized",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/shadow.ts::unparenthesized"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/shadow.ts::helper"
+        }
+      ]
+    }
+  ]
 }

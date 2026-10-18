@@ -1,0 +1,12 @@
+{
+  "name": "@example/shared",
+  "version": "1.2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.cjs"
+    },
+    "./utils/*": { "import": "./dist/utils/*.js" }
+  }
+}

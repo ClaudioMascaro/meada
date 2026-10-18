@@ -1,0 +1,30 @@
+# A sample of what an OpenAPI document read stores (`documents.summary`), for the
+# SCHEMA_VERSION guard in src/index.rs.
+openapi: 3.1.0
+info:
+  title: Sample
+  version: "1.0"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /items/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  tags: { type: array, items: { type: string } }
+                  extra: { type: object, additionalProperties: true }
+  /remote:
+    $ref: "./other.yaml#/paths/remote"
+  /linked:
+    post:
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "./other.yaml#/Item" }

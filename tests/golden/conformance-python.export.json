@@ -6763,5 +6763,4439 @@
       "via": "host:api.example.com"
     }
   ],
-  "links": []
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/conformance::bindings.py::Both.go",
+        "example.com/acme/conformance::bindings.py::Right.right"
+      ]
+    },
+    {
+      "name": ".#10",
+      "members": [
+        "example.com/acme/conformance::families.py::Plain.go",
+        "example.com/acme/conformance::families.py::Plain.keep"
+      ]
+    },
+    {
+      "name": ".#11",
+      "members": [
+        "example.com/acme/conformance::geometry/shapes.py::Shape.area",
+        "example.com/acme/conformance::methods.py::Base.ping",
+        "example.com/acme/conformance::methods.py::Base.shared",
+        "example.com/acme/conformance::methods.py::Dial.spin",
+        "example.com/acme/conformance::methods.py::Mixin.mixed",
+        "example.com/acme/conformance::methods.py::Panel",
+        "example.com/acme/conformance::methods.py::Panel.check",
+        "example.com/acme/conformance::methods.py::Panel.draw",
+        "example.com/acme/conformance::methods.py::Panel.draw.later",
+        "example.com/acme/conformance::methods.py::Panel.render",
+        "example.com/acme/conformance::methods.py::module_level",
+        "example.com/acme/conformance::methods.py::shadowed",
+        "example.com/acme/conformance::methods.py::use"
+      ]
+    },
+    {
+      "name": ".#12",
+      "members": [
+        "example.com/acme/conformance::methods.py::Leaf.run",
+        "example.com/acme/conformance::methods.py::Right.hook"
+      ]
+    },
+    {
+      "name": ".#13",
+      "members": [
+        "example.com/acme/conformance::methods.py::Panel.build",
+        "example.com/acme/conformance::methods.py::Panel.create"
+      ]
+    },
+    {
+      "name": ".#14",
+      "members": [
+        "example.com/acme/conformance::receivers.py::Engine",
+        "example.com/acme/conformance::receivers.py::Engine.start",
+        "example.com/acme/conformance::receivers.py::Typed.run",
+        "example.com/acme/conformance::receivers.py::Untyped",
+        "example.com/acme/conformance::receivers.py::Untyped.run",
+        "example.com/acme/conformance::receivers.py::comprehension",
+        "example.com/acme/conformance::receivers.py::except_as",
+        "example.com/acme/conformance::receivers.py::lambdas",
+        "example.com/acme/conformance::receivers.py::module_read",
+        "example.com/acme/conformance::receivers.py::optional",
+        "example.com/acme/conformance::receivers.py::param_reassigned",
+        "example.com/acme/conformance::receivers.py::spare_read",
+        "example.com/acme/conformance::receivers.py::walrus",
+        "example.com/acme/conformance::receivers.py::with_as"
+      ]
+    },
+    {
+      "name": ".#15",
+      "members": [
+        "example.com/acme/conformance::receivers.py::Runner.each",
+        "example.com/acme/conformance::receivers.py::Runner.stride",
+        "example.com/acme/conformance::receivers.py::lacking"
+      ]
+    },
+    {
+      "name": ".#16",
+      "members": [
+        "example.com/acme/conformance::scopes.py::Helper",
+        "example.com/acme/conformance::scopes.py::Outer.m"
+      ]
+    },
+    {
+      "name": ".#17",
+      "members": [
+        "example.com/acme/conformance::scopes.py::Outer",
+        "example.com/acme/conformance::scopes.py::Outer.Helper"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "example.com/acme/conformance::bindings.py::Line",
+        "example.com/acme/conformance::bindings.py::Line.dial",
+        "example.com/acme/conformance::bindings.py::Looped",
+        "example.com/acme/conformance::bindings.py::Looped.call",
+        "example.com/acme/conformance::bindings.py::Opened",
+        "example.com/acme/conformance::bindings.py::Opened.call",
+        "example.com/acme/conformance::bindings.py::Outside",
+        "example.com/acme/conformance::bindings.py::Outside.call",
+        "example.com/acme/conformance::bindings.py::Reset",
+        "example.com/acme/conformance::bindings.py::Reset.call",
+        "example.com/acme/conformance::bindings.py::Reset.call.reset",
+        "example.com/acme/conformance::bindings.py::Unpacked",
+        "example.com/acme/conformance::bindings.py::Unpacked.__init__",
+        "example.com/acme/conformance::bindings.py::Unpacked.call",
+        "example.com/acme/conformance::bindings.py::factory",
+        "example.com/acme/conformance::bindings.py::factory.Inner",
+        "example.com/acme/conformance::bindings.py::factory.Inner.reset",
+        "example.com/acme/conformance::bindings.py::imported",
+        "example.com/acme/conformance::bindings.py::matched",
+        "example.com/acme/conformance::bindings.py::nested",
+        "example.com/acme/conformance::bindings.py::nested.mid",
+        "example.com/acme/conformance::bindings.py::nested.mid.inner",
+        "example.com/acme/conformance::bindings.py::poke",
+        "example.com/acme/conformance::methods.py::make"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "example.com/acme/conformance::bindings.py::Mixed",
+        "example.com/acme/conformance::bindings.py::mixin"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "example.com/acme/conformance::bindings.py::Mixed.go",
+        "example.com/acme/conformance::bindings.py::Store.stash"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "example.com/acme/conformance::bindings.py::ObjectBoth.go",
+        "example.com/acme/conformance::bindings.py::ObjectRight.side"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "example.com/acme/conformance::cycle_b.py::use",
+        "example.com/acme/conformance::cycles.py::Deep.go",
+        "example.com/acme/conformance::cycles.py::Knot.go",
+        "example.com/acme/conformance::cycles.py::Ping.go",
+        "example.com/acme/conformance::cycles.py::Pong.ring",
+        "example.com/acme/conformance::cycles.py::crossed"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "example.com/acme/conformance::defs.py::Registry",
+        "example.com/acme/conformance::defs.py::Registry.Meta.label",
+        "example.com/acme/conformance::defs.py::Registry.load",
+        "example.com/acme/conformance::defs.py::Registry.tagged",
+        "example.com/acme/conformance::defs.py::Registry.unit",
+        "example.com/acme/conformance::defs.py::decorated",
+        "example.com/acme/conformance::defs.py::fetch_all",
+        "example.com/acme/conformance::defs.py::outer",
+        "example.com/acme/conformance::defs.py::outer.inner",
+        "example.com/acme/conformance::defs.py::plain",
+        "example.com/acme/conformance::defs.py::sorted_names"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "example.com/acme/conformance::families.py::A.go",
+        "example.com/acme/conformance::families.py::D.pick"
+      ]
+    },
+    {
+      "name": ".#9",
+      "members": [
+        "example.com/acme/conformance::families.py::Model.go",
+        "example.com/acme/conformance::families.py::Remote.go",
+        "example.com/acme/conformance::families.py::Stored.save"
+      ]
+    },
+    {
+      "name": "clients",
+      "members": [
+        "example.com/acme/conformance::clients/defaults.py::call_keyword_only",
+        "example.com/acme/conformance::clients/defaults.py::keyword_only",
+        "example.com/acme/conformance::clients/defaults.py::override_keyword_only"
+      ]
+    },
+    {
+      "name": "clients#10",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
+        "example.com/acme/conformance::clients/wrappers.py::class_method"
+      ]
+    },
+    {
+      "name": "clients#11",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::Reports.pull",
+        "example.com/acme/conformance::clients/wrappers.py::unrelated"
+      ]
+    },
+    {
+      "name": "clients#12",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::backoff",
+        "example.com/acme/conformance::clients/wrappers.py::drop_order",
+        "example.com/acme/conformance::clients/wrappers.py::get",
+        "example.com/acme/conformance::clients/wrappers.py::list_by_keyword",
+        "example.com/acme/conformance::clients/wrappers.py::list_orders",
+        "example.com/acme/conformance::clients/wrappers.py::list_patiently",
+        "example.com/acme/conformance::clients/wrappers.py::remove",
+        "example.com/acme/conformance::clients/wrappers.py::retry",
+        "example.com/acme/conformance::clients/wrappers.py::send"
+      ]
+    },
+    {
+      "name": "clients#2",
+      "members": [
+        "example.com/acme/conformance::clients/defaults.py::call_with_splats",
+        "example.com/acme/conformance::clients/defaults.py::with_splats"
+      ]
+    },
+    {
+      "name": "clients#3",
+      "members": [
+        "example.com/acme/conformance::clients/defaults.py::create_default",
+        "example.com/acme/conformance::clients/defaults.py::list_defaults",
+        "example.com/acme/conformance::clients/defaults.py::other_base",
+        "example.com/acme/conformance::clients/defaults.py::request"
+      ]
+    },
+    {
+      "name": "clients#4",
+      "members": [
+        "example.com/acme/conformance::clients/dynamic.py::build_url",
+        "example.com/acme/conformance::clients/dynamic.py::computed"
+      ]
+    },
+    {
+      "name": "clients#5",
+      "members": [
+        "example.com/acme/conformance::clients/sessions.py::Cache",
+        "example.com/acme/conformance::clients/sessions.py::Gateway.__init__"
+      ]
+    },
+    {
+      "name": "clients#6",
+      "members": [
+        "example.com/acme/conformance::clients/sessions.py::hand_over",
+        "example.com/acme/conformance::clients/sessions.py::passed"
+      ]
+    },
+    {
+      "name": "clients#7",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::Api.profile",
+        "example.com/acme/conformance::clients/wrappers.py::Api.user"
+      ]
+    },
+    {
+      "name": "clients#8",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::Inventory",
+        "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
+        "example.com/acme/conformance::clients/wrappers.py::not_a_client",
+        "example.com/acme/conformance::clients/wrappers.py::stock"
+      ]
+    },
+    {
+      "name": "clients#9",
+      "members": [
+        "example.com/acme/conformance::clients/wrappers.py::Pages",
+        "example.com/acme/conformance::clients/wrappers.py::Pages.load",
+        "example.com/acme/conformance::clients/wrappers.py::explicit_instance"
+      ]
+    },
+    {
+      "name": "explicit",
+      "members": [
+        "example.com/acme/conformance::explicit/core.py::default",
+        "example.com/acme/conformance::explicit/letters.py::beta",
+        "example.com/acme/conformance::explicit/mod.py::_hidden",
+        "example.com/acme/conformance::explicit/mod.py::outside",
+        "example.com/acme/conformance::explicit/second.py::pick",
+        "example.com/acme/conformance::explicit/use.py::report",
+        "example.com/acme/conformance::shadow/__init__.py::from_package"
+      ]
+    },
+    {
+      "name": "explicit#2",
+      "members": [
+        "example.com/acme/conformance::explicit/early.py::kept",
+        "example.com/acme/conformance::explicit/order.py::order",
+        "example.com/acme/conformance::explicit/sweeper.py::swept"
+      ]
+    },
+    {
+      "name": "shop/orders",
+      "members": [
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.post",
+        "example.com/acme/conformance::shop/orders/views.py::OrderList.total"
+      ]
+    },
+    {
+      "name": "stars",
+      "members": [
+        "example.com/acme/conformance::bindings.py::lazy",
+        "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
+        "example.com/acme/conformance::geometry/shapes.py::Circle",
+        "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+        "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
+        "example.com/acme/conformance::geometry/shapes.py::area_of",
+        "example.com/acme/conformance::geometry/shapes.py::scale",
+        "example.com/acme/conformance::geometry/units.py::to_cm",
+        "example.com/acme/conformance::helpers.py::clamp",
+        "example.com/acme/conformance::helpers.py::format_name",
+        "example.com/acme/conformance::legacy.py::legacy",
+        "example.com/acme/conformance::main.py::main",
+        "example.com/acme/conformance::receivers.py::fallback",
+        "example.com/acme/conformance::src/billing/invoice.py::total",
+        "example.com/acme/conformance::src/billing/tax.py::fee",
+        "example.com/acme/conformance::src/billing/tax.py::vat",
+        "example.com/acme/conformance::stars/computed.py::named",
+        "example.com/acme/conformance::stars/computed.py::unnamed",
+        "example.com/acme/conformance::stars/literal.py::Shown",
+        "example.com/acme/conformance::stars/literal.py::listed",
+        "example.com/acme/conformance::stars/literal.py::unlisted",
+        "example.com/acme/conformance::stars/underscore.py::_internal",
+        "example.com/acme/conformance::stars/underscore.py::visible"
+      ]
+    },
+    {
+      "name": "web",
+      "members": [
+        "example.com/acme/conformance::web/factory.py::build_admin"
+      ]
+    },
+    {
+      "name": "web#2",
+      "members": [
+        "example.com/acme/conformance::web/factory.py::mount"
+      ]
+    },
+    {
+      "name": "web#3",
+      "members": [
+        "example.com/acme/conformance::web/factory.py::relay"
+      ]
+    },
+    {
+      "name": "web#4",
+      "members": [
+        "example.com/acme/conformance::web/pages.py::fetch"
+      ]
+    },
+    {
+      "name": "web#5",
+      "members": [
+        "example.com/acme/conformance::web/partial.py::build"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Both.go",
+      "kind": "export",
+      "label": "Both.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Both.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Right.right"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Left.left",
+      "kind": "export",
+      "label": "Left.left",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Left.left"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Looped.__init__",
+      "kind": "export",
+      "label": "Looped.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Looped.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Looped.call",
+      "kind": "export",
+      "label": "Looped.call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Looped.call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Mixed.go",
+      "kind": "export",
+      "label": "Mixed.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Mixed.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Store.stash"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::ObjectBoth.go",
+      "kind": "export",
+      "label": "ObjectBoth.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::ObjectBoth.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::ObjectRight.side"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Opened.__init__",
+      "kind": "export",
+      "label": "Opened.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Opened.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Opened.call",
+      "kind": "export",
+      "label": "Opened.call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Opened.call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Outside.call",
+      "kind": "export",
+      "label": "Outside.call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Outside.call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Reset.call",
+      "kind": "export",
+      "label": "Reset.call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Reset.call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Reset.call.reset"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Unpacked.__init__",
+      "kind": "export",
+      "label": "Unpacked.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Unpacked.__init__"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::Unpacked.call",
+      "kind": "export",
+      "label": "Unpacked.call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::Unpacked.call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::factory",
+      "kind": "export",
+      "label": "factory",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::factory"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::factory.Inner.reset"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::factory.Inner"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::imported",
+      "kind": "export",
+      "label": "imported",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::imported"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::lazy",
+      "kind": "export",
+      "label": "lazy",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::lazy"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::scale"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::matched",
+      "kind": "export",
+      "label": "matched",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::matched"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::nested",
+      "kind": "export",
+      "label": "nested",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::nested"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::nested.mid"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::nested.mid.inner"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 4,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::bindings.py::Line.dial"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::bindings.py::poke",
+      "kind": "export",
+      "label": "poke",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::bindings.py::poke"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::call_keyword_only",
+      "kind": "export",
+      "label": "call_keyword_only",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::call_keyword_only"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::keyword_only"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::call_keyword_only::keyword_only#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/kw-default"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::call_with_splats",
+      "kind": "export",
+      "label": "call_with_splats",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::call_with_splats"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::with_splats"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::call_with_splats::with_splats#0",
+          "mark": "no-provider",
+          "contract": "http::HEAD::/splat"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::create_default",
+      "kind": "export",
+      "label": "create_default",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::create_default"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::create_default::request#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/defaults"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::list_defaults",
+      "kind": "export",
+      "label": "list_defaults",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::list_defaults"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::list_defaults::request#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/defaults"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::other_base",
+      "kind": "export",
+      "label": "other_base",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::other_base"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::request"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::other_base::request#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/other"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/defaults.py::override_keyword_only",
+      "kind": "export",
+      "label": "override_keyword_only",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/defaults.py::override_keyword_only"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::keyword_only"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/defaults.py::override_keyword_only::keyword_only#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/kw-override"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/dynamic.py::computed",
+      "kind": "export",
+      "label": "computed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/dynamic.py::computed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::computed::requests.post#0",
+          "mark": "unresolved"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::build_url"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/dynamic.py::formatted",
+      "kind": "export",
+      "label": "formatted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/dynamic.py::formatted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::formatted::requests.get#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/dynamic.py::from_environment",
+      "kind": "export",
+      "label": "from_environment",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/dynamic.py::from_environment"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::from_environment::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/dynamic.py::percent",
+      "kind": "export",
+      "label": "percent",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/dynamic.py::percent"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::percent::requests.delete#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/dynamic.py::unknown_method",
+      "kind": "export",
+      "label": "unknown_method",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/dynamic.py::unknown_method"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/dynamic.py::unknown_method::requests.request#0",
+          "mark": "unresolved"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::client_base_url",
+      "kind": "export",
+      "label": "client_base_url",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::client_base_url"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::client_base_url::client.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::computed_name",
+      "kind": "export",
+      "label": "computed_name",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::computed_name"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::default_argument",
+      "kind": "export",
+      "label": "default_argument",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::default_argument"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::default_argument::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::default_in_environ_get",
+      "kind": "export",
+      "label": "default_in_environ_get",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::default_in_environ_get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::default_in_environ_get::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::default_reads_another",
+      "kind": "export",
+      "label": "default_reads_another",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::default_reads_another"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::environ_get",
+      "kind": "export",
+      "label": "environ_get",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::environ_get"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::environ_get::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::fallback",
+      "kind": "export",
+      "label": "fallback",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::fallback"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::fallback::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::getenv_call",
+      "kind": "export",
+      "label": "getenv_call",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::getenv_call"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::getenv_call::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::imported_getenv",
+      "kind": "export",
+      "label": "imported_getenv",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::imported_getenv"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::imported_getenv::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::imported_subscript",
+      "kind": "export",
+      "label": "imported_subscript",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::imported_subscript"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::imported_subscript::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::interpolated",
+      "kind": "export",
+      "label": "interpolated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::interpolated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::interpolated::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::named",
+      "kind": "export",
+      "label": "named",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::named"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::named::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::string_methods",
+      "kind": "export",
+      "label": "string_methods",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::string_methods"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::string_methods::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::subscript",
+      "kind": "export",
+      "label": "subscript",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::subscript"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::subscript::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/environment.py::two_variables",
+      "kind": "export",
+      "label": "two_variables",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/environment.py::two_variables"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::create_user",
+      "kind": "export",
+      "label": "create_user",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::create_user"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::create_user::httpx.post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/users"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::list_orders",
+      "kind": "export",
+      "label": "list_orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::list_orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::list_orders::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::list_users",
+      "kind": "export",
+      "label": "list_users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::list_users"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::list_users::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/users"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::lookup",
+      "kind": "export",
+      "label": "lookup",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::lookup"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::lookup::cache.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::lookup::options.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::purge",
+      "kind": "export",
+      "label": "purge",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::purge"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::purge::requests.request#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/cache"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::purge::httpx.request#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/cache/flags"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::read_order",
+      "kind": "export",
+      "label": "read_order",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::read_order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::read_order::requests.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::rename_user",
+      "kind": "export",
+      "label": "rename_user",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::rename_user"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::rename_user::requests.put#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/users/{}/name"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/modules.py::status",
+      "kind": "export",
+      "label": "status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/modules.py::status"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/modules.py::status::fetch_page#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/status"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::Gateway.__init__",
+      "kind": "export",
+      "label": "Gateway.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::Gateway.__init__"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::Cache"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::Gateway.health",
+      "kind": "export",
+      "label": "Gateway.health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::Gateway.health"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::Gateway.health::self.cache.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::Gateway.health::self.http.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::Gateway.health::self.http.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/gateway/health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::annotated",
+      "kind": "export",
+      "label": "annotated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::annotated"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with",
+      "kind": "export",
+      "label": "bound_by_async_with",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with::client.patch#0",
+          "mark": "no-provider",
+          "contract": "http::PATCH::/items/9"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with::http.request#0",
+          "mark": "no-provider",
+          "contract": "http::HEAD::/aio/head"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with::http.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/aio"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::bound_by_with",
+      "kind": "export",
+      "label": "bound_by_with",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_with"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::bound_by_with::client.delete#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/items/7"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::from_module",
+      "kind": "export",
+      "label": "from_module",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::from_module"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::from_module::session.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/session"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::from_scope",
+      "kind": "export",
+      "label": "from_scope",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::from_scope"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::from_scope::s.post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::hand_over",
+      "kind": "export",
+      "label": "hand_over",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::hand_over"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::passed"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::passed::client.put#0",
+          "mark": "no-provider",
+          "contract": "http::PUT::/handed/passed"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::no_base",
+      "kind": "export",
+      "label": "no_base",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::no_base"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::no_base::client.head#0",
+          "mark": "no-provider",
+          "contract": "http::HEAD::/ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/sessions.py::with_base",
+      "kind": "export",
+      "label": "with_base",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/sessions.py::with_base"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::with_base::client.get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/v2/items"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/sessions.py::with_base::client.options#0",
+          "mark": "no-provider",
+          "contract": "http::OPTIONS::/probe"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::Api.__init__",
+      "kind": "export",
+      "label": "Api.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Api.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::Api.profile",
+      "kind": "export",
+      "label": "Api.profile",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Api.profile"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Api.user"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Api.user::self.http.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Api.profile::self.user#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/api/users/me"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__",
+      "kind": "export",
+      "label": "Inventory.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
+      "kind": "export",
+      "label": "Pages.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::class_method",
+      "kind": "export",
+      "label": "class_method",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::class_method"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::class_method::Pages.load_shared#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/shared"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::drop_order",
+      "kind": "export",
+      "label": "drop_order",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::drop_order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::remove"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::drop_order::remove#0",
+          "mark": "no-provider",
+          "contract": "http::DELETE::/orders/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
+      "kind": "export",
+      "label": "explicit_instance",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::explicit_instance"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Pages"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Pages.load"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Pages.load::self.http.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::explicit_instance::Pages.load#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/pages"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::list_by_keyword",
+      "kind": "export",
+      "label": "list_by_keyword",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_by_keyword"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::get"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_by_keyword::get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/kw"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::list_orders",
+      "kind": "export",
+      "label": "list_orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_orders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::get"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_orders::get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::list_patiently",
+      "kind": "export",
+      "label": "list_patiently",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_patiently"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::retry"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::backoff"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::retry",
+          "mark": "cycle"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::get"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::list_patiently::retry#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orders/slow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::not_a_client",
+      "kind": "export",
+      "label": "not_a_client",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::not_a_client"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item::self.session.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::stock",
+      "kind": "export",
+      "label": "stock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::stock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item::self.session.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::stock::inventory.fetch_item#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/stock"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::clients/wrappers.py::unrelated",
+      "kind": "export",
+      "label": "unrelated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::clients/wrappers.py::unrelated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Reports.pull"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::clients/wrappers.py::Reports.pull::client.get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::clients/sessions.py::Cache.get",
+            "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::cycle_b.py::use",
+      "kind": "export",
+      "label": "use",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::cycle_b.py::use"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::cycles.py::Pong.ring"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::cycles.py::Deep.go",
+      "kind": "export",
+      "label": "Deep.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::cycles.py::Deep.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::cycles.py::Pong.ring"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::cycles.py::Knot.go",
+      "kind": "export",
+      "label": "Knot.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::cycles.py::Knot.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::cycles.py::Pong.ring"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::cycles.py::Ping.go",
+      "kind": "export",
+      "label": "Ping.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::cycles.py::Ping.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::cycles.py::Pong.ring"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::cycles.py::crossed",
+      "kind": "export",
+      "label": "crossed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::cycles.py::crossed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::cycles.py::Pong.ring"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::Registry.add",
+      "kind": "export",
+      "label": "Registry.add",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::Registry.add"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::Registry.build",
+      "kind": "export",
+      "label": "Registry.build",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::Registry.build"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::Registry.load",
+      "kind": "export",
+      "label": "Registry.load",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::Registry.load"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::fetch_all"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::Registry.tagged",
+      "kind": "export",
+      "label": "Registry.tagged",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::Registry.tagged"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::Registry.unit",
+      "kind": "export",
+      "label": "Registry.unit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::Registry.unit"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::decorated",
+      "kind": "export",
+      "label": "decorated",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::decorated"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::outer",
+      "kind": "export",
+      "label": "outer",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::outer"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::outer.inner"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::register",
+      "kind": "export",
+      "label": "register",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::register"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::defs.py::sorted_names",
+      "kind": "export",
+      "label": "sorted_names",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::defs.py::sorted_names"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::defs.py::plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/early.py::swept",
+      "kind": "export",
+      "label": "swept",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/early.py::swept"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/early.py::taken",
+      "kind": "export",
+      "label": "taken",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/early.py::taken"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/first.py::pick",
+      "kind": "export",
+      "label": "pick",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/first.py::pick"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/letters.py::alpha",
+      "kind": "export",
+      "label": "alpha",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/letters.py::alpha"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/mod.py::public",
+      "kind": "export",
+      "label": "public",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/mod.py::public"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/order.py::order",
+      "kind": "export",
+      "label": "order",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/order.py::order"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/sweeper.py::swept"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/early.py::kept"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/use.py::report",
+      "kind": "export",
+      "label": "report",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/use.py::report"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/mod.py::outside"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/mod.py::_hidden"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/letters.py::beta"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/core.py::default"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::explicit/second.py::pick"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::shadow/__init__.py::from_package"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::explicit/util.py::get",
+      "kind": "export",
+      "label": "get",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::explicit/util.py::get"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::A.go",
+      "kind": "export",
+      "label": "A.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::A.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::D.pick"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Lone.go",
+      "kind": "export",
+      "label": "Lone.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Lone.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Lone.go::self.pick#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::families.py::D.pick",
+            "example.com/acme/conformance::families.py::E.pick"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Lone.make",
+      "kind": "export",
+      "label": "Lone.make",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Lone.make"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Lone.make::cls.pick#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::families.py::D.pick",
+            "example.com/acme/conformance::families.py::E.pick"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Model.go",
+      "kind": "export",
+      "label": "Model.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Model.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Stored.save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Plain.keep",
+      "kind": "export",
+      "label": "Plain.keep",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Plain.keep"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Plain.go"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Remote.go",
+      "kind": "export",
+      "label": "Remote.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Remote.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Stored.save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::families.py::Tangled.go",
+      "kind": "export",
+      "label": "Tangled.go",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::families.py::Tangled.go"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::families.py::Tangled.go::self.pick#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::families.py::D.pick",
+            "example.com/acme/conformance::families.py::E.pick"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::geometry/shapes.py::Circle.__init__",
+      "kind": "export",
+      "label": "Circle.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Circle.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::geometry/shapes.py::Shape.unit",
+      "kind": "export",
+      "label": "Shape.unit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Shape.unit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::main.py::main",
+      "kind": "export",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::main.py::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Circle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::area_of"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::area_of::shape.area#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+            "example.com/acme/conformance::geometry/shapes.py::Shape.area"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/extra/measure.py::perimeter"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::area_of",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::scale"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::scale",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/billing/invoice.py::total"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/billing/tax.py::vat"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/billing/tax.py::fee"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/billing/tax.py::vat",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::helpers.py::format_name"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::helpers.py::clamp"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/literal.py::listed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/literal.py::Shown"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/literal.py::unlisted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/underscore.py::visible"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/underscore.py::_internal"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/computed.py::named"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/computed.py::unnamed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::legacy.py::legacy"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Circle.describe"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm",
+          "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Leaf.run",
+      "kind": "export",
+      "label": "Leaf.run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Leaf.run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Right.hook"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Mixin.shared",
+      "kind": "export",
+      "label": "Mixin.shared",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Mixin.shared"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Panel.__init__",
+      "kind": "export",
+      "label": "Panel.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Panel.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Panel.build",
+      "kind": "export",
+      "label": "Panel.build",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Panel.build"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Panel.check",
+      "kind": "export",
+      "label": "Panel.check",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Panel.check"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Base.ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::Root.hook",
+      "kind": "export",
+      "label": "Root.hook",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::Root.hook"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::module_level",
+      "kind": "export",
+      "label": "module_level",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::module_level"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.render"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::outside",
+      "kind": "export",
+      "label": "outside",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::outside"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::shadowed",
+      "kind": "export",
+      "label": "shadowed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::shadowed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.render"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods.py::use",
+      "kind": "export",
+      "label": "use",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods.py::use"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.draw"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Base.ping"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Base.shared"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Mixin.mixed"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.render"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Shape.area"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Circle.describe"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/units.py::to_cm"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Dial.spin"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.draw.later"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.render",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel.render",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Base.ping",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::make"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::Panel",
+          "mark": "seen"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods.py::use::made.area#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::geometry/shapes.py::Circle.area",
+            "example.com/acme/conformance::geometry/shapes.py::Shape.area"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::Runner.each",
+      "kind": "export",
+      "label": "Runner.each",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::Runner.each"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Runner.stride"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::Typed.__init__",
+      "kind": "export",
+      "label": "Typed.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::Typed.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::Typed.run",
+      "kind": "export",
+      "label": "Typed.run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::Typed.run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::Untyped.__init__",
+      "kind": "export",
+      "label": "Untyped.__init__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::Untyped.__init__"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::Untyped.run",
+      "kind": "export",
+      "label": "Untyped.run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::Untyped.run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::comprehension",
+      "kind": "export",
+      "label": "comprehension",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::comprehension"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::except_as",
+      "kind": "export",
+      "label": "except_as",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::except_as"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::fallback",
+      "kind": "export",
+      "label": "fallback",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::fallback"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::geometry/shapes.py::Circle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::lacking",
+      "kind": "export",
+      "label": "lacking",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::lacking"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Runner.stride"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::lambdas",
+      "kind": "export",
+      "label": "lambdas",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::lambdas"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::module_read",
+      "kind": "export",
+      "label": "module_read",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::module_read"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::optional",
+      "kind": "export",
+      "label": "optional",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::optional"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::param_reassigned",
+      "kind": "export",
+      "label": "param_reassigned",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::param_reassigned"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::spare_read",
+      "kind": "export",
+      "label": "spare_read",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::spare_read"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::swap",
+      "kind": "export",
+      "label": "swap",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::swap"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::walrus",
+      "kind": "export",
+      "label": "walrus",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::walrus"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::receivers.py::with_as",
+      "kind": "export",
+      "label": "with_as",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::receivers.py::with_as"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::scopes.py::Outer.m",
+      "kind": "export",
+      "label": "Outer.m",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::scopes.py::Outer.m"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::scopes.py::Helper"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shadow.py::from_module",
+      "kind": "export",
+      "label": "from_module",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shadow.py::from_module"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/catalog/urls.py::products::http::GET::/catalog/products",
+      "kind": "route",
+      "label": "GET /catalog/products",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/catalog/urls.py::products"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/catalog/urls.py::upload::http::POST::/catalog/upload",
+      "kind": "route",
+      "label": "POST /catalog/upload",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/catalog/urls.py::upload"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/items.py::stock::http::GET::/shop/items/{}/stock",
+      "kind": "route",
+      "label": "GET /shop/items/{}/stock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/items.py::stock"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/items.py::stock::http::HEAD::/shop/items/{}/stock",
+      "kind": "route",
+      "label": "HEAD /shop/items/{}/stock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/items.py::stock"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/views.py::OrderList.get::http::GET::/shop/orders",
+      "kind": "route",
+      "label": "GET /shop/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/views.py::OrderList.get"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/views.py::OrderList.post::http::POST::/shop/orders",
+      "kind": "route",
+      "label": "POST /shop/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/views.py::OrderList.post"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::shop/orders/views.py::OrderList.total"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/views.py::order::http::DELETE::/shop/orders/{}",
+      "kind": "route",
+      "label": "DELETE /shop/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/views.py::order"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/orders/views.py::order::http::GET::/shop/orders/{}",
+      "kind": "route",
+      "label": "GET /shop/orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/orders/views.py::order"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::about::http::ANY::/about",
+      "kind": "route",
+      "label": "ANY /about",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::about"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::archive",
+      "kind": "export",
+      "label": "archive",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::archive"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::contact::http::ANY::/contact",
+      "kind": "route",
+      "label": "ANY /contact",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::contact"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::health::http::ANY::/health",
+      "kind": "route",
+      "label": "ANY /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::legal",
+      "kind": "export",
+      "label": "legal",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::legal"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::shop/views.py::vintage::http::ANY::/vintage/{}",
+      "kind": "route",
+      "label": "ANY /vintage/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::shop/views.py::vintage"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/accounts.py::update::http::PUT::/members/{}",
+      "kind": "route",
+      "label": "PUT /members/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/accounts.py::update"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/api.py::echo::http::GET::/echo",
+      "kind": "route",
+      "label": "GET /echo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/api.py::echo"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/api.py::health::http::GET::/health",
+      "kind": "route",
+      "label": "GET /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/api.py::health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/api.py::ping::http::GET::/ping",
+      "kind": "route",
+      "label": "GET /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/api.py::ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/api.py::ping::http::POST::/ping",
+      "kind": "route",
+      "label": "POST /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/api.py::ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/factory.py::build_admin.remove_user::http::DELETE::/internal/admin/users/{}",
+      "kind": "route",
+      "label": "DELETE /internal/admin/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/factory.py::build_admin.remove_user"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::create_item::http::POST::/api/v1/items/catalog",
+      "kind": "route",
+      "label": "POST /api/v1/items/catalog",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::create_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::create_item::http::POST::/legacy/catalog",
+      "kind": "route",
+      "label": "POST /legacy/catalog",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::create_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::create_item::http::POST::/relay/catalog",
+      "kind": "route",
+      "label": "POST /relay/catalog",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::create_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::read_item::http::GET::/api/v1/items/catalog/{}",
+      "kind": "route",
+      "label": "GET /api/v1/items/catalog/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::read_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::read_item::http::GET::/legacy/catalog/{}",
+      "kind": "route",
+      "label": "GET /legacy/catalog/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::read_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/items.py::read_item::http::GET::/relay/catalog/{}",
+      "kind": "route",
+      "label": "GET /relay/catalog/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/items.py::read_item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/pages.py::daily::http::GET::/reports/daily/{}",
+      "kind": "route",
+      "label": "GET /reports/daily/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/pages.py::daily"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/pages.py::index::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/pages.py::index"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/pages.py::order::http::DELETE::/orders/{}",
+      "kind": "route",
+      "label": "DELETE /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/pages.py::order"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/pages.py::order::http::GET::/orders/{}",
+      "kind": "route",
+      "label": "GET /orders/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/pages.py::order"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/pages.py::shortcut",
+      "kind": "export",
+      "label": "shortcut",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/pages.py::shortcut"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/partial.py::read_part::http::GET::/partial/{}",
+      "kind": "route",
+      "label": "GET /partial/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/partial.py::read_part"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/partial.py::read_user",
+      "kind": "export",
+      "label": "read_user",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/partial.py::read_user"
+        }
+      ]
+    }
+  ]
 }

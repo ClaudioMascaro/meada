@@ -1,5 +1,7 @@
 example.com/chain/catalog app/api/products/[id]/route.ts:3 GET
+  →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/gateway src/checkout.ts:10 createOrder
+    →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:14 createOrder
   →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/gateway src/orders.ts:6 listOrders
     →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:6 listOrders
       example.com/chain/web src/dashboard.ts:7 dashboard
-chain: inferred · 2 hops · 3 repos · 112 tokens
+chain: inferred · 4 hops · 3 repos · 182 tokens

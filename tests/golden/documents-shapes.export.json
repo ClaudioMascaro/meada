@@ -1,0 +1,137 @@
+{
+  "repository": "example.com/documents/shapes",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "http::GET::/categories/{}",
+      "site": "example.com/documents/shapes::openapi.json::GET /categories/{}",
+      "shape": {
+        "source": {
+          "document": "openapi.json"
+        },
+        "fields": [
+          "name",
+          "parent"
+        ],
+        "open": [
+          "parent"
+        ],
+        "scalars": [
+          "name"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/documents/shapes::openapi.json::GET /orders",
+      "shape": {
+        "source": {
+          "document": "openapi.json"
+        },
+        "fields": [
+          "[]",
+          "[].createdAt",
+          "[].customer",
+          "[].id",
+          "[].items",
+          "[].items[]",
+          "[].items[].quantity",
+          "[].items[].sku",
+          "[].metadata",
+          "[].total"
+        ],
+        "open": [
+          "[].customer",
+          "[].metadata"
+        ],
+        "scalars": [
+          "[].createdAt",
+          "[].id",
+          "[].items[].quantity",
+          "[].items[].sku",
+          "[].total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/documents/shapes::openapi.json::GET /orders/{}",
+      "shape": {
+        "source": {
+          "document": "openapi.json"
+        },
+        "fields": [
+          "createdAt",
+          "customer",
+          "id",
+          "items",
+          "items[]",
+          "items[].quantity",
+          "items[].sku",
+          "metadata",
+          "total"
+        ],
+        "open": [
+          "customer",
+          "metadata"
+        ],
+        "scalars": [
+          "createdAt",
+          "id",
+          "items[].quantity",
+          "items[].sku",
+          "total"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/payments/{}",
+      "site": "example.com/documents/shapes::openapi.json::GET /payments/{}",
+      "shape": {
+        "source": {
+          "document": "openapi.json"
+        },
+        "fields": [
+          "brand",
+          "iban",
+          "last4"
+        ],
+        "scalars": [
+          "brand",
+          "iban",
+          "last4"
+        ]
+      }
+    },
+    {
+      "contract": "http::GET::/reports",
+      "site": "example.com/documents/shapes::openapi.json::GET /reports"
+    }
+  ],
+  "consumers": [],
+  "documents": [
+    {
+      "path": "openapi.json",
+      "format": "openapi",
+      "version": "3.0.3",
+      "contracts": [
+        "http::GET::/categories/{}",
+        "http::GET::/orders",
+        "http::GET::/orders/{}",
+        "http::GET::/payments/{}",
+        "http::GET::/reports"
+      ]
+    },
+    {
+      "path": "v2.openapi.json",
+      "format": "openapi",
+      "version": "3.0.3",
+      "contracts": [
+        "http::GET::/orders/{}"
+      ]
+    }
+  ],
+  "links": []
+}

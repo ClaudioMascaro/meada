@@ -7,7 +7,7 @@
     },
     {
       "path": "src/users.ts",
-      "hash": "4dc5ac5882d1fcbf2c0443422dccca715128731a8064dfd6ec6bb7f7b3dbca8c"
+      "hash": "f478c1983cff98151ace93c6aba5ae183e90bd52af44783d60afacc960cf8d0c"
     }
   ],
   "symbols": [
@@ -71,8 +71,16 @@
       "id": "example.com/acme/admin::src/users.ts::listUsersPatiently",
       "span": {
         "path": "src/users.ts",
-        "start": 385,
-        "end": 451
+        "start": 544,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsersTyped",
+      "span": {
+        "path": "src/users.ts",
+        "start": 366,
+        "end": 468
       }
     }
   ],
@@ -172,8 +180,19 @@
       "level": "exact",
       "span": {
         "path": "src/users.ts",
-        "start": 426,
-        "end": 448
+        "start": 585,
+        "end": 607
+      }
+    },
+    {
+      "id": "example.com/acme/admin::src/users.ts::listUsersTyped::get#0",
+      "caller": "example.com/acme/admin::src/users.ts::listUsersTyped",
+      "target": "example.com/acme/admin::src/http.ts::get",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 422,
+        "end": 449
       }
     }
   ],
@@ -193,6 +212,37 @@
       "contract": "http::GET::/api/users",
       "site": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
       "via": "env:BACKEND_URL"
+    },
+    {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/admin::src/users.ts::listUsersTyped::get#0",
+      "via": "env:BACKEND_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/admin::src/http.ts::backoff",
+        "example.com/acme/admin::src/http.ts::retry",
+        "example.com/acme/admin::src/users.ts::listUsersPatiently"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/admin::src/http.ts::get",
+        "example.com/acme/admin::src/users.ts::listUsers",
+        "example.com/acme/admin::src/users.ts::listUsersTyped"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/admin::src/http.ts::remove",
+        "example.com/acme/admin::src/http.ts::request",
+        "example.com/acme/admin::src/users.ts::deleteUser"
+      ]
     }
   ],
   "links": [
@@ -212,6 +262,13 @@
     },
     {
       "consumer": "example.com/acme/admin::src/users.ts::listUsersPatiently::retry#0",
+      "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
+      "contract": "http::GET::/api/users",
+      "level": "inferred",
+      "reason": "base URL from BACKEND_URL, a base_url_env of peer example.com/acme/backend"
+    },
+    {
+      "consumer": "example.com/acme/admin::src/users.ts::listUsersTyped::get#0",
       "provider": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
       "contract": "http::GET::/api/users",
       "level": "inferred",

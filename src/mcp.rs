@@ -19,8 +19,12 @@ struct SearchArgs {
     /// Name to look for, case-insensitive.
     query: String,
     /// Only this kind: `symbol`, `contract`, `route` (an HTTP contract), `resource` (a
-    /// declared one, matched by kind and id), or `ambiguous` or `unresolved` (open items, with
-    /// the `meada decide` command for each).
+    /// declared one, matched by kind and id), `channel` (a queue or topic, by broker kind and
+    /// name), `document` (an OpenAPI or AsyncAPI file, by path or title), `package` (by name,
+    /// with its consumers), `drift` (fields consumers read that a route lacks, by route or field
+    /// path), `community` (by name), `process` (by its entry point's label, with the
+    /// `process::` identity `trace` starts from), or `ambiguous` or `unresolved` (open items,
+    /// with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -28,7 +32,7 @@ struct SearchArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct ContextArgs {
-    /// Symbol name, `<path>::<name>` or full identity; or a resource, `resource::<kind>::<id>`.
+    /// Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; or a channel, `channel::<broker>::<name>`.
     symbol: String,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -36,7 +40,8 @@ struct ContextArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct TraceArgs {
-    /// Start: a symbol, a route (`GET /users/{}` or its contract) or a call site.
+    /// Start: a symbol, a route (`GET /users/{}` or its contract), a call site, or a process
+    /// (`process::<entry point identity>`, down only).
     from: Option<String>,
     /// `uncommitted`: start from the symbols the working-tree diff touches instead.
     changes: Option<String>,
@@ -76,7 +81,9 @@ impl Meada {
         })
     }
 
-    #[tool(description = "Show one symbol: its source, callers and callees.")]
+    #[tool(
+        description = "Show one symbol: its community, the processes it belongs to, its source, callers and callees."
+    )]
     async fn context(&self, Parameters(args): Parameters<ContextArgs>) -> Result<String, String> {
         answer(|engine| engine.context(&args.symbol, args.budget.map(|b| b as usize)))
     }

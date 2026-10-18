@@ -1,4 +1,6 @@
 example.com/acme/api lib/db.ts:1 query
+community: app/api/users
+processes: 6 (2 route, 4 export; 2 repositories): GET /api/users/{} (example.com/acme/api), GET /api/users (example.com/acme/api), local (example.com/acme/web), other (example.com/acme/web), getUser (example.com/acme/web), listUsers (example.com/acme/web)
 function query(table: string, id?: string) {
   return { table, id };
 }

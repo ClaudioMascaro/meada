@@ -14,6 +14,17 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+### REST, when GraphQL is blocked
+
+`gh issue` and `gh pr` go through GraphQL; behind a proxy that blocks it, use REST with `gh api`:
+
+- **Read an issue**: `gh api repos/<owner>/<repo>/issues/<n>` (and `/comments`); sub-issues `/sub_issues`; blockers `/dependencies/blocked_by`.
+- **Comment**: `gh api repos/<owner>/<repo>/issues/<n>/comments -f body=...`
+- **Close**: `gh api -X PATCH repos/<owner>/<repo>/issues/<n> -f state=closed`
+- **Draft PR**: `gh api repos/<owner>/<repo>/pulls -f title=... -f head=<branch> -f base=main -F draft=true -F body=@<file>`, the body carrying `Closes #<n>` lines.
+- **PR body or base**: `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@<file>` (or `-f base=<branch>`).
+- **Ready for review** exists only in GraphQL: leave the PR as draft and say so.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

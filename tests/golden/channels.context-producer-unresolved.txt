@@ -1,0 +1,11 @@
+example.com/channels/api src/dynamic.ts:4 replay
+community: none
+processes: 1 (1 export; 1 repository): replay (example.com/channels/api)
+async function replay(id: string) {
+  await producer.send({ topic: process.env.REPLAY_TOPIC, messages: [{ value: id }] });
+}
+callers: none
+callees:
+example.com/channels/api src/dynamic.ts:5 (unresolved) producer.send
+contracts:
+example.com/channels/api src/dynamic.ts:5 produces channel::kafka (unresolved)

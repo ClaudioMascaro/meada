@@ -1,0 +1,19 @@
+asyncapi: 2.6.0
+info:
+  title: Routing
+  version: 1.0.0
+servers:
+  # No `protocol`: the channels on it are ignored.
+  bare:
+    url: edge.example.com
+  logs:
+    url: kafka.example.com:9092
+    protocol: kafka
+channels:
+  edge.pings:
+    servers: [bare]
+    subscribe: {}
+  # `gone` is no server of this document.
+  routes.updated:
+    servers: [gone]
+    subscribe: {}

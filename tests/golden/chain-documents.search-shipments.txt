@@ -1,0 +1,7 @@
+example.com/chain/gateway openapi.yaml (documented only) http::GET::/api/shipments/{}
+example.com/chain/web src/shipments.ts:10 http::GET::/api/shipments/{}
+example.com/chain/web src/shipments.ts:5 http::GET::/api/shipments/{}
+example.com/chain/web src/shipments.ts:15 http::GET::/gw/api/shipments/{}
+example.com/chain/web src/shipments.ts:25 http::GET::/relative/base/api/shipments/{}
+example.com/chain/web src/shipments.ts:20 http::GET::/v3/api/shipments/{}
+example.com/chain/web src/shipments.ts:30 http::GET::/v9/api/shipments/{}

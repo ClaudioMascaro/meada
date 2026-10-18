@@ -1,0 +1,6 @@
+{
+  "name": "@example/prec",
+  "version": "1.0.0",
+  "types": "./dist/index.d.ts",
+  "main": "./legacy.ts"
+}
