@@ -470,7 +470,9 @@ one for the area a change touches.
   does not follow it either; nor a name its scope binds more than once, or an attribute not
   assigned a call once in its class); a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
-  makes the names it may override unknown.
+  makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
+  its ancestors in C3 order) longer than that is absent, so every member of the class is
+  unknown (a name match at most), and the linearization recurses no deeper down the bases.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
@@ -656,9 +658,18 @@ one for the area a change touches.
   for a workspace that makes this slow.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
-  stack. For imports inside the repository only the root `pyproject.toml` is read
+  stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
+  defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
+  chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
+  of nested calls costs up to `FOLD_DEPTH` steps per call. `DEFINITION_DEPTH` (128): a
+  function or class nested deeper is not a definition (its body belongs to the one around it,
+  its name and parameters are locals that hide outer ones there, and its `return`s are no
+  one's), since qualified names and `Resolver::lexical` cost time cubic in the nesting.
+  `TARGET_DEPTH` (64 nodes): a name deeper in an unpacking target or a `case` pattern is not
+  bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
+  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
   (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
-  Poetry root declarations; one that does not parse fails the refresh with its name. `src` is a source root when nothing is declared, whether or not it holds
+  Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
@@ -674,7 +685,10 @@ one for the area a change touches.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
-  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; what
+  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
+  walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
+  module included under several prefixes is read once for each), so the entries past it yield
+  no provider; what
   an extension of `urlpatterns` adds other than a list literal is left out (marked in
   `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
   yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf

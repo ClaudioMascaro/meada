@@ -150,6 +150,24 @@ impl Pyproject {
     }
 }
 
+/// The source roots of the package whose `pyproject.toml` sits in `dir` (`""` at the repository
+/// root) and declares `declared` (`Pyproject::roots`): `dir`, then the declared roots, or its
+/// `src` when none is. Both the pack's imports and the PyPI packages' modules use it.
+// ponytail: `src` is a root whether or not it holds packages, since neither reader sees the
+// file list.
+pub fn source_roots(dir: &str, declared: &[String]) -> Vec<String> {
+    let join = |root: &str| match dir {
+        "" => root.to_string(),
+        dir => format!("{dir}/{root}"),
+    };
+    let mut roots = vec![dir.to_string()];
+    match declared.is_empty() {
+        true => roots.push(join("src")),
+        false => roots.extend(declared.iter().map(|r| join(r))),
+    }
+    roots
+}
+
 /// A relative directory in its plain form, `None` when it leaves the directory it is relative
 /// to.
 fn clean(path: &str) -> Option<String> {

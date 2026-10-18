@@ -7,20 +7,40 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Message, Modules, Param, Part, Receiver, Star, Value, children, literal, named,
-    text,
+    LanguagePack, Message, Modules, Param, Part, Receiver, Star, TYPE_DEPTH, Value, children,
+    literal, named, text,
 };
+use crate::package::read_manifest;
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
 mod messages;
 pub mod pyproject;
 
+/// How many definitions may nest in one file. Names are qualified by the definitions around
+/// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
+/// Past the limit a function or class is not a definition (its body belongs to the one around
+/// it, where its name and parameters are locals that hide outer ones).
+// ponytail: real code nests a few levels; 128 is the depth the TypeScript pack allows.
+const DEFINITION_DEPTH: usize = 128;
+
+/// How many nodes deep `targets` and `captures` read an unpacking target or a `case` pattern;
+/// a name deeper is not bound.
+// ponytail: real code unpacks a few levels; the recursion must stay shallow, whatever the file.
+const TARGET_DEPTH: usize = 64;
+
 /// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads;
 /// deeper is `Unknown`. A value is read again by every call around it, and the recursion must
 /// stay shallow, whatever the file.
 // ponytail: real code nests a few levels of options; 64 is far past any.
 const VALUE_DEPTH: usize = 64;
+
+/// How deep `parts`, `env_read` and `callee` follow a `+` or `or` chain, a chain of string
+/// method calls or `getenv` defaults, nested f-strings or an attribute chain; the cut side is a
+/// hole (`parts`) or its node kind (`callee`).
+// ponytail: real code concatenates and chains a few dozen terms; the recursion must stay
+// shallow, whatever the file.
+const FOLD_DEPTH: usize = 256;
 
 /// The symbol of an `if __name__ == "__main__":` block, the program entry point of its file.
 const MAIN: &str = "__main__";
@@ -49,22 +69,25 @@ impl LanguagePack for Python {
         // The decorator calls not yet met, by node, and the definition each one decorates.
         let mut decorators: HashMap<usize, String> = HashMap::new();
         // The bare-name decorators of each definition not yet met.
-        let mut bare: HashMap<String, Vec<String>> = HashMap::new();
+        let mut bare_names: HashMap<String, Vec<String>> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
             node: tree.root_node(),
             scope: String::new(),
             in_class: false,
+            flat: false,
         }];
         while let Some(Visit {
             node,
             scope,
             in_class,
+            flat,
         }) = stack.pop()
         {
             let mut inner = scope.clone();
             let mut inner_class = in_class;
+            let mut inner_flat = flat;
             // The body of a main guard, whose calls and bindings belong to the `__main__`
             // symbol.
             // ponytail: a name assigned in the guard is a local of `__main__`, so it no longer
@@ -93,6 +116,19 @@ impl LanguagePack for Python {
                         facts.programs.push(MAIN.to_string());
                     }
                 }
+                "function_definition" | "class_definition"
+                    if levels(&scope) >= DEFINITION_DEPTH =>
+                {
+                    // No definition: its body belongs to the scope around it, where its name
+                    // and parameters hide outer ones, as a lambda's do; its `return`s are no
+                    // one's.
+                    let name = node.child_by_field_name("name");
+                    let params = parameters(node).into_iter().filter_map(|(name, _)| name);
+                    for name in name.into_iter().chain(params) {
+                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
+                    }
+                    inner_flat = true;
+                }
                 "function_definition" | "class_definition" => {
                     let is_class = node.kind() == "class_definition";
                     if let Some(name) = node.child_by_field_name("name") {
@@ -116,7 +152,7 @@ impl LanguagePack for Python {
                                 range: span(node),
                                 params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
-                                decorators: bare.remove(&inner).unwrap_or_default(),
+                                decorators: bare_names.remove(&inner).unwrap_or_default(),
                                 return_values: Vec::new(),
                                 returns: None,
                                 type_params: Vec::new(),
@@ -131,7 +167,7 @@ impl LanguagePack for Python {
                     }
                     inner_class = is_class;
                 }
-                "decorated_definition" => {
+                "decorated_definition" if levels(&scope) < DEFINITION_DEPTH => {
                     let name = (node.child_by_field_name("definition"))
                         .and_then(|d| d.child_by_field_name("name"));
                     if let Some(name) = name {
@@ -142,7 +178,7 @@ impl LanguagePack for Python {
                                     decorators.insert(call.id(), def.clone());
                                 }
                                 Some(e) if matches!(e.kind(), "identifier" | "attribute") => {
-                                    let names = bare.entry(def.clone()).or_default();
+                                    let names = bare_names.entry(def.clone()).or_default();
                                     names.push(callee(e, src));
                                 }
                                 _ => {}
@@ -165,7 +201,7 @@ impl LanguagePack for Python {
                         });
                     }
                 }
-                "return_statement" => {
+                "return_statement" if !flat => {
                     if let (Some(&at), Some(returned)) = (functions.get(&scope), named(node).next())
                     {
                         facts.defs[at].return_values.push(value(returned, src));
@@ -183,7 +219,12 @@ impl LanguagePack for Python {
                         // In a function or a class, the import also hides an outer binding.
                         for import in &facts.imports[first..] {
                             if !import.local.contains('.') && import.local != "*" {
-                                locals.bind(&scope, &import.local, Class::Imported, How::Assigned);
+                                locals.bind(
+                                    &scope,
+                                    &import.local,
+                                    Class::Imported,
+                                    Evidence::Assigned,
+                                );
                             }
                         }
                     }
@@ -209,23 +250,28 @@ impl LanguagePack for Python {
                     };
                     let target = node.child_by_field_name(field);
                     for target in target.map(targets).unwrap_or_default() {
-                        locals.target(target, &scope, Class::Unknown, How::Assigned, src);
+                        locals.target(target, &scope, Class::Unknown, Evidence::Assigned, src);
                     }
                 }
                 "case_clause" => {
                     let mut found = Vec::new();
                     for pattern in named(node).filter(|n| n.kind() == "case_pattern") {
-                        captures(pattern, &mut found);
+                        captures(pattern, 0, &mut found);
                     }
                     for name in found {
-                        locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                        locals.bind(&scope, text(name, src), Class::Unknown, Evidence::Assigned);
                     }
                 }
                 // A lambda's calls belong to the enclosing scope, which its parameters bind.
                 "lambda" => {
                     for (name, _) in parameters(node) {
                         if let Some(name) = name {
-                            locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                            locals.bind(
+                                &scope,
+                                text(name, src),
+                                Class::Unknown,
+                                Evidence::Assigned,
+                            );
                         }
                     }
                 }
@@ -246,6 +292,7 @@ impl LanguagePack for Python {
                     false => inner.clone(),
                 },
                 in_class: inner_class,
+                flat: inner_flat,
             }));
         }
         (facts.exports, facts.star) = module.exports();
@@ -262,21 +309,11 @@ impl LanguagePack for Python {
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
-        let declared = match configs.first() {
-            Some((name, src)) => (pyproject::Pyproject::parse(src))
-                .map_err(|e| format!("{name}: {e}"))?
-                .roots(),
-            None => Vec::new(),
-        };
-        // The repository root, then the declared roots; a `src` directory when none is
-        // declared.
-        // ponytail: `src` is a root whether or not it holds packages, since a pack sees no
-        // file list.
-        let mut roots = vec![String::new()];
-        if declared.is_empty() {
-            roots.push("src".to_string());
-        }
-        roots.extend(declared);
+        // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
+        // nothing, and indexing carries on.
+        let declared =
+            (configs.first()).map_or_else(Vec::new, |(name, src)| read_manifest(name, src).roots);
+        let roots = pyproject::source_roots("", &declared);
         Ok(Box::new(move |importer, specifier| {
             let dots = specifier.bytes().take_while(|&b| b == b'.').count();
             let name = specifier[dots..].replace('.', "/");
@@ -304,6 +341,9 @@ struct Visit<'t> {
     /// Whether the node sits in a class body, outside any function in it: a function defined
     /// here is a method.
     in_class: bool,
+    /// Whether the node sits in a function or class past `DEFINITION_DEPTH`, which is no
+    /// definition: a `return` there is not the enclosing definition's.
+    flat: bool,
 }
 
 /// What a module binds at its top level, which makes up its exports.
@@ -403,6 +443,14 @@ fn is_main_guard(node: Node, src: &[u8]) -> bool {
         )
 }
 
+/// How many definitions the qualified name `scope` nests: none at the top level.
+fn levels(scope: &str) -> usize {
+    match scope {
+        "" => 0,
+        scope => scope.matches('.').count() + 1,
+    }
+}
+
 /// The span of a definition: a decorated one includes its decorators.
 fn span(node: Node) -> Range<usize> {
     match node.parent() {
@@ -488,10 +536,10 @@ fn parameters(node: Node) -> Vec<(Option<Node>, Option<Node>)> {
         .collect()
 }
 
-/// How a name got its class. An annotation decides over the other ways; two other bindings
-/// that disagree leave the class unknown.
+/// What a binding tells of the class of its name. An annotation decides over the other ways;
+/// two other bindings that disagree leave the class unknown.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum How {
+enum Evidence {
     /// A parameter without an annotation: its argument is not known.
     Param,
     Assigned,
@@ -503,7 +551,7 @@ enum How {
 #[derive(Default)]
 struct Locals {
     /// Every binding as written, in source order: its scope, name, class and how.
-    written: Vec<(String, String, Class, How)>,
+    written: Vec<(String, String, Class, Evidence)>,
     /// The receiver parameter (`self`, `cls`) of each method, by the method's scope.
     receivers: HashMap<String, String>,
     /// The names a scope declares `global` (`true`) or `nonlocal` (`false`).
@@ -515,7 +563,7 @@ struct Locals {
 }
 
 impl Locals {
-    fn bind(&mut self, scope: &str, name: &str, class: Class, how: How) {
+    fn bind(&mut self, scope: &str, name: &str, class: Class, how: Evidence) {
         (self.written).push((scope.to_string(), name.to_string(), class, how));
     }
 
@@ -523,7 +571,7 @@ impl Locals {
     /// method binds `self`, also from a function nested in the method. An attribute of any
     /// other object is not a binding.
     // ponytail: a write from outside the class (`obj.x = ...`) is not seen.
-    fn target(&mut self, node: Node, scope: &str, class: Class, how: How, src: &[u8]) {
+    fn target(&mut self, node: Node, scope: &str, class: Class, how: Evidence, src: &[u8]) {
         match node.kind() {
             "identifier" => self.bind(scope, text(node, src), class, how),
             "attribute" => {
@@ -558,11 +606,11 @@ impl Locals {
             };
             if n == 0 && receiver {
                 self.receivers.insert(scope.to_string(), name.to_string());
-                self.bind(scope, name, Class::Enclosing, How::Annotated);
+                self.bind(scope, name, Class::Enclosing, Evidence::Annotated);
             } else if let Some(annotation) = annotation {
-                self.bind(scope, name, class(annotation, src), How::Annotated);
+                self.bind(scope, name, class(annotation, src), Evidence::Annotated);
             } else {
-                self.bind(scope, name, Class::Unknown, How::Param);
+                self.bind(scope, name, Class::Unknown, Evidence::Param);
             }
         }
     }
@@ -580,7 +628,13 @@ impl Locals {
         let at = self.written.len();
         let right = node.child_by_field_name("right");
         if let Some(annotation) = node.child_by_field_name("type") {
-            self.target(left, scope, class(annotation, src), How::Annotated, src);
+            self.target(
+                left,
+                scope,
+                class(annotation, src),
+                Evidence::Annotated,
+                src,
+            );
         } else {
             let constructed = match (node.kind(), left.kind(), right) {
                 ("assignment", "identifier", Some(right)) if right.kind() == "call" => {
@@ -590,7 +644,7 @@ impl Locals {
             };
             let class = constructed.map_or(Class::Unknown, Class::Named);
             for target in targets(left) {
-                self.target(target, scope, class.clone(), How::Assigned, src);
+                self.target(target, scope, class.clone(), Evidence::Assigned, src);
             }
         }
         // A name bound by `name = value` holds that value. So does a `self` attribute, but
@@ -620,11 +674,11 @@ impl Locals {
             (Some(call), Some(name)) => {
                 let class = constructor(call, src).map_or(Class::Unknown, Class::Named);
                 self.values.push((self.written.len(), value(call, src)));
-                self.bind(scope, text(name, src), class, How::Assigned);
+                self.bind(scope, text(name, src), class, Evidence::Assigned);
             }
             _ => {
                 for target in targets(alias) {
-                    self.target(target, scope, Class::Unknown, How::Assigned, src);
+                    self.target(target, scope, Class::Unknown, Evidence::Assigned, src);
                 }
             }
         }
@@ -699,7 +753,7 @@ impl Locals {
                 }
             }
         };
-        let annotated = |how| how == How::Annotated;
+        let annotated = |how| how == Evidence::Annotated;
         let homes: Vec<(String, String)> = (self.written.iter())
             .map(|(scope, name, ..)| (home(scope, name), name.clone()))
             .collect();
@@ -715,7 +769,7 @@ impl Locals {
                 ty: None,
             })
             .collect();
-        let mut bound: BTreeMap<(String, String), (Class, How)> = BTreeMap::new();
+        let mut bound: BTreeMap<(String, String), (Class, Evidence)> = BTreeMap::new();
         for (key, (_, _, class, how)) in homes.iter().zip(&self.written) {
             let key = key.clone();
             let merged = match bound.remove(&key) {
@@ -728,7 +782,7 @@ impl Locals {
             bound.insert(key, merged);
         }
         let locals = (bound.into_iter())
-            .filter(|(_, (_, how))| *how != How::Param)
+            .filter(|(_, (_, how))| *how != Evidence::Param)
             .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
         (locals, consts)
@@ -742,20 +796,30 @@ fn constructor(call: Node, src: &[u8]) -> Option<String> {
 }
 
 /// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also
-/// inside `a, (b, c)`.
+/// inside `a, (b, c)`, to `TARGET_DEPTH` nodes deep.
 fn targets(node: Node) -> Vec<Node> {
+    let mut out = Vec::new();
+    targets_at(node, 0, &mut out);
+    out
+}
+
+/// `targets` of a node `depth` nodes inside the target it started from.
+fn targets_at<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
-        "identifier" | "attribute" => vec![node],
+        _ if depth >= TARGET_DEPTH => {}
+        "identifier" | "attribute" => out.push(node),
         "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
-        | "as_pattern_target" => named(node).flat_map(targets).collect(),
-        _ => Vec::new(),
+        | "as_pattern_target" => named(node).for_each(|n| targets_at(n, depth + 1, out)),
+        _ => {}
     }
 }
 
-/// The names a `case` pattern captures: a bare name, the name after `as` or `*`, and those
-/// inside sequences, mappings and class patterns; not a class's name or a dotted value.
-fn captures<'t>(node: Node<'t>, out: &mut Vec<Node<'t>>) {
+/// The names a `case` pattern `depth` nodes deep captures: a bare name, the name after `as` or
+/// `*`, and those inside sequences, mappings and class patterns, to `TARGET_DEPTH` nodes deep;
+/// not a class's name or a dotted value.
+fn captures<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
+        _ if depth >= TARGET_DEPTH => {}
         "dotted_name" => {
             let parts: Vec<Node> = named(node).collect();
             if let [name] = parts[..] {
@@ -764,15 +828,26 @@ fn captures<'t>(node: Node<'t>, out: &mut Vec<Node<'t>>) {
         }
         "identifier" => out.push(node),
         "class_pattern" | "keyword_pattern" => {
-            named(node).skip(1).for_each(|n| captures(n, out));
+            named(node)
+                .skip(1)
+                .for_each(|n| captures(n, depth + 1, out));
         }
-        _ => named(node).for_each(|n| captures(n, out)),
+        _ => named(node).for_each(|n| captures(n, depth + 1, out)),
     }
 }
 
 /// What an annotation says, read as written: a name, or a string holding one, through
-/// `Optional[...]` and `... | None`.
+/// `Optional[...]` and `... | None`, to `TYPE_DEPTH` levels; deeper is `Unknown`.
 fn class(annotation: Node, src: &[u8]) -> Class {
+    class_at(annotation, src, 0)
+}
+
+/// `class` of an annotation `depth` levels inside the one it started from.
+fn class_at(annotation: Node, src: &[u8], depth: usize) -> Class {
+    if depth >= TYPE_DEPTH {
+        return Class::Unknown;
+    }
+    let class = |n: Node| class_at(n, src, depth + 1);
     let node = bare(annotation);
     match node.kind() {
         "identifier" | "attribute" | "member_type" => dotted(text(node, src)),
@@ -790,7 +865,7 @@ fn class(annotation: Node, src: &[u8]) -> Class {
                 )
             };
             match (name.map(|n| text(n, src)), &inside[..]) {
-                (Some("Optional" | "typing.Optional"), [one]) => class(*one, src),
+                (Some("Optional" | "typing.Optional"), [one]) => class(*one),
                 _ => Class::Unknown,
             }
         }
@@ -798,8 +873,8 @@ fn class(annotation: Node, src: &[u8]) -> Class {
             let operator = node.child_by_field_name("operator").map(|o| text(o, src));
             let sides: Vec<Node> = named(node).collect();
             match (operator, &sides[..]) {
-                (None | Some("|"), [a, b]) if bare(*b).kind() == "none" => class(*a, src),
-                (None | Some("|"), [a, b]) if bare(*a).kind() == "none" => class(*b, src),
+                (None | Some("|"), [a, b]) if bare(*b).kind() == "none" => class(*a),
+                (None | Some("|"), [a, b]) if bare(*a).kind() == "none" => class(*b),
                 _ => Class::Unknown,
             }
         }
@@ -1042,14 +1117,24 @@ fn pair(node: Node, src: &[u8], depth: usize) -> Option<(String, Value)> {
 /// A string expression folded into literal text, names and holes: string literals, f-strings,
 /// implicit and `+` concatenation; `None` when `node` is not one.
 fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
-    let inside = |n: Node| parts(n, src).unwrap_or_else(|| vec![Part::Hole]);
+    parts_at(node, src, 0)
+}
+
+/// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
+/// the rest is a hole.
+fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
+    if depth >= FOLD_DEPTH {
+        return Some(vec![Part::Hole]);
+    }
+    let parts = |n: Node| parts_at(n, src, depth + 1);
+    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
     match node.kind() {
         "string" => Some(
             children(node)
                 .filter_map(|part| match part.kind() {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
-                        Some(e) => (name(e, src).or_else(|| parts(e, src).and_then(single_env)))
+                        Some(e) => (name(e, src).or_else(|| parts(e).and_then(single_env)))
                             .unwrap_or(Part::Hole),
                         None => Part::Hole,
                     }),
@@ -1061,9 +1146,17 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
         "binary_operator" => {
             let left = node.child_by_field_name("left")?;
             let right = node.child_by_field_name("right")?;
-            let plus = text(node.child_by_field_name("operator")?, src) == "+";
-            (plus && (parts(left, src).is_some() || parts(right, src).is_some()))
-                .then(|| inside(left).into_iter().chain(inside(right)).collect())
+            if text(node.child_by_field_name("operator")?, src) != "+" {
+                return None;
+            }
+            // Each side once: a left-associated chain would cost twice per term otherwise.
+            let (left, right) = (parts(left), parts(right));
+            if left.is_none() && right.is_none() {
+                return None;
+            }
+            let hole = || vec![Part::Hole];
+            let (left, right) = (left.unwrap_or_else(hole), right.unwrap_or_else(hole));
+            Some(left.into_iter().chain(right).collect())
         }
         // A fallback keeps the environment read on its left, if it is the only one.
         "boolean_operator" => {
@@ -1072,13 +1165,13 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
             if text(node.child_by_field_name("operator")?, src) != "or" {
                 return None;
             }
-            let env = single_env(parts(left, src)?)?;
+            let env = single_env(parts(left)?)?;
             let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
             Some(vec![if more { Part::Hole } else { env }])
         }
         "identifier" | "attribute" => name(node, src).map(|name| vec![name]),
-        "parenthesized_expression" => parts(named(node).next()?, src),
-        "subscript" | "call" => env_read(node, src).map(|env| vec![env]),
+        "parenthesized_expression" => parts(named(node).next()?),
+        "subscript" | "call" => env_read(node, src, depth).map(|env| vec![env]),
         _ => None,
     }
 }
@@ -1096,10 +1189,10 @@ fn name(node: Node, src: &[u8]) -> Option<Part> {
 /// `os.environ["X"]`, `os.environ.get("X")` or `os.getenv("X")` (also `environ` and `getenv`
 /// imported from `os`), with or without a default, also through string method calls such as
 /// `.rstrip("/")`. Meada never reads the value, so a default is ignored; one that reads
-/// another variable makes the whole read a hole.
+/// another variable makes the whole read a hole. `depth` is the level of `node` in `parts`.
 // ponytail: the names are matched as written, not through the file's imports, so `import os
 // as o` is not read and a local `getenv` function is.
-fn env_read(node: Node, src: &[u8]) -> Option<Part> {
+fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "strip",
         "lstrip",
@@ -1120,15 +1213,25 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             if let "os.getenv" | "getenv" | "os.environ.get" | "environ.get" =
                 callee(function, src).as_str()
             {
-                let (args, kwargs) = arguments(node, src);
-                let name = string(named(node.child_by_field_name("arguments")?).next()?, src)?;
-                let default = args
-                    .get(1)
-                    .or(kwargs.iter().find(|(k, _)| k == "default").map(|(_, v)| v));
-                return Some(match default {
-                    Some(Value::Str(p)) if p.iter().any(|p| matches!(p, Part::Env(_))) => {
-                        Part::Hole
-                    }
+                let list = node.child_by_field_name("arguments")?;
+                let name = string(named(list).next()?, src)?;
+                // The second positional argument, else the `default` keyword, read as `parts`
+                // at the next level rather than as a whole value.
+                let mut positional = named(list).filter(|a| {
+                    !matches!(
+                        a.kind(),
+                        "keyword_argument" | "comment" | "dictionary_splat"
+                    )
+                });
+                let keyword = named(list).find(|a| {
+                    a.kind() == "keyword_argument"
+                        && (a.child_by_field_name("name"))
+                            .is_some_and(|n| text(n, src) == "default")
+                });
+                let default = (positional.nth(1)).or_else(|| keyword?.child_by_field_name("value"));
+                let reads = default.and_then(|d| parts_at(d, src, depth + 1));
+                return Some(match reads {
+                    Some(p) if p.iter().any(|p| matches!(p, Part::Env(_))) => Part::Hole,
                     _ => Part::Env(name),
                 });
             }
@@ -1136,7 +1239,11 @@ fn env_read(node: Node, src: &[u8]) -> Option<Part> {
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
             }
-            single_env(parts(function.child_by_field_name("object")?, src)?)
+            single_env(parts_at(
+                function.child_by_field_name("object")?,
+                src,
+                depth + 1,
+            )?)
         }
         _ => None,
     }
@@ -1153,19 +1260,26 @@ fn single_env(parts: Vec<Part>) -> Option<Part> {
 /// `a.b.c` for identifier and attribute chains; any other expression becomes `(<node kind>)`,
 /// so no source text beyond names reaches the index.
 fn callee(node: Node, src: &[u8]) -> String {
-    match node.kind() {
-        "identifier" => text(node, src).to_string(),
-        "attribute" => match (
-            node.child_by_field_name("object"),
-            node.child_by_field_name("attribute"),
-        ) {
-            (Some(object), Some(attribute)) => {
-                format!("{}.{}", callee(object, src), text(attribute, src))
-            }
-            _ => format!("({})", node.kind()),
-        },
-        kind => format!("({kind})"),
-    }
+    // The attributes of the chain, outermost first; a chain longer than `FOLD_DEPTH` ends in
+    // the kind of the node where it is cut.
+    let (mut node, mut names) = (node, Vec::new());
+    let base = loop {
+        match node.kind() {
+            "identifier" => break text(node, src).to_string(),
+            "attribute" if names.len() < FOLD_DEPTH => match (
+                node.child_by_field_name("object"),
+                node.child_by_field_name("attribute"),
+            ) {
+                (Some(object), Some(attribute)) => {
+                    names.push(text(attribute, src));
+                    node = object;
+                }
+                _ => break format!("({})", node.kind()),
+            },
+            kind => break format!("({kind})"),
+        }
+    };
+    (names.iter().rev()).fold(base, |path, name| path + "." + name)
 }
 
 #[cfg(test)]
@@ -1343,6 +1457,136 @@ mod tests {
         ] {
             let depth = nesting(&held(&consts(&src), name));
             assert!(depth <= VALUE_DEPTH, "{depth} levels in `{}`", &src[..20]);
+        }
+    }
+
+    #[test]
+    fn concatenation_folds_once_per_term() {
+        // Left-associated: reading each side twice would take 2^64 steps.
+        let src = format!("x = \"/x\" + {}\"y\"\n", "b + ".repeat(64));
+
+        let Value::Str(parts) = held(&consts(&src), "x") else {
+            unreachable!("not a string");
+        };
+
+        assert_eq!(parts.len(), 66);
+    }
+
+    #[test]
+    fn long_chains_are_cut() {
+        // Far past the limit: a recursion that does not stop overflows the stack.
+        let n = 30_000;
+        let sum = consts(&format!("a = '' + {}b\n", "b + ".repeat(n)));
+        let Value::Str(parts) = held(&sum, "a") else {
+            unreachable!("not a string");
+        };
+        assert!(parts.len() <= FOLD_DEPTH + 2, "{}", parts.len());
+
+        let fallbacks = format!("a = {}os.getenv(\"X\")\n", "os.getenv(\"X\") or ".repeat(n));
+        // Every call's arguments are folded again, up to `FOLD_DEPTH` each: fewer levels keep
+        // the test fast.
+        let defaults = format!(
+            "a = {}\"/\"{}\n",
+            "os.getenv(\"X\", ".repeat(4 * FOLD_DEPTH),
+            ")".repeat(4 * FOLD_DEPTH)
+        );
+        let methods = format!("a = os.environ[\"X\"]{}\n", ".strip()".repeat(n));
+        for src in [fallbacks, defaults, methods] {
+            let value = held(&consts(&src), "a");
+            assert!(
+                matches!(value, Value::Str(_) | Value::Call(_) | Value::Unknown),
+                "{}",
+                &src[..20]
+            );
+        }
+
+        let member = facts(&format!("a{}.f()\n", ".b".repeat(n)));
+        assert_eq!(member.calls.len(), 1);
+        assert!(member.calls[0].callee.len() < 10 * FOLD_DEPTH);
+    }
+
+    /// The class `facts` binds `name` to in `scope`, if it binds it.
+    fn bound<'f>(facts: &'f Facts, scope: &str, name: &str) -> Option<&'f Class> {
+        (facts.receivers.iter())
+            .find(|r| r.scope == scope && r.name == name)
+            .map(|r| &r.class)
+    }
+
+    #[test]
+    fn definitions_nest_to_a_limit() {
+        // Classes and functions in turn, each with a call in its body.
+        let n = 2 * DEFINITION_DEPTH;
+        let src: String = (0..n)
+            .map(|i| {
+                let pad = "    ".repeat(i);
+                let head = match i % 2 {
+                    0 => format!("class d{i}"),
+                    _ => format!("def d{i}()"),
+                };
+                format!("{pad}{head}:\n{pad}    g()\n")
+            })
+            .collect();
+
+        let f = facts(&src);
+
+        assert_eq!(f.calls.len(), n);
+        let deepest = (f.defs.iter()).map(|d| levels(&d.name)).max();
+        assert_eq!(deepest, Some(DEFINITION_DEPTH));
+    }
+
+    #[test]
+    fn a_definition_past_the_limit_hides_its_name_and_keeps_its_returns() {
+        let mut src = String::from("def g():\n    pass\n");
+        for i in 0..DEFINITION_DEPTH {
+            src += &format!("{}def f{i}():\n", "    ".repeat(i));
+        }
+        let pad = "    ".repeat(DEFINITION_DEPTH);
+        src += &format!("{pad}def g(x):\n{pad}    return x\n{pad}g()\n{pad}return \"/r\"\n");
+
+        let f = facts(&src);
+
+        let call = f.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert_eq!(levels(&call.scope), DEFINITION_DEPTH);
+        assert!(f.defs.iter().all(|d| d.name != qualify(&call.scope, "g")));
+        // Its name and parameters are locals of the definition around it.
+        assert!(matches!(bound(&f, &call.scope, "g"), Some(Class::Unknown)));
+        assert!(matches!(bound(&f, &call.scope, "x"), Some(Class::Unknown)));
+        // Its `return x` is not the one of the definition around it.
+        let outer = f.defs.iter().find(|d| d.name == call.scope).unwrap();
+        assert!(matches!(outer.return_values[..], [Value::Str(_)]));
+    }
+
+    #[test]
+    fn targets_and_captures_nested_past_the_limit_bind_nothing_below_it() {
+        let n = 20_000;
+        let deep = |open: &str, close: &str| format!("{}b{}", open.repeat(n), close.repeat(n));
+        let unpack = facts(&format!("a, {} = v\n", deep("(", ",)")));
+        let case = facts(&format!(
+            "match v:\n    case [a, {}]:\n        pass\n",
+            deep("[", "]")
+        ));
+        for f in [&unpack, &case] {
+            assert!(bound(f, "", "a").is_some());
+            assert!(bound(f, "", "b").is_none());
+        }
+        // Just inside the limit, the name is bound.
+        let unpack = facts(&format!("a, {}b{} = v\n", "(".repeat(8), ",)".repeat(8)));
+        assert!(bound(&unpack, "", "b").is_some());
+    }
+
+    #[test]
+    fn annotations_nested_past_the_type_depth_are_unknown() {
+        let param = |annotation: String| {
+            let f = facts(&format!("def f(x: {annotation}):\n    pass\n"));
+            bound(&f, "f", "x").cloned()
+        };
+        let optional = |n| format!("{}C{}", "Optional[".repeat(n), "]".repeat(n));
+        let union = |n| format!("C{}", " | None".repeat(n));
+
+        assert!(matches!(param(optional(3)), Some(Class::Named(c)) if c == "C"));
+        assert!(matches!(param(union(3)), Some(Class::Named(c)) if c == "C"));
+        for annotation in [optional(20_000), union(20_000)] {
+            assert!(matches!(param(annotation), Some(Class::Unknown)));
         }
     }
 

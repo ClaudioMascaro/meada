@@ -173,8 +173,9 @@ modules updates it.
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
-  `packages.from`, read by `lang/python/pyproject.rs`, which the PyPI package reader shares), or
-  `src` when none is declared; a package comes before a module of the same name.
+  `packages.from`, read by `lang/python/pyproject.rs` through the PyPI manifest reader, so an
+  unreadable file declares nothing), or `src` when none is declared (`pyproject::source_roots`,
+  which `package::python_roots` shares); a package comes before a module of the same name.
   An `if __name__ == "__main__":` block at the top level (either operand order, either quote,
   nothing else) yields the definition `__main__`, spanning the `if` and its body (an `else` is
   not part of it), owns the calls in that body, and is named in `Facts::programs`.
@@ -222,7 +223,8 @@ modules updates it.
   ancestor, named by what the file imports for it (`abc.ABC`) or as written (`object`), so
   classes that share it give C3 one entry; a base that is no name (`mixin()`) is its own
   entry: reaching it before a class that has the member leaves the member unknown, and so
-  does a hierarchy C3 rejects or bases in a cycle. The first class that defines the member, or
+  does a hierarchy C3 rejects, bases in a cycle or a family longer than `FAMILY_DEPTH` (cut
+  without being kept on the way up when the walk down the bases reaches that depth, `Cut`). The first class that defines the member, or
   binds it as an attribute (a `Receiver` of the class), wins, `exact`. A receiver whose class (or whose value's
   callee) is outside the repository is unresolved; any other member call falls back to the
   name match. `Busy` guards locals and families that resolve through themselves. A single
