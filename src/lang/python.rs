@@ -7,14 +7,26 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Message, Modules, Param, Part, Receiver, Star, Value, children, literal, named,
-    text,
+    LanguagePack, Message, Modules, Param, Part, Receiver, Star, TYPE_DEPTH, Value, children,
+    literal, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
 mod messages;
 pub mod pyproject;
+
+/// How many definitions may nest in one file. Names are qualified by the definitions around
+/// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
+/// Past the limit a function or class is not a definition (its body belongs to the one around
+/// it, where its name and parameters are locals that hide outer ones).
+// ponytail: real code nests a few levels; 128 is the depth the TypeScript pack allows.
+const DEFINITION_DEPTH: usize = 128;
+
+/// How many nodes deep `targets` and `captures` read an unpacking target or a `case` pattern;
+/// a name deeper is not bound.
+// ponytail: real code unpacks a few levels; the recursion must stay shallow, whatever the file.
+const TARGET_DEPTH: usize = 64;
 
 /// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads;
 /// deeper is `Unknown`. A value is read again by every call around it, and the recursion must
@@ -63,15 +75,18 @@ impl LanguagePack for Python {
             node: tree.root_node(),
             scope: String::new(),
             in_class: false,
+            flat: false,
         }];
         while let Some(Visit {
             node,
             scope,
             in_class,
+            flat,
         }) = stack.pop()
         {
             let mut inner = scope.clone();
             let mut inner_class = in_class;
+            let mut inner_flat = flat;
             // The body of a main guard, whose calls and bindings belong to the `__main__`
             // symbol.
             // ponytail: a name assigned in the guard is a local of `__main__`, so it no longer
@@ -99,6 +114,19 @@ impl LanguagePack for Python {
                         });
                         facts.programs.push(MAIN.to_string());
                     }
+                }
+                "function_definition" | "class_definition"
+                    if levels(&scope) >= DEFINITION_DEPTH =>
+                {
+                    // No definition: its body belongs to the scope around it, where its name
+                    // and parameters hide outer ones, as a lambda's do; its `return`s are no
+                    // one's.
+                    let name = node.child_by_field_name("name");
+                    let params = parameters(node).into_iter().filter_map(|(name, _)| name);
+                    for name in name.into_iter().chain(params) {
+                        locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
+                    }
+                    inner_flat = true;
                 }
                 "function_definition" | "class_definition" => {
                     let is_class = node.kind() == "class_definition";
@@ -138,7 +166,7 @@ impl LanguagePack for Python {
                     }
                     inner_class = is_class;
                 }
-                "decorated_definition" => {
+                "decorated_definition" if levels(&scope) < DEFINITION_DEPTH => {
                     let name = (node.child_by_field_name("definition"))
                         .and_then(|d| d.child_by_field_name("name"));
                     if let Some(name) = name {
@@ -172,7 +200,7 @@ impl LanguagePack for Python {
                         });
                     }
                 }
-                "return_statement" => {
+                "return_statement" if !flat => {
                     if let (Some(&at), Some(returned)) = (functions.get(&scope), named(node).next())
                     {
                         facts.defs[at].return_values.push(value(returned, src));
@@ -222,7 +250,7 @@ impl LanguagePack for Python {
                 "case_clause" => {
                     let mut found = Vec::new();
                     for pattern in named(node).filter(|n| n.kind() == "case_pattern") {
-                        captures(pattern, &mut found);
+                        captures(pattern, 0, &mut found);
                     }
                     for name in found {
                         locals.bind(&scope, text(name, src), Class::Unknown, How::Assigned);
@@ -253,6 +281,7 @@ impl LanguagePack for Python {
                     false => inner.clone(),
                 },
                 in_class: inner_class,
+                flat: inner_flat,
             }));
         }
         (facts.exports, facts.star) = module.exports();
@@ -311,6 +340,9 @@ struct Visit<'t> {
     /// Whether the node sits in a class body, outside any function in it: a function defined
     /// here is a method.
     in_class: bool,
+    /// Whether the node sits in a function or class past `DEFINITION_DEPTH`, which is no
+    /// definition: a `return` there is not the enclosing definition's.
+    flat: bool,
 }
 
 /// What a module binds at its top level, which makes up its exports.
@@ -408,6 +440,14 @@ fn is_main_guard(node: Node, src: &[u8]) -> bool {
             ("__name__", "\"__main__\"" | "'__main__'")
                 | ("\"__main__\"" | "'__main__'", "__name__")
         )
+}
+
+/// How many definitions the qualified name `scope` nests: none at the top level.
+fn levels(scope: &str) -> usize {
+    match scope {
+        "" => 0,
+        scope => scope.matches('.').count() + 1,
+    }
 }
 
 /// The span of a definition: a decorated one includes its decorators.
@@ -749,20 +789,30 @@ fn constructor(call: Node, src: &[u8]) -> Option<String> {
 }
 
 /// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also
-/// inside `a, (b, c)`.
+/// inside `a, (b, c)`, to `TARGET_DEPTH` nodes deep.
 fn targets(node: Node) -> Vec<Node> {
+    let mut out = Vec::new();
+    targets_at(node, 0, &mut out);
+    out
+}
+
+/// `targets` of a node `depth` nodes inside the target it started from.
+fn targets_at<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
-        "identifier" | "attribute" => vec![node],
+        _ if depth >= TARGET_DEPTH => {}
+        "identifier" | "attribute" => out.push(node),
         "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
-        | "as_pattern_target" => named(node).flat_map(targets).collect(),
-        _ => Vec::new(),
+        | "as_pattern_target" => named(node).for_each(|n| targets_at(n, depth + 1, out)),
+        _ => {}
     }
 }
 
-/// The names a `case` pattern captures: a bare name, the name after `as` or `*`, and those
-/// inside sequences, mappings and class patterns; not a class's name or a dotted value.
-fn captures<'t>(node: Node<'t>, out: &mut Vec<Node<'t>>) {
+/// The names a `case` pattern `depth` nodes deep captures: a bare name, the name after `as` or
+/// `*`, and those inside sequences, mappings and class patterns, to `TARGET_DEPTH` nodes deep;
+/// not a class's name or a dotted value.
+fn captures<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
+        _ if depth >= TARGET_DEPTH => {}
         "dotted_name" => {
             let parts: Vec<Node> = named(node).collect();
             if let [name] = parts[..] {
@@ -771,15 +821,26 @@ fn captures<'t>(node: Node<'t>, out: &mut Vec<Node<'t>>) {
         }
         "identifier" => out.push(node),
         "class_pattern" | "keyword_pattern" => {
-            named(node).skip(1).for_each(|n| captures(n, out));
+            named(node)
+                .skip(1)
+                .for_each(|n| captures(n, depth + 1, out));
         }
-        _ => named(node).for_each(|n| captures(n, out)),
+        _ => named(node).for_each(|n| captures(n, depth + 1, out)),
     }
 }
 
 /// What an annotation says, read as written: a name, or a string holding one, through
-/// `Optional[...]` and `... | None`.
+/// `Optional[...]` and `... | None`, to `TYPE_DEPTH` levels; deeper is `Unknown`.
 fn class(annotation: Node, src: &[u8]) -> Class {
+    class_at(annotation, src, 0)
+}
+
+/// `class` of an annotation `depth` levels inside the one it started from.
+fn class_at(annotation: Node, src: &[u8], depth: usize) -> Class {
+    if depth >= TYPE_DEPTH {
+        return Class::Unknown;
+    }
+    let class = |n: Node| class_at(n, src, depth + 1);
     let node = bare(annotation);
     match node.kind() {
         "identifier" | "attribute" | "member_type" => dotted(text(node, src)),
@@ -797,7 +858,7 @@ fn class(annotation: Node, src: &[u8]) -> Class {
                 )
             };
             match (name.map(|n| text(n, src)), &inside[..]) {
-                (Some("Optional" | "typing.Optional"), [one]) => class(*one, src),
+                (Some("Optional" | "typing.Optional"), [one]) => class(*one),
                 _ => Class::Unknown,
             }
         }
@@ -805,8 +866,8 @@ fn class(annotation: Node, src: &[u8]) -> Class {
             let operator = node.child_by_field_name("operator").map(|o| text(o, src));
             let sides: Vec<Node> = named(node).collect();
             match (operator, &sides[..]) {
-                (None | Some("|"), [a, b]) if bare(*b).kind() == "none" => class(*a, src),
-                (None | Some("|"), [a, b]) if bare(*a).kind() == "none" => class(*b, src),
+                (None | Some("|"), [a, b]) if bare(*b).kind() == "none" => class(*a),
+                (None | Some("|"), [a, b]) if bare(*a).kind() == "none" => class(*b),
                 _ => Class::Unknown,
             }
         }
@@ -1435,6 +1496,91 @@ mod tests {
         let member = facts(&format!("a{}.f()\n", ".b".repeat(n)));
         assert_eq!(member.calls.len(), 1);
         assert!(member.calls[0].callee.len() < 10 * FOLD_DEPTH);
+    }
+
+    /// The class `facts` binds `name` to in `scope`, if it binds it.
+    fn bound<'f>(facts: &'f Facts, scope: &str, name: &str) -> Option<&'f Class> {
+        (facts.receivers.iter())
+            .find(|r| r.scope == scope && r.name == name)
+            .map(|r| &r.class)
+    }
+
+    #[test]
+    fn definitions_nest_to_a_limit() {
+        // Classes and functions in turn, each with a call in its body.
+        let n = 2 * DEFINITION_DEPTH;
+        let src: String = (0..n)
+            .map(|i| {
+                let pad = "    ".repeat(i);
+                let head = match i % 2 {
+                    0 => format!("class d{i}"),
+                    _ => format!("def d{i}()"),
+                };
+                format!("{pad}{head}:\n{pad}    g()\n")
+            })
+            .collect();
+
+        let f = facts(&src);
+
+        assert_eq!(f.calls.len(), n);
+        let deepest = (f.defs.iter()).map(|d| levels(&d.name)).max();
+        assert_eq!(deepest, Some(DEFINITION_DEPTH));
+    }
+
+    #[test]
+    fn a_definition_past_the_limit_hides_its_name_and_keeps_its_returns() {
+        let mut src = String::from("def g():\n    pass\n");
+        for i in 0..DEFINITION_DEPTH {
+            src += &format!("{}def f{i}():\n", "    ".repeat(i));
+        }
+        let pad = "    ".repeat(DEFINITION_DEPTH);
+        src += &format!("{pad}def g(x):\n{pad}    return x\n{pad}g()\n{pad}return \"/r\"\n");
+
+        let f = facts(&src);
+
+        let call = f.calls.iter().find(|c| c.callee == "g").unwrap();
+        assert_eq!(levels(&call.scope), DEFINITION_DEPTH);
+        assert!(f.defs.iter().all(|d| d.name != qualify(&call.scope, "g")));
+        // Its name and parameters are locals of the definition around it.
+        assert!(matches!(bound(&f, &call.scope, "g"), Some(Class::Unknown)));
+        assert!(matches!(bound(&f, &call.scope, "x"), Some(Class::Unknown)));
+        // Its `return x` is not the one of the definition around it.
+        let outer = f.defs.iter().find(|d| d.name == call.scope).unwrap();
+        assert!(matches!(outer.return_values[..], [Value::Str(_)]));
+    }
+
+    #[test]
+    fn targets_and_captures_nested_past_the_limit_bind_nothing_below_it() {
+        let n = 20_000;
+        let deep = |open: &str, close: &str| format!("{}b{}", open.repeat(n), close.repeat(n));
+        let unpack = facts(&format!("a, {} = v\n", deep("(", ",)")));
+        let case = facts(&format!(
+            "match v:\n    case [a, {}]:\n        pass\n",
+            deep("[", "]")
+        ));
+        for f in [&unpack, &case] {
+            assert!(bound(f, "", "a").is_some());
+            assert!(bound(f, "", "b").is_none());
+        }
+        // Just inside the limit, the name is bound.
+        let unpack = facts(&format!("a, {}b{} = v\n", "(".repeat(8), ",)".repeat(8)));
+        assert!(bound(&unpack, "", "b").is_some());
+    }
+
+    #[test]
+    fn annotations_nested_past_the_type_depth_are_unknown() {
+        let param = |annotation: String| {
+            let f = facts(&format!("def f(x: {annotation}):\n    pass\n"));
+            bound(&f, "f", "x").cloned()
+        };
+        let optional = |n| format!("{}C{}", "Optional[".repeat(n), "]".repeat(n));
+        let union = |n| format!("C{}", " | None".repeat(n));
+
+        assert!(matches!(param(optional(3)), Some(Class::Named(c)) if c == "C"));
+        assert!(matches!(param(union(3)), Some(Class::Named(c)) if c == "C"));
+        for annotation in [optional(20_000), union(20_000)] {
+            assert!(matches!(param(annotation), Some(Class::Unknown)));
+        }
     }
 
     #[test]

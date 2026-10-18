@@ -659,7 +659,13 @@ one for the area a change touches.
   stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
   defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
   chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
-  of nested calls costs up to `FOLD_DEPTH` steps per call. For imports inside the repository only the root `pyproject.toml` is read
+  of nested calls costs up to `FOLD_DEPTH` steps per call. `DEFINITION_DEPTH` (128): a
+  function or class nested deeper is not a definition (its body belongs to the one around it,
+  its name and parameters are locals that hide outer ones there, and its `return`s are no
+  one's), since qualified names and `Resolver::lexical` cost time cubic in the nesting.
+  `TARGET_DEPTH` (64 nodes): a name deeper in an unpacking target or a `case` pattern is not
+  bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
+  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
   (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
   Poetry root declarations; one that does not parse fails the refresh with its name. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
