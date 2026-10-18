@@ -128,6 +128,7 @@ impl LanguagePack for TsJs {
                             kwargs: Vec::new(),
                             decorates: None,
                             by_path: false,
+                            receiver: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),

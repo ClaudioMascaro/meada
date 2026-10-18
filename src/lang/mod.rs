@@ -81,6 +81,14 @@ pub trait LanguagePack {
         None
     }
 
+    /// Whether a method call that resolves to nothing in the repository hands back the value
+    /// it was called on, as a builder does (`Router::new().route(..)` in Rust): `Code::origins`
+    /// then follows the call's `receiver`. A language whose methods return anything stays
+    /// with the call as the origin.
+    fn fluent(&self) -> bool {
+        false
+    }
+
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
@@ -468,6 +476,11 @@ pub struct Call {
     /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
+    /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
+    /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
+    /// index, like `args`.
+    #[serde(skip)]
+    pub receiver: Option<Value>,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
     #[serde(skip)]

@@ -43,6 +43,18 @@ fn exports_name(export: &Export, name: &str) -> bool {
     matches!(export, Export::Local { exported, .. } | Export::From { exported, .. } if exported == name)
 }
 
+/// The index among `calls` of the call spanning `range`. Packs list calls in the order a
+/// depth-first walk meets them, an enclosing call before the ones inside it, so the search is
+/// a bisection; a list in another order is scanned.
+pub fn call_at(calls: &[Call], range: &std::ops::Range<usize>) -> Option<usize> {
+    let key = |r: &std::ops::Range<usize>| (r.start, std::cmp::Reverse(r.end));
+    let at = calls.partition_point(|c| key(&c.range) < key(range));
+    match calls.get(at) {
+        Some(c) if c.range == *range => Some(at),
+        _ => calls.iter().position(|c| c.range == *range),
+    }
+}
+
 /// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
 fn bound_in(local: &str, scope: &str, name: &str) -> bool {
     match scope {
@@ -1508,6 +1520,16 @@ impl<'a> Code<'a> {
         self.full(path)?.calls.get(index)
     }
 
+    /// The value the call at `index` of `path` is made on (`Call::receiver`).
+    pub fn receiver(&self, path: &'a str, index: usize) -> Option<&'a Value> {
+        self.call(path, index)?.receiver.as_ref()
+    }
+
+    /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).
+    pub fn call_index(&self, path: &'a str, range: &std::ops::Range<usize>) -> Option<usize> {
+        call_at(&self.resolver.files[path].calls, range)
+    }
+
     /// Whether the pack binds `name` everywhere, as JavaScript does `fetch`.
     pub fn binds_everywhere(&self, name: &str) -> bool {
         self.resolver.globals.contains(&name)
@@ -1587,14 +1609,33 @@ impl<'a> Code<'a> {
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(call) => {
                 let calls = &self.resolver.files[path].calls;
-                let Some(index) = calls.iter().position(|c| c.range == call.range) else {
+                let Some(mut index) = call_at(calls, &call.range) else {
                     return;
                 };
-                let function = match self.resolver.call(path, &calls[index]) {
-                    Resolution::Exact(t) if !self.resolver.is_class(t) => t,
-                    _ => {
-                        trail.out.insert((path, index));
-                        return;
+                // A builder chain (`Router::new().route(..).nest(..)`) is the value it started
+                // from: a call reaching no function of the repository passes its receiver on,
+                // down the chain (a loop, since a chain can be long).
+                let function = loop {
+                    match self.resolver.call(path, &calls[index]) {
+                        Resolution::Exact(t) if !self.resolver.is_class(t) => break t,
+                        _ if self.pack.fluent() => match self.receiver(path, index) {
+                            Some(Value::Call(next)) => match call_at(calls, &next.range) {
+                                Some(next) => index = next,
+                                None => return,
+                            },
+                            Some(other) => {
+                                self.flow(path, &calls[index].scope, other, trail);
+                                return;
+                            }
+                            None => {
+                                trail.out.insert((path, index));
+                                return;
+                            }
+                        },
+                        _ => {
+                            trail.out.insert((path, index));
+                            return;
+                        }
                     }
                 };
                 let Some(def) = (self.full(function.path))

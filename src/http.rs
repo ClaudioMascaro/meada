@@ -556,6 +556,11 @@ fn provider_shape(
 /// router is followed through constants, imports, arguments and return values.
 // ponytail: `router.route(path)` chains and `require` are not followed.
 fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
+    // The names Express is known by are spellings (`Router()`), which any other language may
+    // give its own functions and types.
+    if !code.pack().extensions().contains(&"js") {
+        return Vec::new();
+    }
     let routers = |path, scope, name| -> Vec<CallAt> {
         let origins = code.origins(path, scope, name).into_iter();
         origins.filter(|&r| is_express(code, r)).collect()
@@ -663,6 +668,181 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 shape: shape.clone(),
                 ..provider(site, contract(&method, &full))
             });
+        }
+    }
+    found
+}
+
+/// The method routers of axum, as functions of `axum::routing` and as methods of a method
+/// router: `get(a).post(b)`.
+const AXUM_METHODS: &[&str] = &[
+    "get", "post", "put", "patch", "delete", "head", "options", "trace",
+];
+
+/// The methods of a method router that leave the methods it serves as they are.
+const AXUM_PASSES: &[&str] = &["layer", "route_layer", "with_state", "handle_error"];
+
+/// How many calls a method router chain is read through.
+// ponytail: a route serves a handful of methods; a crafted chain is not read to its end.
+const METHOD_CHAIN: usize = 64;
+
+/// Whether the call `router` creates an axum router.
+fn is_axum_router<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
+    let call = &code.files()[path].calls[n];
+    let name = code.external(path, &call.scope, &call.callee);
+    matches!(
+        name.as_deref(),
+        Some("axum.Router.new" | "axum.Router.default")
+    )
+}
+
+/// The calls of the method router `value` that give a method a handler, last call first: its
+/// `get(a)` and the `.post(b)` after it. `None` when the chain is not made of `axum::routing`
+/// functions and methods that serve methods.
+fn method_router<'a>(code: &Code<'a>, path: &'a str, value: &'a Value) -> Option<Vec<&'a Call>> {
+    let mut out = Vec::new();
+    let mut value = value;
+    for _ in 0..METHOD_CHAIN {
+        let Value::Call(invocation) = value else {
+            return None;
+        };
+        let call = code.call(path, code.call_index(path, &invocation.range)?)?;
+        let name = call.callee.rsplit('.').next()?;
+        match &call.receiver {
+            // `get(h)`, `routing::get(h)`: the function of axum that serves the method.
+            None => {
+                let external = code.external(path, &call.scope, &call.callee)?;
+                match external.strip_prefix("axum.routing.")? {
+                    "any" => out.push(call),
+                    name if AXUM_METHODS.contains(&name) => out.push(call),
+                    "MethodRouter.new" => {}
+                    _ => return None,
+                }
+                out.reverse();
+                return Some(out);
+            }
+            Some(receiver) => {
+                match name {
+                    name if AXUM_METHODS.contains(&name) => out.push(call),
+                    name if AXUM_PASSES.contains(&name) => {}
+                    _ => return None,
+                }
+                value = receiver;
+            }
+        }
+    }
+    None
+}
+
+/// The axum routers `value`, written in `call`, may be.
+fn axum_routers<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    call: &'a Call,
+    value: &'a Value,
+) -> Vec<CallAt<'a>> {
+    let origins = code.value_origins(path, &call.scope, value);
+    (origins.into_iter())
+        .filter(|&r| is_axum_router(code, r))
+        .collect()
+}
+
+/// `path` with each wildcard segment (`*rest`) as a parameter.
+fn axum_path(path: &str) -> String {
+    let segments = path.split('/');
+    let segments = segments.map(|s| if s.starts_with('*') { PARAM } else { s });
+    segments.collect::<Vec<_>>().join("/")
+}
+
+/// axum providers: `Router::new().route(path, get(h).post(g))` and `any(h)`, under every prefix
+/// of the `nest` mounts the router is under, at any depth; `merge` adds no prefix. A router is
+/// the `Router::new()` call that makes it, followed through the chain of builder calls on it,
+/// constants, arguments and return values (`Code::origins`). A router nothing mounts is the
+/// app and is served at its root; one a mount puts under a prefix Meada cannot read, or that
+/// is mounted on a router it cannot read, is served nowhere. A handler is the function the
+/// route names (a closure is an inline handler); any other handler leaves the route at its file.
+// ponytail: a router held by `let mut` or reassigned, `route_service` and `nest_service`, and
+// `on(MethodFilter, h)` are not followed; the routes on them are not providers.
+fn axum(code: &Code) -> Vec<Found> {
+    if !code.pack().extensions().contains(&"rs") {
+        return Vec::new();
+    }
+    let mut mounts = Mounts::new();
+    let mut routes = Vec::new();
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            let member = call.callee.rsplit('.').next().unwrap_or_default();
+            if !matches!(member, "route" | "nest" | "merge") {
+                continue;
+            }
+            let Some(call) = code.call(path, n) else {
+                continue;
+            };
+            let Some(receiver) = &call.receiver else {
+                continue;
+            };
+            let parents = axum_routers(code, path, call, receiver);
+            match (member, call.args.as_slice()) {
+                ("route", [route, handlers]) => {
+                    let Value::Str(parts) = code.value(path, &call.scope, route) else {
+                        continue;
+                    };
+                    let (Some(route), Some(handlers)) =
+                        (literal(&parts), method_router(code, path, handlers))
+                    else {
+                        continue;
+                    };
+                    for at in parents {
+                        routes.push((path, at, axum_path(&route), handlers.clone()));
+                    }
+                }
+                ("nest" | "merge", args) => {
+                    let (prefix, child) = match (member, args) {
+                        ("nest", [prefix, child]) => {
+                            let prefix = code.value(path, &call.scope, prefix);
+                            (path_literal(prefix), child)
+                        }
+                        ("merge", [child]) => (Some(String::new()), child),
+                        _ => continue,
+                    };
+                    // A child mounted on a router Meada cannot read is mounted nowhere it
+                    // could serve it: it still has a mount, with no parents.
+                    for child in axum_routers(code, path, call, child) {
+                        let mounted = mounts.entry(child).or_default();
+                        mounted.extend(parents.iter().map(|&at| (at, prefix.clone())));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut found = Vec::new();
+    let root = |_: CallAt| Some(String::new());
+    for (path, at, route, handlers) in routes {
+        for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
+            let full = normalize_path(&join(&prefix, &route));
+            for call in &handlers {
+                let name = call.callee.rsplit('.').next().unwrap_or_default();
+                let method = (name == "any").then_some(ANY.to_string());
+                let method = method.unwrap_or_else(|| name.to_uppercase());
+                let scope = &call.scope;
+                let site = match call.args.first() {
+                    Some(Value::Function(def)) => Site::Inline {
+                        path: path.into(),
+                        def: def.clone(),
+                        name: format!("{method} {full}"),
+                    },
+                    Some(Value::Ref(name)) => match code.definition(path, scope, name) {
+                        Some(t) => Site::Def {
+                            path: t.path.into(),
+                            name: t.name.into(),
+                        },
+                        None => Site::File(path.into()),
+                    },
+                    _ => Site::File(path.into()),
+                };
+                found.push(provider(site, contract(&method, &full)));
+            }
         }
     }
     found
@@ -1416,6 +1596,7 @@ impl ContractKind for Http {
         }
         found.extend(clients(code));
         found.extend(express(code, &mut literals));
+        found.extend(axum(code));
         found.extend(decorated(code));
         found.extend(django(code));
         found

@@ -1874,6 +1874,59 @@ fn rust() {
     assert!(!export.contains("orphan.rs"));
 }
 
+/// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
+/// built in another module, one router under two prefixes, chained method routers, `any`, a
+/// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot
+/// read is served nowhere.
+#[test]
+fn rust_axum_routes_are_providers_under_every_prefix() {
+    let (_, actual) = providers("rust_axum", "conformance-rust", "crates/web/src/");
+    let items = |prefix: &str| {
+        let at = |path: &str, m: &str, handler: &str| {
+            (
+                format!("http::{m}::{prefix}{path}"),
+                format!("crates/web/src/items.rs::{handler}"),
+            )
+        };
+        vec![
+            at("/items", "GET", "list"),
+            at("/items", "POST", "create"),
+            at("/items/{}", "GET", "show"),
+            at("/items/{}", "PUT", "update"),
+            at("/items/{}", "PATCH", "update"),
+            at("/items/{}", "DELETE", "remove"),
+            at("/items/{}/tags", "POST", "create"),
+            at("/items/{}/tags", "HEAD", "show"),
+            at("/items/{}/tags", "OPTIONS", "show"),
+        ]
+    };
+    let mut expected: Vec<(String, String)> = [
+        // `nest(API, api)` reads the constant from another module; the closure is named for
+        // its route.
+        (
+            "http::GET::/api/ping",
+            "crates/web/src/lib.rs::app.GET /api/ping",
+        ),
+        // `merge` adds no prefix; `any` serves every method.
+        ("http::GET::/health", "crates/web/src/health.rs::check"),
+        ("http::ANY::/echo", "crates/web/src/health.rs::echo"),
+        ("http::GET::/files/{}", "crates/web/src/files.rs::read"),
+        ("http::GET::/blobs/{}", "crates/web/src/files.rs::read"),
+        // A router a function receives and returns, mounted under a literal.
+        ("http::GET::/admin/stats", "crates/web/src/admin.rs::stats"),
+        ("http::POST::/admin/reset", "crates/web/src/admin.rs::reset"),
+        // `orphans::router` is nested under a prefix that is a parameter: no provider at
+        // `/never`, under any prefix.
+    ]
+    .into_iter()
+    .map(|(c, s)| (c.to_string(), s.to_string()))
+    .collect();
+    expected.extend(items("/api/v1"));
+    expected.extend(items("/api/v2"));
+    expected.sort();
+    assert_eq!(actual, expected);
+}
+
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
 /// `pub use`; `pub(crate)` and narrower items stay inside it (the `exports` table, read as the
 /// next ticket's cross-repository imports do).
