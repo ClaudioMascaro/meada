@@ -196,7 +196,7 @@ repositorio (cada `Cargo.toml` con `[package]`, en cualquier carpeta, cada crate
 por el árbol de módulos que arman sus `mod`, sin toolchain Rust: un archivo al que ningún `mod`
 llega queda fuera) con sus funciones, tipos, traits, módulos y métodos de `impl` y las llamadas
 escritas como ruta (`crate::a::f()`, `Tipo::new()`, `Self::f()`), también por `use` (grupos,
-renombres, globs, `pub use` y los otros crates del workspace por nombre; las de dentro de macros
+renombres, globs, `pub use` y los otros crates del workspace por nombre; las de método (`x.m()`) por el tipo del receptor cuando el código lo escribe (`let`, parámetro, campo, `self`, retorno de función; un `dyn Trait` o genérico con trait va al método del trait), si no por el nombre; las de dentro de macros
 no se indexan, y contratos Rust además de los paquetes aún no), y enlaza repositorios, también de un
 lenguaje al otro,
 por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` del lado que consume;

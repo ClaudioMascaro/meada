@@ -1,0 +1,16 @@
+example.com/acme/conformance api/src/methods.rs:37-39 Counter.bump
+community: api/src#5
+processes: none
+pub fn bump(&mut self) {
+        self.hits += 1;
+    }
+callers:
+example.com/acme/conformance api/src/methods.rs:48 Counter.twice
+example.com/acme/conformance api/src/methods.rs:49 Counter.twice
+example.com/acme/conformance api/src/methods.rs:95 annotated
+example.com/acme/conformance api/src/methods.rs:108 Dash.tick
+example.com/acme/conformance api/src/methods.rs:123 built
+example.com/acme/conformance api/src/methods.rs:158 named [ambiguous: 2 methods named bump]
+example.com/acme/conformance api/src/methods.rs:173 shadowed [ambiguous: 2 methods named bump]
+example.com/acme/conformance api/src/methods.rs:178 retyped [ambiguous: 2 methods named bump]
+callees: none

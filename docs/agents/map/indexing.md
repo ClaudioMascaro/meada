@@ -220,9 +220,21 @@ modules updates it.
 - `lang/rust.rs` (spec #30) yields free functions (`Kind::Function`), structs, enums, unions
   and traits (`Kind::Class`), modules written in place (`Kind::Module`), methods of an `impl`
   (`Type.method`, or `Type.Trait.method` in a trait's block, `Kind::Method`) and trait methods
-  with a body (`Trait.method`); closures are no definitions, their calls belong to the function
+  and required methods (`Trait.method`); closures are no definitions, their calls belong to the function
   around them and their parameters are its locals, as `let`, `for`, `if let`/`while let` and
-  match arm patterns are. A method's `self` is a `Param` with `Binds::Instance`. Each `impl`
+  match arm patterns are. A method's `self` is a `Param` with `Binds::Instance` and a
+  `Receiver` of `Class::Enclosing`. Receivers (`Facts::receivers`) also come from a parameter
+  or a `let` of a plain name with a written type, from a struct's named field (at the struct's
+  scope), and from a `let` holding a call of a name or a path (`Class::Returned`, the callee as
+  the call spells it: the resolver gives the class `Def::result` names, `Self` included, the
+  class itself for a constructor, and an outside crate's call stays outside). A type is read
+  as written (`written`): `&T` and `&mut T` as `T`, `dyn Trait`, `impl Trait` and a type
+  parameter (`<T: Trait>` or `where T: Trait`, of the function, `impl` or struct around)
+  bounded by exactly one trait as that trait, a primitive or a path as a path normalized like a
+  call's (an outside crate's or the prelude's type, `Box<T>` and `Vec<T>` included, is in `Facts::externs`, so opaque); anything else (tuples,
+  slices, several bounds, `T::Item`) names no type, and a `let` of it is a local
+  that hides the name. A `let` with a written type and one that disagrees, in a scope, leave
+  the class unknown. `Def::result` is the same reading of a function's return type. Each `impl`
   is a `Facts::impls` entry (its type and trait as callee-like names, from the scope around
   it); a block whose method names one already defined takes the next free `#n` scope
   (`E.From#2`), so each body is its own symbol. A `mod x;` declaration is a `Kind::Module`
@@ -283,7 +295,9 @@ modules updates it.
   `member` tries `block_member` first (the inherent blocks' `scope.m`, else the trait blocks'
   `scope.m` or their traits' default `Trait.m`; several at that step are `Binding::Several`,
   which `call` answers as `Ambiguous` with exactly them), then the class's own `Class.m`, and
-  `class` (the `receiver` keyword, `Self`) answers the block's type inside a block. A
+  `class` (the `receiver` keyword, `Self`) answers the block's type inside a block. `instance`
+  reads `Class::Returned` through `returned`: the callee resolved as a call (a path with
+  `path_binding`), its definition's `Def::result` resolved from the function's own scope. A
   `Kind::Module` definition is a member chain like a function (`inner.helper`); one an import
   of its own name binds to a file (`mod store;`) has that file's exports as members; `lexical`
   stops climbing at one, so a module written in place does not see the names around it (only

@@ -691,7 +691,10 @@ sample.rs
         "start": 278,
         "end": 316
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "u32"
+      }
     },
     {
       "name": "Store.new",
@@ -705,7 +708,10 @@ sample.rs
           "name": "path",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "Self"
+      }
     },
     {
       "name": "Store.empty",
@@ -719,7 +725,10 @@ sample.rs
           "name": "",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "Self"
+      }
     },
     {
       "name": "inner",
@@ -744,7 +753,7 @@ sample.rs
       "kind": "Function",
       "range": {
         "start": 701,
-        "end": 787
+        "end": 837
       },
       "params": [
         {
@@ -935,10 +944,27 @@ sample.rs
     },
     {
       "scope": "save",
+      "callee": "Store.new",
+      "range": {
+        "start": 745,
+        "end": 760
+      },
+      "by_path": true
+    },
+    {
+      "scope": "save",
       "callee": "store.flush",
       "range": {
-        "start": 734,
-        "end": 747
+        "start": 766,
+        "end": 779
+      }
+    },
+    {
+      "scope": "save",
+      "callee": "made.flush",
+      "range": {
+        "start": 785,
+        "end": 797
       }
     }
   ],
@@ -948,7 +974,36 @@ sample.rs
     "Store.empty.size",
     "Store.empty.run"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Store",
+      "name": "n",
+      "class": {
+        "Type": "u32"
+      }
+    },
+    {
+      "scope": "Store.new",
+      "name": "path",
+      "class": {
+        "Type": "str"
+      }
+    },
+    {
+      "scope": "save",
+      "name": "store",
+      "class": {
+        "Type": "Store"
+      }
+    },
+    {
+      "scope": "save",
+      "name": "made",
+      "class": {
+        "Returned": "Store.new"
+      }
+    }
+  ],
   "impls": [
     {
       "scope": "Store",
@@ -963,7 +1018,9 @@ sample.rs
     }
   ],
   "externs": [
-    "std"
+    "std",
+    "str",
+    "u32"
   ],
   "private": [
     "disk",
