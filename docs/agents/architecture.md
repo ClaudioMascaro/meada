@@ -669,7 +669,7 @@ one for the area a change touches.
   bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
   `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
   (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
-  Poetry root declarations; one that does not parse fails the refresh with its name. `src` is a source root when nothing is declared, whether or not it holds
+  Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an

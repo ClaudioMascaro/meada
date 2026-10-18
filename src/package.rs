@@ -608,17 +608,7 @@ fn python_roots(manifest: &Manifest) -> Vec<String> {
         "." => "",
         dir => dir,
     };
-    let join = |root: &str| match base {
-        "" => root.to_string(),
-        base => format!("{base}/{root}"),
-    };
-    let declared = &manifest.summary.roots;
-    let mut roots = vec![base.to_string()];
-    match declared.is_empty() {
-        true => roots.push(join("src")),
-        false => roots.extend(declared.iter().map(|r| join(r))),
-    }
-    roots
+    python::pyproject::source_roots(base, &manifest.summary.roots)
 }
 
 /// The program entry points the console scripts of the PyPI manifests name, as the file of the

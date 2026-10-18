@@ -1689,13 +1689,19 @@ fn python_class_families_are_linearized_once() {
 }
 
 #[test]
-fn python_pyproject_that_does_not_parse_names_the_file() {
-    let repo = fixture_repo("python_roots_invalid", "python-roots", Some(ORIGIN));
-    std::fs::write(repo.join("pyproject.toml"), "[tool\n").unwrap();
-
-    let error = Engine::open(&repo).and_then(|e| e.export()).unwrap_err();
-
-    assert!(error.to_string().contains("pyproject.toml"), "{error}");
+fn python_pyproject_that_cannot_be_read_declares_no_roots() {
+    let exact = Some("exact".to_string());
+    // Hostile input: a file that is not TOML, or one past the size limit, still indexes, as
+    // a pyproject that declares nothing (`src` is a root, `lib` is not).
+    assert_eq!(
+        python_roots("python_roots_invalid", "[tool\n"),
+        [None, exact.clone()]
+    );
+    let large = format!(
+        "[tool.setuptools.package-dir]\n\"\" = \"lib\"\n# {}\n",
+        "x".repeat(1 << 20)
+    );
+    assert_eq!(python_roots("python_roots_large", &large), [None, exact]);
 }
 
 /// The consumers of the Python conformance fixture's export in `file` of `clients/`.

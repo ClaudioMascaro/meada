@@ -173,8 +173,9 @@ modules updates it.
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
-  `packages.from`, read by `lang/python/pyproject.rs`, which the PyPI package reader shares), or
-  `src` when none is declared; a package comes before a module of the same name.
+  `packages.from`, read by `lang/python/pyproject.rs` through the PyPI manifest reader, so an
+  unreadable file declares nothing), or `src` when none is declared (`pyproject::source_roots`,
+  which `package::python_roots` shares); a package comes before a module of the same name.
   An `if __name__ == "__main__":` block at the top level (either operand order, either quote,
   nothing else) yields the definition `__main__`, spanning the `if` and its body (an `else` is
   not part of it), owns the calls in that body, and is named in `Facts::programs`.

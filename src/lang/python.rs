@@ -10,6 +10,7 @@ use super::{
     LanguagePack, Message, Modules, Param, Part, Receiver, Star, TYPE_DEPTH, Value, children,
     literal, named, text,
 };
+use crate::package::read_manifest;
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
@@ -298,21 +299,11 @@ impl LanguagePack for Python {
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
-        let declared = match configs.first() {
-            Some((name, src)) => (pyproject::Pyproject::parse(src))
-                .map_err(|e| format!("{name}: {e}"))?
-                .roots(),
-            None => Vec::new(),
-        };
-        // The repository root, then the declared roots; a `src` directory when none is
-        // declared.
-        // ponytail: `src` is a root whether or not it holds packages, since a pack sees no
-        // file list.
-        let mut roots = vec![String::new()];
-        if declared.is_empty() {
-            roots.push("src".to_string());
-        }
-        roots.extend(declared);
+        // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
+        // nothing, and indexing carries on.
+        let declared =
+            (configs.first()).map_or_else(Vec::new, |(name, src)| read_manifest(name, src).roots);
+        let roots = pyproject::source_roots("", &declared);
         Ok(Box::new(move |importer, specifier| {
             let dots = specifier.bytes().take_while(|&b| b == b'.').count();
             let name = specifier[dots..].replace('.', "/");
