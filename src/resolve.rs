@@ -184,8 +184,8 @@ pub struct Resolver<'a> {
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
     /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
-    /// them, and how many of them each top-level name comes before: those written after its
-    /// last binding (`rebound`).
+    /// them and the last of one specifier alone, and how many of them each top-level name comes
+    /// before: those written after its last binding (`rebound`).
     later: HashMap<&'a str, (Vec<&'a str>, HashMap<&'a str, usize>)>,
 }
 
@@ -239,9 +239,13 @@ impl<'a> Resolver<'a> {
         let later = (files.iter().filter(|_| stars_bind))
             .filter_map(|(path, facts)| {
                 let (mut stars, mut after) = (Vec::new(), HashMap::new());
+                let mut sources = HashSet::new();
                 for export in &facts.exports {
                     match export {
-                        Export::All { source } => stars.push(source.as_str()),
+                        // The latest of one module's star imports is the one that decides.
+                        Export::All { source } if sources.insert(source.as_str()) => {
+                            stars.push(source.as_str());
+                        }
                         Export::Local { exported, .. } if !stars.is_empty() => {
                             after.insert(exported.as_str(), stars.len());
                         }
@@ -2174,6 +2178,18 @@ mod tests {
         ]);
         let found = exact_in(&Python, &sources, "main.py", "x");
         assert_eq!(found.as_deref(), Some("b.py"));
+    }
+
+    #[test]
+    fn a_star_import_written_many_times_is_followed_once() {
+        // Each call of `x` walks the star imports after `def x()`: once per module, or the calls
+        // take time quadratic in the lines.
+        let n = 5_000;
+        let stars = "from m import *\n".repeat(n);
+        let main = format!("def x():\n    pass\n{stars}{}", "x()\n".repeat(n));
+        let sources = owned(&[("m.py", "def y():\n    pass\n"), ("main.py", &main)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("main.py"));
     }
 
     #[test]
