@@ -98,8 +98,20 @@ enum Ancestor<'a> {
 }
 
 /// A class and its ancestors in method resolution order (C3), or `None` when they have none:
-/// C3 rejects the hierarchy, or the bases form a cycle.
+/// C3 rejects the hierarchy, the bases form a cycle, or the family is longer than
+/// `FAMILY_DEPTH`.
 type Family<'a> = Option<Vec<Ancestor<'a>>>;
+
+/// The most classes a family holds, and so the deepest the linearization recurses down the
+/// bases. A longer family is absent: every member of the class is unknown.
+// ponytail: real hierarchies hold a few dozen classes; the limit keeps a crafted chain of
+// thousands from overflowing the stack and from keeping families quadratic in its length.
+const FAMILY_DEPTH: usize = 128;
+
+/// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
+/// families being resolved: no family is kept on the way up, since the cut depends on where
+/// the walk started.
+struct Cut;
 
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
@@ -345,19 +357,45 @@ impl<'a> Resolver<'a> {
     /// `class` and its ancestors in C3 order, from the bases each class writes: Python's
     /// method resolution order. Without written bases (TypeScript) it is `class` alone.
     fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
+        let first = !(work.busy.iter()).any(|b| matches!(b, Busy::Family(_)));
+        self.lineage(class, work).unwrap_or_else(|Cut| {
+            // From no other family, the cut is the class's own: longer than the limit.
+            if first {
+                work.families.insert(class, None);
+            }
+            None
+        })
+    }
+
+    /// `family`, or `Cut` when the bases nest deeper than `FAMILY_DEPTH` below the families
+    /// `work` is resolving.
+    fn lineage(&self, class: Target<'a>, work: &mut Work<'a>) -> Result<Family<'a>, Cut> {
         if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
-            return family.clone();
+            return Ok(family.clone());
         }
         let key = Busy::Family(class);
         if work.busy.contains(&key) {
-            return None;
+            return Ok(None);
+        }
+        if (work.busy.iter())
+            .filter(|b| matches!(b, Busy::Family(_)))
+            .count()
+            >= FAMILY_DEPTH
+        {
+            return Err(Cut);
         }
         work.busy.push(key);
         let bases = self.bases(class, work);
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {
-                Ancestor::Class(base) => self.family(*base, work),
+                Ancestor::Class(base) => match self.lineage(*base, work) {
+                    Ok(family) => family,
+                    Err(cut) => {
+                        work.busy.pop();
+                        return Err(cut);
+                    }
+                },
                 Ancestor::Opaque(_) => Some(vec![base.clone()]),
             });
         }
@@ -367,7 +405,7 @@ impl<'a> Resolver<'a> {
             .map(|rest| [Ancestor::Class(class)].into_iter().chain(rest).collect());
         work.busy.pop();
         work.families.insert(class, family.clone());
-        family
+        Ok(family)
     }
 
     /// What each base `class` writes is, in order, resolved from the scope enclosing it.
@@ -658,7 +696,8 @@ impl<'a> Resolver<'a> {
 }
 
 /// The C3 merge of `lists`: repeatedly the first head that is in no list's tail. `None` when
-/// none is.
+/// none is, or when it would make a family (the class, then the merge) longer than
+/// `FAMILY_DEPTH`.
 fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
     let mut merged = Vec::new();
     loop {
@@ -675,6 +714,9 @@ fn merge(mut lists: Vec<Vec<Ancestor>>) -> Option<Vec<Ancestor>> {
             }
         }
         merged.push(head);
+        if merged.len() >= FAMILY_DEPTH {
+            return None;
+        }
     }
 }
 
@@ -1596,5 +1638,48 @@ fn unbind(value: Value) -> Value {
         ),
         Value::List(items) => Value::List(items.into_iter().map(unbind).collect()),
         other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::python::Python;
+
+    /// A Python file of `n` classes, each but the first deriving from the one before and
+    /// calling `self.m()`, which only the first defines; in reverse source order when `reverse`.
+    fn chain(n: usize, reverse: bool) -> String {
+        let mut classes = vec!["class C0:\n    def m(self):\n        pass\n".to_string()];
+        for i in 1..n {
+            let p = i - 1;
+            classes.push(format!(
+                "class C{i}(C{p}):\n    def go(self):\n        self.m()\n"
+            ));
+        }
+        if reverse {
+            classes.reverse();
+        }
+        classes.join("\n\n")
+    }
+
+    #[test]
+    fn a_family_longer_than_the_limit_is_absent() {
+        // Far past the limit: a recursion down the bases that does not stop overflows the
+        // stack, and families kept whole take memory quadratic in the chain.
+        let n = 5_000;
+        for reverse in [false, true] {
+            let facts = Python.parse("a.py", chain(n, reverse).as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let exact = |class: usize| {
+                let scope = format!("C{class}.go");
+                let call = facts.calls.iter().find(|c| c.scope == scope).unwrap();
+                matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "C0.m")
+            };
+
+            assert!(exact(FAMILY_DEPTH - 1), "reverse: {reverse}");
+            assert!(!exact(FAMILY_DEPTH), "reverse: {reverse}");
+            assert!(!exact(n - 1), "reverse: {reverse}");
+        }
     }
 }

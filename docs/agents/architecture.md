@@ -470,7 +470,9 @@ one for the area a change touches.
   does not follow it either; nor a name its scope binds more than once, or an attribute not
   assigned a call once in its class); a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
-  makes the names it may override unknown.
+  makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
+  its ancestors in C3 order) longer than that is absent, so every member of the class is
+  unknown (a name match at most), and the linearization recurses no deeper down the bases.
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
