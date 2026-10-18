@@ -199,7 +199,7 @@
     },
     {
       "path": "rebound.py",
-      "hash": "33176ca8342ac70efa50ae5c391f57896b8bb95b8737b808a323fe5a1d5f26a1"
+      "hash": "c1038f8157f96eeec8336b0cf5d546d631af9adbbf986651f267be7c5ca5eacc"
     },
     {
       "path": "receivers.py",
@@ -2933,6 +2933,22 @@
         "path": "rebound.py",
         "start": 190,
         "end": 215
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::nested",
+      "span": {
+        "path": "rebound.py",
+        "start": 358,
+        "end": 432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::nested.inner",
+      "span": {
+        "path": "rebound.py",
+        "start": 376,
+        "end": 405
       }
     },
     {
@@ -8278,6 +8294,17 @@
         "path": "methods.py",
         "start": 1384,
         "end": 1396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::nested::inner#0",
+      "caller": "example.com/acme/conformance::rebound.py::nested",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "rebound.py",
+        "start": 425,
+        "end": 432
       }
     },
     {
@@ -15690,6 +15717,20 @@
             "example.com/acme/conformance::geometry/shapes.py::Circle.area",
             "example.com/acme/conformance::geometry/shapes.py::Shape.area"
           ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::rebound.py::nested",
+      "kind": "export",
+      "label": "nested",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::rebound.py::nested"
         }
       ]
     },

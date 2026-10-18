@@ -67,8 +67,9 @@ All notable changes to Meada are recorded here. The format follows
 - A Python top-level name bound again after its definition (`def x(): ...`, then `x = 1`, an
   import of `x` or any other binding, a function's `global x` included) is no longer linked
   `exact` to that definition: the last binding decides, and a call reaches the definition by
-  name match at most. After `del x` the name reaches nothing it was bound to before, at the top
-  level or in a function. A module's `__all__` grown by literal names (`+=`, `.extend`,
+  name match at most. So is a function's nested `def` or `class` bound again in that function,
+  or by a nested function's `nonlocal`. After `del x` the name reaches nothing it was bound to
+  before, at the top level or in a function. A module's `__all__` grown by literal names (`+=`, `.extend`,
   `.append` at its top level) gives a star import the names it adds, and one changed any other
   way is read as computed, so a star import of it no longer takes a stale set of names.
 - A name two `export *` of one module give differently is no longer linked `exact` to the first

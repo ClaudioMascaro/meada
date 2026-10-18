@@ -686,6 +686,8 @@ fn python() {
             "methods.py::use",
             "rebound.py::deleted",
             "rebound.py::grown",
+            "rebound.py::nested",
+            "rebound.py::nested.inner",
             "rebound.py::reach",
             "rebound.py::replaced",
             "scopes.py::Helper",
@@ -1349,6 +1351,9 @@ fn python() {
                 EXACT,
                 &["stars/grown.py::grown"],
             ),
+            // So does the last binding in a function: a nested definition rebound later is not
+            // what its name reaches, and no name match finds a nested one.
+            ("rebound.py::nested::inner#0", None, &[]),
             // A class body's names are in scope for its own statements, not for its methods.
             (
                 "scopes.py::Outer::Helper#0",

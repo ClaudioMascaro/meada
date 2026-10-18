@@ -134,8 +134,9 @@ impl LanguagePack for Python {
                     if let Some(name) = node.child_by_field_name("name") {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
-                        if scope.is_empty() {
-                            module.def(name);
+                        match scope.is_empty() {
+                            true => module.def(name),
+                            false => locals.def(&scope, name),
                         }
                         if defined.insert(inner.clone()) {
                             if !is_class {
@@ -340,7 +341,9 @@ impl LanguagePack for Python {
         }
         facts.locals.extend(module.hidden.iter().cloned());
         (facts.exports, facts.star) = module.exports();
-        (facts.receivers, facts.consts) = locals.finish();
+        let hidden;
+        (facts.receivers, facts.consts, hidden) = locals.finish();
+        facts.locals.extend(hidden);
         Ok(facts)
     }
 
@@ -680,6 +683,9 @@ struct Locals {
     declared: HashMap<(String, String), bool>,
     /// The scopes that are class bodies.
     classes: HashSet<String>,
+    /// Every `def` and `class` in a function or class body, in source order: the position in
+    /// `written` it comes at, its scope and name.
+    defs: Vec<(usize, String, String)>,
     /// The value each `name = value` assigns, by the position of its binding in `written`.
     values: Vec<(usize, Value)>,
 }
@@ -687,6 +693,11 @@ struct Locals {
 impl Locals {
     fn bind(&mut self, scope: &str, name: &str, class: Class, how: Evidence) {
         (self.written).push((scope.to_string(), name.to_string(), class, how));
+    }
+
+    /// A `def` or `class` of `name` in the function or class body `scope`.
+    fn def(&mut self, scope: &str, name: &str) {
+        (self.defs).push((self.written.len(), scope.to_string(), name.to_string()));
     }
 
     /// Binds a target: a name in `scope`, or `self.x` as the attribute `x` of the class whose
@@ -853,10 +864,13 @@ impl Locals {
     /// already lists it). A name declared `global` is bound at the module; one declared
     /// `nonlocal`, in the nearest enclosing function that binds it, class bodies skipped. An
     /// annotation decides; other bindings that disagree make the class unknown. A name its
-    /// scope binds once, by `name = value`, is also a constant holding that value.
-    fn finish(self) -> (Vec<Receiver>, Vec<Const>) {
+    /// scope binds once, by `name = value`, is also a constant holding that value. Last, the
+    /// definitions in a function whose name its last binding there is not (`Facts::locals`).
+    fn finish(self) -> (Vec<Receiver>, Vec<Const>, Vec<String>) {
+        let defs = (self.defs.iter()).map(|(_, scope, name)| (scope.as_str(), name.as_str()));
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
+            .chain(defs)
             .filter(|&(scope, name)| !self.declared.contains_key(&(scope.into(), name.into())))
             .collect();
         let home = |scope: &str, name: &str| -> String {
@@ -883,6 +897,31 @@ impl Locals {
         for key in &homes {
             *times.entry(key).or_default() += 1;
         }
+        // The last binding of each name in its function decides: a definition is hidden when the
+        // name is bound after it there, or from a nested function through `nonlocal`, which may
+        // run at any time. A class body's is not: `self.m()` reads a method through its class.
+        // ponytail: so a class-body `m = None` after `def m` leaves `self.m()` linked to it;
+        // `Resolver::member` would have to read hidden names, at the cost of
+        // `m = staticmethod(m)`'s right link.
+        let mut last: HashMap<(&str, &str), usize> = HashMap::new();
+        for (at, (home, name)) in homes.iter().enumerate() {
+            let at = match *home == self.written[at].0 {
+                true => at,
+                false => usize::MAX,
+            };
+            let latest = last.entry((home.as_str(), name.as_str())).or_default();
+            *latest = (*latest).max(at);
+        }
+        let mut defined: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+        for (at, scope, name) in &self.defs {
+            if !self.classes.contains(scope) {
+                defined.insert((scope.as_str(), name.as_str()), *at);
+            }
+        }
+        let hidden = (defined.into_iter())
+            .filter(|(key, at)| last.get(key).is_some_and(|latest| latest >= at))
+            .map(|((scope, name), _)| qualify(scope, name))
+            .collect();
         let consts = (self.values.into_iter())
             .filter(|(at, _)| times[&homes[*at]] == 1 && homes[*at].0 == self.written[*at].0)
             .map(|(at, value)| Const {
@@ -907,7 +946,7 @@ impl Locals {
             .filter(|(_, (_, how))| *how != Evidence::Param)
             .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
-        (locals, consts)
+        (locals, consts, hidden)
     }
 }
 

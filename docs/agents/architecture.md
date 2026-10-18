@@ -707,8 +707,12 @@ one for the area a change touches.
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
   tuple, grown by literal names at the top level (`+=`, `.extend`, `.append`); any other change
   to it, or one in a function, makes it computed. A name `del` unbinds (at the top level,
-  unless bound again), and a top-level definition another binding follows, are hidden in their
-  whole scope, wherever the call sits (the safe side: a name match instead of `exact`). A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  unless bound again), and a definition another binding of its scope follows (at the top level
+  or in a function, where a nested function's `nonlocal` binding counts as following), are
+  hidden in their whole scope, wherever the call sits (the safe side: a name match instead of
+  `exact`). In a class body a binding after a method hides nothing: `self.m()` reads the method
+  through its class, right for `m = staticmethod(m)` and as `@property` is read for `m =
+  property(m)`, but a class-body `m = None` leaves `self.m()` linked to `def m`. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
   Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
   table form (`{ callable = "...", extras = [...] }`) is left out, and so are
   `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the

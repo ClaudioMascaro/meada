@@ -2354,6 +2354,58 @@ mod tests {
     }
 
     #[test]
+    fn a_binding_after_a_nested_definition_hides_it() {
+        // In a function the last binding of `g` decides too: one after `def g()` or `class g`
+        // (an assignment, an import, any other binding, a nested function's `nonlocal g`,
+        // which may run at any time) leaves `g` no longer the definition, for a call in the
+        // function or in one nested in it.
+        let a = ("a.py", "def y():\n    pass\n");
+        let def = "    def g():\n        pass\n";
+        let nonlocal = "    def h():\n        nonlocal g\n        g = 1\n";
+        for def in [def, "    class g:\n        pass\n"] {
+            for binding in [
+                "    g = 1\n",
+                "    g: int = 1\n",
+                "    g += 1\n",
+                "    y, g = k()\n",
+                "    from a import y as g\n",
+                "    import a as g\n",
+                "    with open(p) as g:\n        pass\n",
+                "    for g in gs:\n        pass\n",
+                "    try:\n        pass\n    except E as g:\n        pass\n",
+                "    (g := k())\n",
+                "    match v:\n        case g:\n            pass\n",
+                nonlocal,
+            ] {
+                for call in ["    g()\n", "    def i():\n        g()\n"] {
+                    let main = format!("def f():\n{def}{binding}{call}");
+                    let found = exact_in(&Python, &owned(&[a, ("main.py", &main)]), "main.py", "g");
+                    assert_ne!(found.as_deref(), Some("main.py"), "{main}");
+                }
+            }
+        }
+        let before = format!("def f():\n{nonlocal}{def}    g()\n");
+        let found = exact_in(&Python, &owned(&[("main.py", &before)]), "main.py", "g");
+        assert_eq!(found, None, "{before}");
+        // `global g` rebinds the module's `g`, not `f`'s, and a definition after the binding is
+        // the name's again.
+        let global = "    def h():\n        global g\n        g = 1\n";
+        for main in [
+            format!("def f():\n{def}{global}    g()\n"),
+            format!("def f():\n    g = 1\n{def}    g()\n"),
+        ] {
+            let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", "g");
+            assert_eq!(found.as_deref(), Some("main.py"), "{main}");
+        }
+        // A class body's binding hides no method: `self.m()` reads the definition through the
+        // class, as it does under `@staticmethod`, and `m = staticmethod(m)` calls it.
+        let class = "class C:\n    def m():\n        pass\n    m = staticmethod(m)\n\
+                     \n    def n(self):\n        self.m()\n";
+        let found = exact_in(&Python, &owned(&[("main.py", class)]), "main.py", "self.m");
+        assert_eq!(found.as_deref(), Some("main.py"));
+    }
+
+    #[test]
     fn a_grown_all_decides_what_a_star_import_takes() {
         // `pkg`'s literal `__all__` grows by literal names at its top level: a star import of it
         // after `def x()` rebinds `x` to `pkg`'s once `x` is added.

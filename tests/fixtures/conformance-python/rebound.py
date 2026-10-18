@@ -26,3 +26,12 @@ def reach():
     replaced()
     deleted()
     grown()
+
+
+# So does the last binding in a function.
+def nested():
+    def inner():
+        return 5
+
+    inner = 6
+    inner()
