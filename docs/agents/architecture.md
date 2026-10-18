@@ -685,7 +685,10 @@ one for the area a change touches.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
-  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; what
+  mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
+  walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
+  module included under several prefixes is read once for each), so the entries past it yield
+  no provider; what
   an extension of `urlpatterns` adds other than a list literal is left out (marked in
   `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
   yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf

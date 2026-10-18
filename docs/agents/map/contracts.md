@@ -84,7 +84,7 @@ modules updates it.
   `shop.urls`), and no `include()` is `Unknown` (then there is no root). Its `path()` and
   `re_path()` entries (`Code::origins` of `urlpatterns`) are walked top-down, an `include()`
   view adding its route before the entries it holds, at any depth, an `include()` met again
-  on the walk (a cycle) adding nothing. Routes join as Django joins them (plain concatenation). A
+  on the walk (a cycle) adding nothing, every entry read charged to `URLCONF_BUDGET`. Routes join as Django joins them (plain concatenation). A
   `re_path()` pattern is read only when it holds literal text and `(?P<name>...)` groups
   (`regex_route`); any other yields nothing. A function view (`Code::definition`) serves what
   `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from

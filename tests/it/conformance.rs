@@ -1534,6 +1534,51 @@ fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
     assert_eq!(json["providers"], serde_json::json!([]));
 }
 
+/// The leaf routes of a ladder of `levels` URLconfs, each including the next twice.
+fn django_ladder(case: &str, levels: usize) -> Vec<String> {
+    let repo = fixture_repo(case, "python-django", Some(ORIGIN));
+    let dir = repo.join("ladder");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::write(dir.join("__init__.py"), "").unwrap();
+    std::fs::write(dir.join("views.py"), "def leaf(request):\n    pass\n").unwrap();
+    for n in 0..levels {
+        let next = n + 1;
+        let include =
+            |prefix: &str| format!("    path(\"{prefix}/\", include(\"ladder.l{next}\")),\n");
+        let src = format!(
+            "from django.urls import include, path\n\nurlpatterns = [\n{}{}]\n",
+            include("a"),
+            include("b")
+        );
+        std::fs::write(dir.join(format!("l{n}.py")), src).unwrap();
+    }
+    let leaf = "from django.urls import path\n\nfrom ladder.views import leaf\n\n\
+                urlpatterns = [path(\"x\", leaf)]\n";
+    std::fs::write(dir.join(format!("l{levels}.py")), leaf).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let site = format!("{REPO}::ladder/views.py::leaf");
+    (json["providers"].as_array().unwrap().iter())
+        .filter(|p| p["site"] == site.as_str())
+        .map(|p| p["contract"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn python_django_includes_are_read_to_a_budget() {
+    // A module included under two prefixes serves its routes under both.
+    let mut routes = django_ladder("python_django_diamond", 2);
+    routes.sort();
+    assert_eq!(
+        routes,
+        ["/a/a/x", "/a/b/x", "/b/a/x", "/b/b/x"].map(|p| format!("http::ANY::{p}"))
+    );
+    // A ladder of 24 levels has 2^24 paths: the budget stops the walk well before them.
+    let routes = django_ladder("python_django_ladder", 24);
+    assert!(!routes.is_empty());
+    assert!(routes.len() < 1 << 20, "{}", routes.len());
+}
+
 #[test]
 fn python_routers_whose_mount_is_not_seen_are_not_served_at_the_root() {
     let (_, actual) = providers("python_mounts", "python-mounts", "");

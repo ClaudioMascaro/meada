@@ -1030,6 +1030,13 @@ const VIEW_METHODS: &[&str] = &[
 const DJANGO_PATH: &str = "django.urls.path";
 const DJANGO_RE_PATH: &str = "django.urls.re_path";
 const DJANGO_INCLUDE: &str = "django.urls.include";
+
+/// How many URLconf entries `django` reads, over every root and every `include()` it follows.
+/// A module included under several prefixes is read once for each, so a crafted ladder of
+/// modules each including the next twice has as many paths as two to its height; past the
+/// budget the remaining entries yield no provider.
+// ponytail: real projects have a few thousand routes at most; 2^15 entries is far past them.
+const URLCONF_BUDGET: usize = 1 << 15;
 const DJANGO_HTTP: &str = "django.views.decorators.http.";
 
 /// A `re_path()` pattern as a route: literal text and simple named groups (`(?P<name>...)`),
@@ -1247,16 +1254,17 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
             }
         }
     }
-    let mut found = Vec::new();
+    let (mut found, mut budget) = (Vec::new(), URLCONF_BUDGET);
     for root in roots {
         let entries = code.origins(root, "", "urlpatterns");
-        urlconf(code, entries, "", &mut Vec::new(), &mut found);
+        urlconf(code, entries, "", &mut Vec::new(), &mut budget, &mut found);
     }
     found
 }
 
 /// The providers of URLconf `entries` under `prefix`; `stack` holds the `include()` calls
-/// being followed, so one met again (a cycle) adds nothing.
+/// being followed, so one met again (a cycle) adds nothing. Each entry read is charged to
+/// `budget`; once it is spent, nothing more is read.
 // ponytail: `django.conf.urls.url`, a view wrapped in a call (`require_POST(view)`), a handler
 // method a class-based view inherits and `as_view()` on a class outside the repository yield
 // nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
@@ -1266,9 +1274,14 @@ fn urlconf<'a>(
     entries: Vec<CallAt<'a>>,
     prefix: &str,
     stack: &mut Vec<CallAt<'a>>,
+    budget: &mut usize,
     found: &mut Vec<Found>,
 ) {
     for entry @ (path, n) in entries {
+        let Some(left) = budget.checked_sub(1) else {
+            return;
+        };
+        *budget = left;
         let regex = match (
             is_call(code, entry, DJANGO_PATH),
             is_call(code, entry, DJANGO_RE_PATH),
@@ -1317,7 +1330,7 @@ fn urlconf<'a>(
                     continue;
                 }
                 stack.push(origin);
-                urlconf(code, included(code, at, i), &route, stack, found);
+                urlconf(code, included(code, at, i), &route, stack, budget, found);
                 stack.pop();
             } else if let Some(class) = origin_call.callee.strip_suffix(".as_view")
                 && let Some(class) = code.definition(at, &origin_call.scope, class)
