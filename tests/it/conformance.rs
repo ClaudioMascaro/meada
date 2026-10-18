@@ -461,6 +461,7 @@ fn python() {
             "receivers.py::fallback",
             "receivers.py::lacking",
             "receivers.py::optional",
+            "reports/__init__.py::build",
             "cycles.py::Ping",
             "cycles.py::Ping.go",
             "cycles.py::Pong",
@@ -559,6 +560,15 @@ fn python() {
             "geometry/units.py::to_cm",
             "helpers.py::clamp",
             "helpers.py::format_name",
+            "jobs/internal.py::_helper",
+            "jobs/internal.py::public",
+            "jobs/listed.py::left_out",
+            "jobs/listed.py::listed",
+            "jobs/single.py::__main__",
+            "jobs/steps.py::fetch",
+            "jobs/steps.py::store",
+            "jobs/sync.py::__main__",
+            "jobs/sync.py::run",
             "legacy.py::legacy",
             "main.py::main",
             "messages/confluent.py::Bus",
@@ -724,8 +734,15 @@ fn python() {
             "web/pages.py::order",
             "web/pages.py::shortcut",
         ],
-        // No program entry points yet: ticket #72.
-        &[],
+        // The main guards of `jobs/` (both spellings, neither of the lookalikes) and the
+        // console scripts of `pyproject.toml` that name a function of a file (`ghost.module`
+        // and `jobs.sync:missing` name none).
+        &[
+            "jobs/single.py::__main__",
+            "jobs/sync.py::__main__",
+            "jobs/sync.py::run",
+            "reports/__init__.py::build",
+        ],
         &[
             // In-file scope: a comprehension and a nested function, a nested function called
             // from its parent, a class body, methods, and lambdas, whose calls belong to the

@@ -22,6 +22,9 @@ pub mod pyproject;
 // ponytail: real code nests a few levels of options; 64 is far past any.
 const VALUE_DEPTH: usize = 64;
 
+/// The symbol of an `if __name__ == "__main__":` block, the program entry point of its file.
+const MAIN: &str = "__main__";
+
 pub struct Python;
 
 impl LanguagePack for Python {
@@ -62,7 +65,34 @@ impl LanguagePack for Python {
         {
             let mut inner = scope.clone();
             let mut inner_class = in_class;
+            // The body of a main guard, whose calls and bindings belong to the `__main__`
+            // symbol.
+            // ponytail: a name assigned in the guard is a local of `__main__`, so it no longer
+            // rebinds the module's global of that name (it is no export or constant of the
+            // file); a script keeps its globals outside the guard in practice.
+            let mut main_body = None;
             match node.kind() {
+                "if_statement" if scope.is_empty() && is_main_guard(node, src) => {
+                    let body = node.child_by_field_name("consequence");
+                    // Only the first `__main__` counts, a guard or a `def __main__()`: the
+                    // calls of a later guard stay at the top level of the file.
+                    if let Some(body) = body.filter(|_| defined.insert(MAIN.to_string())) {
+                        main_body = Some(body.id());
+                        facts.defs.push(Def {
+                            name: MAIN.to_string(),
+                            kind: Kind::Function,
+                            // The `if` and its body, not an `else` after it.
+                            range: node.start_byte()..body.end_byte(),
+                            params: Vec::new(),
+                            bases: Vec::new(),
+                            decorators: Vec::new(),
+                            return_values: Vec::new(),
+                            returns: None,
+                            type_params: Vec::new(),
+                        });
+                        facts.programs.push(MAIN.to_string());
+                    }
+                }
                 "function_definition" | "class_definition" => {
                     let is_class = node.kind() == "class_definition";
                     if let Some(name) = node.child_by_field_name("name") {
@@ -211,7 +241,10 @@ impl LanguagePack for Python {
             let kids: Vec<Node> = children(node).collect();
             stack.extend(kids.into_iter().rev().map(|child| Visit {
                 node: child,
-                scope: inner.clone(),
+                scope: match main_body == Some(child.id()) {
+                    true => MAIN.to_string(),
+                    false => inner.clone(),
+                },
                 in_class: inner_class,
             }));
         }
@@ -347,6 +380,27 @@ pub(crate) fn files(base: &str, name: &str) -> Vec<String> {
     } else {
         vec![init, format!("{path}.py")]
     }
+}
+
+/// Whether the `if` statement `node` tests `__name__ == "__main__"`, in either order and with
+/// either quote. Any other condition (`and`, parentheses, `!=`) is no main guard.
+fn is_main_guard(node: Node, src: &[u8]) -> bool {
+    let Some(condition) = node.child_by_field_name("condition") else {
+        return false;
+    };
+    let operands: Vec<Node> = named(condition).collect();
+    let [left, right] = operands.as_slice() else {
+        return false;
+    };
+    let operator = &src[left.end_byte()..right.start_byte()];
+    let (left, right) = (text(*left, src), text(*right, src));
+    condition.kind() == "comparison_operator"
+        && operator.trim_ascii() == b"=="
+        && matches!(
+            (left, right),
+            ("__name__", "\"__main__\"" | "'__main__'")
+                | ("\"__main__\"" | "'__main__'", "__name__")
+        )
 }
 
 /// The span of a definition: a decorated one includes its decorators.
@@ -1133,6 +1187,96 @@ mod tests {
             Value::Object(entries) => 1 + entries.first().map_or(0, |(_, v)| nesting(v)),
             _ => 0,
         }
+    }
+
+    fn facts(src: &str) -> Facts {
+        Python.parse("a.py", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_main_guard_is_a_program_whose_symbol_holds_its_calls() {
+        let src = "def run():\n    pass\n\nif __name__ == \"__main__\":\n    run()\n    x = 1\nelse:\n    other()\n";
+        let f = facts(src);
+
+        assert_eq!(f.programs, ["__main__"]);
+        let main = f.defs.iter().find(|d| d.name == "__main__").unwrap();
+        // The `if` block up to its last body line: the `else` is not part of it.
+        assert_eq!(
+            &src[main.range.clone()],
+            "if __name__ == \"__main__\":\n    run()\n    x = 1"
+        );
+        let scopes: Vec<(&str, &str)> = (f.calls.iter())
+            .map(|c| (c.callee.as_str(), c.scope.as_str()))
+            .collect();
+        assert_eq!(scopes, [("run", "__main__"), ("other", "")]);
+        // The block binds no export: a module-level name stays what its file exports.
+        assert!(
+            !f.exports
+                .iter()
+                .any(|e| matches!(e, Export::Local { exported, .. } if exported == "__main__"))
+        );
+    }
+
+    #[test]
+    fn a_main_guard_is_read_in_its_other_spellings_and_nothing_else() {
+        for guard in [
+            "if '__main__' == __name__:",
+            "if __name__ == '__main__':",
+            "if \"__main__\" == __name__:",
+        ] {
+            let f = facts(&format!("{guard}\n    run()\n"));
+            assert_eq!(f.programs, ["__main__"], "{guard}");
+        }
+        for guard in [
+            "if __name__ != \"__main__\":",
+            "if __name__ == \"other\":",
+            "if __file__ == \"__main__\":",
+            "if __name__ == \"__main__\" and ok:",
+            "if (__name__ == \"__main__\"):",
+            "if __name__ in [\"__main__\"]:",
+        ] {
+            let f = facts(&format!("{guard}\n    run()\n"));
+            assert!(f.programs.is_empty(), "{guard}");
+            assert!(f.defs.is_empty(), "{guard}");
+        }
+        // Only top-level code starts the program: not a guard inside a function or a class.
+        let f = facts("def f():\n    if __name__ == \"__main__\":\n        run()\n");
+        assert!(f.programs.is_empty());
+    }
+
+    #[test]
+    fn only_the_first_main_symbol_of_a_file_counts() {
+        let two =
+            "if __name__ == \"__main__\":\n    one()\n\nif __name__ == \"__main__\":\n    two()\n";
+        let f = facts(two);
+
+        assert_eq!(f.programs, ["__main__"]);
+        assert_eq!(f.defs.len(), 1);
+        assert_eq!(
+            &two[f.defs[0].range.clone()],
+            "if __name__ == \"__main__\":\n    one()"
+        );
+        let scopes: Vec<(&str, &str)> = (f.calls.iter())
+            .map(|c| (c.callee.as_str(), c.scope.as_str()))
+            .collect();
+        assert_eq!(scopes, [("one", "__main__"), ("two", "")]);
+
+        // A function of that name defined first wins: the guard is no program.
+        let f = facts("def __main__():\n    one()\n\nif __name__ == \"__main__\":\n    two()\n");
+        assert!(f.programs.is_empty());
+        assert_eq!(f.defs.len(), 1);
+        let scopes: Vec<(&str, &str)> = (f.calls.iter())
+            .map(|c| (c.callee.as_str(), c.scope.as_str()))
+            .collect();
+        assert_eq!(scopes, [("one", "__main__"), ("two", "")]);
+    }
+
+    #[test]
+    fn a_function_defined_in_a_main_guard_is_nested_in_its_symbol() {
+        let f = facts("if __name__ == \"__main__\":\n    def go():\n        run()\n    go()\n");
+
+        let names: Vec<&str> = f.defs.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["__main__", "__main__.go"]);
     }
 
     #[test]

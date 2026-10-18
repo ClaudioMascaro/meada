@@ -9,3 +9,6 @@ shared-tools = { version = "^0.3", extras = ["cli"] }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+example = "example.cli:main"

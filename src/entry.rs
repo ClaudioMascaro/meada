@@ -210,6 +210,14 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         let Some(facts) = local.files.get(file.as_str()) else {
             continue;
         };
+        // A name the exporting file keeps out of a star import is no door: an import still
+        // reaches it, but it is that file's own.
+        if let (Some(name), Some(exporter)) = (&e.name, local.files.get(e.path.as_str()))
+            && exporter.star.is_public_set()
+            && !exporter.star.takes(name)
+        {
+            continue;
+        }
         let class = (facts.defs.iter()).any(|d| d.name == *target && d.kind == Kind::Class);
         for def in &facts.defs {
             let own = match def.kind {
@@ -241,6 +249,7 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Star;
 
     #[test]
     fn an_import_drops_an_export_entry_point_and_no_other_kind() {
@@ -310,6 +319,69 @@ mod tests {
         (find(&local).into_iter())
             .map(|e| (e.label, e.kind.name()))
             .collect()
+    }
+
+    /// The labels of the export entry points of `cmd.py`, which exports the functions `names`
+    /// (all uncalled) and holds `star` as the set a star import takes.
+    fn export_doors(star: Star, names: &[&str]) -> Vec<String> {
+        let mut facts = Facts {
+            star,
+            ..Facts::default()
+        };
+        let mut symbols = HashSet::new();
+        let mut exported = Vec::new();
+        for name in names {
+            symbols.insert(format!("r::cmd.py::{name}"));
+            facts.defs.push(crate::lang::Def {
+                name: name.to_string(),
+                kind: Kind::Function,
+                range: 0..0,
+                params: Vec::new(),
+                bases: Vec::new(),
+                decorators: Vec::new(),
+                return_values: Vec::new(),
+                returns: None,
+                type_params: Vec::new(),
+            });
+            exported.push(Exported {
+                path: "cmd.py".into(),
+                name: Some(name.to_string()),
+                file: Some("cmd.py".into()),
+                target: Some(name.to_string()),
+            });
+        }
+        let files = BTreeMap::from([("cmd.py", &facts)]);
+        let local = Local {
+            identity: "r",
+            files: &files,
+            names: &Names::new(&[]),
+            symbols: &symbols,
+            called: &HashSet::new(),
+            exported: &exported,
+            providers: &[],
+            consumers: &[],
+            programs: &[],
+        };
+        find(&local).into_iter().map(|e| e.label).collect()
+    }
+
+    #[test]
+    fn only_the_names_a_star_import_would_take_are_export_doors() {
+        let names = ["shown", "_hidden", "listed", "default"];
+        // A pack that names a public set: no leading `_`, or a literal `__all__`.
+        assert_eq!(
+            export_doors(Star::Public, &names),
+            ["default", "listed", "shown"]
+        );
+        assert_eq!(
+            export_doors(Star::Only(vec!["listed".into(), "_hidden".into()]), &names),
+            ["_hidden", "listed"]
+        );
+        // One that names none (TypeScript) keeps every export, `default` included.
+        assert_eq!(
+            export_doors(Star::ExceptDefault, &names),
+            ["_hidden", "default", "listed", "shown"]
+        );
     }
 
     #[test]

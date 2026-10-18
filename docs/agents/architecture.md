@@ -174,7 +174,7 @@ one for the area a change touches.
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
   name, which `package::is_manifest` makes `manifests_found` (`index.rs`) stamp into
   `manifests`; `Ecosystem::read` (behind `package::read_manifest`) turns the bytes into the same
-  `Summary` (name, version, dependency entries, entry fields, source roots) and never fails;
+  `Summary` (name, version, dependency entries, entry fields, source roots, console scripts) and never fails;
   `Ecosystem::prefix` gives the contract `package::<ecosystem>::<name>`, so `PREFIX` still
   routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
   keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
@@ -295,8 +295,10 @@ one for the area a change touches.
   entry point is top-level code, `parse` yields a definition for that code (the calls it makes
   belong to it) and names it. A name with no symbol is dropped silently: the pack's conformance
   golden catches a wrong one. A form declared outside the code file (Python `[project.scripts]`,
-  which names a function of another file) needs a repository-level step that the pack adds in
-  its own ticket, feeding `entry::Local::programs` with `entry::Program`s. The forms per language are spec #31 "Program entry points per language
+  which names a function of another file) needs a repository-level step feeding
+  `entry::Local::programs` with `entry::Program`s: for Python, `package::python_programs` maps the
+  `Summary::scripts` of each `pyproject.toml` (stored with the manifest rows, whose digest makes an
+  edit re-extract) to files through `python_roots`. The forms per language are spec #31 "Program entry points per language
   pack": Python `if __name__ == "__main__":` as symbol `__main__` plus each `[project.scripts]`
   target; Go `func main` in package `main`; Java `public static void main(String[])`; Kotlin a
   top-level `fun main`; C# a `static Main` and, for top-level statements, a symbol `Main`; Swift
@@ -347,7 +349,7 @@ one for the area a change touches.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
   `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
-  roots it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
+  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), the `tsconfig.json` rows
   (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
   the definition, constant, type or file they name), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts), and
@@ -663,6 +665,12 @@ one for the area a change touches.
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
   tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
+  table form (`{ callable = "...", extras = [...] }`) is left out, and so are
+  `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the
+  scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
+  module's global of that name; only the first `__main__` of a file (a guard or a
+  `def __main__()`) counts.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
@@ -678,7 +686,9 @@ one for the area a change touches.
   client takes the base of every caller that passes one, and several different bases make it a
   hole.
 - `entry.rs`: an export entry point is a function, or a method of an exported class (a
-  constructor excepted), that the `exports` rows name and no call reaches in its repository,
+  constructor excepted), whose exported name the exporting file's `Facts::star` lets through when
+  its pack names a public set (Python: no leading `_`, or a literal `__all__`; TypeScript names
+  none, so all pass), that the `exports` rows name and no call reaches in its repository,
   an ambiguous candidate counting as a caller and a self-call not; a call through a package
   import of its own repository counts too, but only at query time (`Engine::exports`), so the
   stored rows over-list in a monorepo. A method of a class that is not exported, a

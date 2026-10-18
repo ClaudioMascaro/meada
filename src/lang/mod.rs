@@ -235,6 +235,23 @@ pub enum Star {
     Only(Vec<String>),
 }
 
+impl Star {
+    /// Whether a star import takes the export `name`.
+    pub fn takes(&self, name: &str) -> bool {
+        match self {
+            Star::ExceptDefault => name != "default",
+            Star::Public => !name.starts_with('_'),
+            Star::Only(names) => names.iter().any(|n| n == name),
+        }
+    }
+
+    /// Whether the pack names a public set: every export but those a star import leaves out is
+    /// one. `ExceptDefault` names none, since a default export is as public as any.
+    pub fn is_public_set(&self) -> bool {
+        !matches!(self, Star::ExceptDefault)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Kind {
     Function,

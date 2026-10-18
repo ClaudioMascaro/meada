@@ -382,11 +382,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             Ok((pack, Resolver::new(files, modules, language)))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
+    let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+    let files: Vec<&str> = all.keys().copied().collect();
     // The files an import of one of the repository's packages reaches: only they keep shapes.
     let surface = {
-        let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
         let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-        let files: Vec<&str> = all.keys().copied().collect();
         package::surface(&manifests, &tsconfigs, &exported, &files)
     };
 
@@ -559,13 +559,14 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    // The programs the packs declare per file, and the console scripts of the manifests.
+    let scripts = package::python_programs(&manifests, &files);
     let programs: Vec<entry::Program> = (all.iter())
         .flat_map(|(&path, &facts)| {
-            (facts.programs.iter()).map(move |def| entry::Program {
-                file: path.to_string(),
-                def: def.clone(),
-            })
+            (facts.programs.iter()).map(move |def| (path.to_string(), def.clone()))
         })
+        .chain(scripts)
+        .map(|(file, def)| entry::Program { file, def })
         .collect();
     let local = entry::Local {
         identity,

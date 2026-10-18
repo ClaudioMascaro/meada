@@ -24,7 +24,8 @@ modules updates it.
   shelling out to `git`.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
-  `Facts::programs` the packs set) and
+  `Facts::programs` the packs set, and the console scripts of the `manifests` rows through
+  `package::python_programs`) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
@@ -174,6 +175,9 @@ modules updates it.
   `pyproject.toml` declares (setuptools `package-dir` and `packages.find.where`, Poetry
   `packages.from`, read by `lang/python/pyproject.rs`, which the PyPI package reader shares), or
   `src` when none is declared; a package comes before a module of the same name.
+  An `if __name__ == "__main__":` block at the top level (either operand order, either quote,
+  nothing else) yields the definition `__main__`, spanning the `if` and its body (an `else` is
+  not part of it), owns the calls in that body, and is named in `Facts::programs`.
   It also yields the facts receivers resolve through: `Def::bases` (a class's bases as
   written, `B[T]` read as `B`, any other expression `(<kind>)`) and `Facts::receivers`, one
   `Receiver {scope, name, class}` per name a scope binds: a method's first parameter unless

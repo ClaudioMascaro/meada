@@ -126,6 +126,30 @@
       "hash": "5c9887d7189b98db02c1d831ca18fd50f13c5308eef6792e3ff610af5358c017"
     },
     {
+      "path": "jobs/internal.py",
+      "hash": "dc406a30313403f0bbc12a95929ba08671c6af0338fb1d1203f3afdf129a71e9"
+    },
+    {
+      "path": "jobs/listed.py",
+      "hash": "f32943e4a6e3f20695584bc40722e037fa2341e6bef949ea11d475b78d596d3d"
+    },
+    {
+      "path": "jobs/no_guard.py",
+      "hash": "6b55e23dbe5ecc363c5fd02da752b2a7de21b26ff9cf858c150b31fc154b018d"
+    },
+    {
+      "path": "jobs/single.py",
+      "hash": "88bd57b2eda179c0bedd0cb26b6ced9240b5ae0d65b95ee1ff88c611f785ddd0"
+    },
+    {
+      "path": "jobs/steps.py",
+      "hash": "19b28ef6028d8363814d7b5b0b21320a4cf515f34d0332aaf4f5762d5172e927"
+    },
+    {
+      "path": "jobs/sync.py",
+      "hash": "6c5da7ee5e1b0d9704b82316665186949bc25a782335d0a38a41b6ce2b35e71f"
+    },
+    {
       "path": "legacy.py",
       "hash": "ef0019cbf84f93e1cf81329df83340675bee4854a2d6ba10ef248282e045bd0d"
     },
@@ -176,6 +200,10 @@
     {
       "path": "receivers.py",
       "hash": "ad2d648db091953e151f12cf0ce07ceec12ae6835d5e1652e72aa19b41aba44a"
+    },
+    {
+      "path": "reports/__init__.py",
+      "hash": "613237bd4f2846658dd8769d872ba485bb18ad039792165e086d584d6ee238f1"
     },
     {
       "path": "scopes.py",
@@ -1892,6 +1920,78 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::jobs/internal.py::_helper",
+      "span": {
+        "path": "jobs/internal.py",
+        "start": 105,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/internal.py::public",
+      "span": {
+        "path": "jobs/internal.py",
+        "start": 76,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/listed.py::left_out",
+      "span": {
+        "path": "jobs/listed.py",
+        "start": 145,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/listed.py::listed",
+      "span": {
+        "path": "jobs/listed.py",
+        "start": 116,
+        "end": 142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/single.py::__main__",
+      "span": {
+        "path": "jobs/single.py",
+        "start": 93,
+        "end": 137
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/steps.py::fetch",
+      "span": {
+        "path": "jobs/steps.py",
+        "start": 32,
+        "end": 57
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/steps.py::store",
+      "span": {
+        "path": "jobs/steps.py",
+        "start": 60,
+        "end": 85
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::__main__",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 151,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::run",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 114,
+        "end": 148
+      }
+    },
+    {
       "id": "example.com/acme/conformance::legacy.py::legacy",
       "span": {
         "path": "legacy.py",
@@ -2993,6 +3093,14 @@
         "path": "receivers.py",
         "start": 753,
         "end": 835
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::reports/__init__.py::build",
+      "span": {
+        "path": "reports/__init__.py",
+        "start": 107,
+        "end": 131
       }
     },
     {
@@ -5580,6 +5688,94 @@
         "path": "helpers.py",
         "start": 34,
         "end": 46
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/no_guard.py::fetch#0",
+      "caller": "example.com/acme/conformance::jobs/no_guard.py",
+      "target": "example.com/acme/conformance::jobs/steps.py::fetch",
+      "level": "exact",
+      "span": {
+        "path": "jobs/no_guard.py",
+        "start": 157,
+        "end": 164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/no_guard.py::store#0",
+      "caller": "example.com/acme/conformance::jobs/no_guard.py",
+      "target": "example.com/acme/conformance::jobs/steps.py::store",
+      "level": "exact",
+      "span": {
+        "path": "jobs/no_guard.py",
+        "start": 220,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/single.py::__main__::steps.fetch#0",
+      "caller": "example.com/acme/conformance::jobs/single.py::__main__",
+      "target": "example.com/acme/conformance::jobs/steps.py::fetch",
+      "level": "exact",
+      "span": {
+        "path": "jobs/single.py",
+        "start": 124,
+        "end": 137
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/single.py::steps.store#0",
+      "caller": "example.com/acme/conformance::jobs/single.py",
+      "target": "example.com/acme/conformance::jobs/steps.py::store",
+      "level": "exact",
+      "span": {
+        "path": "jobs/single.py",
+        "start": 148,
+        "end": 161
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::__main__::run#0",
+      "caller": "example.com/acme/conformance::jobs/sync.py::__main__",
+      "target": "example.com/acme/conformance::jobs/sync.py::run",
+      "level": "exact",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 182,
+        "end": 187
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::__main__::store#0",
+      "caller": "example.com/acme/conformance::jobs/sync.py::__main__",
+      "target": "example.com/acme/conformance::jobs/steps.py::store",
+      "level": "exact",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 192,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::run::fetch#0",
+      "caller": "example.com/acme/conformance::jobs/sync.py::run",
+      "target": "example.com/acme/conformance::jobs/steps.py::fetch",
+      "level": "exact",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 129,
+        "end": 136
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::jobs/sync.py::run::store#0",
+      "caller": "example.com/acme/conformance::jobs/sync.py::run",
+      "target": "example.com/acme/conformance::jobs/steps.py::store",
+      "level": "exact",
+      "span": {
+        "path": "jobs/sync.py",
+        "start": 141,
+        "end": 148
       }
     },
     {
@@ -8249,6 +8445,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::reports/__init__.py::build::fetch#0",
+      "caller": "example.com/acme/conformance::reports/__init__.py::build",
+      "target": "example.com/acme/conformance::jobs/steps.py::fetch",
+      "level": "exact",
+      "span": {
+        "path": "reports/__init__.py",
+        "start": 124,
+        "end": 131
+      }
+    },
+    {
       "id": "example.com/acme/conformance::scopes.py::Outer.m::Helper#0",
       "caller": "example.com/acme/conformance::scopes.py::Outer.m",
       "target": "example.com/acme/conformance::scopes.py::Helper",
@@ -10015,6 +10222,17 @@
         "example.com/acme/conformance::explicit/early.py::kept",
         "example.com/acme/conformance::explicit/order.py::order",
         "example.com/acme/conformance::explicit/sweeper.py::swept"
+      ]
+    },
+    {
+      "name": "jobs",
+      "members": [
+        "example.com/acme/conformance::jobs/single.py::__main__",
+        "example.com/acme/conformance::jobs/steps.py::fetch",
+        "example.com/acme/conformance::jobs/steps.py::store",
+        "example.com/acme/conformance::jobs/sync.py::__main__",
+        "example.com/acme/conformance::jobs/sync.py::run",
+        "example.com/acme/conformance::reports/__init__.py::build"
       ]
     },
     {
@@ -13126,6 +13344,126 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::jobs/internal.py::public",
+      "kind": "export",
+      "label": "public",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/internal.py::public"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/listed.py::listed",
+      "kind": "export",
+      "label": "listed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/listed.py::listed"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/single.py::__main__",
+      "kind": "program",
+      "label": "__main__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/single.py::__main__"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::fetch"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/sync.py::__main__",
+      "kind": "program",
+      "label": "__main__",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/sync.py::__main__"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/sync.py::run"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::fetch"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::store"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::store",
+          "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::jobs/sync.py::run",
+      "kind": "program",
+      "label": "run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::jobs/sync.py::run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::fetch"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::store"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::main.py::main",
       "kind": "export",
       "label": "main",
@@ -15597,6 +15935,27 @@
           "level": "inferred",
           "via": "call",
           "node": "example.com/acme/conformance::receivers.py::Engine.start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::reports/__init__.py::build",
+      "kind": "program",
+      "label": "build",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::reports/__init__.py::build"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::jobs/steps.py::fetch"
         }
       ]
     },

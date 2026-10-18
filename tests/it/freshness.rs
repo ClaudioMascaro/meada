@@ -96,6 +96,61 @@ fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files(
     );
 }
 
+/// Drops the console script that names `reports:build` and adds one for `jobs.steps:store`.
+fn edit_python_scripts(repo: &Path) {
+    fs::write(
+        repo.join("pyproject.toml"),
+        "[project]\nname = \"acme-conformance\"\n[project.scripts]\n\
+         acme-sync = \"jobs.sync:run\"\nacme-steps = \"jobs.steps:store\"\n",
+    )
+    .unwrap();
+}
+
+/// The kind of the process an entry point of the export starts, by the end of its identity.
+fn kind_of(export: &str, entry_point: &str) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_str(export).unwrap();
+    let processes = json["processes"].as_array().unwrap().iter();
+    let mut kinds = processes.filter(|p| p["entry_point"].as_str().unwrap().ends_with(entry_point));
+    kinds
+        .next()
+        .map(|p| p["kind"].as_str().unwrap().to_string())
+}
+
+#[test]
+fn python_console_scripts_follow_an_edited_pyproject_like_a_cold_index() {
+    let repo = fixture_repo("fresh_python_scripts", "conformance-python", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_python_scripts(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    // `build` is a program while a script names it, an export once none does; `store` is
+    // called by other functions, so only a script makes it a door.
+    assert_eq!(
+        kind_of(&before, "reports/__init__.py::build").as_deref(),
+        Some("program")
+    );
+    assert_eq!(
+        kind_of(&refreshed, "reports/__init__.py::build").as_deref(),
+        Some("export")
+    );
+    assert_eq!(kind_of(&before, "jobs/steps.py::store"), None);
+    assert_eq!(
+        kind_of(&refreshed, "jobs/steps.py::store").as_deref(),
+        Some("program")
+    );
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_python_scripts_cold",
+            "conformance-python",
+            ORIGIN,
+            edit_python_scripts
+        )
+    );
+}
+
 /// Renames a topic constant the Python channel files import, adds a consumer of a topic that
 /// had none, and deletes a module with producers and consumers (spec #73).
 fn edit_python_channels(repo: &Path) {

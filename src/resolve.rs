@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Star, Step, Ty, Value,
+    Step, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -570,12 +570,7 @@ impl<'a> Resolver<'a> {
 
     /// What a star import of `path` takes as `name`.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        let taken = match &self.files[path].star {
-            Star::ExceptDefault => name != "default",
-            Star::Public => !name.starts_with('_'),
-            Star::Only(names) => names.iter().any(|n| n == name),
-        };
-        if taken {
+        if self.files[path].star.takes(name) {
             self.export(path, name, seen)
         } else {
             Binding::Unknown

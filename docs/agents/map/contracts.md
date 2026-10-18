@@ -271,8 +271,9 @@ modules updates it.
   `requirements*.txt` names no package, so it bounds none). `package/pypi.rs` reads a
   `pyproject.toml` (through `lang::python::pyproject::Pyproject`, the one parse the pack's
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
-  dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, and the declared
-  `roots`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
+  dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
+  `roots` and the console `scripts`, `[project.scripts]` else `[tool.poetry.scripts]`, as
+  `(module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
   skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
   written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
   `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
