@@ -94,8 +94,10 @@ All notable changes to Meada are recorded here. The format follows
   from literals, `const` and `static` items (also imported through `use`), `+`, `String::from`,
   `.to_string()`, `format!` and `concat!` (`{}`, `{0}`, `{name}`, inline captures; a format
   spec is a hole) and from a `let mut` String the function only grows with `push_str`, `push`
-  and `+=`. A URL that does not fold is an unresolved consumer. The index is rebuilt once
-  (schema version 31).
+  and `+=`. A URL that does not fold is an unresolved consumer. A value a client hands back
+  (a response, a JSON value, a method of a trait the crate defines) is no client: only the
+  library's own builder methods pass the object on. The index is rebuilt once (schema
+  version 32).
 - A Python language pack (`.py`, spec #24): definitions, imports (relative, packages, `import
   *` with `__all__`, source roots from `pyproject.toml`) and calls, with receivers resolved
   through `self`, annotations, constructor calls and Python's method resolution order.

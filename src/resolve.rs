@@ -1413,6 +1413,14 @@ struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
     out: BTreeSet<(&'a str, usize)>,
+    /// The methods of the builder chains being followed, which the library they start at must
+    /// pass through (`LanguagePack::passes`).
+    steps: Vec<&'a str>,
+}
+
+/// The method a call's callee names (`x.y.get` is `get`).
+fn method(callee: &str) -> &str {
+    callee.rsplit('.').next().unwrap_or(callee)
 }
 
 /// Values evaluated across files for contract kinds: constants folded where they are
@@ -1741,13 +1749,32 @@ impl<'a> Code<'a> {
                 let Some(Tail { stop, matched, .. }) = tail else {
                     return;
                 };
-                let kept = matched.then(|| std::mem::take(&mut trail.out));
+                let fluent = self.pack.fluent();
+                let kept = (matched || fluent).then(|| std::mem::take(&mut trail.out));
+                let mark = trail.steps.len();
+                if fluent {
+                    self.chain_steps(path, index, stop, &mut trail.steps);
+                }
                 self.flow_from(path, stop, trail);
-                if let Some(mut kept) = kept {
-                    let outside = (trail.out.iter()).all(|&(p, n)| {
+                if fluent {
+                    // The methods the chain went through hand back the object they were called
+                    // on only for the library the chain starts at (`LanguagePack::passes`): a
+                    // value derived from a client (`resp.headers()`) is not a client.
+                    let steps = trail.steps.split_off(mark);
+                    trail.out.retain(|&(p, n)| {
                         let call = &self.resolver.files[p].calls[n];
-                        self.external(p, &call.scope, &call.callee).is_some()
+                        match self.external(p, &call.scope, &call.callee) {
+                            Some(origin) => steps.iter().all(|m| self.pack.passes(&origin, m)),
+                            None => steps.is_empty(),
+                        }
                     });
+                }
+                if let Some(mut kept) = kept {
+                    let outside = !matched
+                        || (trail.out.iter()).all(|&(p, n)| {
+                            let call = &self.resolver.files[p].calls[n];
+                            self.external(p, &call.scope, &call.callee).is_some()
+                        });
                     if outside {
                         kept.append(&mut trail.out);
                     }
@@ -1775,7 +1802,10 @@ impl<'a> Code<'a> {
                     return;
                 }
                 Some(Value::Call(_)) => return,
-                Some(other) => return self.flow(path, &calls[index].scope, other, trail),
+                Some(other) => {
+                    trail.steps.push(method(&calls[index].callee));
+                    return self.flow(path, &calls[index].scope, other, trail);
+                }
             },
             _ => {
                 trail.out.insert((path, index));
@@ -1801,6 +1831,23 @@ impl<'a> Code<'a> {
         }
         trail.frames.pop();
         trail.busy.pop();
+    }
+
+    /// The methods of the calls from `index` down to `stop` along their receivers, outermost
+    /// first.
+    fn chain_steps(&self, path: &'a str, index: usize, stop: usize, steps: &mut Vec<&'a str>) {
+        let calls = &self.resolver.files[path].calls;
+        let mut at = index;
+        while at != stop {
+            steps.push(method(&calls[at].callee));
+            match self.receiver(path, at) {
+                Some(Value::Call(next)) => match call_at(calls, &next.range) {
+                    Some(next) => at = next,
+                    None => break,
+                },
+                _ => break,
+            }
+        }
     }
 
     /// Where the builder chain ending in the call at `index` of `path` stops: the first call

@@ -5,6 +5,8 @@
 //! Any other use (a push in a branch or a loop, `&mut url`, `write!(url, ..)`, a shadowing
 //! binding, a method that changes it) leaves the name unknown, as every `let mut` is.
 
+use std::collections::HashSet;
+
 use tree_sitter::Node;
 
 use super::{field, mutable};
@@ -21,6 +23,12 @@ pub(super) const BUILDER_BUDGET: usize = 1 << 20;
 // without end. Past either limit the read is a hole.
 pub(super) const BUILDER_DEPTH: usize = 64;
 pub(super) const BUILDER_SIZE: usize = 4096;
+
+/// What folding the pushes of a file's builders and reading them may cost in all, in `size`
+/// units: each prefix folded and each read copies its text. Past it a read is a hole.
+// ponytail: real files read a few builders a few times; 2000 pushes and 100k reads of one
+// builder would otherwise cost the product.
+pub(super) const BUILDER_WORK: usize = 1 << 22;
 
 /// The size of a builder's `parts`, as `BUILDER_SIZE` counts it.
 pub(super) fn size(parts: &[crate::lang::Part]) -> usize {
@@ -84,8 +92,14 @@ pub(super) fn candidate(node: Node) -> bool {
 }
 
 /// The builder the `let mut` `node` makes; `None` when anything else may change the name, or the
-/// budget `spent` is used up.
-pub(super) fn builder<'t>(node: Node<'t>, src: &[u8], spent: &mut usize) -> Option<Builder<'t>> {
+/// budget `spent` is used up. `live` holds the ids of the children of blocks that the file's
+/// configuration keeps.
+pub(super) fn builder<'t>(
+    node: Node<'t>,
+    src: &[u8],
+    spent: &mut usize,
+    live: &HashSet<usize>,
+) -> Option<Builder<'t>> {
     let pattern = field(node, "pattern").filter(|p| p.kind() == "identifier")?;
     let name = text(pattern, src);
     let init = field(node, "value")?;
@@ -99,19 +113,16 @@ pub(super) fn builder<'t>(node: Node<'t>, src: &[u8], spent: &mut usize) -> Opti
         if *spent > BUILDER_BUDGET {
             return None;
         }
+        // A statement the file's configuration leaves out (`#[cfg(..)]` false, decided where
+        // `parse` reads the block's children) is not in the code, and an attribute is no use.
+        if !live.contains(&stmt.id()) || stmt.kind() == "attribute_item" {
+            continue;
+        }
         let appended = (stmt.kind() == "expression_statement")
             .then(|| named(stmt).next())
             .flatten()
             .and_then(|e| append(e, &is_name, src));
         let (node, parent) = match appended {
-            // A `#[cfg]` on the statement may leave it out.
-            Some(_)
-                if stmt
-                    .prev_sibling()
-                    .is_some_and(|p| p.kind() == "attribute_item") =>
-            {
-                return None;
-            }
             Some((arg, char)) => {
                 steps.push(Push {
                     end: stmt.end_byte(),
@@ -232,6 +243,25 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
                 && grand.kind() == "macro_invocation"
                 && field(grand, "macro").is_some_and(|m| READING_MACROS.contains(&text(m, src)))
         }
-        _ => true,
+        // Handed on, compared or held: the String is moved or copied, and not changed in place.
+        // An index (`u[..].make_ascii_uppercase()`) or a deref (`*u`) reaches it for writing,
+        // and any other use is not known to read.
+        kind => matches!(
+            kind,
+            "arguments"
+                | "let_declaration"
+                | "return_expression"
+                | "binary_expression"
+                | "expression_statement"
+                | "block"
+                | "tuple_expression"
+                | "array_expression"
+                | "field_initializer"
+                | "shorthand_field_initializer"
+                | "parenthesized_expression"
+                | "try_expression"
+                | "await_expression"
+                | "type_cast_expression"
+        ),
     }
 }

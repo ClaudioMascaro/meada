@@ -50,6 +50,81 @@ const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
 
+/// The methods that hand back the object they were called on (`LanguagePack::passes`), per
+/// library: axum's `Router`, the setters of reqwest's `ClientBuilder` up to `build()`, which
+/// makes the client, and those of ureq's `AgentBuilder`.
+// ponytail: a setter not listed ends the chain, so its client is not read; add it here.
+const ROUTER: &[&str] = &[
+    "clone",
+    "route",
+    "route_service",
+    "nest",
+    "nest_service",
+    "merge",
+    "layer",
+    "route_layer",
+    "with_state",
+    "fallback",
+    "fallback_service",
+];
+const CLIENT_BUILDER: &[&str] = &[
+    "clone",
+    "build",
+    "timeout",
+    "connect_timeout",
+    "read_timeout",
+    "user_agent",
+    "default_headers",
+    "redirect",
+    "referer",
+    "proxy",
+    "no_proxy",
+    "gzip",
+    "brotli",
+    "deflate",
+    "zstd",
+    "no_gzip",
+    "no_brotli",
+    "no_deflate",
+    "no_zstd",
+    "cookie_store",
+    "pool_idle_timeout",
+    "pool_max_idle_per_host",
+    "tcp_nodelay",
+    "tcp_keepalive",
+    "http1_only",
+    "http2_prior_knowledge",
+    "https_only",
+    "danger_accept_invalid_certs",
+    "danger_accept_invalid_hostnames",
+    "use_rustls_tls",
+    "use_native_tls",
+    "add_root_certificate",
+    "identity",
+    "min_tls_version",
+    "max_tls_version",
+    "connection_verbose",
+    "local_address",
+    "resolve",
+];
+const AGENT_BUILDER: &[&str] = &[
+    "clone",
+    "build",
+    "timeout",
+    "timeout_connect",
+    "timeout_read",
+    "timeout_write",
+    "user_agent",
+    "max_idle_connections",
+    "max_idle_connections_per_host",
+    "redirects",
+    "proxy",
+    "tls_config",
+    "https_only",
+    "no_delay",
+    "try_proxy_from_env",
+];
+
 pub struct Rust;
 
 impl LanguagePack for Rust {
@@ -91,6 +166,16 @@ impl LanguagePack for Rust {
     // `Router::new().route(..)` is the router `Router::new()` made.
     fn fluent(&self) -> bool {
         true
+    }
+
+    fn passes(&self, origin: &str, method: &str) -> bool {
+        let methods = match origin {
+            o if o.starts_with("axum.Router.") => ROUTER,
+            o if o.starts_with("reqwest.") => CLIENT_BUILDER,
+            o if o.starts_with("ureq.") => AGENT_BUILDER,
+            _ => return false,
+        };
+        methods.contains(&method)
     }
 
     fn modules(
@@ -281,6 +366,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
     let mut spent = 0;
+    // The children of each block the configuration keeps, by node id.
+    let mut live: HashSet<usize> = HashSet::new();
     // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
@@ -314,7 +401,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         if !deep
             && builders::candidate(node)
             && let Some(name) = field(node, "pattern").filter(|p| p.kind() == "identifier")
-            && let Some(found) = builders::builder(node, src, &mut spent)
+            && let Some(found) = builders::builder(node, src, &mut spent, &live)
         {
             let key = (scope.clone(), text(name, src).to_string());
             if !clash.contains(&key) && candidates.insert(key.clone(), found).is_some() {
@@ -767,6 +854,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             _ => built(node, &features, src, &mut renamed),
         };
+        if node.kind() == "block" {
+            live.extend(kids.iter().map(|k| k.id()));
+        }
         stack.extend(kids.into_iter().rev().map(|child| Visit {
             node: child,
             scope: scope.clone(),
@@ -1638,6 +1728,8 @@ mod tests {
             "write!(u, \"/b\");",
             "let u = \"/x\";",
             "u.insert(0, 'x');",
+            "u[..].make_ascii_uppercase();",
+            "(*u).make_ascii_uppercase();",
             "u = String::new();",
         ] {
             let src = format!("fn f() {{ let mut u = String::from(\"/a\"); {body} g(&u); }}");
@@ -1653,7 +1745,12 @@ mod tests {
     fn a_string_that_doubles_or_chains_is_read_up_to_its_limits() {
         let doubling = (0..40).map(|_| "u.push_str(&u);").collect::<String>();
         let src = format!("fn f() {{ let mut u = String::from(\"a\"); {doubling} g(&u); }}");
-        assert_eq!(read(&src), ["{}"]);
+        // Past the size limit what it holds is holes, not the text.
+        let found = read(&src);
+        assert!(
+            found[0].starts_with("{}") && !found[0].contains('a'),
+            "{found:?}"
+        );
         // Each String pushes the one before it: past the depth limit the chain is a hole.
         let chain = |n: usize| {
             let mut src = String::from("fn f() { let mut s0 = String::from(\"a\");\n");
@@ -1666,6 +1763,78 @@ mod tests {
         };
         assert_eq!(read(&chain(builders::BUILDER_DEPTH - 2)), ["a"]);
         assert!(read(&chain(builders::BUILDER_DEPTH + 2))[0].contains("{}"));
+    }
+
+    #[test]
+    fn a_push_the_configuration_leaves_out_is_not_in_the_string() {
+        // The default configuration of a fixed Linux target: `windows` is false, `unix` true, a
+        // comment between the attribute and the statement changes nothing.
+        let src = "fn f() {\n let mut u = String::from(\"/a\");\n\
+                   #[cfg(windows)]\n // not here\n u.push_str(\"/w\");\n\
+                   #[cfg(feature = \"x\")]\n u.push_str(\"/x\");\n\
+                   #[cfg(unix)]\n // here\n u.push_str(\"/u\");\n g(&u);\n}\n";
+        assert_eq!(read(src), ["/a/u"]);
+    }
+
+    #[test]
+    fn a_static_mut_holds_no_known_value() {
+        let facts = facts("static mut X: &str = \"/a\";\nstatic Y: &str = \"/b\";\n");
+        let names: Vec<_> = facts.consts.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, ["Y"]);
+    }
+
+    #[test]
+    fn many_reads_of_a_long_builder_are_charged_to_the_work_budget() {
+        // 400 pushes of 8 bytes: a read copies about 3600 units, so the 4M budget lasts about a
+        // thousand of the 5000 reads, and the rest are holes. Walking every push for each read
+        // would be 2M steps; a prefix is folded once.
+        let mut src = String::from("fn f() {\n let mut u = String::from(\"a\");\n");
+        for _ in 0..400 {
+            src += " u.push_str(\"abcdefgh\");\n";
+        }
+        for _ in 0..5000 {
+            src += " g(&u);\n";
+        }
+        let found = read(&(src + "}"));
+        assert_eq!(found.len(), 5000);
+        assert!(found[0].starts_with("aabcdefgh"));
+        assert_eq!(found[4999], "{}");
+    }
+
+    #[test]
+    fn a_format_past_its_limits_is_unknown() {
+        let many = |n: usize| {
+            format!(
+                "format!(\"{}\", {})",
+                "{}".repeat(n),
+                vec!["\"a\""; n].join(", ")
+            )
+        };
+        let args = values::FORMAT_ARGS;
+        assert_eq!(
+            read(&format!("fn f() {{ g({}); }}", many(args))),
+            ["a".repeat(args)]
+        );
+        assert_eq!(read(&format!("fn f() {{ g({}); }}", many(args + 1))), ["?"]);
+        // Captures of a builder: each copies its text, and the output is bounded.
+        let captures = "{u}".repeat(values::FORMAT_PLACEHOLDERS + 1);
+        let src =
+            format!("fn f() {{ let mut u = String::from(\"a\"); g(format!(\"{captures}\")); }}");
+        assert_eq!(read(&src), ["?"]);
+        let big = "x".repeat(100);
+        let src = format!(
+            "fn f() {{ let mut u = String::from(\"{big}\"); g(format!(\"{}\")); }}",
+            "{u}".repeat(60)
+        );
+        assert_eq!(read(&src), ["?"]);
+        // Named arguments are looked up by name, however many.
+        let keyed: Vec<String> = (0..args).map(|i| format!("k{i} = \"v\"")).collect();
+        let template = (0..args).map(|i| format!("{{k{i}}}")).collect::<String>();
+        let src = format!(
+            "fn f() {{ g(format!(\"{template}\", {})); }}",
+            keyed.join(", ")
+        );
+        assert_eq!(read(&src), ["v".repeat(args)]);
     }
 
     #[test]

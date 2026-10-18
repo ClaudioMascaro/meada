@@ -111,7 +111,8 @@ modules updates it.
   object is nothing. Rust clients (spec #30 #131) are the same code with two more `LIBRARIES`
   entries: `reqwest` (modules `reqwest` and `reqwest.blocking`; clients `Client::new`,
   `Client::builder()`, `ClientBuilder::new` and the `blocking` equivalents, a builder chain
-  followed to its constructor by `fluent`) and `ureq` (module functions; clients `agent()`,
+  followed to its constructor by `fluent`, and every method on the way listed by `passes`:
+  any other method on an outside value ends the chain) and `ureq` (module functions; clients `agent()`,
   `Agent::new*`, `AgentBuilder::new`). The receiver of a chain (`Client::new().get(..)`,
   `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::value_origins`. The method
   is the name, or `request(Method::X, url)` (reqwest: a `Method` of `reqwest`, `http`, `hyper`,

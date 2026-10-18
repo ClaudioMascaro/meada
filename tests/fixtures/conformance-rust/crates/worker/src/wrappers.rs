@@ -51,6 +51,19 @@ impl Api {
     }
 }
 
+/// A wrapper that calls itself: the cycle is cut, and the outside call still reaches it.
+async fn recurse(path: &str, depth: u32) -> Result<(), reqwest::Error> {
+    if depth > 0 {
+        Box::pin(recurse(path, depth - 1)).await?;
+    }
+    reqwest::get(format!("https://api.example.com{path}")).await?;
+    Ok(())
+}
+
+pub async fn recursive() -> Result<(), reqwest::Error> {
+    recurse("/recursive/one", 3).await
+}
+
 /// A public function nobody here calls: its path is a caller's in another crate, so the URL is
 /// not known.
 pub async fn open_ended(path: &str) -> Result<String, reqwest::Error> {

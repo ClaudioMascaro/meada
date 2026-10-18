@@ -166,12 +166,16 @@
       "hash": "8c04288946332cf9a9a9512a38f88efe7bf947cf1a1b69b329659cbed2f6b9d9"
     },
     {
+      "path": "crates/worker/src/derived.rs",
+      "hash": "c916013cae0a58e62114e89bdfd466c492fe72392f9b198193022522b28ef122"
+    },
+    {
       "path": "crates/worker/src/dynamic.rs",
       "hash": "169ed0dd5be6234820849e5c07b43dd81c5ccefc447bde1ce1e13482235017f9"
     },
     {
       "path": "crates/worker/src/lib.rs",
-      "hash": "8248ec9252609b121ffaaeec2830d5c54f7e0eb004f19e6f97ffc82270aeb921"
+      "hash": "bba6d6391514eafdf1abb99b33a1bdc7ce9f4a3ca76eac17e342ee5d8a407e5a"
     },
     {
       "path": "crates/worker/src/modules.rs",
@@ -187,7 +191,7 @@
     },
     {
       "path": "crates/worker/src/wrappers.rs",
-      "hash": "b1fb81d1885a16b3c4749142f0d950c35c7562860fbd59bc5bd34b1f05fd43a4"
+      "hash": "ee8a309bc7c9d73d8f2338dbc0c205efd8ece27c6cd587a3d905a24daa9de90e"
     }
   ],
   "symbols": [
@@ -2096,6 +2100,102 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::ApiExt",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 101,
+        "end": 150
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::ApiExt.api",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 124,
+        "end": 148
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Client.ApiExt.api",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 181,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 765,
+        "end": 780
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.fetch_named",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 861,
+        "end": 967
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 801,
+        "end": 855
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Sender",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1179,
+        "end": 1193
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1213,
+        "end": 1326
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1487,
+        "end": 1789
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 322,
+        "end": 763
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1025,
+        "end": 1177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1870,
+        "end": 2231
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/dynamic.rs::looped",
       "span": {
         "path": "crates/worker/src/dynamic.rs",
@@ -2144,7 +2244,7 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::dynamic",
+      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::derived",
       "span": {
         "path": "crates/worker/src/lib.rs",
         "start": 25,
@@ -2152,7 +2252,7 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::modules",
+      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::dynamic",
       "span": {
         "path": "crates/worker/src/lib.rs",
         "start": 38,
@@ -2160,27 +2260,35 @@
       }
     },
     {
-      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::settings",
+      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::modules",
       "span": {
         "path": "crates/worker/src/lib.rs",
         "start": 51,
-        "end": 64
+        "end": 63
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/lib.rs::settings",
+      "span": {
+        "path": "crates/worker/src/lib.rs",
+        "start": 64,
+        "end": 77
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/lib.rs::urls",
       "span": {
         "path": "crates/worker/src/lib.rs",
-        "start": 65,
-        "end": 74
+        "start": 78,
+        "end": 87
       }
     },
     {
       "id": "example.com/acme/conformance::crates/worker/src/lib.rs::wrappers",
       "span": {
         "path": "crates/worker/src/lib.rs",
-        "start": 75,
-        "end": 88
+        "start": 88,
+        "end": 101
       }
     },
     {
@@ -2283,8 +2391,24 @@
       "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::open_ended",
       "span": {
         "path": "crates/worker/src/wrappers.rs",
-        "start": 1465,
-        "end": 1650
+        "start": 1884,
+        "end": 2069
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1444,
+        "end": 1672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recursive",
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1674,
+        "end": 1771
       }
     },
     {
@@ -5894,6 +6018,286 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::Client.ApiExt.api",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 215,
+        "end": 227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make::Client.new#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 836,
+        "end": 849
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1314,
+        "end": 1320
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::(call_expression).send#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1640,
+        "end": 1699
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1781,
+        "end": 1787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::client.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
+        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
+      ],
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1640,
+        "end": 1692
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::factory.make#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::api/src/methods.rs::Build.make",
+        "example.com/acme/conformance::crates/worker/src/derived.rs::Factory.make"
+      ],
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1620,
+        "end": 1634
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name::sender.send_named#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::by_name",
+      "target": "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named",
+      "level": "inferred",
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1741,
+        "end": 1768
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
+        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
+      ],
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 502,
+        "end": 562
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).get#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::crates/web/src/local.rs::Router.get",
+        "example.com/acme/conformance::crates/worker/src/modules.rs::Cache.get"
+      ],
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 694,
+        "end": 749
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::(call_expression).send#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 424,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::Client.new#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 394,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 755,
+        "end": 761
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::client.api#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 694,
+        "end": 706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::client.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 424,
+        "end": 474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::resp.headers#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 502,
+        "end": 516
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::resp.json#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 599,
+        "end": 610
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::value.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 631,
+        "end": 680
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1169,
+        "end": 1175
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1093,
+        "end": 1156
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::make#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 2130,
+        "end": 2165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 1999,
+        "end": 2035
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#1",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 2077,
+        "end": 2116
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#2",
+      "caller": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/derived.rs",
+        "start": 2185,
+        "end": 2222
+      }
+    },
+    {
       "id": "example.com/acme/conformance::crates/worker/src/dynamic.rs::looped::String.from#0",
       "caller": "example.com/acme/conformance::crates/worker/src/dynamic.rs::looped",
       "target": null,
@@ -6421,8 +6825,8 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/wrappers.rs",
-        "start": 1541,
-        "end": 1633
+        "start": 1960,
+        "end": 2052
       }
     },
     {
@@ -6432,8 +6836,63 @@
       "level": null,
       "span": {
         "path": "crates/worker/src/wrappers.rs",
-        "start": 1541,
-        "end": 1601
+        "start": 1960,
+        "end": 2020
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse::Box.pin#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1544,
+        "end": 1578
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse::Ok#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1664,
+        "end": 1670
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse::recurse#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "target": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "level": "exact",
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1553,
+        "end": 1577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse::reqwest.get#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1597,
+        "end": 1651
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recursive::recurse#0",
+      "caller": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recursive",
+      "target": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+      "level": "exact",
+      "span": {
+        "path": "crates/worker/src/wrappers.rs",
+        "start": 1735,
+        "end": 1763
       }
     },
     {
@@ -6847,6 +7306,31 @@
       "via": "host:api.example.com"
     },
     {
+      "contract": "http::GET::/derived/real",
+      "site": "example.com/acme/conformance::crates/worker/src/derived.rs::derived::client.get#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/by-name/{}",
+      "site": "example.com/acme/conformance::crates/worker/src/derived.rs::send_named::reqwest.get#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/loop",
+      "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/closure",
+      "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#1",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/outer",
+      "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#2",
+      "via": null
+    },
+    {
       "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/dynamic.rs::looped::reqwest.get#0",
       "via": null
@@ -6959,6 +7443,11 @@
     {
       "contract": "http::GET::/open/{}",
       "site": "example.com/acme/conformance::crates/worker/src/wrappers.rs::open_ended::reqwest.get#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/recursive/one",
+      "site": "example.com/acme/conformance::crates/worker/src/wrappers.rs::recursive::recurse#0",
       "via": "host:api.example.com"
     },
     {
@@ -7290,12 +7779,19 @@
     {
       "name": "crates/worker/src",
       "members": [
+        "example.com/acme/conformance::crates/worker/src/derived.rs::Sender.send_named",
+        "example.com/acme/conformance::crates/worker/src/derived.rs::by_name"
+      ]
+    },
+    {
+      "name": "crates/worker/src#2",
+      "members": [
         "example.com/acme/conformance::crates/worker/src/dynamic.rs::pick",
         "example.com/acme/conformance::crates/worker/src/dynamic.rs::unresolved"
       ]
     },
     {
-      "name": "crates/worker/src#2",
+      "name": "crates/worker/src#3",
       "members": [
         "example.com/acme/conformance::crates/worker/src/wrappers.rs::api_get",
         "example.com/acme/conformance::crates/worker/src/wrappers.rs::resource",
@@ -7303,7 +7799,14 @@
       ]
     },
     {
-      "name": "crates/worker/src#3",
+      "name": "crates/worker/src#4",
+      "members": [
+        "example.com/acme/conformance::crates/worker/src/wrappers.rs::recurse",
+        "example.com/acme/conformance::crates/worker/src/wrappers.rs::recursive"
+      ]
+    },
+    {
+      "name": "crates/worker/src#5",
       "members": [
         "example.com/acme/conformance::crates/worker/src/wrappers.rs::send",
         "example.com/acme/conformance::crates/worker/src/wrappers.rs::through_a_parameter"

@@ -844,12 +844,16 @@ one for the area a change touches.
   nothing mounts.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
   (2^20 syntax nodes per file, over every `let mut`), `BUILDER_DEPTH` (64 builders read within
-  one another) and `BUILDER_SIZE` (4096, bytes of text plus parts): a `let mut` String past the
-  budget is unknown, and one read past the depth or the size is a hole (`push_str(&s)` of
-  itself doubles). A `let mut` String is a builder only when its block reads it, `push_str`s,
-  `push`es and `+=`s it in statements of that block; a push in a branch or a loop, `&mut s`,
-  `write!(s, ..)`, another binding of the name, a method that changes it (`insert`, `clear`)
-  or a second builder of that name in the scope leave it unknown. `format!` and `concat!` read
+  one another), `BUILDER_SIZE` (4096, bytes of text plus parts) and `BUILDER_WORK` (2^22 size
+  units per file, over every prefix folded and every read): a `let mut` String past the budget
+  is unknown, and one read past the depth, the size or the work is a hole (`push_str(&s)` of
+  itself doubles). `FORMAT_ARGS` (64), `FORMAT_PLACEHOLDERS` (256) and the size above bound
+  one `format!` or `concat!`; past any the value is unknown. A `let mut` String is a builder
+  only when its block reads it, `push_str`s, `push`es and `+=`s it in statements of that block
+  (a statement `#[cfg]` leaves out, decided where the block is read, is not there); a push in
+  a branch or a loop, `&mut s`, `write!(s, ..)`, an index or deref use (`s[..]`, `*s`), another
+  binding of the name, a method that changes it (`insert`, `clear`) or a second builder of
+  that name in the scope leave it unknown. `format!` and `concat!` read
   a literal format string and arguments that are a literal or a plain name; a spec such as
   `{:.*}` or `{:1$}`, a count that does not match or a `{`/`}` left alone are unknown; a macro
   of another name or one the file defines (`macro_rules!`, in this file only) is not read.
@@ -861,6 +865,10 @@ one for the area a change touches.
   (`hyper`, `surf`, `isahc`, `attohttpc`) are not read; a client parameter is followed through
   the callers that pass a constructor, as in Python; `reqwest::Request::new` and
   `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
+  A value derived from a client (a response, a header map, a JSON value, the result of an
+  extension trait's method) is no client: a method passes the object on only when the
+  library's list names it (`ROUTER`, `CLIENT_BUILDER`, `AGENT_BUILDER` in `lang/rust.rs`), so
+  a setter missing from the list ends the chain and its client is not read.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

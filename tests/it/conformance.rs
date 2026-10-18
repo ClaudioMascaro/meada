@@ -1545,6 +1545,21 @@ fn rust() {
             "crates/worker/src/clients.rs::inline",
             "crates/worker/src/clients.rs::requested",
             "crates/worker/src/clients.rs::verbs",
+            "crates/worker/src/derived.rs::ApiExt",
+            "crates/worker/src/derived.rs::ApiExt.api",
+            "crates/worker/src/derived.rs::Client.ApiExt.api",
+            "crates/worker/src/derived.rs::Factory",
+            "crates/worker/src/derived.rs::Factory.fetch_named",
+            "crates/worker/src/derived.rs::Factory.make",
+            "crates/worker/src/derived.rs::Sender",
+            "crates/worker/src/derived.rs::Sender.send_named",
+            "crates/worker/src/derived.rs::by_name",
+            "crates/worker/src/derived.rs::derived",
+            "crates/worker/src/derived.rs::send_named",
+            "crates/worker/src/derived.rs::shadowed",
+            "crates/worker/src/lib.rs::derived",
+            "crates/worker/src/wrappers.rs::recurse",
+            "crates/worker/src/wrappers.rs::recursive",
             "crates/worker/src/dynamic.rs::looped",
             "crates/worker/src/dynamic.rs::pick",
             "crates/worker/src/dynamic.rs::spec",
@@ -2575,6 +2590,12 @@ fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
             host,
             &site("through_a_parameter", "send#0"),
         ),
+        // A wrapper that calls itself: the cycle is cut, the outside caller's path is read.
+        (
+            "http::GET::/recursive/one",
+            host,
+            &site("recursive", "recurse#0"),
+        ),
         // A public function with no caller here keeps the parameter as a hole.
         (
             "http::GET::/open/{}",
@@ -2583,6 +2604,39 @@ fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
         ),
     ]);
     assert_eq!(rust_clients("rust_http_wrappers", "wrappers.rs"), expected);
+}
+
+#[test]
+fn rust_values_derived_from_a_client_and_name_matches_are_no_consumers() {
+    let host = "host:api.example.com";
+    let site =
+        |function: &str, call: &str| format!("crates/worker/src/derived.rs::{function}::{call}");
+    let expected = triples(&[
+        // `headers().get(..)` of a response, `get` on a JSON value and on `client.api()` (a method
+        // of a trait the crate defines) are not.
+        (
+            "http::GET::/derived/real",
+            host,
+            &site("derived", "client.get#0"),
+        ),
+        // A client from `factory.make()`, found by name, is not one; a wrapper reached only by
+        // a name match keeps its parameter as a hole (the call `sender.send_named("called")` is
+        // not its caller).
+        (
+            "http::GET::/by-name/{}",
+            host,
+            &site("send_named", "reqwest.get#0"),
+        ),
+        // A `{base}` that a loop or a closure parameter binds is not the `let base` around it.
+        ("http::GET::/loop", "", &site("shadowed", "reqwest.get#0")),
+        (
+            "http::GET::/closure",
+            "",
+            &site("shadowed", "reqwest.get#1"),
+        ),
+        ("http::GET::/outer", "", &site("shadowed", "reqwest.get#2")),
+    ]);
+    assert_eq!(rust_clients("rust_http_derived", "derived.rs"), expected);
 }
 
 #[test]

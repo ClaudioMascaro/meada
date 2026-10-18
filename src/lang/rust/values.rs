@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
-use super::builders::{BUILDER_DEPTH, BUILDER_SIZE, Builder, size};
+use super::builders::{BUILDER_DEPTH, BUILDER_SIZE, BUILDER_WORK, Builder, size};
 use super::{DEFINITION_DEPTH, Heads, Path, Scan, field, levels, member, normalize, segments};
 use crate::lang::{Invocation, Part, Value, children, named, text};
 use crate::qualify;
@@ -40,6 +40,14 @@ const KEEPS_NAMES: &[&str] = &["to_string", "to_owned", "as_str"];
 /// The macros whose arguments are a format string and the values it prints.
 const FORMATS: &[&str] = &["format", "concat"];
 
+/// How many arguments and placeholders a `format!` or `concat!` is read with, and how big its
+/// text may be (`builders::size`); past any of them the value is unknown.
+// ponytail: a URL is built from a few arguments; a crafted file with 300k `{u}` captures must
+// not copy a builder for each.
+pub(super) const FORMAT_ARGS: usize = 64;
+pub(super) const FORMAT_PLACEHOLDERS: usize = 256;
+const FORMAT_SIZE: usize = BUILDER_SIZE;
+
 /// Where a value is written: the scope, the module written in place and whether `self::` and
 /// `super::` can be read there, as a `Path` records them.
 pub(super) struct Where {
@@ -58,8 +66,12 @@ pub(super) struct Reader<'a, 't> {
     builders: &'a Builders<'t>,
     /// The parts each step of a builder (0 is what it began as) adds, read once.
     folded: HashMap<(String, String, usize), Vec<Part>>,
+    /// What each builder holds after 0, 1, 2.. of its pushes, folded as far as a read needed.
+    prefixes: HashMap<(String, String), Vec<Vec<Part>>>,
     /// How many builders are being read within one another.
     nest: usize,
+    /// What the builders' folds and reads have cost, in `size` units (`BUILDER_WORK`).
+    work: usize,
 }
 
 impl<'a, 't> Reader<'a, 't> {
@@ -75,7 +87,9 @@ impl<'a, 't> Reader<'a, 't> {
             heads,
             builders,
             folded: HashMap::new(),
+            prefixes: HashMap::new(),
             nest: 0,
+            work: 0,
         }
     }
 
@@ -310,12 +324,14 @@ impl<'a, 't> Reader<'a, 't> {
         let parts = match name.as_str() {
             "format" => self.format(at, node.start_byte(), &args),
             // `concat!` takes literals only: a name there is no string.
+            _ if args.len() > FORMAT_ARGS => None,
             _ => {
                 let parts = args.iter().flat_map(|a| match a.as_slice() {
                     [n] if n.kind() == "identifier" => vec![Part::Hole],
                     _ => self.argument(at, a),
                 });
-                Some(merge(parts.collect::<Vec<_>>()))
+                let parts = merge(parts.collect::<Vec<_>>());
+                (size(&parts) <= FORMAT_SIZE).then_some(parts)
             }
         };
         parts.map_or(Value::Unknown, Value::Str)
@@ -354,18 +370,21 @@ impl<'a, 't> Reader<'a, 't> {
             return None;
         };
         let mut positional: Vec<Vec<Part>> = Vec::new();
-        let mut keyed: Vec<(String, Vec<Part>)> = Vec::new();
+        let mut keyed: HashMap<String, Vec<Part>> = HashMap::new();
+        if rest.len() > FORMAT_ARGS {
+            return None;
+        }
         for arg in rest {
             match arg.as_slice() {
                 [name, eq, value @ ..] if name.kind() == "identifier" && eq.kind() == "=" => {
                     let parts = self.argument(at, value);
-                    keyed.push((text(*name, self.src).to_string(), parts));
+                    keyed.insert(text(*name, self.src).to_string(), parts);
                 }
                 _ if keyed.is_empty() => positional.push(self.argument(at, arg)),
                 _ => return None,
             }
         }
-        let (mut out, mut literal, mut next) = (Vec::new(), String::new(), 0);
+        let (mut out, mut literal, mut next, mut holes) = (Vec::new(), String::new(), 0, 0);
         let mut rest = template.as_str();
         while let Some(c) = rest.chars().next() {
             if let Some(after) = rest.strip_prefix("{{").or_else(|| rest.strip_prefix("}}")) {
@@ -384,7 +403,7 @@ impl<'a, 't> Reader<'a, 't> {
                     positional.get(next - 1)?.clone()
                 } else if target.bytes().all(|b| b.is_ascii_digit()) {
                     positional.get(target.parse::<usize>().ok()?)?.clone()
-                } else if let Some((_, value)) = keyed.iter().find(|(k, _)| k == target) {
+                } else if let Some(value) = keyed.get(target) {
                     value.clone()
                 } else if is_name(target) {
                     self.capture(at, target, pos)
@@ -399,6 +418,10 @@ impl<'a, 't> Reader<'a, 't> {
                     true => out.extend(value),
                     false => out.push(Part::Hole),
                 }
+                holes += 1;
+                if holes > FORMAT_PLACEHOLDERS || size(&out) > FORMAT_SIZE {
+                    return None;
+                }
                 rest = &rest[end + 1..];
             } else if c == '}' {
                 return None;
@@ -408,7 +431,7 @@ impl<'a, 't> Reader<'a, 't> {
             }
         }
         out.push(Part::Text(literal));
-        Some(merge(out))
+        (size(&out) <= FORMAT_SIZE).then(|| merge(out))
     }
 
     /// The parts of a macro argument: a literal, a plain name, else a hole.
@@ -444,6 +467,7 @@ impl<'a, 't> Reader<'a, 't> {
     }
 
     /// The text the builder `name` holds at `pos`: what it began as and the pushes before `pos`.
+    /// Each prefix of the pushes is folded once, from the one before it, and a read copies it.
     fn built(&mut self, at: &Where, name: &str, pos: usize) -> Option<Vec<Part>> {
         let builders = self.builders;
         if builders.is_empty() {
@@ -464,7 +488,7 @@ impl<'a, 't> Reader<'a, 't> {
         if pos < builder.from || pos >= builder.to {
             return None;
         }
-        if self.nest >= BUILDER_DEPTH {
+        if self.nest >= BUILDER_DEPTH || self.work > BUILDER_WORK {
             return Some(vec![Part::Hole]);
         }
         self.nest += 1;
@@ -473,18 +497,30 @@ impl<'a, 't> Reader<'a, 't> {
             module: at.module.clone(),
             pure: at.pure,
         };
-        let mut out = self.step(&place, key, 0, builder.init, false);
-        for (n, push) in builder.steps.iter().enumerate() {
-            if push.end > pos || size(&out) > BUILDER_SIZE {
-                break;
+        if !self.prefixes.contains_key(key) {
+            let init = self.step(&place, key, 0, builder.init, false);
+            self.prefixes.insert(key.clone(), vec![merge(init)]);
+        }
+        let n = builder.steps.partition_point(|p| p.end <= pos);
+        while self.prefixes[key].len() <= n && self.work <= BUILDER_WORK {
+            let k = self.prefixes[key].len();
+            let push = &builder.steps[k - 1];
+            let added = self.step(&place, key, k, push.arg, push.char);
+            let mut next = self.prefixes[key][k - 1].clone();
+            next.extend(added);
+            let mut next = merge(next);
+            if size(&next) > BUILDER_SIZE {
+                next = vec![Part::Hole];
             }
-            out.extend(self.step(&place, key, n + 1, push.arg, push.char));
+            self.work += size(&next);
+            if let Some(prefixes) = self.prefixes.get_mut(key) {
+                prefixes.push(next);
+            }
         }
         self.nest -= 1;
-        if size(&out) > BUILDER_SIZE {
-            out = vec![Part::Hole];
-        }
-        Some(merge(out))
+        let parts = (self.prefixes[key].get(n).cloned()).unwrap_or_else(|| vec![Part::Hole]);
+        self.work += size(&parts);
+        Some(parts)
     }
 
     /// The parts step `n` of the builder `key` adds, read once.
@@ -500,12 +536,16 @@ impl<'a, 't> Reader<'a, 't> {
         if let Some(parts) = self.folded.get(&id) {
             return parts.clone();
         }
-        let parts = match (char, self.value(at, node)) {
+        let mut parts = match (char, self.value(at, node)) {
             (_, Value::Str(parts)) => parts,
             (false, Value::Ref(name)) => vec![Part::Ref(name)],
             (true, _) if node.kind() == "char_literal" => char_text(node, self.src),
             _ => vec![Part::Hole],
         };
+        if size(&parts) > BUILDER_SIZE {
+            parts = vec![Part::Hole];
+        }
+        self.work += size(&parts);
         self.folded.insert(id, parts.clone());
         parts
     }
