@@ -112,6 +112,15 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the source writes everything a name of the repository is (Rust): the blocks of a
+    /// type hold every member it has there, so a member they lack on a type the receiver or the
+    /// path writes is outside the repository (a derive, a blanket or outside trait) and resolves
+    /// to nothing; and an attribute (`Call::decorates`) is a macro, no call of a function, so it
+    /// resolves to nothing too. Otherwise both fall to a name match.
+    fn strict(&self) -> bool {
+        false
+    }
+
     /// Names every file of the language may call without binding them, which contract kinds
     /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {

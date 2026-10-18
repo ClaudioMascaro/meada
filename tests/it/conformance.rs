@@ -1569,6 +1569,11 @@ fn rust() {
             "api/src/methods.rs::wrapped",
             "api/src/methods.rs::sliced",
             "api/src/methods.rs::cleared",
+            "api/src/methods.rs::Config",
+            "api/src/methods.rs::Config.Hash.hash",
+            "api/src/methods.rs::Config.Default.default",
+            "api/src/methods.rs::Plain",
+            "api/src/methods.rs::derived",
             "api/src/methods.rs::marked",
             "api/src/methods.rs::marked_impl",
             "api/src/store.rs::Persist.persist",
@@ -2423,6 +2428,13 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Counter.reset"],
             ),
+            // A written type whose blocks lack the member: nothing, never another type's.
+            ("api/src/methods.rs::derived::Plain.default#0", None, &[]),
+            ("api/src/methods.rs::derived::q.hash#0", None, &[]),
+            // An attribute is no call of a function: neither by name nor through a path.
+            ("crates/greeter/src/main.rs::get#0", None, &[]),
+            ("crates/greeter/src/names.rs::get#0", None, &[]),
+            ("crates/actix/src/stray.rs::elsewhere.get#0", None, &[]),
         ],
     );
     // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.

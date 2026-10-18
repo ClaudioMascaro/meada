@@ -222,6 +222,10 @@ impl LanguagePack for Rust {
         true
     }
 
+    fn strict(&self) -> bool {
+        true
+    }
+
     fn passes(&self, origin: &str, method: &str) -> bool {
         let methods = match origin {
             o if o.starts_with("axum.Router.") => ROUTER,

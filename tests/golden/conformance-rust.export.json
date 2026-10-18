@@ -35,7 +35,7 @@
     },
     {
       "path": "api/src/methods.rs",
-      "hash": "8416d0903ddecd37a093f5a4920bf9d88b3ce4fa1727ce505a4269d7ed23eb9b"
+      "hash": "2aabc627baff4b37a1b850e3a9b23cc5d96870d295060a395db933623b97a684"
     },
     {
       "path": "api/src/mock.rs",
@@ -844,6 +844,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Config",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 4918,
+        "end": 4936
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Config.Default.default",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 4968,
+        "end": 5011
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Config.Hash.hash",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 5053,
+        "end": 5108
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/methods.rs::Counter",
       "span": {
         "path": "api/src/methods.rs",
@@ -988,6 +1012,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/methods.rs::Plain",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 4899,
+        "end": 4916
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/methods.rs::Probe",
       "span": {
         "path": "api/src/methods.rs",
@@ -1057,6 +1089,14 @@
         "path": "api/src/methods.rs",
         "start": 4657,
         "end": 4703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::derived",
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 5112,
+        "end": 5219
       }
     },
     {
@@ -4720,6 +4760,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/methods.rs::derived::Plain.default#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 5181,
+        "end": 5197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/methods.rs::derived::q.hash#0",
+      "caller": "example.com/acme/conformance::api/src/methods.rs::derived",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "api/src/methods.rs",
+        "start": 5203,
+        "end": 5216
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/methods.rs::dynamic::p.probe#0",
       "caller": "example.com/acme/conformance::api/src/methods.rs::dynamic",
       "target": "example.com/acme/conformance::api/src/methods.rs::Probe.probe",
@@ -6361,8 +6423,8 @@
     {
       "id": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get#0",
       "caller": "example.com/acme/conformance::crates/actix/src/stray.rs",
-      "target": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get",
-      "level": "exact",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/actix/src/stray.rs",
         "start": 707,
@@ -6504,8 +6566,8 @@
     {
       "id": "example.com/acme/conformance::crates/greeter/src/main.rs::get#0",
       "caller": "example.com/acme/conformance::crates/greeter/src/main.rs",
-      "target": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/greeter/src/main.rs",
         "start": 197,
@@ -6541,8 +6603,8 @@
     {
       "id": "example.com/acme/conformance::crates/greeter/src/names.rs::get#0",
       "caller": "example.com/acme/conformance::crates/greeter/src/names.rs",
-      "target": "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "crates/greeter/src/names.rs",
         "start": 0,
@@ -14757,12 +14819,6 @@
       "members": [
         "example.com/acme/conformance::crates/actix/src/admin.rs::extras",
         "example.com/acme/conformance::crates/actix/src/admin.rs::more"
-      ]
-    },
-    {
-      "name": "crates/actix/src#3",
-      "members": [
-        "example.com/acme/conformance::crates/actix/src/stray.rs::elsewhere.get"
       ]
     },
     {

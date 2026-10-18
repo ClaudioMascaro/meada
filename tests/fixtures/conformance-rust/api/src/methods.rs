@@ -251,3 +251,25 @@ pub fn marked_impl(p: impl Probe + Send + 'static) {
 pub fn cleared(c: &Counter) {
     c.reset();
 }
+
+// A written type whose blocks do not hold the member (a derive, a blanket or outside trait)
+// resolves to nothing: `Config`'s `default` and `hash` are another type's.
+#[derive(Default, Hash)]
+pub struct Plain;
+
+pub struct Config;
+
+impl Default for Config {
+    fn default() -> Self {
+        Config
+    }
+}
+
+impl std::hash::Hash for Config {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+}
+
+pub fn derived<H: std::hash::Hasher>(q: &Plain, state: &mut H) {
+    Plain::default();
+    q.hash(state);
+}

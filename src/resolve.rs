@@ -256,6 +256,8 @@ pub struct Resolver<'a> {
     published: Option<BTreeSet<String>>,
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
+    /// The pack's `LanguagePack::strict`.
+    strict: bool,
     /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
     /// them and the last of one specifier alone, and how many of them each top-level name comes
     /// before: those written after its last binding (`rebound`).
@@ -370,6 +372,7 @@ impl<'a> Resolver<'a> {
             blocks: HashMap::new(),
             published: None,
             stars_bind,
+            strict: language.strict(),
             later,
         };
         let mut work = Work::default();
@@ -436,6 +439,9 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
+        if self.strict && call.decorates.is_some() {
+            return Resolution::Unresolved;
+        }
         let binding = match call.by_path {
             true => self.path_binding(path, &call.scope, &call.callee),
             false => self.binding(path, &call.scope, &call.callee),
@@ -444,7 +450,9 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             Binding::Several(all) => Resolution::Ambiguous(all),
             Binding::External(..) => Resolution::Unresolved,
-            Binding::Unknown if self.owned_outside(path, call) => Resolution::Unresolved,
+            Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
+                Resolution::Unresolved
+            }
             Binding::Instance(_)
             | Binding::Module(_)
             | Binding::Const(..)
@@ -467,6 +475,23 @@ impl<'a> Resolver<'a> {
         let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
         let found = self.resolve_as(path, &call.scope, &callee, seen, work, Reading::Value);
         matches!(found, Binding::External(..))
+    }
+
+    /// Whether, in a strict pack (`LanguagePack::strict`), the receiver or the path head of
+    /// `call` is a type of the repository the source writes (`s: Store`, `Store::`): the member
+    /// its blocks lack is outside the repository, not any member of the name.
+    fn lacks(&self, path: &'a str, call: &'a Call) -> bool {
+        let Some((head, _)) = call.callee.rsplit_once('.').filter(|_| self.strict) else {
+            return false;
+        };
+        let reading = match call.by_path {
+            true => Reading::Path,
+            false => Reading::Value,
+        };
+        let (seen, work) = (&mut self.seen(path, &call.scope), &mut Work::default());
+        let found = self.resolve_as(path, &call.scope, head, seen, work, reading);
+        let found = self.instance(found, work);
+        matches!(found, Binding::Def(t) | Binding::Instance(t) if self.is_class(t))
     }
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
