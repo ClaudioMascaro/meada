@@ -1,0 +1,5 @@
+[workspace]
+members = ["app", "worker"]
+
+[workspace.dependencies]
+shared-core = "1.0"

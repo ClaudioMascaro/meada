@@ -1,0 +1,13 @@
+example.com/cargo/lib core/src/text.rs:1-3 greet
+community: core/src
+processes: 3 (1 export, 2 program; 2 repositories): main (example.com/cargo/lib), main (example.com/cargo/web), run (example.com/cargo/web)
+pub fn greet(name: &str) -> String {
+    shout(&format!("hello {name}"))
+}
+callers:
+example.com/cargo/lib app/src/main.rs:4 main
+callees:
+example.com/cargo/lib core/src/text.rs:5 shout
+consumers:
+example.com/cargo/web app/src/main.rs:10 welcome [range unchecked]
+example.com/cargo/web worker/src/lib.rs:2 run [range unchecked]

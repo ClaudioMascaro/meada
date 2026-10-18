@@ -184,6 +184,23 @@ modules updates it.
   root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
   (PEP 503 names, requirement lines and continuations, both readers, the limits) and
   `lang/python/pyproject.rs`.
+- `tests/it/cargo.rs` (spec #30): the Cargo fixtures `cargo-lib` and `cargo-web` as siblings
+  (`web` names `lib` as its peer). `lib` is a workspace of `shared-core` (`pub use text::{greet,
+  shout}` of a private module, `pub mod api` with `Client::create`), `shared-extras` and
+  `inner-app`, which depends on both by path. `web` depends on `shared-core` by version (`app`),
+  through `workspace = true` and a renamed key (`worker`), on `shared-extras` by a renamed `git`
+  key, on a `path` that lands in `lib` (`../../cargo-lib/extras`, linked) and one that lands in
+  no workspace repository (`ghost`, not linked), and on `serde` (no link). The tests check each
+  form's link and reason, every `use` into `lib` (`exact`, `; import crate name`), the path
+  dependency that stays inside `lib`, a `git` URL of another repository that links to nothing,
+  a private module that is not reached until it is made `pub`, a `[lib] name` and a
+  `version.workspace = true` written into copies of `lib`, and the `cargo-fork` fixture (a second
+  provider of `shared-core`, added as a peer) that makes the version dependency `ambiguous`.
+  Goldens `cargo-{web,lib}.export.json`, `cargo-lib.context-greet.txt` and
+  `cargo-web.trace-down.txt`; the freshness test edits the library's version, `app`'s
+  requirement, the workspace requirement and a dependency key. Unit tests in `package/cargo.rs`
+  (the reader, unreadable sources, the dedup, `workspace = true`, hostile manifests) and
+  `package.rs` (`reaches`).
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500

@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{Result, qualify};
 
-mod crates;
+pub(crate) mod crates;
 
 use crates::{MOD, PATH, Tree};
 

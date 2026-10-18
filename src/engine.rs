@@ -111,6 +111,7 @@ impl Engine {
         let mut exports = repos
             .map(|(n, m)| {
                 let mut export = index::export(&self.db, &schema(n), &m.identity)?;
+                export.root = m.root.clone();
                 for kind in contract::KINDS {
                     kind.declare(m, &mut export);
                 }
