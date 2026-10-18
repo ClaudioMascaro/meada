@@ -1,5 +1,5 @@
 example.com/acme/conformance api/src/methods.rs:45-45 Counter.reset
-community: api/src#7
+community: api/src#8
 processes: none
 pub fn reset(&mut self) {}
 callers:

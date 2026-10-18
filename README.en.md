@@ -191,7 +191,7 @@ through the module tree its `mod` declarations build, with no Rust toolchain: a 
 reaches stays out) with its functions, types, traits, modules and `impl` methods and the calls
 written as paths (`crate::a::f()`, `Type::new()`, `Self::f()`), also through `use` (groups,
 renames, globs, `pub use` and the other workspace crates by name; method calls (`x.m()`) go through the receiver's type when the code writes it (`let`, parameter, field, `self`, function return; a `dyn Trait` or trait-bounded generic goes to the trait's method), else by name; calls inside macros are not
-indexed, and Rust contracts other than packages are not there yet), and links repositories,
+indexed, and Rust contracts other than packages are not there yet; only each crate's default configuration is read, for a fixed x86_64 Linux target: an item under a false `#[cfg(..)]`, or under a feature outside the `Cargo.toml` `default`, stays out, and `#[cfg(test)]` modules are in), and links repositories,
 also from one language to the other, through HTTP contracts (`fetch` and, in Python, `requests`, `httpx` and `aiohttp`
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
 Django on the serving side, also behind a gateway), through

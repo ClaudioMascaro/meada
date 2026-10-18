@@ -765,6 +765,10 @@ one for the area a change touches.
   scope `__main__`, so a name it assigns is a local of that symbol and no longer rebinds the
   module's global of that name; only the first `__main__` of a file (a guard or a
   `def __main__()`) counts.
+- `lang/rust/cfg.rs` (spec #30): `PREDICATE_DEPTH` (64): a `cfg` predicate nesting `all`,
+  `any` and `not` deeper is false; `FEATURES` (4096): the default features of a crate followed
+  through features that enable others (a cycle ends sooner, by the visited set), the rest is
+  not followed.
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names

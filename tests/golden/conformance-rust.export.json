@@ -22,12 +22,16 @@
       "hash": "76704e036fc55272924b80420a1c14c6fb0f26f88f8d34f00d815bc08b0d59ac"
     },
     {
+      "path": "api/src/gated.rs",
+      "hash": "47b39fa1c5e5faf97ec3d4072d51290ad2def95459c8fbae87e98e682d34f1c1"
+    },
+    {
       "path": "api/src/launch.rs",
       "hash": "ac30287d0c3aab4f09550e6cea7b807f29a073b60e481c7296573fba5b5cbd20"
     },
     {
       "path": "api/src/main.rs",
-      "hash": "cc9123a0b5e6e0f966a35899d807811bcc7e5a4530b252cc44bedae26697cbe3"
+      "hash": "d5443cc49a90921a731c49de27133289c4754034b7f3b93d8d860b69a8fde564"
     },
     {
       "path": "api/src/methods.rs",
@@ -196,6 +200,78 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::Gauge",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 591,
+        "end": 608
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::Gauge.plain",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 690,
+        "end": 707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::Gauge.unix_method",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 787,
+        "end": 810
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::always",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 81,
+        "end": 99
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::on_linux",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 432,
+        "end": 452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::tests",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 881,
+        "end": 943
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::tests.helper",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 897,
+        "end": 941
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::through_net",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 287,
+        "end": 310
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::unix_without_metrics",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 356,
+        "end": 388
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/launch.rs::launch",
       "span": {
         "path": "api/src/launch.rs",
@@ -207,64 +283,64 @@
       "id": "example.com/acme/conformance::api/src/main.rs::below",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1729,
-        "end": 1810
+        "start": 1810,
+        "end": 1891
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::below.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1764,
-        "end": 1808
+        "start": 1845,
+        "end": 1889
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 546,
-        "end": 840
+        "start": 627,
+        "end": 921
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 563,
-        "end": 600
+        "start": 644,
+        "end": 681
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.run_checks",
       "span": {
         "path": "api/src/main.rs",
-        "start": 714,
-        "end": 785
+        "start": 795,
+        "end": 866
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::checks.verify",
       "span": {
         "path": "api/src/main.rs",
-        "start": 791,
-        "end": 838
+        "start": 872,
+        "end": 919
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3982,
-        "end": 4011
+        "start": 4063,
+        "end": 4092
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::elsewhere",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3729,
-        "end": 3764
+        "start": 3810,
+        "end": 3845
       }
     },
     {
@@ -276,243 +352,251 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/main.rs::gated",
+      "span": {
+        "path": "api/src/main.rs",
+        "start": 12,
+        "end": 22
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/main.rs::hidden",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3934,
-        "end": 3980
+        "start": 4015,
+        "end": 4061
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner",
       "span": {
         "path": "api/src/main.rs",
-        "start": 417,
-        "end": 544
+        "start": 498,
+        "end": 625
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.helper",
       "span": {
         "path": "api/src/main.rs",
-        "start": 433,
-        "end": 473
+        "start": 514,
+        "end": 554
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::inner.twice",
       "span": {
         "path": "api/src/main.rs",
-        "start": 479,
-        "end": 542
+        "start": 560,
+        "end": 623
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1233,
-        "end": 1339
+        "start": 1314,
+        "end": 1420
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.far",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1292,
-        "end": 1337
+        "start": 1373,
+        "end": 1418
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::isolated.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1252,
-        "end": 1286
+        "start": 1333,
+        "end": 1367
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::launch",
       "span": {
         "path": "api/src/main.rs",
-        "start": 12,
-        "end": 23
+        "start": 23,
+        "end": 34
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1395,
-        "end": 1524
+        "start": 1476,
+        "end": 1605
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.compute",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1435,
-        "end": 1472
+        "start": 1516,
+        "end": 1553
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::local_wins.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1478,
-        "end": 1522
+        "start": 1559,
+        "end": 1603
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1572,
-        "end": 1660
+        "start": 1653,
+        "end": 1741
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::loops.f",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1627,
-        "end": 1658
+        "start": 1708,
+        "end": 1739
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::main",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1962,
-        "end": 3517
+        "start": 2043,
+        "end": 3598
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::methods",
       "span": {
         "path": "api/src/main.rs",
-        "start": 24,
-        "end": 36
+        "start": 76,
+        "end": 88
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1885,
-        "end": 1960
+        "start": 1966,
+        "end": 2041
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.deep",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1926,
-        "end": 1939
+        "start": 2007,
+        "end": 2020
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::nested.plain",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1944,
-        "end": 1958
+        "start": 2025,
+        "end": 2039
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::outside",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3570,
-        "end": 3605
+        "start": 3651,
+        "end": 3686
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::prelude",
       "span": {
         "path": "api/src/main.rs",
-        "start": 37,
-        "end": 49
+        "start": 89,
+        "end": 101
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::ring",
       "span": {
         "path": "api/src/main.rs",
-        "start": 50,
-        "end": 59
+        "start": 102,
+        "end": 111
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::routes",
       "span": {
         "path": "api/src/main.rs",
-        "start": 60,
-        "end": 71
+        "start": 112,
+        "end": 123
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::run",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4028,
-        "end": 4039
+        "start": 4109,
+        "end": 4120
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped",
       "span": {
         "path": "api/src/main.rs",
-        "start": 938,
-        "end": 1079
+        "start": 1019,
+        "end": 1160
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::scoped.go",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1027,
-        "end": 1077
+        "start": 1108,
+        "end": 1158
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::start",
       "span": {
         "path": "api/src/main.rs",
-        "start": 4013,
-        "end": 4026
+        "start": 4094,
+        "end": 4107
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::store",
       "span": {
         "path": "api/src/main.rs",
-        "start": 72,
-        "end": 82
+        "start": 124,
+        "end": 134
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::util",
       "span": {
         "path": "api/src/main.rs",
-        "start": 406,
-        "end": 415
+        "start": 487,
+        "end": 496
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::with_param",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3836,
-        "end": 3875
+        "start": 3917,
+        "end": 3956
       }
     },
     {
       "id": "example.com/acme/conformance::api/src/main.rs::within",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3652,
-        "end": 3727
+        "start": 3733,
+        "end": 3808
       }
     },
     {
@@ -1444,14 +1528,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::tests.helper::mod.always#0",
+      "caller": "example.com/acme/conformance::api/src/gated.rs::tests.helper",
+      "target": "example.com/acme/conformance::api/src/gated.rs::always",
+      "level": "exact",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 919,
+        "end": 934
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/main.rs::below.go::compute#0",
       "caller": "example.com/acme/conformance::api/src/main.rs::below.go",
       "target": "example.com/acme/conformance::api/src/main.rs::compute",
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1793,
-        "end": 1802
+        "start": 1874,
+        "end": 1883
       }
     },
     {
@@ -1461,8 +1556,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 770,
-        "end": 779
+        "start": 851,
+        "end": 860
       }
     },
     {
@@ -1472,8 +1567,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 751,
-        "end": 767
+        "start": 832,
+        "end": 848
       }
     },
     {
@@ -1483,8 +1578,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 817,
-        "end": 831
+        "start": 898,
+        "end": 912
       }
     },
     {
@@ -1494,8 +1589,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3750,
-        "end": 3761
+        "start": 3831,
+        "end": 3842
       }
     },
     {
@@ -1505,8 +1600,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3972,
-        "end": 3977
+        "start": 4053,
+        "end": 4058
       }
     },
     {
@@ -1516,8 +1611,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 511,
-        "end": 519
+        "start": 592,
+        "end": 600
       }
     },
     {
@@ -1527,8 +1622,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 522,
-        "end": 536
+        "start": 603,
+        "end": 617
       }
     },
     {
@@ -1538,8 +1633,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1315,
-        "end": 1330
+        "start": 1396,
+        "end": 1411
       }
     },
     {
@@ -1549,8 +1644,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1274,
-        "end": 1279
+        "start": 1355,
+        "end": 1360
       }
     },
     {
@@ -1560,8 +1655,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1507,
-        "end": 1516
+        "start": 1588,
+        "end": 1597
       }
     },
     {
@@ -1571,8 +1666,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 1648,
-        "end": 1651
+        "start": 1729,
+        "end": 1732
       }
     },
     {
@@ -1582,8 +1677,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2661,
-        "end": 2672
+        "start": 2742,
+        "end": 2753
       }
     },
     {
@@ -1593,8 +1688,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2845,
-        "end": 2859
+        "start": 2926,
+        "end": 2940
       }
     },
     {
@@ -1604,8 +1699,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2610,
-        "end": 2621
+        "start": 2691,
+        "end": 2702
       }
     },
     {
@@ -1615,8 +1710,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2362,
-        "end": 2375
+        "start": 2443,
+        "end": 2456
       }
     },
     {
@@ -1626,8 +1721,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2587,
-        "end": 2592
+        "start": 2668,
+        "end": 2673
       }
     },
     {
@@ -1637,8 +1732,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3133,
-        "end": 3144
+        "start": 3214,
+        "end": 3225
       }
     },
     {
@@ -1648,8 +1743,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2707,
-        "end": 2730
+        "start": 2788,
+        "end": 2811
       }
     },
     {
@@ -1659,8 +1754,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2678,
-        "end": 2701
+        "start": 2759,
+        "end": 2782
       }
     },
     {
@@ -1670,8 +1765,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2761,
-        "end": 2773
+        "start": 2842,
+        "end": 2854
       }
     },
     {
@@ -1681,8 +1776,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2158,
-        "end": 2179
+        "start": 2239,
+        "end": 2260
       }
     },
     {
@@ -1692,8 +1787,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2598,
-        "end": 2604
+        "start": 2679,
+        "end": 2685
       }
     },
     {
@@ -1703,8 +1798,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2951,
-        "end": 2956
+        "start": 3032,
+        "end": 3037
       }
     },
     {
@@ -1714,8 +1809,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2962,
-        "end": 2969
+        "start": 3043,
+        "end": 3050
       }
     },
     {
@@ -1725,8 +1820,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2137,
-        "end": 2152
+        "start": 2218,
+        "end": 2233
       }
     },
     {
@@ -1736,8 +1831,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3170,
-        "end": 3185
+        "start": 3251,
+        "end": 3266
       }
     },
     {
@@ -1747,8 +1842,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3150,
-        "end": 3164
+        "start": 3231,
+        "end": 3245
       }
     },
     {
@@ -1758,8 +1853,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3329,
-        "end": 3337
+        "start": 3410,
+        "end": 3418
       }
     },
     {
@@ -1769,8 +1864,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3343,
-        "end": 3359
+        "start": 3424,
+        "end": 3440
       }
     },
     {
@@ -1780,8 +1875,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3458,
-        "end": 3488
+        "start": 3539,
+        "end": 3569
       }
     },
     {
@@ -1791,8 +1886,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3494,
-        "end": 3514
+        "start": 3575,
+        "end": 3595
       }
     },
     {
@@ -1802,8 +1897,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2736,
-        "end": 2755
+        "start": 2817,
+        "end": 2836
       }
     },
     {
@@ -1813,8 +1908,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3191,
-        "end": 3207
+        "start": 3272,
+        "end": 3288
       }
     },
     {
@@ -1824,8 +1919,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2185,
-        "end": 2205
+        "start": 2266,
+        "end": 2286
       }
     },
     {
@@ -1835,8 +1930,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2211,
-        "end": 2232
+        "start": 2292,
+        "end": 2313
       }
     },
     {
@@ -1846,8 +1941,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3061,
-        "end": 3079
+        "start": 3142,
+        "end": 3160
       }
     },
     {
@@ -1857,8 +1952,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3033,
-        "end": 3055
+        "start": 3114,
+        "end": 3136
       }
     },
     {
@@ -1868,8 +1963,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3085,
-        "end": 3109
+        "start": 3166,
+        "end": 3190
       }
     },
     {
@@ -1879,8 +1974,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2090,
-        "end": 2111
+        "start": 2171,
+        "end": 2192
       }
     },
     {
@@ -1890,8 +1985,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2351,
-        "end": 2356
+        "start": 2432,
+        "end": 2437
       }
     },
     {
@@ -1901,8 +1996,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3115,
-        "end": 3127
+        "start": 3196,
+        "end": 3208
       }
     },
     {
@@ -1912,8 +2007,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2338,
-        "end": 2345
+        "start": 2419,
+        "end": 2426
       }
     },
     {
@@ -1923,8 +2018,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 2381,
-        "end": 2402
+        "start": 2462,
+        "end": 2483
       }
     },
     {
@@ -1934,8 +2029,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2065,
-        "end": 2084
+        "start": 2146,
+        "end": 2165
       }
     },
     {
@@ -1945,8 +2040,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2627,
-        "end": 2642
+        "start": 2708,
+        "end": 2723
       }
     },
     {
@@ -1956,8 +2051,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2648,
-        "end": 2655
+        "start": 2729,
+        "end": 2736
       }
     },
     {
@@ -1967,8 +2062,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 2117,
-        "end": 2131
+        "start": 2198,
+        "end": 2212
       }
     },
     {
@@ -1978,8 +2073,8 @@
       "level": "inferred",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3596,
-        "end": 3603
+        "start": 3677,
+        "end": 3684
       }
     },
     {
@@ -1989,8 +2084,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1056,
-        "end": 1061
+        "start": 1137,
+        "end": 1142
       }
     },
     {
@@ -2000,8 +2095,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 1064,
-        "end": 1071
+        "start": 1145,
+        "end": 1152
       }
     },
     {
@@ -2011,8 +2106,8 @@
       "level": null,
       "span": {
         "path": "api/src/main.rs",
-        "start": 3867,
-        "end": 3872
+        "start": 3948,
+        "end": 3953
       }
     },
     {
@@ -2022,8 +2117,8 @@
       "level": "exact",
       "span": {
         "path": "api/src/main.rs",
-        "start": 3713,
-        "end": 3724
+        "start": 3794,
+        "end": 3805
       }
     },
     {
@@ -3045,6 +3140,14 @@
     {
       "name": "api/src#10",
       "members": [
+        "example.com/acme/conformance::api/src/methods.rs::outside",
+        "example.com/acme/conformance::api/src/methods.rs::pick",
+        "example.com/acme/conformance::api/src/methods.rs::shadowed"
+      ]
+    },
+    {
+      "name": "api/src#11",
+      "members": [
         "example.com/acme/conformance::api/src/methods.rs::wrap",
         "example.com/acme/conformance::api/src/methods.rs::wrapped"
       ]
@@ -3071,17 +3174,23 @@
         "example.com/acme/conformance::api/src/store.rs::Store.Persist.persist",
         "example.com/acme/conformance::api/src/store.rs::Store.new",
         "example.com/acme/conformance::api/src/store.rs::reset",
-        "example.com/acme/conformance::crates/billing/src/billing.rs::total",
-        "example.com/acme/conformance::crates/billing/src/billing.rs::util.round",
-        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.amount",
+        "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
         "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.new",
-        "example.com/acme/conformance::crates/billing/src/invoice.rs::tax",
+        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add",
         "example.com/acme/conformance::crates/ledger-core/src/lib.rs::internal.secret",
+        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::post",
         "example.com/acme/conformance::crates/ledger-core/src/meter.rs::meter"
       ]
     },
     {
       "name": "api/src#3",
+      "members": [
+        "example.com/acme/conformance::api/src/gated.rs::always",
+        "example.com/acme/conformance::api/src/gated.rs::tests.helper"
+      ]
+    },
+    {
+      "name": "api/src#4",
       "members": [
         "example.com/acme/conformance::api/src/main.rs::below.go",
         "example.com/acme/conformance::api/src/main.rs::checks.compute",
@@ -3097,7 +3206,7 @@
       ]
     },
     {
-      "name": "api/src#4",
+      "name": "api/src#5",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Build.make",
         "example.com/acme/conformance::api/src/methods.rs::Build.seed",
@@ -3106,7 +3215,7 @@
       ]
     },
     {
-      "name": "api/src#5",
+      "name": "api/src#6",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Build.seed",
         "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
@@ -3126,7 +3235,7 @@
       ]
     },
     {
-      "name": "api/src#6",
+      "name": "api/src#7",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
         "example.com/acme/conformance::api/src/methods.rs::Counter.read",
@@ -3143,7 +3252,7 @@
       ]
     },
     {
-      "name": "api/src#7",
+      "name": "api/src#8",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
         "example.com/acme/conformance::api/src/methods.rs::cleared",
@@ -3151,20 +3260,12 @@
       ]
     },
     {
-      "name": "api/src#8",
+      "name": "api/src#9",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::modular",
         "example.com/acme/conformance::api/src/methods.rs::opened",
         "example.com/acme/conformance::api/src/methods.rs::reopened",
         "example.com/acme/conformance::api/src/store.rs::Store.save"
-      ]
-    },
-    {
-      "name": "api/src#9",
-      "members": [
-        "example.com/acme/conformance::api/src/methods.rs::outside",
-        "example.com/acme/conformance::api/src/methods.rs::pick",
-        "example.com/acme/conformance::api/src/methods.rs::shadowed"
       ]
     },
     {
@@ -3198,11 +3299,12 @@
       ]
     },
     {
-      "name": "crates/ledger-core/src",
+      "name": "crates/billing/src",
       "members": [
-        "example.com/acme/conformance::crates/billing/src/billing.rs::settle",
-        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::entries.add",
-        "example.com/acme/conformance::crates/ledger-core/src/lib.rs::post"
+        "example.com/acme/conformance::crates/billing/src/billing.rs::total",
+        "example.com/acme/conformance::crates/billing/src/billing.rs::util.round",
+        "example.com/acme/conformance::crates/billing/src/invoice.rs::Invoice.amount",
+        "example.com/acme/conformance::crates/billing/src/invoice.rs::tax"
       ]
     }
   ],

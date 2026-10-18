@@ -253,7 +253,18 @@ modules updates it.
   `d`, `e`; `local` is qualified by the scope holding the `use`; `as _` and `use serde;` bind
   nothing) or an `Imported::Glob` import (`local` is `*` qualified the same way), its path
   normalized like a call's, `use super::*` and `use self::*` being `inside`. Macro invocations
-  are not read. `lang/rust/crates.rs` (`Tree`) is the module tree behind
+  are not read. Conditional compilation (`lang/rust/cfg.rs`): `parse` skips a node whose
+  preceding `#[cfg(..)]` attributes are not all true (`compiled`), for the fixed target
+  `x86_64` Linux (`unix`, `target_os = "linux"`, `target_family = "unix"`,
+  `target_arch = "x86_64"`, `target_pointer_width = "64"`, `target_endian = "little"`,
+  `target_env = "gnu"`, `debug_assertions`, `test`; any other predicate is false) and the
+  crate's default features: `[features] default` followed through features that enable others
+  (`dep:x` and `x/feat` entries ignored). So `#[cfg(test)]` modules are indexed and
+  `cfg(not(test))` items are not; `#[cfg_attr]` is no skip; a cfg-false `mod x;` makes no
+  import, so its file is no member. The features reach `parse` as `Facts::setting`
+  (`LanguagePack::settings` gives it per path, `parse_with` takes it): `refresh` parses a file
+  again when the setting it was parsed under differs, so a toggled default feature gives the
+  cold export. A crate-level `#![cfg(..)]` is not read. `lang/rust/crates.rs` (`Tree`) is the module tree behind
   `members` and `modules`: the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,
   `src/bin/*/main.rs`), walked breadth first

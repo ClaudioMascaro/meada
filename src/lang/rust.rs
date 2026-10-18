@@ -15,6 +15,7 @@ use super::{
 };
 use crate::{Result, qualify};
 
+pub(crate) mod cfg;
 pub(crate) mod crates;
 
 use crates::{MOD, PATH, Tree};
@@ -53,8 +54,26 @@ impl LanguagePack for Rust {
         &["rs"]
     }
 
-    fn parse(&self, _path: &str, src: &[u8]) -> Result<Facts> {
-        parse(src)
+    fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
+        self.parse_with(path, src, "")
+    }
+
+    fn parse_with(&self, _path: &str, src: &[u8], setting: &str) -> Result<Facts> {
+        parse(src, setting)
+    }
+
+    fn settings(&self, configs: &[(&str, &[u8])]) -> Box<dyn Fn(&str) -> String> {
+        let crates = crates::features(configs);
+        Box::new(move |path| {
+            let owns = |dir: &str| {
+                dir.is_empty() || path.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
+            };
+            // The nearest package above the file.
+            (crates.iter().filter(|(dir, _)| owns(dir)))
+                .max_by_key(|(dir, _)| dir.len())
+                .map(|(_, setting)| setting.clone())
+                .unwrap_or_default()
+        })
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -200,7 +219,11 @@ impl Scan {
     }
 }
 
-fn parse(src: &[u8]) -> Result<Facts> {
+fn parse(src: &[u8], setting: &str) -> Result<Facts> {
+    let features: BTreeSet<String> = (setting.split(','))
+        .filter(|f| !f.is_empty())
+        .map(String::from)
+        .collect();
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_rust::LANGUAGE.into())?;
     let tree = parser
@@ -235,6 +258,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
         open,
     }) = stack.pop()
     {
+        if !compiled(node, &features, src) {
+            continue;
+        }
         let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
         // Directly in a module (the file's or one written in place): not in a function, an
         // `impl` or a trait.
@@ -644,6 +670,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         });
     }
     facts.star = Star::Only(public_names);
+    facts.setting = setting.to_string();
     Ok(facts)
 }
 
@@ -705,6 +732,28 @@ fn export(
             local: dotted,
         });
     }
+}
+
+/// Whether every `#[cfg(..)]` written on the node holds (`cfg`). A `#[cfg_attr(..)]` only adds
+/// attributes, so it never leaves the item out.
+fn compiled(node: Node, features: &BTreeSet<String>, src: &[u8]) -> bool {
+    let mut at = node.prev_named_sibling();
+    while let Some(sibling) = at {
+        match sibling.kind() {
+            "attribute_item" => {
+                let attribute = named(sibling).find(|n| n.kind() == "attribute");
+                let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
+                let condition = condition.filter(|c| c.trim_start().starts_with('('));
+                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features)) {
+                    return false;
+                }
+            }
+            "line_comment" | "block_comment" => {}
+            _ => return true,
+        }
+        at = sibling.prev_named_sibling();
+    }
+    true
 }
 
 /// A `mod x;` declaration in `module` (empty at the top level): an import of the file it names
@@ -1257,7 +1306,7 @@ mod tests {
     use super::*;
 
     fn facts(src: &str) -> Facts {
-        parse(src.as_bytes()).unwrap()
+        parse(src.as_bytes(), "").unwrap()
     }
 
     fn callees(src: &str) -> Vec<(String, bool)> {
@@ -1334,6 +1383,39 @@ mod tests {
         let files = BTreeMap::from([("src/main.rs", &inline)]);
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
         assert!(Rust.programs(&configs, &files).is_empty());
+    }
+
+    #[test]
+    fn a_false_cfg_leaves_the_item_and_a_declared_file_out() {
+        let src = "#[cfg(windows)]\nfn a() {}\n#[cfg(unix)]\n#[inline]\nfn b() {}\n\
+                   #[cfg(feature = \"x\")]\nmod m;\n#[cfg_attr(windows, inline)]\nfn c() {}\n\
+                   struct S;\nimpl S {\n#[cfg(not(test))]\nfn d() {}\nfn e() {}\n}\n\
+                   #[cfg(test)]\nmod t { fn f() {} }\n";
+        let names = |setting: &str| -> Vec<String> {
+            let facts = parse(src.as_bytes(), setting).unwrap();
+            facts.defs.into_iter().map(|d| d.name).collect()
+        };
+        assert_eq!(names(""), ["b", "c", "S", "S.e", "t", "t.f"]);
+        assert_eq!(names("x"), ["b", "m", "c", "S", "S.e", "t", "t.f"]);
+    }
+
+    #[test]
+    fn a_file_takes_the_default_features_of_the_nearest_package() {
+        let configs: [(&str, &[u8]); 2] = [
+            (
+                "Cargo.toml",
+                b"[package]\nname = \"p\"\n[features]\ndefault = [\"a\"]\n",
+            ),
+            (
+                "sub/Cargo.toml",
+                b"[package]\nname = \"q\"\n[features]\ndefault = [\"b\"]\n",
+            ),
+        ];
+        let setting = Rust.settings(&configs);
+        assert_eq!(setting("src/lib.rs"), "a,default");
+        assert_eq!(setting("sub/src/lib.rs"), "b,default");
+        assert_eq!(setting("subway/x.rs"), "a,default");
+        assert_eq!(setting("elsewhere/x.rs"), "a,default");
     }
 
     #[test]

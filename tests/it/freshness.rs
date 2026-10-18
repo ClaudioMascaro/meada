@@ -262,6 +262,42 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     );
 }
 
+fn enable_metrics(repo: &Path) {
+    let manifest = repo.join("api/Cargo.toml");
+    let text = fs::read_to_string(&manifest).unwrap();
+    let from = "default = [\"net\", \"json\"]";
+    assert!(text.contains(from));
+    let to = "default = [\"net\", \"json\", \"metrics\"]";
+    fs::write(manifest, text.replacen(from, to, 1)).unwrap();
+}
+
+#[test]
+fn a_default_feature_toggled_in_cargo_toml_refreshes_to_the_cold_export() {
+    let repo = fixture_repo("fresh_rust_feature", "conformance-rust", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    enable_metrics(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(!before.contains("api/src/metrics.rs"));
+    assert!(!before.contains("gated.rs::metrics_only"));
+    assert!(before.contains("gated.rs::unix_without_metrics"));
+    assert!(refreshed.contains("api/src/metrics.rs::gauge"));
+    assert!(refreshed.contains("gated.rs::metrics_only"));
+    assert!(refreshed.contains("gated.rs::Gauge.sampled"));
+    assert!(!refreshed.contains("gated.rs::unix_without_metrics"));
+    assert_eq!(
+        refreshed,
+        cold_export(
+            "fresh_rust_feature_cold",
+            "conformance-rust",
+            ORIGIN,
+            enable_metrics
+        )
+    );
+}
+
 fn add_bin(repo: &Path) {
     fs::write(repo.join("api/tools/second.rs"), "fn main() {}\n").unwrap();
     let manifest = repo.join("api/Cargo.toml");

@@ -1,10 +1,15 @@
 mod extras;
+mod gated;
 mod launch;
+#[cfg(feature = "metrics")]
+mod metrics;
 mod methods;
 mod prelude;
 mod ring;
 mod routes;
 mod store;
+#[cfg(windows)]
+mod winonly;
 
 use crate::extras::*;
 use crate::prelude::*;

@@ -252,6 +252,17 @@ fn manifests<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)>
     manifests
 }
 
+/// The default features of each package among `configs`, joined with commas, by directory: the
+/// `setting` its files are parsed with.
+pub fn features(configs: &[(&str, &[u8])]) -> Vec<(String, String)> {
+    (manifests(configs).into_iter())
+        .map(|(dir, manifest)| {
+            let on: Vec<String> = super::cfg::defaults(&manifest).into_iter().collect();
+            (dir.to_string(), on.join(","))
+        })
+        .collect()
+}
+
 /// A package of the repository: where it lives, its `[package] name`, the name a path writes
 /// for its library (`[lib] name`, else the package name, hyphens turned into underscores),
 /// and the library's root file when the walk found one.
@@ -538,7 +549,7 @@ mod tests {
 
     #[test]
     fn only_pub_modules_from_a_library_root_are_published() {
-        let parse = |src: &str| super::super::parse(src.as_bytes()).unwrap();
+        let parse = |src: &str| super::super::parse(src.as_bytes(), "").unwrap();
         let (root, open, shut, below, main) = (
             parse("pub mod open;\nmod shut;\npub(crate) mod narrow;\n"),
             parse("pub mod below;\npub fn f() {}\n"),
