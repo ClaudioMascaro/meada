@@ -25,7 +25,7 @@ modules updates it.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
   `Facts::programs` the packs set, and the console scripts of the `manifests` rows through
-  `package::python_programs`) and
+  `package::python_programs`, and `LanguagePack::programs`, Rust's binary roots) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in

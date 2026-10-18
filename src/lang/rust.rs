@@ -37,6 +37,8 @@ const SELF: &str = "mod";
 // ponytail: real paths hold a handful of segments; the limit keeps a crafted one cheap.
 const PATH_DEPTH: usize = 256;
 
+const MAIN: &str = "main";
+
 pub struct Rust;
 
 impl LanguagePack for Rust {
@@ -73,6 +75,17 @@ impl LanguagePack for Rust {
         files: &BTreeMap<&str, &Facts>,
     ) -> Option<BTreeSet<String>> {
         Some(Tree::new(configs, files).members())
+    }
+
+    fn programs(
+        &self,
+        configs: &[(&str, &[u8])],
+        files: &BTreeMap<&str, &Facts>,
+    ) -> Vec<(String, String)> {
+        (Tree::new(configs, files).bins())
+            .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
+            .map(|bin| (bin.to_string(), MAIN.to_string()))
+            .collect()
     }
 }
 
@@ -807,6 +820,21 @@ mod tests {
     fn super_out_of_an_inline_module_is_read_from_the_file_top() {
         let src = "fn k() {}\nmod t { fn k() {} fn g() { super::k(); } }\n";
         assert_eq!(callees(src)[0].0, "mod.k");
+    }
+
+    #[test]
+    fn main_starts_a_program_only_in_a_binary_root() {
+        let main = facts("fn main() {}\nmod m;\n");
+        let other = facts("pub fn main() {}\n");
+        let files = BTreeMap::from([
+            ("src/lib.rs", &main),
+            ("src/main.rs", &main),
+            ("src/m.rs", &other),
+        ]);
+        // `src/lib.rs` is a library root and `src/m.rs` a module: neither starts a program.
+        let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
+        let found = Rust.programs(&configs, &files);
+        assert_eq!(found, [("src/main.rs".to_string(), "main".to_string())]);
     }
 
     #[test]
