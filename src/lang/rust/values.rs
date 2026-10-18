@@ -37,6 +37,27 @@ const METHOD_CRATES: &[&str] = &["reqwest", "http", "hyper", "axum", "actix_web"
 const KEEPS: &[&str] = &["to_string", "to_owned", "into", "clone", "as_str", "as_ref"];
 const KEEPS_NAMES: &[&str] = &["to_string", "to_owned", "as_str"];
 
+/// The methods an environment read goes through: those that keep the text of a string
+/// (`trim_end_matches`) and those that unwrap its `Result` (`unwrap_or(fallback)` among them).
+const ENV_METHODS: &[&str] = &[
+    "trim",
+    "trim_start",
+    "trim_end",
+    "trim_matches",
+    "trim_start_matches",
+    "trim_end_matches",
+    "to_string",
+    "to_owned",
+    "as_str",
+    "into",
+    "clone",
+    "unwrap",
+    "unwrap_or",
+    "unwrap_or_else",
+    "unwrap_or_default",
+    "expect",
+];
+
 /// The macros whose arguments are a format string and the values it prints.
 const FORMATS: &[&str] = &["format", "concat"];
 
@@ -194,6 +215,9 @@ impl<'a, 't> Reader<'a, 't> {
         let Some(function) = field(node, "function") else {
             return Value::Unknown;
         };
+        if let Some(read) = self.env_read(at, node, 0) {
+            return Value::Str(vec![read]);
+        }
         let args: Vec<Node> = (field(node, "arguments").into_iter())
             .flat_map(named)
             .filter(|a| !is_comment(*a))
@@ -272,19 +296,35 @@ impl<'a, 't> Reader<'a, 't> {
         if kind != "Method" || !VERBS.contains(&verb.as_str()) {
             return None;
         }
-        let path = self.path_of(at, segments.clone());
-        let head = segments.first()?;
-        let full: Vec<&String> = match self.scan.defines(&path, head) {
-            true => self
-                .target(at, head)?
-                .iter()
-                .chain(&segments[1..])
-                .collect(),
-            false => segments.iter().collect(),
-        };
+        let full = self.spelled(at, &segments)?;
         METHOD_CRATES
-            .contains(&full.first()?.as_str())
+            .contains(full.first()?)
             .then(|| Value::Str(vec![Part::Text(verb.clone())]))
+    }
+
+    /// The path `segments` names with the `use` of its head applied: the head is the one
+    /// `use` that imports it, or is a crate written in full.
+    fn spelled<'s>(&self, at: &Where, segments: &'s [String]) -> Option<Vec<&'s str>>
+    where
+        'a: 's,
+    {
+        let head = segments.first()?;
+        match self
+            .scan
+            .defines(&self.path_of(at, segments.to_vec()), head)
+        {
+            true => {
+                let target = self.target(at, head)?;
+                Some(
+                    target
+                        .iter()
+                        .chain(&segments[1..])
+                        .map(String::as_str)
+                        .collect(),
+                )
+            }
+            false => Some(segments.iter().map(String::as_str).collect()),
+        }
     }
 
     /// The path the one `use` of `name` in scope at `at` imports.
@@ -305,6 +345,89 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
+    /// The environment read the expression `node` is, if it is one: `std::env::var("X")`,
+    /// `env::var("X")` after `use std::env`, `dotenvy::var("X")` or `env!("X")`, through
+    /// `unwrap`, `unwrap_or(..)`, `expect`, `?` and the string methods that keep the text. A
+    /// second read in an argument (a fallback) makes it a hole: which of the two is the base
+    /// is unknown. The value of the variable is never read.
+    // ponytail: an argument is searched for the names `env`, `var` and `dotenvy`: one that only
+    // looks like a read makes a hole, which is never wrong, only less.
+    fn env_read(&mut self, at: &Where, node: Node<'t>, depth: usize) -> Option<Part> {
+        if depth >= VALUE_DEPTH {
+            return None;
+        }
+        match node.kind() {
+            "parenthesized_expression" | "try_expression" => {
+                self.env_read(at, named(node).next()?, depth + 1)
+            }
+            "macro_invocation" => {
+                let name = self.macro_name(field(node, "macro")?)?;
+                if name == "env" && !self.scan.macros.contains(&name) {
+                    return self.env_macro(node);
+                }
+                None
+            }
+            "call_expression" => {
+                let function = field(node, "function")?;
+                if function.kind() != "field_expression" {
+                    return self.env_var(at, node, function);
+                }
+                let method = text(field(function, "field")?, self.src);
+                if !ENV_METHODS.contains(&method) {
+                    return None;
+                }
+                let read = self.env_read(at, field(function, "value")?, depth + 1)?;
+                let mut args = field(node, "arguments").into_iter().flat_map(named);
+                Some(match args.any(|a| mentions_env(a, self.src)) {
+                    true => Part::Hole,
+                    false => read,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// `std::env::var("X")` and `dotenvy::var("X")`, written in full or through a `use`.
+    fn env_var(&self, at: &Where, call: Node, function: Node) -> Option<Part> {
+        let segments = segments(function, self.src)?;
+        if !matches!(
+            self.spelled(at, &segments)?.as_slice(),
+            ["std", "env", "var"] | ["dotenvy", "var"]
+        ) {
+            return None;
+        }
+        let mut args = field(call, "arguments").into_iter().flat_map(named);
+        match (args.next(), args.next()) {
+            (Some(name), None) => self.literal(name).map(Part::Env),
+            _ => None,
+        }
+    }
+
+    /// `env!("X")`: the variable the macro names.
+    fn env_macro(&self, node: Node) -> Option<Part> {
+        let tree = named(node).find(|c| c.kind() == "token_tree")?;
+        self.env_name(tree).map(Part::Env)
+    }
+
+    /// The name in the first argument of the token tree of `env!("X")` or `env!("X", "msg")`.
+    fn env_name(&self, tree: Node) -> Option<String> {
+        match arguments(tree)?.first()?.as_slice() {
+            [name] => self.literal(*name),
+            _ => None,
+        }
+    }
+
+    /// The text of the string literal `node`, if that is what it is.
+    fn literal(&self, node: Node) -> Option<String> {
+        match string(node, self.src) {
+            Value::Str(parts) => match <[Part; 1]>::try_from(parts) {
+                Ok([Part::Text(text)]) => Some(text),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// `format!` and `concat!`: a format string and the arguments that fill it. An argument
     /// that is a literal or a plain name folds; any other is a hole, and so is a name with a
     /// format spec. A macro of another name, or one the file defines, is unknown.
@@ -312,6 +435,11 @@ impl<'a, 't> Reader<'a, 't> {
         let Some(name) = field(node, "macro").and_then(|m| self.macro_name(m)) else {
             return Value::Unknown;
         };
+        if name == "env" && !self.scan.macros.contains(&name) {
+            return self
+                .env_macro(node)
+                .map_or(Value::Unknown, |e| Value::Str(vec![e]));
+        }
         if !FORMATS.contains(&name.as_str()) || self.scan.macros.contains(&name) {
             return Value::Unknown;
         }
@@ -436,6 +564,14 @@ impl<'a, 't> Reader<'a, 't> {
 
     /// The parts of a macro argument: a literal, a plain name, else a hole.
     fn argument(&mut self, at: &Where, nodes: &[Node<'t>]) -> Vec<Part> {
+        // `env!("X")` is three tokens: the macro's name, `!` and its arguments.
+        if let [name, bang, tree] = nodes
+            && [name.kind(), bang.kind(), tree.kind()] == ["identifier", "!", "token_tree"]
+            && text(*name, self.src) == "env"
+            && !self.scan.macros.contains("env")
+        {
+            return vec![self.env_name(*tree).map_or(Part::Hole, Part::Env)];
+        }
         let [node] = nodes else {
             return vec![Part::Hole];
         };
@@ -592,6 +728,19 @@ impl<'a, 't> Reader<'a, 't> {
         }
         out
     }
+}
+
+/// Whether the expression `node` has a name that may read the environment (`env`, `var`,
+/// `dotenvy`), in any depth, a macro's tokens included.
+fn mentions_env(node: Node, src: &[u8]) -> bool {
+    let mut stack = vec![node];
+    while let Some(node) = stack.pop() {
+        if node.kind() == "identifier" && matches!(text(node, src), "env" | "var" | "dotenvy") {
+            return true;
+        }
+        stack.extend(children(node));
+    }
+    false
 }
 
 fn is_comment(node: Node) -> bool {

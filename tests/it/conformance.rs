@@ -1564,10 +1564,20 @@ fn rust() {
             "crates/worker/src/dynamic.rs::pick",
             "crates/worker/src/dynamic.rs::spec",
             "crates/worker/src/dynamic.rs::unresolved",
+            "crates/worker/src/env.rs::dotenv",
+            "crates/worker/src/env.rs::fallbacks",
+            "crates/worker/src/env.rs::full_path",
+            "crates/worker/src/env.rs::function_import",
+            "crates/worker/src/env.rs::imported",
+            "crates/worker/src/env.rs::macros",
+            "crates/worker/src/env.rs::optional",
+            "crates/worker/src/env.rs::two_reads",
             "crates/worker/src/lib.rs::agents",
             "crates/worker/src/lib.rs::clients",
             "crates/worker/src/lib.rs::dynamic",
+            "crates/worker/src/lib.rs::env",
             "crates/worker/src/lib.rs::modules",
+            "crates/worker/src/lib.rs::not_env",
             "crates/worker/src/lib.rs::settings",
             "crates/worker/src/lib.rs::urls",
             "crates/worker/src/lib.rs::wrappers",
@@ -1577,6 +1587,11 @@ fn rust() {
             "crates/worker/src/modules.rs::health",
             "crates/worker/src/modules.rs::items",
             "crates/worker/src/modules.rs::lookalikes",
+            "crates/worker/src/not_env.rs::env",
+            "crates/worker/src/not_env.rs::env.var",
+            "crates/worker/src/not_env.rs::other",
+            "crates/worker/src/not_env.rs::other.bare",
+            "crates/worker/src/not_env.rs::own_module",
             "crates/worker/src/urls.rs::consts",
             "crates/worker/src/urls.rs::formats",
             "crates/worker/src/urls.rs::strings",
@@ -2681,6 +2696,51 @@ fn rust_urls_that_do_not_fold_are_holes_or_unresolved() {
         ("http::GET::/spec/{}", host, &site("spec")),
     ]);
     assert_eq!(rust_clients("rust_http_dynamic", "dynamic.rs"), expected);
+}
+
+#[test]
+fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
+    let site =
+        |function: &str, n: usize| format!("crates/worker/src/env.rs::{function}::reqwest.get#{n}");
+    let expected = triples(&[
+        // `std::env::var` in full, `use std::env`, `use std::env::var` inside a function.
+        ("http::GET::/std", "env:STD_URL", &site("full_path", 0)),
+        (
+            "http::GET::/imported",
+            "env:IMPORTED_URL",
+            &site("imported", 0),
+        ),
+        (
+            "http::GET::/function",
+            "env:FUNCTION_URL",
+            &site("function_import", 0),
+        ),
+        // `env!` bound to a name and inside `concat!`, and `dotenvy::var` with `?`.
+        ("http::GET::/macro", "env:MACRO_URL", &site("macros", 0)),
+        ("http::GET::/concat", "env:CONCAT_URL", &site("macros", 1)),
+        ("http::GET::/dotenv", "env:DOTENV_URL", &site("dotenv", 0)),
+        // A fallback and string methods keep the one read.
+        ("http::GET::/or", "env:OR_URL", &site("fallbacks", 0)),
+        ("http::GET::/else", "env:ELSE_URL", &site("fallbacks", 1)),
+        ("http::GET::/trim", "env:TRIM_URL", &site("fallbacks", 2)),
+        // A second read in the fallback leaves a hole, and `option_env!` is not read.
+        ("http::GET::/two", "", &site("two_reads", 0)),
+        ("http::GET::/macro-fallback", "", &site("two_reads", 1)),
+        ("http::GET::/optional", "", &site("optional", 0)),
+    ]);
+    assert_eq!(rust_clients("rust_http_env", "env.rs"), expected);
+}
+
+#[test]
+fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
+    let site = |function: &str| format!("crates/worker/src/not_env.rs::{function}::reqwest.get#0");
+    let expected = triples(&[
+        // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
+        // hole, not a variable.
+        ("http::GET::/own", "", &site("own_module")),
+        ("http::GET::/bare", "", &site("other.bare")),
+    ]);
+    assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
