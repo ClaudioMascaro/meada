@@ -41,8 +41,15 @@ All notable changes to Meada are recorded here. The format follows
   no longer stops indexing: it declares no `paths`, as a `pyproject.toml` that cannot be read
   declares no source roots. A root config that is a symbolic link is not read, as the walk
   follows none.
+- A manifest or config larger than 1 MiB (`package.json`, `pyproject.toml`,
+  `requirements*.txt`, `tsconfig.json`) is no longer read whole on every refresh: only its first
+  1 MiB and one byte are read, and it still counts as empty.
 - A name re-exported through a crafted chain of thousands of files no longer overflows the
-  stack while indexing: past 64 files it is unknown.
+  stack while indexing: past 64 files it is unknown, and no other import or `export *` binds
+  it instead.
+- A receiver whose class is named through a crafted chain of thousands of receivers
+  (`x: y.C`, `x = y.C()`) no longer overflows the stack while indexing: past 64 receivers its
+  class is unknown.
 
 ## [0.1.0] - Unreleased
 
