@@ -2152,19 +2152,19 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "an outside star import is taken to bind nothing (ponytail in Resolver::imported)"]
-    fn a_star_import_from_outside_the_repository_hides_the_bindings_before_it() {
-        // `numpy` is no file of the repository, so what `from numpy import *` binds is not
-        // known: it may rebind `x`, and a call of `x` after it reaches no import or definition
-        // before it.
+    fn a_star_import_from_outside_the_repository_binds_nothing() {
+        // The ceiling (`ponytail:` in `Resolver::imported`): what `from numpy import *` binds is
+        // not known, as `numpy` is no file of the repository, and it is taken to bind nothing,
+        // so the import or definition before it keeps `x`. Python may bind `numpy`'s instead.
         let b = ("b.py", "def x():\n    pass\n");
-        for main in [
-            "from b import *\nfrom numpy import *\nx()\n",
-            "from b import x\nfrom numpy import *\nx()\n",
-            "def x():\n    pass\nfrom numpy import *\nx()\n",
+        for (main, before) in [
+            ("from b import *\nfrom numpy import *\nx()\n", "b.py"),
+            ("from b import x\nfrom numpy import *\nx()\n", "b.py"),
+            ("def x():\n    pass\nfrom numpy import *\nx()\n", "main.py"),
         ] {
             let sources = owned(&[b, ("main.py", main)]);
-            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some(before), "{main}");
         }
         // The same through a module that star-imports both and is imported by name.
         let sources = owned(&[
@@ -2172,8 +2172,13 @@ mod tests {
             ("m.py", "from b import *\nfrom numpy import *\n"),
             ("main.py", "from m import x\nx()\n"),
         ]);
-        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
-        // An import after it binds the name again.
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("b.py"));
+    }
+
+    #[test]
+    fn an_import_after_a_star_import_from_outside_the_repository_binds_the_name() {
+        let b = ("b.py", "def x():\n    pass\n");
         for main in [
             "from numpy import *\nfrom b import *\nx()\n",
             "from numpy import *\nfrom b import x\nx()\n",
