@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Step, Ty, Value,
+    Star, Step, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -64,6 +64,7 @@ fn bound_in(local: &str, scope: &str, name: &str) -> bool {
 }
 
 /// What a name or a member chain refers to.
+#[derive(Clone)]
 enum Binding<'a> {
     Def(Target<'a>),
     /// What a receiver whose class the source writes holds: an instance of this class, or
@@ -101,41 +102,47 @@ struct Caller<'a> {
     by_name: bool,
 }
 
-/// What one resolution has met, so that imports and re-exports forming a cycle give nothing:
-/// the `(file, exported name)` pairs, the glob imports asked for a name (their file, place in
-/// its imports and the name), and how many aliases and globs deep the walk is.
+/// What resolving one name follows through exports, aliases and globs: what each `(file,
+/// exported name)` pair seen exports, read as a value or not (`Resolver::export_as`), as
+/// re-exports may form cycles (a pair met again while it is resolved exports nothing) and
+/// diamonds (one met again once resolved exports what it did); the aliases (`use a as b`: file
+/// and path) and the glob imports (file, place in its imports and name) met, as a `use` may
+/// reach itself; how many links deep it is now, and whether a link was cut at `LINK_DEPTH`. A
+/// cut link is unknown, not absent (`Resolver::exports`, `Resolver::globs`): a module or a glob
+/// that may give the name leaves it unknown rather than let another import, module or glob
+/// bind it. What a cycle gives is absent instead, as in ES modules (and a Python module met
+/// again while it is initialized has only what its bindings before gave): `looped` says what is
+/// being resolved met a pair being resolved, since the innermost star import began
+/// (`Resolver::star`), and each pair keeps whether it did.
 #[derive(Default)]
 struct Seen<'a> {
-    names: HashSet<(&'a str, &'a str)>,
+    /// `None` while the pair is resolved.
+    pairs: HashMap<(&'a str, &'a str, bool), Option<Given<'a>>>,
+    aliases: HashSet<(&'a str, &'a str)>,
     globs: HashSet<(&'a str, usize, &'a str)>,
-    links: usize,
+    depth: usize,
+    cut: bool,
+    looped: bool,
+    /// The file whose code being run while it loads (at its top level, in a class body there or
+    /// in its main guard) the name is resolved from (`Resolver::seen`).
+    load: Option<&'a str>,
 }
 
-impl<'a> Seen<'a> {
+/// What a pair exports, and whether it met a cycle (`Seen::looped`).
+type Given<'a> = (Option<Binding<'a>>, bool);
+
+impl Seen<'_> {
     fn new() -> Self {
         Self::default()
     }
-
-    fn insert(&mut self, key: (&'a str, &'a str)) -> bool {
-        self.names.insert(key)
-    }
-
-    fn contains(&self, key: &(&str, &str)) -> bool {
-        self.names.contains(key)
-    }
 }
 
-/// How many aliases and globs one resolution follows one into the other. A longer chain of
-/// `use` gives nothing.
-// ponytail: real code chains a handful of `use`s and `pub use`s; a crafted chain of thousands
-// must not overflow the stack. A pack with longer chains raises the limit with the stack.
-const LINK_DEPTH: usize = 128;
-
-/// How many calls whose result a receiver takes (`Class::Returned`) one resolution follows into
-/// one another. A deeper chain gives nothing.
-// ponytail: a result is the class its function writes, so real chains are one or two deep; the
-// limit keeps a crafted repository from recursing through thousands of functions.
-const RETURN_DEPTH: usize = 64;
+/// The most links a name is followed through, each into the next: a file re-exporting it from
+/// another (`export { x } from`, `export * from`, a Python `from m import x` or `import *`,
+/// Rust's `pub use`), an alias (`use a as b`) or a glob (`use m::*`). Deeper, it is unknown.
+// ponytail: real chains are a few links long; the limit keeps a crafted chain of thousands from
+// overflowing the stack.
+const LINK_DEPTH: usize = 64;
 
 /// What a name is read as.
 #[derive(Clone, Copy, PartialEq)]
@@ -171,14 +178,23 @@ enum Busy<'a> {
     Family(Target<'a>),
 }
 
-/// What resolving one name carries along: what is being resolved, and the families
-/// linearized so far (while `Resolver::new` linearizes them all).
+/// The most receivers a class is followed through, each naming its class through the next
+/// (`x: y.C`, `x = y.C()`, or the result of a call on it, Rust's `let x = y.f()`); deeper, the
+/// class is unknown.
+// ponytail: real receivers name their class through a few others; the limit keeps a crafted
+// chain of thousands of parameters from overflowing the stack.
+const RECEIVER_DEPTH: usize = 64;
+
+/// What resolving one name carries along: what is being resolved, the families linearized so
+/// far (while `Resolver::new` linearizes them all), and whether a receiver was cut at
+/// `RECEIVER_DEPTH`, or a family a member lookup reached was cut at `FAMILY_DEPTH`, since the
+/// outermost family began. The cut counts the receivers or bases of the walk that reached a
+/// family, so every family then being linearized gives up (`Cut`).
 #[derive(Default)]
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
-    /// How many `returned` are being resolved.
-    returns: usize,
+    cut: bool,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -203,8 +219,9 @@ type Family<'a> = Option<Vec<Ancestor<'a>>>;
 const FAMILY_DEPTH: usize = 128;
 
 /// A linearization given up because the bases nest deeper than `FAMILY_DEPTH` below the
-/// families being resolved: no family is kept on the way up, since the cut depends on where
-/// the walk started.
+/// families being resolved, or a receiver or a family reached through a member was cut
+/// (`Work::cut`): no family is kept on the way up, since the cut depends on where the walk
+/// started.
 struct Cut;
 
 /// The files of one language pack, resolved together.
@@ -237,6 +254,12 @@ pub struct Resolver<'a> {
     /// The files whose exports other packages can import, when the pack says which
     /// (`LanguagePack::published`).
     published: Option<BTreeSet<String>>,
+    /// The pack's `LanguagePack::stars_bind`.
+    stars_bind: bool,
+    /// Where stars bind, each file's star imports, the last first as `Facts::exports` lists
+    /// them and the last of one specifier alone, and how many of them each top-level name comes
+    /// before: those written after its last binding (`rebound`).
+    later: HashMap<&'a str, (Vec<&'a str>, HashMap<&'a str, usize>)>,
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
@@ -310,6 +333,26 @@ impl<'a> Resolver<'a> {
             }
         }
         by_name.values_mut().for_each(|targets| targets.sort());
+        let stars_bind = language.stars_bind();
+        let later = (files.iter().filter(|_| stars_bind))
+            .filter_map(|(path, facts)| {
+                let (mut stars, mut after) = (Vec::new(), HashMap::new());
+                let mut sources = HashSet::new();
+                for export in &facts.exports {
+                    match export {
+                        // The latest of one module's star imports is the one that decides.
+                        Export::All { source } if sources.insert(source.as_str()) => {
+                            stars.push(source.as_str());
+                        }
+                        Export::Local { exported, .. } if !stars.is_empty() => {
+                            after.insert(exported.as_str(), stars.len());
+                        }
+                        _ => {}
+                    }
+                }
+                (!stars.is_empty()).then_some((*path, (stars, after)))
+            })
+            .collect();
         let mut resolver = Self {
             files,
             defs,
@@ -326,6 +369,8 @@ impl<'a> Resolver<'a> {
             impls: HashMap::new(),
             blocks: HashMap::new(),
             published: None,
+            stars_bind,
+            later,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -411,14 +456,14 @@ impl<'a> Resolver<'a> {
 
     /// `resolve` of one name on its own, with nothing seen or being resolved yet.
     fn binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
-        let (seen, work) = (&mut Seen::new(), &mut Work::default());
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
         self.resolve_as(path, scope, callee, seen, work, Reading::Value)
     }
 
     /// `binding` of a path (Rust's `store::Store::new`, `Call::by_path`): its head names a
     /// module or a type, which a local or a parameter of the same name does not hide.
     fn path_binding(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Binding<'a> {
-        let (seen, work) = (&mut Seen::new(), &mut Work::default());
+        let (seen, work) = (&mut self.seen(path, scope), &mut Work::default());
         self.resolve_as(path, scope, callee, seen, work, Reading::Path)
     }
 
@@ -508,8 +553,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// What a parameter or a local holds, as far as the source writes its class: an instance
-    /// of a class of the repository, something from outside it, or unknown. Other bindings
-    /// stay as they are.
+    /// of a class of the repository, something from outside it, or unknown (also more than
+    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
     fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
         let (path, scope, name) = match binding {
             Binding::Param(f, n, field) => {
@@ -532,18 +577,27 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         };
         if let Class::Imported = class {
-            return self.imported(path, name, &mut Seen::new());
+            return self.imported(path, name, &mut self.seen(path, scope));
         }
         let key = Busy::Local(path, scope, name);
+        let depth = (work.busy.iter())
+            .filter(|b| matches!(b, Busy::Local(..)))
+            .count();
+        if depth >= RECEIVER_DEPTH {
+            work.cut = true;
+            return Binding::Unknown;
+        }
         if work.busy.contains(&key) {
             return Binding::Unknown;
         }
         work.busy.push(key);
         let found = match class {
             Class::Enclosing => self.class(path, scope),
-            Class::Named(class) => self.resolve(path, scope, class, &mut Seen::new(), work),
+            Class::Named(class) => {
+                self.resolve(path, scope, class, &mut self.seen(path, scope), work)
+            }
             Class::Type(class) => {
-                let (seen, reading) = (&mut Seen::new(), Reading::Path);
+                let (seen, reading) = (&mut self.seen(path, scope), Reading::Path);
                 self.resolve_as(path, scope, class, seen, work, reading)
             }
             Class::Returned(callee) => self.returned(path, scope, callee, work),
@@ -560,6 +614,7 @@ impl<'a> Resolver<'a> {
     /// What a call to `callee`, written in `scope`, gives: the class its definition writes as
     /// its result (`Def::result`), the class itself for a constructor, or something outside the
     /// repository for a call that reaches outside. A call that is not exact gives nothing known.
+    /// Only `instance` calls it, so `RECEIVER_DEPTH` bounds a chain of results.
     fn returned(
         &self,
         path: &'a str,
@@ -567,23 +622,7 @@ impl<'a> Resolver<'a> {
         callee: &'a str,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
-        if work.returns >= RETURN_DEPTH {
-            return Binding::Unknown;
-        }
-        work.returns += 1;
-        let found = self.result(path, scope, callee, work);
-        work.returns -= 1;
-        found
-    }
-
-    fn result(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        callee: &'a str,
-        work: &mut Work<'a>,
-    ) -> Binding<'a> {
-        let (seen, path_reading) = (&mut Seen::new(), Reading::Path);
+        let (seen, path_reading) = (&mut self.seen(path, scope), Reading::Path);
         let by_path = callee.rsplit_once('.');
         let reading = if by_path.is_some() {
             path_reading
@@ -600,13 +639,14 @@ impl<'a> Resolver<'a> {
                     let Some((ty, _)) = by_path else {
                         return Binding::Unknown;
                     };
-                    match self.resolve_as(path, scope, ty, &mut Seen::new(), work, path_reading) {
+                    let seen = &mut self.seen(path, scope);
+                    match self.resolve_as(path, scope, ty, seen, work, path_reading) {
                         Binding::Def(c) if self.is_class(c) => Binding::Def(c),
                         _ => Binding::Unknown,
                     }
                 }
                 Some(Class::Type(class)) => {
-                    let seen = &mut Seen::new();
+                    let seen = &mut self.seen(t.path, t.name);
                     self.resolve_as(t.path, t.name, class, seen, work, path_reading)
                 }
                 _ => Binding::Unknown,
@@ -671,17 +711,26 @@ impl<'a> Resolver<'a> {
     /// method resolution order. Without written bases (TypeScript) it is `class` alone.
     fn family(&self, class: Target<'a>, work: &mut Work<'a>) -> Family<'a> {
         let first = !(work.busy.iter()).any(|b| matches!(b, Busy::Family(_)));
+        if first {
+            work.cut = false;
+        }
         self.lineage(class, work).unwrap_or_else(|Cut| {
-            // From no other family, the cut is the class's own: longer than the limit.
-            if first {
+            // From no other family, a cut of the bases is the class's own: longer than the
+            // limit. Reached from another family (through a member one of its bases names, as
+            // in `class Z(K.D)`), the cut counts that family's bases too, and a receiver cut
+            // depends on the families linearized before: those being linearized give up, and
+            // each is linearized again when asked for.
+            if first && !work.cut {
                 work.families.insert(class, None);
+            } else {
+                work.cut = true;
             }
             None
         })
     }
 
     /// `family`, or `Cut` when the bases nest deeper than `FAMILY_DEPTH` below the families
-    /// `work` is resolving.
+    /// `work` is resolving, or a receiver was cut on the way (`Work::cut`).
     fn lineage(&self, class: Target<'a>, work: &mut Work<'a>) -> Result<Family<'a>, Cut> {
         if let Some(family) = self.families.get(&class).or(work.families.get(&class)) {
             return Ok(family.clone());
@@ -690,15 +739,20 @@ impl<'a> Resolver<'a> {
         if work.busy.contains(&key) {
             return Ok(None);
         }
-        if (work.busy.iter())
-            .filter(|b| matches!(b, Busy::Family(_)))
-            .count()
-            >= FAMILY_DEPTH
+        if work.cut
+            || (work.busy.iter())
+                .filter(|b| matches!(b, Busy::Family(_)))
+                .count()
+                >= FAMILY_DEPTH
         {
             return Err(Cut);
         }
         work.busy.push(key);
         let bases = self.bases(class, work);
+        if work.cut {
+            work.busy.pop();
+            return Err(Cut);
+        }
         let mut lists = Vec::new();
         for base in &bases {
             lists.push(match base {
@@ -726,15 +780,21 @@ impl<'a> Resolver<'a> {
         let scope = crate::parent(class.name);
         let bases = self.defs[class.path][class.name].bases.iter().enumerate();
         bases
-            .map(
-                |(n, base)| match self.resolve(class.path, scope, base, &mut Seen::new(), work) {
+            .map(|(n, base)| {
+                match self.resolve(
+                    class.path,
+                    scope,
+                    base,
+                    &mut self.seen(class.path, scope),
+                    work,
+                ) {
                     Binding::Def(t) if self.is_class(t) => Ancestor::Class(t),
                     _ if base.starts_with('(') => {
                         Ancestor::Opaque(format!("{}::{}#{n}", class.path, class.name))
                     }
                     _ => Ancestor::Opaque(self.imported_name(class.path, scope, base)),
-                },
-            )
+                }
+            })
             .collect()
     }
 
@@ -824,9 +884,31 @@ impl<'a> Resolver<'a> {
         Binding::Unknown
     }
 
+    /// A `Seen` to resolve a name written in `scope` of `path` with: one that runs while the
+    /// module loads, unless it is in a function (`Seen::load`).
+    fn seen(&self, path: &'a str, scope: &str) -> Seen<'a> {
+        let mut s = scope;
+        while !s.is_empty() {
+            let program = self.files[path].programs.iter().any(|p| p == s);
+            if !program
+                && !self.defs[path]
+                    .get(s)
+                    .is_some_and(|d| d.kind == Kind::Class)
+            {
+                return Seen::new();
+            }
+            s = crate::parent(s);
+        }
+        Seen {
+            load: Some(path),
+            ..Seen::new()
+        }
+    }
+
     /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
     /// binding, which hides the name; else what it defines, its constants, its parameters, its
-    /// receivers), then the top level, then the file's imports. Methods are not lexical
+    /// receivers), then the top level (where a star import written after every other binding
+    /// of the name may rebind it, `rebound`), then the file's imports. Methods are not lexical
     /// bindings, and a class body's names are in scope only for the statements written directly
     /// in it, not for its methods or nested classes. A module written in place (`Kind::Module`)
     /// ends the climb: the names around it are not its own, only the file's imports are.
@@ -887,6 +969,11 @@ impl<'a> Resolver<'a> {
             if self.locals[path].contains(candidate.as_str()) {
                 return Binding::Hidden;
             }
+            if s.is_empty()
+                && let Some(found) = self.rebound(path, name, seen)
+            {
+                return found;
+            }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
                 && !(def.kind == Kind::Module && reading == Reading::Value)
@@ -925,10 +1012,15 @@ impl<'a> Resolver<'a> {
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
     /// in source order decides, whatever it resolves to. An import of every name binds
-    /// `name` only if the module takes it. The imports a pack scopes (`Imported::Path` and
-    /// `Glob`, Rust's `use`) are not these: `imported_at` reads them where they are written,
-    /// and a name no import binds is a crate outside the file when the pack says so
-    /// (`Facts::externs`).
+    /// `name` only if the module exports it (`star`), to whatever it is there. The imports a
+    /// pack scopes (`Imported::Path` and `Glob`, Rust's `use`) are not these: `imported_at` reads
+    /// them where they are written, and a name no import binds is a crate outside the file when
+    /// the pack says so (`Facts::externs`).
+    // ponytail: a star import from outside the repository (`from numpy import *`) is taken to
+    // bind nothing, here, in `rebound` and in `own_export`, since what it takes is not known: a
+    // name it rebinds stays linked to the import or definition before it (`from _heapq import
+    // *` after `def heappush`). Taking it to rebind every name loses about as many right links
+    // as wrong ones on the standard library.
     fn imported(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
         self.imported_in(path, name, seen, true)
     }
@@ -942,24 +1034,25 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         top: bool,
     ) -> Binding<'a> {
-        for import in self.files[path].imports.iter().rev() {
+        let given = (self.files[path].imports.iter().rev()).map(|import| {
             let scoped = matches!(import.name, Imported::Path(_) | Imported::Glob { .. });
             // A module declared in the file (Rust's `mod x;`) is in scope where its
             // definition is.
             let declared = matches!(import.name, Imported::Namespace)
                 && (self.defs[path].get(import.local.as_str()))
                     .is_some_and(|d| d.kind == Kind::Module);
-            if import.local == name && !scoped && (top || !declared) {
-                let scope = scope_of(&import.local);
-                return self.import(path, scope, &import.source, &import.name, seen);
+            match import.name {
+                _ if import.local == name && !scoped && (top || !declared) => {
+                    let scope = scope_of(&import.local);
+                    let found = self.import(path, scope, &import.source, &import.name, seen);
+                    Some((found, false))
+                }
+                Imported::All => self.taken(path, &import.source, name, seen),
+                _ => None,
             }
-            if matches!(import.name, Imported::All)
-                && let Some(module) = self.module(path, &import.source)
-                && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                    self.star(module, name, seen)
-            {
-                return found;
-            }
+        });
+        if let Some(found) = latest(given, false) {
+            return found;
         }
         if top && let Some(found) = self.globs(path, "", name, false, seen) {
             return found;
@@ -987,7 +1080,7 @@ impl<'a> Resolver<'a> {
         for import in self.files[path].imports.iter().rev() {
             if let Imported::Path(target) = &import.name
                 && bound_in(&import.local, scope, name)
-                && !seen.contains(&(path, target))
+                && !seen.aliases.contains(&(path, target.as_str()))
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
             }
@@ -1001,7 +1094,8 @@ impl<'a> Resolver<'a> {
 
     /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
     /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
-    /// itself.
+    /// itself. A glob cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob
+    /// binds it in its place.
     fn globs(
         &self,
         path: &'a str,
@@ -1020,18 +1114,21 @@ impl<'a> Resolver<'a> {
             else {
                 continue;
             };
-            if (public && !re_exports)
-                || !bound_in(&import.local, scope, "*")
-                || seen.links >= LINK_DEPTH
-                || !seen.globs.insert((path, at, name))
-            {
+            if (public && !re_exports) || !bound_in(&import.local, scope, "*") {
                 continue;
             }
-            seen.links += 1;
+            if seen.depth >= LINK_DEPTH {
+                seen.cut = true;
+                return Some(Binding::Unknown);
+            }
+            if !seen.globs.insert((path, at, name)) {
+                continue;
+            }
+            seen.depth += 1;
             let work = &mut Work::default();
             let found = match self.resolve_as(path, scope, target, seen, work, Reading::Alias) {
                 Binding::Module(m) if *inside => self.export(m, name, seen),
-                Binding::Module(m) => self.star(m, name, seen),
+                Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
                 // A module written in place states no visibility of its items: only a glob
                 // from inside it, which sees them all, is read.
                 Binding::Def(t) if *inside && self.defs[t.path][t.name].kind == Kind::Module => {
@@ -1043,12 +1140,12 @@ impl<'a> Resolver<'a> {
                         found => found,
                     }
                 }
-                _ => {
-                    seen.links -= 1;
-                    continue;
-                }
+                _ => Binding::Unknown,
             };
-            seen.links -= 1;
+            seen.depth -= 1;
+            if seen.cut {
+                return Some(Binding::Unknown);
+            }
             if matches!(found, Binding::Def(_) | Binding::Module(_)) {
                 return Some(found);
             }
@@ -1058,7 +1155,7 @@ impl<'a> Resolver<'a> {
 
     /// What the callee-like name `target` written in `scope` gives (a `use` path): its head
     /// read among types and modules, so no local hides it. An alias met again while resolving
-    /// itself gives nothing.
+    /// itself gives nothing; one cut at `LINK_DEPTH` is unknown (`Seen::cut`).
     fn alias(
         &self,
         path: &'a str,
@@ -1066,13 +1163,17 @@ impl<'a> Resolver<'a> {
         target: &'a str,
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
-        if seen.links >= LINK_DEPTH || !seen.insert((path, target)) {
+        if seen.depth >= LINK_DEPTH {
+            seen.cut = true;
             return Binding::Unknown;
         }
-        seen.links += 1;
+        if !seen.aliases.insert((path, target)) {
+            return Binding::Unknown;
+        }
+        seen.depth += 1;
         let work = &mut Work::default();
         let found = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
-        seen.links -= 1;
+        seen.depth -= 1;
         found
     }
 
@@ -1089,7 +1190,7 @@ impl<'a> Resolver<'a> {
             .map(|(at, _)| at)
             .filter(|&at| callee[..at].contains('.'))
             .find_map(|at| match self.imported(path, &callee[..at], seen) {
-                Binding::Unknown => None,
+                Binding::Unknown if !seen.cut => None,
                 found => Some((found, &callee[at + 1..])),
             })
     }
@@ -1115,6 +1216,7 @@ impl<'a> Resolver<'a> {
         };
         if let Imported::Member { module, .. } = name
             && matches!(found, Binding::Unknown | Binding::External(..))
+            && !seen.cut
             && let Some(module) = self.module(path, module)
         {
             return Binding::Module(module);
@@ -1122,13 +1224,35 @@ impl<'a> Resolver<'a> {
         found
     }
 
-    /// What a star import of `path` takes as `name`.
-    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Binding<'a> {
-        if self.files[path].star.takes(name) {
-            self.export(path, name, seen)
-        } else {
-            (self.globs(path, "", name, true, seen)).unwrap_or(Binding::Unknown)
+    /// What a star import of `path` takes as `name` (`exports`), else what its re-exporting
+    /// globs give it (Rust's `pub use m::*`). An unknown it reaches through a cycle
+    /// (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut at
+    /// `LINK_DEPTH` stays unknown.
+    fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
+        if !self.files[path].star.takes(name) {
+            return self.globs(path, "", name, true, seen);
         }
+        let outer = std::mem::take(&mut seen.looped);
+        let found = self.exports(path, name, seen, false);
+        let looped = std::mem::replace(&mut seen.looped, outer);
+        match found {
+            Some(Binding::Unknown) if looped && !seen.cut => None,
+            found => found,
+        }
+    }
+
+    /// What a star import of `source` from `path` takes as `name` (`star`), and whether it may
+    /// not take it (`Star::Computed`).
+    fn taken(
+        &self,
+        path: &'a str,
+        source: &str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+    ) -> Option<(Binding<'a>, bool)> {
+        let module = self.module(path, source)?;
+        let found = self.star(module, name, seen)?;
+        Some((found, matches!(self.files[module].star, Star::Computed)))
     }
 
     /// What `path` exports as `name`: all it lets an explicit import name.
@@ -1145,11 +1269,70 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         value: bool,
     ) -> Binding<'a> {
-        if !seen.insert((path, name)) {
-            return Binding::Unknown;
+        self.exports(path, name, seen, value)
+            .unwrap_or(Binding::Unknown)
+    }
+
+    /// `export_as`, or `None` when `path` exports no `name`, so that another star may bind it.
+    /// An export of what is not known (a constant, something from outside the repository, an
+    /// export cut more than `LINK_DEPTH` links deep, where `seen` records the cut) is still the
+    /// name's: no other star binds it.
+    fn exports(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
+        if seen.depth >= LINK_DEPTH {
+            seen.cut = true;
+            return Some(Binding::Unknown);
         }
+        let key = (path, name, value);
+        match seen.pairs.get(&key).cloned() {
+            Some(None) => {
+                seen.looped = true;
+                return None;
+            }
+            Some(Some((found, looped))) => {
+                seen.looped |= looped;
+                return found;
+            }
+            None => {}
+        }
+        seen.pairs.insert(key, None);
+        let outer = std::mem::take(&mut seen.looped);
+        seen.depth += 1;
+        let found = self.own_export(path, name, seen, value);
+        seen.depth -= 1;
+        seen.pairs.insert(key, Some((found.clone(), seen.looped)));
+        seen.looped |= outer;
+        found
+    }
+
+    /// `exports`, once `path` and `name` are seen. Where stars bind (`stars_bind`), the exports
+    /// are listed last binding first, and the first that gives `name` exports it. Otherwise
+    /// the module's own export of the name decides, else its `export *`: the binding they give
+    /// it when they all give the same one, as in ES modules; two that differ leave the name
+    /// unknown, still the module's, so that no other star binds it. With neither, the globs of
+    /// its top level give it (Rust's `use m::*`).
+    fn own_export(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
         let exports = &self.files[path].exports;
-        let mut named = exports.iter().filter(|e| exports_name(e, name));
+        if self.stars_bind {
+            let given = (exports.iter()).map(|export| match export {
+                Export::All { source } => self.taken(path, source, name, seen),
+                _ => (self.gives(path, export, name, seen, value)).map(|found| (found, false)),
+            });
+            return latest(given, false);
+        }
+        let star = |export: &&Export| matches!(export, Export::All { .. });
+        let named = || (exports.iter()).filter(|e| !star(e) && exports_name(e, name));
         let namespace = |e: &&Export| {
             matches!(
                 e,
@@ -1159,12 +1342,35 @@ impl<'a> Resolver<'a> {
                 }
             )
         };
-        let found = match value {
-            true => (named.clone().find(|e| !namespace(e))).or_else(|| named.next()),
-            false => named.next(),
+        let own = match value {
+            true => named().find(|e| !namespace(e)).or_else(|| named().next()),
+            false => named().next(),
         };
-        match found {
-            Some(Export::Local { local, .. }) => {
+        if let Some(export) = own {
+            return self.gives(path, export, name, seen, value);
+        }
+        let mut given = (exports.iter().filter(star))
+            .filter_map(|export| self.gives(path, export, name, seen, value));
+        let Some(first) = given.next() else {
+            return self.globs(path, "", name, false, seen);
+        };
+        match given.all(|other| same(&first, &other)) {
+            true => Some(first),
+            false => Some(Binding::Unknown),
+        }
+    }
+
+    /// What one export of `path` gives `name`, if it gives it, read as a value when `value`.
+    fn gives(
+        &self,
+        path: &'a str,
+        export: &'a Export,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
+        match export {
+            Export::Local { exported, local } if exported == name => {
                 // The item of a module written in place is exported under its dotted name, and
                 // read from inside that module.
                 let (scope, bare) = match local.rsplit_once('.') {
@@ -1178,25 +1384,36 @@ impl<'a> Resolver<'a> {
                     _ => ("", local.as_str()),
                 };
                 let reading = if value { Reading::Value } else { Reading::Any };
-                return self.lexical_as(path, scope, bare, seen, reading);
+                Some(self.lexical_as(path, scope, bare, seen, reading))
             }
-            Some(Export::From {
+            Export::From {
+                exported,
                 source,
                 name: imported,
-                ..
-            }) => return self.import(path, "", source, imported, seen),
-            _ => {}
+            } if exported == name => Some(self.import(path, "", source, imported, seen)),
+            Export::All { source } => self.star(self.module(path, source)?, name, seen),
+            _ => None,
         }
-        for export in exports {
-            if let Export::All { source } = export
-                && let Some(module) = self.module(path, source)
-                && let found @ (Binding::Def(_) | Binding::Module(_)) =
-                    self.star(module, name, seen)
-            {
-                return found;
-            }
-        }
-        (self.globs(path, "", name, false, seen)).unwrap_or(Binding::Unknown)
+    }
+
+    /// Where stars bind (`stars_bind`), what a star import written after every other top-level
+    /// binding of `name` in `path` binds it to (`later`), the last first, when its module exports
+    /// the name (one from outside the repository binds nothing, `imported`).
+    fn rebound(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
+        let (stars, after) = self.later.get(path)?;
+        let stars = &stars[..*after.get(name)?];
+        let given = stars
+            .iter()
+            .map(|source| self.taken(path, source, name, seen));
+        let found = latest(given, true)?;
+        // Code run while the module loads may come before the star import, and see the binding
+        // before it.
+        // ponytail: where the code sits is not compared with the star import's line, so what a
+        // star import rebinds is unknown to all of it.
+        Some(match seen.load == Some(path) {
+            true => Binding::Unknown,
+            false => found,
+        })
     }
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
@@ -1310,6 +1527,49 @@ impl<'a> Resolver<'a> {
             .iter()
             .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
             .map(|(path, _)| *path)
+    }
+}
+
+/// What the latest of `bindings` (the latest first) binds a name to, if one binds it: the first
+/// that gives it, unless it may not (`Resolver::taken`), when the one before it decides as well,
+/// and so on; two that differ leave the name unknown, and so does one that may not when
+/// something before them all (`before`) binds the name.
+fn latest<'a>(
+    bindings: impl Iterator<Item = Option<(Binding<'a>, bool)>>,
+    before: bool,
+) -> Option<Binding<'a>> {
+    let mut found = None;
+    for (binding, maybe) in bindings.flatten() {
+        if found.as_ref().is_some_and(|first| !same(first, &binding)) {
+            return Some(Binding::Unknown);
+        }
+        found = Some(binding);
+        if !maybe {
+            return found;
+        }
+    }
+    match found {
+        Some(_) if before => Some(Binding::Unknown),
+        found => found,
+    }
+}
+
+/// Whether two bindings are the same one, as two `export *` must give a name for a module to
+/// export it. What is not known is the same as nothing else.
+fn same(a: &Binding, b: &Binding) -> bool {
+    match (a, b) {
+        (Binding::Def(x), Binding::Def(y)) => x == y,
+        (Binding::Module(x), Binding::Module(y)) => x == y,
+        (Binding::Const(p, x), Binding::Const(q, y)) => (p, x) == (q, y),
+        (Binding::External(p, x), Binding::External(q, y)) => {
+            p == q
+                && match (x, y) {
+                    (Imported::Namespace, Imported::Namespace) => true,
+                    (Imported::Name(x), Imported::Name(y)) => x == y,
+                    _ => false,
+                }
+        }
+        _ => false,
     }
 }
 
@@ -1480,44 +1740,50 @@ impl<'a> Code<'a> {
     ) -> Option<Origin<'a>> {
         let mut members = chain.split('.');
         let head = members.next()?;
-        let mut origin = match self.resolver.lexical(path, scope, head, &mut Seen::new()) {
-            Binding::External(package, name) => Origin {
-                package,
-                expr: match name {
-                    Imported::Namespace => String::new(),
-                    Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
-                    // A star import spells no name of its own.
-                    Imported::All | Imported::Path(_) | Imported::Glob { .. } => return None,
+        let mut origin =
+            match self
+                .resolver
+                .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
+            {
+                Binding::External(package, name) => Origin {
+                    package,
+                    expr: match name {
+                        Imported::Namespace => String::new(),
+                        Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
+                        // A star import spells no name of its own.
+                        Imported::All | Imported::Path(_) | Imported::Glob { .. } => {
+                            return None;
+                        }
+                    },
+                    binding: None,
                 },
-                binding: None,
-            },
-            Binding::Const(at, constant) => {
-                // `const a = b; const b = a;` comes from nowhere.
-                if seen.contains(&(at, constant)) {
-                    return None;
+                Binding::Const(at, constant) => {
+                    // `const a = b; const b = a;` comes from nowhere.
+                    if seen.contains(&(at, constant)) {
+                        return None;
+                    }
+                    seen.push((at, constant));
+                    let (value, within) = self.held(at, constant)?;
+                    let mut origin = match value {
+                        Value::Ref(name) => self.trace(at, within, name, seen)?,
+                        Value::Call(call) => {
+                            let callee = &call.callee;
+                            let mut origin = self.trace(at, within, callee, seen)?;
+                            origin.expr += "()";
+                            origin
+                        }
+                        Value::New(callee, _) => {
+                            let mut origin = self.trace(at, within, callee, seen)?;
+                            origin.expr = format!("new {}()", origin.expr);
+                            origin
+                        }
+                        _ => return None,
+                    };
+                    origin.binding = Some((at, constant));
+                    origin
                 }
-                seen.push((at, constant));
-                let (value, within) = self.held(at, constant)?;
-                let mut origin = match value {
-                    Value::Ref(name) => self.trace(at, within, name, seen)?,
-                    Value::Call(call) => {
-                        let callee = &call.callee;
-                        let mut origin = self.trace(at, within, callee, seen)?;
-                        origin.expr += "()";
-                        origin
-                    }
-                    Value::New(callee, _) => {
-                        let mut origin = self.trace(at, within, callee, seen)?;
-                        origin.expr = format!("new {}()", origin.expr);
-                        origin
-                    }
-                    _ => return None,
-                };
-                origin.binding = Some((at, constant));
-                origin
-            }
-            _ => return None,
-        };
+                _ => return None,
+            };
         for member in members {
             if !origin.expr.is_empty() {
                 origin.expr.push('.');
@@ -1541,7 +1807,8 @@ impl<'a> Code<'a> {
             .split_once('.')
             .map_or((chain, None), |(h, m)| (h, Some(m)));
         let Binding::External(specifier, name) =
-            self.resolver.lexical(path, scope, head, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
         else {
             return None;
         };
@@ -1978,7 +2245,10 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
     ) -> Option<((&'a str, &'a str), &'a Value)> {
-        match self.resolver.lexical(path, scope, name, &mut Seen::new()) {
+        match self
+            .resolver
+            .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
+        {
             Binding::Const(at, constant) => Some(((at, constant), self.held(at, constant)?.0)),
             _ => None,
         }
@@ -2007,7 +2277,8 @@ impl<'a> Code<'a> {
         name: &'a str,
     ) -> Option<(&'a str, &'a str, &'a Ty)> {
         let Binding::Const(at, constant) =
-            self.resolver.lexical(path, scope, name, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         else {
             return None;
         };
@@ -2031,7 +2302,8 @@ impl<'a> Code<'a> {
         default: &str,
     ) -> bool {
         let Binding::Param(function, n, field) =
-            self.resolver.lexical(path, scope, name, &mut Seen::new())
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         else {
             return false;
         };
@@ -2054,7 +2326,7 @@ impl<'a> Code<'a> {
         n: usize,
     ) -> bool {
         matches!(
-            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            self.resolver.lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
             Binding::Param(f, at, None) if f == function && at == n
         )
     }
@@ -2063,7 +2335,8 @@ impl<'a> Code<'a> {
     /// global such as `Response`. A local binding of the name hides the global.
     pub fn is_global(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
         matches!(
-            self.resolver.lexical(path, scope, name, &mut Seen::new()),
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
             Binding::Unknown
         )
     }
@@ -2429,6 +2702,442 @@ mod tests {
         classes.join("\n\n")
     }
 
+    /// The file `f0.{ext}`, defining `x` as `define`, and the files `f{i}` up to `f{n - 1}`, each
+    /// re-exporting it from the one before as `link(i - 1)` writes.
+    fn reexports(
+        ext: &str,
+        n: usize,
+        define: &str,
+        link: impl Fn(usize) -> String,
+    ) -> Vec<(String, String)> {
+        let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
+        sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
+        sources
+    }
+
+    /// The file defining the target of the call of `callee` in `main`, when it is exact.
+    fn exact_in(
+        pack: &dyn LanguagePack,
+        sources: &[(String, String)],
+        main: &str,
+        callee: &str,
+    ) -> Option<String> {
+        let facts: Vec<(String, Facts)> = (sources.iter())
+            .map(|(path, src)| (path.clone(), pack.parse(path, src.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = (facts.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let resolver = Resolver::new(&files, pack.modules(&[], &BTreeMap::new()).unwrap(), pack);
+        let call = files[main]
+            .calls
+            .iter()
+            .find(|c| c.callee == callee)
+            .unwrap();
+        match resolver.call(main, call) {
+            Resolution::Exact(t) => Some(t.path.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Whether a call of `x` in `main` is exact at `f0` when `main` imports it from `f{n - 1}`
+    /// of `reexports` as `import(n - 1)` writes.
+    fn reexported(
+        pack: &dyn LanguagePack,
+        ext: &str,
+        n: usize,
+        define: &str,
+        link: impl Fn(usize) -> String,
+        import: impl Fn(usize) -> String,
+    ) -> bool {
+        let mut sources = reexports(ext, n, define, link);
+        let main = format!("main.{ext}");
+        sources.push((main.clone(), import(n - 1)));
+        exact_in(pack, &sources, &main, "x") == Some(format!("f0.{ext}"))
+    }
+
+    #[test]
+    fn a_name_reexported_deeper_than_the_limit_is_unknown() {
+        use crate::lang::ts::TsJs;
+
+        // Far past the limit: a recursion through re-exports that does not stop overflows the
+        // stack.
+        let far = 5_000;
+        // Every other file re-exports by name, the others re-export everything.
+        let ts = |n| {
+            let link = |p: usize| match p % 2 {
+                0 => format!("export {{ x }} from './f{p}';\n"),
+                _ => format!("export * from './f{p}';\n"),
+            };
+            let import = |p| format!("import {{ x }} from './f{p}';\nx();\n");
+            reexported(&TsJs, "ts", n, "export function x() {}\n", link, import)
+        };
+        let py = |n| {
+            let link = |p: usize| match p % 2 {
+                0 => format!("from f{p} import x\n"),
+                _ => format!("from f{p} import *\n"),
+            };
+            let import = |p| format!("from f{p} import x\nx()\n");
+            reexported(&Python, "py", n, "def x():\n    pass\n", link, import)
+        };
+
+        for exact in [ts, py] {
+            assert!(exact(LINK_DEPTH));
+            assert!(!exact(LINK_DEPTH + 1));
+            assert!(!exact(far));
+        }
+    }
+
+    #[test]
+    fn a_name_cut_past_the_limit_is_taken_from_no_other_module() {
+        use crate::lang::ts::TsJs;
+
+        // `a` re-exports the `x` of `f0` through `n` files, and `b` defines its own: the module
+        // that binds `x` is `a`, whose `x` is unknown past the limit, and never `b`'s.
+        let cut = LINK_DEPTH + 1;
+        let py_link = |p| format!("from f{p} import x\n");
+        let py = |n: usize| {
+            let mut sources = reexports("py", n, "def x():\n    pass\n", py_link);
+            sources.extend([
+                ("a.py".into(), py_link(n - 1)),
+                ("b.py".into(), "def x():\n    pass\n".into()),
+                // The last star import binds `x`.
+                (
+                    "main.py".into(),
+                    "from b import *\nfrom a import *\nx()\n".into(),
+                ),
+            ]);
+            exact_in(&Python, &sources, "main.py", "x")
+        };
+        assert_eq!(py(2).as_deref(), Some("f0.py"));
+        assert_eq!(py(cut), None);
+
+        let ts = |n: usize| {
+            let link = |p| format!("export {{ x }} from './f{p}';\n");
+            let mut sources = reexports("ts", n, "export function x() {}\n", link);
+            // `b` re-exports `f0`'s `x` itself: both `export *` give the same `x` below the
+            // limit; past it, `a`'s `x` is unknown, and so is `m`'s, never `b`'s.
+            sources.extend([
+                ("a.ts".into(), link(n - 1)),
+                ("b.ts".into(), link(0)),
+                (
+                    "m.ts".into(),
+                    "export * from './a';\nexport * from './b';\n".into(),
+                ),
+                ("main.ts".into(), "import { x } from './m';\nx();\n".into()),
+            ]);
+            exact_in(&TsJs, &sources, "main.ts", "x")
+        };
+        assert_eq!(ts(2).as_deref(), Some("f0.ts"));
+        assert_eq!(ts(cut), None);
+
+        // `from pkg import x` names the submodule `pkg.x` only when `pkg` exports no `x`.
+        let member = |init: String| {
+            let mut sources = reexports("py", cut, "def x():\n    pass\n", py_link);
+            sources.extend([
+                ("pkg/__init__.py".into(), init),
+                ("pkg/x.py".into(), "def y():\n    pass\n".into()),
+                ("main.py".into(), "from pkg import x\nx.y()\n".into()),
+            ]);
+            exact_in(&Python, &sources, "main.py", "x.y")
+        };
+        assert_eq!(member(String::new()).as_deref(), Some("pkg/x.py"));
+        assert_eq!(member(py_link(cut - 1)), None);
+    }
+
+    #[test]
+    fn a_star_that_binds_a_name_to_no_function_hides_the_stars_before_it() {
+        use crate::lang::ts::TsJs;
+
+        let src = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+            (pairs.iter())
+                .map(|(p, s)| (p.to_string(), s.to_string()))
+                .collect()
+        };
+        // `a` binds `x` to a constant, to something from outside the repository, or to a name
+        // it binds twice; `b` defines `def x()`. The last star import binds `x` to `a`'s, which
+        // no call reaches exactly, and never to `b`'s.
+        for a in ["x = 1\n", "from os import x\n", "x = f()\nx = g()\n"] {
+            let b = "def x():\n    pass\n";
+            let imported = src(&[
+                ("a.py", a),
+                ("b.py", b),
+                ("main.py", "from b import *\nfrom a import *\nx()\n"),
+            ]);
+            assert_eq!(exact_in(&Python, &imported, "main.py", "x"), None, "{a}");
+            // The same through a module that star-imports both and is imported by name.
+            let exported = src(&[
+                ("a.py", a),
+                ("b.py", b),
+                ("m.py", "from b import *\nfrom a import *\n"),
+                ("main.py", "from m import x\nx()\n"),
+            ]);
+            assert_eq!(exact_in(&Python, &exported, "main.py", "x"), None, "{a}");
+        }
+        // Two `export *` that give `x` differently export neither.
+        for a in ["export const x = 1;\n", "export { x } from 'ext';\n"] {
+            let sources = src(&[
+                ("a.ts", a),
+                ("b.ts", "export function x() {}\n"),
+                ("m.ts", "export * from './a';\nexport * from './b';\n"),
+                ("main.ts", "import { x } from './m';\nx();\n"),
+            ]);
+            assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None, "{a}");
+        }
+    }
+
+    #[test]
+    fn the_last_star_import_of_a_module_exports_the_name() {
+        // `m` star-imports `b`, then `a`: the later rebinds `x`, so `from m import x` is `a`'s.
+        let def = "def x():\n    pass\n";
+        let sources: Vec<(String, String)> = [
+            ("a.py", def),
+            ("b.py", def),
+            ("m.py", "from b import *\nfrom a import *\n"),
+            ("main.py", "from m import x\nx()\n"),
+        ]
+        .map(|(p, s)| (p.to_string(), s.to_string()))
+        .into();
+        assert_eq!(
+            exact_in(&Python, &sources, "main.py", "x").as_deref(),
+            Some("a.py")
+        );
+    }
+
+    fn owned(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        (pairs.iter())
+            .map(|(p, s)| (p.to_string(), s.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn a_star_import_from_outside_the_repository_binds_nothing() {
+        // The ceiling (`ponytail:` in `Resolver::imported`): what `from numpy import *` binds is
+        // not known, as `numpy` is no file of the repository, and it is taken to bind nothing,
+        // so the import or definition before it keeps `x`. Python may bind `numpy`'s instead.
+        let b = ("b.py", "def x():\n    pass\n");
+        for (main, before) in [
+            ("from b import *\nfrom numpy import *\nx()\n", "b.py"),
+            ("from b import x\nfrom numpy import *\nx()\n", "b.py"),
+            ("def x():\n    pass\nfrom numpy import *\nx()\n", "main.py"),
+        ] {
+            let sources = owned(&[b, ("main.py", main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some(before), "{main}");
+        }
+        // The same through a module that star-imports both and is imported by name.
+        let sources = owned(&[
+            b,
+            ("m.py", "from b import *\nfrom numpy import *\n"),
+            ("main.py", "from m import x\nx()\n"),
+        ]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("b.py"));
+    }
+
+    #[test]
+    fn a_star_import_written_many_times_is_followed_once() {
+        // Each call of `x` walks the star imports after `def x()`: once per module, or the calls
+        // take time quadratic in the lines.
+        let n = 5_000;
+        let stars = "from m import *\n".repeat(n);
+        let main = format!("def x():\n    pass\n{stars}{}", "x()\n".repeat(n));
+        let sources = owned(&[("m.py", "def y():\n    pass\n"), ("main.py", &main)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("main.py"));
+    }
+
+    #[test]
+    fn an_import_after_a_star_import_from_outside_the_repository_binds_the_name() {
+        let b = ("b.py", "def x():\n    pass\n");
+        for main in [
+            "from numpy import *\nfrom b import *\nx()\n",
+            "from numpy import *\nfrom b import x\nx()\n",
+        ] {
+            let sources = owned(&[b, ("main.py", main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("b.py"), "{main}");
+        }
+    }
+
+    #[test]
+    fn a_star_import_after_a_definition_rebinds_its_name() {
+        // `a` exports `x`, so `from a import *` after `def x()` rebinds `x` to `a`'s for a call
+        // in a function, which runs once the module is loaded.
+        let def = "def x():\n    pass\n";
+        let a = ("a.py", def);
+        let main = format!("{def}from a import *\ndef f():\n    x()\n");
+        let sources = owned(&[a, ("main.py", &main)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("a.py"));
+        // Code that runs while the module loads (at the top level, in a class body, in the main
+        // guard) may run before the star import and reach `main`'s `x`, or after it and reach
+        // `a`'s: neither exactly.
+        for call in [
+            "x()\n",
+            "class C:\n    x()\n",
+            "if __name__ == \"__main__\":\n    x()\n",
+        ] {
+            for main in [
+                format!("{def}{call}from a import *\n"),
+                format!("{def}from a import *\n{call}"),
+            ] {
+                let sources = owned(&[a, ("main.py", &main)]);
+                assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            }
+        }
+        // The same through a module that defines `x`, then star-imports `a`.
+        let m = format!("{def}from a import *\n");
+        let sources = owned(&[a, ("m.py", &m), ("main.py", "from m import x\nx()\n")]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("a.py"));
+        // A definition after the star import rebinds the name again, and a star import of a
+        // module that exports no `x` leaves the definition.
+        let after = format!("from a import *\n{def}x()\n");
+        let none = ("a.py", "def y():\n    pass\n");
+        let before = format!("{def}from a import *\nx()\n");
+        for (a, main) in [(a, &after), (none, &before)] {
+            let sources = owned(&[a, ("main.py", main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("main.py"), "{main}");
+        }
+    }
+
+    #[test]
+    fn two_export_stars_that_give_a_name_differently_export_neither() {
+        use crate::lang::ts::TsJs;
+
+        // As in ES modules: `a` and `b` each export their own `x`, so `m` exports no `x`.
+        let m = ("m.ts", "export * from './a';\nexport * from './b';\n");
+        let main = ("main.ts", "import { x } from './m';\nx();\n");
+        let def = "export function x() {}\n";
+        let sources = owned(&[("a.ts", def), ("b.ts", def), m, main]);
+        assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None);
+        // Both lead to the same definition, which is `m`'s `x`.
+        let sources = owned(&[
+            ("a.ts", "export * from './c';\n"),
+            ("b.ts", "export { x } from './c';\n"),
+            ("c.ts", def),
+            m,
+            main,
+        ]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("c.ts"));
+        // Only one of them exports `x`.
+        let sources = owned(&[("a.ts", def), ("b.ts", "export function y() {}\n"), m, main]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("a.ts"));
+    }
+
+    #[test]
+    fn a_top_level_binding_after_a_star_import_rebinds_its_name() {
+        // `x` is `b`'s, then `a`'s through the star import, then the binding's, which no call
+        // reaches exactly: never `a`'s or `b`'s. A function's `global x` may run at any time.
+        let def = "def x():\n    pass\n";
+        let global = "def f():\n    global x\n    x = 1\n";
+        for binding in [
+            "with open(p) as x:\n    pass\n",
+            "for x in xs:\n    pass\n",
+            "try:\n    pass\nexcept E as x:\n    pass\n",
+            "(x := g())\n",
+            "match v:\n    case x:\n        pass\n",
+            "y, x = g()\n",
+            "x += 1\n",
+            global,
+        ] {
+            let main = format!("from b import x\nfrom a import *\n{binding}x()\n");
+            let sources = owned(&[("a.py", def), ("b.py", def), ("main.py", &main)]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            // The same through a module that binds them all and is imported by name.
+            let m = format!("from b import x\nfrom a import *\n{binding}");
+            let main = ("main.py", "from m import x\nx()\n");
+            let sources = owned(&[("a.py", def), ("b.py", def), ("m.py", &m), main]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{m}");
+        }
+        // A `global x` written before the star import may run after it.
+        let main = format!("{global}from a import *\nx()\n");
+        let sources = owned(&[("a.py", def), ("main.py", &main)]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+    }
+
+    #[test]
+    fn a_star_import_of_a_computed_all_rebinds_a_name_to_nothing_known() {
+        // `pkg`'s `__all__` may or may not list `x`: a star import of it rebinds `x` to `pkg`'s,
+        // or leaves the binding before it, so a call reaches neither exactly.
+        let def = "def x():\n    pass\n";
+        let pkg = (
+            "pkg.py",
+            "import core\n__all__ = core.__all__ + ['y']\ndef x():\n    pass\n",
+        );
+        let (b, core) = (("b.py", def), ("core.py", "__all__ = []\n"));
+        let call = "def f():\n    x()\n";
+        for before in [def, "from b import x\n", "from b import *\n"] {
+            let main = format!("{before}from pkg import *\n{call}");
+            let sources = owned(&[pkg, b, core, ("main.py", &main)]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+            // The same through a module that binds both and is imported by name.
+            let m = format!("{before}from pkg import *\n");
+            let main = ("main.py", "from m import x\nx()\n");
+            let sources = owned(&[pkg, b, core, ("m.py", &m), main]);
+            assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{m}");
+        }
+        // With nothing bound before it, `x` is `pkg`'s or no name at all.
+        let sources = owned(&[
+            pkg,
+            core,
+            ("main.py", &format!("from pkg import *\n{call}")),
+        ]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("pkg.py"));
+    }
+
+    #[test]
+    fn a_star_import_that_reaches_the_name_back_through_a_cycle_gives_nothing() {
+        use crate::lang::ts::TsJs;
+
+        // `utils` imports `helper` from the package being initialized, which has `core`'s by
+        // then: its star import gives nothing new, and `core`'s is the package's.
+        let sources = owned(&[
+            (
+                "pkg/__init__.py",
+                "from .core import *\nfrom .utils import *\n",
+            ),
+            ("pkg/core.py", "def helper():\n    pass\n"),
+            ("pkg/utils.py", "from pkg import helper\n"),
+            ("main.py", "from pkg import helper\nhelper()\n"),
+        ]);
+        let found = exact_in(&Python, &sources, "main.py", "helper");
+        assert_eq!(found.as_deref(), Some("pkg/core.py"));
+        // As in ES modules, where the cycle resolves to null: `c`'s `x` is `index`'s.
+        let sources = owned(&[
+            ("index.ts", "export * from './a';\nexport * from './c';\n"),
+            ("a.ts", "export { x } from './index';\n"),
+            ("c.ts", "export function x() {}\n"),
+            ("main.ts", "import { x } from './index';\nx();\n"),
+        ]);
+        let found = exact_in(&TsJs, &sources, "main.ts", "x");
+        assert_eq!(found.as_deref(), Some("c.ts"));
+    }
+
+    #[test]
+    fn a_star_import_through_a_cycle_and_two_differing_stars_gives_neither() {
+        use crate::lang::ts::TsJs;
+
+        // `a` reaches `index` back through a cycle, and `p` and `q` give `x` differently: `a`
+        // exports no `x` it is sure of, so neither does `index`, `c`'s notwithstanding.
+        let def = "export function x() {}\n";
+        let sources = owned(&[
+            ("index.ts", "export * from './a';\nexport * from './c';\n"),
+            (
+                "a.ts",
+                "export * from './index';\nexport * from './p';\nexport * from './q';\n",
+            ),
+            ("p.ts", def),
+            ("q.ts", def),
+            ("c.ts", def),
+            ("main.ts", "import { x } from './index';\nx();\n"),
+        ]);
+        assert_eq!(exact_in(&TsJs, &sources, "main.ts", "x"), None);
+    }
+
     #[test]
     fn a_call_is_found_by_its_range_in_a_list_in_any_order() {
         let facts = Python.parse("a.py", b"f(g(1))\nh()\n").unwrap();
@@ -2523,6 +3232,40 @@ mod tests {
         let found = calls(&[("main.rs", &src)]);
         assert_eq!(found[&format!("main.rs main a{last}")], "exact main.rs::a0");
         assert_eq!(found[&format!("main.rs main a{n}")], "none");
+    }
+
+    #[test]
+    fn a_name_a_glob_reaches_past_the_limit_is_taken_from_no_other_glob() {
+        // `x()` in `main.rs`, where the latest glob reaches `x` through `n` modules, each
+        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too.
+        let x = |n: usize, by_name: bool| {
+            let mut files = vec![("main.rs".to_string(), String::new())];
+            let mut main = String::from("mod near;\n");
+            for i in 0..n {
+                main.push_str(&format!("mod m{i};\n"));
+                let next = match by_name {
+                    true => format!("pub use crate::m{}::x;\n", i + 1),
+                    false => format!("pub use crate::m{}::*;\n", i + 1),
+                };
+                files.push((format!("m{i}.rs"), next));
+            }
+            main.push_str(&format!(
+                "mod m{n};\nuse crate::near::*;\nuse crate::m0::*;\n"
+            ));
+            main.push_str("fn main() { x(); }\n");
+            files[0].1 = main;
+            files.push((format!("m{n}.rs"), "pub fn x() {}\n".to_string()));
+            files.push(("near.rs".to_string(), "pub fn x() {}\n".to_string()));
+            let files: Vec<(&'static str, &str)> = (files.iter())
+                .map(|(path, src)| (&*path.clone().leak(), src.as_str()))
+                .collect();
+            calls(&files)["main.rs main x"].clone()
+        };
+        for by_name in [false, true] {
+            assert_eq!(x(3, by_name), "exact m3.rs::x", "by name: {by_name}");
+            let past = x(3 * LINK_DEPTH, by_name);
+            assert!(!past.starts_with("exact"), "by name: {by_name}: {past}");
+        }
     }
 
     #[test]
@@ -2650,6 +3393,8 @@ mod tests {
 
     #[test]
     fn a_result_followed_past_the_limit_gives_nothing() {
+        // A result is followed inside `instance`, so `RECEIVER_DEPTH` receivers being resolved
+        // around it leave it unknown, and the cut is recorded.
         let parsed = parsed(&[(
             "main.rs",
             "struct S;\nimpl S { fn new() -> Self { S } fn go(&self) {} }\n\
@@ -2657,15 +3402,122 @@ mod tests {
         )]);
         let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let resolver = resolver(&map);
-        let new = |returns| {
+        let s = |depth: usize| {
             let mut work = Work {
-                returns,
+                busy: (0..depth)
+                    .map(|_| Busy::Local("main.rs", "f", "y"))
+                    .collect(),
                 ..Work::default()
             };
-            resolver.returned("main.rs", "f", "S.new", &mut work)
+            let found = resolver.instance(Binding::Local("main.rs", "f", "s"), &mut work);
+            (
+                matches!(found, Binding::Instance(t) if t.name == "S"),
+                work.cut,
+            )
         };
-        assert!(matches!(new(0), Binding::Def(t) if t.name == "S"));
-        assert!(matches!(new(RETURN_DEPTH - 1), Binding::Def(t) if t.name == "S"));
-        assert!(matches!(new(RETURN_DEPTH), Binding::Unknown));
+        assert_eq!(s(0), (true, false));
+        assert_eq!(s(RECEIVER_DEPTH - 1), (true, false));
+        assert_eq!(s(RECEIVER_DEPTH), (false, true));
+    }
+
+    #[test]
+    fn a_class_annotated_deeper_than_the_limit_is_unknown() {
+        // Whether `x0.m()` is exact when `n` parameters of `f` each take their class from the
+        // next one's (`x0: x1.C`), quoted or not, and the last is `K`, whose member `C` is a
+        // class that derives from `K` and so has it as a member too.
+        let exact = |n: usize, quoted: bool| {
+            let annotation = |i: usize| match (i + 1 == n, quoted) {
+                (true, _) => "K".to_string(),
+                (false, true) => format!("\"x{}.C\"", i + 1),
+                (false, false) => format!("x{}.C", i + 1),
+            };
+            let params: Vec<String> = (0..n).map(|i| format!("x{i}: {}", annotation(i))).collect();
+            let src = format!(
+                "class K:\n    class C(K):\n        def m(self):\n            pass\n\n\
+                 def f({}):\n    x0.m()\n",
+                params.join(", ")
+            );
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let call = facts.calls.iter().find(|c| c.callee == "x0.m").unwrap();
+            matches!(resolver.call("a.py", call), Resolution::Exact(t) if t.name == "K.C.m")
+        };
+
+        // Far past the limit: a recursion through receivers that does not stop overflows the
+        // stack.
+        let far = 5_000;
+        for quoted in [false, true] {
+            assert!(exact(RECEIVER_DEPTH, quoted), "quoted: {quoted}");
+            assert!(!exact(RECEIVER_DEPTH + 1, quoted), "quoted: {quoted}");
+            assert!(!exact(far, quoted), "quoted: {quoted}");
+        }
+    }
+
+    #[test]
+    fn a_family_does_not_depend_on_the_bases_of_the_walk_that_reaches_it() {
+        // `K` (`C127`) has the longest family the limit keeps, `C0` the last of it. `Z` derives
+        // from `K.D`, the class `D` that `C0` defines, found through `K`'s family: linearized on
+        // the way from `Z`, it is one class past the limit; from `K` itself it is not.
+        let k = FAMILY_DEPTH - 1;
+        let mut head =
+            "class C0:\n    class D:\n        def m(self):\n            pass\n".to_string();
+        for i in 1..=k {
+            head.push_str(&format!("\n\nclass C{i}(C{}):\n    pass\n", i - 1));
+        }
+        let z = format!("class Z(C{k}.D):\n    pass\n");
+        let go = "def go(z: Z):\n    z.m()\n";
+        for z_first in [false, true] {
+            let src = match z_first {
+                true => format!("{z}\n{head}\n{go}"),
+                false => format!("{head}\n{z}\n{go}"),
+            };
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            let call = facts.calls.iter().find(|c| c.callee == "z.m").unwrap();
+            let found = resolver.call("a.py", call);
+            assert!(
+                matches!(found, Resolution::Exact(t) if t.name == "C0.D.m"),
+                "z first: {z_first}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_family_does_not_depend_on_the_receivers_of_the_walk_that_reaches_it() {
+        // `K` derives from `L.D`, named through two receivers (`y = w.D()`). `Z` derives from
+        // `K.C`, named through `RECEIVER_DEPTH` receivers (`x0 = x1.C()`, ..., `x63 = K()`), so
+        // `K`'s family, linearized on the way from `Z`, is two receivers past the limit; from
+        // `K` itself it is not.
+        let n = RECEIVER_DEPTH;
+        let mut head =
+            "class L:\n    class D(L):\n        pass\n\n    def m(self):\n        pass\n\n\
+                        w = L()\ny = w.D()\n\n\
+                        class K(y.D):\n    class C(K):\n        pass\n"
+                .to_string();
+        for i in 0..n - 1 {
+            head.push_str(&format!("x{i} = x{}.C()\n", i + 1));
+        }
+        head.push_str(&format!("x{} = K()\n", n - 1));
+        let z = "class Z(x0.C):\n    pass\n";
+        let go = "def go(k: K, z: Z):\n    k.m()\n    z.m()\n";
+        for z_first in [false, true] {
+            let src = match z_first {
+                true => format!("{z}\n{head}\n{go}"),
+                false => format!("{head}\n{z}\n{go}"),
+            };
+            let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.py", &facts)]);
+            let resolver = Resolver::new(&files, Box::new(|_, _| Vec::new()), &Python);
+            for callee in ["k.m", "z.m"] {
+                let call = facts.calls.iter().find(|c| c.callee == callee).unwrap();
+                let found = resolver.call("a.py", call);
+                assert!(
+                    matches!(found, Resolution::Exact(t) if t.name == "L.m"),
+                    "{callee}, z first: {z_first}"
+                );
+            }
+        }
     }
 }

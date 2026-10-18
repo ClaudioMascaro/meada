@@ -316,12 +316,14 @@ one for the area a change touches.
   shared resolution cannot guess: `receiver` and `base_receiver` (keywords for the enclosing
   class and its base), `globals` (names bound everywhere), `Def::bases` (a class's bases, for
   its family), `Facts::receivers` (the class each binding gives a name), `Facts::star` (what a
-  star import takes) and `Param::binds` (which argument binds each parameter). A pack that
+  star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
+  Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
+  argument binds each parameter). A pack that
   writes none of them (TypeScript writes no bases or receivers) gets name matches where those
   would have resolved. A language whose files are not all built, or whose imports name files by
   a tree spread over several files (Rust's crates and `mod` declarations), says so through
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
-  path order, each stat'ed against `MAX_CONFIG`, read and folded into the configs digest on
+  path order, each read as a root config is (`read_config`) and folded into the configs digest on
   every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
   empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
   facts besides the configs. A language whose imports name a path rather than a file (Rust's
@@ -528,7 +530,13 @@ one for the area a change touches.
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
-  no fragments, since only `refresh` writes it.
+  no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
+  `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `tsconfig.json`, `jsconfig.json`) is read up to one
+  byte past `package::MAX_BYTES`, and a provider document up to one byte past
+  `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
+  holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A
+  pack config, at the root or at any depth (`**/`), is read through no symbolic link
+  (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
@@ -546,15 +554,36 @@ one for the area a change touches.
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
   makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
   its ancestors in C3 order) longer than that is absent, so every member of the class is
-  unknown (a name match at most), and the linearization recurses no deeper down the bases.
-- `resolve.rs` (Rust receivers): `RETURN_DEPTH` (64): a `let` that takes the class of a call's
-  result (`Class::Returned`) follows at most that many such results into one another; deeper
-  gives nothing (a name match at most).
+  unknown (a name match at most), and the linearization recurses no deeper down the bases. The
+  bases count from where the walk started, a family looked up for a member a base names
+  (`class Z(K.D)` linearizes `K`'s) included.
+  `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
+  re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
+  or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
+  (a name match at most), and no other import, `export *`, glob or submodule binds it in its
+  place. A star import from outside the repository (`from numpy import *`) is taken to bind
+  nothing (`ponytail:` in `Resolver::imported`): a name it rebinds stays linked `exact` to the
+  import or definition before it, as with the standard library's accelerator modules (`from
+  _heapq import *` after `def heappush`). Where a Python star import sits is not compared with
+  the code that reads a name it rebinds (`ponytail:` in `Resolver::rebound`): code run while
+  the module loads (its top level, a class body there, its main guard) gets the name unknown, as
+  it may run before the star import, and a function's code gets the star import's, as for every
+  binding a function reads. `RECEIVER_DEPTH` (64): a receiver whose class is named through
+  more receivers than that, each through the next (`x: y.C`, `x = y.C()`, or a Rust `let` that
+  takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
+  unknown class.
+  The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
+  a walk, the families being linearized give up and none is kept: each is linearized again when
+  asked for, and does not depend on the walk that first reached it.
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,
   so no repository type is guessed.
-- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
+- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
+  `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
+  (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
+  not an object declares no `paths` or `baseUrl` and the refresh carries on, with no status
+  line. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
   is not a definition (its body belongs to the one around it, and its name is a local that hides outer
@@ -745,7 +774,9 @@ one for the area a change touches.
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
-  larger parts are unreadable or open. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
+  larger parts are unreadable or open. `mod.rs`: `MAX_BYTES` (16 MiB, above the largest public
+  single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
+  document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
   marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
@@ -792,9 +823,8 @@ one for the area a change touches.
   builder chain costs one value per call. A closure written as an argument of a call is a
   `Kind::Inline` definition; any other closure is not, and neither is a `let mut`, a name bound
   twice in its scope or assigned again, or a destructuring a constant. A string literal with an escape sequence is
-  `Unknown`. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
-  `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
-  line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
+  `Unknown`. A `Cargo.toml` past `package::MAX_BYTES` (read up to one byte past it, as every
+  pack config is), not UTF-8 or not TOML declares no crate, with no status line. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
   none, and a vendored or fixture crate the walk finds is indexed too); `tests/`, `examples/`,
   `benches/` and `build.rs` are no crate roots (no marker). A file two crates reach (`mod
@@ -815,9 +845,9 @@ one for the area a change touches.
   `workspace = true` through `[workspace.dependencies]`), a binary naming the library of its own
   package; the same tables under `[target.*]` count, and `optional` and features are not read
   (a listed dependency counts as present; no marker). Any other crate name is external. A module declared inside a module
-  written in place is not followed for exports (no marker). `LINK_DEPTH` (128, `resolve.rs`): a
-  chain of `use` aliases or globs longer than that gives nothing, so a name behind it is
-  unknown (a name match at most).
+  written in place is not followed for exports (no marker). A chain of `use` aliases, globs and
+  `pub use` longer than `LINK_DEPTH` (see `resolve.rs` above) is unknown, and no other glob
+  binds the name in its place.
   `self::` and `super::` read inside a module that sits in a function are
   `(scoped_identifier)`, unresolved, and a `use` there binds nothing. A file's exports table
   rows are its `pub` items, `pub use` names, `pub` modules and, inside `pub` modules written

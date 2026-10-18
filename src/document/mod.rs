@@ -20,6 +20,13 @@ use crate::shape::Shape;
 use crate::workspace::Repository;
 use crate::{channel, http};
 
+/// The largest document read; a larger one is unreadable. The largest public single-file
+/// descriptions are 10 to 15 MB (GitHub's REST API, Stripe's SDK spec), far past the manifests'
+/// `package::MAX_BYTES`.
+// ponytail: a flat 16 MiB, parsed whole in memory; a streaming reader that keeps only the
+// paths, servers and channels lifts it.
+pub(crate) const MAX_BYTES: usize = 16 << 20;
+
 /// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
 /// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions;
 /// the same with `asyncapi`.
@@ -219,12 +226,17 @@ pub enum Problem {
 }
 
 /// The summary of the document at `path` (repository-relative) holding `src`. JSON by the
-/// extension, YAML otherwise. It never fails: what cannot be read is a problem.
+/// extension, YAML otherwise. It never fails: what cannot be read is a problem, and a document
+/// larger than `MAX_BYTES` is unreadable at its first line whatever the rest holds.
 ///
 /// The content decides the format, since a listed document can have any name: a top-level
 /// `openapi` field is OpenAPI, an `asyncapi` one AsyncAPI. With neither, the name only picks
 /// which format the document is reported as not being.
 pub fn read(path: &str, src: &[u8]) -> Summary {
+    if src.len() > MAX_BYTES {
+        let error = format!("larger than {} MiB", MAX_BYTES >> 20);
+        return Summary::problem(Problem::Unreadable { line: 1, error });
+    }
     match parse(path, src) {
         Ok(doc) if doc.get("openapi").is_some() => openapi::read(path, &doc),
         Ok(doc) if doc.get("asyncapi").is_some() || named(path, "asyncapi") => {
@@ -341,7 +353,26 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, Problem, is_document, read};
+    use super::{Format, MAX_BYTES, Problem, is_document, read};
+
+    #[test]
+    fn a_document_past_the_size_limit_is_unreadable() {
+        let valid = "openapi: 3.1.0\npaths:\n  /a:\n    get: {}\n";
+        let padded = |len: usize| format!("{valid}{}", "#".repeat(len - valid.len()));
+
+        let at_limit = read("openapi.yaml", padded(MAX_BYTES).as_bytes());
+        let past = read("openapi.yaml", padded(MAX_BYTES + 1).as_bytes());
+
+        assert_eq!(at_limit.format, Some(Format::Openapi));
+        assert_eq!(past.format, None);
+        assert_eq!(
+            past.problems,
+            [Problem::Unreadable {
+                line: 1,
+                error: "larger than 16 MiB".into()
+            }]
+        );
+    }
 
     #[test]
     fn documents_are_found_by_file_name() {
