@@ -28,7 +28,7 @@ All notable changes to Meada are recorded here. The format follows
   with the range as written and `range unchecked`. A Python import of one of its modules crosses
   into the provider's symbols: `exact` through the distribution's own name, `inferred` through
   another top-level module, `ambiguous` when several distributions expose it. An npm and a PyPI
-  package of one name never link. The index is rebuilt once (schema version 23).
+  package of one name never link. The index is rebuilt once (schema version 24).
 - Python program entry points, each with its process: the `if __name__ == "__main__":` block of a
   file (symbol `__main__`, its range the `if` block) and each function a `[project.scripts]`
   (or Poetry `[tool.poetry.scripts]`) target names, mapped to its file through the package's
@@ -64,6 +64,13 @@ All notable changes to Meada are recorded here. The format follows
   `except ... as x`, `:=`, a `case` capture, unpacking, `+=`, a function's `global x`) keeps
   that binding, and a star import of a module whose `__all__` is computed rebinds a name to
   nothing known.
+- A Python top-level name bound again after its definition (`def x(): ...`, then `x = 1`, an
+  import of `x` or any other binding, a function's `global x` included) is no longer linked
+  `exact` to that definition: the last binding decides, and a call reaches the definition by
+  name match at most. After `del x` the name reaches nothing it was bound to before, at the top
+  level or in a function. A module's `__all__` grown by literal names (`+=`, `.extend`,
+  `.append` at its top level) gives a star import the names it adds, and one changed any other
+  way is read as computed, so a star import of it no longer takes a stale set of names.
 - A name two `export *` of one module give differently is no longer linked `exact` to the first
   one's: as in ES modules, the module exports neither. Two that lead to the same definition
   still export it.

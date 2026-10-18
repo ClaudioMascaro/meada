@@ -172,7 +172,10 @@ modules updates it.
   its star imports, last binding first, since a later one rebinds the name (`stars_bind`: the
   resolver takes the first export that gives a name, so a star import after a definition
   rebinds it when its module exports it); what `import *` takes is `Facts::star`: the public
-  names, or a literal `__all__` alone.
+  names, or a literal `__all__` alone, grown by the literal names its top level adds (`+=`,
+  `.extend`, `.append`), else `Star::Computed`. The last top-level binding of a name decides:
+  a definition another binding follows, and a name `del` unbinds (in any scope), are
+  `Facts::locals`, which hide the name (`Module::hidden`).
   Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots

@@ -148,7 +148,8 @@ pub struct Facts {
     /// body or parameters hold it (a function that is no definition lends its names to the
     /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
     /// and `for ... of` bindings, and each parameter name `Def::params` does not hold (a nested,
-    /// array or rest pattern, or any parameter of a function that is no definition). Each hides
+    /// array or rest pattern, or any parameter of a function that is no definition); in Python,
+    /// a name `del` unbinds, and a top-level definition a later binding rebinds. Each hides
     /// the same spelling in its whole scope (`Resolver::lexical`), whatever block it sits in: an
     /// outer name, and a definition, constant or parameter of its own scope.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

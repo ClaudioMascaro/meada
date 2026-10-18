@@ -6,6 +6,7 @@ from . import helpers
 from .models import *
 
 __all__ = ["Circle", "area"]
+__all__ += ["main"]
 
 BASE = "/api"
 
@@ -32,6 +33,13 @@ def area(circle: Circle, factor=2):
     with open(os.path.join(BASE, "x")) as handle:
         handle.read()
     return circle.radius * factor
+
+
+def legacy():
+    pass
+
+
+legacy = area
 
 
 def main():

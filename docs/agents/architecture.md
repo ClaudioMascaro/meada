@@ -705,7 +705,10 @@ one for the area a change touches.
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
-  tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  tuple, grown by literal names at the top level (`+=`, `.extend`, `.append`); any other change
+  to it, or one in a function, makes it computed. A name `del` unbinds (at the top level,
+  unless bound again), and a top-level definition another binding follows, are hidden in their
+  whole scope, wherever the call sits (the safe side: a name match instead of `exact`). A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
   Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
   table form (`{ callable = "...", extras = [...] }`) is left out, and so are
   `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the

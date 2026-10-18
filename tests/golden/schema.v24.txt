@@ -288,8 +288,8 @@ sample.py
       "name": "Circle",
       "kind": "Class",
       "range": {
-        "start": 207,
-        "end": 498
+        "start": 227,
+        "end": 518
       },
       "params": [],
       "bases": [
@@ -300,8 +300,8 @@ sample.py
       "name": "Circle.__init__",
       "kind": "Method",
       "range": {
-        "start": 251,
-        "end": 345
+        "start": 271,
+        "end": 365
       },
       "params": [
         {
@@ -318,8 +318,8 @@ sample.py
       "name": "Circle.unit",
       "kind": "Method",
       "range": {
-        "start": 351,
-        "end": 430
+        "start": 371,
+        "end": 450
       },
       "params": [
         {
@@ -347,8 +347,8 @@ sample.py
       "name": "Circle.describe",
       "kind": "Method",
       "range": {
-        "start": 436,
-        "end": 498
+        "start": 456,
+        "end": 518
       },
       "params": [
         {
@@ -364,8 +364,8 @@ sample.py
       "name": "area",
       "kind": "Function",
       "range": {
-        "start": 501,
-        "end": 681
+        "start": 521,
+        "end": 701
       },
       "params": [
         {
@@ -382,11 +382,20 @@ sample.py
       ]
     },
     {
+      "name": "legacy",
+      "kind": "Function",
+      "range": {
+        "start": 704,
+        "end": 726
+      },
+      "params": []
+    },
+    {
       "name": "main",
       "kind": "Function",
       "range": {
-        "start": 684,
-        "end": 746
+        "start": 745,
+        "end": 807
       },
       "params": []
     }
@@ -447,6 +456,12 @@ sample.py
     },
     {
       "Local": {
+        "exported": "legacy",
+        "local": "legacy"
+      }
+    },
+    {
+      "Local": {
         "exported": "area",
         "local": "area"
       }
@@ -496,7 +511,8 @@ sample.py
   "star": {
     "Only": [
       "Circle",
-      "area"
+      "area",
+      "main"
     ]
   },
   "calls": [
@@ -504,24 +520,24 @@ sample.py
       "scope": "Circle.__init__",
       "callee": "Client",
       "range": {
-        "start": 337,
-        "end": 345
+        "start": 357,
+        "end": 365
       }
     },
     {
       "scope": "Circle.unit",
       "callee": "cls",
       "range": {
-        "start": 424,
-        "end": 430
+        "start": 444,
+        "end": 450
       }
     },
     {
       "scope": "",
       "callee": "app.get",
       "range": {
-        "start": 502,
-        "end": 526
+        "start": 522,
+        "end": 546
       },
       "decorates": "area"
     },
@@ -529,48 +545,48 @@ sample.py
       "scope": "area",
       "callee": "open",
       "range": {
-        "start": 585,
-        "end": 614
+        "start": 605,
+        "end": 634
       }
     },
     {
       "scope": "area",
       "callee": "os.path.join",
       "range": {
-        "start": 590,
-        "end": 613
+        "start": 610,
+        "end": 633
       }
     },
     {
       "scope": "area",
       "callee": "handle.read",
       "range": {
-        "start": 634,
-        "end": 647
+        "start": 654,
+        "end": 667
       }
     },
     {
       "scope": "main",
       "callee": "Circle",
       "range": {
-        "start": 708,
-        "end": 717
+        "start": 769,
+        "end": 778
       }
     },
     {
       "scope": "main",
       "callee": "helpers.log",
       "range": {
-        "start": 722,
-        "end": 746
+        "start": 783,
+        "end": 807
       }
     },
     {
       "scope": "main",
       "callee": "area",
       "range": {
-        "start": 734,
-        "end": 745
+        "start": 795,
+        "end": 806
       }
     }
   ],
@@ -588,8 +604,14 @@ sample.py
       "name": "area.handle"
     },
     {
+      "name": "legacy"
+    },
+    {
       "name": "main.shape"
     }
+  ],
+  "locals": [
+    "legacy"
   ],
   "receivers": [
     {
@@ -600,6 +622,11 @@ sample.py
     {
       "scope": "",
       "name": "__all__",
+      "class": "Unknown"
+    },
+    {
+      "scope": "",
+      "name": "legacy",
       "class": "Unknown"
     },
     {

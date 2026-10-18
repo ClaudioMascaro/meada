@@ -612,7 +612,8 @@ impl<'a> Resolver<'a> {
     /// What `name` refers to from `scope`: the innermost enclosing definition first (a local
     /// binding, which hides the name; else what it defines, its constants, its parameters, its
     /// receivers), then the top level (where a star import written after every other binding
-    /// of the name may rebind it, `rebound`), then the file's imports. Methods are not lexical
+    /// of the name, a hiding one included, may rebind it first, `rebound`), then the file's
+    /// imports. Methods are not lexical
     /// bindings, and a class body's names are in scope only for the statements written directly
     /// in it, not for its methods or nested classes.
     fn lexical(
@@ -637,16 +638,16 @@ impl<'a> Resolver<'a> {
             } else {
                 format!("{s}.{name}")
             };
+            if s.is_empty()
+                && let Some(found) = self.rebound(path, name, seen)
+            {
+                return found;
+            }
             // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
             // it hides every name it spells, outer ones and those of its own definition (a
             // definition, constant or parameter it may shadow in a block alike).
             if self.locals[path].contains(candidate.as_str()) {
                 return Binding::Hidden;
-            }
-            if s.is_empty()
-                && let Some(found) = self.rebound(path, name, seen)
-            {
-                return found;
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
@@ -2303,6 +2304,124 @@ mod tests {
         let main = format!("{global}from a import *\nx()\n");
         let sources = owned(&[("a.py", def), ("main.py", &main)]);
         assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+    }
+
+    #[test]
+    fn a_top_level_binding_after_a_definition_hides_it() {
+        // The last top-level binding of `x` decides: one after `def x()` (an assignment, an
+        // import, any other binding, a function's `global x`) leaves `x` no longer the
+        // definition, for a call at the top level, in a function or through an import.
+        let def = "def x():\n    pass\n";
+        let a = ("a.py", "def y():\n    pass\n");
+        let global = "def f():\n    global x\n    x = 1\n";
+        for binding in [
+            "x = 1\n",
+            "x: int = 1\n",
+            "x += 1\n",
+            "y, x = g()\n",
+            "from a import y as x\n",
+            "import a as x\n",
+            "with open(p) as x:\n    pass\n",
+            "for x in xs:\n    pass\n",
+            "try:\n    pass\nexcept E as x:\n    pass\n",
+            "(x := g())\n",
+            "match v:\n    case x:\n        pass\n",
+            global,
+        ] {
+            for call in ["x()\n", "def h():\n    x()\n"] {
+                let main = format!("{def}{binding}{call}");
+                let found = exact_in(&Python, &owned(&[a, ("main.py", &main)]), "main.py", "x");
+                assert_ne!(found.as_deref(), Some("main.py"), "{main}");
+            }
+            let m = format!("{def}{binding}");
+            let sources = owned(&[a, ("m.py", &m), ("main.py", "from m import x\nx()\n")]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_ne!(found.as_deref(), Some("m.py"), "{m}");
+        }
+        // A star import between them changes nothing, as `global x` is bound last.
+        let main = format!("{def}from a import *\n{global}def h():\n    x()\n");
+        let found = exact_in(&Python, &owned(&[a, ("main.py", &main)]), "main.py", "x");
+        assert_eq!(found, None, "{main}");
+        // A definition after the binding is the name's again, and a star import after both
+        // rebinds it.
+        let again = format!("x = 1\n{def}x()\n");
+        let found = exact_in(&Python, &owned(&[a, ("main.py", &again)]), "main.py", "x");
+        assert_eq!(found.as_deref(), Some("main.py"));
+        let star = format!("{def}x = 1\nfrom b import *\ndef h():\n    x()\n");
+        let sources = owned(&[("b.py", def), ("main.py", &star)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("b.py"));
+    }
+
+    #[test]
+    fn a_grown_all_decides_what_a_star_import_takes() {
+        // `pkg`'s literal `__all__` grows by literal names at its top level: a star import of it
+        // after `def x()` rebinds `x` to `pkg`'s once `x` is added.
+        let def = "def x():\n    pass\n";
+        let main = format!("{def}from pkg import *\ndef f():\n    x()\n");
+        let pkg = |all: &str| format!("{all}{def}def y():\n    pass\n");
+        for grown in [
+            "__all__ = ['y']\n__all__ += ['x']\n",
+            "__all__ = ['y']\n__all__ += ('x',)\n",
+            "__all__ = ['y']\n__all__.extend(['x'])\n",
+            "__all__ = ['y']\n__all__.append('x')\n",
+        ] {
+            let sources = owned(&[("pkg.py", &pkg(grown)), ("main.py", &main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found.as_deref(), Some("pkg.py"), "{grown}");
+        }
+        // Changed some other way, it may or may not list `x`: a call reaches neither exactly.
+        for changed in [
+            "__all__ = ['y']\n__all__ += names\n",
+            "__all__ = ['y']\n__all__.extend(names)\n",
+            "__all__ = ['y']\ndef g():\n    __all__.append('x')\n",
+            "__all__ = ['x', 'y']\n__all__.remove('x')\n",
+            "__all__ = ['x', 'y']\n__all__ -= ['x']\n",
+        ] {
+            let sources = owned(&[("pkg.py", &pkg(changed)), ("main.py", &main)]);
+            let found = exact_in(&Python, &sources, "main.py", "x");
+            assert_eq!(found, None, "{changed}");
+        }
+    }
+
+    #[test]
+    fn a_deleted_name_reaches_nothing() {
+        // After `del x`, `x` is bound to nothing: no call reaches the definition or import it
+        // was, at the top level, in a function or through an import.
+        let def = "def x():\n    pass\n";
+        let b = ("b.py", def);
+        for before in [def, "from b import x\n"] {
+            for del in ["del x\n", "del y, x\n", "del [x]\n"] {
+                for call in ["x()\n", "def f():\n    x()\n"] {
+                    let main = format!("{before}{del}{call}");
+                    let sources = owned(&[b, ("main.py", &main)]);
+                    assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{main}");
+                }
+                let m = format!("{before}{del}");
+                let sources = owned(&[b, ("m.py", &m), ("main.py", "from m import x\nx()\n")]);
+                assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None, "{m}");
+            }
+        }
+        // Nor the class of the instance it held, nor a definition deleted in a function, nor a
+        // star import's that it deletes.
+        let instance = "class A:\n    def m(self):\n        pass\nx = A()\ndel x\nx.m()\n";
+        let sources = owned(&[("main.py", instance)]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x.m"), None);
+        let nested = "def f():\n    def x():\n        pass\n    del x\n    x()\n";
+        let sources = owned(&[("main.py", nested)]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+        let star = format!("{def}from b import *\ndel x\ndef f():\n    x()\n");
+        let sources = owned(&[b, ("main.py", &star)]);
+        assert_eq!(exact_in(&Python, &sources, "main.py", "x"), None);
+        // Bound again after `del`, by a definition or a star import, the name is that binding's.
+        let again = format!("{def}del x\n{def}x()\n");
+        let sources = owned(&[b, ("main.py", &again)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("main.py"));
+        let star = format!("{def}del x\nfrom b import *\ndef f():\n    x()\n");
+        let sources = owned(&[b, ("main.py", &star)]);
+        let found = exact_in(&Python, &sources, "main.py", "x");
+        assert_eq!(found.as_deref(), Some("b.py"));
     }
 
     #[test]
