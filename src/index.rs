@@ -25,7 +25,7 @@ use crate::trace::Process;
 
 /// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
 /// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 23;
+const SCHEMA_VERSION: i64 = 24;
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -412,7 +412,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .map(|(&pack, files)| {
             let language = lang::pack(pack);
             let modules = language.modules(&found_configs(pack), files)?;
-            Ok((pack, Resolver::new(files, modules, language)))
+            let published = language.published(&found_configs(pack), files);
+            Ok((
+                pack,
+                Resolver::new(files, modules, language).publishing(published),
+            ))
         })
         .collect::<Result<BTreeMap<usize, Resolver>>>()?;
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;

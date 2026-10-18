@@ -46,6 +46,18 @@ pub trait LanguagePack {
         None
     }
 
+    /// The files whose exports (the `exports` table) another package can import, when the
+    /// language says which: a Rust file's `pub` items are reachable from outside its crate
+    /// only through a library root and `pub mod` declarations, and a binary exports nothing.
+    /// `None` keeps every file.
+    fn published(
+        &self,
+        _configs: &[(&str, &[u8])],
+        _files: &BTreeMap<&str, &Facts>,
+    ) -> Option<BTreeSet<String>> {
+        None
+    }
+
     /// The program entry points only the whole repository tells, as `(file, qualified name)`
     /// among the files `members` kept: a Rust `fn main` starts a program only in a binary
     /// target's root, which `parse` of one file cannot know. `Facts::programs` still applies.
@@ -189,6 +201,15 @@ pub struct Facts {
     /// the shared side looks a member of the type up in each block too.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub impls: Vec<Impl>,
+    /// Names a path of the file begins with that nothing in it binds: the crates outside the
+    /// file (Rust's extern prelude). They resolve after every import and glob: to another crate
+    /// of the repository by its name, else to something outside it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub externs: Vec<String>,
+    /// The `exports` names only the package itself sees (Rust's items that are not `pub`):
+    /// they resolve for the package's own files but are not in the exports table.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub private: Vec<String>,
 }
 
 /// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
@@ -255,6 +276,19 @@ pub enum Imported {
     /// unused). It binds a name only when the module takes it, and then like an import of
     /// that name written there.
     All,
+    /// What this callee-like name (`crate.a.f`, `inner.helper`) gives, resolved from the scope
+    /// that holds `local` (Rust's `use a::f as local`). `source` is unused. Only the scope
+    /// of the name's own `local` sees it, and a binding of the name in a scope inside hides it.
+    Path(String),
+    /// Every name the module this callee-like name gives takes, as a `use path::*` binds them
+    /// (`local` is the scope's `*`, `qualify(scope, "*")`; `source` is unused). `inside` is
+    /// whether the scope is within that module, which then gives its private items too.
+    /// `public` is whether the glob re-exports (`pub use`).
+    Glob {
+        path: String,
+        inside: bool,
+        public: bool,
+    },
 }
 
 #[derive(Serialize, Deserialize)]

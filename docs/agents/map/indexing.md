@@ -229,14 +229,19 @@ modules updates it.
   definition `x` (`inner.x` in a module written in place, the declaration's span) and an
   import of the whole file under that name, its specifier `mod x` / `mod inner/x` or, with
   `#[path = "p"]`, `path |p` / `path inner|p`; at the top level the file also exports it.
-  Every top-level item is exported; the `pub` ones are `Facts::star`. Calls: an identifier, a
+  Every top-level item and `use` name is exported (`Facts::exports`, `Facts::private` for the
+  ones not `pub`, which the exports table leaves out); the `pub` ones are `Facts::star`, and a
+  `pub` item of a `pub` module written in place is also exported under its dotted name. Calls: an identifier, a
   member chain (`Call::by_path` false) or a path (`by_path` true, dotted by `normalize` once
   the file is read: `crate.…` and `super.…` with their synthetic imports `crate` and
   `super(.super)`, `Self.…`, `self::` and in-file `super::` as `mod.<module>.…` with the
   synthetic import `mod` of the file itself (`Tree::lookup("self")`), and a first segment no
-  item of the module or `use` of the file binds imported as an outside crate). `use`
-  declarations are only scanned for the names they bind (spec #30's `use` resolution is #126).
-  Macro invocations are not read. `lang/rust/crates.rs` (`Tree`) is the module tree behind
+  item of the module or `use` of the scope binds a crate outside the file, `Facts::externs`).
+  A `use` leaf is an `Imported::Path` import (`use a::{b, c as d, e::{self}}` binds `b`,
+  `d`, `e`; `local` is qualified by the scope holding the `use`; `as _` and `use serde;` bind
+  nothing) or an `Imported::Glob` import (`local` is `*` qualified the same way), its path
+  normalized like a call's, `use super::*` and `use self::*` being `inside`. Macro invocations
+  are not read. `lang/rust/crates.rs` (`Tree`) is the module tree behind
   `members` and `modules`: the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,
   `src/bin/*/main.rs`), walked breadth first
@@ -244,7 +249,14 @@ modules updates it.
   its own for a root, a `mod.rs` or a `#[path]` file, the one named after it otherwise; a
   `#[path]` from the file's directory, or from the inline module's directory inside one).
   `lookup` answers `crate` (the root), `self` (the file), `super` (`super::super`, through the top-level
-  declarations that reached the file) and a `mod` specifier (its file).
+  declarations that reached the file), a `mod` specifier (its file) and a crate's name (the
+  root of its library, `[lib] name` else the package name, hyphens as underscores; a binary is
+  no library), reached only from the crates whose manifests list it as a dependency
+  (`Tree::libs`, per crate root; `dependencies()` reads the three tables, a `package =` rename and
+  `workspace = true`). `Tree::published` (`LanguagePack::published`) walks from each library
+  root through `pub mod` declarations (`Export::From` whose source is the specifier, not in
+  `Facts::private`): the exports table keeps the `pub` items of those files alone, and a binary
+  root exports nothing (no other crate can import it), so no `export` entry point either.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a

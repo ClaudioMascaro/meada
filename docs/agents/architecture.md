@@ -302,7 +302,23 @@ one for the area a change touches.
   path order, each stat'ed against `MAX_CONFIG`, read and folded into the configs digest on
   every refresh), `members` (the files it builds; the rest keep their facts in `files` with an
   empty `resolved` and no rows, and leave the export) and `modules`, which sees the members'
-  facts besides the configs. A block that adds members to a type written elsewhere (Rust's
+  facts besides the configs. A language whose imports name a path rather than a file (Rust's
+  `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
+  from the scope of the import's own `local`, which a pack qualifies by the scope that holds
+  it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
+  `inside` it, the module's private items too; `public`, a `pub use` also re-exports them),
+  both found by `Resolver::lexical` at each enclosing scope (`imported_at`) and, for the file
+  itself, by `imported` and `export`; explicit imports beat globs, and an alias or a glob
+  that reaches itself gives nothing (`Seen`: the names being resolved, the globs by file, import
+  and name, and the depth of links followed, bounded by `LINK_DEPTH`). A call name is never read
+  as a `Kind::Module` (`Reading::Value`); a use path is (`Reading::Alias`). `Facts::externs` names the first segments of
+  paths that nothing in the file binds (the crates outside it), resolved last in `imported`:
+  a glob beats them, another crate of the repository answers through `Modules` and the rest
+  is `Binding::External`. `Facts::private` lists the `exports` names `Resolver::exported`
+  leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
+  crate), and `LanguagePack::published` (default: none) the files whose exports a pack counts
+  at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
+  library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
   (`block_member`, before the class's own names: the inherent blocks' definitions, else the
   trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
@@ -714,7 +730,8 @@ one for the area a change touches.
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names
-  no type. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
+  no type; `USE_BINDINGS` (4096): the names the `use` declarations of a file bind, the rest
+  bind nothing. `index.rs`: `MAX_CONFIG` (1 MiB): a larger config file of any pack (`tsconfig.json`,
   `pyproject.toml`, each `Cargo.toml`) is stat'ed and not read, as if absent, with no status
   line; a `Cargo.toml` that is not UTF-8 or not TOML declares no crate. Every `Cargo.toml` with
   a `[package]`, at any depth, is a crate (a workspace's `members` and `exclude` add or remove
@@ -723,14 +740,30 @@ one for the area a change touches.
   util;` in both `lib.rs` and `main.rs`) belongs to the first by root order (the library
   first), so its `crate::` names that root (no marker). `#[path]` on a module written in place
   is not read, and `super::` out of a file declared inside a module written in place of its
-  parent reaches nothing (no marker). Imports bind for the whole file, so the `mod` imports and
-  the synthetic ones (`crate`, `super`, `mod`, an outside crate's first segment: `std`,
-  `String`, added only when neither the module's items nor any `use`, a glob included, binds
-  it) are seen inside every inline module too; `use` declarations are not imports yet, so a
-  call through one is a name match at most. `self::` and `super::` read inside a module that
-  sits in a function are `(scoped_identifier)`, unresolved. A file's `pub` items are its
-  public set (`Facts::star`), whatever the visibility of the modules above it. Calls inside
-  macro invocations are not indexed.
+  parent reaches nothing (no marker). The `mod` imports and the synthetic ones (`crate`,
+  `super`, `mod`) bind for the whole file, so they are seen inside every inline module too;
+  a `use` binds in the scope that holds it, and the `mod` import of a declared module is not
+  seen inside a module written in place. A `use` path whose first segment nothing in the
+  file binds is a crate outside it (`Facts::externs`, no marker, never name-matched), also when
+  the file holds a glob that brings no such name. A glob of a module written in place from
+  outside it, and of an enum or a type, bring nothing (the visibility of the items of a module
+  written in place is not kept; no marker), and a glob takes `pub` items alone, so a
+  `pub(crate)` item reached through one falls to a name match. `pub use` names are `pub`;
+  a crate in the workspace is reached only from a crate whose `Cargo.toml` lists it in
+  `[dependencies]`, `[dev-dependencies]` or `[build-dependencies]` (by key, or by `package =`;
+  `workspace = true` through `[workspace.dependencies]`), a binary naming the library of its own
+  package; the same tables under `[target.*]` count, and `optional` and features are not read
+  (a listed dependency counts as present; no marker). Any other crate name is external. A module declared inside a module
+  written in place is not followed for exports (no marker). `LINK_DEPTH` (128, `resolve.rs`): a
+  chain of `use` aliases or globs longer than that gives nothing, so a name behind it is
+  unknown (a name match at most).
+  `self::` and `super::` read inside a module that sits in a function are
+  `(scoped_identifier)`, unresolved, and a `use` there binds nothing. A file's exports table
+  rows are its `pub` items, `pub use` names, `pub` modules and, inside `pub` modules written
+  in place, the dotted names of their `pub` items (`entries.add`), and a `pub use` glob of a
+  file gives that file's public names; whether the file itself is reachable from the crate's
+  root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
+  are not indexed.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

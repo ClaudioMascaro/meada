@@ -64,6 +64,8 @@ impl From<u8> for Store {
     }
 }
 
+fn private_helper() {}
+
 pub fn reset() {
     Store::new();
     Persist::describe();
@@ -77,8 +79,9 @@ mod tests {
     use super::*;
     use crate::util::Store;
 
-    // The file's own `Store` is not in scope here: no exact link to it.
+    // `use crate::util::Store` hides the file's own `Store`, which `use super::*` brings.
     fn t() {
         Store::new();
+        private_helper();
     }
 }

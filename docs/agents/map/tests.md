@@ -14,11 +14,20 @@ modules updates it.
   `let` named like the module a path names, `src/bin/tool.rs`, `src/bin/sync/main.rs`, a
   `[[bin]]` at `tools/admin.rs`, an inherent `impl` in another file than its struct, a trait's
   `impl` and a default body, two traits giving `label` and two `impl From<_>` blocks
-  (`ambiguous`), a `#[cfg(test)] mod tests` that does not see the file's `Store`, a
-  `println!` whose call is not indexed, a closure, and `orphan.rs`, which no `mod` reaches) and
-  `crates/billing` (`[lib] path`, a path call through a `use` matched by name), and
-  `crates/scratch`, which the workspace's `exclude` names and is a crate all the same;
-  `freshness` moves a `mod`, declares the orphan, adds a module and drops the `[[bin]]`, and
+  (`ambiguous`), a `#[cfg(test)] mod tests` that sees the file's `Store` only through a
+  `use`, a `println!` whose call is not indexed, a closure, and `orphan.rs`, which no `mod`
+  reaches; every `use` form (`crate::`, `self::`, a group, a rename, a crate name, a glob,
+  `use super::*` taking a private item), a `use` that binds in an inline module or a function
+  alone, a `pub use` chain (`ring/c.rs` to `d.rs` to `e.rs`), a re-export cycle
+  (`ring/x.rs`, `ring/y.rs`), mutual aliases, a glob beaten by an explicit import or a local item, a parameter hiding a
+  `used` name, a top-level `use` unseen in an inline module, a module and an item of one name
+  (`launch`); the `exports` table read back over `rusqlite`: a binary crate has no row), `crates/billing` (`[lib] path`, a `pub use`,
+  a call to another member) and `crates/ledger-core` (a library reached by its name with an
+  underscore from a crate that lists it as a dependency, a `pub(crate)` item that stays inside
+  it, a `pub` module holding `pub` and private items and a `pub use` of a private module's
+  item, a private module and an item of one name, `mod meter; pub use meter::meter;`), and `crates/scratch`, which the workspace's `exclude` names and is a crate all the same (a call to a crate it does not list stays external);
+  `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
+  `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
   and over a Kafka topic: exports, `context`, `trace`), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
