@@ -196,11 +196,11 @@ also from one language to the other, through HTTP contracts (`fetch` and, in Pyt
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
 Django and, in Rust, axum on the serving side, also behind a gateway; in Rust, a base URL read from the environment with `std::env::var`, `env!` or `dotenvy::var` links through `base_url_env`), through
 the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
-`confluent-kafka` and `kafka-python`), RabbitMQ queues (`amqplib` and, in Python, `pika`, with a
+`confluent-kafka` and `kafka-python` and, in Rust, `rdkafka`), RabbitMQ queues (`amqplib` and, in Python, `pika` and, in Rust, `lapin`, with a
 `publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK
-v3, `sqs-consumer` and, in Python, `boto3`), NATS subjects (`nats` and, in Python, `nats-py`, with
+v3, `sqs-consumer` and, in Python, `boto3` and, in Rust, `aws-sdk-sqs`), NATS subjects (`nats` and, in Python, `nats-py` and, in Rust, `async-nats`, with
 the `*` and `>` wildcards), BullMQ jobs and Redis streams (`ioredis`, `node-redis` and, in Python,
-`redis-py`), with the producer linked
+`redis-py` and, in Rust, the `redis` crate), with the producer linked
 to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
 also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
 listed in `[serve] documents`: the routes and channels they describe become contracts, with the

@@ -212,7 +212,7 @@ one for the area a change touches.
   `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
   paths, never opening one, so a symlink changes nothing. A change to what is stored bumps `SCHEMA_VERSION`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`), matching a call's
+  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
   `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
@@ -618,6 +618,16 @@ one for the area a change touches.
   (`on_message_callback=handler`, `cb=self.on_job`); a lambda or anything else leaves the
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
   constant folded to one); a dict built otherwise is an unresolved stream.
+- `lang/rust/messages.rs`: a client is recognized when its receiver traces back to the library's
+  constructor (`Code::value_origins`, then `Code::external`, one constructor per `LIBRARIES`
+  entry); a client held in a struct field, passed as `&mut con` to a parameter, or rebound by
+  assignment is not followed. `lapin` `set_delegate` closures are not followed (the function
+  that holds `basic_consume` handles). A Kafka topic starting with `^` is unresolved; an
+  `queue_bind` that cannot be fully evaluated is dropped; an SQS `queue_url` on a builder held
+  in a `let` is not recognized. `Code::mutable` takes the value of a `let mut` bound once and
+  never assigned (`Facts::mutable`), and ignores shadowing in an inner scope.
+  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`) is
+  walked to that many calls; a longer one is not a producer.
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.

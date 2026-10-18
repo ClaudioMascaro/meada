@@ -11,13 +11,15 @@ use std::ops::Range;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Modules, Param, Receiver, Star, children, named, text,
+    Message, Modules, Param, Receiver, Star, children, named, text,
 };
+use crate::resolve::Code;
 use crate::{Result, qualify};
 
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+mod messages;
 mod values;
 
 use crates::{MOD, PATH, Tree};
@@ -173,7 +175,7 @@ impl LanguagePack for Rust {
             o if o.starts_with("axum.Router.") => ROUTER,
             o if o.starts_with("reqwest.") => CLIENT_BUILDER,
             o if o.starts_with("ureq.") => AGENT_BUILDER,
-            _ => return false,
+            _ => return messages::passes(origin, method),
         };
         methods.contains(&method)
     }
@@ -195,6 +197,10 @@ impl LanguagePack for Rust {
         files: &BTreeMap<&str, &Facts>,
     ) -> Option<BTreeSet<String>> {
         Some(Tree::new(configs, files).members())
+    }
+
+    fn messages(&self, code: &Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn published(
@@ -362,6 +368,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
+    // The names a `let mut` of a plain name declares.
+    let mut mut_lets: HashSet<String> = HashSet::new();
     // The Strings a function builds, by scope and name, and the names two of them share.
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
@@ -761,6 +769,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 // It is a constant too, if nothing else binds the name in its scope.
                 let local = qualify(&scope, &name);
                 *bindings.entry(local.clone()).or_default() += 1 + usize::from(mutable(node));
+                if mutable(node) {
+                    mut_lets.insert(local.clone());
+                }
                 if let Some(value) = field(node, "value") {
                     let at = Where {
                         scope: scope.clone(),
@@ -796,6 +807,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         };
                         let local = qualify(&scope, text(pattern, src));
                         *bindings.entry(local.clone()).or_default() += usize::from(mutable(node));
+                        if mutable(node) {
+                            mut_lets.insert(local.clone());
+                        }
                         let put = Put::Let(local);
                         held.push(Held {
                             at,
@@ -928,6 +942,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             Put::Let(name) => {
                 let value = reader.value(&at, node);
+                // Declared `mut` once, and bound or assigned nowhere else.
+                if bindings.get(&name) == Some(&2) && mut_lets.contains(&name) {
+                    facts.mutable.push((name.clone(), value.clone()));
+                }
                 facts
                     .rebound
                     .push((crate::parent(&name).to_string(), value));

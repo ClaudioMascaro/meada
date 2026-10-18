@@ -6,8 +6,12 @@
       "hash": "9656516e107141d611a9a1c6b2fa28943278bc1a9bcaa196b5cbe78402afb899"
     },
     {
+      "path": "src/events.rs",
+      "hash": "2236d708f2d7d31f4a6954145a85b43371b77bf31783912219c38e8d624f26c1"
+    },
+    {
       "path": "src/main.rs",
-      "hash": "52a793a96896bcd7061d31be85053da8f263a9b572c5306bb5ece79f86b2f4d1"
+      "hash": "e2afd6263f9102ca55cfecd30ff555939fa9cc95c859373e5405d4c07ce021df"
     },
     {
       "path": "src/orders.rs",
@@ -28,6 +32,22 @@
       }
     },
     {
+      "id": "example.com/xlang-rust/api::src/events.rs::apply_shipment",
+      "span": {
+        "path": "src/events.rs",
+        "start": 108,
+        "end": 130
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "span": {
+        "path": "src/events.rs",
+        "start": 207,
+        "end": 639
+      }
+    },
+    {
       "id": "example.com/xlang-rust/api::src/main.rs::audit",
       "span": {
         "path": "src/main.rs",
@@ -36,15 +56,7 @@
       }
     },
     {
-      "id": "example.com/xlang-rust/api::src/main.rs::main",
-      "span": {
-        "path": "src/main.rs",
-        "start": 52,
-        "end": 212
-      }
-    },
-    {
-      "id": "example.com/xlang-rust/api::src/main.rs::orders",
+      "id": "example.com/xlang-rust/api::src/main.rs::events",
       "span": {
         "path": "src/main.rs",
         "start": 11,
@@ -52,11 +64,27 @@
       }
     },
     {
-      "id": "example.com/xlang-rust/api::src/main.rs::pricing",
+      "id": "example.com/xlang-rust/api::src/main.rs::main",
+      "span": {
+        "path": "src/main.rs",
+        "start": 64,
+        "end": 224
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/main.rs::orders",
       "span": {
         "path": "src/main.rs",
         "start": 23,
-        "end": 35
+        "end": 34
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/main.rs::pricing",
+      "span": {
+        "path": "src/main.rs",
+        "start": 35,
+        "end": 47
       }
     },
     {
@@ -135,14 +163,135 @@
       }
     },
     {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(await_expression).is_ok#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 511,
+        "end": 540
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(call_expression).create#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 277,
+        "end": 394
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(call_expression).expect#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 277,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(call_expression).expect#1",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 428,
+        "end": 487
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(call_expression).set#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 277,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::(call_expression).set#1",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 277,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::ClientConfig.new#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 277,
+        "end": 296
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::apply_shipment#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": "example.com/xlang-rust/api::src/events.rs::apply_shipment",
+      "level": "exact",
+      "span": {
+        "path": "src/events.rs",
+        "start": 555,
+        "end": 571
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::consumer.recv#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 511,
+        "end": 526
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::consumer.subscribe#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.rs",
+        "start": 428,
+        "end": 467
+      }
+    },
+    {
+      "id": "example.com/xlang-rust/api::src/events.rs::consume_shipments::pricing.promotions#0",
+      "caller": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "target": "example.com/xlang-rust/api::src/pricing.rs::promotions",
+      "level": "exact",
+      "span": {
+        "path": "src/events.rs",
+        "start": 593,
+        "end": 614
+      }
+    },
+    {
       "id": "example.com/xlang-rust/api::src/main.rs::main::(await_expression).unwrap#0",
       "caller": "example.com/xlang-rust/api::src/main.rs::main",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main.rs",
-        "start": 89,
-        "end": 149
+        "start": 101,
+        "end": 161
       }
     },
     {
@@ -152,8 +301,8 @@
       "level": null,
       "span": {
         "path": "src/main.rs",
-        "start": 155,
-        "end": 209
+        "start": 167,
+        "end": 221
       }
     },
     {
@@ -163,8 +312,8 @@
       "level": null,
       "span": {
         "path": "src/main.rs",
-        "start": 155,
-        "end": 194
+        "start": 167,
+        "end": 206
       }
     },
     {
@@ -174,8 +323,8 @@
       "level": "exact",
       "span": {
         "path": "src/main.rs",
-        "start": 177,
-        "end": 193
+        "start": 189,
+        "end": 205
       }
     },
     {
@@ -185,8 +334,8 @@
       "level": null,
       "span": {
         "path": "src/main.rs",
-        "start": 89,
-        "end": 134
+        "start": 101,
+        "end": 146
       }
     },
     {
@@ -343,6 +492,11 @@
       "via": "env:WEB_URL"
     },
     {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-rust/api::src/orders.rs::status::pricing.price_of#0",
       "via": "env:WEB_URL"
@@ -366,15 +520,17 @@
     {
       "name": "src",
       "members": [
-        "example.com/xlang-rust/api::src/main.rs::main",
-        "example.com/xlang-rust/api::src/orders.rs::router"
+        "example.com/xlang-rust/api::src/events.rs::apply_shipment",
+        "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+        "example.com/xlang-rust/api::src/orders.rs::reserve",
+        "example.com/xlang-rust/api::src/pricing.rs::promotions"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/xlang-rust/api::src/orders.rs::reserve",
-        "example.com/xlang-rust/api::src/pricing.rs::promotions"
+        "example.com/xlang-rust/api::src/main.rs::main",
+        "example.com/xlang-rust/api::src/orders.rs::router"
       ]
     },
     {
@@ -392,6 +548,13 @@
       "contract": "http::POST::/api/audit",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-rust/web"
+    },
+    {
+      "consumer": "example.com/xlang-rust/api::src/events.rs::consume_shipments",
+      "provider": "example.com/xlang-rust/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-rust/api::src/orders.rs::status::pricing.price_of#0",

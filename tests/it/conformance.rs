@@ -1609,6 +1609,61 @@ fn rust() {
             "crates/worker/src/wrappers.rs::open_ended",
             "crates/worker/src/wrappers.rs::resource",
             "crates/worker/src/wrappers.rs::wrapped",
+            "crates/worker/src/lib.rs::kafka",
+            "crates/worker/src/lib.rs::mq_shadowed",
+            "crates/worker/src/lib.rs::queues",
+            "crates/worker/src/lib.rs::rabbit",
+            "crates/worker/src/lib.rs::streams",
+            "crates/worker/src/lib.rs::subjects",
+            "crates/worker/src/kafka.rs::make_producer",
+            "crates/worker/src/kafka.rs::produce_all",
+            "crates/worker/src/kafka.rs::base_produce",
+            "crates/worker/src/kafka.rs::emit",
+            "crates/worker/src/kafka.rs::emit_refund",
+            "crates/worker/src/kafka.rs::produce_unknown",
+            "crates/worker/src/kafka.rs::consume_orders",
+            "crates/worker/src/kafka.rs::consume_refunds",
+            "crates/worker/src/kafka.rs::consume_pattern",
+            "crates/worker/src/kafka.rs::Transport",
+            "crates/worker/src/kafka.rs::Transport.send",
+            "crates/worker/src/kafka.rs::not_rdkafka",
+            "crates/worker/src/rabbit.rs::publish_all",
+            "crates/worker/src/rabbit.rs::bind_all",
+            "crates/worker/src/rabbit.rs::work_jobs",
+            "crates/worker/src/rabbit.rs::audit",
+            "crates/worker/src/rabbit.rs::publish_unknown",
+            "crates/worker/src/queues.rs::sqs_client",
+            "crates/worker/src/queues.rs::send_all",
+            "crates/worker/src/queues.rs::enqueue",
+            "crates/worker/src/queues.rs::enqueue_audit",
+            "crates/worker/src/queues.rs::send_unknown",
+            "crates/worker/src/queues.rs::receive_jobs",
+            "crates/worker/src/queues.rs::receive_many",
+            "crates/worker/src/queues.rs::other_calls",
+            "crates/worker/src/queues.rs::Mailer",
+            "crates/worker/src/queues.rs::Mailer.send_message",
+            "crates/worker/src/queues.rs::Mailer.queue_url",
+            "crates/worker/src/queues.rs::not_sqs",
+            "crates/worker/src/subjects.rs::publish_all",
+            "crates/worker/src/subjects.rs::publish_with_options",
+            "crates/worker/src/subjects.rs::listen_orders",
+            "crates/worker/src/subjects.rs::listen_queue",
+            "crates/worker/src/subjects.rs::not_nats",
+            "crates/worker/src/subjects.rs::Bus",
+            "crates/worker/src/subjects.rs::Bus.publish",
+            "crates/worker/src/subjects.rs::Bus.subscribe",
+            "crates/worker/src/streams.rs::append_all",
+            "crates/worker/src/streams.rs::read_group",
+            "crates/worker/src/streams.rs::read_inline",
+            "crates/worker/src/streams.rs::read_unknown",
+            "crates/worker/src/streams.rs::read_plain",
+            "crates/worker/src/streams.rs::Log",
+            "crates/worker/src/streams.rs::Log.xadd",
+            "crates/worker/src/streams.rs::not_redis",
+            "crates/worker/src/mq_shadowed.rs::shadowed",
+            "crates/worker/src/mq_shadowed.rs::Outbox",
+            "crates/worker/src/mq_shadowed.rs::Outbox.send",
+            "crates/worker/src/mq_shadowed.rs::unreached",
             "crates/web/src/admin.rs::mount",
             "crates/web/src/admin.rs::reset",
             "crates/web/src/admin.rs::router",
@@ -4417,6 +4472,352 @@ fn python_redis_streams_are_channel_producers_and_consumers() {
         stream("read_orders", "append_all::client.xadd#0", "orders"),
         stream("read_many", "append_all::client.xadd#0", "orders"),
         stream("read_many", "append_all::pool.xadd#0", "shipments.eu"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::redis::"), expected);
+}
+
+/// The channel sides of `file` in the Rust fixture's worker crate: the export, its producers as
+/// `(contract, site)` and its consumers as `(contract, via, site)`, sorted, with
+/// repository-relative sites. An unresolved side has the contract `channel::<broker>`.
+fn rust_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
+    let dir = format!("crates/worker/src/{file}::");
+    let (json, producers) = providers(case, "conformance-rust", &dir);
+    let consumers = consumers(&json, &dir);
+    (json, producers, consumers)
+}
+
+/// The rdkafka forms of the Rust pack (spec #30): `send` of a `FutureRecord` or `BaseRecord`
+/// on a producer, and `subscribe` on a consumer, both made by `ClientConfig`, whichever way the
+/// client and the record reach the call. A channel's `send` and a transport of the repository
+/// produce nothing; a topic from the environment is unresolved, and so is a regular expression.
+#[test]
+fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
+    let kafka = |rest: &str| format!("crates/worker/src/kafka.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_kafka", "kafka.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &kafka("produce_all::FutureRecord.to#0")
+            ),
+            (
+                "channel::kafka::payments",
+                &kafka("produce_all::FutureRecord.to#1")
+            ),
+            (
+                "channel::kafka::refunds.eu",
+                &kafka("produce_all::FutureRecord.to#2")
+            ),
+            (
+                "channel::kafka::invoices",
+                &kafka("produce_all::FutureRecord.to#3")
+            ),
+            (
+                "channel::kafka::audits",
+                &kafka("base_produce::BaseRecord.to#0")
+            ),
+            ("channel::kafka::retries", &kafka("emit_refund::emit#0")),
+            (
+                "channel::kafka",
+                &kafka("produce_unknown::FutureRecord.to#0")
+            ),
+        ])
+    );
+    // A polling client: the function that subscribes handles.
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::orders", "", &kafka("consume_orders")),
+            ("channel::kafka::payments", "", &kafka("consume_orders")),
+            ("channel::kafka::refunds.eu", "", &kafka("consume_refunds")),
+            ("channel::kafka::retries", "", &kafka("consume_refunds")),
+            ("channel::kafka::invoices", "", &kafka("consume_refunds")),
+            ("channel::kafka::audits", "", &kafka("consume_refunds")),
+            ("channel::kafka", "", &kafka("consume_pattern")),
+        ])
+    );
+
+    let topic = |handler: &str, producer: &str, name: &str| {
+        link(
+            kafka(handler),
+            kafka(producer),
+            &format!("channel::kafka::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        topic("consume_orders", "produce_all::FutureRecord.to#0", "orders"),
+        topic(
+            "consume_orders",
+            "produce_all::FutureRecord.to#1",
+            "payments",
+        ),
+        topic(
+            "consume_refunds",
+            "produce_all::FutureRecord.to#2",
+            "refunds.eu",
+        ),
+        topic(
+            "consume_refunds",
+            "produce_all::FutureRecord.to#3",
+            "invoices",
+        ),
+        topic("consume_refunds", "base_produce::BaseRecord.to#0", "audits"),
+        topic("consume_refunds", "emit_refund::emit#0", "retries"),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::kafka::"), expected);
+
+    // A parameter of the repository's own type, and a producer no caller passes, are no clients.
+    let (_, producers, consumers) = rust_channels("rust_kafka_shadowed", "mq_shadowed.rs");
+    assert_eq!((producers, consumers), (vec![], vec![]));
+}
+
+/// The lapin forms of the Rust pack (spec #30): `basic_publish`, `basic_consume` and
+/// `queue_bind` on a channel that traces back to `Connection::connect`, as sides and links. A
+/// publish to the default exchange is the queue its key names; one to `events` reaches the
+/// queues bound to it, `inferred` for a wildcard pattern. A binding that cannot be evaluated is
+/// dropped, and an exchange that cannot makes an unresolved producer.
+#[test]
+fn rust_lapin_channels_are_amqp_producers_consumers_and_bindings() {
+    let rabbit = |rest: &str| format!("crates/worker/src/rabbit.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_lapin", "rabbit.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::amqp::jobs",
+                &rabbit("publish_all::channel.basic_publish#0")
+            ),
+            (
+                "channel::amqp",
+                &rabbit("publish_unknown::channel.basic_publish#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::amqp::jobs", "", &rabbit("work_jobs")),
+            ("channel::amqp::audit", "", &rabbit("audit")),
+            ("channel::amqp", "", &rabbit("audit")),
+        ])
+    );
+
+    let mut expected = vec![
+        link(
+            rabbit("work_jobs"),
+            rabbit("publish_all::channel.basic_publish#0"),
+            "channel::amqp::jobs",
+            "exact",
+        ),
+        link(
+            rabbit("audit"),
+            rabbit("publish_all::channel.basic_publish#1"),
+            "channel::amqp::audit binding events order.#",
+            "inferred",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::amqp::"), expected);
+}
+
+/// The aws-sdk-sqs forms of the Rust pack (spec #30): the `queue_url` of a `send_message`,
+/// `send_message_batch` or `receive_message` builder on a client from `Client::new`, the queue
+/// being the last segment of the URL. Another call on the queue and a builder of the repository
+/// produce nothing; a URL read from the environment is an unresolved producer.
+#[test]
+fn rust_aws_sdk_sqs_clients_are_channel_producers_and_consumers() {
+    let sqs = |rest: &str| format!("crates/worker/src/queues.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_sqs", "queues.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::sqs::jobs",
+                &sqs("send_all::(call_expression).queue_url#0")
+            ),
+            (
+                "channel::sqs::billing",
+                &sqs("send_all::(call_expression).queue_url#1")
+            ),
+            (
+                "channel::sqs::mail",
+                &sqs("send_all::(call_expression).queue_url#2")
+            ),
+            ("channel::sqs::audit", &sqs("enqueue_audit::enqueue#0")),
+            (
+                "channel::sqs",
+                &sqs("send_unknown::(call_expression).queue_url#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::sqs::jobs", "", &sqs("receive_jobs")),
+            ("channel::sqs::billing", "", &sqs("receive_many")),
+        ])
+    );
+
+    let mut expected = vec![
+        link(
+            sqs("receive_jobs"),
+            sqs("send_all::(call_expression).queue_url#0"),
+            "channel::sqs::jobs",
+            "exact",
+        ),
+        link(
+            sqs("receive_many"),
+            sqs("send_all::(call_expression).queue_url#1"),
+            "channel::sqs::billing",
+            "exact",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::sqs::"), expected);
+}
+
+/// The async-nats forms of the Rust pack (spec #30): `publish`, `subscribe` and
+/// `queue_subscribe` on a client from `async_nats::connect` or `ConnectOptions`, whichever way
+/// the crate is named. A wildcard subject links at `inferred`; a bus of the repository produces
+/// nothing and a subject from the environment is an unresolved producer.
+#[test]
+fn rust_async_nats_clients_are_channel_producers_and_consumers() {
+    let nats = |rest: &str| format!("crates/worker/src/subjects.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_nats", "subjects.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::nats::orders.created",
+                &nats("publish_all::client.publish#0")
+            ),
+            (
+                "channel::nats::orders.shipped",
+                &nats("publish_all::client.publish#1")
+            ),
+            (
+                "channel::nats::audit.login",
+                &nats("publish_all::client.publish#2")
+            ),
+            (
+                "channel::nats::mail.sent",
+                &nats("publish_with_options::client.publish#0")
+            ),
+            (
+                "channel::nats",
+                &nats("publish_with_options::client.publish#1")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::nats::orders.created", "", &nats("listen_orders")),
+            ("channel::nats::orders.*", "", &nats("listen_orders")),
+            ("channel::nats::audit.>", "", &nats("listen_queue")),
+            ("channel::nats::mail.sent", "", &nats("listen_queue")),
+        ])
+    );
+
+    let exact = |handler: &str, producer: &str, subject: &str| {
+        link(
+            nats(handler),
+            nats(producer),
+            &format!("channel::nats::{subject}"),
+            "exact",
+        )
+    };
+    let wild = |handler: &str, producer: &str, subject: &str, pattern: &str| {
+        link(
+            nats(handler),
+            nats(producer),
+            &format!("channel::nats::{subject} wildcard {pattern}"),
+            "inferred",
+        )
+    };
+    let mut expected = vec![
+        exact(
+            "listen_orders",
+            "publish_all::client.publish#0",
+            "orders.created",
+        ),
+        wild(
+            "listen_orders",
+            "publish_all::client.publish#0",
+            "orders.created",
+            "orders.*",
+        ),
+        wild(
+            "listen_orders",
+            "publish_all::client.publish#1",
+            "orders.shipped",
+            "orders.*",
+        ),
+        wild(
+            "listen_queue",
+            "publish_all::client.publish#2",
+            "audit.login",
+            "audit.>",
+        ),
+        exact(
+            "listen_queue",
+            "publish_with_options::client.publish#0",
+            "mail.sent",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::nats::"), expected);
+}
+
+/// The redis forms of the Rust pack (spec #30): `xadd` and the keys of `xread_options` whose
+/// options carry a group, on a connection that traces back to `Client::open`. A read without a
+/// group, and an `xadd` of the repository's own type, produce nothing; a key from the
+/// environment is an unresolved side.
+#[test]
+fn rust_redis_streams_are_channel_producers_and_consumers() {
+    let redis = |rest: &str| format!("crates/worker/src/streams.rs::{rest}");
+    let (json, producers, consumers) = rust_channels("rust_redis", "streams.rs");
+    assert_eq!(
+        producers,
+        pairs(&[
+            ("channel::redis::orders", &redis("append_all::con.xadd#0")),
+            (
+                "channel::redis::shipments",
+                &redis("append_all::con.xadd#1")
+            ),
+            (
+                "channel::redis::events.audit",
+                &redis("append_all::con.xadd#2")
+            ),
+            ("channel::redis", &redis("append_all::con.xadd#3")),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::redis::orders", "", &redis("read_group")),
+            ("channel::redis::shipments", "", &redis("read_group")),
+            ("channel::redis::events.audit", "", &redis("read_inline")),
+            ("channel::redis", "", &redis("read_unknown")),
+        ])
+    );
+
+    let stream = |handler: &str, producer: &str, name: &str| {
+        link(
+            redis(handler),
+            redis(producer),
+            &format!("channel::redis::{name}"),
+            "exact",
+        )
+    };
+    let mut expected = vec![
+        stream("read_group", "append_all::con.xadd#0", "orders"),
+        stream("read_group", "append_all::con.xadd#1", "shipments"),
+        stream("read_inline", "append_all::con.xadd#2", "events.audit"),
     ];
     expected.sort();
     assert_eq!(channel_links(&json, "channel::redis::"), expected);

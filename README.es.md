@@ -202,11 +202,11 @@ lenguaje al otro,
 por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` y, en Rust, `reqwest` y `ureq` del lado que consume;
 Next.js (app router) y Express y, en Python, FastAPI, Flask y Django y, en Rust, axum del lado que sirve, también
 detrás de un gateway; en Rust, una URL base leída del entorno con `std::env::var`, `env!` o `dotenvy::var` enlaza por `base_url_env`), por los
-recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python`), colas RabbitMQ
-(`amqplib` y, en Python, `pika`, con el `publish` a un exchange llegando a las colas que los
-bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3`), subjects
-NATS (`nats` y, en Python, `nats-py`, con los comodines `*` y `>`), jobs BullMQ y streams Redis
-(`ioredis`, `node-redis` y, en Python, `redis-py`), con el productor enlazado al handler de cada
+recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python` y, en Rust, `rdkafka`), colas RabbitMQ
+(`amqplib` y, en Python, `pika` y, en Rust, `lapin`, con el `publish` a un exchange llegando a las colas que los
+bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3` y, en Rust, `aws-sdk-sqs`), subjects
+NATS (`nats` y, en Python, `nats-py` y, en Rust, `async-nats`, con los comodines `*` y `>`), jobs BullMQ y streams Redis
+(`ioredis`, `node-redis` y, en Python, `redis-py` y, en Rust, el crate `redis`), con el productor enlazado al handler de cada
 consumidor, también en el mismo repositorio. Un repositorio con la tabla `[serve]` también lee
 sus documentos OpenAPI (3.0 y 3.1) y AsyncAPI (2.x y 3.0), encontrados por el nombre o listados
 en `[serve] documents`: las rutas y los canales que describen se vuelven contratos, con los

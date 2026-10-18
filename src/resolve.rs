@@ -1914,6 +1914,30 @@ impl<'a> Code<'a> {
         self.full(path).map_or(&[], |f| f.rebound.as_slice())
     }
 
+    /// The `let mut` that `name`, written in `scope` of `path`, refers to (`Facts::mutable`),
+    /// looked up from the scope outwards: the scope it is bound in and the value it holds.
+    // ponytail: a name an inner scope binds again hides the outer one only in the value flow,
+    // which reads the outer `let mut`.
+    pub fn mutable(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &str,
+    ) -> Option<(&'a str, &'a Value)> {
+        let held = &self.full(path)?.mutable;
+        let mut scope = scope;
+        loop {
+            let local = crate::qualify(scope, name);
+            if let Some((_, value)) = held.iter().find(|(n, _)| *n == local) {
+                return Some((scope, value));
+            }
+            if scope.is_empty() {
+                return None;
+            }
+            scope = crate::parent(scope);
+        }
+    }
+
     /// The index among the calls of `path` of the one spanning `range` (an `Invocation`'s).
     pub fn call_index(&self, path: &'a str, range: &std::ops::Range<usize>) -> Option<usize> {
         call_at(&self.resolver.files[path].calls, range)

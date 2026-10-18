@@ -174,6 +174,21 @@ modules updates it.
   no string literal is the entry `[]` holding the key and the value, so `Code::expand` folds
   it). `lang::channel_name` and `lang::queue_name` evaluate a channel name and an SQS queue URL
   for both packs.
+- Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
+  a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
+  (suffix-matched on `Code::external`) and the methods that hand back the same object
+  (`passes`, which `RustPack::passes` falls through to, so `flow` follows `set`, `create_channel`,
+  `connect` and the like). Forms: rdkafka `send` of a `FutureRecord::to(topic)` or
+  `BaseRecord::to(topic)` (the record is found from the argument, down its chain) and
+  `subscribe(&[topics])`, on a client from `ClientConfig::new()`; lapin `basic_publish`,
+  `basic_consume` and `queue_bind` on a channel of `Connection::connect`; aws-sdk-sqs
+  `queue_url` of a `send_message`, `send_message_batch` or `receive_message` builder (the
+  queue is the last URL segment); async-nats `publish`, `subscribe`, `queue_subscribe`; redis
+  `xadd` and the keys of `xread_options`, only with a `group` option. A polling or stream
+  client's handler is the function that holds the call. The shared evaluation (`produce`,
+  `consume`, `topic`, `topics`, `publication`, `queue_name`) lives in `lang/mod.rs`, used by
+  the three packs. A `let mut` bound once keeps its call as `Facts::mutable`, read by
+  `Code::mutable`, so a redis connection held by one is traced.
 - `lang/python.rs` yields `Kind::Method` for a function directly in a class body, keeps the first of
   two definitions of one name, spans a decorated definition with its decorators, and exports
   every module-level name (imports included), as an explicit import or `m.x` sees them, and

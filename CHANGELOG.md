@@ -8,6 +8,22 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Rust channels (spec #30): producers and consumers of the common broker clients, on a client
+  that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
+  or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),
+  lapin (`basic_publish`, `basic_consume` and `queue_bind` on a channel of
+  `Connection::connect`, with the routing rules of the other languages), aws-sdk-sqs (the
+  `queue_url` of a `send_message`, `send_message_batch` or `receive_message` builder; the queue
+  is the last URL segment), async-nats (`publish`, `subscribe`, `queue_subscribe`; wildcards link
+  as `inferred`) and the redis crate (`xadd`, and the keys of an `xread_options` whose options
+  set a `group`). Names are evaluated like URLs, `format!` included; one that cannot be is an
+  unresolved side. A polling or stream client's handler is the function that holds the call. A
+  `let mut` that nothing else binds or assigns now keeps the object its call made, for the
+  client's flow only (a redis connection is held by one). The cross-language fixture gains a
+  topic a TypeScript kafkajs producer sends and a Rust consumer reads, with a golden `trace`
+  down. A queue URL built from two literals the evaluation folds (`.../{queue}` given a literal)
+  now names its last segment in every language. The index is rebuilt once (schema version 34).
+
 - Rust base URLs read from the environment (spec #30): `std::env::var("X")`, `env::var("X")`
   after `use std::env` (or `use std::env::var`), `dotenvy::var("X")` and `env!("X")`, also inside
   `concat!`, through `unwrap`, `unwrap_or`, `unwrap_or_else`, `unwrap_or_default`, `expect`, `?`
