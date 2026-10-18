@@ -756,6 +756,64 @@ fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
     }
 }
 
+/// Edits, adds and deletes `.rs` files of the api and deletes a route of the web app: a route
+/// path changes, the variable a base URL is read from changes names, a module with a consumer on
+/// the declared host appears, and the module a `mod` declaration points to goes.
+fn edit_xlang_rust((web, api): &(PathBuf, PathBuf)) {
+    edit_file(
+        api,
+        "src/orders.rs",
+        "\"/orders/:id\"",
+        "\"/orders/:id/level\"",
+    );
+    edit_file(api, "src/pricing.rs", "\"WEB_URL\"", "\"SITE_URL\"");
+    edit_file(
+        api,
+        "src/main.rs",
+        "mod orders;\n",
+        "mod orders;\nmod report;\n",
+    );
+    fs::write(
+        api.join("src/report.rs"),
+        "pub async fn report() {\n    let _ = reqwest::get(\"https://web.example.com/api/audit\").await;\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(api.join("src/audit.rs")).unwrap();
+    fs::remove_file(web.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_rust_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_rust("fresh_xlang_rust");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_rust(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_rust("fresh_xlang_rust_cold");
+    edit_xlang_rust(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+    // The renamed variable no longer reaches the web app's routes.
+    assert!(before[1].contains("env:WEB_URL"));
+    assert!(refreshed[1].contains("env:SITE_URL"));
+    assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
 #[test]
 fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     let exports = |gateway: &Path| -> Vec<String> {

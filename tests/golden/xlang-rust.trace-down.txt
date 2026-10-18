@@ -1,0 +1,10 @@
+example.com/xlang-rust/web src/sync.ts:3 syncOrders
+  example.com/xlang-rust/web src/orders.ts:4 orderStatus
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-rust/api] example.com/xlang-rust/api src/orders.rs:13 status
+    example.com/xlang-rust/api src/pricing.rs:4 price_of
+    →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-rust/web] example.com/xlang-rust/web app/api/prices/[sku]/route.ts:1 GET
+  example.com/xlang-rust/web src/orders.ts:9 reserveOrder
+    →[exact: host api.example.com is served by example.com/xlang-rust/api] example.com/xlang-rust/api src/orders.rs:17 reserve
+      example.com/xlang-rust/api src/pricing.rs:10 promotions
+        →[exact: host web.example.com is served by example.com/xlang-rust/web] example.com/xlang-rust/web app/api/promotions/route.ts:1 GET
+chain: inferred · 4 hops · 2 repos · 226 tokens

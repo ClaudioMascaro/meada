@@ -1,0 +1,4 @@
+example.com/xlang-rust/api src/orders.rs:17 reserve
+  →[exact: host api.example.com is served by example.com/xlang-rust/api] example.com/xlang-rust/web src/orders.ts:10 reserveOrder
+    example.com/xlang-rust/web src/sync.ts:5 syncOrders
+chain: exact · 1 hops · 2 repos · 72 tokens

@@ -1618,10 +1618,21 @@ fn rust() {
             "crates/worker/src/dynamic.rs::pick",
             "crates/worker/src/dynamic.rs::spec",
             "crates/worker/src/dynamic.rs::unresolved",
+            "crates/worker/src/env.rs::dotenv",
+            "crates/worker/src/env.rs::fallbacks",
+            "crates/worker/src/env.rs::full_path",
+            "crates/worker/src/env.rs::function_import",
+            "crates/worker/src/env.rs::imported",
+            "crates/worker/src/env.rs::macros",
+            "crates/worker/src/env.rs::mid_url",
+            "crates/worker/src/env.rs::optional",
+            "crates/worker/src/env.rs::two_reads",
             "crates/worker/src/lib.rs::agents",
             "crates/worker/src/lib.rs::clients",
             "crates/worker/src/lib.rs::dynamic",
+            "crates/worker/src/lib.rs::env",
             "crates/worker/src/lib.rs::modules",
+            "crates/worker/src/lib.rs::not_env",
             "crates/worker/src/lib.rs::settings",
             "crates/worker/src/lib.rs::urls",
             "crates/worker/src/lib.rs::wrappers",
@@ -1631,6 +1642,16 @@ fn rust() {
             "crates/worker/src/modules.rs::health",
             "crates/worker/src/modules.rs::items",
             "crates/worker/src/modules.rs::lookalikes",
+            "crates/worker/src/not_env.rs::env",
+            "crates/worker/src/not_env.rs::env.var",
+            "crates/worker/src/not_env.rs::foreign",
+            "crates/worker/src/not_env.rs::foreign.read",
+            "crates/worker/src/not_env.rs::hidden",
+            "crates/worker/src/not_env.rs::hidden.closure",
+            "crates/worker/src/not_env.rs::hidden.parameter",
+            "crates/worker/src/not_env.rs::other",
+            "crates/worker/src/not_env.rs::other.bare",
+            "crates/worker/src/not_env.rs::own_module",
             "crates/worker/src/urls.rs::consts",
             "crates/worker/src/urls.rs::formats",
             "crates/worker/src/urls.rs::strings",
@@ -2842,6 +2863,101 @@ fn rust_urls_that_do_not_fold_are_holes_or_unresolved() {
         ("http::GET::/spec/{}", host, &site("spec")),
     ]);
     assert_eq!(rust_clients("rust_http_dynamic", "dynamic.rs"), expected);
+}
+
+#[test]
+fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
+    let site =
+        |function: &str, n: usize| format!("crates/worker/src/env.rs::{function}::reqwest.get#{n}");
+    let expected = triples(&[
+        // `std::env::var` in full, `use std::env`, `use std::env::var` inside a function.
+        ("http::GET::/std", "env:STD_URL", &site("full_path", 0)),
+        (
+            "http::GET::/imported",
+            "env:IMPORTED_URL",
+            &site("imported", 0),
+        ),
+        (
+            "http::GET::/function",
+            "env:FUNCTION_URL",
+            &site("function_import", 0),
+        ),
+        // `env!` bound to a name and inside `concat!`, and `dotenvy::var` with `?`.
+        ("http::GET::/macro", "env:MACRO_URL", &site("macros", 0)),
+        ("http::GET::/concat", "env:CONCAT_URL", &site("macros", 1)),
+        ("http::GET::/dotenv", "env:DOTENV_URL", &site("dotenv", 0)),
+        // A fallback and string methods keep the one read.
+        ("http::GET::/or", "env:OR_URL", &site("fallbacks", 0)),
+        ("http::GET::/else", "env:ELSE_URL", &site("fallbacks", 1)),
+        ("http::GET::/trim", "env:TRIM_URL", &site("fallbacks", 2)),
+        // A second read in the fallback leaves a hole, and `option_env!` is not read.
+        ("http::GET::/two", "", &site("two_reads", 0)),
+        ("http::GET::/macro-fallback", "", &site("two_reads", 1)),
+        ("http::GET::/optional", "", &site("optional", 0)),
+        // A read in the middle of the URL is a hole in the path, not the base.
+        (
+            "http::GET::/{}/mid",
+            "host:api.example.com",
+            &site("mid_url", 0),
+        ),
+    ]);
+    assert_eq!(rust_clients("rust_http_env", "env.rs"), expected);
+}
+
+#[test]
+fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
+    let site2 = |function: &str, n: usize| {
+        format!("crates/worker/src/not_env.rs::{function}::reqwest.get#{n}")
+    };
+    let site = |function: &str| site2(function, 0);
+    let expected = triples(&[
+        // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
+        // hole, not a variable.
+        ("http::GET::/own", "", &site("own_module")),
+        ("http::GET::/bare", "", &site("other.bare")),
+        // A parameter or a closure named `var` hides `use std::env::var`.
+        ("http::GET::/parameter", "", &site("hidden.parameter")),
+        ("http::GET::/closure", "", &site("hidden.closure")),
+        // A `var`, an `env!` and a `format!` imported from a path outside `std`.
+        ("http::GET::/foreign", "", &site("foreign.read")),
+        ("http::GET::/macro", "", &site2("foreign.read", 1)),
+        ("unresolved", "", &site2("foreign.read", 2)),
+    ]);
+    assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
+}
+
+/// A read under hundreds of string methods is read only as far as `VALUE_DEPTH`, and a read with
+/// hundreds of fallbacks nested in it is a hole: the base is no variable, and indexing carries on.
+#[test]
+fn an_environment_read_under_a_deep_chain_is_a_hole() {
+    let repo = fixture_repo("rust_env_long", "conformance-rust", Some(ORIGIN));
+    let src = repo.join("crates/worker/src");
+    let lib = std::fs::read_to_string(src.join("lib.rs")).unwrap();
+    std::fs::write(src.join("lib.rs"), format!("mod long_env;\n{lib}")).unwrap();
+    let trims = ".trim()".repeat(200);
+    let nested = format!(
+        "{}\"/x\"{}",
+        "std::env::var(\"A\").unwrap_or(".repeat(200),
+        ")".repeat(200)
+    );
+    let long = format!(
+        "pub async fn chain() {{\n    let a = std::env::var(\"LONG_URL\").unwrap(){trims}.to_string();\n    \
+         let _ = reqwest::get(a + \"/long\").await;\n    \
+         let b = {nested};\n    let _ = reqwest::get(b + \"/nested\").await;\n}}\n"
+    );
+    std::fs::write(src.join("long_env.rs"), long).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let found = consumers(&json, "crates/worker/src/long_env.rs");
+    let reads: Vec<_> = found
+        .iter()
+        .map(|(c, v, _)| (c.as_str(), v.as_str()))
+        .collect();
+    assert_eq!(
+        reads,
+        [("http::GET::/long", ""), ("http::GET::/nested", "")]
+    );
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and

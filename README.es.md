@@ -201,7 +201,7 @@ no se indexan, y contratos Rust además de los paquetes aún no; solo entra la c
 lenguaje al otro,
 por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` y, en Rust, `reqwest` y `ureq` del lado que consume;
 Next.js (app router) y Express y, en Python, FastAPI, Flask y Django y, en Rust, axum, actix-web y Rocket del lado que sirve, también
-detrás de un gateway), por los
+detrás de un gateway; en Rust, una URL base leída del entorno con `std::env::var`, `env!` o `dotenvy::var` enlaza por `base_url_env`), por los
 recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python`), colas RabbitMQ
 (`amqplib` y, en Python, `pika`, con el `publish` a un exchange llegando a las colas que los
 bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3`), subjects

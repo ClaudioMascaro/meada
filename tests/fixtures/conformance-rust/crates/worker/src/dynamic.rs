@@ -1,5 +1,5 @@
 fn pick() -> String {
-    std::env::var("API_PATH").unwrap_or_default()
+    std::fs::read_to_string("api-path").unwrap_or_default()
 }
 
 /// A URL a function computes at run time: a consumer with no contract.
