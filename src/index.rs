@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -304,13 +305,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .filter(|p| !packs.contains_key(p.as_str()))
         .collect();
 
-    // Config files, read whole on every refresh: they are few and small.
+    // Config files, read on every refresh: they are few and small.
     let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
-            if let Ok(src) = fs::read(root.join(name)) {
+            if let Some(src) = read_config(root, name) {
                 digest.update(format!("{pack}\0{name}\0{}\0", src.len()).as_bytes());
                 digest.update(&src);
                 found.push((name, src));
@@ -682,6 +683,17 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
         file = kind.is_file();
     }
     file.then_some(abs)
+}
+
+/// The pack config file `name` at the repository root, read up to one byte past
+/// `package::MAX_BYTES`: the pack reads a file that large as invalid, so the rest of it is never
+/// read. Like the walk, the read goes through no symbolic link.
+fn read_config(root: &Path, name: &str) -> Option<Vec<u8>> {
+    let mut src = Vec::new();
+    let file = fs::File::open(plain_file(root, name)?).ok()?;
+    let limit = package::MAX_BYTES as u64 + 1;
+    file.take(limit).read_to_end(&mut src).ok()?;
+    Some(src)
 }
 
 /// The manifests of a repository (`package.json`, `pyproject.toml`, `requirements*.txt`) and its
@@ -1462,7 +1474,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION, refresh_stamped};
+    use super::{SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
     use crate::{document, lang, package};
 
     #[test]
@@ -1501,6 +1513,25 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
         assert_eq!(paths, ["Cargo.toml"]);
+    }
+
+    #[test]
+    fn a_config_file_is_read_up_to_one_byte_past_the_size_limit() {
+        let root = std::env::temp_dir().join(format!("meada-index-config-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("tsconfig.json"),
+            " ".repeat(package::MAX_BYTES * 2),
+        )
+        .unwrap();
+        fs::write(root.join("jsconfig.json"), "{}").unwrap();
+
+        let large = read_config(&root, "tsconfig.json").map(|src| src.len());
+        let small = read_config(&root, "jsconfig.json");
+        fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(large, Some(package::MAX_BYTES + 1));
+        assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
     /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its

@@ -147,7 +147,7 @@ const MAX_NAME: usize = 214;
 /// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
 /// and the stored summary and the export stay proportional to what is read.
 // ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
-const MAX_BYTES: usize = 1 << 20;
+pub(crate) const MAX_BYTES: usize = 1 << 20;
 
 /// The dependency fields of a manifest that `read` collects.
 const FIELDS: [&str; 4] = [
@@ -398,12 +398,7 @@ pub struct Config {
 /// limit or not an object is invalid, `None`, which counts as no config at all (the repository
 /// root's is tried instead); an option that is not a string counts as absent in a valid one.
 pub fn read_tsconfig(src: &[u8]) -> Option<Tsconfig> {
-    let text = std::str::from_utf8(src)
-        .ok()
-        .filter(|_| src.len() <= MAX_BYTES);
-    let Some(Ok(Value::Object(root))) = text.map(|t| serde_json::from_str(&strip_jsonc(t))) else {
-        return None;
-    };
+    let root = tsconfig_root(src)?;
     let option = |name: &str| match root.get("compilerOptions")?.get(name)? {
         Value::String(s) if !s.is_empty() => Some(s.clone()),
         _ => None,
@@ -412,6 +407,17 @@ pub fn read_tsconfig(src: &[u8]) -> Option<Tsconfig> {
         out_dir: option("outDir"),
         root_dir: option("rootDir"),
     })
+}
+
+/// The root object of a `tsconfig.json` or `jsconfig.json`, read from its bytes; `None` when the
+/// file is invalid, as `read_tsconfig` says.
+pub(crate) fn tsconfig_root(src: &[u8]) -> Option<Value> {
+    if src.len() > MAX_BYTES {
+        return None;
+    }
+    serde_json::from_str(&strip_jsonc(std::str::from_utf8(src).ok()?))
+        .ok()
+        .filter(Value::is_object)
 }
 
 /// `outDir` and `rootDir` as repository-relative directories, for the config at `config`

@@ -10,7 +10,7 @@ use super::{
     LanguagePack, Message, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::resolve::Code;
-use crate::{Result, qualify};
+use crate::{Result, package, qualify};
 
 mod messages;
 mod types;
@@ -233,10 +233,10 @@ impl LanguagePack for TsJs {
     }
 
     fn modules(&self, configs: &[(&str, &[u8])]) -> Result<Modules> {
-        let aliases = match configs.first() {
-            Some((name, src)) => Aliases::parse(src).map_err(|e| format!("{name}: {e}"))?,
-            None => Aliases::default(),
-        };
+        // Read as `package::read_tsconfig` reads one: a config past the size limit, not UTF-8,
+        // not JSON or not an object declares no paths, and indexing carries on.
+        let aliases =
+            (configs.first()).map_or_else(Aliases::default, |(_, src)| Aliases::parse(src));
         Ok(Box::new(move |importer, specifier| {
             let bases: Vec<String> = if specifier.starts_with('.') {
                 let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
@@ -261,9 +261,10 @@ struct Aliases {
 }
 
 impl Aliases {
-    fn parse(src: &[u8]) -> Result<Self> {
-        let config: serde_json::Value =
-            serde_json::from_str(&strip_jsonc(std::str::from_utf8(src)?))?;
+    fn parse(src: &[u8]) -> Self {
+        let Some(config) = package::tsconfig_root(src) else {
+            return Self::default();
+        };
         let options = &config["compilerOptions"];
         let paths = options["paths"]
             .as_object()
@@ -275,10 +276,10 @@ impl Aliases {
                 (pattern.clone(), targets.collect())
             })
             .collect();
-        Ok(Self {
+        Self {
             base_url: options["baseUrl"].as_str().and_then(|b| join("", b)),
             paths,
-        })
+        }
     }
 
     /// The paths a bare specifier names: the targets of the `paths` pattern with the
@@ -1081,6 +1082,27 @@ fn callee(node: Node, src: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tsconfig_that_is_invalid_or_past_the_size_limit_declares_no_paths() {
+        let resolve = |config: &[u8]| {
+            let modules = TsJs.modules(&[("tsconfig.json", config)]).unwrap();
+            (modules("src/a.ts", "@/b"), modules("src/a.ts", "./c"))
+        };
+        let valid = r#"{"compilerOptions": {"paths": {"@/*": ["src/*"]}}}"#;
+        let (aliased, relative) = resolve(valid.as_bytes());
+        assert!(aliased.contains(&"src/b.ts".to_string()), "{aliased:?}");
+        let padded = format!("{valid}{}", " ".repeat(crate::package::MAX_BYTES));
+        let deep = "[".repeat(100_000);
+        for config in [
+            padded.as_bytes(),
+            b"{ not json",
+            deep.as_bytes(),
+            b"{\"a\": \"\xff\"}",
+        ] {
+            assert_eq!(resolve(config), (Vec::new(), relative.clone()));
+        }
+    }
 
     #[test]
     fn a_cast_is_the_value_it_casts() {

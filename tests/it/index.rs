@@ -1,6 +1,7 @@
 use crate::common;
 
 use std::fs;
+use std::path::Path;
 
 use common::{age, assert_golden, fixture_repo, git, without_processes};
 use meada::engine::Engine;
@@ -118,4 +119,31 @@ fn index_whose_stored_facts_do_not_parse_is_rebuilt() {
     let rebuilt = Engine::open(&broken).unwrap().export().unwrap();
 
     assert_eq!(rebuilt, Engine::open(&fresh).unwrap().export().unwrap());
+}
+
+#[test]
+fn a_root_tsconfig_that_is_invalid_or_linked_declares_no_paths() {
+    use std::os::unix::fs::symlink;
+
+    let export = |case: &str, config: &dyn Fn(&Path)| {
+        let repo = fixture_repo(case, "conformance-ts-js", None);
+        config(&repo.join("tsconfig.json"));
+        Engine::open(&repo).unwrap().export().unwrap()
+    };
+    let none = export("tsconfig_none", &|path| fs::write(path, "{}\n").unwrap());
+    // The fixture's `@/*` alias resolves calls: a config that declares nothing shows.
+    assert_ne!(export("tsconfig_valid", &|_| {}), none);
+
+    let invalid = export("tsconfig_invalid", &|path| {
+        fs::write(path, "{ not").unwrap()
+    });
+    // Like the walk, the read goes through no symbolic link.
+    let linked = export("tsconfig_linked", &|path| {
+        let outside = path.parent().unwrap().with_extension("tsconfig.json");
+        fs::rename(path, &outside).unwrap();
+        symlink(&outside, path).unwrap();
+    });
+
+    assert_eq!(invalid, none);
+    assert_eq!(linked, none);
 }

@@ -35,6 +35,13 @@ All notable changes to Meada are recorded here. The format follows
   source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
   entry points, though an import still reaches the others.
 
+### Fixed
+
+- A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,
+  no longer stops indexing: it declares no `paths`, as a `pyproject.toml` that cannot be read
+  declares no source roots. A root config that is a symbolic link is not read, as the walk
+  follows none.
+
 ## [0.1.0] - Unreleased
 
 The first release: the trunk of the roadmap (ADR 0003). The maintainer sets the date when

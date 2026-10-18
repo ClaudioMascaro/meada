@@ -454,7 +454,9 @@ one for the area a change touches.
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
-  no fragments, since only `refresh` writes it.
+  no fragments, since only `refresh` writes it. A pack config file (`tsconfig.json`,
+  `jsconfig.json`, `pyproject.toml`) is read up to one byte past `package::MAX_BYTES`, which its
+  pack reads as invalid, and through no symbolic link (`read_config`), as the walk follows none.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
@@ -473,7 +475,11 @@ one for the area a change touches.
   makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
   its ancestors in C3 order) longer than that is absent, so every member of the class is
   unknown (a name match at most), and the linearization recurses no deeper down the bases.
-- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. `require` and
+- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
+  `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
+  (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
+  not an object declares no `paths` or `baseUrl` and the refresh carries on, with no status
+  line. `require` and
   `module.exports` are not imports (no `ponytail:` marker). `new X()` is a call fact (callee `X`)
   and a `Value::New(callee, args)`. `DEFINITION_DEPTH` (128): a function or class nested deeper
   is not a definition (its body belongs to the one around it, and its name is a local that hides outer
