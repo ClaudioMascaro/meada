@@ -1,4 +1,4 @@
-example.com/chain/web src/status.ts:2 health
+example.com/chain/web src/status.ts:2-4 health
 community: src#3
 processes: 1 (1 export; 1 repository): dashboard (example.com/chain/web)
 function health() {

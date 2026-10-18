@@ -1,4 +1,4 @@
-example.com/chain/web src/status.ts:7 track
+example.com/chain/web src/status.ts:7-9 track
 community: src#3
 processes: 1 (1 export; 1 repository): dashboard (example.com/chain/web)
 function track(event: { url: string }) {

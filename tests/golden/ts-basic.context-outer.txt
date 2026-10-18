@@ -1,4 +1,4 @@
-example.com/acme/web src/math.ts:13 outer
+example.com/acme/web src/math.ts:13-18 outer
 community: src#2
 processes: none
 function outer(): number {

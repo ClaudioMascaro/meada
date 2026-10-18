@@ -142,6 +142,8 @@ tagging.
   then the entries that fit; under the budget the span text is cut first, ahead of the callers,
   callees, consumers and contracts, so the line keeps its summary and as many entries as fit;
   a span with no room for its cut note is left out, to be read from the file the header names.
+  The first line names the span's range, `<path>:<start>-<end>`, so a cut or omitted span can
+  be read exactly from the file; it names the start alone when the file changed since indexing.
 
 ### Fixed
 

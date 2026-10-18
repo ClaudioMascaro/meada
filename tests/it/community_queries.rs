@@ -101,6 +101,15 @@ fn the_processes_line_is_cut_under_the_budget_with_a_count_of_the_rest() {
     let answer = engine.context("lib/products.ts::find", Some(90)).unwrap();
 
     assert_golden("chain.context-processes-cut.txt", &answer);
+    // The span is omitted here: the range in the first line is where to read it.
+    assert_eq!(
+        answer.lines().next(),
+        Some("example.com/chain/catalog lib/products.ts:10-12 find")
+    );
+    let file = fs::read_to_string(catalog.join("lib/products.ts")).unwrap();
+    let lines: Vec<&str> = file.lines().collect();
+    assert!(lines[9].starts_with("function find("), "{file}");
+    assert_eq!(lines[11], "}", "{file}");
 }
 
 #[test]
@@ -121,7 +130,8 @@ fn the_answer_stays_within_the_budget_and_keeps_the_summary() {
     let (_, _, catalog) = chain("community_queries_sweep");
     let engine = Engine::open(&catalog).unwrap();
 
-    for budget in [None, Some(90), Some(60), Some(46)] {
+    // 47 is the smallest budget whose answer keeps the header, community and processes summary.
+    for budget in [None, Some(90), Some(60), Some(47)] {
         let answer = engine.context("lib/products.ts::find", budget).unwrap();
 
         let limit = budget.unwrap_or(2_000);
@@ -157,6 +167,15 @@ fn a_long_body_is_cut_before_the_processes_and_the_callers() {
         .unwrap();
 
     assert_golden("chain.context-processes-span-cut.txt", &answer);
+    assert_eq!(
+        answer.lines().next(),
+        Some("example.com/chain/catalog lib/long.ts:3-14 long")
+    );
+    let file = fs::read_to_string(catalog.join("lib/long.ts")).unwrap();
+    let lines: Vec<&str> = file.lines().collect();
+    assert!(lines[2].contains("function long"), "{file}");
+    assert_eq!(lines[13], "}", "{file}");
+    assert!(answer.contains("of 12 lines"), "{answer}");
 }
 
 #[test]
