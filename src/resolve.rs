@@ -80,11 +80,14 @@ struct Caller<'a> {
 #[derive(Default)]
 struct Seen<'a> {
     /// `None` while the pair is resolved.
-    pairs: HashMap<(&'a str, &'a str), Option<(Option<Binding<'a>>, bool)>>,
+    pairs: HashMap<(&'a str, &'a str), Option<Given<'a>>>,
     depth: usize,
     cut: bool,
     looped: bool,
 }
+
+/// What a pair exports, and whether it met a cycle (`Seen::looped`).
+type Given<'a> = (Option<Binding<'a>>, bool);
 
 impl Seen<'_> {
     fn new() -> Self {
