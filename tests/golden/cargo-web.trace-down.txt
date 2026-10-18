@@ -1,0 +1,4 @@
+example.com/cargo/web app/src/main.rs:10 greet
+  →[exact: package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked; import crate name] example.com/cargo/lib core/src/text.rs:1 greet
+    example.com/cargo/lib core/src/text.rs:5 shout
+chain: exact · 1 hops · 2 repos · 73 tokens

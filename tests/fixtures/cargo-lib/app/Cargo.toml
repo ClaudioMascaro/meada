@@ -1,0 +1,8 @@
+[package]
+name = "inner-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared-core = { path = "../core", version = "1.2" }
+shared-extras = { path = "../extras" }

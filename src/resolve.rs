@@ -1517,6 +1517,19 @@ impl<'a> Code<'a> {
         else {
             return None;
         };
+        // A crate a pack's path import (Rust's `use`) names: the whole path, as `external` spells it.
+        let pathed = self.resolver.files[path]
+            .imports
+            .iter()
+            .any(|i| matches!(i.name, Imported::Path(_)));
+        if pathed && matches!(name, Imported::Namespace) {
+            let full = self.resolver.imported_name(path, scope, chain);
+            let rest = full.strip_prefix(specifier)?;
+            let rest = rest
+                .strip_prefix('.')
+                .or_else(|| rest.is_empty().then_some(rest))?;
+            return Some((specifier, rest.to_string()));
+        }
         let mut spelled = match name {
             Imported::Namespace => String::new(),
             Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
