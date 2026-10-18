@@ -2115,7 +2115,7 @@ impl<'a> Code<'a> {
                 let kept = (matched || fluent).then(|| std::mem::take(&mut trail.out));
                 let mark = trail.steps.len();
                 if fluent {
-                    self.chain_steps(path, index, stop, &mut trail.steps);
+                    self.chain_steps(path, index, &mut trail.steps);
                 }
                 self.flow_from(path, stop, trail);
                 if fluent {
@@ -2195,20 +2195,34 @@ impl<'a> Code<'a> {
         trail.busy.pop();
     }
 
-    /// The methods of the calls from `index` down to `stop` along their receivers, outermost
-    /// first.
-    fn chain_steps(&self, path: &'a str, index: usize, stop: usize, steps: &mut Vec<&'a str>) {
+    /// The calls of the builder chain that ends in the call at `index` of `path`, that call
+    /// first, down its receivers to where `chain_tail` stops it: a call a function of the
+    /// repository answers, or one made on no call. `None` past `FLUENT_CHAIN` calls. The one
+    /// walk down a chain: the value flow and the kinds that read a chain step by step go through
+    /// it.
+    pub fn chain(&self, path: &'a str, index: usize) -> Option<Vec<usize>> {
+        let stop = self.chain_tail(path, index)?.stop;
         let calls = &self.resolver.files[path].calls;
-        let mut at = index;
-        while at != stop {
-            steps.push(method(&calls[at].callee));
-            match self.receiver(path, at) {
-                Some(Value::Call(next)) => match call_at(calls, &next.range) {
-                    Some(next) => at = next,
-                    None => break,
-                },
-                _ => break,
-            }
+        let mut out = vec![index];
+        while out[out.len() - 1] != stop {
+            let Some(Value::Call(next)) = self.receiver(path, out[out.len() - 1]) else {
+                return None;
+            };
+            out.push(call_at(calls, &next.range)?);
+        }
+        Some(out)
+    }
+
+    /// The methods of the calls of the chain ending at `index`, above where it stops, outermost
+    /// first.
+    fn chain_steps(&self, path: &'a str, index: usize, steps: &mut Vec<&'a str>) {
+        let calls = &self.resolver.files[path].calls;
+        if let Some((_, above)) = self
+            .chain(path, index)
+            .as_deref()
+            .and_then(<[usize]>::split_last)
+        {
+            steps.extend(above.iter().map(|&at| method(&calls[at].callee)));
         }
     }
 

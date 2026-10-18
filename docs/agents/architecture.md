@@ -183,9 +183,16 @@ one for the area a change touches.
   `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
   `Code::origins` then walks a chain down its receivers, by `call_at` (a call found by its byte
   range; `Code::call_index` for a kind) and `Code::receiver` (the value a call is made on).
+  `Code::chain` is that walk, memoized by `chain_tail`: the calls from one down to where the
+  flow stops (a call a function of the repository answers, or one made on no call). A kind
+  that reads a chain step by step (an axum method router, an actix-web `ServiceConfig`, a
+  Kafka record, an SQS request, redis read options) goes through it, never its own walk.
   A step no function of the repository answers passes the receiver on; one only a name match
   found does when the chain starts at a constructor of an outside crate (whose method it then
-  is), else the flow ends. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
+  is), else the flow ends. Which methods pass the object on is listed per object, with its
+  constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
+  clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
+  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
@@ -629,8 +636,9 @@ one for the area a change touches.
   in a `let` is not recognized. `Code::mutable` takes the value of a `let mut` bound once and
   never assigned (`Facts::mutable`, keyed by qualified name); a closure parameter, a `let` in a
   closure given to a call, a nested function's parameter or an assignment in such a closure hides it.
-  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`) is
-  walked to that many calls; a longer one is not a producer.
+  `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
+  redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
+  bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
 - `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
   (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
   be external; a root that is a repository type, a parameter, or a local with no written class
@@ -892,11 +900,12 @@ one for the area a change touches.
   `cfg_if!`, an alias, a local of the name) means it may be registered where Meada cannot tell,
   and then it is served nowhere. A service configuration is followed into the functions of the
   repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
-- `http.rs` (axum): `METHOD_CHAIN` (64): a method router chain (`get(a).post(b)`) is read to
-  that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
-  `resolve.rs`): a builder chain (`Router::new().route(..)`) is read to that many calls down to
-  what starts it, and a call past it has no origin, so its route is no provider (the walk is
-  memoized per call, linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
+- `http.rs` (axum): `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
+  to that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
+  `resolve.rs`): a builder chain (`Router::new().route(..)`, an actix-web `ServiceConfig`'s
+  `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
+  and a call past it has no origin, so its route is no provider (the walk is memoized per call,
+  linear in the chain). `PREFIX_DEPTH` (64) and `PREFIX_WORK` (4096):
   `prefixes`, for every kind that mounts (Express, FastAPI, Flask, axum, actix-web, Rocket), reads a router
   nested deeper than the first, or through more mounts than the second, as served nowhere
   rather than under part of its prefixes. A name bound again in its scope (`let mut`,
@@ -934,8 +943,10 @@ one for the area a change touches.
   `RequestBuilder::build` are not followed; a `Url::parse(..)?` or `join` URL is unknown.
   A value derived from a client (a response, a header map, a JSON value, the result of an
   extension trait's method) is no client: a method passes the object on only when the
-  library's list names it (`ROUTER`, `CLIENT_BUILDER`, `AGENT_BUILDER` in `lang/rust.rs`), so
-  a setter missing from the list ends the chain and its client is not read.
+  object's entry lists it (`FRAMEWORKS` in `lang/rust/frameworks.rs`, the constructors named
+  exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
+  setter missing from the list ends the chain and its client (or its router, app, scope,
+  resource or Rocket instance) is not read.
 - `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
   that depends on a parameter is not read through callers (it yields no route). A FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else

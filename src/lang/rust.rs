@@ -19,6 +19,7 @@ use crate::{Result, qualify};
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+pub(crate) mod frameworks;
 mod mentions;
 mod messages;
 mod values;
@@ -52,116 +53,6 @@ const SELF: &str = "mod";
 const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
-
-/// The methods that hand back the object they were called on (`LanguagePack::passes`), per
-/// library: axum's `Router`, the setters of reqwest's `ClientBuilder` up to `build()`, which
-/// makes the client, and those of ureq's `AgentBuilder`.
-// ponytail: a setter not listed ends the chain, so its client is not read; add it here.
-const ROUTER: &[&str] = &[
-    "clone",
-    "route",
-    "route_service",
-    "nest",
-    "nest_service",
-    "merge",
-    "layer",
-    "route_layer",
-    "with_state",
-    "fallback",
-    "fallback_service",
-];
-/// actix-web's `App`, `Scope` and `Resource`, and Rocket's `build()` (a `Rocket`): the methods
-/// that hand back the object they were called on. A method that narrows what is served
-/// (`guard`, `Resource::to`) is left out, so what it is called on is not read.
-const APP: &[&str] = &[
-    "service",
-    "route",
-    "configure",
-    "app_data",
-    "data",
-    "data_factory",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-    "external_resource",
-];
-const SCOPE: &[&str] = &[
-    "service",
-    "route",
-    "configure",
-    "app_data",
-    "data",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-];
-const RESOURCE: &[&str] = &[
-    "route",
-    "name",
-    "app_data",
-    "data",
-    "wrap",
-    "wrap_fn",
-    "default_service",
-];
-const ROCKET: &[&str] = &["mount", "attach", "manage", "register"];
-const CLIENT_BUILDER: &[&str] = &[
-    "clone",
-    "build",
-    "timeout",
-    "connect_timeout",
-    "read_timeout",
-    "user_agent",
-    "default_headers",
-    "redirect",
-    "referer",
-    "proxy",
-    "no_proxy",
-    "gzip",
-    "brotli",
-    "deflate",
-    "zstd",
-    "no_gzip",
-    "no_brotli",
-    "no_deflate",
-    "no_zstd",
-    "cookie_store",
-    "pool_idle_timeout",
-    "pool_max_idle_per_host",
-    "tcp_nodelay",
-    "tcp_keepalive",
-    "http1_only",
-    "http2_prior_knowledge",
-    "https_only",
-    "danger_accept_invalid_certs",
-    "danger_accept_invalid_hostnames",
-    "use_rustls_tls",
-    "use_native_tls",
-    "add_root_certificate",
-    "identity",
-    "min_tls_version",
-    "max_tls_version",
-    "connection_verbose",
-    "local_address",
-    "resolve",
-];
-const AGENT_BUILDER: &[&str] = &[
-    "clone",
-    "build",
-    "timeout",
-    "timeout_connect",
-    "timeout_read",
-    "timeout_write",
-    "user_agent",
-    "max_idle_connections",
-    "max_idle_connections_per_host",
-    "redirects",
-    "proxy",
-    "tls_config",
-    "https_only",
-    "no_delay",
-    "try_proxy_from_env",
-];
 
 /// The attributes that register the function they sit on as a route, in actix-web and Rocket:
 /// `#[get("/x")]` and its kin, and actix-web's `#[route("/x", method = "GET")]`. The pack emits
@@ -223,17 +114,10 @@ impl LanguagePack for Rust {
     }
 
     fn passes(&self, origin: &str, method: &str) -> bool {
-        let methods = match origin {
-            o if o.starts_with("axum.Router.") => ROUTER,
-            o if o.starts_with("actix_web.App.") => APP,
-            "actix_web.web.scope" => SCOPE,
-            "actix_web.web.resource" => RESOURCE,
-            "rocket.build" | "rocket.custom" => ROCKET,
-            o if o.starts_with("reqwest.") => CLIENT_BUILDER,
-            o if o.starts_with("ureq.") => AGENT_BUILDER,
-            _ => return messages::passes(origin, method),
-        };
-        methods.contains(&method)
+        match frameworks::made(origin) {
+            Some(made) => frameworks::passes(made).contains(&method),
+            None => messages::passes(origin, method),
+        }
     }
 
     fn modules(

@@ -14,15 +14,13 @@ use std::cell::{Cell, OnceCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::{
-    ANY, CallAt, METHOD_CHAIN, Mounts, PARAM, handler_site, join, normalize_path, path_literal,
-    prefixes, provider,
+    ANY, CallAt, Mounts, PARAM, handler_site, join, normalize_path, path_literal, prefixes,
+    provider,
 };
 use crate::contract::{Found, Site};
+use crate::lang::rust::frameworks::{self, Made, VERBS};
 use crate::lang::{Call, Class, Value};
 use crate::resolve::{Code, scope_of};
-
-/// The methods of a `ServiceConfig` that hand it back.
-const CONFIG_PASSES: &[&str] = &["service", "route", "configure", "app_data", "data"];
 
 /// How many values the expansions of `items` (constants, the functions a call answers) may add,
 /// over every call of the repository; past it a list is read no further.
@@ -33,26 +31,10 @@ const ITEM_WORK: usize = 1 << 14;
 /// The methods `actix_web::web` has a route builder for: `web::get()`, `web::post()`.
 const METHODS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "trace"];
 
-/// The HTTP verbs an `actix_web::web::method(Method::X)` may be given.
-const VERBS: &[&str] = &[
-    "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE",
-];
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Framework {
     Actix,
     Rocket,
-}
-
-/// What a place of routes is.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    App,
-    Scope,
-    Resource,
-    Rocket,
-    /// The service configuration a function receives.
-    Config,
 }
 
 /// Where routes are registered or served, a node of the mounts.
@@ -187,22 +169,20 @@ impl<'c, 'a> Web<'c, 'a> {
     }
 
     /// What the call `at` makes, when it makes an app, a scope, a resource or a Rocket instance.
-    fn made(&self, (path, n): CallAt<'a>) -> Option<Kind> {
+    fn made(&self, (path, n): CallAt<'a>) -> Option<Made> {
         let call = &self.code.files()[path].calls[n];
-        let name = self.code.external_of(path, call)?;
-        match name.as_str() {
-            "actix_web.App.new" | "actix_web.App.default" => Some(Kind::App),
-            "actix_web.web.scope" => Some(Kind::Scope),
-            "actix_web.web.resource" => Some(Kind::Resource),
-            "rocket.build" | "rocket.custom" => Some(Kind::Rocket),
-            _ => None,
-        }
+        let made = frameworks::made(&self.code.external_of(path, call)?)?;
+        matches!(
+            made,
+            Made::App | Made::Scope | Made::Resource | Made::Rocket
+        )
+        .then_some(made)
     }
 
-    fn kind(&self, place: Place<'a>) -> Option<Kind> {
+    fn kind(&self, place: Place<'a>) -> Option<Made> {
         match place {
             Place::Made(at) => self.made(at),
-            Place::Config(..) => Some(Kind::Config),
+            Place::Config(..) => Some(Made::Config),
             Place::Handler(..) => None,
         }
     }
@@ -238,26 +218,27 @@ impl<'c, 'a> Web<'c, 'a> {
     /// Whether `value` is the service configuration the function `scope` receives, or the
     /// result of its methods called on it (`cfg.service(a).route(..)`).
     fn configuration(&self, path: &'a str, scope: &'a str, value: &'a Value) -> bool {
-        let mut value = value;
-        for _ in 0..METHOD_CHAIN {
-            match value {
-                Value::Ref(name) => return self.config(path, scope, name),
-                Value::Call(invocation) => {
-                    let call = (self.code.call_index(path, &invocation.range))
-                        .and_then(|at| self.code.call(path, at));
-                    let Some(call) = call else {
-                        return false;
-                    };
-                    let member = call.callee.rsplit('.').next().unwrap_or_default();
-                    match &call.receiver {
-                        Some(next) if CONFIG_PASSES.contains(&member) => value = next,
-                        _ => return false,
-                    }
-                }
-                _ => return false,
-            }
-        }
-        false
+        let code = self.code;
+        let invocation = match value {
+            Value::Ref(name) => return self.config(path, scope, name),
+            Value::Call(invocation) => invocation,
+            _ => return false,
+        };
+        let chain = code
+            .call_index(path, &invocation.range)
+            .and_then(|at| code.chain(path, at));
+        let passes = frameworks::passes(Made::Config);
+        let Some(calls) = chain else {
+            return false;
+        };
+        let passed = calls.iter().all(|&at| {
+            let member = code
+                .call(path, at)
+                .and_then(|c| c.callee.rsplit('.').next());
+            member.is_some_and(|m| passes.contains(&m))
+        });
+        let start = calls.last().and_then(|&at| code.receiver(path, at));
+        passed && matches!(start, Some(Value::Ref(name)) if self.config(path, scope, name))
     }
 
     /// The items `value`, written in `scope` of `path`, lists or names: a tuple's or a list's
@@ -486,7 +467,7 @@ impl<'c, 'a> Web<'c, 'a> {
     }
 
     /// `parents` of the kinds `kinds`.
-    fn only(&self, parents: &[Place<'a>], kinds: &[Kind]) -> Vec<Place<'a>> {
+    fn only(&self, parents: &[Place<'a>], kinds: &[Made]) -> Vec<Place<'a>> {
         let of = |p: &Place<'a>| self.kind(*p).is_some_and(|k| kinds.contains(&k));
         parents.iter().copied().filter(of).collect()
     }
@@ -494,7 +475,7 @@ impl<'c, 'a> Web<'c, 'a> {
     /// `x.service(h)`, `x.service(web::scope(prefix)...)`, `x.service(web::resource(path)...)`
     /// and a tuple of them.
     fn service(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
-        let parents = self.only(parents, &[Kind::App, Kind::Scope, Kind::Config]);
+        let parents = self.only(parents, &[Made::App, Made::Scope, Made::Config]);
         if parents.is_empty() {
             return;
         }
@@ -510,7 +491,7 @@ impl<'c, 'a> Web<'c, 'a> {
             }
             let (path, scope, arg) = item;
             for child in code.value_origins(path, scope, arg) {
-                if !matches!(self.made(child), Some(Kind::Scope | Kind::Resource)) {
+                if !matches!(self.made(child), Some(Made::Scope | Made::Resource)) {
                     continue;
                 }
                 // The segment a scope or a resource puts before its routes is the one it is
@@ -531,8 +512,8 @@ impl<'c, 'a> Web<'c, 'a> {
         let code = self.code;
         let scope = call.scope.as_str();
         let (route, value, kinds) = match call.args.as_slice() {
-            [route, value] => (Some(route), value, [Kind::App, Kind::Scope, Kind::Config]),
-            [value] => (None, value, [Kind::Resource; 3]),
+            [route, value] => (Some(route), value, [Made::App, Made::Scope, Made::Config]),
+            [value] => (None, value, [Made::Resource; 3]),
             _ => return,
         };
         let parents = self.only(parents, &kinds);
@@ -592,7 +573,7 @@ impl<'c, 'a> Web<'c, 'a> {
     /// `x.configure(f)`: the service configuration `f` receives is mounted on `x`, with no
     /// segment.
     fn configure(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
-        let parents = self.only(parents, &[Kind::App, Kind::Scope, Kind::Config]);
+        let parents = self.only(parents, &[Made::App, Made::Scope, Made::Config]);
         let [Value::Ref(name)] = call.args.as_slice() else {
             return;
         };
@@ -609,7 +590,7 @@ impl<'c, 'a> Web<'c, 'a> {
     fn rocket(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
         let code = self.code;
         let scope = call.scope.as_str();
-        let parents = self.only(parents, &[Kind::Rocket]);
+        let parents = self.only(parents, &[Made::Rocket]);
         let [prefix, routes] = call.args.as_slice() else {
             return;
         };
@@ -633,7 +614,7 @@ impl<'c, 'a> Web<'c, 'a> {
         let root = |place: Place<'a>| match place {
             Place::Handler(path, name) => (!self.mentioned(path, name)).then(String::new),
             Place::Made(_) | Place::Config(..) => {
-                (matches!(self.kind(place), Some(Kind::App | Kind::Rocket))).then(String::new)
+                (matches!(self.kind(place), Some(Made::App | Made::Rocket))).then(String::new)
             }
         };
         let served = |places: &[Place<'a>]| -> BTreeSet<String> {
