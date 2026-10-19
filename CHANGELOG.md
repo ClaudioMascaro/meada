@@ -176,6 +176,11 @@ All notable changes to Meada are recorded here. The format follows
   source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
   entry points, though an import still reaches the others.
 
+### Changed
+
+- The default model of the `decisions` decider is now `typesafe/jev-1.14` (was `typesafe/jev-1.13`);
+  `MEADA_DECIDER_MODEL` still overrides it. The request and answer shapes are unchanged.
+
 ### Fixed
 
 - A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,

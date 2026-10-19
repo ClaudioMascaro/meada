@@ -3,7 +3,7 @@ Authorization: <hidden>
 Content-Type: application/json
 
 {
-  "model": "typesafe/jev-1.13",
+  "model": "typesafe/jev-1.14",
   "provider": {
     "data_collection": "deny",
     "zdr": true
