@@ -66,6 +66,10 @@
       "hash": "eddb60486d0486767435ae621c88a8383775693692b9425ac2fbd4f3ddf3fb59"
     },
     {
+      "path": "store/entry.go",
+      "hash": "535c8dfd66cd3e3872a4ae9ccda313f7aa38b374b81188ba16321fb82e119fec"
+    },
+    {
       "path": "store/helpers.go",
       "hash": "a932a54a511f5a462a1bd4126349a8b6aa525b3972ce791755d52e6ff0d4d114"
     },
@@ -929,6 +933,14 @@
         "path": "store/disk_linux.go",
         "start": 61,
         "end": 89
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::store/entry.go::main",
+      "span": {
+        "path": "store/entry.go",
+        "start": 88,
+        "end": 102
       }
     },
     {
@@ -2831,6 +2843,113 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::main.go::main",
+      "kind": "program",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::main.go::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/shapes/shapes.go::clamp"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/units/units.go::Meters"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::main.go::run"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/shapes/shapes.go::Each"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
+          "mark": "seen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/store.go::New"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/helpers.go::helper"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/store.go::open"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/helpers.go::Exported"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/store.go::open",
+          "mark": "seen"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::methods/calls.go::AfterBlock",
       "kind": "export",
       "label": "AfterBlock",
@@ -4356,6 +4475,34 @@
           "via": "call",
           "node": "example.com/acme/conformance::store/helpers.go::helper",
           "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::worker/main.go::main",
+      "kind": "program",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::worker/main.go::main"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::worker/jobs/jobs.go::Run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::legacy/old/old.go::Old"
         }
       ]
     }

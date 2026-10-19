@@ -1,6 +1,6 @@
 example.com/acme/conformance store/store.go:9-15 New
 community: store
-processes: 3 (3 export; 1 repository): Plain (example.com/acme/conformance), TestClient (example.com/acme/conformance), TestNew (example.com/acme/conformance)
+processes: 4 (3 export, 1 program; 1 repository): main (example.com/acme/conformance), Plain (example.com/acme/conformance), TestClient (example.com/acme/conformance), TestNew (example.com/acme/conformance)
 func New() *Store {
 	helper()
 	open()

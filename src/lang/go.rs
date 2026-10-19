@@ -731,6 +731,10 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let mut function = def(name.clone(), Kind::Function, range, params(list, src));
                 function.result = result_class(node, src);
                 walk.facts.defs.push(function);
+                // `func main` of package `main` starts a program.
+                if name == "main" && walk.facts.package == "main" {
+                    walk.facts.programs.push(name.clone());
+                }
                 walk.typed_params(&name, list, false);
                 walk.typed_params(&name, result_list(node), true);
                 walk.bind_type_params(&name, node);

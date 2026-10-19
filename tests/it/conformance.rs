@@ -2630,6 +2630,7 @@ fn go() {
             "store/client_test.go::TestClient",
             "store/client_test.go::helper",
             "store/disk_linux.go::onLinux",
+            "store/entry.go::main",
             "store/helpers.go::Exported",
             "store/helpers.go::helper",
             "store/store.go::New",
@@ -2643,7 +2644,7 @@ fn go() {
             "worker/jobs/jobs.go::Run",
             "worker/main.go::main",
         ],
-        &[],
+        &["main.go::main", "worker/main.go::main"],
         &[
             // A function of the same file, and one called inside a function literal, which
             // belongs to the function around it.
