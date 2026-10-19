@@ -67,17 +67,27 @@ enum Method {
     Argument(usize),
 }
 
-/// A resty client, as far as the source tells: the call that makes it, or only its type.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+/// A resty client, as far as the source tells: the call that makes it with the calls of the
+/// functions it came through (two clients one factory makes differ by the call that made each),
+/// or only its type.
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum Client<'a> {
-    Made(CallAt<'a>),
+    Made(CallAt<'a>, Vec<CallAt<'a>>),
     Typed,
+}
+
+/// A base URL set on the clients a call makes: those that came through the calls `through` or
+/// through more, as a base set inside a factory reaches what the factory makes.
+struct Set<'a> {
+    made: CallAt<'a>,
+    through: Vec<CallAt<'a>>,
+    base: Vec<Part>,
 }
 
 struct Clients<'c, 'a> {
     code: &'c Code<'a>,
-    /// The base URLs set on each resty client a call makes, read on first use.
-    bases: OnceCell<HashMap<CallAt<'a>, Vec<Vec<Part>>>>,
+    /// The base URLs set on resty clients, read on first use.
+    bases: OnceCell<Vec<Set<'a>>>,
     /// The clients each call hands back (`true`: the client a request is made on), so a long
     /// chain several calls start from is walked once.
     walked: RefCell<HashMap<(bool, CallAt<'a>), Vec<Client<'a>>>>,
@@ -121,24 +131,63 @@ impl<'c, 'a> Clients<'c, 'a> {
         depth: usize,
         request: bool,
     ) -> Vec<Client<'a>> {
+        let mut out = self.traced(path, scope, value, depth, request);
+        let ty = if request { "Request" } else { "Client" };
+        if let Value::Ref(name) = value
+            && self.typed(path, scope, name, ty)
+            && (out.is_empty() || self.untraced(path, scope, name, depth, request))
+        {
+            // Only its type is known, or a caller passes one whose origin is not.
+            out.push(Client::Typed);
+        }
+        out
+    }
+
+    /// The clients the calls `value` comes from make or hand back.
+    fn traced(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        depth: usize,
+        request: bool,
+    ) -> Vec<Client<'a>> {
         if depth >= CLIENT_DEPTH {
             return Vec::new();
         }
         let mut out: Vec<Client<'a>> = Vec::new();
-        for (p, i) in self.code.value_origins(path, scope, value) {
+        for ((p, i), through) in self.code.value_origins_through(path, scope, value) {
             for client in self.hands(p, i, depth + 1, request) {
+                let client = match client {
+                    Client::Made(made, inner) => {
+                        let through = through.iter().chain(&inner).copied().collect();
+                        Client::Made(made, through)
+                    }
+                    Client::Typed => Client::Typed,
+                };
                 if !out.contains(&client) {
                     out.push(client);
                 }
             }
         }
-        let ty = if request { "Request" } else { "Client" };
-        match value {
-            Value::Ref(name) if out.is_empty() && self.typed(path, scope, name, ty) => {
-                vec![Client::Typed]
-            }
-            _ => out,
-        }
+        out
+    }
+
+    /// Whether `name`, a parameter, is passed a client whose origin is not traced by a caller.
+    fn untraced(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        depth: usize,
+        request: bool,
+    ) -> bool {
+        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+            return false;
+        };
+        let args = self.code.param_args(function, n);
+        args.iter()
+            .any(|&(p, sc, arg)| self.traced(p, sc, arg, depth + 1, request).is_empty())
     }
 
     /// The clients the call at `index` of `path` hands back (`request` false), or makes its
@@ -174,7 +223,7 @@ impl<'c, 'a> Clients<'c, 'a> {
             return if request {
                 Vec::new()
             } else {
-                vec![Client::Made((path, index))]
+                vec![Client::Made((path, index), Vec::new())]
             };
         }
         let Some(receiver) = self.code.receiver(path, index) else {
@@ -194,14 +243,17 @@ impl<'c, 'a> Clients<'c, 'a> {
         let set = self.bases.get_or_init(|| self.set());
         let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
         for client in clients {
-            let given = match client {
-                Client::Made(made) => set.get(made).map(Vec::as_slice).unwrap_or_default(),
-                Client::Typed => &[],
+            let given: Vec<&Vec<Part>> = match client {
+                Client::Made(made, through) => (set.iter())
+                    .filter(|s| s.made == *made && through.ends_with(&s.through))
+                    .map(|s| &s.base)
+                    .collect(),
+                Client::Typed => Vec::new(),
             };
-            let base = match given {
+            let base = match given[..] {
                 [] => None,
                 [one] => Some(one.clone()),
-                [first, rest @ ..] if rest.iter().all(|b| b == first) => Some(first.clone()),
+                [first, ref rest @ ..] if rest.iter().all(|b| *b == first) => Some(first.clone()),
                 _ => Some(vec![Part::Hole]),
             };
             if !bases.contains(&base) {
@@ -215,10 +267,9 @@ impl<'c, 'a> Clients<'c, 'a> {
         }
     }
 
-    /// The base URL each call that makes a resty client is given, by `SetBaseURL` on a client it
-    /// may have made.
-    fn set(&self) -> HashMap<CallAt<'a>, Vec<Vec<Part>>> {
-        let mut set: HashMap<CallAt<'a>, Vec<Vec<Part>>> = HashMap::new();
+    /// The base URL each `SetBaseURL` gives, with the clients it may be called on.
+    fn set(&self) -> Vec<Set<'a>> {
+        let mut set: Vec<Set<'a>> = Vec::new();
         for (&path, facts) in self.code.files() {
             for (n, stored) in facts.calls.iter().enumerate() {
                 if !stored.callee.ends_with("SetBaseURL") {
@@ -236,12 +287,19 @@ impl<'c, 'a> Clients<'c, 'a> {
                     _ => vec![Part::Hole],
                 };
                 for client in self.clients(path, &call.scope, receiver, 0) {
-                    let Client::Made(made) = client else {
+                    let Client::Made(made, through) = client else {
                         continue;
                     };
-                    let bases = set.entry(made).or_default();
-                    if !bases.contains(&base) {
-                        bases.push(base.clone());
+                    let known = set
+                        .iter()
+                        .any(|s| (s.made, &s.through, &s.base) == (made, &through, &base));
+                    if !known {
+                        let base = base.clone();
+                        set.push(Set {
+                            made,
+                            through,
+                            base,
+                        });
                     }
                 }
             }

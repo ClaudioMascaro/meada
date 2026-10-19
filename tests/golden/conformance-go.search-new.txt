@@ -6,5 +6,5 @@ example.com/acme/conformance methods/types.go:63 NewCounter
 example.com/acme/conformance web/stdlib.go:82 newAPI
 example.com/acme/conformance web/stdlib.go:95 newGuarded
 example.com/acme/conformance web/stdlib.go:89 newStripped
-example.com/acme/conformance client/net.go:50 (unresolved) http.NewRequestWithContext
+example.com/acme/conformance client/net.go:51 (unresolved) http.NewRequestWithContext
 example.com/acme/conformance store/store_test.go:5 TestNew

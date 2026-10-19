@@ -2527,27 +2527,35 @@ fn go() {
         &[
             "billing/invoice/invoice.go::Total",
             "billing/invoice/invoice.go::round",
+            "client/flags.go::Configure",
             "client/net.go::Cache",
             "client/net.go::Cache.Get",
             "client/net.go::Clients",
+            "client/net.go::Formats",
             "client/net.go::Lookup",
             "client/net.go::Package",
             "client/net.go::Requests",
             "client/net.go::Unresolved",
             "client/net.go::Urls",
+            "client/net.go::Written",
             "client/net.go::init",
             "client/net.go::lookup",
+            "client/rest.go::Factory",
             "client/rest.go::Gateway",
             "client/rest.go::Gateway.Items",
+            "client/rest.go::Mixed",
             "client/rest.go::Other",
+            "client/rest.go::Reassigned",
             "client/rest.go::Rest",
             "client/rest.go::Returned",
             "client/rest.go::Reused",
             "client/rest.go::Separate",
             "client/rest.go::Typed",
             "client/rest.go::Wrapper",
+            "client/rest.go::fetchBase",
             "client/rest.go::fetchJSON",
             "client/rest.go::newClient",
+            "client/rest.go::plainClient",
             "client/routes/routes.go::Move",
             "client/tenants.go::Rename",
             "client/wrappers.go::Cycle",
@@ -3539,6 +3547,33 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:billing.example.com",
             &rest("Wrapper", "fetchJSON#0"),
         ),
+        // Two clients one factory makes keep their own bases; a wrapper given a traced client and
+        // one that is not has an unknown base; a client assigned again is no consumer.
+        (
+            "http::GET::/from-a",
+            "host:a.example.com",
+            &rest("Factory", &chain("Get", 1)),
+        ),
+        ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
+        ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
+        ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        // A package variable another package writes through a selector (`config.Base = ..`,
+        // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
+        // to the constant `Host`.
+        ("http::GET::/a", "", &net("Written", "http.Get#0")),
+        ("unresolved", "", &net("Written", "http.Get#1")),
+        ("unresolved", "", &net("Written", "http.Get#2")),
+        ("http::GET::/stable", api, &net("Written", "http.Get#3")),
+        // A flag, width or precision makes a hole; `%d` prints integers only.
+        ("http::GET::/pad/{}", api, &net("Formats", "http.Get#0")),
+        ("http::GET::/prec/{}", api, &net("Formats", "http.Get#1")),
+        ("http::GET::/num/{}", api, &net("Formats", "http.Get#2")),
+        ("http::GET::/v2/items/7", api, &net("Formats", "http.Get#3")),
+        (
+            "http::GET::/plain/ab/{}",
+            api,
+            &net("Formats", "http.Get#4"),
+        ),
     ]);
     assert_eq!(consumers(&json, "client/"), expected);
 }
@@ -3835,6 +3870,34 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(export.contains("http::GET::/r10\""));
     assert!(!export.contains("http::GET::/r2999\""));
+}
+
+/// A resty client followed back through setters is followed only as far as the limit
+/// (`CLIENT_DEPTH`, 64: the setters, `SetBaseURL` and `R()` count): a request at the limit has
+/// its base, one past it is no consumer.
+#[test]
+fn a_long_resty_setter_chain_is_followed_up_to_its_limit() {
+    const LAST: usize = 61;
+    let repo = fixture_repo("go_setters_long", "conformance-go", Some(ORIGIN));
+    let mut long = String::from("package client\n\nimport \"github.com/go-resty/resty/v2\"\n");
+    for n in [LAST, LAST + 1] {
+        let setters = ".SetTimeout(1)".repeat(n);
+        long += &format!(
+            "\nfunc Setters{n}() {{\n\tresty.New().SetBaseURL(\"https://deep.example.com\"){setters}\
+             .R().Get(\"/s{n}\")\n}}\n"
+        );
+    }
+    std::fs::write(repo.join("client/long.go"), long).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let found = consumers(&json, "client/long.go");
+    let site = format!("client/long.go::Setters{LAST}::(call_expression).Get#0");
+    let expected = triples(&[(
+        &format!("http::GET::/s{LAST}"),
+        "host:deep.example.com",
+        &site,
+    )]);
+    assert_eq!(found, expected);
 }
 
 /// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.

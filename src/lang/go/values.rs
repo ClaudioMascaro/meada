@@ -137,7 +137,7 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
             };
             let sprintf = std.fmt.as_ref().map(|fmt| format!("{fmt}.Sprintf"));
             if sprintf.is_some_and(|name| callee(function, src) == name) {
-                return sprintf_value(node, again);
+                return sprintf_value(node, src, again);
             }
             Value::Call(invocation(node, function, src, again))
         }
@@ -189,10 +189,18 @@ fn concat(left: Value, right: Value) -> Value {
     Value::Str(joined(pieces(left).into_iter().chain(pieces(right))))
 }
 
-/// `fmt.Sprintf(format, args..)` with a literal format: each `%s`, `%d` and `%v` (with flags,
-/// width and precision) is the argument at its place, and `%%` is `%`. A format with another
-/// verb, a number of arguments other than its verbs, or `args...` is `Unknown`.
-fn sprintf_value(node: Node, read: impl Fn(Node) -> Value) -> Value {
+/// An argument of `fmt.Sprintf`: a decimal integer literal, or any other value.
+enum Arg {
+    Int(String),
+    Other(Value),
+}
+
+/// `fmt.Sprintf(format, args..)` with a literal format: a bare `%s` or `%v` is the argument at
+/// its place when that is a string, `%d` and `%v` an integer literal, and `%%` is `%`. Any other
+/// pairing of a verb and an argument, and a verb with flags, width or precision (`%5s`, `%.1s`,
+/// `%#v`), is a hole. A format with another verb, a number of arguments other than its verbs,
+/// or `args...` is `Unknown`.
+fn sprintf_value(node: Node, src: &[u8], read: impl Fn(Node) -> Value) -> Value {
     let args: Vec<Node> = arguments(node).collect();
     if args.iter().any(|a| a.kind() == "variadic_argument") {
         return Value::Unknown;
@@ -203,13 +211,21 @@ fn sprintf_value(node: Node, read: impl Fn(Node) -> Value) -> Value {
     let [Part::Text(format)] = &format[..] else {
         return Value::Unknown;
     };
-    format_parts(format, &mut args[1..].iter().map(|a| read(*a)))
+    let arg = |a: &Node| {
+        let digits = text(*a, src);
+        let decimal = digits == "0" || digits.starts_with(|c: char| ('1'..='9').contains(&c));
+        match a.kind() == "int_literal" && decimal && digits.chars().all(|c| c.is_ascii_digit()) {
+            true => Arg::Int(digits.to_string()),
+            false => Arg::Other(read(*a)),
+        }
+    };
+    format_parts(format, &mut args[1..].iter().map(arg))
         .map_or(Value::Unknown, |parts| Value::Str(joined(parts)))
 }
 
 /// The parts of `format` with `given` at its verbs, `None` when it has any other verb or more or
 /// fewer verbs than `given` has values.
-fn format_parts(format: &str, given: &mut impl Iterator<Item = Value>) -> Option<Vec<Part>> {
+fn format_parts(format: &str, given: &mut impl Iterator<Item = Arg>) -> Option<Vec<Part>> {
     let (mut parts, mut text) = (Vec::new(), String::new());
     let mut chars = format.chars();
     while let Some(c) = chars.next() {
@@ -222,14 +238,19 @@ fn format_parts(format: &str, given: &mut impl Iterator<Item = Value>) -> Option
             text.push('%');
             continue;
         }
+        let mut plain = true;
         while verb.is_some_and(|v| matches!(v, '+' | '-' | '#' | ' ' | '.' | '0'..='9')) {
-            verb = chars.next();
+            (plain, verb) = (false, chars.next());
         }
-        let ('s' | 'd' | 'v') = verb? else {
+        let verb @ ('s' | 'd' | 'v') = verb? else {
             return None;
         };
         parts.push(Part::Text(std::mem::take(&mut text)));
-        parts.extend(pieces(given.next()?));
+        parts.extend(match (given.next()?, verb, plain) {
+            (Arg::Int(digits), 'd' | 'v', true) => vec![Part::Text(digits)],
+            (Arg::Other(value), 's' | 'v', true) => pieces(value),
+            _ => vec![Part::Hole],
+        });
     }
     parts.push(Part::Text(text));
     given.next().is_none().then_some(parts)
@@ -340,10 +361,18 @@ mod tests {
         assert!(!matches!(first_arg(shadow), Value::Str(_)));
     }
 
-    /// The text of what `fmt.Sprintf(format, a, b)` gives, a name as `<name>`, a hole as `{}`;
-    /// `None` when it is not read.
-    fn formatted(format: &str, given: &[Value]) -> Option<String> {
-        let parts = format_parts(format, &mut given.iter().cloned())?;
+    /// The text of what `fmt.Sprintf(format, ..)` gives for the arguments `given`, a name as
+    /// `<name>`, a hole as `{}`; `None` when it is not read. Each character of `given` is an
+    /// argument: `a` a name, `u` an unreadable value, `i` the integer literal 7, `t` the
+    /// string literal "ab".
+    fn formatted(format: &str, given: &str) -> Option<String> {
+        let arg = |c: char| match c {
+            'a' => Arg::Other(Value::Ref("a".into())),
+            'i' => Arg::Int("7".into()),
+            't' => Arg::Other(Value::Str(vec![Part::Text("ab".into())])),
+            _ => Arg::Other(Value::Unknown),
+        };
+        let parts = format_parts(format, &mut given.chars().map(arg))?;
         Some(
             joined(parts)
                 .iter()
@@ -358,28 +387,37 @@ mod tests {
 
     #[test]
     fn sprintf_verbs_are_holes_in_place() {
-        let (name, unknown) = (Value::Ref("a".into()), Value::Unknown);
-        let given = |n: usize| [name.clone(), unknown.clone(), unknown.clone()][..n].to_vec();
-        let cases: [(&str, usize, Option<&str>); 13] = [
-            ("/users/%s", 1, Some("/users/<a>")),
-            ("/users/%d/items/%v", 2, Some("/users/<a>/items/{}")),
-            ("%s/users", 1, Some("<a>/users")),
-            ("/u/%5d/%-5s/%+v", 3, Some("/u/<a>/{}/{}")),
-            ("/rate/100%%", 0, Some("/rate/100%")),
-            ("/users", 0, Some("/users")),
-            ("/rate/%.2f", 1, None),
-            ("/rate/%", 0, None),
-            ("/users/%s", 0, None),
-            ("/users", 1, None),
-            ("/users/%[1]d", 1, None),
-            ("/users/%*d", 1, None),
-            ("/users/%x", 1, None),
+        let cases: [(&str, &str, Option<&str>); 22] = [
+            ("/users/%s", "a", Some("/users/<a>")),
+            ("/users/%d/items/%v", "iu", Some("/users/7/items/{}")),
+            ("%s/users", "t", Some("ab/users")),
+            ("/v%d/%v", "ii", Some("/v7/7")),
+            ("/rate/100%%", "", Some("/rate/100%")),
+            ("/users", "", Some("/users")),
+            // A verb with flags, width or precision does not print its argument as it is.
+            ("/u/%5d/%-5s/%+v", "iat", Some("/u/{}/{}/{}")),
+            ("/pad/%5s", "t", Some("/pad/{}")),
+            ("/prec/%.1s", "t", Some("/prec/{}")),
+            ("/quote/%#v", "t", Some("/quote/{}")),
+            // A verb meets only the arguments it prints as they are.
+            ("/n/%d", "t", Some("/n/{}")),
+            ("/n/%d", "a", Some("/n/{}")),
+            ("/s/%s", "i", Some("/s/{}")),
+            ("/s/%s", "u", Some("/s/{}")),
+            ("/rate/%.2f", "a", None),
+            ("/rate/%", "", None),
+            ("/users/%s", "", None),
+            ("/users", "a", None),
+            ("/users/%[1]d", "a", None),
+            ("/users/%*d", "a", None),
+            ("/users/%x", "a", None),
+            ("/users/%s/%s", "a", None),
         ];
-        for (format, n, expected) in cases {
+        for (format, given, expected) in cases {
             assert_eq!(
-                formatted(format, &given(n)).as_deref(),
+                formatted(format, given).as_deref(),
                 expected,
-                "{format}"
+                "{format} {given}"
             );
         }
     }

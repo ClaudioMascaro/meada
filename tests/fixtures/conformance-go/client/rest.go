@@ -79,3 +79,33 @@ func Wrapper() {
 	c := resty.New().SetBaseURL("https://billing.example.com")
 	fetchJSON(c, "/wrapped-rest")
 }
+
+// Two clients one factory makes do not share a base.
+func plainClient() *resty.Client {
+	return resty.New()
+}
+
+func Factory() {
+	a := plainClient()
+	a.SetBaseURL("https://a.example.com")
+	b := plainClient()
+	b.R().Get("/from-b")
+	a.R().Get("/from-a")
+}
+
+// A wrapper given a traced client and one whose origin is not traced has an unknown base.
+func fetchBase(c *resty.Client, path string) {
+	c.R().Get(path)
+}
+
+func Mixed(u *resty.Client) {
+	fetchBase(resty.New().SetBaseURL("https://m.example.com"), "/m1")
+	fetchBase(u, "/m2")
+}
+
+// A client assigned again is not traced: its request is no consumer.
+func Reassigned() {
+	c := resty.New().SetBaseURL("https://first.example.com")
+	c = resty.New()
+	c.R().Get("/reassigned")
+}

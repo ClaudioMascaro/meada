@@ -121,6 +121,9 @@ struct Walk<'s> {
     std: values::Std,
     /// The package-level `var`s, which hold their value only if nothing assigns them.
     vars: BTreeSet<String>,
+    /// The field names written through a selector (`cfg.Base = ..`, `cfg.Base++`, `&cfg.Base`),
+    /// whichever package the selector reaches.
+    selected: BTreeSet<String>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -190,6 +193,25 @@ impl Walk<'_> {
         }
     }
 
+    /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
+    /// a selector, which any package may write (`config.Base = ..`).
+    fn write(&mut self, scope: &str, targets: &[Node]) {
+        for target in targets {
+            let name = match target.kind() {
+                "identifier" => text(*target, self.src),
+                "selector_expression" => {
+                    let Some(field) = target.child_by_field_name("field") else {
+                        continue;
+                    };
+                    self.selected.insert(text(field, self.src).to_string());
+                    continue;
+                }
+                _ => continue,
+            };
+            self.assigned.push((scope.to_string(), name.to_string()));
+        }
+    }
+
     /// Makes the names held by one binding constants, and gives each definition what it
     /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
     /// inside it, holds no one value.
@@ -222,6 +244,18 @@ impl Walk<'_> {
             if self.vars.contains(&constant.name) && assigned.contains(&constant.name) {
                 constant.value = Value::Unknown;
             }
+        }
+        // The markers `Resolver::redeclared` reads: a package variable, and a field written
+        // through a selector, which makes a variable of that name no constant in any package.
+        let marks = (self.vars.iter()).map(|v| format!("{v}.var"));
+        let marks = marks.chain(self.selected.iter().map(|f| format!(".{f}")));
+        for name in marks {
+            let value = Value::Unknown;
+            self.facts.consts.push(Const {
+                name,
+                value,
+                ty: None,
+            });
         }
         for name in elsewhere {
             let value = Value::Unknown;
@@ -339,12 +373,13 @@ impl Walk<'_> {
                 // `r = gin.New()`, `for r = range rs`: the name is assigned again.
                 "assignment_statement" | "range_clause" | "receive_statement" => {
                     if let Some(left) = node.child_by_field_name("left") {
-                        let targets = named(left).chain([left]);
-                        for name in targets.filter(|n| n.kind() == "identifier") {
-                            let name = text(name, src).to_string();
-                            self.assigned.push((scope.to_string(), name));
-                        }
+                        let targets: Vec<Node> = named(left).chain([left]).collect();
+                        self.write(scope, &targets);
                     }
+                }
+                "inc_statement" | "dec_statement" => {
+                    let targets: Vec<Node> = named(node).collect();
+                    self.write(scope, &targets);
                 }
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
@@ -369,10 +404,8 @@ impl Walk<'_> {
                     let address = node.child_by_field_name("operator");
                     if let (Some(operand), Some(address)) = (operand, address)
                         && text(address, src) == "&"
-                        && operand.kind() == "identifier"
                     {
-                        self.assigned
-                            .push((scope.to_string(), text(operand, src).to_string()));
+                        self.write(scope, &[operand]);
                     }
                 }
                 "type_switch_statement" => {
@@ -864,6 +897,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         returns: HashMap::new(),
         std: values::Std::default(),
         vars: BTreeSet::new(),
+        selected: BTreeSet::new(),
     };
     // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {

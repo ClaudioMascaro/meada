@@ -216,8 +216,15 @@ one for the area a change touches.
   `lang/go/values.rs` at parse time (`+`, `fmt.Sprintf` verbs as holes, `net/http` method
   constants, package-level `const` and a `var` nothing assigns, in the package or in another one
   by import), and a resty base is the value of the `SetBaseURL` argument on the chain (or the
-  statement) that built the client. Wrapper climbing is `Code::expand`, as for every kind. A
-  package `var` another file assigns is `Unknown` (`Resolver::redeclared`).
+  statement) that built the client. A base belongs to one client, not to the call that makes
+  clients: a client is the `resty.New()` call with the calls of the repository's functions it
+  came through (`Code::value_origins_through`), so two clients one factory makes keep their own
+  bases, and a `SetBaseURL` inside the factory reaches every client it makes. Wrapper climbing is
+  `Code::expand`, as for every kind. A package `var` another file of the package assigns, or any
+  file of the repository writes through a selector (`pkg.X = ..`, `&pkg.X`, `pkg.X++`: any write
+  to a field called `X`, whatever it belongs to), is `Unknown` (`Resolver::redeclared`, read from
+  the markers `Name.var` and `.Name` the Go pack stores as constants of no value); a `const` is
+  never one.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -685,11 +692,16 @@ one for the area a change touches.
   read (a router made by a call that is not `NewRouter` has no provider).
 - `http/go/clients.rs` (spec #25, #79): `CLIENT_DEPTH` (64): a client or a request is followed
   back through that many calls and names (`New().SetX().R().SetY()`, `b := a`); past it the
-  base is unknown, and a request on a client Meada cannot trace is a consumer with no host. Only
-  the libraries of the table (`net/http`, resty v2) are clients; a `Client` held in a map, a
-  slice or a channel, or an interface, is untraced. A `fmt.Sprintf` format with a verb other than
-  `%s`, `%d` and `%v` (flags and width allowed), or a count of verbs and values that differ, and a `var` assigned anywhere but its declaration, fold to
-  nothing: the consumer is unresolved (no marker).
+  base is unknown and the request is no consumer (the chain is no longer known to be resty's).
+  A request on a client only written as a type (a parameter or field with no constructor in
+  sight) is a consumer with no host, and so is one on a parameter some caller passes an untraced
+  client to (the base is unknown). Only the libraries of the table (`net/http`, resty v2) are
+  clients; a client assigned more than once, one held in a map, a slice or a channel, or an
+  interface, is untraced and its requests are no consumer. A `fmt.Sprintf` format with a verb
+  other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned
+  anywhere but its declaration (or written through a selector), fold to nothing: the consumer is
+  unresolved (no marker). A verb with flags, width or precision is a hole, and so is `%d` of
+  anything but an integer literal, and `%s` of an integer literal.
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result

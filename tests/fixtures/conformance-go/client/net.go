@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"example.com/acme/shop/client/config"
 	"example.com/acme/shop/client/routes"
 )
 
@@ -78,6 +79,24 @@ func Lookup(r *http.Request, s *Cache) string {
 	r.URL.Query().Get("q")
 	s.Get("key")
 	return r.Header.Get("X-Id")
+}
+
+// A package variable another package writes through a selector holds no one value; one nobody
+// writes folds.
+func Written() {
+	http.Get(config.Base + "/a")
+	http.Get("https://x.example.com" + config.Path)
+	http.Get(Host + config.Mode)
+	http.Get(Host + config.Stable)
+}
+
+// A format flag, width or precision changes what is printed; `%d` prints an integer.
+func Formats(name string) {
+	http.Get(fmt.Sprintf("https://api.example.com/pad/%5s", "ab"))
+	http.Get(fmt.Sprintf("https://api.example.com/prec/%.1s", "abc"))
+	http.Get(fmt.Sprintf("https://api.example.com/num/%d", "ab"))
+	http.Get(fmt.Sprintf("https://api.example.com/v%d/items/%v", 2, 7))
+	http.Get(fmt.Sprintf("https://api.example.com/plain/%s/%v", "ab", name))
 }
 
 type Cache struct{}

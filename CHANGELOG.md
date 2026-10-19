@@ -58,10 +58,15 @@ All notable changes to Meada are recorded here. The format follows
 - Go HTTP consumers (spec #25): `net/http` calls on the package, a `Client` or `DefaultClient`
   (`Get`, `Head`, `Post`, `PostForm`), `NewRequest` and `NewRequestWithContext` (the construction
   is the consumer, its method read from a literal or `http.MethodX`), and resty requests (the
-  verbs and `Execute`), with the host of the `SetBaseURL` of the client that issued them, also
-  when the client is a parameter, a field or a function result. A URL is folded from literals,
-  `+`, `fmt.Sprintf` (`%s`, `%d`, `%v` are parameter segments), constants and package-level names
-  of the package or of another one (a `var` nothing assigns folds like a constant). A wrapper over
+  verbs and `Execute`), with the host of the `SetBaseURL` of the client that issued them (that
+  one client: two clients a factory makes keep their own bases), also when the client is a
+  function result or a wrapper's parameter whose callers all pass a traced client; a client
+  written only as a type, such as a field, has no host, and so has a wrapper parameter some
+  caller passes an untraced client to. A URL is folded from literals, `+`, `fmt.Sprintf` (a bare
+  `%s` or `%v` is the argument, `%d` and `%v` an integer literal; any other verb and argument,
+  and any flag, width or precision, a parameter segment), constants and package-level names of
+  the package or of another one (a `var` nothing assigns, in the package or through a selector
+  such as `config.Base = ..`, folds like a constant). A wrapper over
   a client is read at its call sites, to any depth, with cycle detection. A path that cannot be
   folded is an unresolved consumer.
 
