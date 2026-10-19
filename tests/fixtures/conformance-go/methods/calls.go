@@ -144,3 +144,65 @@ func Capture() {
 	})
 	c.Bump()
 }
+
+func opaque() any { return nil }
+
+// A call before the := that binds the name again still sees the name outside it (here the
+// package's `cur`), so the receiver is not the new type.
+func UseBefore() {
+	cur.Add("x")
+	cur := Gauge{}
+	_ = cur
+}
+
+func UseBeforeInClosure() {
+	c := Log{}
+	run(func() {
+		c.Add("x")
+		c := Gauge{}
+		_ = c
+	})
+}
+
+// A name bound in a block holds to its end.
+func AfterBlock() {
+	{
+		cur := Gauge{}
+		cur.Add("in")
+	}
+	cur.Add("out")
+}
+
+// Init statements, type switch bindings and range variables bind the name again.
+func IfInitShadow(c *Counter) {
+	if c := opaque(); c != nil {
+		c.Add("x")
+	}
+}
+
+func SwitchInitShadow(c *Counter) {
+	switch c := opaque(); {
+	default:
+		c.Add("x")
+	}
+}
+
+func ForInitShadow(c *Counter) {
+	for c := opaque(); ; {
+		c.Add("x")
+		break
+	}
+}
+
+func TypeSwitchShadow(c *Counter, v any) {
+	switch c := v.(type) {
+	case Log:
+		c.Add("x")
+	}
+}
+
+func RangeShadow(c *Counter, all []Log) {
+	for _, c := range all {
+		c.Add("x")
+	}
+}

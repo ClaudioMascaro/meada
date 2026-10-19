@@ -102,26 +102,41 @@ struct Walk<'s> {
     /// The locals recorded so far, so each is listed once.
     locals: BTreeSet<String>,
     /// Every binding of a name in a scope, with the class the source writes for it (`None` when
-    /// it writes none). A name all its bindings give one class is a receiver (`finish`).
-    bound: BTreeMap<(String, String), Vec<Option<Class>>>,
+    /// it writes none) and the bytes it holds for, when that is less than the whole scope (a
+    /// `:=` or `var`, from its end to the end of its block). A name all its bindings give one
+    /// class is a receiver (`finish`).
+    bound: BTreeMap<(String, String), Vec<Binding>>,
+    /// The type parameters of the type declarations, as `Type.Param`: they hide a name in the
+    /// declaration alone, not in the methods.
+    type_scoped: BTreeSet<String>,
 }
+
+/// A binding of a name: the class the source writes for it, and where it holds.
+type Binding = (Option<Class>, Option<Range<usize>>);
 
 impl Walk<'_> {
     /// A name bound in `scope` to a value of no class the source writes.
     fn local(&mut self, scope: &str, name: &str) {
-        self.bind_as(scope, name, None, true);
+        self.bind_as(scope, name, None, true, None);
     }
 
     /// A name bound in `scope`, holding `class` when the source writes it. A `local` hides the
     /// outer names it spells; a parameter or a field is no local.
-    fn bind_as(&mut self, scope: &str, name: &str, class: Option<Class>, local: bool) {
+    fn bind_as(
+        &mut self,
+        scope: &str,
+        name: &str,
+        class: Option<Class>,
+        local: bool,
+        region: Option<Range<usize>>,
+    ) {
         if name == "_" {
             return;
         }
         if local && self.locals.insert(qualify(scope, name)) {
             self.facts.locals.push(qualify(scope, name));
         }
-        (self.bound.entry((scope.into(), name.into())).or_default()).push(class);
+        (self.bound.entry((scope.into(), name.into())).or_default()).push((class, region));
     }
 
     /// The names a parameter list binds, with the type each writes: parameters (`local` false,
@@ -132,7 +147,7 @@ impl Walk<'_> {
             let ty = ty.filter(|_| param.kind() == "parameter_declaration");
             let class = ty.and_then(|t| type_name(t, self.src)).map(Class::Type);
             for name in names(param) {
-                self.bind_as(scope, text(name, self.src), class.clone(), local);
+                self.bind_as(scope, text(name, self.src), class.clone(), local, None);
             }
         }
     }
@@ -146,7 +161,7 @@ impl Walk<'_> {
         left: &[Node],
         ty: Option<Node>,
         values: Option<Node>,
-        local: bool,
+        region: Option<(usize, usize)>,
     ) {
         let src = self.src;
         let values: Vec<Node> = values.into_iter().flat_map(named).collect();
@@ -158,7 +173,8 @@ impl Walk<'_> {
                 1 if at == 0 => value_class(values[0], src),
                 _ => None,
             };
-            self.bind_as(scope, text(*name, src), class, local);
+            let region = region.map(|(from, to)| from..to);
+            self.bind_as(scope, text(*name, src), class, region.is_some(), region);
         }
     }
 
@@ -186,11 +202,15 @@ impl Walk<'_> {
 
     /// The type parameters a generic function declares (`[T any]`).
     fn bind_type_params(&mut self, scope: &str, node: Node) {
-        let list = node.child_by_field_name("type_parameters");
-        for declaration in list.into_iter().flat_map(named) {
-            for name in names(declaration) {
-                self.local(scope, text(name, self.src));
-            }
+        for name in type_params(node) {
+            self.local(scope, text(name, self.src));
+        }
+    }
+
+    /// The type parameters a type declaration declares: names within the declaration alone.
+    fn bind_type_scope(&mut self, ty: &str, node: Node) {
+        for name in type_params(node) {
+            self.type_scoped.insert(qualify(ty, text(name, self.src)));
         }
     }
 
@@ -219,7 +239,8 @@ impl Walk<'_> {
                     if let Some(left) = node.child_by_field_name("left") {
                         let left = identifiers(left);
                         let right = node.child_by_field_name("right");
-                        self.assigned(scope, &left, None, right, true);
+                        let region = Some(region(node));
+                        self.assigned(scope, &left, None, right, region);
                     }
                 }
                 "range_clause" | "receive_statement"
@@ -232,7 +253,7 @@ impl Walk<'_> {
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
                     let value = node.child_by_field_name("value");
-                    self.assigned(scope, &names(node), ty, value, true);
+                    self.assigned(scope, &names(node), ty, value, Some(region(node)));
                 }
                 "type_spec" | "type_alias" => {
                     for name in names(node) {
@@ -265,12 +286,16 @@ impl Walk<'_> {
     /// results and receivers whose type a local hides: the shared side reads a type among types
     /// and modules, so a local type of the same name (or a type parameter) would be missed.
     fn finish(&mut self) {
+        let type_scoped = std::mem::take(&mut self.type_scoped);
         let hides = |locals: &BTreeSet<String>, scope: &str, class: &Class| {
             let Class::Type(ty) = class else {
                 return false;
             };
             let head = ty.split('.').next().unwrap_or(ty);
             let mut scope = scope;
+            if type_scoped.contains(&qualify(scope, head)) {
+                return true;
+            }
             loop {
                 if locals.contains(&qualify(scope, head)) {
                     return true;
@@ -281,15 +306,55 @@ impl Walk<'_> {
                 scope = parent(scope);
             }
         };
+        // The method calls by the name they start at, with their scope and place, in order of
+        // scope: a name held for part of its scope is a receiver only if every call it starts
+        // in the scope (or in a literal in it) is inside that part.
+        let mut called: HashMap<&str, Vec<(&str, usize)>> = HashMap::new();
+        for call in &self.facts.calls {
+            if let Some((head, _)) = call.callee.split_once('.')
+                && !head.starts_with('(')
+            {
+                (called.entry(head).or_default()).push((&call.scope, call.range.start));
+            }
+        }
+        called.values_mut().for_each(|v| v.sort_unstable());
         let mut taken = BTreeSet::new();
         for ((scope, name), events) in std::mem::take(&mut self.bound) {
-            let Some(Some(class)) = events.first() else {
+            let Some((Some(class), _)) = events.first() else {
                 continue;
             };
-            if events.iter().any(|e| e.as_ref() != Some(class))
+            if events.iter().any(|e| e.0.as_ref() != Some(class))
                 || hides(&self.locals, &scope, class)
             {
                 continue;
+            }
+            if events.iter().all(|e| e.1.is_some()) {
+                // The farthest end reached by the regions starting at or before each place.
+                let mut held: Vec<(usize, usize)> = (events.iter())
+                    .filter_map(|e| e.1.as_ref().map(|r| (r.start, r.end)))
+                    .collect();
+                held.sort_unstable();
+                let mut reach = 0;
+                let held: Vec<(usize, usize)> = (held.into_iter())
+                    .map(|(from, to)| {
+                        reach = reach.max(to);
+                        (from, reach)
+                    })
+                    .collect();
+                let holds = |place: usize| {
+                    let at = held.partition_point(|h| h.0 <= place);
+                    at > 0 && held[at - 1].1 > place
+                };
+                // The calls of the scope and of the literals in it come together in order.
+                let calls = called.get(name.as_str()).map_or(&[][..], Vec::as_slice);
+                let from = calls.partition_point(|c| c.0 < scope.as_str());
+                let own = |at: &str| {
+                    at == scope || (at.starts_with(&scope) && at[scope.len()..].starts_with('.'))
+                };
+                let calls = calls[from..].iter().take_while(|c| own(c.0));
+                if calls.into_iter().any(|c| !holds(c.1)) {
+                    continue;
+                }
             }
             taken.insert(qualify(&scope, &name));
             let class = class.clone();
@@ -325,6 +390,39 @@ impl Walk<'_> {
 fn names(node: Node) -> Vec<Node> {
     let mut cursor = node.walk();
     node.children_by_field_name("name", &mut cursor).collect()
+}
+
+/// The names of the type parameters a declaration lists.
+fn type_params(node: Node) -> Vec<Node> {
+    let list = node.child_by_field_name("type_parameters");
+    (list.into_iter().flat_map(named)).flat_map(names).collect()
+}
+
+/// What a `:=` or a `var` in `node` holds for: from the end of the statement (its own value
+/// still sees the outer name) to the end of the block, clause or statement that encloses it.
+fn region(node: Node) -> (usize, usize) {
+    let mut at = node.parent();
+    while let Some(parent) = at {
+        let ends = matches!(
+            parent.kind(),
+            "block"
+                | "if_statement"
+                | "for_statement"
+                | "expression_switch_statement"
+                | "type_switch_statement"
+                | "select_statement"
+                | "expression_case"
+                | "type_case"
+                | "default_case"
+                | "communication_case"
+                | "source_file"
+        );
+        if ends {
+            return (node.end_byte(), parent.end_byte());
+        }
+        at = parent.parent();
+    }
+    (node.end_byte(), usize::MAX)
 }
 
 /// The identifiers of the left side of a `:=`.
@@ -600,6 +698,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         facts: Facts::default(),
         locals: BTreeSet::new(),
         bound: BTreeMap::new(),
+        type_scoped: BTreeSet::new(),
     };
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
@@ -675,7 +774,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         Vec::new(),
                     ));
                     top.push(name.to_string());
-                    walk.bind_type_params(name, spec);
+                    walk.bind_type_scope(name, spec);
                     let ty = spec.child_by_field_name("type");
                     for field in (ty.filter(|t| t.kind() == "struct_type").into_iter())
                         .flat_map(named)
@@ -685,7 +784,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         let class = field.child_by_field_name("type");
                         let class = class.and_then(|t| type_name(t, src)).map(Class::Type);
                         for field in names(field) {
-                            walk.bind_as(name, text(field, src), class.clone(), false);
+                            walk.bind_as(name, text(field, src), class.clone(), false, None);
                         }
                     }
                     for elem in ty
@@ -716,7 +815,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 for spec in specs {
                     let ty = spec.child_by_field_name("type");
                     let value = spec.child_by_field_name("value");
-                    walk.assigned("", &names(spec), ty, value, false);
+                    walk.assigned("", &names(spec), ty, value, None);
                     for name in names(spec).into_iter().map(|n| text(n, src)) {
                         if name == "_" {
                             continue;
@@ -837,6 +936,26 @@ mod tests {
             func f[T any](a *T, b B) {\n\ttype B int\n\tc := C{}\n\t{\n\t\tc := D{}\n\t}\n\
             \td := E{}\n\td, e := g()\n}\n";
         assert!(receivers(src).is_empty());
+    }
+
+    #[test]
+    fn a_name_held_for_part_of_its_scope_is_a_receiver_only_if_every_call_is_inside() {
+        let src = |body: &str| format!("package x\n\nfunc f() {{\n{body}\n}}\n");
+        let held = |body: &str| receivers(&src(body));
+        assert_eq!(held("\ta := S{}\n\ta.M()"), ["f a = S"]);
+        assert_eq!(held("\ta := S{}\n\tg(func() { a.M() })"), ["f a = S"]);
+        // Before the binding, after the block that holds it, or in its own value.
+        assert!(held("\ta.M()\n\ta := S{}").is_empty());
+        assert!(held("\tg(func() { a.M() })\n\ta := S{}").is_empty());
+        assert!(held("\t{\n\t\ta := S{}\n\t\ta.M()\n\t}\n\ta.M()").is_empty());
+        assert!(held("\ta := a.N()").is_empty());
+    }
+
+    #[test]
+    fn a_type_declarations_parameters_hide_a_type_in_the_declaration_alone() {
+        let src = "package x\n\ntype B[T any] struct{ v T; w U }\n\n\
+                   func (b B[U]) M(t T, u U) {}\n";
+        assert_eq!(receivers(src), ["B w = U", "B.M b = B", "B.M t = T"]);
     }
 
     #[test]

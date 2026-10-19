@@ -2546,6 +2546,19 @@ fn go() {
             "main.go::main",
             "main.go::run",
             "methods/calls.go::run",
+            "methods/calls.go::opaque",
+            "methods/calls.go::UseBefore",
+            "methods/calls.go::UseBeforeInClosure",
+            "methods/calls.go::AfterBlock",
+            "methods/calls.go::IfInitShadow",
+            "methods/calls.go::SwitchInitShadow",
+            "methods/calls.go::ForInitShadow",
+            "methods/calls.go::TypeSwitchShadow",
+            "methods/calls.go::RangeShadow",
+            "methods/types.go::T",
+            "methods/types.go::T.Ping",
+            "methods/types.go::Box",
+            "methods/types.go::Box.M",
             "methods/calls.go::FromParam",
             "methods/calls.go::FromValueParam",
             "methods/calls.go::FromVar",
@@ -2979,6 +2992,63 @@ fn go() {
                 "methods/types.go::Counter.Twice::c.Bump#1",
                 EXACT,
                 &["methods/types.go::Counter.Bump"],
+            ),
+            // A call before the binding that hides a name, a block, and every binding form.
+            (
+                "methods/calls.go::UseBefore::cur.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::UseBeforeInClosure::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::AfterBlock::cur.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::AfterBlock::cur.Add#1",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::IfInitShadow::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::SwitchInitShadow::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::ForInitShadow::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::TypeSwitchShadow::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            (
+                "methods/calls.go::RangeShadow::c.Add#0",
+                AMBIGUOUS,
+                &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
+            ),
+            // A type declaration's parameters scope the declaration, not its methods.
+            (
+                "methods/types.go::Box.M::t.Ping#0",
+                EXACT,
+                &["methods/types.go::T.Ping"],
+            ),
+            (
+                "methods/types.go::Box.M::b.v.Ping#0",
+                INFERRED,
+                &["methods/types.go::T.Ping"],
             ),
         ],
     );

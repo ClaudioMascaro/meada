@@ -352,7 +352,8 @@ one for the area a change touches.
   `file_exports`); a method declared in another file of the group is found for its type too
   (`Resolver::sibling_method`, in `member`); files that define one name apart are `Binding::Several`, an `ambiguous`
   call. The group is built from `Facts::package`, the package each file declares. A member
-  lookup (`Resolver::member`) still reads the class's own file. A language whose imports name a path rather than a file (Rust's
+  lookup (`Resolver::member`) reads the class's own file, then the group's others for a method
+  (`sibling_method`). A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -624,7 +625,12 @@ one for the area a change touches.
   receiver, named results, `var`, `:=`) writes the same class, one scope per function and per
   literal, so a name bound again to another type (in any block) or by `range`, a type switch or
   a second result is a local that hides, and so is a name whose type a local of the function
-  hides (a local `type`, a type parameter). A struct's named fields are receivers in the type's
+  hides (a local `type`, a type parameter; a type declaration's own parameters hide only in
+  the declaration, not in its methods). A `:=` or `var` holds from the end of its statement to
+  the end of its block, clause or statement, and the name is a receiver only if every call that
+  starts at the name in its function (and in the literals in it) lies inside the regions of its
+  bindings; a call before it, or after the block, may mean an outer name, so the name stays a
+  hiding local. A struct's named fields are receivers in the type's
   scope; an embedded field, and so a promoted method, is not followed (a name match).
   `Class::Called` is a call read as a value (`h.Counter()`, `shapes.NewCircle()`), the first
   result only. `DEFINITION_DEPTH` (128): a function

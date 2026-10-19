@@ -1238,6 +1238,21 @@ fn go() -> Vec<Case> {
             ),
         ),
         m(
+            "bindings",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n{}\n",
+                lines(WIDE, |i| format!("func f{i}() {{ a := S{{}}; a.M() }}"))
+            ),
+        ),
+        m(
+            "nested bindings",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n\
+                 func g() {{ a := S{{}}; {} }}\n",
+                nest("func() { a := S{}; a.M(); ", "a.M()", " }()", DEEP)
+            ),
+        ),
+        m(
             "rebound",
             format!(
                 "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n\

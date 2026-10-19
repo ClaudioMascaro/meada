@@ -31,7 +31,7 @@
     },
     {
       "path": "methods/calls.go",
-      "hash": "b199ba4fd4a69a9edf094e680a2d6a63e791d78aa51b051ed27d8d37216adc41"
+      "hash": "e3fe25e773d8e02fbe9da031bc28edc5819d7569ca4ae849e663d6e49909a11c"
     },
     {
       "path": "methods/reset.go",
@@ -39,7 +39,7 @@
     },
     {
       "path": "methods/types.go",
-      "hash": "5c558b688f909e0c179011c38eb12a48e46effec3389cb2473675cedb7d18ee5"
+      "hash": "7a7157aa22125f87e103fdffd5847076c33b20c20b418be67c9711134c5190e3"
     },
     {
       "path": "report.go",
@@ -252,11 +252,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::AfterBlock",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2534,
+        "end": 2610
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::Capture",
       "span": {
         "path": "methods/calls.go",
         "start": 2058,
         "end": 2146
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2865,
+        "end": 2947
       }
     },
     {
@@ -372,6 +388,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2694,
+        "end": 2773
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::LocalType",
       "span": {
         "path": "methods/calls.go",
@@ -396,6 +420,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::RangeShadow",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3046,
+        "end": 3130
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::Rebound",
       "span": {
         "path": "methods/calls.go",
@@ -412,11 +444,51 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2775,
+        "end": 2863
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::TypeParam",
       "span": {
         "path": "methods/calls.go",
         "start": 2014,
         "end": 2056
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2949,
+        "end": 3044
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBefore",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2331,
+        "end": 2390
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2392,
+        "end": 2487
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::opaque",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2148,
+        "end": 2180
       }
     },
     {
@@ -433,6 +505,22 @@
         "path": "methods/reset.go",
         "start": 80,
         "end": 118
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1480,
+        "end": 1506
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box.M",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1508,
+        "end": 1557
       }
     },
     {
@@ -585,6 +673,22 @@
         "path": "methods/types.go",
         "start": 550,
         "end": 563
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::T",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1290,
+        "end": 1300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::T.Ping",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1302,
+        "end": 1320
       }
     },
     {
@@ -1113,6 +1217,36 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::AfterBlock::cur.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::AfterBlock",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2576,
+        "end": 2589
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::AfterBlock::cur.Add#1",
+      "caller": "example.com/acme/conformance::methods/calls.go::AfterBlock",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2594,
+        "end": 2608
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::Capture::c.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::Capture",
       "target": "example.com/acme/conformance::methods/types.go::Log.Add",
@@ -1143,6 +1277,32 @@
         "path": "methods/calls.go",
         "start": 2092,
         "end": 2134
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2924,
+        "end": 2934
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow::opaque#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+      "target": "example.com/acme/conformance::methods/calls.go::opaque",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2908,
+        "end": 2916
       }
     },
     {
@@ -1469,6 +1629,32 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2758,
+        "end": 2768
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow::opaque#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+      "target": "example.com/acme/conformance::methods/calls.go::opaque",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2735,
+        "end": 2743
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::LocalType::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::LocalType",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -1503,6 +1689,21 @@
         "path": "methods/calls.go",
         "start": 1612,
         "end": 1622
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::RangeShadow::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::RangeShadow",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3115,
+        "end": 3125
       }
     },
     {
@@ -1558,6 +1759,32 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2848,
+        "end": 2858
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow::opaque#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+      "target": "example.com/acme/conformance::methods/calls.go::opaque",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2824,
+        "end": 2832
+      }
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::TypeParam::s.Flush#0",
       "caller": "example.com/acme/conformance::methods/calls.go::TypeParam",
       "target": null,
@@ -1571,6 +1798,84 @@
         "path": "methods/calls.go",
         "start": 2045,
         "end": 2054
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3029,
+        "end": 3039
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBefore::cur.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBefore",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2351,
+        "end": 2363
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::c.Add#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log.Add"
+      ],
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2448,
+        "end": 2458
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::run#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "target": "example.com/acme/conformance::methods/calls.go::run",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2433,
+        "end": 2485
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box.M::b.v.Ping#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Box.M",
+      "target": "example.com/acme/conformance::methods/types.go::T.Ping",
+      "level": "inferred",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1545,
+        "end": 1555
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box.M::t.Ping#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Box.M",
+      "target": "example.com/acme/conformance::methods/types.go::T.Ping",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1535,
+        "end": 1543
       }
     },
     {
@@ -2295,6 +2600,7 @@
         "example.com/acme/conformance::methods/calls.go::Capture",
         "example.com/acme/conformance::methods/calls.go::FromClosure",
         "example.com/acme/conformance::methods/calls.go::FromSecondResult",
+        "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
         "example.com/acme/conformance::methods/calls.go::run",
         "example.com/acme/conformance::methods/types.go::Log.Add",
         "example.com/acme/conformance::methods/types.go::Pair"
@@ -2302,6 +2608,15 @@
     },
     {
       "name": "methods#3",
+      "members": [
+        "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+        "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+        "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+        "example.com/acme/conformance::methods/calls.go::opaque"
+      ]
+    },
+    {
+      "name": "methods#4",
       "members": [
         "example.com/acme/conformance::methods/calls.go::FromLiteral",
         "example.com/acme/conformance::methods/calls.go::FromMethodResult",
@@ -2320,10 +2635,17 @@
       ]
     },
     {
-      "name": "methods#4",
+      "name": "methods#5",
       "members": [
         "example.com/acme/conformance::methods/calls.go::FromSibling",
         "example.com/acme/conformance::methods/reset.go::Counter.Reset"
+      ]
+    },
+    {
+      "name": "methods#6",
+      "members": [
+        "example.com/acme/conformance::methods/types.go::Box.M",
+        "example.com/acme/conformance::methods/types.go::T.Ping"
       ]
     },
     {
@@ -2434,6 +2756,44 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::AfterBlock",
+      "kind": "export",
+      "label": "AfterBlock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::AfterBlock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::AfterBlock::cur.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::AfterBlock::cur.Add#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::methods/calls.go::Capture",
       "kind": "export",
       "label": "Capture",
@@ -2465,6 +2825,39 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::methods/types.go::Counter.Bump"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+      "kind": "export",
+      "label": "ForInitShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::ForInitShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::opaque"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::ForInitShadow::c.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
         }
       ]
     },
@@ -2846,6 +3239,39 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+      "kind": "export",
+      "label": "IfInitShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::IfInitShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::opaque"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::IfInitShadow::c.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::methods/calls.go::LocalType",
       "kind": "export",
       "label": "LocalType",
@@ -2905,6 +3331,32 @@
           "level": "ambiguous",
           "via": "call",
           "node": "example.com/acme/conformance::methods/calls.go::NotWrittenMany::l.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::RangeShadow",
+      "kind": "export",
+      "label": "RangeShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::RangeShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::RangeShadow::c.Add#0",
           "mark": "ambiguous",
           "candidates": [
             "example.com/acme/conformance::methods/types.go::Gauge.Add",
@@ -2980,6 +3432,39 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+      "kind": "export",
+      "label": "SwitchInitShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::opaque"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow::c.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::methods/calls.go::TypeParam",
       "kind": "export",
       "label": "TypeParam",
@@ -3003,6 +3488,112 @@
             "example.com/acme/conformance::methods/types.go::Mem.Flush",
             "example.com/acme/conformance::methods/types.go::Sink.Flush"
           ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+      "kind": "export",
+      "label": "TypeSwitchShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow::c.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::UseBefore",
+      "kind": "export",
+      "label": "UseBefore",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::UseBefore"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::UseBefore::cur.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "kind": "export",
+      "label": "UseBeforeInClosure",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::c.Add#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::methods/types.go::Gauge.Add",
+            "example.com/acme/conformance::methods/types.go::Log.Add"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::methods/types.go::Box.M",
+      "kind": "export",
+      "label": "Box.M",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::methods/types.go::Box.M"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::methods/types.go::T.Ping"
         }
       ]
     },

@@ -76,3 +76,20 @@ func Pair() (Log, Gauge) {
 var shared = &Counter{}
 
 var global Counter
+
+var cur = Log{}
+
+type T struct{}
+
+func (T) Ping() {}
+
+// A type declaration's parameters scope the declaration, not its methods: `T` in `M` is the
+// package's type, while the field `v` has the parameter's.
+type Box[T any] struct {
+	v T
+}
+
+func (b Box[U]) M(t *T) {
+	t.Ping()
+	b.v.Ping()
+}
