@@ -258,6 +258,11 @@ All notable changes to Meada are recorded here. The format follows
   source roots. Only public names (no leading `_`, or those of a literal `__all__`) are export
   entry points, though an import still reaches the others.
 
+### Changed
+
+- The default model of the `decisions` decider is now `typesafe/jev-1.14` (was `typesafe/jev-1.13`);
+  `MEADA_DECIDER_MODEL` still overrides it. The request and answer shapes are unchanged.
+
 ### Fixed
 
 - A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,
@@ -321,10 +326,22 @@ All notable changes to Meada are recorded here. The format follows
   index: each name it exports is looked up among the file's exports, and the functions and
   methods of each export entry point among its definitions, by name rather than by reading
   them all.
+- A file of thousands of imports, of names in a literal `__all__`, or of Python definitions and
+  additions to a list (`xs += [...]`, `xs = xs + [...]`) no longer takes time quadratic in
+  their count to index: each name is looked up among the file's imports, externs and
+  `__all__`, each Python definition among the names bound before it, and each addition among
+  the values assigned before it, by name rather than by reading them all.
+- A value followed through a file of thousands of functions or constants, or a name read in a
+  function of thousands of parameters, no longer takes time quadratic in their count: each
+  definition, constant and parameter is looked up by name rather than by reading them all.
 - A Rust `let mut` String in a block nested deep in other blocks no longer costs, for each
   statement after it, time in proportion to the depth: its statements are read once from the
   block instead of being looked up from the root of the tree, so a thousand `let mut`s a
   thousand blocks deep no longer take most of a minute to index.
+- A Rust file nested deep in blocks no longer costs, for each name it mentions, each type it
+  writes and each function with route attributes, time in proportion to the depth: what the
+  walks need is kept on the way down instead of being looked up from the root of the tree, so
+  a few hundred `let x: T` a thousand blocks deep no longer take seconds to index.
 
 ## [0.1.0] - Unreleased
 

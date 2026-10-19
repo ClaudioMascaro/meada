@@ -177,6 +177,46 @@ struct Visit<'t> {
     open: bool,
     /// Whether the node is an argument of a call: a closure there is a definition.
     arg: bool,
+    /// How many nodes are above it, and the items that may declare type parameters among them
+    /// (the node itself too, when it is one), nearest first: `parameter` reads them from here.
+    depth: usize,
+    items: Option<Rc<Items<'t>>>,
+}
+
+/// An item around a node, with its depth in the tree.
+struct Items<'t> {
+    item: Node<'t>,
+    depth: usize,
+    up: Option<Rc<Items<'t>>>,
+}
+
+// Dropped one at a time: items nested thousands deep in a generated file would overflow the call
+// stack if each one dropped the next.
+impl Drop for Items<'_> {
+    fn drop(&mut self) {
+        let mut up = self.up.take();
+        while let Some(items) = up {
+            up = Rc::into_inner(items).and_then(|mut i| i.up.take());
+        }
+    }
+}
+
+/// Where a type is in the tree, for `parameter`: a parent lookup walks down from the root of
+/// the tree, so it costs the depth of the node, and the walk already knows what it needs.
+#[derive(Clone, Copy)]
+struct Around<'a, 't> {
+    depth: usize,
+    items: Option<&'a Items<'t>>,
+}
+
+impl Around<'_, '_> {
+    /// The place of a node `levels` below this one.
+    fn down(self, levels: usize) -> Self {
+        Around {
+            depth: self.depth + levels,
+            ..self
+        }
+    }
 }
 
 /// What a value is read for, once the whole file is.
@@ -312,6 +352,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut spent = 0;
     // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
+    // The route attributes before each function, by node id.
+    let mut routes: HashMap<usize, Routes> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Visit {
         node: tree.root_node(),
@@ -321,6 +363,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         body: Body::Items,
         open: true,
         arg: false,
+        depth: 0,
+        items: None,
     }];
     while let Some(Visit {
         node,
@@ -330,8 +374,27 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         body,
         open,
         arg,
+        depth,
+        items,
     }) = stack.pop()
     {
+        let items = match node.kind() {
+            "function_item"
+            | "function_signature_item"
+            | "impl_item"
+            | "trait_item"
+            | "struct_item"
+            | "enum_item" => Some(Rc::new(Items {
+                item: node,
+                depth,
+                up: items,
+            })),
+            _ => items,
+        };
+        let place = Around {
+            depth,
+            items: items.as_deref(),
+        };
         let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
         // Directly in a module (the file's or one written in place): not in a function, an
         // `impl` or a trait.
@@ -422,7 +485,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         binds: None,
                     };
                     // A type parameter as the result names no class: it is the caller's type.
-                    let result = field(node, "return_type").and_then(|t| written(t, src, false));
+                    let result = field(node, "return_type")
+                        .and_then(|t| written(t, place.down(1), src, false));
                     if let Some(result) = result {
                         paths.push((Slot::Result(facts.defs.len()), path(result)));
                     }
@@ -433,7 +497,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                             class: Class::Enclosing,
                         });
                     }
-                    for (name, segments) in typed_parameters(node, src) {
+                    for (name, segments) in typed_parameters(node, place, src) {
                         paths.push((Slot::Named(facts.receivers.len()), path(segments)));
                         facts.receivers.push(Receiver {
                             scope: qualified.clone(),
@@ -459,7 +523,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         ..def(&qualified, kind, node)
                     });
                     if kind == Kind::Function {
-                        for (item, segments, tree) in route_attributes(node, src) {
+                        let attributes = routes.remove(&node.id()).unwrap_or_default();
+                        for (item, segments, tree) in attributes {
                             let (args, kwargs) = values::attribute(tree, src);
                             let by_path = segments.len() > 1;
                             let callee = segments.first().filter(|_| !by_path).cloned();
@@ -532,7 +597,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 if defined.insert(qualified.clone()) {
                     facts.defs.push(def(&qualified, Kind::Class, node));
                     if node.kind() == "struct_item" {
-                        for (name, segments) in fields(node, src) {
+                        for (name, segments) in fields(node, place, src) {
                             let path = Path {
                                 scope: qualified.clone(),
                                 module: module.clone(),
@@ -706,10 +771,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             // too: the two cannot tell which a call reaches, so the name is a local.
             "let_declaration"
                 if !deep
-                    && typed_let(node, src)
+                    && typed_let(node, place, src)
                         .is_some_and(|(name, _)| !scan.params.contains(&(scope.clone(), name))) =>
             {
-                let Some((name, how)) = typed_let(node, src) else {
+                let Some((name, how)) = typed_let(node, place, src) else {
                     continue;
                 };
                 match how {
@@ -825,7 +890,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 facts.unbuilt = true;
                 Vec::new()
             }
-            _ => built(node, &features, src, &mut renamed),
+            _ => built(node, &features, src, &mut renamed, &mut routes),
         };
         // A `let mut` String the rest of its block only reads and appends to: the statements
         // after it are the ones `kids` holds, read once (a sibling lookup costs the depth of the
@@ -854,6 +919,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             body: body.clone(),
             open,
             arg: node.kind() == "arguments",
+            depth: depth + 1,
+            items: items.clone(),
         }));
     }
     for (scope, name) in assigned {
@@ -1024,13 +1091,15 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
     }
 }
 
-/// The route attributes written before the function `node`, first first: the attribute item,
-/// the segments of its path (`get`, `actix_web::get`) and its argument tokens. Comments between
-/// attributes are skipped, and only `ROUTES_PER_FUNCTION` are kept.
-fn route_attributes<'t>(node: Node<'t>, src: &[u8]) -> Vec<(Node<'t>, Vec<String>, Node<'t>)> {
+/// The route attributes of a function: the attribute item, the segments of its path (`get`,
+/// `actix_web::get`) and its argument tokens, first first.
+type Routes<'t> = Vec<(Node<'t>, Vec<String>, Node<'t>)>;
+
+/// The route attributes written at the end of `before`, the children of a node that come before
+/// a function. Comments between attributes are skipped, and only `ROUTES_PER_FUNCTION` are kept.
+fn route_attributes<'t>(before: &[Node<'t>], src: &[u8]) -> Routes<'t> {
     let mut out = Vec::new();
-    let mut at = node.prev_sibling();
-    while let Some(item) = at {
+    for &item in before.iter().rev() {
         match item.kind() {
             "line_comment" | "block_comment" => {}
             "attribute_item" => {
@@ -1042,7 +1111,6 @@ fn route_attributes<'t>(node: Node<'t>, src: &[u8]) -> Vec<(Node<'t>, Vec<String
             }
             _ => break,
         }
-        at = item.prev_sibling();
     }
     out.reverse();
     out
@@ -1151,17 +1219,19 @@ fn declare(
 /// The children of `node` that are built, in one pass over the list (a sibling lookup per
 /// child would be quadratic in a flat file): the `#[cfg(..)]` attributes before a child decide
 /// it, and so does an inner `#![cfg(..)]` of a module written in place. A `#[path]` value
-/// goes to `paths` under the id of the item it sits on. A `#[cfg_attr(..)]` only adds
-/// attributes, so it never leaves an item out.
+/// goes to `paths` under the id of the item it sits on, and the route attributes before a
+/// function to `routes`. A `#[cfg_attr(..)]` only adds attributes, so it never leaves an item out.
 fn built<'t>(
     node: Node<'t>,
     features: &BTreeSet<String>,
     src: &[u8],
     paths: &mut HashMap<usize, String>,
+    routes: &mut HashMap<usize, Routes<'t>>,
 ) -> Vec<Node<'t>> {
     let mut out = Vec::new();
     let (mut on, mut test, mut path) = (true, false, None);
-    for child in children(node) {
+    let kids: Vec<Node> = children(node).collect();
+    for (at, &child) in kids.iter().enumerate() {
         match child.kind() {
             "attribute_item" => {
                 let (holds, only_test) = attribute_holds(child, features, src);
@@ -1175,6 +1245,12 @@ fn built<'t>(
                 if kept && !inner_off(child, features, src) {
                     if let Some(value) = path {
                         paths.insert(child.id(), value);
+                    }
+                    if child.kind() == "function_item" {
+                        let found = route_attributes(&kids[..at], src);
+                        if !found.is_empty() {
+                            routes.insert(child.id(), found);
+                        }
                     }
                     out.push(child);
                 }
@@ -1291,7 +1367,7 @@ fn has_self(function: Node) -> bool {
 
 /// The parameters named by a plain identifier whose type the source writes, with the path of
 /// that type.
-fn typed_parameters(function: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
+fn typed_parameters(function: Node, place: Around, src: &[u8]) -> Vec<(String, Vec<String>)> {
     let Some(list) = field(function, "parameters") else {
         return Vec::new();
     };
@@ -1301,14 +1377,14 @@ fn typed_parameters(function: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
             let name = field(p, "pattern").filter(|n| n.kind() == "identifier")?;
             Some((
                 text(name, src).to_string(),
-                written(field(p, "type")?, src, true)?,
+                written(field(p, "type")?, place.down(3), src, true)?,
             ))
         })
         .collect()
 }
 
 /// The named fields of a struct whose type the source writes, with the path of that type.
-fn fields(item: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
+fn fields(item: Node, place: Around, src: &[u8]) -> Vec<(String, Vec<String>)> {
     let Some(list) = field(item, "body").filter(|b| b.kind() == "field_declaration_list") else {
         return Vec::new();
     };
@@ -1316,7 +1392,7 @@ fn fields(item: Node, src: &[u8]) -> Vec<(String, Vec<String>)> {
     declared
         .filter_map(|f| {
             let name = text(field(f, "name")?, src).to_string();
-            Some((name, written(field(f, "type")?, src, true)?))
+            Some((name, written(field(f, "type")?, place.down(3), src, true)?))
         })
         .collect()
 }
@@ -1333,11 +1409,11 @@ fn mutable(node: Node) -> bool {
     children(node).any(|c| c.kind() == "mutable_specifier")
 }
 
-fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
+fn typed_let(node: Node, place: Around, src: &[u8]) -> Option<(String, How)> {
     let pattern = field(node, "pattern").filter(|p| p.kind() == "identifier")?;
     let name = text(pattern, src).to_string();
     if let Some(ty) = field(node, "type") {
-        return Some((name, How::Type(written(ty, src, true)?)));
+        return Some((name, How::Type(written(ty, place.down(1), src, true)?)));
     }
     // Only a call of a name or a path: the function it calls is what the call's own callee says.
     let value = field(node, "value").filter(|v| v.kind() == "call_expression")?;
@@ -1354,22 +1430,25 @@ fn typed_let(node: Node, src: &[u8]) -> Option<(String, How)> {
 /// Trait` and a type parameter bounded by one trait name that trait, so a call on it stops at
 /// the trait's method. `None` for a type that names no single item: a tuple, a slice, a
 /// function, a parameter bounded by several traits or by none. With `generic` false a type
-/// parameter names nothing (a function's result: it is whatever its caller passes).
-fn written(ty: Node, src: &[u8], generic: bool) -> Option<Vec<String>> {
+/// parameter names nothing (a function's result: it is whatever its caller passes). `place` is
+/// where `ty` is.
+fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec<String>> {
     let mut at = ty;
     for _ in 0..PATH_DEPTH {
         return match at.kind() {
             "reference_type" => {
                 at = field(at, "type")?;
+                place = place.down(1);
                 continue;
             }
             "dynamic_type" | "abstract_type" | "bounded_type" => only_bound(&[at], src),
             // `(dyn A + Send)`: a parenthesized type is a tuple of one.
             "tuple_type" if at.child_count() == 3 && at.named_child_count() == 1 => {
                 at = at.named_child(0)?;
+                place = place.down(1);
                 continue;
             }
-            "type_identifier" => match parameter(at, text(at, src), src) {
+            "type_identifier" => match parameter(place, text(at, src), src) {
                 Some(bound) => bound.filter(|_| generic),
                 None => Some(vec![text(at, src).to_string()]),
             },
@@ -1377,7 +1456,7 @@ fn written(ty: Node, src: &[u8], generic: bool) -> Option<Vec<String>> {
             "scoped_type_identifier" | "generic_type" => {
                 let path = segments(at, src)?;
                 // `T::Item`: a member of a type parameter names nothing here.
-                match parameter(at, &path[0], src) {
+                match parameter(place, &path[0], src) {
                     Some(_) => None,
                     None => Some(path),
                 }
@@ -1428,28 +1507,22 @@ fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
     }
 }
 
-/// The type parameter `name` as the items around `node` declare it: `Some` of the one trait it
-/// is bounded by (in `<T: Trait>` or a `where` clause), or of `None` when it has no single
-/// bound; `None` when no item around declares it, so the name is a type.
-fn parameter(node: Node, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> {
-    let mut at = node.parent();
+/// The type parameter `name` as the items around the type at `place` declare it: `Some` of the
+/// one trait it is bounded by (in `<T: Trait>` or a `where` clause), or of `None` when it has no
+/// single bound; `None` when no item around declares it, so the name is a type.
+fn parameter(place: Around, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> {
+    let mut up = place.items;
     // ponytail: blocks nest deeper than items; past the limit the name is taken as a type
     // parameter with no bound, so no repository type is guessed.
-    for _ in 0..PATH_DEPTH {
-        let item = at?;
-        at = item.parent();
-        if !matches!(
-            item.kind(),
-            "function_item"
-                | "function_signature_item"
-                | "impl_item"
-                | "trait_item"
-                | "struct_item"
-                | "enum_item"
-        ) {
-            continue;
-        }
-        let declared = field(item, "type_parameters").into_iter().flat_map(named);
+    while let Some(Items {
+        item,
+        depth,
+        up: next,
+    }) = up
+        && place.depth - depth <= PATH_DEPTH
+    {
+        up = next.as_deref();
+        let declared = field(*item, "type_parameters").into_iter().flat_map(named);
         let mut declared = declared
             .filter(|p| p.kind() == "type_parameter")
             .filter(|p| field(*p, "name").is_some_and(|n| text(n, src) == name));
@@ -1459,7 +1532,7 @@ fn parameter(node: Node, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> 
         let mut bounds: Vec<Node> = (field(declared, "bounds").into_iter())
             .flat_map(named)
             .collect();
-        let clause = named(item).find(|c| c.kind() == "where_clause");
+        let clause = named(*item).find(|c| c.kind() == "where_clause");
         for predicate in clause.into_iter().flat_map(named) {
             let left = field(predicate, "left");
             if left.is_some_and(|l| l.kind() == "type_identifier" && text(l, src) == name) {
@@ -1468,7 +1541,7 @@ fn parameter(node: Node, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> 
         }
         return Some(only_bound(&bounds, src));
     }
-    Some(None)
+    (place.depth >= PATH_DEPTH).then_some(None)
 }
 
 /// The names a pattern binds, `BINDING_DEPTH` levels deep: not the type a struct or tuple
@@ -1758,11 +1831,51 @@ fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Optio
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
     use super::*;
     use crate::lang::Value;
 
     pub(super) fn facts(src: &str) -> Facts {
         parse(src.as_bytes(), "").unwrap()
+    }
+
+    /// How many empty blocks the timing tests put side by side, and how many they nest.
+    const DEPTH: usize = 2000;
+
+    /// Times `run` on two files of the same nodes, `fn f() { BODY }`: one with `body` after
+    /// `DEPTH` empty blocks side by side, one with `body` inside `DEPTH` nested blocks. It must
+    /// take less than four times as long deep as at the top.
+    pub(super) fn same_time_at_any_depth(
+        body: &str,
+        run: impl Fn(&str, &tree_sitter::Tree) -> Duration,
+    ) {
+        let top = format!("fn f() {{ {}{body} }}\n", "{} ".repeat(DEPTH));
+        let deep = format!(
+            "fn f() {{ {}{body}{} }}\n",
+            "{ ".repeat(DEPTH),
+            "} ".repeat(DEPTH)
+        );
+        let mut parser = Parser::new();
+        let language = tree_sitter_rust::LANGUAGE.into();
+        parser.set_language(&language).unwrap();
+        let [top, deep] = [top, deep].map(|src| {
+            let tree = parser.parse(&src, None).unwrap();
+            assert!(!tree.root_node().has_error());
+            (src, tree)
+        });
+        // A parent or sibling lookup walks down from the root of the tree, so it costs the depth
+        // of the node; each node must cost the same anywhere. The least of interleaved runs
+        // keeps the machine's speed and load out of the ratio.
+        let (mut at_top, mut at_depth) = (Duration::MAX, Duration::MAX);
+        for _ in 0..5 {
+            at_top = at_top.min(run(&top.0, &top.1));
+            at_depth = at_depth.min(run(&deep.0, &deep.1));
+        }
+        assert!(
+            at_depth < at_top * 4,
+            "{at_top:?} at the top, {at_depth:?} {DEPTH} deep"
+        );
     }
 
     fn callees(src: &str) -> Vec<(String, bool)> {
@@ -2485,5 +2598,90 @@ mod tests {
         );
         // The walk gives up before it finds the declaration: `T` is no type, so no receiver.
         assert!(receivers(&src).is_empty());
+    }
+
+    #[test]
+    fn a_parameter_is_declared_for_the_types_up_to_the_limit_below_it() {
+        // Each nested block is two nodes (an expression statement and a block). The type of a
+        // `let` in `k` of them is `3 + 2k` levels below the function that declares `T`, one more
+        // behind a `&`; the type of a nested function's parameter or a nested struct's field is
+        // `5 + 2k`, and one more.
+        let found = |head: &str, inner: &str, k: usize| {
+            let (open, close) = ("{ ".repeat(k), "}".repeat(k));
+            receivers(&format!("{head} {{ {open}{inner}{close} }}\n"))
+        };
+        let cases = [
+            ("let x: T = y();", 3, "f x"),
+            ("let x: &T = y();", 4, "f x"),
+            ("fn g(x: T) {}", 5, "f.g x"),
+            ("fn g(x: &T) {}", 6, "f.g x"),
+            ("struct S { a: T }", 5, "f.S a"),
+        ];
+        for (inner, levels, receiver) in cases {
+            let last = (PATH_DEPTH - levels) / 2;
+            let class = [format!("{receiver} = P")];
+            assert_eq!(found("fn f<T: P>()", inner, last), class, "{inner}");
+            assert!(found("fn f<T: P>()", inner, last + 1).is_empty(), "{inner}");
+        }
+        // A name nothing declares is a type, until the type is `PATH_DEPTH` levels below the
+        // root of the tree: there the walk gives up and the name is no type.
+        for (inner, depth) in [("let x: U = y();", 4), ("let x: &U = y();", 5)] {
+            let last = (PATH_DEPTH - 1 - depth) / 2;
+            assert_eq!(found("fn f()", inner, last), ["f x = U"], "{inner}");
+            assert!(found("fn f()", inner, last + 1).is_empty(), "{inner}");
+        }
+        // So is the result of a nested function.
+        let result = |k: usize| {
+            let (open, close) = ("{ ".repeat(k), "}".repeat(k));
+            let src = format!("fn f() {{ {open}fn g() -> U {{ y() }}{close} }}\n");
+            let defs = facts(&src).defs.into_iter();
+            defs.filter(|d| d.name == "f.g").find_map(|d| d.result)
+        };
+        let last = (PATH_DEPTH - 1 - 4) / 2;
+        assert!(matches!(result(last), Some(Class::Type(u)) if u == "U"));
+        assert!(result(last + 1).is_none());
+    }
+
+    #[test]
+    fn a_long_chain_of_items_is_dropped_without_recursion() {
+        let mut parser = Parser::new();
+        let language = tree_sitter_rust::LANGUAGE.into();
+        parser.set_language(&language).unwrap();
+        let tree = parser.parse("fn f() {}", None).unwrap();
+        let mut items = None;
+        for depth in 0..1_000_000 {
+            let item = tree.root_node();
+            items = Some(Rc::new(Items {
+                item,
+                depth,
+                up: items,
+            }));
+        }
+        drop(items);
+    }
+
+    #[test]
+    fn a_type_parameter_is_read_in_the_same_time_at_any_depth() {
+        // Looking for the declaration of the `T` of each `let`, the walk went up the tree, a
+        // lookup per level, up to `PATH_DEPTH` of them.
+        same_time_at_any_depth(&"let x: T = y();\n".repeat(50), |src, _| {
+            let start = Instant::now();
+            facts(src);
+            start.elapsed()
+        });
+    }
+
+    #[test]
+    fn the_route_attributes_of_a_function_are_read_in_the_same_time_at_any_depth() {
+        // Reading the attributes before each function, the walk looked up a sibling per attribute.
+        let functions =
+            (0..300).map(|i| format!("#[get(\"/a\")] #[post(\"/b\")] fn h{i}() {{}}\n"));
+        same_time_at_any_depth(&functions.collect::<String>(), |src, _| {
+            let start = Instant::now();
+            let calls = facts(src).calls;
+            let took = start.elapsed();
+            assert_eq!(calls.iter().filter(|c| c.decorates.is_some()).count(), 600);
+            took
+        });
     }
 }

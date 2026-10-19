@@ -151,7 +151,7 @@ Quatro variáveis de ambiente o configuram (nada vem de arquivo):
 | `MEADA_DECIDER_PROTOCOL` | `decisions` ou `chat` | `decisions` |
 | `MEADA_DECIDER_URL` | URL base | `https://openrouter.ai` (`decisions`); obrigatória com `chat` |
 | `MEADA_DECIDER_KEY` | chave da API, enviada só no cabeçalho `Authorization` | obrigatória com `decisions`; opcional com `chat` |
-| `MEADA_DECIDER_MODEL` | modelo | `typesafe/jev-1.13` (`decisions`); obrigatória com `chat` |
+| `MEADA_DECIDER_MODEL` | modelo | `typesafe/jev-1.14` (`decisions`); obrigatória com `chat` |
 
 - **`decisions`** (o padrão) usa a API de decisões do OpenRouter, com o Jev: uma única
   requisição leva todos os itens, e a resposta traz a probabilidade de cada candidato. A

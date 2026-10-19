@@ -151,7 +151,7 @@ ask. Four environment variables configure it (nothing comes from a file):
 | `MEADA_DECIDER_PROTOCOL` | `decisions` or `chat` | `decisions` |
 | `MEADA_DECIDER_URL` | base URL | `https://openrouter.ai` (`decisions`); required with `chat` |
 | `MEADA_DECIDER_KEY` | API key, sent only in the `Authorization` header | required with `decisions`; optional with `chat` |
-| `MEADA_DECIDER_MODEL` | model | `typesafe/jev-1.13` (`decisions`); required with `chat` |
+| `MEADA_DECIDER_MODEL` | model | `typesafe/jev-1.14` (`decisions`); required with `chat` |
 
 - **`decisions`** (the default) uses OpenRouter's decisions API, with Jev: a single request
   carries every item, and the response gives the probability of each candidate. The request
