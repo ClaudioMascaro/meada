@@ -1,12 +1,12 @@
 //! The shared resolution (ADR 0007): connects each call a language pack found to the
 //! definitions it reaches, with Meada's own scope and import resolution and no types.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Reaches, Star, Step, Ty, Value,
+    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules,
+    Param, Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -38,8 +38,9 @@ static NAMESPACE: Imported = Imported::Namespace;
 /// An `exports` row: the name, the file and the definition in it.
 type Row<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
 
-/// Where a file's star exports (`Export::All`) and the exports of each name sit in its
-/// `Facts::exports`, each list in order: a name is looked up without a scan of them all.
+/// Where a file's star entries (`Export::All`, `Imported::All`) and those of each name sit in
+/// its `Facts::exports` or its `Facts::imports`, each list in order: a name is looked up
+/// without a scan of them all.
 #[derive(Default)]
 struct Named<'a> {
     stars: Vec<usize>,
@@ -47,7 +48,7 @@ struct Named<'a> {
 }
 
 impl<'a> Named<'a> {
-    fn new(exports: &'a [Export]) -> Self {
+    fn exports(exports: &'a [Export]) -> Self {
         let mut named = Self::default();
         for (at, export) in exports.iter().enumerate() {
             match export {
@@ -60,7 +61,24 @@ impl<'a> Named<'a> {
         named
     }
 
-    /// Where the exports of `name` sit.
+    /// The imports by the `local` they bind (a pack's scoped ones under the qualified name:
+    /// `inner.c`, `inner.*`), and those of every name (`Imported::All`) among the stars.
+    fn imports(imports: &'a [Import]) -> Self {
+        let mut named = Self::default();
+        for (at, import) in imports.iter().enumerate() {
+            named
+                .names
+                .entry(import.local.as_str())
+                .or_default()
+                .push(at);
+            if matches!(import.name, Imported::All) {
+                named.stars.push(at);
+            }
+        }
+        named
+    }
+
+    /// Where the entries of `name` sit.
     fn of(&self, name: &str) -> &[usize] {
         self.names.get(name).map_or(&[], Vec::as_slice)
     }
@@ -75,14 +93,6 @@ pub fn call_at(calls: &[Call], range: &std::ops::Range<usize>) -> Option<usize> 
     match calls.get(at) {
         Some(c) if c.range == *range => Some(at),
         _ => calls.iter().position(|c| c.range == *range),
-    }
-}
-
-/// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
-fn bound_in(local: &str, scope: &str, name: &str) -> bool {
-    match scope {
-        "" => local == name,
-        scope => local.strip_prefix(scope).and_then(|l| l.strip_prefix('.')) == Some(name),
     }
 }
 
@@ -245,6 +255,10 @@ const FAMILY_DEPTH: usize = 128;
 /// started.
 struct Cut;
 
+/// A file's parameters and the names their object patterns destructure, by function and name:
+/// the position of the first parameter, then field of one, that spells it.
+type Params<'a> = HashMap<(&'a str, &'a str), (usize, Option<usize>)>;
+
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
@@ -257,8 +271,18 @@ pub struct Resolver<'a> {
     locals: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::receivers`, by scope and name.
     receivers: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+    /// Each file's parameters and the names their object patterns destructure.
+    params: HashMap<&'a str, Params<'a>>,
     /// Each file's `Facts::exports`, by the name they give.
     named: HashMap<&'a str, Named<'a>>,
+    /// Each file's `Facts::imports`, by the `local` they bind.
+    by_local: HashMap<&'a str, Named<'a>>,
+    /// Each file's `Facts::externs`.
+    externs: HashMap<&'a str, HashSet<&'a str>>,
+    /// The files with a path import (`Imported::Path`).
+    pathed: HashSet<&'a str>,
+    /// What each file's star import takes (`Facts::star`).
+    takers: HashMap<&'a str, Taker<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
@@ -375,6 +399,24 @@ impl<'a> Resolver<'a> {
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
             .collect();
+        // Those of the definition `defs` keeps for each name.
+        let params = (defs.iter())
+            .map(|(path, names)| {
+                let mut params = HashMap::new();
+                for (&function, def) in names {
+                    for (n, p) in def.params.iter().enumerate() {
+                        params
+                            .entry((function, p.name.as_str()))
+                            .or_insert((n, None));
+                        for (f, field) in p.fields.iter().enumerate() {
+                            let name = field.name.as_str();
+                            params.entry((function, name)).or_insert((n, Some(f)));
+                        }
+                    }
+                }
+                (*path, params)
+            })
+            .collect();
         let consts = files
             .iter()
             .map(|(path, facts)| {
@@ -396,7 +438,23 @@ impl<'a> Resolver<'a> {
             })
             .collect();
         let named = (files.iter())
-            .map(|(path, facts)| (*path, Named::new(&facts.exports)))
+            .map(|(path, facts)| (*path, Named::exports(&facts.exports)))
+            .collect();
+        let by_local = (files.iter())
+            .map(|(path, facts)| (*path, Named::imports(&facts.imports)))
+            .collect();
+        let externs = files
+            .iter()
+            .map(|(path, facts)| (*path, facts.externs.iter().map(String::as_str).collect()))
+            .collect();
+        let pathed = (files.iter())
+            .filter(|(_, facts)| {
+                (facts.imports.iter()).any(|i| matches!(i.name, Imported::Path(_)))
+            })
+            .map(|(path, _)| *path)
+            .collect();
+        let takers = (files.iter())
+            .map(|(path, facts)| (*path, facts.star.taker()))
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
@@ -454,7 +512,12 @@ impl<'a> Resolver<'a> {
             consts,
             locals,
             receivers,
+            params,
             named,
+            by_local,
+            externs,
+            pathed,
+            takers,
             families: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
@@ -728,8 +791,12 @@ impl<'a> Resolver<'a> {
         if let Some((exported, _)) = self.named[path].names.get_key_value(dotted.as_str()) {
             return self.export_as(path, exported, seen, value);
         }
-        let mut imports = self.files[path].imports.iter().rev();
-        match imports.find(|i| i.local == module.name && matches!(i.name, Imported::Namespace)) {
+        let imports = &self.files[path].imports;
+        let at = self.by_local[path].of(module.name).iter().rev();
+        let namespace = at
+            .map(|&at| &imports[at])
+            .find(|i| matches!(i.name, Imported::Namespace));
+        match namespace {
             Some(i) => match self.import(path, "", &i.source, &i.name, seen) {
                 Binding::Module(m) => self.export_as(m, member, seen, value),
                 _ => Binding::Unknown,
@@ -1028,8 +1095,9 @@ impl<'a> Resolver<'a> {
             let mut at = Some(scope);
             let target = loop {
                 let Some(s) = at else { break None };
-                let found = imports.iter().rev().find_map(|i| match &i.name {
-                    Imported::Path(t) if bound_in(&i.local, s, head) => Some(t),
+                let bound = self.by_local[path].of(&crate::qualify(s, head));
+                let found = bound.iter().rev().find_map(|&at| match &imports[at].name {
+                    Imported::Path(t) => Some(t),
                     _ => None,
                 });
                 if found.is_some() {
@@ -1045,8 +1113,8 @@ impl<'a> Resolver<'a> {
             name = next;
         }
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
-        let imports = imports.iter().rev();
-        match imports.map(|i| (i, &i.name)).find(|(i, _)| i.local == head) {
+        let latest = self.by_local[path].of(head).last();
+        match latest.map(|&at| (&imports[at], &imports[at].name)) {
             Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
                 format!("{}.{n}{rest}", i.source)
@@ -1210,20 +1278,8 @@ impl<'a> Resolver<'a> {
             if let Some(constant) = self.consts[path].get(candidate.as_str()) {
                 return Binding::Const(path, constant);
             }
-            if let Some((function, def)) = defs.get_key_value(s)
-                && let Some((n, field)) = def.params.iter().enumerate().find_map(|(n, p)| {
-                    if p.name == name {
-                        return Some((n, None));
-                    }
-                    let field = p.fields.iter().position(|f| f.name == name)?;
-                    Some((n, Some(field)))
-                })
-            {
-                let function = Target {
-                    path,
-                    name: function,
-                };
-                return Binding::Param(function, n, field);
+            if let Some(&(n, field)) = self.params[path].get(&(s, name)) {
+                return Binding::Param(Target { path, name: s }, n, field);
             }
             match self.receivers[path].get(&(s, name)) {
                 Some(Class::Imported) => return self.imported_in(path, name, seen, true),
@@ -1300,7 +1356,13 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         top: bool,
     ) -> Binding<'a> {
-        let given = (self.files[path].imports.iter().rev()).map(|import| {
+        // Only the imports that bind `name` or every name may give it, the latest first.
+        let (imports, index) = (&self.files[path].imports, &self.by_local[path]);
+        let mut at = [index.of(name), index.stars.as_slice()].concat();
+        at.sort_unstable();
+        at.dedup();
+        let given = at.into_iter().rev().map(|at| {
+            let import = &imports[at];
             let scoped = matches!(import.name, Imported::Path(_) | Imported::Glob { .. });
             // A module declared in the file (Rust's `mod x;`) is in scope where its
             // definition is.
@@ -1323,7 +1385,7 @@ impl<'a> Resolver<'a> {
         if top && let Some(found) = self.globs(path, "", name, false, seen) {
             return found;
         }
-        if !self.files[path].externs.iter().any(|n| n == name) {
+        if !self.externs[path].contains(name) {
             return Binding::Unknown;
         }
         match self.module(path, name) {
@@ -1343,9 +1405,14 @@ impl<'a> Resolver<'a> {
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
-        for import in self.files[path].imports.iter().rev() {
+        let imports = &self.files[path].imports;
+        for &at in self.by_local[path]
+            .of(&crate::qualify(scope, name))
+            .iter()
+            .rev()
+        {
+            let import = &imports[at];
             if let Imported::Path(target) = &import.name
-                && bound_in(&import.local, scope, name)
                 && !seen.aliases.contains(&(path, target.as_str()))
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
@@ -1370,8 +1437,13 @@ impl<'a> Resolver<'a> {
         public: bool,
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
-        let imports = self.files[path].imports.iter().enumerate();
-        for (at, import) in imports.rev() {
+        let imports = &self.files[path].imports;
+        for &at in self.by_local[path]
+            .of(&crate::qualify(scope, "*"))
+            .iter()
+            .rev()
+        {
+            let import = &imports[at];
             let Imported::Glob {
                 path: target,
                 inside,
@@ -1380,7 +1452,7 @@ impl<'a> Resolver<'a> {
             else {
                 continue;
             };
-            if (public && !re_exports) || !bound_in(&import.local, scope, "*") {
+            if public && !re_exports {
                 continue;
             }
             if seen.depth >= LINK_DEPTH {
@@ -1495,7 +1567,7 @@ impl<'a> Resolver<'a> {
     /// (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut at
     /// `LINK_DEPTH` stays unknown.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
-        if !self.files[path].star.takes(name) {
+        if !self.takers[path].takes(name) {
             return self.globs(path, "", name, true, seen);
         }
         let outer = std::mem::take(&mut seen.looped);
@@ -1723,7 +1795,8 @@ impl<'a> Resolver<'a> {
             for export in &facts.exports {
                 let found = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
-                        if private.contains(exported.as_str()) && !facts.star.takes(exported) {
+                        if private.contains(exported.as_str()) && !self.takers[path].takes(exported)
+                        {
                             continue;
                         }
                         self.rows(path, exported, private.contains(exported.as_str()))
@@ -1804,7 +1877,7 @@ impl<'a> Resolver<'a> {
                     }
                     Export::All { .. } => None,
                 });
-                out.extend(named.filter(|n| facts.star.takes(n)));
+                out.extend(named.filter(|n| self.takers[m].takes(n)));
                 self.glob_names(m, done, out);
             }
         }
@@ -2052,7 +2125,31 @@ pub struct Code<'a> {
     chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
     /// What folding and tracing values has spent of each file's `EVAL_BUDGET`.
     folded: RefCell<HashMap<&'a str, usize>>,
+    /// Each file of `full` by name, built the first time a name is looked up in it.
+    by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     pack: &'static dyn LanguagePack,
+}
+
+/// A file's full definitions and constants by name: the first definition of each name, and its
+/// constants of each name in source order.
+#[derive(Default)]
+struct ByName<'a> {
+    defs: HashMap<&'a str, &'a Def>,
+    consts: HashMap<&'a str, Vec<&'a Const>>,
+}
+
+impl<'a> ByName<'a> {
+    fn new(facts: &'a Facts) -> Self {
+        let mut by_name = Self::default();
+        for def in &facts.defs {
+            by_name.defs.entry(def.name.as_str()).or_insert(def);
+        }
+        for constant in &facts.consts {
+            let named = by_name.consts.entry(constant.name.as_str()).or_default();
+            named.push(constant);
+        }
+        by_name
+    }
 }
 
 /// Where a value comes from when a package outside the repository made it: the specifier
@@ -2080,6 +2177,7 @@ impl<'a> Code<'a> {
             misses: RefCell::new(BTreeSet::new()),
             chains: RefCell::new(HashMap::new()),
             folded: RefCell::new(HashMap::new()),
+            by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             pack,
         }
     }
@@ -2187,10 +2285,7 @@ impl<'a> Code<'a> {
             return None;
         };
         // A crate a pack's path import (Rust's `use`) names: the whole path, as `external` spells it.
-        let pathed = self.resolver.files[path]
-            .imports
-            .iter()
-            .any(|i| matches!(i.name, Imported::Path(_)));
+        let pathed = self.resolver.pathed.contains(path);
         if pathed && matches!(name, Imported::Namespace) {
             let full = self.resolver.imported_name(path, scope, chain);
             let rest = full.strip_prefix(specifier)?;
@@ -2266,8 +2361,7 @@ impl<'a> Code<'a> {
         };
         let mut out = Vec::new();
         for t in targets {
-            let defs = self.full(t.path).map(|f| f.defs.iter());
-            let def = defs.and_then(|mut d| d.find(|d| d.name == t.name));
+            let def = self.def(t.path, t.name);
             let values = def.map(|d| d.return_values.iter()).into_iter().flatten();
             out.extend(values.map(|v| (t.path, t.name, v)));
         }
@@ -2303,13 +2397,10 @@ impl<'a> Code<'a> {
             if let Some(value) = held.get(&local) {
                 return Some((scope, value));
             }
-            let param = |d: &Def| {
-                (d.params.iter()).any(|p| p.name == name || p.fields.iter().any(|f| f.name == name))
-            };
             if r.locals[path].contains(local.as_str())
                 || r.consts[path].contains(local.as_str())
                 || r.receivers[path].contains_key(&(scope, name))
-                || r.defs[path].get(scope).is_some_and(|d| param(d))
+                || r.params[path].contains_key(&(scope, name))
                 || scope.is_empty()
             {
                 return None;
@@ -2546,9 +2637,7 @@ impl<'a> Code<'a> {
                 return;
             }
         };
-        let Some(def) = (self.full(function.path))
-            .and_then(|f| f.defs.iter().find(|d| d.name == function.name))
-        else {
+        let Some(def) = self.def(function.path, function.name) else {
             return;
         };
         if !self.follows(trail, &Flow::Returns(function)) {
@@ -2653,10 +2742,7 @@ impl<'a> Code<'a> {
         };
         match binding {
             Binding::Const(at, constant) => {
-                let found = self
-                    .full(at)
-                    .and_then(|f| f.consts.iter().find(|c| c.name == constant));
-                let Some(found) = found else {
+                let Some(found) = self.consts(at, constant).first() else {
                     return;
                 };
                 if !self.follows(trail, &Flow::Const(at, constant)) {
@@ -2712,12 +2798,8 @@ impl<'a> Code<'a> {
 
     /// The type the constant `constant` of `path` is declared to have (`Const::ty`).
     pub fn constant_type(&self, path: &'a str, constant: &str) -> Option<&'a Ty> {
-        let consts = &self.full(path)?.consts;
-        consts
-            .iter()
-            .find(|c| c.name == constant && c.ty.is_some())?
-            .ty
-            .as_ref()
+        let consts = self.consts(path, constant);
+        consts.iter().find(|c| c.ty.is_some())?.ty.as_ref()
     }
 
     /// What the function making the call at `index` of `path` does with its result
@@ -2728,16 +2810,13 @@ impl<'a> Code<'a> {
 
     /// The declared return type of the definition `name` of `path` (`Def::returns`).
     pub fn returns(&self, path: &'a str, name: &str) -> Option<&'a Ty> {
-        let def = self.full(path)?.defs.iter().find(|d| d.name == name)?;
-        def.returns.as_ref()
+        self.def(path, name)?.returns.as_ref()
     }
 
     /// The names of the type parameters of the definition `name` of `path`
     /// (`Def::type_params`).
     pub fn type_params(&self, path: &'a str, name: &str) -> &'a [String] {
-        let def = self
-            .full(path)
-            .and_then(|f| f.defs.iter().find(|d| d.name == name));
+        let def = self.def(path, name);
         def.map_or(&[], |d| d.type_params.as_slice())
     }
 
@@ -2749,14 +2828,26 @@ impl<'a> Code<'a> {
         found
     }
 
+    /// The full facts of `path` by name; a file `full` lacks is missed, as `full` misses it.
+    fn by_name(&self, path: &'a str) -> Option<&ByName<'a>> {
+        let facts = self.full(path)?;
+        Some(self.by_name[path].get_or_init(|| ByName::new(facts)))
+    }
+
+    /// The first full definition `name` of `path`.
+    fn def(&self, path: &'a str, name: &str) -> Option<&'a Def> {
+        self.by_name(path)?.defs.get(name).copied()
+    }
+
+    /// The full constants `name` of `path`, in source order.
+    fn consts(&self, path: &'a str, name: &str) -> &[&'a Const] {
+        let consts = self.by_name(path).and_then(|b| b.consts.get(name));
+        consts.map_or(&[], Vec::as_slice)
+    }
+
     /// The parameter at position `n` of `function`.
     fn param(&self, function: Target<'a>, n: usize) -> Option<&'a Param> {
-        let file = self.full(function.path)?;
-        file.defs
-            .iter()
-            .find(|d| d.name == function.name)?
-            .params
-            .get(n)
+        self.def(function.path, function.name)?.params.get(n)
     }
 
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
@@ -2785,13 +2876,9 @@ impl<'a> Code<'a> {
     /// The value the `const` `constant` of `path` holds, as written, and the scope it is
     /// written in.
     fn held(&self, path: &'a str, constant: &'a str) -> Option<(&'a Value, &'a str)> {
-        let value = &self
-            .full(path)?
-            .consts
-            .iter()
-            .find(|c| c.name == constant && !matches!(c.value, Value::Type(_)))?
-            .value;
-        Some((value, scope_of(constant)))
+        let consts = self.consts(path, constant);
+        let held = consts.iter().find(|c| !matches!(c.value, Value::Type(_)))?;
+        Some((&held.value, scope_of(constant)))
     }
 
     /// The `interface` or `type` declaration `name` refers to from `scope` in `path` (spec #23),
@@ -2811,8 +2898,8 @@ impl<'a> Code<'a> {
             return None;
         };
         // Namespaces open no scope: two declarations of one name leave it unknown.
-        let mut declared = (self.full(at)?.consts.iter())
-            .filter(|c| c.name == constant && matches!(c.value, Value::Type(_)));
+        let mut declared =
+            (self.consts(at, constant).iter()).filter(|c| matches!(c.value, Value::Type(_)));
         let declared = declared.next().filter(|_| declared.next().is_none())?;
         match &declared.value {
             Value::Type(ty) => Some((at, constant, ty)),
@@ -3548,6 +3635,354 @@ mod tests {
             let took = start.elapsed();
             assert!(took.as_secs() < 20, "{label}: {took:?}");
         }
+    }
+
+    /// An import nothing looks up: its `local` is no name asked for.
+    fn filler(name: Imported) -> Import {
+        Import {
+            local: "z".into(),
+            source: String::new(),
+            name,
+        }
+    }
+
+    /// A module written in place, `name`.
+    fn module_def(name: &str) -> Def {
+        Def {
+            name: name.into(),
+            kind: Kind::Module,
+            range: 0..0,
+            params: Vec::new(),
+            bases: Vec::new(),
+            decorators: Vec::new(),
+            return_values: Vec::new(),
+            returns: None,
+            type_params: Vec::new(),
+            result: None,
+        }
+    }
+
+    /// The rows `main.rs` of `facts` exports, timed.
+    fn timed_rows(facts: Facts, label: &str) -> usize {
+        let files = BTreeMap::from([("main.rs", &facts)]);
+        let start = std::time::Instant::now();
+        let rows = resolver(&files).exported().len();
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{label}: {took:?}");
+        rows
+    }
+
+    #[test]
+    fn a_file_of_many_imports_looks_each_name_up_in_linear_time() {
+        // Imports of each kind and crates outside the file, none of which a name asked for is.
+        let imports = (0..300_000).map(|i| {
+            filler(match i % 3 {
+                0 => Imported::Namespace,
+                1 => Imported::Path(String::new()),
+                _ => Imported::Glob {
+                    path: String::new(),
+                    inside: false,
+                    public: false,
+                },
+            })
+        });
+        let n = 40_000;
+        let facts = Facts {
+            imports: imports.collect(),
+            externs: (0..300_000).map(|i| format!("e{i}")).collect(),
+            exports: (0..n)
+                .map(|i| Export::Local {
+                    exported: format!("u{i}"),
+                    local: format!("u{i}"),
+                })
+                .collect(),
+            ..Facts::default()
+        };
+        // Each name nothing binds was looked up among the file's imports and among its
+        // externs one by one: minutes here.
+        assert_eq!(timed_rows(facts, "imports"), n);
+    }
+
+    #[test]
+    fn a_file_of_many_imports_finds_each_module_in_linear_time() {
+        // `mod m{i}; pub use m{i}::f as a{i};`, then imports nothing looks up: the namespace
+        // import of `m{i}` sits at the far end of the walk, and so does `a{i}`'s own.
+        let n = 40_000;
+        let mut facts = Facts::default();
+        for i in 0..n {
+            facts.defs.push(module_def(&format!("m{i}")));
+            facts.imports.push(Import {
+                local: format!("m{i}"),
+                source: format!("mod m{i}"),
+                name: Imported::Namespace,
+            });
+        }
+        for i in 0..n {
+            facts.imports.push(Import {
+                local: format!("a{i}"),
+                source: String::new(),
+                name: Imported::Path(format!("m{i}.f")),
+            });
+            facts.exports.push(Export::Local {
+                exported: format!("a{i}"),
+                local: format!("a{i}"),
+            });
+        }
+        let fillers = (0..300_000).map(|_| filler(Imported::Namespace));
+        facts.imports.extend(fillers);
+        // Each module was looked up among the file's imports one by one: minutes here.
+        assert_eq!(timed_rows(facts, "modules"), n);
+    }
+
+    #[test]
+    fn a_file_of_many_imports_resolves_each_external_call_in_linear_time() {
+        let (n, fillers) = (60_000, 500_000);
+        let names: Vec<String> = (0..n).map(|i| format!("a{i}")).collect();
+        let named = names.iter().map(|name| Import {
+            local: name.clone(),
+            source: "ext".into(),
+            name: Imported::Name(name.clone()),
+        });
+        // The imports the calls name come first, so that each lookup walks the fillers.
+        let facts = Facts {
+            imports: (named.chain((0..fillers).map(|_| filler(Imported::Namespace)))).collect(),
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        let start = std::time::Instant::now();
+        for name in &names {
+            assert_eq!(code.imported("a.py", "", name), Some(("ext", name.clone())));
+            assert_eq!(code.external("a.py", "", name), Some(format!("ext.{name}")));
+        }
+        // Each call looked its name up among the file's imports one by one, for the import,
+        // for whether a path import exists and for the name it spells: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_file_of_many_all_names_takes_each_export_in_linear_time() {
+        let (n, listed) = (30_000, 500_000);
+        // `m.py` exports `p{i}` and lists none of them in `__all__`; `main.py` star-imports it
+        // and exports `x{i}`, and `lib.py` globs it (`pub use`).
+        let m = Facts {
+            exports: (0..n)
+                .map(|i| Export::Local {
+                    exported: format!("p{i}"),
+                    local: format!("p{i}"),
+                })
+                .collect(),
+            private: (0..n).map(|i| format!("p{i}")).collect(),
+            star: Star::Only((0..listed).map(|i| format!("n{i}")).collect()),
+            ..Facts::default()
+        };
+        let all = |name: Imported| Import {
+            local: "*".into(),
+            source: "m".into(),
+            name,
+        };
+        let main = Facts {
+            imports: vec![all(Imported::All)],
+            exports: std::iter::once(Export::All { source: "m".into() })
+                .chain((0..n).map(|i| Export::Local {
+                    exported: format!("x{i}"),
+                    local: format!("x{i}"),
+                }))
+                .collect(),
+            ..Facts::default()
+        };
+        let lib = Facts {
+            imports: vec![
+                Import {
+                    local: "m".into(),
+                    source: "m".into(),
+                    name: Imported::Namespace,
+                },
+                all(Imported::Glob {
+                    path: "m".into(),
+                    inside: false,
+                    public: true,
+                }),
+            ],
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("m.py", &m), ("main.py", &main), ("lib.py", &lib)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let start = std::time::Instant::now();
+        let rows = Resolver::new(&files, modules, &Python).exported();
+        // Each name was looked up in `__all__` one by one, to read it, to keep it out of the
+        // exports and to glob it: minutes here. Only `main.py` exports: `m.py` keeps its names
+        // out, and its glob gives none.
+        let took = start.elapsed();
+        assert_eq!(rows.len(), n + 1);
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    /// A plain parameter `name`.
+    fn param(name: &str) -> Param {
+        Param {
+            name: name.into(),
+            binds: Binds::Any,
+            default: None,
+            fields: Vec::new(),
+        }
+    }
+
+    /// A top-level function `name` of `params`.
+    fn function(name: &str, params: Vec<Param>) -> Def {
+        Def {
+            kind: Kind::Function,
+            params,
+            ..module_def(name)
+        }
+    }
+
+    #[test]
+    fn a_file_of_many_definitions_reads_each_one_in_linear_time() {
+        let (n, fillers) = (40_000, 220_000);
+        let names: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
+        // `f{i}()` at the top level, as a value flows from it.
+        let invoked: Vec<Value> = (names.iter().enumerate())
+            .map(|(i, name)| {
+                Value::Call(crate::lang::Invocation {
+                    callee: name.clone(),
+                    receiver: None,
+                    args: Vec::new(),
+                    range: i..i + 1,
+                })
+            })
+            .collect();
+        // `def f{i}[T](x=d)` returning one value.
+        let defined = |name: &str| {
+            let x = Param {
+                default: Some(Value::Ref("d".into())),
+                ..param("x")
+            };
+            Def {
+                return_values: vec![Value::Unknown],
+                type_params: vec!["T".into()],
+                ..function(name, vec![x])
+            }
+        };
+        // The functions looked up come after definitions nothing looks up, so that each lookup
+        // walks them.
+        let defs = (0..fillers).map(|_| module_def("z"));
+        let mut facts = Facts {
+            defs: defs.chain(names.iter().map(|name| defined(name))).collect(),
+            ..Facts::default()
+        };
+        facts.calls = (names.iter().enumerate())
+            .map(|(i, name)| Call {
+                scope: String::new(),
+                callee: name.clone(),
+                range: i..i + 1,
+                args: Vec::new(),
+                kwargs: Vec::new(),
+                decorates: None,
+                by_path: false,
+                root: None,
+                receiver: None,
+                arg_types: Vec::new(),
+                uses: Vec::new(),
+            })
+            .collect();
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        let start = std::time::Instant::now();
+        for (i, name) in names.iter().enumerate() {
+            assert!(code.returns("a.py", name).is_none());
+            assert_eq!(code.type_params("a.py", name), ["T"]);
+            assert!(code.param_defaults_to("a.py", name, "x", "d"));
+            assert_eq!(code.returned("a.py", i).len(), 1);
+            assert!(code.value_origins("a.py", "", &invoked[i]).is_empty());
+        }
+        // Each function was looked up among the file's definitions one by one, for its return
+        // type, its type parameters, its parameter, its return values and the flow through
+        // them: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_file_of_many_constants_reads_each_one_in_linear_time() {
+        let (n, fillers) = (40_000, 300_000);
+        let names: Vec<String> = (0..n).map(|i| format!("c{i}")).collect();
+        let constant = |name: &str| Const {
+            name: name.into(),
+            value: Value::Unknown,
+            ty: None,
+        };
+        // The constants looked up come after those nothing looks up, so that each lookup walks
+        // them.
+        let consts = (0..fillers).map(|_| constant("z"));
+        let facts = Facts {
+            consts: consts
+                .chain(names.iter().map(|name| constant(name)))
+                .collect(),
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        let start = std::time::Instant::now();
+        for name in &names {
+            assert!(code.constant("a.py", "", name).is_some());
+            assert!(code.constant_type("a.py", name).is_none());
+            assert!(code.declared_type("a.py", "", name).is_none());
+            assert!(code.origins("a.py", "", name).is_empty());
+        }
+        // Each constant was looked up among the file's constants one by one, for its value, its
+        // type, its declaration and the flow through it: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_function_of_many_parameters_binds_each_name_in_linear_time() {
+        let (n, fillers) = (40_000, 400_000);
+        let names: Vec<String> = (0..n).map(|i| format!("x{i}")).collect();
+        // `def f(z, z, ..., {x0, x1, ...}, x0, x1, ...)`: each name looked up is a field of the
+        // destructured parameter after the fillers, and a parameter after that, which the field
+        // hides.
+        let fields = names.iter().map(|name| crate::lang::Field {
+            name: name.clone(),
+            key: String::new(),
+            default: None,
+        });
+        let destructured = Param {
+            fields: fields.collect(),
+            ..param("")
+        };
+        let params = ((0..fillers).map(|_| param("z")))
+            .chain([destructured])
+            .chain(names.iter().map(|name| param(name)));
+        let facts = Facts {
+            defs: vec![function("f", params.collect())],
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        let start = std::time::Instant::now();
+        for (i, name) in names.iter().enumerate() {
+            let found = resolver.lexical("a.py", "f", name, &mut resolver.seen("a.py", "f"));
+            assert!(matches!(
+                found,
+                Binding::Param(t, at, Some(field)) if t.name == "f" && at == fillers && field == i
+            ));
+            assert!(code.mutable("a.py", "f", name).is_none());
+        }
+        // Each name was looked up among the function's parameters and their fields one by one,
+        // to bind it and to tell it from a `let mut` around: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
     }
 
     #[test]
