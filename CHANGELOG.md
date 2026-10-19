@@ -70,6 +70,17 @@ All notable changes to Meada are recorded here. The format follows
   a client is read at its call sites, to any depth, with cycle detection. A path that cannot be
   folded is an unresolved consumer.
 
+- Go base URLs from the environment (spec #25): `os.Getenv("X")` and `os.LookupEnv("X")` (its
+  first result) lead a URL as the base URL variable `X`, which maps through `base_url_env` like
+  the other languages' (Meada never reads the value). The read survives a fallback assignment
+  when the value is empty (`if v == "" { v = ".." }`, the default never read, provided it
+  folds to text from literals and constants of the same file) and
+  `strings.TrimSuffix`, `strings.TrimRight` and `strings.TrimSpace`, of the read or of a name
+  bound to it. Two reads in one URL, a fallback to another read, a name assigned any other way
+  and a read the code spells with a shadowed `os` give no base. Cross-language fixtures
+  `xlang-go-web` (TypeScript) and `xlang-go-api` (Go) prove both directions through a variable
+  and through a declared host.
+
 - Go HTTP providers for chi and gorilla/mux (spec #25). chi: `Get`, `Post` and the other
   methods, `Method`/`MethodFunc`, `Handle`/`HandleFunc` (every method), `Route(prefix, fn)` and
   `Group(fn)` (the router `fn` receives, a literal or a named function, is the group, also passed on or held by a name) and

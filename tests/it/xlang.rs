@@ -7,7 +7,7 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, without_processes, xlang, xlang_rust};
+use common::{assert_golden, without_processes, xlang, xlang_go, xlang_rust};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -202,4 +202,144 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_rust_file() {
         .unwrap();
 
     assert_golden("xlang-rust.trace-uncommitted.txt", &answer);
+}
+
+/// The same chain with a Go service (spec #25): the web app (TypeScript, Next.js) reaches the api
+/// (net/http) through `API_URL` and through the api's declared host; the api reaches the web app
+/// with net/http and resty through `WEB_URL` and `STOCK_URL`, read from the environment, and
+/// through its declared host.
+#[test]
+fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
+    let (web, api) = xlang_go("xlang_go_export");
+
+    for (repo, name) in [(web, "web"), (api, "api")] {
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        assert_golden(
+            &format!("xlang-go-{name}.export.json"),
+            &without_processes(&export),
+        );
+    }
+}
+
+/// Every shape of environment read the Go pack folds, and the near misses it leaves alone: the
+/// `via` of the request each function of `go-env-reads` makes.
+#[test]
+fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
+    let repo = common::fixture_repo(
+        "xlang_go_env_reads",
+        "go-env-reads",
+        Some("https://example.com/goenv/probes.git"),
+    );
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let vias: std::collections::BTreeMap<&str, Option<&str>> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let site = c["site"].as_str().unwrap();
+            let function = site.split("::").nth(2).unwrap();
+            (function, c["via"].as_str())
+        })
+        .collect();
+
+    let read = [
+        ("direct", "DIRECT_URL"),
+        ("named", "NAMED_URL"),
+        ("fallback", "FALLBACK_URL"),
+        ("constantDefault", "CONST_URL"),
+        ("emptyOnTheLeft", "LEFT_URL"),
+        ("selfTrim", "SELF_URL"),
+        ("trimmed", "TRIMMED_URL"),
+        ("trimmedRight", "RIGHT_URL"),
+        ("lookedUp", "LOOKUP_URL"),
+        ("formatted", "FORMAT_URL"),
+        ("packageLevel", "PKG_URL"),
+    ];
+    for (function, variable) in read {
+        let expected = format!("env:{variable}");
+        assert_eq!(
+            vias.get(function),
+            Some(&Some(expected.as_str())),
+            "{function}"
+        );
+    }
+    let unread = [
+        "twoReads",
+        "trimmedByARead",
+        "fallbackToAnotherRead",
+        "fallbackToANamedRead",
+        "fallbackToACall",
+        "trimmedAfterANamedRead",
+        "fallbackToALoopVariable",
+        "fallbackToAVariable",
+        "fallbackWithElse",
+        "fallbackOnAnotherTest",
+        "assignedAgain",
+        "fallbackOfALiteral",
+        "hostInTheMiddle",
+        "nameFromAVariable",
+        "trimmedLiteral",
+        "trimmedOtherName",
+        "shadowedPackage",
+    ];
+    for function in unread {
+        assert_eq!(vias.get(function), Some(&None), "{function}");
+    }
+    assert_eq!(vias.len(), read.len() + unread.len());
+}
+
+#[test]
+fn two_exports_of_the_go_cross_language_fixture_are_byte_identical() {
+    let export = |case| {
+        let (web, api) = xlang_go(case);
+        [web, api].map(|r| Engine::open(&r).unwrap().export().unwrap())
+    };
+
+    assert_eq!(export("xlang_go_twice_a"), export("xlang_go_twice_b"));
+}
+
+#[test]
+fn trace_down_crosses_into_go_and_back_to_typescript() {
+    let (web, _) = xlang_go("xlang_go_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("syncOrders"), Direction::Down, None)
+        .unwrap();
+
+    assert_golden("xlang-go.trace-down.txt", &answer);
+}
+
+#[test]
+fn trace_up_crosses_into_go_and_back_to_typescript() {
+    let (web, _) = xlang_go("xlang_go_up");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(
+            Start::From("http::GET::/api/prices/{}"),
+            Direction::Up,
+            None,
+        )
+        .unwrap();
+
+    assert_golden("xlang-go.trace-up.txt", &answer);
+}
+
+#[test]
+fn trace_from_uncommitted_changes_starts_at_an_edited_go_file() {
+    let (_, api) = xlang_go("xlang_go_uncommitted");
+    let orders = api.join("orders.go");
+    let edited = fs::read_to_string(&orders)
+        .unwrap()
+        .replace("func reserve(w", "func reserve(_ int, w");
+    fs::write(&orders, edited).unwrap();
+
+    let answer = Engine::open(&api)
+        .unwrap()
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+
+    assert_golden("xlang-go.trace-uncommitted.txt", &answer);
 }
