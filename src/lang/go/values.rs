@@ -258,25 +258,72 @@ fn env_name(args: &[Node], again: impl Fn(Node) -> Value) -> Option<Part> {
     }
 }
 
-/// Whether the assignment `node` leaves a name that holds an environment read bound to it: the
-/// fallback `if v == "" { v = .. }` (whatever the default is, Meada never reads it, unless it is
-/// another environment read), or the trim of the name by itself (`v = strings.TrimSuffix(v,
-/// "/")`).
-pub(super) fn keeps_env(node: Node, src: &[u8], std: &Std) -> bool {
+/// What an assignment `node` does to a name that holds an environment read.
+#[derive(Clone)]
+pub(super) enum Keep {
+    /// It replaces the read: the name holds no one value.
+    No,
+    /// It trims the name by itself (`v = strings.TrimSuffix(v, "/")`): the read stays.
+    Trim,
+    /// It is the fallback `if v == "" { v = .. }` to this value: the read stays when the value
+    /// is plain (`plain`), since Meada never reads a default.
+    Default(Value),
+}
+
+/// What the assignment `node`, written in `scope` at function literal nesting `depth`, does to
+/// the name it assigns.
+pub(super) fn keeps_env(node: Node, src: &[u8], std: &Std, scope: &str, depth: usize) -> Keep {
     let sides = (node.child_by_field_name("left"))
         .zip(node.child_by_field_name("right"))
         .zip(node.child_by_field_name("operator"));
     let Some(((left, right), operator)) = sides else {
-        return false;
+        return Keep::No;
     };
     let (Some(target), Some(right)) = (only(left), only(right)) else {
-        return false;
+        return Keep::No;
     };
     if text(operator, src) != "=" || target.kind() != "identifier" {
-        return false;
+        return Keep::No;
     }
     let name = text(target, src);
-    trims_itself(right, src, std, name) || empties_to(node, src, name) && !reads_env(right, src)
+    if trims_itself(right, src, std, name) {
+        Keep::Trim
+    } else if empties_to(node, src, name) {
+        Keep::Default(value(right, src, std, scope, depth))
+    } else {
+        Keep::No
+    }
+}
+
+/// Whether a default `value`, written in `scope`, holds no environment read and nothing a call
+/// or an unfoldable name gives: text, and names that are constants of the file (`consts`, by
+/// qualified name) holding plain values. A name another file declares, a `var` and a name bound
+/// in a function the file does not fold are not plain: which value the base is then is unknown.
+pub(super) fn plain(value: &Value, scope: &str, consts: &HashMap<&str, &Value>) -> bool {
+    fn within(value: &Value, scope: &str, consts: &HashMap<&str, &Value>, depth: usize) -> bool {
+        let name = |name: &str| {
+            let mut at = scope;
+            loop {
+                if let Some(held) = consts.get(qualify(at, name).as_str()) {
+                    return depth < VALUE_DEPTH && within(held, at, consts, depth + 1);
+                }
+                if at.is_empty() {
+                    return false;
+                }
+                at = crate::parent(at);
+            }
+        };
+        match value {
+            Value::Str(parts) => parts.iter().all(|p| match p {
+                Part::Text(_) => true,
+                Part::Ref(n) => name(n),
+                Part::Env(_) | Part::Hole => false,
+            }),
+            Value::Ref(n) => name(n),
+            _ => false,
+        }
+    }
+    within(value, scope, consts, 0)
 }
 
 /// The one expression of `list`, which is itself when it is no expression list.
@@ -343,21 +390,6 @@ fn empties_to(node: Node, src: &[u8], name: &str) -> bool {
         (text(l, src) == name && empty(r)) || (empty(l) && text(r, src) == name)
     });
     alone && sides && operator.is_some_and(|o| text(o, src) == "==")
-}
-
-/// Whether the expression `node` names `Getenv` or `LookupEnv` anywhere.
-fn reads_env(node: Node, src: &[u8]) -> bool {
-    // An explicit stack: a crafted expression can nest deeper than the call stack allows.
-    let mut stack = vec![node];
-    while let Some(at) = stack.pop() {
-        if matches!(at.kind(), "identifier" | "field_identifier")
-            && matches!(text(at, src), "Getenv" | "LookupEnv")
-        {
-            return true;
-        }
-        stack.extend(named(at));
-    }
-    false
 }
 
 /// The first result of `os.LookupEnv("X")`, the call `node` as the one value of a `:=` or `var`.

@@ -18,6 +18,7 @@ use crate::{Result, parent, qualify};
 mod build;
 pub mod modfile;
 mod values;
+use values::Keep;
 
 /// How many segments of a member chain a callee keeps, and how many wrappers (`*`, `[T]`,
 /// parentheses) a receiver's type is read through; a longer one is its node kind, or names no
@@ -113,9 +114,9 @@ struct Walk<'s> {
     /// The plain names a statement of a function's own block binds to one value (`r :=
     /// gin.Default()`), by scope: constants when nothing else binds or assigns the name.
     held: Vec<(String, String, Value)>,
-    /// The names assigned again, with the scope the assignment is written in and whether the
-    /// assignment keeps an environment read (`keeps_env`): a name bound to one stays that read.
-    assigned: Vec<(String, String, bool)>,
+    /// The names assigned again, with the scope the assignment is written in and what it does
+    /// to a name bound to an environment read (`keeps_env`).
+    assigned: Vec<(String, String, Keep)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
     /// The standard-library packages whose calls and constants the values fold.
@@ -196,7 +197,7 @@ impl Walk<'_> {
 
     /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
     /// a selector, which any package may write (`config.Base = ..`).
-    fn write(&mut self, scope: &str, targets: &[Node], keeps_env: bool) {
+    fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep) {
         for target in targets {
             let name = match target.kind() {
                 "identifier" => text(*target, self.src),
@@ -210,7 +211,7 @@ impl Walk<'_> {
                 _ => continue,
             };
             let name = name.to_string();
-            self.assigned.push((scope.to_string(), name, keeps_env));
+            self.assigned.push((scope.to_string(), name, keeps.clone()));
         }
     }
 
@@ -228,7 +229,9 @@ impl Walk<'_> {
             .filter(|(_, _, value)| values::is_env(value))
             .map(|(scope, name, _)| qualify(scope, name))
             .collect();
-        for (scope, name, keeps_env) in std::mem::take(&mut self.assigned) {
+        // The fallbacks of names bound to a read: the name, the scope and the default.
+        let mut defaults = Vec::new();
+        for (scope, name, keeps) in std::mem::take(&mut self.assigned) {
             let mut at = scope.as_str();
             // The binding the name refers to: the innermost scope that binds it.
             let found = loop {
@@ -241,7 +244,13 @@ impl Walk<'_> {
                 at = crate::parent(at);
             };
             match found {
-                Some(found) if keeps_env && env.contains(&found) => {}
+                Some(found) if env.contains(&found) && matches!(keeps, Keep::Trim) => {}
+                Some(found) if env.contains(&found) && matches!(keeps, Keep::Default(_)) => {
+                    let Keep::Default(value) = keeps else {
+                        unreachable!()
+                    };
+                    defaults.push((found, scope, value));
+                }
                 Some(found) => _ = assigned.insert(found),
                 None if name != "_" => _ = elsewhere.insert(name),
                 None => {}
@@ -287,6 +296,20 @@ impl Walk<'_> {
                     ty: None,
                 });
             }
+        }
+        // A fallback leaves the name its read only when the default is plain, which the
+        // constants of the file now tell.
+        if !defaults.is_empty() {
+            let table: HashMap<&str, &Value> = (self.facts.consts.iter())
+                .filter(|c| !self.vars.contains(&c.name))
+                .map(|c| (c.name.as_str(), &c.value))
+                .collect();
+            let rejected: HashSet<String> = (defaults.into_iter())
+                .filter(|(_, scope, value)| !values::plain(value, scope, &table))
+                .map(|(found, _, _)| found)
+                .collect();
+            self.facts.consts.retain(|c| !rejected.contains(&c.name));
+            constants.retain(|c| !rejected.contains(c));
         }
         // A constant is a name that holds its value, not a local hiding what it is bound to.
         self.facts.locals.retain(|l| !constants.contains(l));
@@ -383,14 +406,18 @@ impl Walk<'_> {
                 "assignment_statement" | "range_clause" | "receive_statement" => {
                     if let Some(left) = node.child_by_field_name("left") {
                         let targets: Vec<Node> = named(left).chain([left]).collect();
-                        let keeps = node.kind() == "assignment_statement"
-                            && values::keeps_env(node, src, &self.std);
+                        let keeps = match node.kind() {
+                            "assignment_statement" => {
+                                values::keeps_env(node, src, &self.std, scope, depth)
+                            }
+                            _ => Keep::No,
+                        };
                         self.write(scope, &targets, keeps);
                     }
                 }
                 "inc_statement" | "dec_statement" => {
                     let targets: Vec<Node> = named(node).collect();
-                    self.write(scope, &targets, false);
+                    self.write(scope, &targets, Keep::No);
                 }
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
@@ -416,7 +443,7 @@ impl Walk<'_> {
                     if let (Some(operand), Some(address)) = (operand, address)
                         && text(address, src) == "&"
                     {
-                        self.write(scope, &[operand], false);
+                        self.write(scope, &[operand], Keep::No);
                     }
                 }
                 "type_switch_statement" => {

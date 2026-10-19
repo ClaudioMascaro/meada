@@ -10,6 +10,11 @@ import (
 // A package-level variable bound to a read.
 var pkgBase = os.Getenv("PKG_URL")
 
+// A package-level constant, and a variable, as defaults.
+const DefaultURL = "http://localhost:3000"
+
+var defaultVar = "http://localhost:4000"
+
 func main() {}
 
 // Reads: each function's request goes to the base URL variable named in the call.
@@ -27,6 +32,14 @@ func fallback() {
 	base := os.Getenv("FALLBACK_URL")
 	if base == "" {
 		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
+func constantDefault() {
+	base := os.Getenv("CONST_URL")
+	if base == "" {
+		base = DefaultURL
 	}
 	http.Get(base + "/a")
 }
@@ -86,6 +99,50 @@ func fallbackToAnotherRead() {
 	http.Get(base + "/a")
 }
 
+func fallbackToANamedRead() {
+	base := os.Getenv("NAMED_MAIN_URL")
+	other := os.Getenv("NAMED_OTHER_URL")
+	if base == "" {
+		base = other
+	}
+	http.Get(base + "/a")
+}
+
+func fallbackToACall() {
+	base := os.Getenv("CALL_MAIN_URL")
+	if base == "" {
+		base = fallbackURL()
+	}
+	http.Get(base + "/a")
+}
+
+func trimmedAfterANamedRead() {
+	raw := os.Getenv("RAW_URL")
+	alt := os.Getenv("ALT_URL")
+	if raw == "" {
+		raw = alt
+	}
+	http.Get(strings.TrimSuffix(raw, "/") + "/a")
+}
+
+func fallbackToALoopVariable(alts []string) {
+	base := os.Getenv("LOOP_URL")
+	for _, alt := range alts {
+		if base == "" {
+			base = alt
+		}
+	}
+	http.Get(base + "/a")
+}
+
+func fallbackToAVariable() {
+	base := os.Getenv("VAR_URL")
+	if base == "" {
+		base = defaultVar
+	}
+	http.Get(base + "/a")
+}
+
 func fallbackWithElse() {
 	base := os.Getenv("ELSE_URL")
 	if base == "" {
@@ -138,3 +195,5 @@ func trimmedOtherName() {
 
 
 func other() string { return "" }
+
+func fallbackURL() string { return os.Getenv("G_URL") }

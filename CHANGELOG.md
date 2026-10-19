@@ -73,7 +73,8 @@ All notable changes to Meada are recorded here. The format follows
 - Go base URLs from the environment (spec #25): `os.Getenv("X")` and `os.LookupEnv("X")` (its
   first result) lead a URL as the base URL variable `X`, which maps through `base_url_env` like
   the other languages' (Meada never reads the value). The read survives a fallback assignment
-  when the value is empty (`if v == "" { v = ".." }`, the default never read) and
+  when the value is empty (`if v == "" { v = ".." }`, the default never read, provided it
+  folds to text from literals and constants of the same file) and
   `strings.TrimSuffix`, `strings.TrimRight` and `strings.TrimSpace`, of the read or of a name
   bound to it. Two reads in one URL, a fallback to another read, a name assigned any other way
   and a read the code spells with a shadowed `os` give no base. Cross-language fixtures

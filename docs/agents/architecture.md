@@ -229,8 +229,11 @@ one for the area a change touches.
   `os.LookupEnv("X")` is so for the first name of a `:=` or `var` (`values::lookup_env`), through
   `strings.TrimSuffix`/`TrimRight`/`TrimSpace` (`values::env_value`) of the read or of a name
   `Std::note` saw bound to one earlier in the file (source order; a package-level `var` counts).
-  `if v == "" { v = .. }` and `v = strings.TrimX(v, ..)` leave `v` a constant when it holds a
-  read (`values::keeps_env`, `Walk::assigned`'s third field). `http/go/clients.rs` `one_read`
+  `v = strings.TrimX(v, ..)` leaves `v` a constant when it holds a read, and so does
+  `if v == "" { v = .. }` when the default is plain (`values::keeps_env`, `values::plain`,
+  decided in `Walk::finish_values`): text, or names that are constants of the same file holding
+  plain values; a call, a name bound to a read, a loop variable, a package `var` or a name from
+  another file leaves `v` no constant, so the base is absent. `http/go/clients.rs` `one_read`
   makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
