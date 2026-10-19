@@ -296,6 +296,10 @@ pub struct Facts {
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
+    /// The methods (`Class.method`) that are no export door though their class is (Go's
+    /// lower-case methods of an exported type).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden: Vec<String>,
     /// Whether the file is left out of the build for the target: a Rust file that opens with an
     /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
     /// constraints exclude it.

@@ -6651,20 +6651,6 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::tools/runner.go::Runner.main",
-      "kind": "export",
-      "label": "Runner.main",
-      "steps": [
-        {
-          "depth": 0,
-          "repository": "example.com/acme/conformance",
-          "level": null,
-          "via": "entry",
-          "node": "example.com/acme/conformance::tools/runner.go::Runner.main"
-        }
-      ]
-    },
-    {
       "entry_point": "example.com/acme/conformance::web/echo.go::Auth",
       "kind": "export",
       "label": "Auth",

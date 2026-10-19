@@ -1,3 +1,2 @@
 example.com/acme/conformance main process::example.com/acme/conformance::main.go::main (program)
 example.com/acme/conformance main process::example.com/acme/conformance::worker/main.go::main (program)
-example.com/acme/conformance Runner.main process::example.com/acme/conformance::tools/runner.go::Runner.main (export)
