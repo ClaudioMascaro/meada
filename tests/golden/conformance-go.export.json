@@ -2539,8 +2539,75 @@
       }
     }
   ],
-  "providers": [],
-  "consumers": [],
+  "providers": [
+    {
+      "contract": "package::go::example.com/acme/billing",
+      "site": "example.com/acme/conformance::billing/go.mod"
+    },
+    {
+      "contract": "package::go::example.com/acme/billing",
+      "site": "example.com/acme/conformance::forks/billing/go.mod"
+    },
+    {
+      "contract": "package::go::example.com/acme/legacy",
+      "site": "example.com/acme/conformance::legacy/go.mod"
+    },
+    {
+      "contract": "package::go::example.com/acme/shop",
+      "site": "example.com/acme/conformance::go.mod"
+    },
+    {
+      "contract": "package::go::example.com/acme/worker",
+      "site": "example.com/acme/conformance::worker/go.mod"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::go::example.com/acme/billing",
+      "site": "example.com/acme/conformance::go.mod::require::example.com/acme/billing",
+      "via": "path forks/billing/go.mod"
+    }
+  ],
+  "packages": [
+    {
+      "name": "example.com/acme/billing",
+      "repository": "example.com/acme/conformance",
+      "directory": "billing",
+      "ecosystem": "go"
+    },
+    {
+      "name": "example.com/acme/billing",
+      "repository": "example.com/acme/conformance",
+      "directory": "forks/billing",
+      "ecosystem": "go"
+    },
+    {
+      "name": "example.com/acme/legacy",
+      "repository": "example.com/acme/conformance",
+      "directory": "legacy",
+      "ecosystem": "go"
+    },
+    {
+      "name": "example.com/acme/shop",
+      "repository": "example.com/acme/conformance",
+      "directory": ".",
+      "ecosystem": "go"
+    },
+    {
+      "name": "example.com/acme/worker",
+      "repository": "example.com/acme/conformance",
+      "directory": "worker",
+      "ecosystem": "go"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "go.mod",
+      "field": "require",
+      "name": "example.com/acme/billing",
+      "range": "v0.0.0"
+    }
+  ],
   "communities": [
     {
       "name": ".",
@@ -2690,7 +2757,15 @@
       ]
     }
   ],
-  "links": [],
+  "links": [
+    {
+      "consumer": "example.com/acme/conformance::go.mod::require::example.com/acme/billing",
+      "provider": "example.com/acme/conformance::forks/billing/go.mod",
+      "contract": "package::go::example.com/acme/billing",
+      "level": "exact",
+      "reason": "package::go::example.com/acme/billing v0.0.0 (local none), range unchecked"
+    }
+  ],
   "processes": [
     {
       "entry_point": "example.com/acme/conformance::billing/invoice/invoice.go::Total",

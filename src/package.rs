@@ -1,6 +1,6 @@
 //! Packages (spec #22): every manifest of a workspace repository with a valid name provides
 //! `package::<ecosystem>::<name>` (`package.json`: `npm`; `pyproject.toml`: `pypi`, spec #24;
-//! `Cargo.toml`: `cargo`, spec #30),
+//! `Cargo.toml`: `cargo`, spec #30; `go.mod`: `go`, spec #25),
 //! and every dependency entry that names a package of the workspace, in the same ecosystem,
 //! consumes it. `refresh` reads each manifest into a `Summary`, derived from its bytes
 //! alone and stored in the index; `Packages::declare` turns the named ones into providers and
@@ -35,6 +35,7 @@ use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
 
 pub mod cargo;
+mod go;
 mod pypi;
 
 pub struct Packages;
@@ -51,6 +52,7 @@ pub enum Ecosystem {
     Npm,
     Pypi,
     Cargo,
+    Go,
 }
 
 impl Ecosystem {
@@ -65,37 +67,45 @@ impl Ecosystem {
             Ecosystem::Npm => "npm",
             Ecosystem::Pypi => "pypi",
             Ecosystem::Cargo => "cargo",
+            Ecosystem::Go => "go",
         }
     }
 
     /// The ecosystem of the manifest at `path`, by its file name: `package.json` is npm's,
-    /// `pyproject.toml` and `requirements*.txt` PyPI's, `Cargo.toml` Cargo's; `None` for any
-    /// other file.
+    /// `pyproject.toml` and `requirements*.txt` PyPI's, `Cargo.toml` Cargo's, `go.mod` Go's; `None` for
+    /// any other file.
     pub fn of(path: &str) -> Option<Self> {
         match path.rsplit('/').next()? {
             "package.json" => Some(Ecosystem::Npm),
             "pyproject.toml" => Some(Ecosystem::Pypi),
             "Cargo.toml" => Some(Ecosystem::Cargo),
+            "go.mod" => Some(Ecosystem::Go),
             name if pypi::is_requirements(name) => Some(Ecosystem::Pypi),
             _ => None,
         }
     }
 
     /// The ecosystem whose packages the source file at `path` imports: PyPI's for a `.py`
-    /// file, Cargo's for a `.rs` file, npm's for the TS/JS pack's.
+    /// file, Cargo's for a `.rs` file, Go's for a `.go` file, npm's for the TS/JS pack's.
     fn of_source(path: &str) -> Option<Self> {
         match path.rsplit_once('.').map(|(_, extension)| extension) {
             Some("py") => Some(Ecosystem::Pypi),
             Some("rs") => Some(Ecosystem::Cargo),
+            Some("go") => Some(Ecosystem::Go),
             _ => Some(Ecosystem::Npm),
         }
     }
 
     /// The ecosystem of a package contract identifier.
     fn of_contract(contract: &str) -> Option<Self> {
-        [Ecosystem::Npm, Ecosystem::Pypi, Ecosystem::Cargo]
-            .into_iter()
-            .find(|e| contract.starts_with(e.prefix()))
+        [
+            Ecosystem::Npm,
+            Ecosystem::Pypi,
+            Ecosystem::Cargo,
+            Ecosystem::Go,
+        ]
+        .into_iter()
+        .find(|e| contract.starts_with(e.prefix()))
     }
 
     /// The start of its contract identifiers.
@@ -104,6 +114,7 @@ impl Ecosystem {
             Ecosystem::Npm => "package::npm::",
             Ecosystem::Pypi => "package::pypi::",
             Ecosystem::Cargo => "package::cargo::",
+            Ecosystem::Go => "package::go::",
         }
     }
 
@@ -117,17 +128,18 @@ impl Ecosystem {
         match (self, path.ends_with("pyproject.toml")) {
             (Ecosystem::Npm, _) => read(src),
             (Ecosystem::Cargo, _) => cargo::read(path, src),
+            (Ecosystem::Go, _) => go::read(path, src),
             (Ecosystem::Pypi, true) => pypi::read_pyproject(src),
             (Ecosystem::Pypi, false) => pypi::read_requirements(src),
         }
     }
 
     /// What the dependency `range` says of the provider's `version`: npm checks it (`flag`);
-    /// a PyPI or Cargo range is never evaluated, so it is always `Unchecked`.
+    /// a PyPI, Cargo or Go range is never evaluated, so it is always `Unchecked`.
     fn flag(self, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
         match self {
             Ecosystem::Npm => flag(range, version),
-            Ecosystem::Pypi | Ecosystem::Cargo => Some(Flag::Unchecked),
+            Ecosystem::Pypi | Ecosystem::Cargo | Ecosystem::Go => Some(Flag::Unchecked),
         }
     }
 
@@ -145,7 +157,7 @@ impl Ecosystem {
     ) -> bool {
         match (self, via) {
             (Ecosystem::Npm, _) => from.0 == to || !range.is_some_and(|r| r.starts_with(WORKSPACE)),
-            (Ecosystem::Cargo, Some(via)) => match via.split_once(' ') {
+            (Ecosystem::Cargo | Ecosystem::Go, Some(via)) => match via.split_once(' ') {
                 Some(("path", manifest)) if manifest.starts_with("../") => {
                     folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
                 }
@@ -371,7 +383,7 @@ pub struct ExportedShape {
 /// `OutDir` when the output-to-source mapping found the file. For an `ambiguous` import, the
 /// field or rule whose entry could not be followed to a source file. A PyPI import is named by
 /// the module it imports: the distribution's own name (`ModuleName`) or one of its top-level
-/// modules (`TopLevel`); a Rust `use` by the crate's name (`CrateName`).
+/// modules (`TopLevel`); a Rust `use` by the crate's name (`CrateName`); a Go import by the module path it starts with (`ModulePath`).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum How {
@@ -384,6 +396,7 @@ pub enum How {
     ModuleName,
     TopLevel,
     CrateName,
+    ModulePath,
 }
 
 impl How {
@@ -398,6 +411,7 @@ impl How {
             How::ModuleName => "module name",
             How::TopLevel => "top-level module",
             How::CrateName => "crate name",
+            How::ModulePath => "module path",
         }
     }
 }
@@ -639,10 +653,11 @@ fn nearest<'m>(
 
 /// The manifest of the package `path` belongs to: the nearest `package.json` for npm, the
 /// nearest `pyproject.toml` for PyPI (a `requirements*.txt` names no package, so it bounds none),
-/// the nearest `Cargo.toml` with a package for Cargo (a virtual workspace root has none).
+/// the nearest `Cargo.toml` with a package for Cargo (a virtual workspace root has none), the
+/// nearest `go.mod` for Go.
 fn owner<'m>(manifests: &'m [Manifest], path: &str, ecosystem: Ecosystem) -> Option<&'m Manifest> {
     (holding(manifests, path, ecosystem).into_iter()).find(|m| match ecosystem {
-        Ecosystem::Npm => true,
+        Ecosystem::Npm | Ecosystem::Go => true,
         Ecosystem::Pypi => m.path.rsplit('/').next() == Some("pyproject.toml"),
         Ecosystem::Cargo => m.summary.name.is_some(),
     })
@@ -859,6 +874,9 @@ impl<'e> Provided<'e> {
         chain: &str,
         known: &dyn Fn(&str) -> bool,
     ) -> Option<Resolved> {
+        if Ecosystem::of(&manifest.path) == Some(Ecosystem::Go) {
+            return self.package(repository, manifest, subpath, chain, known);
+        }
         let tried = ways(manifest, subpath);
         let first = tried.first()?.0;
         let Some((file, how, level)) = self.entry(manifest, &tried) else {
@@ -877,6 +895,39 @@ impl<'e> Provided<'e> {
             how,
             level,
             targets: vec![id],
+        })
+    }
+
+    /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
+    /// `./<directory>`) of the module at `manifest`: the exported name of the one source file of
+    /// that directory (a test file or one of a nested module is none) that defines it. `exact`
+    /// when found; none when the directory lacks or the name is not exported there.
+    fn package(
+        &self,
+        repository: &str,
+        manifest: &Manifest,
+        subpath: &str,
+        chain: &str,
+        known: &dyn Fn(&str) -> bool,
+    ) -> Option<Resolved> {
+        let base = directory(&manifest.path);
+        let dir = match subpath.strip_prefix("./") {
+            Some(rest) => inside(base, rest)?,
+            None if base == "." => String::new(),
+            None => base.to_string(),
+        };
+        let mut ids: Vec<String> = (self.files.iter())
+            .filter(|f| f.rsplit_once('/').map_or("", |(d, _)| d) == dir)
+            .filter(|f| f.ends_with(".go") && !f.ends_with("_test.go"))
+            .filter(|f| self.owned_source(manifest, f))
+            .filter_map(|f| self.reach(repository, f, chain, known))
+            .collect();
+        ids.sort();
+        ids.dedup();
+        (ids.len() == 1).then_some(Resolved {
+            how: How::ModulePath,
+            level: Level::Exact,
+            targets: ids,
         })
     }
 
@@ -1274,6 +1325,19 @@ fn resolutions<'e>(
                 .filter(|_| cargo::names_crate(specifier))
                 .and_then(|m| m.summary.dependencies.iter().find(|e| heads(e)));
             (entry, ".".to_string())
+        }
+        Ecosystem::Go => {
+            // The module of the nearest `go.mod` whose path the import starts with, the longest.
+            let found = (owner(&exports[n].manifests, from, ecosystem)).and_then(|m| {
+                (m.summary.dependencies.iter())
+                    .filter_map(|e| Some((e, go::inside(specifier, &e.name)?)))
+                    .max_by_key(|(e, _)| e.name.len())
+            });
+            let subpath = match found {
+                Some((_, rest)) if !rest.is_empty() => format!("./{rest}"),
+                _ => ".".to_string(),
+            };
+            (found.map(|(e, _)| e), subpath)
         }
         _ => {
             let Some((name, subpath)) = split(specifier) else {
@@ -1728,6 +1792,7 @@ impl ContractKind for Packages {
                 };
                 let package = match Ecosystem::of_source(path) {
                     Some(Ecosystem::Cargo) => cargo::names_crate(specifier),
+                    Some(Ecosystem::Go) => go::names_module(specifier),
                     _ => split(specifier).is_some(),
                 };
                 if chain.is_empty() || !package {

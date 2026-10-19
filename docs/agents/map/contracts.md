@@ -297,6 +297,13 @@ modules updates it.
   different shapes is unresolved. A consumer left with no field has no shape.
   `Resolver::exported` names constants and types as targets too, which no call reaches since
   they are no symbols.
+  Go (spec #25): `package/go.rs` reads a `go.mod` (module path, no version; each `require` an
+  entry under `require` with the version as range; a `replace` to a local directory gives its
+  entry, or one under `replace` when nothing here requires the module, the Cargo `path` form in
+  `via`; a `replace` by anything else marks the entry `outside`, which reaches no provider). A call
+  from a `.go` file through an import whose first element has a dot resolves in the provider
+  directory the import path names (`Provided::package`): the exported name of the one non-test
+  source file of that directory (nested modules left out) that defines it, `exact`, `How::ModulePath`.
   Ecosystems (spec #24): everything above is npm's, behind `Ecosystem` (`Npm`, `Pypi`), which
   names a manifest by its file name (`of`), gives the contract prefix (`package::npm::`,
   `package::pypi::`), reads the bytes (`read`), checks a range (`flag`) and holds the

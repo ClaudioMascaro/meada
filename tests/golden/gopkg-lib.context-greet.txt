@@ -1,0 +1,12 @@
+example.com/gopkg/lib text/text.go:6-8 Greet
+community: text
+processes: none
+func Greet(name string) string {
+	return Shout("hello " + name)
+}
+callers:
+example.com/gopkg/lib cmd/app/main.go:6 main
+callees:
+example.com/gopkg/lib text/text.go:11 Shout
+consumers:
+example.com/gopkg/web main.go:17 welcome [range unchecked]

@@ -205,6 +205,15 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   requirement, the workspace requirement and a dependency key. Unit tests in `package/cargo.rs`
   (the reader, unreadable sources, the dedup, `workspace = true`, hostile manifests) and
   `package.rs` (`reaches`).
+- `tests/it/gopkg.rs` (spec #25): the Go fixtures `gopkg-lib` (modules `kit`, with `text` and `api`
+  packages and a `cmd/app`, and a nested `extras`) and `gopkg-web` as siblings (`web` names `lib`
+  as its peer; its nested `worker` module requires `extras` with a `replace` to
+  `../../gopkg-lib/extras`), and `gopkg-fork` (a second provider of `kit`, added as a peer, which
+  makes the `require` and the import `ambiguous`). The tests check each `require` link and reason,
+  every import into `lib` (`exact`, `; import module path`), a directory the provider lacks, a
+  module outside the workspace and a local that hides the import (no link), and the freshness of
+  an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
+  `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`
   listens on `127.0.0.1:<free port>` (`Stub::url`, the value for `MEADA_DECIDER_URL`), answers
   the n-th request to `.../chat/completions` or `.../api/alpha/decisions` with `script[n]` (500
