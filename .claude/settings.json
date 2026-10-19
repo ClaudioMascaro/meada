@@ -1,5 +1,9 @@
 {
   "enabledPlugins": {
     "mattpocock-skills@claude-plugins-official": false
+  },
+  "enabledMcpjsonServers": ["meada"],
+  "permissions": {
+    "allow": ["mcp__meada"]
   }
 }

@@ -334,11 +334,13 @@ one for the area a change touches.
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
   path order, each read as a root config is (`read_config`) and folded into the configs digest on
   every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
-  and every file the pack parsed, and which answers four things from one build (Rust's crate
+  and every file the pack parsed, and which answers five things from one build (Rust's crate
   `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
   files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
   and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
-  and `Layout::programs` (both below). A language whose imports name a path rather than a file (Rust's
+  and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
+  files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
+  Rust's are its crate's and those of the repository's libraries it depends on. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -461,7 +463,8 @@ one for the area a change touches.
 - `context` shows span text only while the file's BLAKE3 still equals the indexed hash; on a
   mismatch it forgets the file's mtime, refreshes and retries once.
 - Facts resolve only among files of the same pack, and inference runs only when resolution
-  fails; an import from outside the repository is never inferred. A file its pack leaves out
+  fails, among the files the caller reaches (`Layout::reaches`); an import from outside the
+  repository is never inferred. A file its pack leaves out
   (`Layout::members`) resolves nothing and has no symbol, call or `files` row in the export.
 
 ## Tests (`tests/`)

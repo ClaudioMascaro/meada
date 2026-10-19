@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Star, Step, Ty, Value,
+    Reaches, Star, Step, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -93,13 +93,11 @@ enum Binding<'a> {
     Unknown,
 }
 
-/// A call site whose single target is a definition. `by_name` when only a name match found it
-/// (`data.get(...)`, or a bare name no import binds): it may reach any object or function.
+/// A call site whose single target is a definition, `exact`.
 #[derive(Clone, Copy)]
 struct Caller<'a> {
     path: &'a str,
     index: usize,
-    by_name: bool,
 }
 
 /// What resolving one name follows through exports, aliases and globs: what each `(file,
@@ -241,7 +239,10 @@ pub struct Resolver<'a> {
     base_receiver: Option<&'static str>,
     /// The pack's names bound everywhere (`LanguagePack::globals`).
     globals: &'static [&'static str],
-    /// The call sites whose single target (exact or inferred) is each definition, sorted.
+    /// The call sites whose single target is each definition, `exact`, sorted. One only a name
+    /// match found (`data.get(...)`, or a bare name no import binds) may be on any object or
+    /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
+    /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes, and those of modules written in place, by their name (`false`).
@@ -257,6 +258,9 @@ pub struct Resolver<'a> {
     /// The files whose exports other packages can import, when the pack says which
     /// (`Layout::published`).
     published: Option<BTreeSet<String>>,
+    /// The definitions a name match may reach from each file, when the pack says which
+    /// (`Layout::reaches`).
+    reaches: Option<Reaches>,
     /// The pack's `LanguagePack::stars_bind`.
     stars_bind: bool,
     /// The pack's `LanguagePack::strict`.
@@ -375,6 +379,7 @@ impl<'a> Resolver<'a> {
             blocks: HashMap::new(),
             outside: HashSet::new(),
             published: None,
+            reaches: None,
             stars_bind,
             strict: language.strict(),
             later,
@@ -424,17 +429,12 @@ impl<'a> Resolver<'a> {
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         for (path, facts) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                let (target, by_name) = match resolver.call(path, call) {
-                    Resolution::Exact(t) => (t, false),
-                    Resolution::Inferred(t) => (t, true),
-                    _ => continue,
-                };
-                let caller = Caller {
-                    path,
-                    index,
-                    by_name,
-                };
-                callers.entry(target).or_default().push(caller);
+                if let Resolution::Exact(target) = resolver.call(path, call) {
+                    callers
+                        .entry(target)
+                        .or_default()
+                        .push(Caller { path, index });
+                }
             }
         }
         resolver.callers = callers;
@@ -444,6 +444,13 @@ impl<'a> Resolver<'a> {
     /// Limits `exported` to these files (`Layout::published`); `None` keeps every file.
     pub fn publishing(mut self, published: Option<BTreeSet<String>>) -> Self {
         self.published = published;
+        self
+    }
+
+    /// Limits name matches to the definitions each file reaches (`Layout::reaches`); `None`
+    /// reaches every file. `callers` holds exact calls alone, which this leaves as they are.
+    pub fn reaching(mut self, reaches: Option<Reaches>) -> Self {
+        self.reaches = reaches;
         self
     }
 
@@ -468,7 +475,7 @@ impl<'a> Resolver<'a> {
             | Binding::Param(..)
             | Binding::Local(..)
             | Binding::Hidden
-            | Binding::Unknown => self.infer(&call.callee, call.by_path),
+            | Binding::Unknown => self.infer(path, &call.callee, call.by_path),
         }
     }
 
@@ -934,10 +941,10 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// The definitions whose name matches the callee's last name anywhere in the repository:
-    /// methods for a member call (`x.area()`), top-level functions and classes for a plain
-    /// call (`area()`), both for a path (`a::area()`, `by_path`).
-    fn infer(&self, callee: &str, by_path: bool) -> Resolution<'a> {
+    /// The definitions whose name matches the callee's last name anywhere `path` reaches
+    /// (`reaches`): methods for a member call (`x.area()`), top-level functions and classes for
+    /// a plain call (`area()`), both for a path (`a::area()`, `by_path`).
+    fn infer(&self, path: &str, callee: &str, by_path: bool) -> Resolution<'a> {
         let (member, last) = match callee.rsplit_once('.') {
             Some((_, last)) => (true, last),
             None => (false, callee),
@@ -947,6 +954,9 @@ impl<'a> Resolver<'a> {
         if member && by_path {
             found.extend(self.by_name.get(&(false, last)).into_iter().flatten());
             found.sort();
+        }
+        if let Some(reaches) = &self.reaches {
+            found.retain(|t| reaches(path, t.path));
         }
         match found[..] {
             [] => Resolution::Unresolved,
@@ -2360,9 +2370,9 @@ impl<'a> Code<'a> {
                     // ponytail: a parameter of an outer function, captured by a closure, is
                     // not followed.
                     Some(_) => return,
-                    // A caller found only by a name match may pass any object: not climbed.
+                    // Its exact callers alone (`callers`): one found only by a name match may
+                    // pass any object.
                     None => (self.resolver.callers.get(&function).into_iter().flatten())
-                        .filter(|c| !c.by_name)
                         .map(|c| (c.path, c.index))
                         .collect(),
                 };
@@ -2698,7 +2708,6 @@ impl<'a> Code<'a> {
         // class Meada cannot tell, a bare name no import binds) is read where it stands, its
         // parameters unknown.
         let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
-            .filter(|c| !c.by_name)
             .copied()
             .collect();
         if callers.is_empty() {

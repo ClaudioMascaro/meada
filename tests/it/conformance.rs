@@ -1541,6 +1541,10 @@ fn rust() {
             "api/src/ring/c.rs::internal",
             "api/src/store.rs::private_helper",
             "crates/billing/src/billing.rs::settle",
+            "crates/billing/src/billing.rs::copies",
+            "crates/ledger-core/src/lib.rs::Ledger",
+            "crates/ledger-core/src/lib.rs::Ledger.Clone.clone",
+            "crates/ledger-core/src/lib.rs::amounts",
             "crates/ledger-core/src/lib.rs::audit",
             "crates/ledger-core/src/lib.rs::entries",
             "crates/ledger-core/src/lib.rs::entries.add",
@@ -2064,6 +2068,18 @@ fn rust() {
                 "crates/billing/src/billing.rs::total::(call_expression).amount#0",
                 INFERRED,
                 &["crates/billing/src/invoice.rs::Invoice.amount"],
+            ),
+            // A name match keeps to the crates the caller reaches: its own and the libraries it
+            // depends on, never `api`, which depends on it, nor `billing` from `ledger-core`.
+            (
+                "crates/billing/src/billing.rs::copies::l.clone#0",
+                INFERRED,
+                &["crates/ledger-core/src/lib.rs::Ledger.Clone.clone"],
+            ),
+            (
+                "crates/ledger-core/src/lib.rs::amounts::i.amount#0",
+                None,
+                &[],
             ),
             // `use crate::util as u` renames a module written in place.
             (
@@ -3226,12 +3242,15 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         // place; a private module and what it holds are not.
         "crates/actix/src/lib.rs serve_catalog crates/actix/src/lib.rs serve_catalog",
         "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
+        "crates/billing/src/billing.rs copies crates/billing/src/billing.rs copies",
         "crates/billing/src/billing.rs invoice crates/billing/src/invoice.rs -",
         "crates/billing/src/billing.rs settle crates/billing/src/billing.rs settle",
         "crates/billing/src/billing.rs total crates/billing/src/billing.rs total",
         "crates/billing/src/invoice.rs Invoice crates/billing/src/invoice.rs Invoice",
         "crates/billing/src/invoice.rs tax crates/billing/src/invoice.rs tax",
         "crates/flat/lib.rs serve crates/flat/lib.rs serve",
+        "crates/ledger-core/src/lib.rs Ledger crates/ledger-core/src/lib.rs Ledger",
+        "crates/ledger-core/src/lib.rs amounts crates/ledger-core/src/lib.rs amounts",
         "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
         "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
         // A `pub use` in a `pub` module written in place is one of its members.
