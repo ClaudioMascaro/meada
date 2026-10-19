@@ -736,7 +736,9 @@ one for the area a change touches.
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,
-  so no repository type is guessed.
+  so no repository type is guessed. The walk in `parse` carries each node's depth and the items
+  around it, so `parameter` asks for no parent (each lookup walks down from the root of the
+  tree).
 - `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
   `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
@@ -1050,8 +1052,8 @@ one for the area a change touches.
   root is for the reader to follow through the `pub mod` rows. Calls inside macro invocations
   are not indexed.
 - `lang/rust.rs` (spec #30, actix-web and Rocket): `ROUTES_PER_FUNCTION` (16): a function with
-  more route attributes (`#[get("/x")]`, `#[route(..)]`) than that has the first ones as calls
-  that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
+  more route attributes (`#[get("/x")]`, `#[route(..)]`) than that has the last ones (nearest the
+  function) as calls that decorate it (`Call::decorates`), the rest nothing. `ROUTE_ITEMS` (1024, `lang/rust/values.rs`):
   a `routes![..]` listing more handlers is `Unknown`; `ROUTE_METHODS` (16): the `method = ".."`
   of a `#[route]` past that are `Unknown`, so the attribute gives no provider. `MENTIONS`
   (16384, `lang/rust/mentions.rs`): a file referring to more distinct names has no
@@ -1064,7 +1066,9 @@ one for the area a change touches.
   or closure's body, a `match`, `if let`, `while let` or `for` binding in its arm or block (an
   `else` sees none). An item declared in a block (`const`, `static`, `fn` inside a function)
   hides nothing, and a pattern deeper than `BINDING_DEPTH` binds nothing, so the reference
-  still counts (no marker).
+  still counts (no marker). The walk over mentions carries each node's parent, the token
+  before it and where an `if let` binds, and `built` reads the attributes before a function
+  with the one read of its parent's children, so neither asks for a parent or sibling.
 - `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
   returned lists adds, over the whole repository, to the handlers a call names; a list past it
   is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate

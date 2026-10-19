@@ -50,7 +50,7 @@ const MODEL: &str = "MEADA_DECIDER_MODEL";
 
 /// The defaults of the `decisions` protocol: OpenRouter, and Jev.
 const DECISIONS_URL: &str = "https://openrouter.ai";
-const DECISIONS_MODEL: &str = "typesafe/jev-1.13";
+const DECISIONS_MODEL: &str = "typesafe/jev-1.14";
 
 /// The task every protocol states, with the repository identity of the item.
 fn task(repository: &str) -> String {
