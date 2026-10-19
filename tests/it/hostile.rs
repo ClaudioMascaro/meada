@@ -1211,6 +1211,55 @@ fn go() -> Vec<Case> {
                 "*".repeat(DEEP)
             ),
         ),
+        // Receivers: a result passed from variable to variable, a field chain, a type wrapped
+        // in pointers, and one name bound over and over.
+        m(
+            "result chain",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() S {{ return s }}\n\n\
+                 func g() {{\n\ta0 := S{{}}\n{}\n\ta0.M()\n}}\n",
+                lines(DEEP, |i| format!("\ta{} := a{i}.M()", i + 1))
+            ),
+        ),
+        m(
+            "field chain",
+            format!(
+                "package h\n\ntype S struct{{ n *S }}\n\nfunc (s *S) M() {{}}\n\n\
+                 func g(a *S) {{ a{}.M() }}\n",
+                ".n".repeat(DEEP)
+            ),
+        ),
+        m(
+            "pointers",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n\
+                 func g(a {}S) {{ a.M() }}\n",
+                "*".repeat(DEEP)
+            ),
+        ),
+        m(
+            "bindings",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n{}\n",
+                lines(WIDE, |i| format!("func f{i}() {{ a := S{{}}; a.M() }}"))
+            ),
+        ),
+        m(
+            "nested bindings",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n\
+                 func g() {{ a := S{{}}; {} }}\n",
+                nest("func() { a := S{}; a.M(); ", "a.M()", " }()", DEEP)
+            ),
+        ),
+        m(
+            "rebound",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s S) M() {{}}\n\n\
+                 func g() {{\n{}\n\ta.M()\n}}\n",
+                lines(WIDE, |_| "\ta := S{}".into())
+            ),
+        ),
         m(
             "constraint",
             format!(

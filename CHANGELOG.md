@@ -20,7 +20,13 @@ All notable changes to Meada are recorded here. The format follows
   modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
   target (gc, no cgo): a file whose name ends in another system or architecture, or whose
   `//go:build` line is false, is left out. Exports are the names that start with an upper-case
-  letter. The language-neutral seam `Layout::shared` gives a group of files one scope. The index
+  letter. The language-neutral seam `Layout::shared` gives a group of files one scope. Method
+  calls: a call on a receiver whose type the source writes (a parameter, the method receiver, a
+  struct field, a `var`, a composite literal `T{}` or `&T{}`, or the first result of a function
+  whose result type is written) reaches that type's method at `exact`, also when another file
+  of the package declares it; a receiver whose type is not written is a name match
+  (`inferred`, or `ambiguous` with every candidate), and a call through an interface stops at
+  the interface method. A promoted method of an embedded struct is a name match. The index
   is rebuilt once (new schema version).
 
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client

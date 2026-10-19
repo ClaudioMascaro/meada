@@ -351,6 +351,10 @@ pub enum Class {
     /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
     /// repository stays outside; a function with no written result is unknown.
     Returned(String),
+    /// `Returned`, for a call written as a value (Go's `s.Open()`, `shapes.NewCircle()`): the
+    /// name is read as an expression, so its head may be a local or a parameter whose class
+    /// the source writes, and a method of that class is the function called.
+    Called(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.

@@ -1107,7 +1107,10 @@ sample.go
           "name": "key",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "string"
+      }
     },
     {
       "name": "New",
@@ -1121,7 +1124,10 @@ sample.go
           "name": "name",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "Store.Get",
@@ -1135,7 +1141,10 @@ sample.go
           "name": "key",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "string"
+      }
     }
   ],
   "imports": [
@@ -1213,12 +1222,43 @@ sample.go
       "name": "Prefix"
     }
   ],
-  "locals": [
-    "New.s",
-    "New.label",
-    "Store.Get.s"
+  "receivers": [
+    {
+      "scope": "New",
+      "name": "label",
+      "class": {
+        "Called": "fmt.Sprint"
+      }
+    },
+    {
+      "scope": "New",
+      "name": "name",
+      "class": {
+        "Type": "string"
+      }
+    },
+    {
+      "scope": "New",
+      "name": "s",
+      "class": {
+        "Type": "Store"
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "key",
+      "class": {
+        "Type": "string"
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "s",
+      "class": {
+        "Type": "Store"
+      }
+    }
   ],
-  "receivers": [],
   "package": "store"
 }
 

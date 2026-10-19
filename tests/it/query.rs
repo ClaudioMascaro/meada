@@ -186,6 +186,14 @@ fn go_functions_are_found_by_name_and_list_callers_and_callees() {
         "conformance-go.context-new.txt",
         &engine.context("store/store.go::New", None).unwrap(),
     );
+    // A method's callers by the receiver's written type (a parameter, a field, a `var`, a
+    // literal, a result, a package variable) at `exact`, and by name alone at `inferred`.
+    assert_golden(
+        "conformance-go.context-bump.txt",
+        &engine
+            .context("methods/types.go::Counter.Bump", None)
+            .unwrap(),
+    );
 }
 
 #[test]
