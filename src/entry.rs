@@ -418,6 +418,17 @@ mod tests {
     }
 
     #[test]
+    fn a_file_of_many_all_names_finds_its_doors_in_linear_time() {
+        let names: Vec<String> = (0..30_000).map(|i| format!("f{i}")).collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let listed = (0..500_000).map(|i| format!("n{i}")).collect();
+        let start = std::time::Instant::now();
+        assert!(export_doors(Star::Only(listed), &names).is_empty());
+        // Each export was looked up in `__all__` one by one: minutes here.
+        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+    }
+
+    #[test]
     fn a_handler_of_two_channels_has_one_entry_each() {
         let symbols: HashSet<String> = ["r::a.ts::handle"].map(String::from).into();
         let facts = Facts::default();

@@ -3009,6 +3009,7 @@ fn unbind(value: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Import;
     use crate::lang::python::Python;
 
     /// A Python file of `n` classes, each but the first deriving from the one before and
@@ -3293,6 +3294,190 @@ mod tests {
             let took = start.elapsed();
             assert!(took.as_secs() < 20, "{label}: {took:?}");
         }
+    }
+
+    /// An import nothing looks up: its `local` is no name asked for.
+    fn filler(name: Imported) -> Import {
+        Import {
+            local: "z".into(),
+            source: String::new(),
+            name,
+        }
+    }
+
+    /// A module written in place, `name`.
+    fn module_def(name: &str) -> Def {
+        Def {
+            name: name.into(),
+            kind: Kind::Module,
+            range: 0..0,
+            params: Vec::new(),
+            bases: Vec::new(),
+            decorators: Vec::new(),
+            return_values: Vec::new(),
+            returns: None,
+            type_params: Vec::new(),
+            result: None,
+        }
+    }
+
+    /// The rows `main.rs` of `facts` exports, timed.
+    fn timed_rows(facts: Facts, label: &str) -> usize {
+        let files = BTreeMap::from([("main.rs", &facts)]);
+        let start = std::time::Instant::now();
+        let rows = resolver(&files).exported().len();
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{label}: {took:?}");
+        rows
+    }
+
+    #[test]
+    fn a_file_of_many_imports_looks_each_name_up_in_linear_time() {
+        // Imports of each kind and crates outside the file, none of which a name asked for is.
+        let imports = (0..300_000).map(|i| {
+            filler(match i % 3 {
+                0 => Imported::Namespace,
+                1 => Imported::Path(String::new()),
+                _ => Imported::Glob {
+                    path: String::new(),
+                    inside: false,
+                    public: false,
+                },
+            })
+        });
+        let n = 40_000;
+        let facts = Facts {
+            imports: imports.collect(),
+            externs: (0..300_000).map(|i| format!("e{i}")).collect(),
+            exports: (0..n)
+                .map(|i| Export::Local {
+                    exported: format!("u{i}"),
+                    local: format!("u{i}"),
+                })
+                .collect(),
+            ..Facts::default()
+        };
+        // Each name nothing binds was looked up among the file's imports and among its
+        // externs one by one: minutes here.
+        assert_eq!(timed_rows(facts, "imports"), n);
+    }
+
+    #[test]
+    fn a_file_of_many_imports_finds_each_module_in_linear_time() {
+        // `mod m{i}; pub use m{i}::f as a{i};`, then imports nothing looks up: the namespace
+        // import of `m{i}` sits at the far end of the walk, and so does `a{i}`'s own.
+        let n = 40_000;
+        let mut facts = Facts::default();
+        for i in 0..n {
+            facts.defs.push(module_def(&format!("m{i}")));
+            facts.imports.push(Import {
+                local: format!("m{i}"),
+                source: format!("mod m{i}"),
+                name: Imported::Namespace,
+            });
+        }
+        for i in 0..n {
+            facts.imports.push(Import {
+                local: format!("a{i}"),
+                source: String::new(),
+                name: Imported::Path(format!("m{i}.f")),
+            });
+            facts.exports.push(Export::Local {
+                exported: format!("a{i}"),
+                local: format!("a{i}"),
+            });
+        }
+        let fillers = (0..300_000).map(|_| filler(Imported::Namespace));
+        facts.imports.extend(fillers);
+        // Each module was looked up among the file's imports one by one: minutes here.
+        assert_eq!(timed_rows(facts, "modules"), n);
+    }
+
+    #[test]
+    fn a_file_of_many_imports_resolves_each_external_call_in_linear_time() {
+        let (n, fillers) = (60_000, 500_000);
+        let names: Vec<String> = (0..n).map(|i| format!("a{i}")).collect();
+        let named = names.iter().map(|name| Import {
+            local: name.clone(),
+            source: "ext".into(),
+            name: Imported::Name(name.clone()),
+        });
+        // The imports the calls name come first, so that each lookup walks the fillers.
+        let facts = Facts {
+            imports: (named.chain((0..fillers).map(|_| filler(Imported::Namespace)))).collect(),
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        let start = std::time::Instant::now();
+        for name in &names {
+            assert_eq!(code.imported("a.py", "", name), Some(("ext", name.clone())));
+            assert_eq!(code.external("a.py", "", name), Some(format!("ext.{name}")));
+        }
+        // Each call looked its name up among the file's imports one by one, for the import,
+        // for whether a path import exists and for the name it spells: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_file_of_many_all_names_takes_each_export_in_linear_time() {
+        let (n, listed) = (30_000, 500_000);
+        // `m.py` exports `p{i}` and lists none of them in `__all__`; `main.py` star-imports it
+        // and exports `x{i}`, and `lib.py` globs it (`pub use`).
+        let m = Facts {
+            exports: (0..n)
+                .map(|i| Export::Local {
+                    exported: format!("p{i}"),
+                    local: format!("p{i}"),
+                })
+                .collect(),
+            private: (0..n).map(|i| format!("p{i}")).collect(),
+            star: Star::Only((0..listed).map(|i| format!("n{i}")).collect()),
+            ..Facts::default()
+        };
+        let all = |name: Imported| Import {
+            local: "*".into(),
+            source: "m".into(),
+            name,
+        };
+        let main = Facts {
+            imports: vec![all(Imported::All)],
+            exports: std::iter::once(Export::All { source: "m".into() })
+                .chain((0..n).map(|i| Export::Local {
+                    exported: format!("x{i}"),
+                    local: format!("x{i}"),
+                }))
+                .collect(),
+            ..Facts::default()
+        };
+        let lib = Facts {
+            imports: vec![
+                Import {
+                    local: "m".into(),
+                    source: "m".into(),
+                    name: Imported::Namespace,
+                },
+                all(Imported::Glob {
+                    path: "m".into(),
+                    inside: false,
+                    public: true,
+                }),
+            ],
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("m.py", &m), ("main.py", &main), ("lib.py", &lib)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let start = std::time::Instant::now();
+        let rows = Resolver::new(&files, modules, &Python).exported();
+        // Each name was looked up in `__all__` one by one, to read it, to keep it out of the
+        // exports and to glob it: minutes here. Only `main.py` exports: `m.py` keeps its names
+        // out, and its glob gives none.
+        let took = start.elapsed();
+        assert_eq!(rows.len(), n + 1);
+        assert!(took.as_secs() < 20, "{took:?}");
     }
 
     #[test]

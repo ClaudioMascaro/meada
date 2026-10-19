@@ -1856,4 +1856,37 @@ mod tests {
 
         assert_eq!(nesting(&held(&consts(&src), "x")), n);
     }
+
+    #[test]
+    fn a_file_of_many_definitions_and_additions_parses_in_linear_time() {
+        use std::fmt::Write;
+
+        let (fillers, more) = (200_000, 40_000);
+        let mut src = String::from("c0 = []\n");
+        for i in 0..fillers {
+            writeln!(src, "z{i} = []").unwrap();
+        }
+        for _ in 0..more {
+            src += "c0 += [1]\n";
+        }
+        for i in 0..more {
+            writeln!(src, "def f{i}(): pass").unwrap();
+        }
+        src += "class C:\n";
+        for i in 0..more {
+            writeln!(src, "    def m{i}(self): pass").unwrap();
+        }
+        let start = std::time::Instant::now();
+        let parsed = facts(&src);
+        // Each addition looked its list up among the values assigned before it, each
+        // definition among the bindings of its scope, one by one: minutes here.
+        let took = start.elapsed();
+        let count = |kind| parsed.defs.iter().filter(|d| d.kind == kind).count();
+        assert_eq!((count(Kind::Function), count(Kind::Method)), (more, more));
+        let Value::List(items) = held(&parsed.consts, "c0") else {
+            panic!("c0 is no list");
+        };
+        assert_eq!(items.len(), more);
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
 }
