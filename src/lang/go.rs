@@ -11,11 +11,12 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
-    Modules, Param, Receiver, Value, children, named, text,
+    Message, Modules, Param, Receiver, Value, children, named, text,
 };
 use crate::{Result, parent, qualify};
 
 mod build;
+mod messages;
 pub mod modfile;
 mod values;
 use values::Keep;
@@ -46,6 +47,10 @@ impl LanguagePack for Go {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["**/go.mod"]
+    }
+
+    fn messages(&self, code: &crate::resolve::Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn modules(
@@ -126,6 +131,9 @@ struct Walk<'s> {
     /// The field names written through a selector (`cfg.Base = ..`, `cfg.Base++`, `&cfg.Base`),
     /// whichever package the selector reaches.
     selected: BTreeSet<String>,
+    /// The scopes that write through a dereference (`*p = ..`, `*p.Topic = ..`), with every
+    /// scope around them.
+    derefs: HashSet<String>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -195,6 +203,21 @@ impl Walk<'_> {
         }
     }
 
+    /// Notes that `scope` writes through a dereference when one of `targets` is `*p`.
+    fn dereference(&mut self, scope: &str, targets: &[Node]) {
+        let src = self.src;
+        let deref = |t: &&Node| {
+            t.kind() == "unary_expression"
+                && (t.child_by_field_name("operator")).is_some_and(|o| text(o, src) == "*")
+        };
+        if targets.iter().any(|t| deref(&t)) {
+            let mut at = scope;
+            while !at.is_empty() && self.derefs.insert(at.to_string()) {
+                at = crate::parent(at);
+            }
+        }
+    }
+
     /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
     /// a selector, which any package may write (`config.Base = ..`).
     fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep) {
@@ -213,6 +236,18 @@ impl Walk<'_> {
             let name = name.to_string();
             self.assigned.push((scope.to_string(), name, keeps.clone()));
         }
+    }
+
+    /// Whether `scope`, or a scope around or inside it, writes through a dereference.
+    fn writes_through(&self, scope: &str) -> bool {
+        let mut at = scope;
+        while !at.is_empty() {
+            if self.derefs.contains(at) {
+                return true;
+            }
+            at = crate::parent(at);
+        }
+        false
     }
 
     /// Makes the names held by one binding constants, and gives each definition what it
@@ -243,6 +278,10 @@ impl Walk<'_> {
                 }
                 at = crate::parent(at);
             };
+            // The address of a topic: a write only when the scope writes through a pointer.
+            if matches!(keeps, Keep::Pointer) && !self.writes_through(&scope) {
+                continue;
+            }
             match found {
                 Some(found) if env.contains(&found) && matches!(keeps, Keep::Trim) => {}
                 Some(found) if env.contains(&found) && matches!(keeps, Keep::Default(_)) => {
@@ -412,11 +451,13 @@ impl Walk<'_> {
                             }
                             _ => Keep::No,
                         };
+                        self.dereference(scope, &targets);
                         self.write(scope, &targets, keeps);
                     }
                 }
                 "inc_statement" | "dec_statement" => {
                     let targets: Vec<Node> = named(node).collect();
+                    self.dereference(scope, &targets);
                     self.write(scope, &targets, Keep::No);
                 }
                 "var_spec" | "const_spec" => {
@@ -437,13 +478,19 @@ impl Walk<'_> {
                     }
                 }
                 // `&p`: the name may be written through the pointer, so it holds no one value.
+                // ponytail: except as the `Topic` of a `TopicPartition` literal (confluent-kafka-go's
+                // `*string`), unless the function writes through a dereference; no alias analysis.
                 "unary_expression" => {
                     let operand = node.child_by_field_name("operand");
                     let address = node.child_by_field_name("operator");
                     if let (Some(operand), Some(address)) = (operand, address)
                         && text(address, src) == "&"
                     {
-                        self.write(scope, &[operand], Keep::No);
+                        let keeps = match is_topic_pointer(node, src) {
+                            true => Keep::Pointer,
+                            false => Keep::No,
+                        };
+                        self.write(scope, &[operand], keeps);
                     }
                 }
                 "type_switch_statement" => {
@@ -626,6 +673,18 @@ fn in_body(node: Node) -> bool {
             "function_declaration" | "method_declaration" | "func_literal"
         )
     })
+}
+
+/// Whether the `&name` `node` is the value of the `Topic:` field of a `TopicPartition` literal.
+fn is_topic_pointer(node: Node, src: &[u8]) -> bool {
+    let keyed = (node.parent())
+        .and_then(|element| element.parent())
+        .filter(|keyed| keyed.kind() == "keyed_element");
+    let key = keyed.and_then(|keyed| keyed.child_by_field_name("key"));
+    let literal = (keyed.and_then(|keyed| keyed.parent())).and_then(|body| body.parent());
+    let ty = literal.and_then(|l| l.child_by_field_name("type"));
+    key.is_some_and(|key| text(key, src) == "Topic")
+        && ty.is_some_and(|ty| text(ty, src).ends_with("TopicPartition"))
 }
 
 /// The `name` fields of a declaration (`a, b int`, `x, y = 1, 2`).
@@ -947,6 +1006,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         std: values::Std::default(),
         vars: BTreeSet::new(),
         selected: BTreeSet::new(),
+        derefs: HashSet::new(),
     };
     // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
@@ -1274,6 +1334,19 @@ mod tests {
             "_ := mk()",
         ] {
             assert_eq!(consts(body), Vec::<String>::new(), "{body}");
+        }
+        // The address of a name as the `Topic` of a `TopicPartition` keeps it a constant, unless
+        // the function writes through a dereference; any other literal does not.
+        let kept = "r := \"x\"; _ = kafka.TopicPartition{Topic: &r}";
+        assert_eq!(consts(kept), ["f.r"]);
+        for body in [
+            "r := \"x\"; _ = T{Topic: &r}",
+            "r := \"x\"; _ = kafka.TopicPartition{Other: &r}",
+            "r := \"x\"; p := kafka.TopicPartition{Topic: &r}; *p.Topic = \"y\"",
+            "r := \"x\"; p := kafka.TopicPartition{Topic: &r}; func() { *p.Topic = \"y\" }()",
+            "r := \"x\"; p := kafka.TopicPartition{Topic: &r}; *q++",
+        ] {
+            assert!(!consts(body).contains(&"f.r".to_string()), "{body}");
         }
         // A literal's own statement binds in the literal.
         let inner = consts("func() { q := mk(); _ = q }()");

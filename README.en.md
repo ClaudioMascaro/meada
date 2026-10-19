@@ -196,11 +196,11 @@ also from one language to the other, through HTTP contracts (`fetch` and, in Pyt
 on the consuming side; Next.js (app router) and Express and, in Python, FastAPI, Flask and
 Django and, in Rust, axum, actix-web and Rocket and, in Go, `net/http`, gin, echo, chi and gorilla/mux on the serving side, also behind a gateway; in Rust, a base URL read from the environment with `std::env::var`, `env!` or `dotenvy::var` and, in Go, with `os.Getenv` or `os.LookupEnv` (with a default `if v == "" { v = ... }` and through `strings.TrimSuffix`, `TrimRight` or `TrimSpace`) links through `base_url_env`), through
 the resources declared in `meada.toml` and through channels: Kafka topics (`kafkajs` and, in Python,
-`confluent-kafka` and `kafka-python` and, in Rust, `rdkafka`), RabbitMQ queues (`amqplib` and, in Python, `pika` and, in Rust, `lapin`, with a
+`confluent-kafka` and `kafka-python` and, in Rust, `rdkafka` and, in Go, `segmentio/kafka-go`, `confluent-kafka-go` and `sarama`), RabbitMQ queues (`amqplib` and, in Python, `pika` and, in Rust, `lapin` and, in Go, `amqp091-go`, with a
 `publish` to an exchange reaching the queues its bindings tie to it), Amazon SQS queues (AWS SDK
-v3, `sqs-consumer` and, in Python, `boto3` and, in Rust, `aws-sdk-sqs`), NATS subjects (`nats` and, in Python, `nats-py` and, in Rust, `async-nats`, with
+v3, `sqs-consumer` and, in Python, `boto3` and, in Rust, `aws-sdk-sqs` and, in Go, `aws-sdk-go-v2`), NATS subjects (`nats` and, in Python, `nats-py` and, in Rust, `async-nats` and, in Go, `nats.go`, with
 the `*` and `>` wildcards), BullMQ jobs and Redis streams (`ioredis`, `node-redis` and, in Python,
-`redis-py` and, in Rust, the `redis` crate), with the producer linked
+`redis-py` and, in Rust, the `redis` crate and, in Go, `go-redis`), with the producer linked
 to the handler of each consumer, in the same repository too. A repository with a `[serve]` table
 also reads its OpenAPI (3.0 and 3.1) and AsyncAPI (2.x and 3.0) documents, found by name or
 listed in `[serve] documents`: the routes and channels they describe become contracts, with the

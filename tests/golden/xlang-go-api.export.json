@@ -6,6 +6,10 @@
       "hash": "95627deebbe33b9198d0b54c5c3defd3cfab00c7c80dcd909e9a4c2d8dded24d"
     },
     {
+      "path": "events.go",
+      "hash": "7450feb2b56e17ca535cbcc6439fdcf15fe0139956db6cbcbb19b94b8a4c5384"
+    },
+    {
       "path": "main.go",
       "hash": "d50254e2ae08a9726a1f799c11bfae4787e48ef074130e4170e0e605b654bc4e"
     },
@@ -29,6 +33,54 @@
         "path": "audit.go",
         "start": 107,
         "end": 269
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::applyShipment",
+      "span": {
+        "path": "events.go",
+        "start": 571,
+        "end": 612
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::consumeShipments",
+      "span": {
+        "path": "events.go",
+        "start": 614,
+        "end": 842
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments",
+      "span": {
+        "path": "events.go",
+        "start": 160,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.Cleanup",
+      "span": {
+        "path": "events.go",
+        "start": 255,
+        "end": 329
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "span": {
+        "path": "events.go",
+        "start": 330,
+        "end": 569
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.Setup",
+      "span": {
+        "path": "events.go",
+        "start": 180,
+        "end": 254
       }
     },
     {
@@ -120,6 +172,72 @@
         "path": "audit.go",
         "start": 200,
         "end": 228
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::consumeShipments::group.Consume#0",
+      "caller": "example.com/xlang-go/api::events.go::consumeShipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "events.go",
+        "start": 781,
+        "end": 840
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::consumeShipments::sarama.NewConsumerGroup#0",
+      "caller": "example.com/xlang-go/api::events.go::consumeShipments",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "events.go",
+        "start": 680,
+        "end": 739
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim::applyShipment#0",
+      "caller": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "target": "example.com/xlang-go/api::events.go::applyShipment",
+      "level": "exact",
+      "span": {
+        "path": "events.go",
+        "start": 481,
+        "end": 517
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim::claim.Messages#0",
+      "caller": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "events.go",
+        "start": 460,
+        "end": 476
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim::session.MarkMessage#0",
+      "caller": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "events.go",
+        "start": 520,
+        "end": 552
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim::string#0",
+      "caller": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "events.go",
+        "start": 495,
+        "end": 516
       }
     },
     {
@@ -364,6 +482,11 @@
       "via": "env:WEB_URL"
     },
     {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-go/api::orders.go::status::priceOf#0",
       "via": "env:WEB_URL"
@@ -399,12 +522,19 @@
     {
       "name": ".#2",
       "members": [
+        "example.com/xlang-go/api::events.go::applyShipment",
+        "example.com/xlang-go/api::events.go::shipments.ConsumeClaim"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
         "example.com/xlang-go/api::main.go::main",
         "example.com/xlang-go/api::orders.go::router"
       ]
     },
     {
-      "name": ".#3",
+      "name": ".#4",
       "members": [
         "example.com/xlang-go/api::orders.go::status",
         "example.com/xlang-go/api::pricing.go::priceOf",
@@ -419,6 +549,13 @@
       "contract": "http::POST::/api/audit",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "provider": "example.com/xlang-go/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-go/api::orders.go::status::priceOf#0",

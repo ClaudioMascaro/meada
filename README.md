@@ -195,11 +195,11 @@ não são indexadas, e os contratos Rust são os pacotes, o HTTP e os canais (ab
 linguagem para a outra, por contratos HTTP (`fetch` e, em Python, `requests`, `httpx` e `aiohttp` e, em Rust, `reqwest` e `ureq` e, em Go, `net/http` e resty no lado que
 consome; Next.js (app router) e Express e, em Python, FastAPI, Flask e Django e, em Rust, axum, actix-web e Rocket e, em Go, `net/http`, gin, echo, chi e gorilla/mux no lado que serve,
 também atrás de um gateway; em Rust, uma URL base lida do ambiente com `std::env::var`, `env!` ou `dotenvy::var` e, em Go, com `os.Getenv` ou `os.LookupEnv` (com um valor padrão `if v == "" { v = ... }` e através de `strings.TrimSuffix`, `TrimRight` ou `TrimSpace`) liga pelo `base_url_env`), pelos recursos
-declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python` e, em Rust, `rdkafka`), filas RabbitMQ
-(`amqplib` e, em Python, `pika` e, em Rust, `lapin`, com o `publish` numa exchange chegando às filas que os bindings
-ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3` e, em Rust, `aws-sdk-sqs`), subjects NATS
-(`nats` e, em Python, `nats-py` e, em Rust, `async-nats`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
-(`ioredis`, `node-redis` e, em Python, `redis-py` e, em Rust, o crate `redis`), com o produtor ligado ao handler de cada consumidor, inclusive
+declarados no `meada.toml` e por canais: tópicos Kafka (`kafkajs` e, em Python, `confluent-kafka` e `kafka-python` e, em Rust, `rdkafka` e, em Go, `segmentio/kafka-go`, `confluent-kafka-go` e `sarama`), filas RabbitMQ
+(`amqplib` e, em Python, `pika` e, em Rust, `lapin` e, em Go, `amqp091-go`, com o `publish` numa exchange chegando às filas que os bindings
+ligam a ela), filas Amazon SQS (AWS SDK v3, `sqs-consumer` e, em Python, `boto3` e, em Rust, `aws-sdk-sqs` e, em Go, `aws-sdk-go-v2`), subjects NATS
+(`nats` e, em Python, `nats-py` e, em Rust, `async-nats` e, em Go, `nats.go`, com os curingas `*` e `>`), jobs BullMQ e streams Redis
+(`ioredis`, `node-redis` e, em Python, `redis-py` e, em Rust, o crate `redis` e, em Go, `go-redis`), com o produtor ligado ao handler de cada consumidor, inclusive
 no mesmo repositório. Um repositório com a tabela `[serve]` também lê seus documentos OpenAPI
 (3.0 e 3.1) e AsyncAPI (2.x e 3.0), achados pelo nome ou listados em `[serve] documents`: as rotas
 e os canais que eles descrevem viram contratos, com os campos de cada resposta ou payload, e o

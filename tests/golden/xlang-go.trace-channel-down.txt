@@ -1,0 +1,4 @@
+example.com/xlang-go/web src/events.ts:7 announceShipment
+  →[exact: channel::kafka::orders.shipped] example.com/xlang-go/api events.go:14 shipments.ConsumeClaim
+    example.com/xlang-go/api events.go:22 applyShipment
+chain: exact · 1 hops · 2 repos · 67 tokens

@@ -8,7 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use tree_sitter::Node;
 
-use super::{DEFINITION_DEPTH, callee};
+use super::{DEFINITION_DEPTH, callee, type_name};
 use crate::lang::{Import, Invocation, Part, Value, named, text};
 use crate::qualify;
 
@@ -26,6 +26,7 @@ pub(super) struct Std {
     http: Option<String>,
     os: Option<String>,
     strings: Option<String>,
+    aws: Option<String>,
     /// The names a statement of a function's own block binds once, by scope and name (`base :=
     /// os.Getenv("X")`), with whether the value is an environment read. Filled in source order,
     /// so a name is known where it is used after it is bound.
@@ -43,7 +44,8 @@ impl Std {
         };
         let (fmt, http) = (by("fmt"), by("net/http"));
         let (os, strings) = (by("os"), by("strings"));
-        let all = [&fmt, &http, &os, &strings];
+        let aws = by("github.com/aws/aws-sdk-go-v2/aws");
+        let all = [&fmt, &http, &os, &strings, &aws];
         let names: Vec<&str> = all.iter().filter_map(|n| n.as_deref()).collect();
         let hidden = if names.is_empty() {
             BTreeSet::new()
@@ -56,6 +58,7 @@ impl Std {
             http: free(http),
             os: free(os),
             strings: free(strings),
+            aws: free(aws),
             held: RefCell::default(),
         }
     }
@@ -158,7 +161,9 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
             };
             concat(side("left"), side("right"))
         }
-        "parenthesized_expression" => named(node).next().map_or(Value::Unknown, again),
+        "parenthesized_expression" | "variadic_argument" => {
+            named(node).next().map_or(Value::Unknown, again)
+        }
         "unary_expression"
             if node
                 .child_by_field_name("operator")
@@ -170,6 +175,7 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
         "func_literal" if depth < DEFINITION_DEPTH => {
             Value::Function(qualify(scope, &format!("@{}", node.start_byte())))
         }
+        "composite_literal" => composite(node, files, scope, depth, level),
         "call_expression" => {
             let Some(function) = node.child_by_field_name("function") else {
                 return Value::Unknown;
@@ -181,10 +187,103 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
             if let Some(env) = env_value(node, function, files, scope, again) {
                 return env;
             }
+            // `aws.String(x)` is a pointer to the string `x`.
+            let aws = std.aws.as_ref().map(|aws| format!("{aws}.String"));
+            if aws.is_some_and(|name| callee(function, src) == name)
+                && let [arg] = arguments(node).collect::<Vec<_>>()[..]
+            {
+                return again(arg);
+            }
             Value::Call(invocation(node, function, src, again))
         }
         _ => Value::Unknown,
     }
+}
+
+/// A composite literal: a slice or an array is the list of its elements; a struct of a named type
+/// is that type, `New`, with the object of its fields. A struct written without field names, a map
+/// and any other type are `Unknown`.
+fn composite(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usize) -> Value {
+    let (src, _) = files;
+    let (Some(ty), Some(body)) = (
+        node.child_by_field_name("type"),
+        node.child_by_field_name("body"),
+    ) else {
+        return Value::Unknown;
+    };
+    match ty.kind() {
+        "slice_type" | "array_type" | "implicit_length_array_type" => {
+            Value::List(elements(body, files, scope, depth, level))
+        }
+        "type_identifier" | "qualified_type" => {
+            match (type_name(ty, src), fields(body, files, scope, depth, level)) {
+                (Some(name), Some(fields)) => Value::New(name, vec![Value::Object(fields)]),
+                _ => Value::Unknown,
+            }
+        }
+        _ => Value::Unknown,
+    }
+}
+
+/// The value of one element of a literal: an expression, or a literal written without its type.
+fn element(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usize) -> Value {
+    let Some(inner) = named(node).next() else {
+        return Value::Unknown;
+    };
+    match inner.kind() {
+        "literal_value" if level < VALUE_DEPTH => {
+            // The type is left out: a slice of structs is a list of objects.
+            match fields(inner, files, scope, depth, level + 1) {
+                Some(fields) => Value::Object(fields),
+                None => Value::List(elements(inner, files, scope, depth, level + 1)),
+            }
+        }
+        "literal_value" => Value::Unknown,
+        _ => read(inner, files, scope, depth, level + 1),
+    }
+}
+
+/// The values of the elements of a literal, keys left out.
+fn elements(
+    body: Node,
+    files: (&[u8], &Std),
+    scope: &str,
+    depth: usize,
+    level: usize,
+) -> Vec<Value> {
+    named(body)
+        .map(|e| match e.kind() {
+            "keyed_element" => e
+                .child_by_field_name("value")
+                .map_or(Value::Unknown, |v| element(v, files, scope, depth, level)),
+            _ => element(e, files, scope, depth, level),
+        })
+        .collect()
+}
+
+/// The fields a struct literal sets, by name. `None` when an element has no field name, as in a
+/// slice or a map, or a struct written by position.
+fn fields(
+    body: Node,
+    files: (&[u8], &Std),
+    scope: &str,
+    depth: usize,
+    level: usize,
+) -> Option<Vec<(String, Value)>> {
+    let (src, _) = files;
+    let mut out = Vec::new();
+    for e in named(body) {
+        let key = e
+            .child_by_field_name("key")
+            .filter(|_| e.kind() == "keyed_element")?;
+        let key = named(key).next().filter(|k| k.kind() == "identifier")?;
+        let value = e.child_by_field_name("value")?;
+        out.push((
+            text(key, src).to_string(),
+            element(value, files, scope, depth, level),
+        ));
+    }
+    Some(out)
 }
 
 /// The environment read the call `node` is, or the trimmed one: `os.Getenv("X")`, and
@@ -268,6 +367,9 @@ pub(super) enum Keep {
     /// It is the fallback `if v == "" { v = .. }` to this value: the read stays when the value
     /// is plain (`plain`), since Meada never reads a default.
     Default(Value),
+    /// The address of a name is taken as the `Topic` of a `TopicPartition` literal: the name
+    /// stays a constant unless the scope writes through a dereference.
+    Pointer,
 }
 
 /// What the assignment `node`, written in `scope` at function literal nesting `depth`, does to
@@ -639,6 +741,37 @@ mod tests {
         ));
         let shadow = "package x\nimport \"net/http\"\nfunc f(http T){ g(http.MethodGet) }\n";
         assert!(!matches!(first_arg(shadow), Value::Str(_)));
+    }
+
+    #[test]
+    fn aws_string_folds_only_as_the_import_it_names() {
+        let imports = "import \"github.com/aws/aws-sdk-go-v2/aws\"\n";
+        let folded = |body: &str| first_arg(&format!("package x\n{imports}func f(){{ {body} }}\n"));
+        assert!(matches!(folded("g(aws.String(\"q\"))"), Value::Str(_)));
+        assert!(!matches!(
+            folded("aws := mk(); g(aws.String(\"q\"))"),
+            Value::Str(_)
+        ));
+    }
+
+    #[test]
+    fn struct_literals_nested_past_the_limit_are_unknown() {
+        // How many literals deep the first argument of `g` is read.
+        let depth = |nesting: usize| {
+            let literal = format!("{}1{}", "T{A: ".repeat(nesting), "}".repeat(nesting));
+            let mut value = first_arg(&format!("package x\nfunc f(){{ g({literal}) }}\n"));
+            let mut depth = 0;
+            while let Value::New(_, args) = value {
+                depth += 1;
+                value = match args.into_iter().next() {
+                    Some(Value::Object(mut fields)) => fields.remove(0).1,
+                    _ => break,
+                };
+            }
+            depth
+        };
+        assert_eq!(depth(10), 10);
+        assert!(depth(VALUE_DEPTH + 10) <= VALUE_DEPTH);
     }
 
     /// The text of what `fmt.Sprintf(format, ..)` gives for the arguments `given`, a name as
