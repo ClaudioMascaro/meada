@@ -3446,6 +3446,19 @@ mod tests {
             "__all__ = ['y']\ndef g():\n    __all__.append('x')\n",
             "__all__ = ['x', 'y']\n__all__.remove('x')\n",
             "__all__ = ['x', 'y']\n__all__ -= ['x']\n",
+            // A change that may not run, under `if`, `try`, a loop or in a lambda.
+            "__all__ = ['y']\nif WIN:\n    __all__ += ['x']\n",
+            "__all__ = ['y']\ntry:\n    __all__.append('x')\nexcept E:\n    pass\n",
+            "__all__ = ['y']\nfor _ in xs:\n    __all__.extend(['x'])\n",
+            "__all__ = ['y']\nadd = lambda: __all__.append('x')\n",
+            "if WIN:\n    __all__ = ['x', 'y']\nelse:\n    __all__ = ['y']\n",
+            // An item set or deleted, or a function's `global __all__`.
+            "__all__ = ['y']\n__all__[:] = ['x', 'y']\n",
+            "__all__ = ['y']\n__all__[0] = 'x'\n",
+            "__all__ = ['x', 'y']\ndel __all__[0]\n",
+            "__all__ = ['y']\ndef g():\n    __all__[0] = 'x'\n",
+            "__all__ = ['y']\ndef g():\n    global __all__\n    __all__ = ['x']\n",
+            "__all__ = ['y']\ndef g():\n    global __all__\n    __all__ += ['x']\n",
         ] {
             let sources = owned(&[("pkg.py", &pkg(changed)), ("main.py", &main)]);
             let found = exact_in(&Python, &sources, "main.py", "x");

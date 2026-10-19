@@ -213,8 +213,9 @@ All notable changes to Meada are recorded here. The format follows
   OrderedDict`, `except ImportError: class OrderedDict(dict): ...`) it leaves the name to no
   `exact` link either. After `del x` the name reaches nothing it was bound to before, at the top
   level or in a function. A module's `__all__` grown by literal names (`+=`, `.extend`,
-  `.append` at its top level) gives a star import the names it adds, and one changed any other
-  way is read as computed, so a star import of it no longer takes a stale set of names.
+  `.append` in a statement of its top level) gives a star import the names it adds, and one
+  changed any other way (under `if`, `try` or a loop, in a lambda or a function, an item set
+  or deleted) is read as computed, so a star import of it no longer takes a stale set of names.
   The index is rebuilt once (schema version 37).
 - A name two `export *` of one module give differently is no longer linked `exact` to the first
   one's: as in ES modules, the module exports neither. Two that lead to the same definition

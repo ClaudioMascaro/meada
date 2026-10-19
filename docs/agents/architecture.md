@@ -839,8 +839,9 @@ one for the area a change touches.
   there for the whole scope (the safe side: a name match instead of `exact`). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
-  tuple, grown by literal names at the top level (`+=`, `.extend`, `.append`); any other change
-  to it, or one in a function, makes it computed. A name `del` unbinds (at the top level,
+  tuple, grown by literal names in a statement of the module itself (`+=`, `.extend`,
+  `.append`); any other change to it, one under `if`, `try` or a loop, in a lambda or a
+  function, and an item set or deleted (`__all__[:] = ...`, `del __all__[0]`) make it computed. A name `del` unbinds (at the top level,
   unless bound again), and a definition another binding of its scope follows (at the top level
   or in a function, where a nested function's `nonlocal` binding counts as following), and one
   under `if`, `try`, a loop, `with` or `match` after another binding of its name, which it may
