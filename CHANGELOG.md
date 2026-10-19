@@ -243,6 +243,10 @@ All notable changes to Meada are recorded here. The format follows
   statement after it, time in proportion to the depth: its statements are read once from the
   block instead of being looked up from the root of the tree, so a thousand `let mut`s a
   thousand blocks deep no longer take most of a minute to index.
+- A Rust file nested deep in blocks no longer costs, for each name it mentions, each type it
+  writes and each function with route attributes, time in proportion to the depth: what the
+  walks need is kept on the way down instead of being looked up from the root of the tree, so
+  a few hundred `let x: T` a thousand blocks deep no longer take seconds to index.
 
 ## [0.1.0] - Unreleased
 

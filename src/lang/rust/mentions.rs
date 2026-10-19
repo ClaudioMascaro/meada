@@ -10,7 +10,8 @@ use std::ops::Range;
 
 use tree_sitter::Node;
 
-use super::{bind, field, named, route_attribute, text};
+use super::{bind, field, route_attribute, text};
+use crate::lang::{children, named};
 
 /// How many distinct names a file may mention before `Facts::mentions` tells nothing of it.
 // ponytail: a generated file with more is read as mentioning every name (none of its crate's
@@ -19,6 +20,33 @@ pub(super) const MENTIONS: usize = 1 << 14;
 
 /// The owner of what no function encloses.
 const TOP: usize = usize::MAX;
+
+/// A node on the way down, with what a lookup would find: tree-sitter's `parent` and sibling
+/// lookups walk down from the root, so each costs the depth of the node (a file nested deep would
+/// cost depth times nodes).
+struct Seen<'t> {
+    node: Node<'t>,
+    owner: usize,
+    parent: Option<Node<'t>>,
+    /// The entry before it among its parent's children (every token, in a token tree).
+    before: Option<Node<'t>>,
+    /// Where the bindings of an `if let`, `while let` or guard's pattern end, for the `let` of
+    /// such a condition: with the block they guard (the `else` sees none of them), or with the
+    /// arm. `None` ends them with the condition itself.
+    guard: Option<usize>,
+}
+
+impl<'t> Seen<'t> {
+    fn under(node: Node<'t>, parent: Node<'t>, owner: usize) -> Self {
+        Seen {
+            node,
+            owner,
+            parent: Some(parent),
+            before: None,
+            guard: None,
+        }
+    }
+}
 
 /// The names `root` mentions, apart from the functions it defines and its route attributes;
 /// `None` past `MENTIONS` names.
@@ -38,8 +66,21 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
     // segments and a `use` are read among modules and types).
     let mut references: Vec<(&str, usize, usize, bool)> = Vec::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
-    let mut stack = vec![(root, TOP)];
-    while let Some((node, owner)) = stack.pop() {
+    let mut stack = vec![Seen {
+        node: root,
+        owner: TOP,
+        parent: None,
+        before: None,
+        guard: None,
+    }];
+    while let Some(Seen {
+        node,
+        owner,
+        parent,
+        before,
+        guard,
+    }) = stack.pop()
+    {
         match node.kind() {
             "attribute_item" if route_attribute(node, src).is_some() => {}
             "function_item" | "function_signature_item" => {
@@ -51,7 +92,7 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
                 for parameter in parameters.filter(|p| p.kind() == "parameter") {
                     bind_in(parameter, body.byte_range(), inner);
                 }
-                stack.push((body, inner));
+                stack.push(Seen::under(body, node, inner));
             }
             "closure_expression" => {
                 let Some(body) = field(node, "body") else {
@@ -60,49 +101,75 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
                 for parameter in field(node, "parameters").into_iter().flat_map(named) {
                     bind_in(parameter, body.byte_range(), owner);
                 }
-                stack.push((body, owner));
+                stack.push(Seen::under(body, node, owner));
             }
             "let_declaration" => {
-                let block = node.parent().map_or(node.end_byte(), |b| b.end_byte());
+                let block = parent.map_or(node.end_byte(), |b| b.end_byte());
                 if let Some(pattern) = field(node, "pattern") {
                     bind_in(pattern, node.end_byte()..block, owner);
                 }
-                stack.extend(field(node, "value").map(|c| (c, owner)));
-                stack.extend(field(node, "alternative").map(|c| (c, owner)));
+                stack.extend(field(node, "value").map(|c| Seen::under(c, node, owner)));
+                stack.extend(field(node, "alternative").map(|c| Seen::under(c, node, owner)));
             }
             "let_condition" => {
                 if let Some(pattern) = field(node, "pattern") {
-                    bind_in(pattern, node.end_byte()..guarded(node), owner);
+                    let end = guard.unwrap_or(node.end_byte());
+                    bind_in(pattern, node.end_byte()..end, owner);
                 }
-                stack.extend(field(node, "value").map(|c| (c, owner)));
+                stack.extend(field(node, "value").map(|c| Seen::under(c, node, owner)));
             }
             "match_arm" => {
+                let guard = Some(node.end_byte());
                 if let Some(pattern) = field(node, "pattern") {
                     bind_in(pattern, pattern.start_byte()..node.end_byte(), owner);
-                    stack.extend(field(pattern, "condition").map(|c| (c, owner)));
+                    let condition = field(pattern, "condition");
+                    stack.extend(condition.map(|c| Seen {
+                        guard,
+                        ..Seen::under(c, pattern, owner)
+                    }));
                 }
-                stack.extend(field(node, "value").map(|c| (c, owner)));
+                stack.extend(field(node, "value").map(|c| Seen {
+                    guard,
+                    ..Seen::under(c, node, owner)
+                }));
             }
             "for_expression" => {
                 let body = field(node, "body");
                 if let (Some(pattern), Some(body)) = (field(node, "pattern"), body) {
                     bind_in(pattern, body.byte_range(), owner);
                 }
-                stack.extend(field(node, "value").map(|c| (c, owner)));
-                stack.extend(body.map(|c| (c, owner)));
+                stack.extend(field(node, "value").map(|c| Seen::under(c, node, owner)));
+                stack.extend(body.map(|c| Seen::under(c, node, owner)));
             }
-            "identifier" if !declares(node) => {
-                let hideable = match node.parent().map(|p| p.kind()) {
+            "identifier" if !declares(node, parent) => {
+                let hideable = match parent.map(|p| p.kind()) {
                     Some(
                         "scoped_identifier" | "use_declaration" | "use_list" | "scoped_use_list"
                         | "use_as_clause" | "use_wildcard",
                     ) => false,
-                    Some("token_tree") => node.prev_sibling().is_none_or(|p| p.kind() != "::"),
+                    Some("token_tree") => before.is_none_or(|p| p.kind() != "::"),
                     _ => true,
                 };
                 references.push((text(node, src), owner, node.start_byte(), hideable));
             }
-            _ => stack.extend(named(node).map(|c| (c, owner))),
+            _ => {
+                let guard = match node.kind() {
+                    "if_expression" => field(node, "consequence").map(|n| n.end_byte()),
+                    "while_expression" => field(node, "body").map(|n| n.end_byte()),
+                    "let_chain" => guard,
+                    _ => None,
+                };
+                let kids: Vec<Node> = children(node).collect();
+                stack.extend(kids.iter().enumerate().filter(|(_, k)| k.is_named()).map(
+                    |(at, &kid)| Seen {
+                        node: kid,
+                        owner,
+                        parent: Some(node),
+                        before: at.checked_sub(1).map(|at| kids[at]),
+                        guard,
+                    },
+                ));
+            }
         }
     }
     for ranges in scopes.values_mut().flat_map(|s| s.values_mut()) {
@@ -124,33 +191,13 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
 
 /// Whether `node` is the name an item other than a function declares (a function's is never
 /// visited): a `const`, a `static`, a module, an enum variant, a crate.
-fn declares(node: Node) -> bool {
-    node.parent().is_some_and(|p| {
+fn declares(node: Node, parent: Option<Node>) -> bool {
+    parent.is_some_and(|p| {
         matches!(
             p.kind(),
             "const_item" | "static_item" | "mod_item" | "enum_variant" | "extern_crate_declaration"
         ) && field(p, "name") == Some(node)
     })
-}
-
-/// Where the bindings of an `if let`, `while let` or guard's pattern end: with the block they
-/// guard (the `else` sees none of them), or with the arm.
-fn guarded(condition: Node) -> usize {
-    let mut at = condition.parent();
-    while let Some(node) = at {
-        let end = match node.kind() {
-            "if_expression" => field(node, "consequence"),
-            "while_expression" => field(node, "body"),
-            "match_arm" => Some(node),
-            "let_chain" | "match_pattern" => {
-                at = node.parent();
-                continue;
-            }
-            _ => None,
-        };
-        return end.map_or(condition.end_byte(), |n| n.end_byte());
-    }
-    condition.end_byte()
 }
 
 /// `ranges` sorted and joined where they meet.
@@ -174,7 +221,9 @@ fn covers(ranges: &[Range<usize>], at: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::facts;
+    use std::time::Instant;
+
+    use super::super::tests::{facts, same_time_at_any_depth};
     use super::*;
 
     fn names(src: &str) -> Vec<String> {
@@ -223,5 +272,19 @@ mod tests {
             let found = names(src).contains(&"h".to_string());
             assert_eq!(found, n < 6, "{src}");
         }
+    }
+
+    #[test]
+    fn the_names_of_a_file_are_read_in_the_same_time_at_any_depth() {
+        // Each of these used to ask for a parent or a sibling: an identifier, a `let`, an
+        // `if let` and the tokens of a macro.
+        let body = "let y = x; if let Some(z) = y { g(z); } m![a::x, y];\n".repeat(500);
+        same_time_at_any_depth(&body, |src, tree| {
+            let start = Instant::now();
+            let found = mentions(tree.root_node(), src.as_bytes());
+            let took = start.elapsed();
+            assert!(found.is_some());
+            took
+        });
     }
 }
