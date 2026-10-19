@@ -97,3 +97,42 @@ func Import() {
 	store := pick()
 	store.New()
 }
+
+func Generic[outer ~int](x int) outer {
+	return outer(x)
+}
+
+type Box[T ~int] struct{}
+
+// A receiver's type argument binds the type parameter in the method.
+func (b Box[outer]) Get(x int) outer {
+	return outer(x)
+}
+
+type H func()
+
+// The receiver is a name of the method.
+func (outer H) Serve() {
+	outer()
+}
+
+func LocalType() {
+	type outer int
+	_ = outer(1)
+}
+
+func LocalConst() {
+	const outer = 1
+	// Not valid Go: the probe needs a call through the constant.
+	outer()
+}
+
+// A blank function's parameters bind in it alone.
+func _(outer func()) {
+	outer()
+}
+
+// So do those of a literal at the top level.
+var handler = func(outer func()) {
+	outer()
+}

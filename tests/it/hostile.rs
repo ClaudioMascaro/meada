@@ -1173,6 +1173,121 @@ fn rust() -> Vec<Case> {
     ]
 }
 
+/// A Go module `example.com/h`, its `h.go` the `body`, with `more` files beside it.
+fn module(body: String, more: Vec<(String, String)>) -> Vec<(String, String)> {
+    let mut files = vec![
+        ("go.mod".to_string(), "module example.com/h\n".to_string()),
+        ("h.go".into(), body),
+    ];
+    files.extend(more);
+    files
+}
+
+fn go() -> Vec<Case> {
+    let m = |name, body: String| (name, module(body, vec![]));
+    let x =
+        |body: String| format!("package h\n\nfunc f(a int) int {{ return a }}\n\nvar x = {body}\n");
+    let g = |body: String| format!("package h\n\nfunc g() {{ {body} }}\n");
+    let manifest = |name, go_mod: String| {
+        let files = vec![
+            ("go.mod".to_string(), go_mod),
+            ("h.go".into(), "package h\n".into()),
+        ];
+        (name, files)
+    };
+    vec![
+        m("parens", x(nest("(", "1", ")", DEEP))),
+        m("calls", x(nest("f(", "1", ")", DEEP))),
+        m("composites", x(nest("[]any{", "1", "}", DEEP))),
+        m("binary", x(vec!["\"a\""; 5 * LONG].join(" + "))),
+        m("literals", g(nest("func() { ", "f(1)", " }()", DEEP))),
+        m("blocks", g(nest("{ ", "f(1)", " }", DEEP))),
+        m("ifs", g(nest("if true { ", "f(1)", " }", DEEP))),
+        m("selectors", g(format!("a{}()", ".b".repeat(DEEP)))),
+        m(
+            "receivers",
+            format!(
+                "package h\n\ntype S struct{{}}\n\nfunc (s {}S) M() {{}}\n",
+                "*".repeat(DEEP)
+            ),
+        ),
+        m(
+            "constraint",
+            format!(
+                "//go:build {}\n\npackage h\n",
+                nest("(", "linux", ")", DEEP)
+            ),
+        ),
+        m(
+            "negations",
+            format!("//go:build {}linux\n\npackage h\n", "!".repeat(DEEP)),
+        ),
+        m(
+            "imports",
+            format!(
+                "package h\n\nimport (\n{}\n)\n",
+                lines(WIDE, |i| format!("\tp{i} \"example.com/h/p{i}\""))
+            ),
+        ),
+        m(
+            "names",
+            format!(
+                "package h\n\n{}\n",
+                lines(WIDE, |i| format!("func f{i}() {{ f{}() }}", i + 1))
+            ),
+        ),
+        (
+            "package",
+            module(
+                "package h\n".into(),
+                chain(
+                    LINKS,
+                    |i| format!("p{i}.go"),
+                    |i| format!("package h\n\nfunc f{i}() {{ f{}() }}\n", i + 1),
+                ),
+            ),
+        ),
+        manifest(
+            "large",
+            format!("module example.com/h\n// {}\n", "x".repeat(1 << 20)),
+        ),
+        manifest(
+            "replaces",
+            format!(
+                "module example.com/h\n\nreplace (\n{}\n)\n",
+                lines(WIDE, |i| format!("\texample.com/r{i} => ./r{i}"))
+            ),
+        ),
+        (
+            "module-chain",
+            chain(
+                LINKS,
+                |i| format!("m{i}/go.mod"),
+                |i| {
+                    format!(
+                        "module example.com/m{i}\n\nreplace example.com/m{} => ../m{}\n",
+                        i + 1,
+                        i + 1
+                    )
+                },
+            )
+            .into_iter()
+            .chain(chain(
+                LINKS,
+                |i| format!("m{i}/m.go"),
+                |i| {
+                    format!(
+                        "package m{i}\n\nimport \"example.com/m{}\"\n\nfunc F() {{ m{}.F() }}\n",
+                        i + 1,
+                        i + 1
+                    )
+                },
+            ))
+            .collect(),
+        ),
+    ]
+}
+
 /// A test for each part of each pack: `<pack>_survives_hostile_input_<part>`.
 macro_rules! parts {
     ($($test:ident = $pack:literal, $cases:ident, $part:literal;)*) => {
@@ -1196,4 +1311,8 @@ parts! {
     rust_survives_hostile_input_1 = "rs", rust, 1;
     rust_survives_hostile_input_2 = "rs", rust, 2;
     rust_survives_hostile_input_3 = "rs", rust, 3;
+    go_survives_hostile_input_0 = "go", go, 0;
+    go_survives_hostile_input_1 = "go", go, 1;
+    go_survives_hostile_input_2 = "go", go, 2;
+    go_survives_hostile_input_3 = "go", go, 3;
 }

@@ -343,7 +343,7 @@ impl<'a> Resolver<'a> {
             for &path in &members {
                 let facts = files[path];
                 let defs = (facts.defs.iter())
-                    .filter(|d| d.kind != Kind::Method)
+                    .filter(|d| !matches!(d.kind, Kind::Method | Kind::Inline))
                     .map(|d| d.name.as_str());
                 let names = defs.chain(facts.consts.iter().map(|c| c.name.as_str()));
                 for name in names.filter(|n| !n.contains('.')) {

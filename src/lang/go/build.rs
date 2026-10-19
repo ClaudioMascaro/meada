@@ -63,7 +63,20 @@ const ARCHITECTURES: &[&str] = &[
 
 /// Whether the target builds the file at `path` holding `src`.
 pub fn builds(path: &str, src: &[u8]) -> bool {
-    named(path) && header(src).is_none_or(holds)
+    named(path)
+        && match header(src) {
+            Header::None => true,
+            Header::One(expression) => holds(expression),
+            Header::Unreadable => false,
+        }
+}
+
+/// The `//go:build` line of a file's header.
+enum Header<'s> {
+    None,
+    One(&'s str),
+    /// Two lines, or one that is not UTF-8: the Go tools reject the file.
+    Unreadable,
 }
 
 /// Whether the file name lets the target build it.
@@ -92,30 +105,48 @@ fn named(path: &str) -> bool {
     }
 }
 
-/// The expression of the `//go:build` line in the file's header: the line comments before the
-/// package clause, up to the last blank line among them (those after it document the package).
-fn header(src: &[u8]) -> Option<&str> {
-    let mut found = None;
-    let mut pending = None;
-    for line in src.split(|b| *b == b'\n') {
-        let Ok(line) = std::str::from_utf8(line) else {
-            break;
-        };
-        let line = line.trim();
-        if line.is_empty() {
-            found = pending.or(found);
-            continue;
+/// The `//go:build` line of the file's header, read as the Go tools read it: the lines before
+/// the first that holds code (blank lines, `//` comments, `/* */` comments), a directive inside a
+/// block comment not counting.
+fn header(src: &[u8]) -> Header<'_> {
+    let mut found = Header::None;
+    let mut in_block = false;
+    'lines: for line in src.split(|b| *b == b'\n') {
+        let mut line = line.trim_ascii();
+        if !in_block && let Some(expression) = directive(line) {
+            if !matches!(found, Header::None) {
+                return Header::Unreadable;
+            }
+            found = match std::str::from_utf8(expression) {
+                Ok(expression) => Header::One(expression.trim()),
+                Err(_) => return Header::Unreadable,
+            };
         }
-        let Some(comment) = line.strip_prefix("//") else {
-            break;
-        };
-        if let Some(expression) = comment.strip_prefix("go:build")
-            && (expression.is_empty() || expression.starts_with([' ', '\t']))
-        {
-            pending = Some(expression.trim());
+        while !line.is_empty() {
+            if in_block {
+                let Some(end) = line.windows(2).position(|w| w == b"*/") else {
+                    continue 'lines;
+                };
+                in_block = false;
+                line = line[end + 2..].trim_ascii();
+            } else if line.starts_with(b"//") {
+                continue 'lines;
+            } else if let Some(rest) = line.strip_prefix(b"/*") {
+                in_block = true;
+                line = rest.trim_ascii();
+            } else {
+                break 'lines;
+            }
         }
     }
     found
+}
+
+/// The expression of a `//go:build` line.
+fn directive(line: &[u8]) -> Option<&[u8]> {
+    let expression = line.strip_prefix(b"//go:build")?;
+    (expression.is_empty() || expression.starts_with(b" ") || expression.starts_with(b"\t"))
+        .then_some(expression)
 }
 
 /// Whether a constraint expression holds for the target. One that cannot be read does not.
@@ -255,11 +286,21 @@ mod tests {
         ));
         assert!(built("//go:build linux\n\npackage x\n"));
         assert!(built("package x\n"));
-        // Right above the package clause, it documents the package.
-        assert!(built("//go:build ignore\npackage x\n"));
+        // Right above the package clause, it still counts.
+        assert!(!built("//go:build ignore\npackage x\n"));
+        // After a block comment it counts; inside one it does not.
+        assert!(!built("/* License */\n//go:build windows\npackage x\n"));
+        assert!(!built(
+            "/*\n * License\n */\n\n//go:build windows\n\npackage x\n"
+        ));
+        assert!(built("/*\n//go:build windows\n*/\npackage x\n"));
+        assert!(!built("/* a */ /* b */\n//go:build ignore\npackage x\n"));
         // After the package clause, it is any comment.
         assert!(built("package x\n\n//go:build ignore\n\n"));
-        assert!(built("/* block */\n//go:build ignore\n\npackage x\n"));
+        assert!(built("package x /* a */\n//go:build ignore\n"));
+        // Two lines: the Go tools reject the file.
+        assert!(!built("//go:build linux\n//go:build amd64\n\npackage x\n"));
+        assert!(built("//go:buildx windows\npackage x\n"));
     }
 
     #[test]

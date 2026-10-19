@@ -3,8 +3,9 @@
 //! `go.mod` that owns it (`modfile.rs`), the files of one package share their top-level scope
 //! (`Layout::shared`), and build constraints are evaluated for one fixed target (`build.rs`).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 
 use tree_sitter::{Node, Parser};
 
@@ -22,6 +23,13 @@ mod modfile;
 /// type.
 // ponytail: real chains hold a handful of segments; the limit keeps a crafted one cheap.
 const PATH_DEPTH: usize = 256;
+
+/// How many function literals may nest in one another as definitions of their own. Names are
+/// qualified by the literals around them and each call resolves its names up that chain, so
+/// unbounded nesting costs cubic time. Past the limit a literal is no definition: its
+/// parameters and calls belong to the one around it.
+// ponytail: real code nests a few levels; 128 is the depth the other packs allow.
+const DEFINITION_DEPTH: usize = 128;
 
 pub struct Go;
 
@@ -57,19 +65,22 @@ impl LanguagePack for Go {
             let key = (dir(path), facts.package.as_str());
             packages.entry(key).or_default().push(path.to_string());
         }
-        // What an import of a directory names: its files, but the tests, which no other
-        // package imports.
-        let mut importable: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        // What an import of a directory names: its first file but the tests (which no other
+        // package imports), which stands for the package (`Layout::shared`).
+        let mut importable: BTreeMap<&str, &str> = BTreeMap::new();
         for path in built.keys().filter(|p| !p.ends_with("_test.go")) {
-            (importable.entry(dir(path).to_string()).or_default()).push(path.to_string());
+            importable.entry(dir(path)).or_insert(path);
         }
+        let importable: BTreeMap<String, String> = (importable.into_iter())
+            .map(|(d, p)| (d.to_string(), p.to_string()))
+            .collect();
         let modules = modfile::Modules::new(configs);
         Ok(Layout {
             members: Some(built.keys().map(|p| p.to_string()).collect()),
             modules: Box::new(move |from, specifier| {
                 (modules.dir(dir(from), specifier))
-                    .and_then(|d| importable.get(&d).cloned())
-                    .unwrap_or_default()
+                    .and_then(|d| importable.get(&d))
+                    .map_or_else(Vec::new, |first| vec![first.clone()])
             }),
             published: None,
             programs: Vec::new(),
@@ -121,13 +132,27 @@ impl Walk<'_> {
         }
     }
 
-    /// Records the calls and the bindings under `node`, all belonging to `scope`: a function
-    /// literal is no definition, so its parameters and its calls are its enclosing function's.
+    /// The type parameters a generic function declares (`[T any]`).
+    fn bind_type_params(&mut self, scope: &str, node: Node) {
+        let list = node.child_by_field_name("type_parameters");
+        for declaration in list.into_iter().flat_map(named) {
+            for name in names(declaration) {
+                self.local(scope, text(name, self.src));
+            }
+        }
+    }
+
+    /// Records the calls and the bindings under `node`, which belong to `scope`. A function
+    /// literal is a `Kind::Inline` definition (`@<offset>` under `scope`) that the index names
+    /// or folds into the one around it: its parameters bind in it, and its calls are its own.
     fn body(&mut self, scope: &str, node: Node) {
         let src = self.src;
         // Explicit stack instead of recursion: generated code can nest deeper than the stack.
-        let mut stack = vec![node];
-        while let Some(node) = stack.pop() {
+        let mut stack: Vec<(Node, Rc<str>, usize)> = vec![(node, scope.into(), 0)];
+        while let Some((node, scope, depth)) = stack.pop() {
+            let mut inner_scope = Rc::clone(&scope);
+            let mut inner_depth = depth;
+            let scope = &*scope;
             match node.kind() {
                 "call_expression" => {
                     if let Some(function) = node.child_by_field_name("function") {
@@ -155,6 +180,11 @@ impl Walk<'_> {
                         self.bind(scope, alias);
                     }
                 }
+                "func_literal" if depth < DEFINITION_DEPTH => {
+                    let name = self.inline(scope, node);
+                    (inner_scope, inner_depth) = (name.into(), depth + 1);
+                }
+                // Too deep to be a definition: it lends its names to the one around it.
                 "func_literal" => {
                     self.bind_params(scope, node.child_by_field_name("parameters"));
                     self.bind_params(scope, result_list(node));
@@ -163,8 +193,19 @@ impl Walk<'_> {
             }
             let mut inner: Vec<Node> = named(node).collect();
             inner.reverse();
-            stack.extend(inner);
+            stack.extend((inner.into_iter()).map(|n| (n, Rc::clone(&inner_scope), inner_depth)));
         }
+    }
+
+    /// The `Kind::Inline` definition of the function `node` (a literal, or a blank `func _`)
+    /// written in `scope`, with its parameters, and the names its results bind: its name.
+    fn inline(&mut self, scope: &str, node: Node) -> String {
+        let name = qualify(scope, &format!("@{}", node.start_byte()));
+        let params = params(node.child_by_field_name("parameters"), self.src);
+        (self.facts.defs).push(def(name.clone(), Kind::Inline, node.byte_range(), params));
+        self.bind_params(&name, result_list(node));
+        self.bind_type_params(&name, node);
+        name
     }
 }
 
@@ -264,15 +305,26 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
-/// The type a method's receiver names, through pointers, type arguments and parentheses:
-/// `Store` for `*Store`, `Store[T]` and `(*Store)`.
-fn receiver_type<'s>(receiver: Node, src: &'s [u8]) -> Option<&'s str> {
+/// The type a method's receiver names, through pointers, type arguments and parentheses
+/// (`Store` for `*Store`, `Store[T]` and `(*Store)`), and the type parameters its type
+/// arguments name (`T`), which the method binds.
+fn receiver_type<'s>(receiver: Node, src: &'s [u8]) -> Option<(&'s str, Vec<&'s str>)> {
     let declaration = named(receiver).next()?;
     let mut ty = declaration.child_by_field_name("type")?;
+    let mut bound = Vec::new();
     for _ in 0..PATH_DEPTH {
         ty = match ty.kind() {
-            "type_identifier" => return Some(text(ty, src)),
-            "generic_type" => ty.child_by_field_name("type")?,
+            "type_identifier" => return Some((text(ty, src), bound)),
+            "generic_type" => {
+                let arguments = ty.child_by_field_name("type_arguments");
+                let elems = arguments.into_iter().flat_map(named);
+                bound.extend(
+                    (elems.filter_map(|e| named(e).next()))
+                        .filter(|t| t.kind() == "type_identifier")
+                        .map(|t| text(t, src)),
+                );
+                ty.child_by_field_name("type")?
+            }
             "pointer_type" | "parenthesized_type" => named(ty).next()?,
             _ => return None,
         };
@@ -334,6 +386,25 @@ fn imports(node: Node, src: &[u8], facts: &mut Facts) {
     }
 }
 
+/// Leaves a name two imports of the file give unknown: a plain import binds the name assumed
+/// from its path (`assumed_name`), which may not be its package's, so neither is sure to bind
+/// it. They become one import of the name from the empty specifier, which names nothing of the
+/// repository: a call through it links to nothing.
+fn unbind_clashes(imports: &mut Vec<Import>) {
+    let mut count: HashMap<String, usize> = HashMap::new();
+    for import in imports.iter().filter(|i| !i.local.is_empty()) {
+        *count.entry(import.local.clone()).or_default() += 1;
+    }
+    let mut seen = HashSet::new();
+    imports.retain_mut(|import| {
+        if count.get(&import.local).is_none_or(|n| *n < 2) {
+            return true;
+        }
+        import.source.clear();
+        seen.insert(import.local.clone())
+    });
+}
+
 fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     if !build::builds(path, src) {
         return Ok(Facts {
@@ -364,9 +435,10 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     continue;
                 };
                 let body = node.child_by_field_name("body");
-                // A blank function names no symbol: its calls are the file's.
+                // A blank function names no symbol: it folds into the file, as a literal does.
                 if name == "_" {
-                    body.into_iter().for_each(|b| walk.body("", b));
+                    let inline = walk.inline("", node);
+                    body.into_iter().for_each(|b| walk.body(&inline, b));
                     continue;
                 }
                 // Each `init` (the one name a file may declare twice) is a symbol of its own.
@@ -382,6 +454,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     .defs
                     .push(def(name.clone(), Kind::Function, range, params));
                 walk.bind_params(&name, result_list(node));
+                walk.bind_type_params(&name, node);
                 if let Some(body) = body {
                     walk.body(&name, body);
                 }
@@ -391,7 +464,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let receiver = node.child_by_field_name("receiver");
                 let ty = receiver.and_then(|r| receiver_type(r, src));
                 let name = node.child_by_field_name("name").map(|n| text(n, src));
-                let (Some(ty), Some(name)) = (ty, name) else {
+                let (Some((ty, type_params)), Some(name)) = (ty, name) else {
                     continue;
                 };
                 let qualified = format!("{ty}.{name}");
@@ -400,6 +473,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.facts.defs.push(method);
                 walk.bind_params(&qualified, receiver);
                 walk.bind_params(&qualified, result_list(node));
+                for type_param in type_params {
+                    walk.local(&qualified, type_param);
+                }
                 if let Some(body) = node.child_by_field_name("body") {
                     walk.body(&qualified, body);
                 }
@@ -465,6 +541,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         }
     }
     let mut facts = walk.facts;
+    unbind_clashes(&mut facts.imports);
     facts.exports = (top.into_iter().filter(|n| exported(n)))
         .map(|name| Export::Local {
             exported: name.clone(),
@@ -472,4 +549,68 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     Ok(facts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn facts(src: &str) -> Facts {
+        parse("x.go", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_selector_chain_longer_than_the_limit_is_its_node_kind() {
+        let callee = |n: usize| {
+            let src = format!("package x\n\nfunc f() {{ a{}() }}\n", ".b".repeat(n));
+            facts(&src).calls[0].callee.clone()
+        };
+        assert_eq!(callee(PATH_DEPTH), format!("a{}", ".b".repeat(PATH_DEPTH)));
+        assert_eq!(callee(PATH_DEPTH + 1), "(selector_expression)");
+    }
+
+    #[test]
+    fn a_receiver_type_wrapped_deeper_than_the_limit_names_no_method() {
+        let methods = |n: usize| {
+            let src = format!("package x\n\nfunc (s {}S) M() {{}}\n", "*".repeat(n));
+            facts(&src)
+                .defs
+                .into_iter()
+                .map(|d| d.name)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(methods(PATH_DEPTH - 1), ["S.M"]);
+        assert!(methods(PATH_DEPTH).is_empty());
+    }
+
+    #[test]
+    fn literals_nested_deeper_than_the_limit_are_no_definitions() {
+        let n = DEFINITION_DEPTH + 10;
+        let src = format!(
+            "package x\n\nfunc f() {{ {} g() {} }}\n",
+            "func() {".repeat(n),
+            "}()".repeat(n)
+        );
+        let facts = facts(&src);
+        let inline = facts.defs.iter().filter(|d| d.kind == Kind::Inline).count();
+        assert_eq!(inline, DEFINITION_DEPTH);
+        let scope = &facts.calls.iter().find(|c| c.callee == "g").unwrap().scope;
+        assert_eq!(scope.matches('@').count(), DEFINITION_DEPTH);
+    }
+
+    #[test]
+    fn a_plain_import_binds_the_name_the_go_tools_assume() {
+        let cases = [
+            ("fmt", "fmt"),
+            ("net/http", "http"),
+            ("github.com/go-chi/chi/v5", "chi"),
+            ("gopkg.in/yaml.v3", "yaml"),
+            ("github.com/segmentio/kafka-go", "kafka"),
+            ("github.com/redis/go-redis/v9", "redis"),
+            ("github.com/nats-io/nats.go", "nats"),
+        ];
+        for (path, name) in cases {
+            assert_eq!(assumed_name(path), name, "{path}");
+        }
+    }
 }

@@ -53,8 +53,8 @@ pub fn read(text: &str) -> ModFile {
     file
 }
 
-/// The modules of a repository: each `go.mod`'s directory, module path and the local
-/// directories its `replace` directives name.
+/// The modules of a repository: each `go.mod`'s directory, module path and what its `replace`
+/// directives name.
 pub struct Modules {
     modules: Vec<Module>,
 }
@@ -62,8 +62,10 @@ pub struct Modules {
 struct Module {
     dir: String,
     path: Option<String>,
-    /// The module paths replaced by a directory of the repository, as that directory.
-    replaces: Vec<(String, String)>,
+    /// The module paths each `replace` replaces, with the directory of the repository that
+    /// replaces it; `None` for any other target (a module, a directory outside), which makes the
+    /// replaced module one from outside.
+    replaces: Vec<(String, Option<String>)>,
 }
 
 impl Modules {
@@ -75,7 +77,10 @@ impl Modules {
                 let dir = path.rsplit_once('/').map_or("", |(d, _)| d).to_string();
                 let file = read(&String::from_utf8_lossy(bytes));
                 let replaces = (file.replaces.into_iter())
-                    .filter_map(|(old, new)| Some((old, local(&dir, &new)?)))
+                    .map(|(old, new)| {
+                        let target = local(&dir, &new);
+                        (old, target)
+                    })
                     .collect();
                 Module {
                     dir,
@@ -95,15 +100,19 @@ impl Modules {
     }
 
     /// The package directory an import of `specifier` from a file of `from` names: through a
-    /// `replace` of the importing file's module, else through the module path of the repository's
-    /// modules, the longest that matches (none when two modules declare it). The directory must
-    /// belong to that module, not to a module nested in it. `None` for the standard library and
-    /// the modules outside.
+    /// `replace` of the importing file's module (none when it replaces the module with one from
+    /// outside), else through the module path of the repository's modules, the longest that
+    /// matches (none when two modules declare it). The directory must belong to that module, not
+    /// to a module nested in it. `None` for the standard library and the modules outside.
     pub fn dir(&self, from: &str, specifier: &str) -> Option<String> {
         let own = self.owner(from)?;
         let replaced = (own.replaces.iter())
-            .filter_map(|(old, dir)| Some((rest(specifier, old)?, dir.as_str(), old.len())))
+            .filter_map(|(old, dir)| Some((rest(specifier, old)?, dir.as_deref(), old.len())))
             .max_by_key(|(_, _, len)| *len);
+        let replaced = match replaced {
+            Some((rest, dir, len)) => Some((rest, dir?, len)),
+            None => None,
+        };
         let found = replaced.or_else(|| {
             let matches: Vec<(&str, &str, usize)> = (self.modules.iter())
                 .filter_map(|m| {
@@ -231,6 +240,17 @@ mod tests {
         assert_eq!(
             dir("worker", "example.com/worker/jobs").as_deref(),
             Some("worker/jobs")
+        );
+        // A replace by a module from outside makes the replaced one outside.
+        let forked: &[(&str, &[u8])] = &[
+            ("go.mod", b"module example.com/shop\nreplace example.com/billing v1.0.0 => example.com/fork v1.0.0\n"),
+            ("billing/go.mod", b"module example.com/billing\n"),
+        ];
+        let forked = Modules::new(forked);
+        assert_eq!(forked.dir("", "example.com/billing/tax"), None);
+        assert_eq!(
+            forked.dir("billing", "example.com/billing/tax").as_deref(),
+            Some("billing/tax")
         );
         // Two modules that declare one path, with no replace to pick one, name nothing.
         assert_eq!(dir("worker", "example.com/billing/tax"), None);

@@ -615,19 +615,23 @@ one for the area a change touches.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when
   asked for, and does not depend on the walk that first reached it.
-- `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many segments of a selector chain (a
-  longer one is its node kind) and a receiver's type is read through that many `*`, type
-  arguments and parentheses (past it the method is no definition). `CONSTRAINT_DEPTH` (64,
-  `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`, parentheses) is not read,
-  and the file is left out, as one that cannot be read is. Build constraints hold for one
-  target (`linux`, `amd64`, `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false);
-  a legacy `// +build` line alone is not read. A plain import binds the name the Go tools
-  assume for its path (`assumed_name`: the last element, the one before a `vN`, without `go-`,
-  up to the first character no identifier holds), not the package clause of the directory it
-  names, so a package whose clause differs from its directory is reached by its alias alone.
-  An import of two modules of the repository that declare one path names nothing unless a
-  `replace` picks one; a `replace` to a directory outside the repository, and a `vendor/`
-  directory, are not followed.
+- `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
+  one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
+  parentheses (past it the method is no definition). `DEFINITION_DEPTH` (128): a function
+  literal nested deeper is no definition (its parameters and calls are the enclosing one's).
+  `CONSTRAINT_DEPTH` (64, `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`,
+  parentheses) is not read, and the file is left out, as one that cannot be read (two
+  `//go:build` lines, not UTF-8) is. Build constraints hold for one target (`linux`, `amd64`,
+  `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false); a legacy `// +build` line
+  alone is not read. A plain import binds the name the Go tools assume for its path
+  (`assumed_name`: the last element, the one before a `vN`, without `go-`, up to the first
+  character no identifier holds), not the package clause of the directory it names, so a
+  package whose clause differs from its directory is reached by its alias alone, and a name two
+  imports of a file give is unknown (`unbind_clashes`: an import of it from the empty
+  specifier, which names nothing), so a call through it links to nothing. An import of two
+  modules of the repository that declare one path names nothing unless a `replace` picks one; a
+  `replace` by a module or a directory outside the repository makes the replaced module an
+  outside one; a `vendor/` directory is not followed.
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,

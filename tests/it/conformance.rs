@@ -2529,6 +2529,7 @@ fn go() {
             "billing/invoice/invoice.go::round",
             "forks/billing/invoice/invoice.go::Total",
             "forks/billing/invoice/invoice.go::round",
+            "internal/http-utils/utils.go::NewRequest",
             "internal/shapes/shapes.go::Circle",
             "internal/shapes/shapes.go::Circle.Area",
             "internal/shapes/shapes.go::Circle.Perimeter",
@@ -2541,10 +2542,19 @@ fn go() {
             "internal/shapes/shapes.go::Shape.Perimeter",
             "internal/shapes/shapes.go::clamp",
             "internal/units/units.go::Meters",
+            "legacy/old/old.go::Old",
             "main.go::main",
             "main.go::run",
             "report.go::report",
+            "scopes/clash.go::Clash",
             "scopes/other.go::Other",
+            "scopes/scopes.go::Box",
+            "scopes/scopes.go::Box.Get",
+            "scopes/scopes.go::Generic",
+            "scopes/scopes.go::H",
+            "scopes/scopes.go::H.Serve",
+            "scopes/scopes.go::LocalConst",
+            "scopes/scopes.go::LocalType",
             "scopes/scopes.go::Capture",
             "scopes/scopes.go::ForInit",
             "scopes/scopes.go::IfInit",
@@ -2574,6 +2584,7 @@ fn go() {
             "store/store.go::init#2",
             "store/store.go::open",
             "store/store_test.go::TestNew",
+            "store/sys_unix.go::sysOpen",
             "worker/jobs/jobs.go::Run",
             "worker/main.go::main",
         ],
@@ -2716,6 +2727,30 @@ fn go() {
             ),
             ("scopes/scopes.go::Capture::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::Import::store.New#0", None, &[]),
+            // Type parameters, a receiver's type arguments, the receiver, local types and
+            // constants, and the parameters of a blank function and of a top-level literal.
+            ("scopes/scopes.go::Generic::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Box.Get::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::H.Serve::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::LocalType::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::LocalConst::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::outer#1", INFERRED, &[OUTER]),
+            // Two imports that give one name leave it unknown.
+            ("scopes/clash.go::Clash::http.NewRequest#0", None, &[]),
+            // A build constraint after a block comment counts.
+            (
+                "store/store.go::New::sysOpen#0",
+                EXACT,
+                &["store/sys_unix.go::sysOpen"],
+            ),
+            // A replace by a module from outside makes the module of the repository outside.
+            ("report.go::report::old.Old#0", None, &[]),
+            (
+                "worker/main.go::main::old.Old#0",
+                EXACT,
+                &["legacy/old/old.go::Old"],
+            ),
         ],
     );
     // Files the build constraints leave out for `linux/amd64` are not indexed.
@@ -2723,6 +2758,7 @@ fn go() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(!export.contains("disk_windows.go"));
     assert!(!export.contains("legacy.go"));
+    assert!(!export.contains("sys_other.go"));
 }
 
 /// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router

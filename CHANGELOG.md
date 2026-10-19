@@ -13,8 +13,9 @@ All notable changes to Meada are recorded here. The format follows
   and interface methods (`Interface.Method`); a function literal is no definition, its calls
   belong to the function around it. An import names a package directory through the module path
   of the `go.mod` that owns it (a nested module owns its subtree, two modules of one path name
-  none), or through a `replace` to a local directory of the repository; plain, aliased, dot and
-  blank imports. The files of one directory that declare one package share their top-level
+  none), or through a `replace` to a local directory of the repository (a `replace` by an
+  outside module makes the module external); plain, aliased, dot and blank imports, a name two
+  imports of a file give linking to nothing. The files of one directory that declare one package share their top-level
   scope, `_test.go` files included, and an import names them all; the standard library and
   modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
   target (gc, no cgo): a file whose name ends in another system or architecture, or whose
