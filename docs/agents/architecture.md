@@ -237,6 +237,21 @@ one for the area a change touches.
   makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
+- **Go channels** (spec #25, #82): `lang/go/messages.rs` lists each library (`LIBRARIES`: the
+  import path without its major version, `versionless`, and the constructors that make its client)
+  and reads a call when `Code::outside_origin` traces its receiver to one of them (the class-based
+  twin of `outside_type`: it also follows `x, err := f()`, a repository function that returns a
+  library type, and a method on a value the library made, such as `conn.Channel()`). The
+  channel name goes through `Code::expand`, struct fields of a composite literal included:
+  `values::composite` gives `Value::New(Type, [Object(fields)])` for a struct written with its
+  type and `Value::List` for a slice (`Code::eval` descends into `New`); `aws.String(x)` is `x`.
+  A callback is the handler (`Handler::Inline`, or `Def` for a function or a method value
+  `a.onAudit`, through `Code::method`); a polling client's handler is the function containing
+  the call that names the topic, queue or stream (the `consume` default); a sarama group's is
+  the `ConsumeClaim` of the type its `Consume` is given. A writer that names a topic
+  (`kafka.Writer{Topic:}`) stands for its messages, read from `Code::constant` of the writer's
+  name; a writer a function made, or one with no topic, is read from each message. The
+  `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -266,7 +281,7 @@ one for the area a change touches.
   paths, never opening one, so a symlink changes nothing. A change to what is stored re-blesses
   `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
-  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`), matching a call's
+  `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
   `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
@@ -670,10 +685,23 @@ one for the area a change touches.
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
   in a block, an `if` or a loop), so a name bound again, assigned or shadowed holds no value
   (the `Hidden` binding wins); a function returns a value only for a `return` of one expression.
-  A name whose address is taken (`&p`) is no constant. A name bound in a block or an `if` hides
+  A name whose address is taken (`&p`) is no constant, except `&p` as the `Topic:` of a literal
+  (confluent-kafka-go's `*string`; `ponytail:` in `Walk::body`): a write through that pointer is
+  not seen. A struct literal nests as deep as `VALUE_DEPTH`; one written by position, a map and
+  a literal of any other type are `Unknown`. A name bound in a block or an `if` hides
   the name in the whole function for constants (absence only: a router or path written outside
   the block after such a binding yields no provider; the receivers of the pack hold a name for a
   region, constants do not).
+- `lang/go/messages.rs` (spec #25, #82): a receiver that does not trace back to a library's
+  constructor or type makes no side (a type of the repository with a `Publish` or
+  `WriteMessages` method is never one). A confluent `Produce` takes the topic from
+  `TopicPartition.Topic` of the message literal written in the call or held by one name; a
+  message built elsewhere is unresolved. A topic starting with `^` is a pattern and names no
+  topic. A Redis read without a consumer group (`XRead`) is no consumer, and `XReadGroup` gives
+  the first half of `Streams` as the names (the ids are the second). A sarama `Consume` handler
+  is found when its third argument is a literal or a name that holds one; any other leaves the
+  consumer on the function that calls `Consume`. A queue name is the last segment of the SQS
+  queue URL.
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
   group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
   `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route

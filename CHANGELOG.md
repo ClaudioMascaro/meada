@@ -91,6 +91,24 @@ All notable changes to Meada are recorded here. The format follows
   a router mounted inside a call (a middleware) or given to a router Meada does not read is an
   unread mount, and `http.StripPrefix` is not modelled.
 
+- Go channels (spec #25): producers and consumers of the common broker clients, linked to the
+  other languages' sides of the same channel. Kafka: segmentio/kafka-go (`Writer{Topic:}` and
+  `WriteMessages`, `Message{Topic:}`, `NewReader(ReaderConfig{Topic:, GroupTopics:})`),
+  confluent-kafka-go (`Produce` with `TopicPartition.Topic`, `Subscribe`, `SubscribeTopics`) and
+  sarama (`SendMessage`, `ConsumePartition`, `ConsumerGroup.Consume`, whose handler is the
+  `ConsumeClaim` of the handler type). RabbitMQ: amqp091-go (`Publish`, `PublishWithContext`,
+  `Consume`, `QueueBind`; the default exchange reaches the queue its key names). SQS:
+  aws-sdk-go-v2 (`SendMessage`, `SendMessageBatch`, `ReceiveMessage`, the queue being the last
+  segment of `QueueUrl`, through `aws.String`). NATS: nats.go (`Publish`, `Subscribe`,
+  `QueueSubscribe`, with the `*` and `>` wildcards inferred). Redis streams: go-redis (`XAdd`,
+  `XReadGroup`; a read without a group is no consumer). A name is folded like a URL, struct
+  fields of a composite literal included; a name that cannot be folded, a pattern topic and a
+  producer whose receiver does not come from the library are unresolved or no side. A callback
+  client's handler is the callback, a polling client's the function that names the topic or
+  queue. `&topic` as the `Topic:` of a literal keeps the name a constant. The cross-language
+  fixtures carry a TypeScript producer to a Go consumer group, with a golden `trace`. The index
+  is not rebuilt (no schema change).
+
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
   or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),
