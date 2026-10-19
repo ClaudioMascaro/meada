@@ -38,9 +38,32 @@ static NAMESPACE: Imported = Imported::Namespace;
 /// An `exports` row: the name, the file and the definition in it.
 type Row<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
 
-/// Whether the export names `name`.
-fn exports_name(export: &Export, name: &str) -> bool {
-    matches!(export, Export::Local { exported, .. } | Export::From { exported, .. } if exported == name)
+/// Where a file's star exports (`Export::All`) and the exports of each name sit in its
+/// `Facts::exports`, each list in order: a name is looked up without a scan of them all.
+#[derive(Default)]
+struct Named<'a> {
+    stars: Vec<usize>,
+    names: HashMap<&'a str, Vec<usize>>,
+}
+
+impl<'a> Named<'a> {
+    fn new(exports: &'a [Export]) -> Self {
+        let mut named = Self::default();
+        for (at, export) in exports.iter().enumerate() {
+            match export {
+                Export::All { .. } => named.stars.push(at),
+                Export::Local { exported, .. } | Export::From { exported, .. } => {
+                    named.names.entry(exported.as_str()).or_default().push(at);
+                }
+            }
+        }
+        named
+    }
+
+    /// Where the exports of `name` sit.
+    fn of(&self, name: &str) -> &[usize] {
+        self.names.get(name).map_or(&[], Vec::as_slice)
+    }
 }
 
 /// The index among `calls` of the call spanning `range`. Packs list calls in the order a
@@ -231,6 +254,8 @@ pub struct Resolver<'a> {
     locals: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::receivers`, by scope and name.
     receivers: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+    /// Each file's `Facts::exports`, by the name they give.
+    named: HashMap<&'a str, Named<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
@@ -313,6 +338,9 @@ impl<'a> Resolver<'a> {
                 (*path, names)
             })
             .collect();
+        let named = (files.iter())
+            .map(|(path, facts)| (*path, Named::new(&facts.exports)))
+            .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
             let names: &HashMap<&str, &Def> = &defs[path];
@@ -368,6 +396,7 @@ impl<'a> Resolver<'a> {
             consts,
             locals,
             receivers,
+            named,
             families: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
@@ -636,10 +665,7 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         let (path, dotted) = (module.path, format!("{}.{member}", module.name));
-        let exports = &self.files[path].exports;
-        if let Some(Export::Local { exported, .. } | Export::From { exported, .. }) =
-            exports.iter().find(|e| exports_name(e, &dotted))
-        {
+        if let Some((exported, _)) = self.named[path].names.get_key_value(dotted.as_str()) {
             return self.export_as(path, exported, seen, value);
         }
         let mut imports = self.files[path].imports.iter().rev();
@@ -1436,16 +1462,18 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         value: bool,
     ) -> Option<Binding<'a>> {
-        let exports = &self.files[path].exports;
+        let (exports, index) = (&self.files[path].exports, &self.named[path]);
         if self.stars_bind {
-            let given = (exports.iter()).map(|export| match export {
+            // Only the name's own exports and the star ones may give it: those, in order.
+            let mut at = [index.of(name), index.stars.as_slice()].concat();
+            at.sort_unstable();
+            let given = at.into_iter().map(|at| match &exports[at] {
                 Export::All { source } => self.taken(path, source, name, seen),
-                _ => (self.gives(path, export, name, seen, value)).map(|found| (found, false)),
+                export => (self.gives(path, export, name, seen, value)).map(|found| (found, false)),
             });
             return latest(given, false);
         }
-        let star = |export: &&Export| matches!(export, Export::All { .. });
-        let named = || (exports.iter()).filter(|e| !star(e) && exports_name(e, name));
+        let named = || index.of(name).iter().map(|&at| &exports[at]);
         let namespace = |e: &&Export| {
             matches!(
                 e,
@@ -1462,8 +1490,8 @@ impl<'a> Resolver<'a> {
         if let Some(export) = own {
             return self.gives(path, export, name, seen, value);
         }
-        let mut given = (exports.iter().filter(star))
-            .filter_map(|export| self.gives(path, export, name, seen, value));
+        let mut given = (index.stars.iter())
+            .filter_map(|&at| self.gives(path, &exports[at], name, seen, value));
         let Some(first) = given.next() else {
             return self.globs(path, "", name, false, seen);
         };
@@ -1561,7 +1589,7 @@ impl<'a> Resolver<'a> {
             }
             let mut names = BTreeSet::new();
             self.glob_names(path, &mut HashSet::new(), &mut names);
-            names.retain(|n| facts.exports.iter().all(|e| !exports_name(e, n)));
+            names.retain(|n| self.named[path].of(n).is_empty());
             let found = names
                 .into_iter()
                 .flat_map(|name| self.rows(path, name, false));
@@ -3240,6 +3268,31 @@ mod tests {
         let sources = owned(&[("m.py", "def y():\n    pass\n"), ("main.py", &main)]);
         let found = exact_in(&Python, &sources, "main.py", "x");
         assert_eq!(found.as_deref(), Some("main.py"));
+    }
+
+    #[test]
+    fn a_file_of_many_names_exports_them_in_linear_time() {
+        use crate::lang::ts::TsJs;
+
+        let n = 150_000;
+        let exports = (0..n).map(|i| Export::Local {
+            exported: format!("a{i}"),
+            local: format!("a{i}"),
+        });
+        let facts = Facts {
+            exports: exports.collect(),
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a", &facts)]);
+        // Where stars do not bind, and where they do.
+        for (pack, label) in [(&TsJs as &dyn LanguagePack, "ts"), (&Python, "py")] {
+            let modules = pack.modules(&[], &BTreeMap::new()).unwrap();
+            let start = std::time::Instant::now();
+            assert_eq!(Resolver::new(&files, modules, pack).exported().len(), n);
+            // Each name was looked up among the file's exports one by one: minutes here.
+            let took = start.elapsed();
+            assert!(took.as_secs() < 20, "{label}: {took:?}");
+        }
     }
 
     #[test]

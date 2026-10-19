@@ -419,8 +419,8 @@ fn python() -> Vec<Case> {
         p(
             "aliases",
             format!(
-                "a0 = 1\n{}\ny = a{LONG}\n",
-                lines(LONG, |i| format!("a{} = a{i}", i + 1))
+                "a0 = 1\n{}\ny = a{WIDE}\n",
+                lines(WIDE, |i| format!("a{} = a{i}", i + 1))
             ),
         ),
         p(
@@ -443,7 +443,7 @@ fn python() -> Vec<Case> {
         ),
         p(
             "decorators",
-            lines(LONG, |i| format!("@d\ndef f{i}(): pass")),
+            lines(WIDE, |i| format!("@d\ndef f{i}(): pass")),
         ),
         p(
             "decorator-stack",
