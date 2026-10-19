@@ -53,6 +53,16 @@ All notable changes to Meada are recorded here. The format follows
   handler. The Go pack now reads what a call is given, what a function returns and what a `:=`
   holds. The index is rebuilt once (new schema version).
 
+- Go HTTP consumers (spec #25): `net/http` calls on the package, a `Client` or `DefaultClient`
+  (`Get`, `Head`, `Post`, `PostForm`), `NewRequest` and `NewRequestWithContext` (the construction
+  is the consumer, its method read from a literal or `http.MethodX`), and resty requests (the
+  verbs and `Execute`), with the host of the `SetBaseURL` of the client that issued them, also
+  when the client is a parameter, a field or a function result. A URL is folded from literals,
+  `+`, `fmt.Sprintf` (`%s`, `%d`, `%v` are parameter segments), constants and package-level names
+  of the package or of another one (a `var` nothing assigns folds like a constant). A wrapper over
+  a client is read at its call sites, to any depth, with cycle detection. A path that cannot be
+  folded is an unresolved consumer.
+
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
   or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),

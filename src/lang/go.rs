@@ -117,6 +117,10 @@ struct Walk<'s> {
     assigned: Vec<(String, String)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
+    /// The standard-library packages whose calls and constants the values fold.
+    std: values::Std,
+    /// The package-level `var`s, which hold their value only if nothing assigns them.
+    vars: BTreeSet<String>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -191,6 +195,9 @@ impl Walk<'_> {
     /// inside it, holds no one value.
     fn finish_values(&mut self) {
         let mut assigned = HashSet::new();
+        // The names assigned that no scope of the file binds: a variable another file of the
+        // package declares.
+        let mut elsewhere = BTreeSet::new();
         for (scope, name) in std::mem::take(&mut self.assigned) {
             let mut at = scope.as_str();
             // The binding the name refers to: the innermost scope that binds it.
@@ -203,7 +210,26 @@ impl Walk<'_> {
                 }
                 at = crate::parent(at);
             };
-            assigned.extend(found);
+            match found {
+                Some(found) => _ = assigned.insert(found),
+                None if name != "_" => _ = elsewhere.insert(name),
+                None => {}
+            }
+        }
+        // A `var` assigned again holds no one value. One assigned in another file is declared
+        // there and here (as a constant of no value), so the package binds the name to neither.
+        for constant in &mut self.facts.consts {
+            if self.vars.contains(&constant.name) && assigned.contains(&constant.name) {
+                constant.value = Value::Unknown;
+            }
+        }
+        for name in elsewhere {
+            let value = Value::Unknown;
+            self.facts.consts.push(Const {
+                name,
+                value,
+                ty: None,
+            });
         }
         let mut constants = HashSet::new();
         for (scope, name, value) in std::mem::take(&mut self.held) {
@@ -279,16 +305,16 @@ impl Walk<'_> {
                     if let Some(function) = node.child_by_field_name("function") {
                         let mut at = call(scope, callee(function, src), node.byte_range());
                         at.args = values::arguments(node)
-                            .map(|a| values::value(a, src, scope, depth))
+                            .map(|a| values::value(a, src, &self.std, scope, depth))
                             .collect();
-                        at.receiver = values::receiver(function, src, scope, depth);
+                        at.receiver = values::receiver(function, src, &self.std, scope, depth);
                         self.facts.calls.push(at);
                     }
                 }
                 "return_statement" => {
                     let results: Vec<Node> = named(node).flat_map(named).collect();
                     if let [result] = results[..] {
-                        let value = values::value(result, src, scope, depth);
+                        let value = values::value(result, src, &self.std, scope, depth);
                         (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
                 }
@@ -479,7 +505,7 @@ impl Walk<'_> {
             && name.kind() == "identifier"
             && text(*name, src) != "_"
         {
-            let value = values::value(*value, src, scope, depth);
+            let value = values::value(*value, src, &self.std, scope, depth);
             let name = text(*name, src).to_string();
             self.held.push((scope.to_string(), name, value));
         }
@@ -836,7 +862,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         held: Vec::new(),
         assigned: Vec::new(),
         returns: HashMap::new(),
+        std: values::Std::default(),
+        vars: BTreeSet::new(),
     };
+    // Imports come before every other declaration, and the values read the names they give.
+    for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
+        imports(node, src, &mut walk.facts);
+    }
+    walk.std = values::Std::new(tree.root_node(), src, &walk.facts.imports);
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
     for node in named(tree.root_node()) {
@@ -844,7 +877,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             "package_clause" => {
                 walk.facts.package = named(node).next().map_or("", |n| text(n, src)).into();
             }
-            "import_declaration" => imports(node, src, &mut walk.facts),
+            "import_declaration" => {}
             "function_declaration" => {
                 let Some(name) = node.child_by_field_name("name").map(|n| text(n, src)) else {
                     continue;
@@ -953,13 +986,26 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     let ty = spec.child_by_field_name("type");
                     let value = spec.child_by_field_name("value");
                     walk.assigned("", &names(spec), ty, value, None);
-                    for name in names(spec).into_iter().map(|n| text(n, src)) {
+                    // Each name holds the value written at its place, when the names and the
+                    // values pair up. A `var` holds it only if nothing assigns it (`finish_values`).
+                    let given: Vec<Node> = value.into_iter().flat_map(named).collect();
+                    let listed = names(spec);
+                    let paired = given.len() == listed.len();
+                    for (at, name) in listed.into_iter().enumerate() {
+                        let name = text(name, src);
                         if name == "_" {
                             continue;
                         }
+                        let value = match given.get(at) {
+                            Some(v) if paired => values::value(*v, src, &walk.std, "", 0),
+                            _ => Value::Unknown,
+                        };
+                        if node.kind() == "var_declaration" {
+                            walk.vars.insert(name.to_string());
+                        }
                         walk.facts.consts.push(Const {
                             name: name.to_string(),
-                            value: Value::Unknown,
+                            value,
                             ty: None,
                         });
                         top.push(name.to_string());

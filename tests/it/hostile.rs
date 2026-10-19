@@ -1239,6 +1239,33 @@ fn go() -> Vec<Case> {
                 nest("w(", "mux", ")", DEEP)
             )),
         ),
+        // Consumers: a client built by more setters than `CLIENT_DEPTH`, one handed from name
+        // to name, and a URL written as a long `+` and a long `fmt.Sprintf` nest.
+        m(
+            "setters",
+            gin(format!(
+                "func g() {{\n\tresty.New(){}.R().Get(\"/x\")\n}}",
+                ".SetTimeout(1)".repeat(DEEP)
+            ))
+            .replace("gin-gonic/gin", "go-resty/resty/v2")
+            .replace("gin.Context", "resty.Client"),
+        ),
+        m(
+            "client chain",
+            gin(format!(
+                "func g() {{\n\tc0 := resty.New()\n{}\n\tc{DEEP}.R().Get(\"/x\")\n}}",
+                lines(DEEP, |i| format!("\tc{} := c{i}", i + 1))
+            ))
+            .replace("gin-gonic/gin", "go-resty/resty/v2")
+            .replace("gin.Context", "resty.Client"),
+        ),
+        m(
+            "url",
+            gin(format!(
+                "func g() {{ http.Get({}) }}",
+                nest("fmt.Sprintf(\"%s\", ", "\"/x\"", ")", DEEP)
+            )),
+        ),
         m("parens", x(nest("(", "1", ")", DEEP))),
         m("calls", x(nest("f(", "1", ")", DEEP))),
         m("composites", x(nest("[]any{", "1", "}", DEEP))),

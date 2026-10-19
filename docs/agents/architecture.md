@@ -36,7 +36,7 @@ one for the area a change touches.
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `http/rust.rs`, `http/go.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
-  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`: net/http, gin and echo), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`, `http/go/clients.rs`: net/http, gin and echo providers, and their consumers with resty), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
   #24, #30 and #25). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
@@ -203,6 +203,15 @@ one for the area a change touches.
   `Code::origins` and `prefixes`, as the Rust kinds do. The pack gives it `Call::args`,
   `Call::receiver`, the constants a function binds once (`Facts::consts`) and what it returns
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
+- New **Go HTTP client** (spec #25, #79): `http/go/clients.rs` reads `net/http` calls (on the
+  package, a `Client`, `DefaultClient`), `NewRequest(WithContext)` and resty requests as
+  consumers; a receiver is a client of a library when `Code::outside_type` (the type a typed
+  parameter, field or `:=` names, qualified by its import path) says so. The URL is folded in
+  `lang/go/values.rs` at parse time (`+`, `fmt.Sprintf` verbs as holes, `net/http` method
+  constants, package-level `const` and a `var` nothing assigns, in the package or in another one
+  by import), and a resty base is the value of the `SetBaseURL` argument on the chain (or the
+  statement) that built the client. Wrapper climbing is `Code::expand`, as for every kind. A
+  package `var` another file assigns is `Unknown` (`Resolver::redeclared`).
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -654,6 +663,13 @@ one for the area a change touches.
   too. `http.StripPrefix` and other middleware that rewrites paths are not modelled (spec #25).
   Middleware (`Use`, extra handlers) has no effect on a gin or echo path. A router held in a
   struct field, a map or a slice is not followed (no marker).
+- `http/go/clients.rs` (spec #25, #79): `CLIENT_DEPTH` (64): a client or a request is followed
+  back through that many calls and names (`New().SetX().R().SetY()`, `b := a`); past it the
+  base is unknown, and a request on a client Meada cannot trace is a consumer with no host. Only
+  the libraries of the table (`net/http`, resty v2) are clients; a `Client` held in a map, a
+  slice or a channel, or an interface, is untraced. A `fmt.Sprintf` format with a verb other than
+  `%s`, `%d` and `%v` (flags and width allowed), or a count of verbs and values that differ, and a `var` assigned anywhere but its declaration, fold to
+  nothing: the consumer is unresolved (no marker).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result

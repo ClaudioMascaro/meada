@@ -12,6 +12,10 @@
 //! The routers are the rows of `ROUTERS`: a package, what makes its routers, the method that
 //! makes a group, and the methods that register a route. Another router package is another row.
 
+mod clients;
+
+pub(super) use clients::consumers;
+
 use super::rust::actix_path;
 use super::{
     ANY, CallAt, Mounts, PARAM, PREFIX_DEPTH, PREFIX_WORK, handler_site, join, normalize_path,
@@ -147,6 +151,15 @@ fn unversioned(package: &str) -> &str {
     }
 }
 
+/// What `callee` (`pkg.Name`) names in a package outside the repository: only when its head is
+/// the import itself, not a name typed as the package's class (`e := other()` with
+/// `e.Default()`), which the resolver would also read as that package's.
+fn external<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
+    let (head, _) = callee.split_once('.').unwrap_or((callee, ""));
+    code.external(path, scope, head)?;
+    code.external(path, scope, callee)
+}
+
 /// The package and the name an outside function is called by (`net/http`, `HandleFunc`).
 fn split(external: &str) -> Option<(&str, &str)> {
     external
@@ -256,9 +269,7 @@ impl<'c, 'a> Go<'c, 'a> {
     /// is the import itself, not a name typed as the package's class (`e := other()` with
     /// `e.Default()`), which the resolver would also read as that package's.
     fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        let (head, _) = callee.split_once('.').unwrap_or((callee, ""));
-        self.code.external(path, scope, head)?;
-        self.code.external(path, scope, callee)
+        external(self.code, path, scope, callee)
     }
 
     /// Whether the call `at` is a function of `router` that makes a router.

@@ -734,11 +734,10 @@ impl<'a> Resolver<'a> {
         self.defs[t.path][t.name].kind == Kind::Class
     }
 
-    /// What a parameter or a local holds, as far as the source writes its class: an instance
-    /// of a class of the repository, something from outside it, or unknown (also more than
-    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
-    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
-        let (path, scope, name) = match binding {
+    /// The file, scope and name under which `Facts::receivers` may hold the class of what
+    /// `binding` is: a parameter, a local, a constant.
+    fn holder(&self, binding: &Binding<'a>) -> Option<(&'a str, &'a str, &'a str)> {
+        Some(match *binding {
             Binding::Param(f, n, field) => {
                 let param = &self.defs[f.path][f.name].params[n];
                 let name = match field {
@@ -753,7 +752,16 @@ impl<'a> Resolver<'a> {
                 Some((scope, name)) => (path, scope, name),
                 None => (path, "", constant),
             },
-            other => return other,
+            _ => return None,
+        })
+    }
+
+    /// What a parameter or a local holds, as far as the source writes its class: an instance
+    /// of a class of the repository, something from outside it, or unknown (also more than
+    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
+    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
+        let Some((path, scope, name)) = self.holder(&binding) else {
+            return binding;
         };
         let Some(class) = self.receivers[path].get(&(scope, name)) else {
             return Binding::Unknown;
@@ -1224,6 +1232,18 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// Whether another file `path` shares its scope with (`Layout::shared`) binds the top-level
+    /// name `name` too: it is not the one thing the constant of `path` says (Go: a variable
+    /// another file assigns).
+    fn redeclared(&self, path: &'a str, name: &str) -> bool {
+        let Some(&group) = self.shared.get(path) else {
+            return false;
+        };
+        let tops = &self.groups[group].tops;
+        tops.get(name)
+            .is_some_and(|files| files.iter().any(|f| *f != path))
     }
 
     /// What the top level of the other files `path` shares its scope with (`Layout::shared`)
@@ -2296,6 +2316,26 @@ impl<'a> Code<'a> {
             .then(|| self.resolver.imported_name(path, scope, callee))
     }
 
+    /// The type outside the repository that the source writes for the name `name` (`c *http.Client`
+    /// is `net/http.Client`), written in `scope` of `path`: a parameter, a local, a constant or a
+    /// field. A type is written as a path, so an import in the file that writes it names the
+    /// package.
+    pub fn outside_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
+        let binding = self.resolver.binding(path, scope, name);
+        let (at, within, held) = self.resolver.holder(&binding)?;
+        let Class::Type(written) = self.resolver.receivers[at].get(&(within, held))? else {
+            return None;
+        };
+        let (seen, work) = (&mut self.resolver.seen(at, within), &mut Work::default());
+        let found = self
+            .resolver
+            .resolve_as(at, within, written, seen, work, Reading::Path);
+        let Binding::External(package, _) = found else {
+            return None;
+        };
+        Some(format!("{package}.{}", written.rsplit('.').next()?))
+    }
+
     /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
     /// its head among types and modules, so a function of the file that spells like a crate
     /// (`fn rocket()` calling `rocket::build()`) does not hide it.
@@ -3033,7 +3073,7 @@ impl<'a> Code<'a> {
         match self.resolver.binding(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
-                if fold.held.contains(&(at, constant)) {
+                if fold.held.contains(&(at, constant)) || self.resolver.redeclared(at, constant) {
                     return Value::Unknown;
                 }
                 let Some((value, within)) = self.held(at, constant) else {
