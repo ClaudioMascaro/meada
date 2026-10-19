@@ -1195,7 +1195,50 @@ fn go() -> Vec<Case> {
         ];
         (name, files)
     };
+    let gin = |body: String| {
+        let head = "package h\n\nimport (\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n)\n";
+        format!("{head}\nfunc f(c *gin.Context) {{}}\n\n{body}\n")
+    };
     vec![
+        // Routers: groups made on groups past `PREFIX_DEPTH`, a registration function reaching
+        // the next one with a group, and a mux inside calls nested past the value depth.
+        m(
+            "groups",
+            gin(format!(
+                "func g() {{\n\tg0 := gin.Default()\n{}\n\tg{LINKS}.GET(\"/x\", f)\n}}",
+                lines(LINKS, |i| format!("\tg{} := g{i}.Group(\"/a\")", i + 1))
+            )),
+        ),
+        m(
+            "registrations",
+            gin(format!(
+                "func g() {{ r0(gin.Default().Group(\"/a\")) }}\n{}\nfunc r{LINKS}(g *gin.RouterGroup) {{ g.GET(\"/x\", f) }}",
+                lines(LINKS, |i| {
+                    format!(
+                        "func r{i}(g *gin.RouterGroup) {{ r{}(g.Group(\"/a\")) }}",
+                        i + 1
+                    )
+                })
+            )),
+        ),
+        m(
+            "mux-chain",
+            gin(format!(
+                "func g() {{\n\tm0 := http.NewServeMux()\n{}\n\tm{LINKS}.HandleFunc(\"/a/x\", f)\n}}",
+                lines(LINKS, |i| format!(
+                    "\tm{} := http.NewServeMux()\n\tm{i}.Handle(\"/a/\", m{})",
+                    i + 1,
+                    i + 1
+                ))
+            )),
+        ),
+        m(
+            "wrapped-muxes",
+            gin(format!(
+                "func g() {{\n\tmux := http.NewServeMux()\n\thttp.Handle(\"/x\", {})\n}}",
+                nest("w(", "mux", ")", DEEP)
+            )),
+        ),
         m("parens", x(nest("(", "1", ")", DEEP))),
         m("calls", x(nest("f(", "1", ")", DEEP))),
         m("composites", x(nest("[]any{", "1", "}", DEEP))),

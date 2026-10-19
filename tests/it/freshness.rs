@@ -284,6 +284,7 @@ fn edit_go(repo: &Path) {
     .unwrap();
     fs::remove_file(repo.join("scopes/other.go")).unwrap();
     replace("go.mod", "=> ./forks/billing", "=> ./billing");
+    replace("web/gin.go", "r.Group(\"/v1\")", "r.Group(\"/v2\")");
 }
 
 #[test]
@@ -299,6 +300,8 @@ fn go_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
     assert!(!refreshed.contains("scopes/other.go"));
     assert!(refreshed.contains("store/assist.go::helper"));
     assert!(!refreshed.contains("assist_darwin.go"));
+    assert!(before.contains("/v1/users") && !refreshed.contains("/v1/users"));
+    assert!(refreshed.contains("/v2/users"));
     assert_eq!(
         refreshed,
         cold_export("fresh_go_cold", "conformance-go", ORIGIN, edit_go)
