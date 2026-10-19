@@ -1,6 +1,6 @@
 example.com/gopkg/lib text/text.go:6-8 Greet
 community: text
-processes: 1 (1 export; 1 repository): Helper (example.com/gopkg/lib)
+processes: 3 (1 export, 2 program; 2 repositories): main (example.com/gopkg/lib), Helper (example.com/gopkg/lib), main (example.com/gopkg/web)
 func Greet(name string) string {
 	return Shout("hello " + name)
 }

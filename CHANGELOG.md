@@ -26,7 +26,9 @@ All notable changes to Meada are recorded here. The format follows
   whose result type is written) reaches that type's method at `exact`, also when another file
   of the package declares it; a receiver whose type is not written is a name match
   (`inferred`, or `ambiguous` with every candidate), and a call through an interface stops at
-  the interface method. A promoted method of an embedded struct is a name match. The index
+  the interface method. A promoted method of an embedded struct is a name match. The
+  `func main` of each `package main` is a program entry point with its process; a `main` in
+  another package, a method named `main` or a file left out of the build is not. The index
   is rebuilt once (new schema version).
 - Go packages (spec #25): each `go.mod` with a `module` provides `package::go::<module path>`, and
   each `require`, and each `replace` to a local directory (in the repository or, when it leaves it,
