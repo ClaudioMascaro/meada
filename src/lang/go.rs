@@ -17,6 +17,7 @@ use crate::{Result, parent, qualify};
 
 mod build;
 pub mod modfile;
+mod values;
 
 /// How many segments of a member chain a callee keeps, and how many wrappers (`*`, `[T]`,
 /// parentheses) a receiver's type is read through; a longer one is its node kind, or names no
@@ -109,6 +110,13 @@ struct Walk<'s> {
     /// The type parameters of the type declarations, as `Type.Param`: they hide a name in the
     /// declaration alone, not in the methods.
     type_scoped: BTreeSet<String>,
+    /// The plain names a statement of a function's own block binds to one value (`r :=
+    /// gin.Default()`), by scope: constants when nothing else binds or assigns the name.
+    held: Vec<(String, String, Value)>,
+    /// The names assigned again, with the scope the assignment is written in.
+    assigned: Vec<(String, String)>,
+    /// The single value each `return` of a definition gives.
+    returns: HashMap<String, Vec<Value>>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -178,6 +186,47 @@ impl Walk<'_> {
         }
     }
 
+    /// Makes the names held by one binding constants, and gives each definition what it
+    /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
+    /// inside it, holds no one value.
+    fn finish_values(&mut self) {
+        let mut assigned = HashSet::new();
+        for (scope, name) in std::mem::take(&mut self.assigned) {
+            let mut at = scope.as_str();
+            // The binding the name refers to: the innermost scope that binds it.
+            let found = loop {
+                if self.bound.contains_key(&(at.to_string(), name.clone())) {
+                    break Some(qualify(at, &name));
+                }
+                if at.is_empty() {
+                    break None;
+                }
+                at = crate::parent(at);
+            };
+            assigned.extend(found);
+        }
+        let mut constants = HashSet::new();
+        for (scope, name, value) in std::mem::take(&mut self.held) {
+            let local = qualify(&scope, &name);
+            if self.bound.get(&(scope.clone(), name.clone())).map(Vec::len) == Some(1)
+                && !assigned.contains(&local)
+            {
+                constants.insert(local.clone());
+                self.facts.consts.push(Const {
+                    name: local,
+                    value,
+                    ty: None,
+                });
+            }
+        }
+        // A constant is a name that holds its value, not a local hiding what it is bound to.
+        self.facts.locals.retain(|l| !constants.contains(l));
+        let mut returns = std::mem::take(&mut self.returns);
+        for def in &mut self.facts.defs {
+            def.return_values = returns.remove(&def.name).unwrap_or_default();
+        }
+    }
+
     /// The identifiers of an expression list on the left of `:=`, or of a name field.
     fn bind(&mut self, scope: &str, node: Node) {
         let src = self.src;
@@ -228,11 +277,19 @@ impl Walk<'_> {
             match node.kind() {
                 "call_expression" => {
                     if let Some(function) = node.child_by_field_name("function") {
-                        self.facts.calls.push(call(
-                            scope,
-                            callee(function, src),
-                            node.byte_range(),
-                        ));
+                        let mut at = call(scope, callee(function, src), node.byte_range());
+                        at.args = values::arguments(node)
+                            .map(|a| values::value(a, src, scope, depth))
+                            .collect();
+                        at.receiver = values::receiver(function, src, scope, depth);
+                        self.facts.calls.push(at);
+                    }
+                }
+                "return_statement" => {
+                    let results: Vec<Node> = named(node).flat_map(named).collect();
+                    if let [result] = results[..] {
+                        let value = values::value(result, src, scope, depth);
+                        (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
                 }
                 "short_var_declaration" => {
@@ -241,6 +298,9 @@ impl Walk<'_> {
                         let right = node.child_by_field_name("right");
                         let region = Some(region(node));
                         self.assigned(scope, &left, None, right, region);
+                        if in_body(node) {
+                            self.hold(scope, &left, right, depth);
+                        }
                     }
                 }
                 "range_clause" | "receive_statement"
@@ -250,14 +310,43 @@ impl Walk<'_> {
                         self.bind(scope, left);
                     }
                 }
+                // `r = gin.New()`, `for r = range rs`: the name is assigned again.
+                "assignment_statement" | "range_clause" | "receive_statement" => {
+                    if let Some(left) = node.child_by_field_name("left") {
+                        let targets = named(left).chain([left]);
+                        for name in targets.filter(|n| n.kind() == "identifier") {
+                            let name = text(name, src).to_string();
+                            self.assigned.push((scope.to_string(), name));
+                        }
+                    }
+                }
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
                     let value = node.child_by_field_name("value");
                     self.assigned(scope, &names(node), ty, value, Some(region(node)));
+                    if node.kind() == "var_spec" && in_body(node) {
+                        self.hold(scope, &names(node), value, depth);
+                    }
                 }
                 "type_spec" | "type_alias" => {
                     for name in names(node) {
                         self.local(scope, text(name, src));
+                    }
+                    if node.kind() == "var_spec" && in_body(node) {
+                        let right = node.child_by_field_name("value");
+                        self.hold(scope, &names(node), right, depth);
+                    }
+                }
+                // `&p`: the name may be written through the pointer, so it holds no one value.
+                "unary_expression" => {
+                    let operand = node.child_by_field_name("operand");
+                    let address = node.child_by_field_name("operator");
+                    if let (Some(operand), Some(address)) = (operand, address)
+                        && text(address, src) == "&"
+                        && operand.kind() == "identifier"
+                    {
+                        self.assigned
+                            .push((scope.to_string(), text(operand, src).to_string()));
                     }
                 }
                 "type_switch_statement" => {
@@ -372,6 +461,30 @@ impl Walk<'_> {
         }
     }
 
+    /// Holds the value of `right` for the name `left` binds, when one name is bound to one
+    /// value.
+    fn hold(&mut self, scope: &str, left: &[Node], right: Option<Node>, depth: usize) {
+        let src = self.src;
+        let left: Vec<Node> = match left {
+            [list] if list.kind() == "expression_list" => named(*list).collect(),
+            left => left.to_vec(),
+        };
+        let right: Vec<Node> = (right.into_iter())
+            .flat_map(|r| match r.kind() {
+                "expression_list" => named(r).collect(),
+                _ => vec![r],
+            })
+            .collect();
+        if let ([name], [value]) = (&left[..], &right[..])
+            && name.kind() == "identifier"
+            && text(*name, src) != "_"
+        {
+            let value = values::value(*value, src, scope, depth);
+            let name = text(*name, src).to_string();
+            self.held.push((scope.to_string(), name, value));
+        }
+    }
+
     /// The `Kind::Inline` definition of the function `node` (a literal, or a blank `func _`)
     /// written in `scope`, with its parameters, and the names its results bind: its name.
     fn inline(&mut self, scope: &str, node: Node) -> String {
@@ -384,6 +497,27 @@ impl Walk<'_> {
         self.bind_type_params(&name, node);
         name
     }
+}
+
+/// Whether the declaration `node` is a statement of a function's own body, not of a block
+/// inside it: a name it binds is visible in the rest of the function, whatever else the function
+/// does.
+fn in_body(node: Node) -> bool {
+    let mut at = node.parent();
+    while let Some(parent) = at.filter(|p| matches!(p.kind(), "var_spec_list" | "var_declaration"))
+    {
+        at = parent.parent();
+    }
+    let block = (at.filter(|p| p.kind() == "statement_list"))
+        .and_then(|p| p.parent())
+        .filter(|b| b.kind() == "block");
+    let function = block.and_then(|b| b.parent());
+    function.is_some_and(|f| {
+        matches!(
+            f.kind(),
+            "function_declaration" | "method_declaration" | "func_literal"
+        )
+    })
 }
 
 /// The `name` fields of a declaration (`a, b int`, `x, y = 1, 2`).
@@ -699,6 +833,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         locals: BTreeSet::new(),
         bound: BTreeMap::new(),
         type_scoped: BTreeSet::new(),
+        held: Vec::new(),
+        assigned: Vec::new(),
+        returns: HashMap::new(),
     };
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
@@ -835,6 +972,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             _ => walk.body("", node),
         }
     }
+    // The values read `bound`, which `finish` takes.
+    walk.finish_values();
     walk.finish();
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
@@ -966,6 +1105,55 @@ mod tests {
         };
         assert_eq!(receivers(PATH_DEPTH - 1), ["f a = S"]);
         assert!(receivers(PATH_DEPTH).is_empty());
+    }
+
+    #[test]
+    fn a_name_one_statement_of_the_function_binds_once_is_a_constant() {
+        let consts = |body: &str| -> Vec<String> {
+            let src = format!("package x\n\nfunc f() {{ {body} }}\n");
+            facts(&src).consts.into_iter().map(|c| c.name).collect()
+        };
+        assert_eq!(consts("r := mk()"), ["f.r"]);
+        assert_eq!(consts("var r = mk()"), ["f.r"]);
+        assert_eq!(consts("r := mk(); r.Use()"), ["f.r"]);
+        // Assigned again, in the function or in a literal in it, bound again in a block, in an
+        // initializer, in a loop, or bound with others: no one value.
+        for body in [
+            "r := mk(); r = other()",
+            "r := mk(); func() { r = other() }()",
+            "r := mk(); for r = range xs {}",
+            "r := mk(); keep(&r)",
+            "r := mk(); func() { keep(&r) }()",
+            "r := mk(); { r := other(); _ = r }",
+            "r := mk(); if r := other(); r != nil {}",
+            "if r := mk(); r != nil {}",
+            "{ r := mk(); _ = r }",
+            "a, b := mk()",
+            "var a, b = mk(), mk()",
+            "var r *T",
+            "_ := mk()",
+        ] {
+            assert_eq!(consts(body), Vec::<String>::new(), "{body}");
+        }
+        // A literal's own statement binds in the literal.
+        let inner = consts("func() { q := mk(); _ = q }()");
+        assert_eq!(inner.len(), 1);
+        assert!(inner[0].starts_with("f.@") && inner[0].ends_with(".q"));
+    }
+
+    #[test]
+    fn a_function_returns_the_one_value_a_return_gives() {
+        let returns = |src: &str| -> usize {
+            let src = format!("package x\n\n{src}\n");
+            facts(&src).defs[0].return_values.len()
+        };
+        assert_eq!(returns("func f() *T { return mk() }"), 1);
+        assert_eq!(
+            returns("func f(c bool) *T { if c { return a() }; return b() }"),
+            2
+        );
+        assert_eq!(returns("func f() (*T, error) { return mk(), nil }"), 0);
+        assert_eq!(returns("func f() (r *T) { return }"), 0);
     }
 
     #[test]

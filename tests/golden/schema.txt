@@ -1220,6 +1220,9 @@ sample.go
   "consts": [
     {
       "name": "Prefix"
+    },
+    {
+      "name": "New.label"
     }
   ],
   "receivers": [
