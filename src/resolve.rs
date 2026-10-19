@@ -3381,6 +3381,22 @@ mod tests {
     }
 
     #[test]
+    fn a_top_level_comprehension_or_lambda_name_hides_no_definition() {
+        // A known ceiling: at the top level, a comprehension's variable or a lambda's parameter
+        // `h` leaves a call of `h` in it linked to `def h()`, which it may not be. In a
+        // function they hide `h` there.
+        let def = "def h():\n    pass\n";
+        for code in ["[h() for h in hs]\n", "run = lambda h: h()\n"] {
+            let main = format!("{def}{code}");
+            let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", "h");
+            assert_eq!(found.as_deref(), Some("main.py"), "{main}");
+            let main = format!("{def}def f():\n    {code}");
+            let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", "h");
+            assert_eq!(found, None, "{main}");
+        }
+    }
+
+    #[test]
     fn a_definition_under_global_or_nonlocal_rebinds_its_name() {
         // `def x()` in a function that declares `global x` binds the module's `x` whenever the
         // function runs, and one under `nonlocal g` the enclosing function's `g`.

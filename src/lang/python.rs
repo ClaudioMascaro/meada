@@ -260,7 +260,10 @@ impl LanguagePack for Python {
                 }
                 // Other bindings say nothing of a class, but hide an outer binding of the name.
                 // ponytail: a comprehension's variables are bound in the enclosing scope, so
-                // they hide a name there for the whole scope.
+                // they hide a name there for the whole scope. At the top level, as a lambda's
+                // parameters, they hide nothing (the module's hidden names are `Module`'s,
+                // which takes neither): `[h() for h in hs]` beside `def h()` stays `exact` to
+                // it. Hiding `h` there alone needs a scope of the comprehension's own.
                 "for_statement" | "for_in_clause" | "as_pattern" | "except_clause"
                 | "named_expression" => {
                     let field = match node.kind() {

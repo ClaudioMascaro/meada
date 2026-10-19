@@ -836,7 +836,9 @@ one for the area a change touches.
   Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
-  there for the whole scope (the safe side: a name match instead of `exact`). A write to an
+  there for the whole scope (the safe side: a name match instead of `exact`); at the top level
+  they, and a lambda's parameters, hide nothing, so `[h() for h in hs]` beside `def h()` stays
+  `exact` to the definition (hiding `h` there alone needs a scope of the comprehension's own). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
   tuple, grown by literal names in a statement of the module itself (`+=`, `.extend`,
