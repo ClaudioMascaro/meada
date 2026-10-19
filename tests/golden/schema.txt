@@ -1211,11 +1211,13 @@ sample.go
   "consts": [
     {
       "name": "Prefix"
+    },
+    {
+      "name": "New.label"
     }
   ],
   "locals": [
     "New.s",
-    "New.label",
     "Store.Get.s"
   ],
   "receivers": [],

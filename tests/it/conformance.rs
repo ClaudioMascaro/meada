@@ -2585,6 +2585,47 @@ fn go() {
             "store/store.go::open",
             "store/store_test.go::TestNew",
             "store/sys_unix.go::sysOpen",
+            "web/echo.go::Auth",
+            "web/echo.go::Billing",
+            "web/echo.go::Create",
+            "web/echo.go::EchoDynamic",
+            "web/echo.go::EchoRoutes",
+            "web/echo.go::EchoRoutes.DELETE /api/items/{}",
+            "web/echo.go::Item",
+            "web/echo.go::RegisterBilling",
+            "web/echo.go::Wide",
+            "web/gin.go::Audit",
+            "web/gin.go::GinCaptured",
+            "web/gin.go::GinHidden",
+            "web/gin.go::GinReassigned",
+            "web/gin.go::GinRoutes",
+            "web/gin.go::GinRoutes.DELETE /v1/users/{}",
+            "web/gin.go::GinShadow",
+            "web/gin.go::Hidden",
+            "web/gin.go::Mid",
+            "web/gin.go::Operations",
+            "web/gin.go::RegisterAudit",
+            "web/gin.go::Save",
+            "web/gin.go::Serve",
+            "web/gin.go::Show",
+            "web/gin.go::Status",
+            "web/gin.go::other",
+            "web/stdlib.go::CreateUser",
+            "web/stdlib.go::Default",
+            "web/stdlib.go::Echo",
+            "web/stdlib.go::Files",
+            "web/stdlib.go::GetUser",
+            "web/stdlib.go::Guard",
+            "web/stdlib.go::Health",
+            "web/stdlib.go::Home",
+            "web/stdlib.go::Hosted",
+            "web/stdlib.go::Ledger",
+            "web/stdlib.go::Mounted",
+            "web/stdlib.go::Mux",
+            "web/stdlib.go::Mux.DELETE /users/{}",
+            "web/stdlib.go::Ping",
+            "web/stdlib.go::Register",
+            "web/stdlib.go::Stats",
             "worker/jobs/jobs.go::Run",
             "worker/main.go::main",
         ],
@@ -2759,6 +2800,76 @@ fn go() {
     assert!(!export.contains("disk_windows.go"));
     assert!(!export.contains("legacy.go"));
     assert!(!export.contains("sys_other.go"));
+}
+
+/// The routers of the Go fixture (spec #25): `net/http` patterns, and gin and echo groups, with
+/// every prefix a router is registered under, a group passed to or returned from a function, a
+/// function literal as the handler and a router reached under two prefixes. A name a block, a
+/// loop, a literal or an assignment binds again, an import a local hides and a prefix Meada
+/// cannot read leave no provider.
+#[test]
+fn go_routes_are_providers_under_every_prefix() {
+    let (_, actual) = providers("go_routes", "conformance-go", "web/");
+    let mut expected = pairs(&[
+        // The default mux and a conversion to `HandlerFunc`.
+        ("http::ANY::/health", "web/stdlib.go::Health"),
+        ("http::ANY::/echo", "web/stdlib.go::Echo"),
+        // Go 1.22 patterns: a method, parameters, a rest wildcard, a dropped host, the anchor.
+        ("http::GET::/users/{}", "web/stdlib.go::GetUser"),
+        ("http::POST::/users", "web/stdlib.go::CreateUser"),
+        ("http::ANY::/files/{}", "web/stdlib.go::Files"),
+        ("http::ANY::/hosted", "web/stdlib.go::Hosted"),
+        ("http::GET::/", "web/stdlib.go::Home"),
+        (
+            "http::DELETE::/users/{}",
+            "web/stdlib.go::Mux.DELETE /users/{}",
+        ),
+        ("http::GET::/ping", "web/stdlib.go::Ping"),
+        // A mux mounted through `StripPrefix`, and one given as the handler; the one a wrapper
+        // holds is served nowhere.
+        ("http::GET::/admin/stats", "web/stdlib.go::Stats"),
+        ("http::GET::/plain/ledger", "web/stdlib.go::Ledger"),
+        // gin: nested groups, every method, `Handle`, `Any`, the last of several handlers and a
+        // group made in a chain.
+        ("http::GET::/v1/users/{}", "web/gin.go::Show"),
+        ("http::POST::/v1/users", "web/gin.go::Save"),
+        ("http::PUT::/v1/users/{}", "web/gin.go::Save"),
+        ("http::PATCH::/v1/users/{}", "web/gin.go::Save"),
+        ("http::HEAD::/v1/users/{}", "web/gin.go::Show"),
+        ("http::OPTIONS::/v1/users/{}", "web/gin.go::Show"),
+        (
+            "http::DELETE::/v1/users/{}",
+            "web/gin.go::GinRoutes.DELETE /v1/users/{}",
+        ),
+        ("http::GET::/v1/users/{}/tags", "web/gin.go::Show"),
+        ("http::POST::/v1/users/{}/tags", "web/gin.go::Save"),
+        ("http::ANY::/v1/users/any", "web/gin.go::Save"),
+        ("http::GET::/files/{}", "web/gin.go::Serve"),
+        ("http::GET::/mw/chained", "web/gin.go::Show"),
+        // A group passed to a function: one provider per prefix, and the cycle adds none.
+        ("http::GET::/v1/audit", "web/gin.go::Audit"),
+        ("http::GET::/admin/audit", "web/gin.go::Audit"),
+        // A group a function returns, and a router a closure captures.
+        ("http::GET::/ops/status", "web/gin.go::Status"),
+        ("http::GET::/captured", "web/gin.go::Show"),
+        // echo: the handler is the second argument, middleware follows.
+        ("http::GET::/api/items/{}", "web/echo.go::Item"),
+        ("http::POST::/api/items", "web/echo.go::Create"),
+        ("http::PUT::/api/items/{}", "web/echo.go::Create"),
+        ("http::PATCH::/api/items/{}", "web/echo.go::Create"),
+        (
+            "http::DELETE::/api/items/{}",
+            "web/echo.go::EchoRoutes.DELETE /api/items/{}",
+        ),
+        ("http::HEAD::/api/items/{}", "web/echo.go::Item"),
+        ("http::OPTIONS::/api/items/{}", "web/echo.go::Item"),
+        ("http::ANY::/api/items/any", "web/echo.go::Wide"),
+        ("http::GET::/static/{}", "web/echo.go::Wide"),
+        ("http::GET::/api/billing", "web/echo.go::Billing"),
+        ("http::GET::/internal/billing", "web/echo.go::Billing"),
+    ]);
+    expected.sort();
+    assert_eq!(actual, expected);
 }
 
 /// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router

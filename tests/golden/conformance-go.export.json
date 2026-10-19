@@ -70,6 +70,18 @@
       "hash": "76535fb7a457cebe3aaf138e06c6c7a2e4f18bdb8cf6204888a7adf0d0784b32"
     },
     {
+      "path": "web/echo.go",
+      "hash": "1f0c69b72009fd5d05ea5348a1e1b500e39ccf761824ebc04d42c05a85ce3aa1"
+    },
+    {
+      "path": "web/gin.go",
+      "hash": "f8df8ef5a6f0cca09b2c01465bb7ce4902d8253aae092a1136fbd003c5caf589"
+    },
+    {
+      "path": "web/stdlib.go",
+      "hash": "c3c6555f63bdab9b03b2d6c0346aa841661f1498b2679d1c73b584644acb3a14"
+    },
+    {
       "path": "worker/jobs/jobs.go",
       "hash": "9add8bbce5b462210c7ee08117fc31113b255c9d24bf4fbf468f85a219b4f905"
     },
@@ -557,6 +569,334 @@
         "path": "store/sys_unix.go",
         "start": 36,
         "end": 53
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::Auth",
+      "span": {
+        "path": "web/echo.go",
+        "start": 253,
+        "end": 318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::Billing",
+      "span": {
+        "path": "web/echo.go",
+        "start": 202,
+        "end": 251
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::Create",
+      "span": {
+        "path": "web/echo.go",
+        "start": 104,
+        "end": 152
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "span": {
+        "path": "web/echo.go",
+        "start": 994,
+        "end": 1129
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "span": {
+        "path": "web/echo.go",
+        "start": 415,
+        "end": 877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}",
+      "span": {
+        "path": "web/echo.go",
+        "start": 656,
+        "end": 697
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::Item",
+      "span": {
+        "path": "web/echo.go",
+        "start": 56,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::RegisterBilling",
+      "span": {
+        "path": "web/echo.go",
+        "start": 879,
+        "end": 946
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::Wide",
+      "span": {
+        "path": "web/echo.go",
+        "start": 154,
+        "end": 200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Audit",
+      "span": {
+        "path": "web/gin.go",
+        "start": 124,
+        "end": 151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinCaptured",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1965,
+        "end": 2040
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1362,
+        "end": 1599
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1647,
+        "end": 1793
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "span": {
+        "path": "web/gin.go",
+        "start": 407,
+        "end": 1034
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes.DELETE /v1/users/{}",
+      "span": {
+        "path": "web/gin.go",
+        "start": 681,
+        "end": 702
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinShadow",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1843,
+        "end": 1921
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Hidden",
+      "span": {
+        "path": "web/gin.go",
+        "start": 239,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Mid",
+      "span": {
+        "path": "web/gin.go",
+        "start": 212,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Operations",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1036,
+        "end": 1107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1179,
+        "end": 1293
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Save",
+      "span": {
+        "path": "web/gin.go",
+        "start": 96,
+        "end": 122
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Serve",
+      "span": {
+        "path": "web/gin.go",
+        "start": 183,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Show",
+      "span": {
+        "path": "web/gin.go",
+        "start": 68,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Status",
+      "span": {
+        "path": "web/gin.go",
+        "start": 153,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::other",
+      "span": {
+        "path": "web/gin.go",
+        "start": 2042,
+        "end": 2079
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::CreateUser",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 199,
+        "end": 257
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Default",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 730,
+        "end": 830
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Echo",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 88,
+        "end": 140
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Files",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 259,
+        "end": 312
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::GetUser",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 142,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Guard",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 589,
+        "end": 641
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Health",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 32,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Home",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 370,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Hosted",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 314,
+        "end": 368
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Ledger",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 533,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1669,
+        "end": 2091
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1021,
+        "end": 1402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux.DELETE /users/{}",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1325,
+        "end": 1372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Ping",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 424,
+        "end": 476
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Register",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1404,
+        "end": 1476
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Stats",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 478,
+        "end": 531
       }
     },
     {
@@ -1319,6 +1659,1007 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::(call_expression).GET#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 1046,
+        "end": 1083
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::d.GET#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 1107,
+        "end": 1127
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::e.Group#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 1046,
+        "end": 1061
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::e.Group#1",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 1090,
+        "end": 1105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::echo.New#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 1034,
+        "end": 1044
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::RegisterBilling#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": "example.com/acme/conformance::web/echo.go::RegisterBilling",
+      "level": "exact",
+      "span": {
+        "path": "web/echo.go",
+        "start": 806,
+        "end": 826
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::RegisterBilling#1",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": "example.com/acme/conformance::web/echo.go::RegisterBilling",
+      "level": "exact",
+      "span": {
+        "path": "web/echo.go",
+        "start": 828,
+        "end": 865
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::api.Group#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 503,
+        "end": 522
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::e.GET#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 780,
+        "end": 804
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::e.Group#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 471,
+        "end": 492
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::e.Group#1",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 844,
+        "end": 864
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::echo.New#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 452,
+        "end": 462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.Any#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 755,
+        "end": 778
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.DELETE#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 635,
+        "end": 698
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.GET#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 524,
+        "end": 547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.HEAD#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 700,
+        "end": 724
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.OPTIONS#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 726,
+        "end": 753
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.PATCH#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 606,
+        "end": 633
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.POST#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 549,
+        "end": 577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::EchoRoutes::items.PUT#0",
+      "caller": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 579,
+        "end": 604
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/echo.go::RegisterBilling::g.GET#0",
+      "caller": "example.com/acme/conformance::web/echo.go::RegisterBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/echo.go",
+        "start": 918,
+        "end": 944
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinCaptured::(func_literal)#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinCaptured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 2001,
+        "end": 2038
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinCaptured::g.New#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinCaptured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1992,
+        "end": 1999
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinCaptured::r.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinCaptured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 2010,
+        "end": 2034
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::(func_literal)#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1545,
+        "end": 1597
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::other#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": "example.com/acme/conformance::web/gin.go::other",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1448,
+        "end": 1455
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::r.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1414,
+        "end": 1437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::r.GET#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1458,
+        "end": 1481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::r.GET#2",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1516,
+        "end": 1540
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinHidden::r.GET#3",
+      "caller": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1565,
+        "end": 1590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::(func_literal)#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1767,
+        "end": 1791
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::g.Default#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1676,
+        "end": 1687
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::g.Default#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1732,
+        "end": 1743
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::g.New#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1693,
+        "end": 1700
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::g.New#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1780,
+        "end": 1787
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::h.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1745,
+        "end": 1765
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinReassigned::r.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1702,
+        "end": 1725
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::(call_expression).GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 859,
+        "end": 900
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::GinHidden#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": "example.com/acme/conformance::web/gin.go::GinHidden",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 955,
+        "end": 972
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::Operations#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": "example.com/acme/conformance::web/gin.go::Operations",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 981,
+        "end": 994
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::RegisterAudit#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 902,
+        "end": 919
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::RegisterAudit#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 921,
+        "end": 953
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::g.Default#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 442,
+        "end": 453
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::ops.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 996,
+        "end": 1022
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::r.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 820,
+        "end": 857
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::r.Group#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 461,
+        "end": 475
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::r.Group#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 859,
+        "end": 878
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::r.Group#2",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 935,
+        "end": 952
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.Any#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 795,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.DELETE#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 660,
+        "end": 703
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 506,
+        "end": 529
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.HEAD#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 605,
+        "end": 629
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.Handle#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 705,
+        "end": 752
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.Handle#1",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 754,
+        "end": 793
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.OPTIONS#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 631,
+        "end": 658
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.PATCH#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 578,
+        "end": 603
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.POST#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 531,
+        "end": 551
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::users.PUT#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 553,
+        "end": 576
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinRoutes::v1.Group#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 486,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinShadow::g.Default#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1882,
+        "end": 1893
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinShadow::other#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinShadow",
+      "target": "example.com/acme/conformance::web/gin.go::other",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1868,
+        "end": 1875
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::GinShadow::r.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::GinShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1895,
+        "end": 1919
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::Operations::r.Group#0",
+      "caller": "example.com/acme/conformance::web/gin.go::Operations",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1090,
+        "end": 1105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::RegisterAudit::RegisterAudit#0",
+      "caller": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "target": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "level": "exact",
+      "span": {
+        "path": "web/gin.go",
+        "start": 1271,
+        "end": 1291
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::RegisterAudit::audit.GET#0",
+      "caller": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1249,
+        "end": 1269
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gin.go::RegisterAudit::rg.Group#0",
+      "caller": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gin.go",
+        "start": 1229,
+        "end": 1247
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Default::http.Handle#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Default",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 784,
+        "end": 828
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Default::http.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Default",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 748,
+        "end": 782
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Default::http.HandlerFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Default",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 805,
+        "end": 827
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::Guard#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": "example.com/acme/conformance::web/stdlib.go::Guard",
+      "level": "exact",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 2073,
+        "end": 2087
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::admin.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1744,
+        "end": 1781
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.NewServeMux#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1695,
+        "end": 1713
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.NewServeMux#1",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1724,
+        "end": 1742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.NewServeMux#2",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1851,
+        "end": 1869
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.NewServeMux#3",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1960,
+        "end": 1978
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.StripPrefix#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1806,
+        "end": 1839
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::http.StripPrefix#1",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 2050,
+        "end": 2088
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::plain.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1871,
+        "end": 1916
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::root.Handle#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1783,
+        "end": 1840
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::root.Handle#1",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1918,
+        "end": 1947
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::root.Handle#2",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 2031,
+        "end": 2089
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mounted::wrapped.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1980,
+        "end": 2029
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::Register#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": "example.com/acme/conformance::web/stdlib.go::Register",
+      "level": "exact",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1375,
+        "end": 1388
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::http.NewServeMux#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1057,
+        "end": 1075
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1077,
+        "end": 1119
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#1",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1121,
+        "end": 1162
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#2",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1164,
+        "end": 1205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#3",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1207,
+        "end": 1252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#4",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1254,
+        "end": 1286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Mux::mux.HandleFunc#5",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1288,
+        "end": 1373
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/stdlib.go::Register::mux.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Register",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 1441,
+        "end": 1474
+      }
+    },
+    {
       "id": "example.com/acme/conformance::worker/main.go::main::invoice.Total#0",
       "caller": "example.com/acme/conformance::worker/main.go::main",
       "target": null,
@@ -1352,7 +2693,160 @@
       }
     }
   ],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "http::ANY::/api/items/any",
+      "site": "example.com/acme/conformance::web/echo.go::Wide"
+    },
+    {
+      "contract": "http::ANY::/echo",
+      "site": "example.com/acme/conformance::web/stdlib.go::Echo"
+    },
+    {
+      "contract": "http::ANY::/files/{}",
+      "site": "example.com/acme/conformance::web/stdlib.go::Files"
+    },
+    {
+      "contract": "http::ANY::/health",
+      "site": "example.com/acme/conformance::web/stdlib.go::Health"
+    },
+    {
+      "contract": "http::ANY::/hosted",
+      "site": "example.com/acme/conformance::web/stdlib.go::Hosted"
+    },
+    {
+      "contract": "http::ANY::/v1/users/any",
+      "site": "example.com/acme/conformance::web/gin.go::Save"
+    },
+    {
+      "contract": "http::DELETE::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}"
+    },
+    {
+      "contract": "http::DELETE::/users/{}",
+      "site": "example.com/acme/conformance::web/stdlib.go::Mux.DELETE /users/{}"
+    },
+    {
+      "contract": "http::DELETE::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::GinRoutes.DELETE /v1/users/{}"
+    },
+    {
+      "contract": "http::GET::/",
+      "site": "example.com/acme/conformance::web/stdlib.go::Home"
+    },
+    {
+      "contract": "http::GET::/admin/audit",
+      "site": "example.com/acme/conformance::web/gin.go::Audit"
+    },
+    {
+      "contract": "http::GET::/admin/stats",
+      "site": "example.com/acme/conformance::web/stdlib.go::Stats"
+    },
+    {
+      "contract": "http::GET::/api/billing",
+      "site": "example.com/acme/conformance::web/echo.go::Billing"
+    },
+    {
+      "contract": "http::GET::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Item"
+    },
+    {
+      "contract": "http::GET::/captured",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::GET::/files/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Serve"
+    },
+    {
+      "contract": "http::GET::/internal/billing",
+      "site": "example.com/acme/conformance::web/echo.go::Billing"
+    },
+    {
+      "contract": "http::GET::/mw/chained",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::GET::/ops/status",
+      "site": "example.com/acme/conformance::web/gin.go::Status"
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::web/stdlib.go::Ping"
+    },
+    {
+      "contract": "http::GET::/plain/ledger",
+      "site": "example.com/acme/conformance::web/stdlib.go::Ledger"
+    },
+    {
+      "contract": "http::GET::/static/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Wide"
+    },
+    {
+      "contract": "http::GET::/users/{}",
+      "site": "example.com/acme/conformance::web/stdlib.go::GetUser"
+    },
+    {
+      "contract": "http::GET::/v1/audit",
+      "site": "example.com/acme/conformance::web/gin.go::Audit"
+    },
+    {
+      "contract": "http::GET::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::GET::/v1/users/{}/tags",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::HEAD::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Item"
+    },
+    {
+      "contract": "http::HEAD::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::OPTIONS::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Item"
+    },
+    {
+      "contract": "http::OPTIONS::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::PATCH::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Create"
+    },
+    {
+      "contract": "http::PATCH::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Save"
+    },
+    {
+      "contract": "http::POST::/api/items",
+      "site": "example.com/acme/conformance::web/echo.go::Create"
+    },
+    {
+      "contract": "http::POST::/users",
+      "site": "example.com/acme/conformance::web/stdlib.go::CreateUser"
+    },
+    {
+      "contract": "http::POST::/v1/users",
+      "site": "example.com/acme/conformance::web/gin.go::Save"
+    },
+    {
+      "contract": "http::POST::/v1/users/{}/tags",
+      "site": "example.com/acme/conformance::web/gin.go::Save"
+    },
+    {
+      "contract": "http::PUT::/api/items/{}",
+      "site": "example.com/acme/conformance::web/echo.go::Create"
+    },
+    {
+      "contract": "http::PUT::/v1/users/{}",
+      "site": "example.com/acme/conformance::web/gin.go::Save"
+    }
+  ],
   "consumers": [],
   "communities": [
     {
@@ -1389,29 +2883,24 @@
       "members": [
         "example.com/acme/conformance::scopes/other.go::Other",
         "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Capture",
+        "example.com/acme/conformance::scopes/scopes.go::ForInit",
         "example.com/acme/conformance::scopes/scopes.go::Generic",
         "example.com/acme/conformance::scopes/scopes.go::H.Serve",
+        "example.com/acme/conformance::scopes/scopes.go::IfInit",
+        "example.com/acme/conformance::scopes/scopes.go::Import",
+        "example.com/acme/conformance::scopes/scopes.go::LiteralParam",
         "example.com/acme/conformance::scopes/scopes.go::LocalConst",
         "example.com/acme/conformance::scopes/scopes.go::LocalType",
         "example.com/acme/conformance::scopes/scopes.go::Named",
         "example.com/acme/conformance::scopes/scopes.go::Param",
         "example.com/acme/conformance::scopes/scopes.go::Range",
         "example.com/acme/conformance::scopes/scopes.go::Select",
-        "example.com/acme/conformance::scopes/scopes.go::TypeSwitch",
-        "example.com/acme/conformance::scopes/scopes.go::Var",
-        "example.com/acme/conformance::scopes/scopes.go::outer"
-      ]
-    },
-    {
-      "name": "scopes#2",
-      "members": [
-        "example.com/acme/conformance::scopes/scopes.go::Capture",
-        "example.com/acme/conformance::scopes/scopes.go::ForInit",
-        "example.com/acme/conformance::scopes/scopes.go::IfInit",
-        "example.com/acme/conformance::scopes/scopes.go::Import",
-        "example.com/acme/conformance::scopes/scopes.go::LiteralParam",
         "example.com/acme/conformance::scopes/scopes.go::ShortVar",
         "example.com/acme/conformance::scopes/scopes.go::SwitchInit",
+        "example.com/acme/conformance::scopes/scopes.go::TypeSwitch",
+        "example.com/acme/conformance::scopes/scopes.go::Var",
+        "example.com/acme/conformance::scopes/scopes.go::outer",
         "example.com/acme/conformance::scopes/scopes.go::pick",
         "example.com/acme/conformance::scopes/scopes.go::run"
       ]
@@ -1423,19 +2912,46 @@
         "example.com/acme/conformance::store/client_test.go::TestClient",
         "example.com/acme/conformance::store/client_test.go::helper",
         "example.com/acme/conformance::store/disk_linux.go::onLinux",
+        "example.com/acme/conformance::store/helpers.go::Exported",
         "example.com/acme/conformance::store/helpers.go::helper",
         "example.com/acme/conformance::store/store.go::New",
+        "example.com/acme/conformance::store/store.go::init",
         "example.com/acme/conformance::store/store.go::init#2",
+        "example.com/acme/conformance::store/store.go::open",
         "example.com/acme/conformance::store/store_test.go::TestNew",
         "example.com/acme/conformance::store/sys_unix.go::sysOpen"
       ]
     },
     {
-      "name": "store#2",
+      "name": "web",
       "members": [
-        "example.com/acme/conformance::store/helpers.go::Exported",
-        "example.com/acme/conformance::store/store.go::init",
-        "example.com/acme/conformance::store/store.go::open"
+        "example.com/acme/conformance::web/echo.go::EchoRoutes",
+        "example.com/acme/conformance::web/echo.go::RegisterBilling"
+      ]
+    },
+    {
+      "name": "web#2",
+      "members": [
+        "example.com/acme/conformance::web/gin.go::GinHidden",
+        "example.com/acme/conformance::web/gin.go::GinRoutes",
+        "example.com/acme/conformance::web/gin.go::GinShadow",
+        "example.com/acme/conformance::web/gin.go::Operations",
+        "example.com/acme/conformance::web/gin.go::RegisterAudit",
+        "example.com/acme/conformance::web/gin.go::other"
+      ]
+    },
+    {
+      "name": "web#3",
+      "members": [
+        "example.com/acme/conformance::web/stdlib.go::Guard",
+        "example.com/acme/conformance::web/stdlib.go::Mounted"
+      ]
+    },
+    {
+      "name": "web#4",
+      "members": [
+        "example.com/acme/conformance::web/stdlib.go::Mux",
+        "example.com/acme/conformance::web/stdlib.go::Register"
       ]
     }
   ],
@@ -2125,6 +3641,770 @@
           "via": "call",
           "node": "example.com/acme/conformance::store/helpers.go::helper",
           "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Auth",
+      "kind": "export",
+      "label": "Auth",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Auth"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Billing::http::GET::/api/billing",
+      "kind": "route",
+      "label": "GET /api/billing",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Billing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Billing::http::GET::/internal/billing",
+      "kind": "route",
+      "label": "GET /internal/billing",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Billing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Create::http::PATCH::/api/items/{}",
+      "kind": "route",
+      "label": "PATCH /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Create::http::POST::/api/items",
+      "kind": "route",
+      "label": "POST /api/items",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Create::http::PUT::/api/items/{}",
+      "kind": "route",
+      "label": "PUT /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Create"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::EchoDynamic",
+      "kind": "export",
+      "label": "EchoDynamic",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::EchoDynamic"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::EchoRoutes",
+      "kind": "export",
+      "label": "EchoRoutes",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::EchoRoutes"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/echo.go::RegisterBilling"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}::http::DELETE::/api/items/{}",
+      "kind": "route",
+      "label": "DELETE /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Item::http::GET::/api/items/{}",
+      "kind": "route",
+      "label": "GET /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Item::http::HEAD::/api/items/{}",
+      "kind": "route",
+      "label": "HEAD /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Item::http::OPTIONS::/api/items/{}",
+      "kind": "route",
+      "label": "OPTIONS /api/items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Item"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Wide::http::ANY::/api/items/any",
+      "kind": "route",
+      "label": "ANY /api/items/any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Wide"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/echo.go::Wide::http::GET::/static/{}",
+      "kind": "route",
+      "label": "GET /static/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/echo.go::Wide"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Audit::http::GET::/admin/audit",
+      "kind": "route",
+      "label": "GET /admin/audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Audit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Audit::http::GET::/v1/audit",
+      "kind": "route",
+      "label": "GET /v1/audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Audit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::GinCaptured",
+      "kind": "export",
+      "label": "GinCaptured",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::GinCaptured"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::GinReassigned",
+      "kind": "export",
+      "label": "GinReassigned",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::GinReassigned"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::GinRoutes",
+      "kind": "export",
+      "label": "GinRoutes",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::GinRoutes"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::RegisterAudit"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::RegisterAudit",
+          "mark": "cycle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::GinHidden"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::other"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::Operations"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::GinRoutes.DELETE /v1/users/{}::http::DELETE::/v1/users/{}",
+      "kind": "route",
+      "label": "DELETE /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::GinRoutes.DELETE /v1/users/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::GinShadow",
+      "kind": "export",
+      "label": "GinShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::GinShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gin.go::other"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Hidden",
+      "kind": "export",
+      "label": "Hidden",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Hidden"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Mid",
+      "kind": "export",
+      "label": "Mid",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Mid"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Save::http::ANY::/v1/users/any",
+      "kind": "route",
+      "label": "ANY /v1/users/any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Save::http::PATCH::/v1/users/{}",
+      "kind": "route",
+      "label": "PATCH /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Save::http::POST::/v1/users",
+      "kind": "route",
+      "label": "POST /v1/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Save::http::POST::/v1/users/{}/tags",
+      "kind": "route",
+      "label": "POST /v1/users/{}/tags",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Save::http::PUT::/v1/users/{}",
+      "kind": "route",
+      "label": "PUT /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Save"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Serve::http::GET::/files/{}",
+      "kind": "route",
+      "label": "GET /files/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Serve"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::GET::/captured",
+      "kind": "route",
+      "label": "GET /captured",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::GET::/mw/chained",
+      "kind": "route",
+      "label": "GET /mw/chained",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::GET::/v1/users/{}",
+      "kind": "route",
+      "label": "GET /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::GET::/v1/users/{}/tags",
+      "kind": "route",
+      "label": "GET /v1/users/{}/tags",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::HEAD::/v1/users/{}",
+      "kind": "route",
+      "label": "HEAD /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Show::http::OPTIONS::/v1/users/{}",
+      "kind": "route",
+      "label": "OPTIONS /v1/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Show"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gin.go::Status::http::GET::/ops/status",
+      "kind": "route",
+      "label": "GET /ops/status",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gin.go::Status"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::CreateUser::http::POST::/users",
+      "kind": "route",
+      "label": "POST /users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::CreateUser"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Default",
+      "kind": "export",
+      "label": "Default",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Default"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Echo::http::ANY::/echo",
+      "kind": "route",
+      "label": "ANY /echo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Echo"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Files::http::ANY::/files/{}",
+      "kind": "route",
+      "label": "ANY /files/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Files"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::GetUser::http::GET::/users/{}",
+      "kind": "route",
+      "label": "GET /users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::GetUser"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Health::http::ANY::/health",
+      "kind": "route",
+      "label": "ANY /health",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Health"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Home::http::GET::/",
+      "kind": "route",
+      "label": "GET /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Home"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Hosted::http::ANY::/hosted",
+      "kind": "route",
+      "label": "ANY /hosted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Hosted"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Ledger::http::GET::/plain/ledger",
+      "kind": "route",
+      "label": "GET /plain/ledger",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Ledger"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Mounted",
+      "kind": "export",
+      "label": "Mounted",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Mounted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/stdlib.go::Guard"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Mux",
+      "kind": "export",
+      "label": "Mux",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Mux"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/stdlib.go::Register"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Mux.DELETE /users/{}::http::DELETE::/users/{}",
+      "kind": "route",
+      "label": "DELETE /users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Mux.DELETE /users/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Ping::http::GET::/ping",
+      "kind": "route",
+      "label": "GET /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Ping"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/stdlib.go::Stats::http::GET::/admin/stats",
+      "kind": "route",
+      "label": "GET /admin/stats",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/stdlib.go::Stats"
         }
       ]
     }

@@ -35,8 +35,8 @@ one for the area a change touches.
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs`, `http/rust.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
-  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers), resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
+- `contract.rs`, `http.rs`, `http/rust.rs`, `http/go.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`: net/http, gin and echo), resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
   #24 and #30). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
@@ -197,6 +197,12 @@ one for the area a change touches.
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
+- New **Go router** (spec #25; chi and gorilla, #78): a row of `ROUTERS` in `http/go.rs` (the
+  package, the functions that make a router, the method that makes a group, the route methods
+  with the methods each serves, where the handler sits); `Go::provide` reads the routers through
+  `Code::origins` and `prefixes`, as the Rust kinds do. The pack gives it `Call::args`,
+  `Call::receiver`, the constants a function binds once (`Facts::consts`) and what it returns
+  (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
@@ -615,6 +621,16 @@ one for the area a change touches.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when
   asked for, and does not depend on the walk that first reached it.
+- `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
+  nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
+  the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
+  in a block, an `if` or a loop), so a name bound again, assigned or shadowed holds no value
+  (the `Hidden` binding wins); a function returns a value only for a `return` of one expression.
+- `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
+  `StripPrefix` prefix, a group prefix or a pattern Meada cannot read serves nothing. Only the
+  net/http calls of `ROUTERS` are routes (`mux.Handle` on a value that is no `ServeMux` is not);
+  middleware (`Use`, extra handlers) has no effect on the path, and a mux inside a call other
+  than `StripPrefix` (a handler wrapper) is mounted nowhere. A mux or a router held in a struct field, a map or a slice is not followed (no marker).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition). `DEFINITION_DEPTH` (128): a function
