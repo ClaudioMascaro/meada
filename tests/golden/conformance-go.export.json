@@ -86,6 +86,14 @@
       "hash": "76535fb7a457cebe3aaf138e06c6c7a2e4f18bdb8cf6204888a7adf0d0784b32"
     },
     {
+      "path": "tools/ext_test.go",
+      "hash": "93e34c4a87a3cc04aca29cb83995da827b7b6db8efbd71e7392cdfbf2deea742"
+    },
+    {
+      "path": "tools/runner.go",
+      "hash": "3250e445341dd781f77130aef7fca7d925afebcd4d550b7c299caac5cd1b5132"
+    },
+    {
       "path": "worker/jobs/jobs.go",
       "hash": "9add8bbce5b462210c7ee08117fc31113b255c9d24bf4fbf468f85a219b4f905"
     },
@@ -1021,6 +1029,30 @@
         "path": "store/sys_unix.go",
         "start": 36,
         "end": 53
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::tools/ext_test.go::main",
+      "span": {
+        "path": "tools/ext_test.go",
+        "start": 62,
+        "end": 76
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::tools/runner.go::Runner",
+      "span": {
+        "path": "tools/runner.go",
+        "start": 59,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::tools/runner.go::Runner.main",
+      "span": {
+        "path": "tools/runner.go",
+        "start": 76,
+        "end": 99
       }
     },
     {
@@ -4475,6 +4507,20 @@
           "via": "call",
           "node": "example.com/acme/conformance::store/helpers.go::helper",
           "mark": "seen"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::tools/runner.go::Runner.main",
+      "kind": "export",
+      "label": "Runner.main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::tools/runner.go::Runner.main"
         }
       ]
     },
