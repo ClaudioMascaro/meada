@@ -198,6 +198,10 @@
       "hash": "9d69dae48911f404a295f730f4d22162e26c1eba4f64866e1bd5a0e4e36a65d8"
     },
     {
+      "path": "rebound.py",
+      "hash": "c1038f8157f96eeec8336b0cf5d546d631af9adbbf986651f267be7c5ca5eacc"
+    },
+    {
       "path": "receivers.py",
       "hash": "ad2d648db091953e151f12cf0ce07ceec12ae6835d5e1652e72aa19b41aba44a"
     },
@@ -272,6 +276,10 @@
     {
       "path": "stars/computed.py",
       "hash": "a52c7fc43fc6b01a06a140d30cecaf23234159caf212823b303b1c884d6fb583"
+    },
+    {
+      "path": "stars/grown.py",
+      "hash": "8cdd068da9a9fc5155f7d9aee14937788b69c8e273d8f20d9b20a965b76fa707"
     },
     {
       "path": "stars/literal.py",
@@ -2920,6 +2928,54 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::rebound.py::deleted",
+      "span": {
+        "path": "rebound.py",
+        "start": 146,
+        "end": 173
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::grown",
+      "span": {
+        "path": "rebound.py",
+        "start": 190,
+        "end": 215
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::nested",
+      "span": {
+        "path": "rebound.py",
+        "start": 358,
+        "end": 432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::nested.inner",
+      "span": {
+        "path": "rebound.py",
+        "start": 376,
+        "end": 405
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::reach",
+      "span": {
+        "path": "rebound.py",
+        "start": 260,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::replaced",
+      "span": {
+        "path": "rebound.py",
+        "start": 100,
+        "end": 128
+      }
+    },
+    {
       "id": "example.com/acme/conformance::receivers.py::Engine",
       "span": {
         "path": "receivers.py",
@@ -3309,6 +3365,22 @@
         "path": "stars/computed.py",
         "start": 78,
         "end": 105
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/grown.py::grown",
+      "span": {
+        "path": "stars/grown.py",
+        "start": 69,
+        "end": 94
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::stars/grown.py::seed",
+      "span": {
+        "path": "stars/grown.py",
+        "start": 42,
+        "end": 66
       }
     },
     {
@@ -8244,6 +8316,50 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::rebound.py::nested::inner#0",
+      "caller": "example.com/acme/conformance::rebound.py::nested",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "rebound.py",
+        "start": 425,
+        "end": 432
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::reach::deleted#0",
+      "caller": "example.com/acme/conformance::rebound.py::reach",
+      "target": "example.com/acme/conformance::rebound.py::deleted",
+      "level": "inferred",
+      "span": {
+        "path": "rebound.py",
+        "start": 292,
+        "end": 301
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::reach::grown#0",
+      "caller": "example.com/acme/conformance::rebound.py::reach",
+      "target": "example.com/acme/conformance::stars/grown.py::grown",
+      "level": "exact",
+      "span": {
+        "path": "rebound.py",
+        "start": 306,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::rebound.py::reach::replaced#0",
+      "caller": "example.com/acme/conformance::rebound.py::reach",
+      "target": "example.com/acme/conformance::rebound.py::replaced",
+      "level": "inferred",
+      "span": {
+        "path": "rebound.py",
+        "start": 277,
+        "end": 287
+      }
+    },
+    {
       "id": "example.com/acme/conformance::receivers.py::Engine#0",
       "caller": "example.com/acme/conformance::receivers.py",
       "target": "example.com/acme/conformance::receivers.py::Engine",
@@ -10000,6 +10116,15 @@
     {
       "name": ".#14",
       "members": [
+        "example.com/acme/conformance::rebound.py::deleted",
+        "example.com/acme/conformance::rebound.py::reach",
+        "example.com/acme/conformance::rebound.py::replaced",
+        "example.com/acme/conformance::stars/grown.py::grown"
+      ]
+    },
+    {
+      "name": ".#15",
+      "members": [
         "example.com/acme/conformance::receivers.py::Engine",
         "example.com/acme/conformance::receivers.py::Engine.start",
         "example.com/acme/conformance::receivers.py::Typed.run",
@@ -10017,7 +10142,7 @@
       ]
     },
     {
-      "name": ".#15",
+      "name": ".#16",
       "members": [
         "example.com/acme/conformance::receivers.py::Runner.each",
         "example.com/acme/conformance::receivers.py::Runner.stride",
@@ -10025,14 +10150,14 @@
       ]
     },
     {
-      "name": ".#16",
+      "name": ".#17",
       "members": [
         "example.com/acme/conformance::scopes.py::Helper",
         "example.com/acme/conformance::scopes.py::Outer.m"
       ]
     },
     {
-      "name": ".#17",
+      "name": ".#18",
       "members": [
         "example.com/acme/conformance::scopes.py::Outer",
         "example.com/acme/conformance::scopes.py::Outer.Helper"
@@ -15633,6 +15758,55 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::rebound.py::nested",
+      "kind": "export",
+      "label": "nested",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::rebound.py::nested"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::rebound.py::reach",
+      "kind": "export",
+      "label": "reach",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::rebound.py::reach"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::rebound.py::replaced"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "inferred",
+          "via": "call",
+          "node": "example.com/acme/conformance::rebound.py::deleted"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::stars/grown.py::grown"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::receivers.py::Runner.each",
       "kind": "export",
       "label": "Runner.each",
@@ -16231,6 +16405,20 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::shop/views.py::vintage"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::stars/grown.py::seed",
+      "kind": "export",
+      "label": "seed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::stars/grown.py::seed"
         }
       ]
     },

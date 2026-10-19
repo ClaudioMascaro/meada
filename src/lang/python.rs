@@ -1,6 +1,6 @@
 //! The Python language pack.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use tree_sitter::{Node, Parser};
@@ -135,8 +135,10 @@ impl LanguagePack for Python {
                     if let Some(name) = node.child_by_field_name("name") {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
-                        if scope.is_empty() {
-                            module.name(name);
+                        let in_place = in_place(node, &scope, src);
+                        match scope.is_empty() {
+                            true => module.def(name, in_place),
+                            false => locals.def(&scope, name, in_place),
                         }
                         if defined.insert(inner.clone()) {
                             if !is_class {
@@ -190,10 +192,14 @@ impl LanguagePack for Python {
                 }
                 "call" => {
                     if let Some(function) = node.child_by_field_name("function") {
+                        let callee = callee(function, src);
+                        if let Some(method) = callee.strip_prefix("__all__.") {
+                            module.call_all(method, node, src);
+                        }
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             scope: scope.clone(),
-                            callee: callee(function, src),
+                            callee,
                             range: node.byte_range(),
                             args,
                             kwargs,
@@ -237,6 +243,8 @@ impl LanguagePack for Python {
                     }
                 }
                 "assignment" | "augmented_assignment" => {
+                    let left = node.child_by_field_name("left");
+                    module.items(&left.map(targets).unwrap_or_default(), src);
                     if scope.is_empty() {
                         module.assign(node, src);
                     }
@@ -252,7 +260,10 @@ impl LanguagePack for Python {
                 }
                 // Other bindings say nothing of a class, but hide an outer binding of the name.
                 // ponytail: a comprehension's variables are bound in the enclosing scope, so
-                // they hide a name there for the whole scope.
+                // they hide a name there for the whole scope. At the top level, as a lambda's
+                // parameters, they hide nothing (the module's hidden names are `Module`'s,
+                // which takes neither): `[h() for h in hs]` beside `def h()` stays `exact` to
+                // it. Hiding `h` there alone needs a scope of the comprehension's own.
                 "for_statement" | "for_in_clause" | "as_pattern" | "except_clause"
                 | "named_expression" => {
                     let field = match node.kind() {
@@ -298,6 +309,21 @@ impl LanguagePack for Python {
                         }
                     }
                 }
+                // A deleted name is bound to nothing: at the top level until bound again, in a
+                // function in its whole body.
+                // ponytail: `del` of a `global` name in a function hides it in that function
+                // alone.
+                "delete_statement" => {
+                    let deleted: Vec<Node> = named(node).flat_map(targets).collect();
+                    module.items(&deleted, src);
+                    for name in deleted.into_iter().filter(|t| t.kind() == "identifier") {
+                        let name = text(name, src);
+                        match scope.is_empty() {
+                            true => module.del(name),
+                            false => facts.locals.push(qualify(&scope, name)),
+                        }
+                    }
+                }
                 "global_statement" | "nonlocal_statement" => {
                     let global = node.kind() == "global_statement";
                     for name in named(node).filter(|n| n.kind() == "identifier") {
@@ -325,8 +351,11 @@ impl LanguagePack for Python {
                 module.name(name);
             }
         }
+        facts.locals.extend(module.hidden.iter().cloned());
         (facts.exports, facts.star) = module.exports();
-        (facts.receivers, facts.consts) = locals.finish();
+        let hidden;
+        (facts.receivers, facts.consts, hidden) = locals.finish();
+        facts.locals.extend(hidden);
         Ok(facts)
     }
 
@@ -383,15 +412,55 @@ struct Visit<'t> {
 /// What a module binds at its top level, which makes up its exports.
 #[derive(Default)]
 struct Module {
-    /// Every top-level binding in statement order: a name (`Export::Local`) or a star import
-    /// (`Export::All`).
+    /// Every top-level binding in statement order: a name (`Export::Local`, `del` included) or
+    /// a star import (`Export::All`).
     bindings: Vec<Export>,
+    /// The names a top-level `def` or `class` binds.
+    defs: HashSet<String>,
+    /// The names whose last top-level binding leaves no call reaching what they were bound to:
+    /// a `del`, or any binding after a `def` or `class` of the name, whose definition stays a
+    /// symbol. They become `Facts::locals`, which hide them.
+    hidden: BTreeSet<String>,
     /// What a star import takes by `__all__`: the names of a literal one, or `Star::Computed`;
     /// `None` when there is none.
     all: Option<Star>,
 }
 
 impl Module {
+    /// A top-level `def` or `class`; one not `in_place` (under `if`, `try`, a loop) may not run,
+    /// so a name bound before it, a star import included, stays hidden.
+    fn def(&mut self, name: &str, in_place: bool) {
+        let bound = self.bindings.iter().any(|b| match b {
+            Export::Local { exported, .. } => exported == name,
+            _ => true,
+        });
+        self.name(name);
+        self.defs.insert(name.to_string());
+        match in_place || !bound {
+            true => self.hidden.remove(name),
+            false => self.hidden.insert(name.to_string()),
+        };
+    }
+
+    /// `del name` at the top level: the name is bound to nothing.
+    fn del(&mut self, name: &str) {
+        self.name(name);
+        self.hidden.insert(name.to_string());
+    }
+
+    /// `__all__` grown by the literal names `added`, or changed some other way (`None`): a
+    /// literal one adds them, any other is computed.
+    // ponytail: `__all__ = __all__ + [...]` is not folded; it is computed.
+    fn grow_all(&mut self, added: Option<Vec<String>>) {
+        self.all = Some(match (self.all.take(), added) {
+            (Some(Star::Only(mut names)), Some(added)) => {
+                names.extend(added);
+                Star::Only(names)
+            }
+            _ => Star::Computed,
+        });
+    }
+
     fn import(&mut self, imports: &[Import]) {
         for import in imports {
             match import.name {
@@ -404,11 +473,31 @@ impl Module {
         }
     }
 
+    /// A top-level binding of `name`: `__all__` bound by anything but a literal is computed.
     fn name(&mut self, name: &str) {
         self.bindings.push(Export::Local {
             exported: name.to_string(),
             local: name.to_string(),
         });
+        match self.defs.contains(name) {
+            true => self.hidden.insert(name.to_string()),
+            false => self.hidden.remove(name),
+        };
+        if name == "__all__" {
+            self.all = Some(Star::Computed);
+        }
+    }
+
+    /// Targets set or deleted, in any scope: an item of `__all__` among them (`__all__[0]`,
+    /// `__all__[:]`) makes it computed.
+    fn items(&mut self, targets: &[Node], src: &[u8]) {
+        let item = |t: &Node| {
+            t.kind() == "subscript"
+                && (t.child_by_field_name("value")).is_some_and(|v| text(v, src) == "__all__")
+        };
+        if targets.iter().any(item) {
+            self.all = Some(Star::Computed);
+        }
     }
 
     /// The names an unpacking or `as` target binds; `self.x` binds none at the top level.
@@ -421,21 +510,46 @@ impl Module {
         }
     }
 
-    /// A top-level assignment, `x += ...` and `a, b = ...` included, and a literal `__all__`.
+    /// A top-level assignment, `x += ...` and `a, b = ...` included, and a literal `__all__`,
+    /// which `+=` may grow, both in a statement of the module itself (`statement`); one that
+    /// may not run, under `if`, `try` or a loop, makes it computed.
     fn assign(&mut self, node: Node, src: &[u8]) {
         let Some(left) = node.child_by_field_name("left") else {
             return;
         };
-        if left.kind() != "identifier" || node.kind() != "assignment" {
-            return self.targets(left, src);
+        let all = left.kind() == "identifier" && text(left, src) == "__all__";
+        // `targets` reads `__all__` as bound some other way: what it was is set below.
+        let before = all.then(|| self.all.take()).flatten();
+        self.targets(left, src);
+        if !all {
+            return;
         }
-        let name = text(left, src);
-        self.name(name);
-        if name == "__all__" {
-            let right = node.child_by_field_name("right");
-            let names = right.and_then(|right| string_list(right, src));
-            self.all = Some(names.map_or(Star::Computed, Star::Only));
+        let right = node.child_by_field_name("right");
+        let names = right.and_then(|right| string_list(right, src));
+        self.all = before;
+        match node.kind() {
+            _ if !statement(node) => self.all = Some(Star::Computed),
+            "assignment" => self.all = Some(names.map_or(Star::Computed, Star::Only)),
+            _ => {
+                let operator = node.child_by_field_name("operator").map(|o| text(o, src));
+                self.grow_all(names.filter(|_| operator == Some("+=")));
+            }
         }
+    }
+
+    /// A call of a method of `__all__`: in a statement of the module itself (`statement`),
+    /// `.extend` of a literal list or `.append` of a literal name grows it; any other, or one
+    /// that may run at any time or not at all (in a function or a lambda, under `if`, `try`
+    /// or a loop), makes it computed.
+    fn call_all(&mut self, method: &str, call: Node, src: &[u8]) {
+        let args = call.child_by_field_name("arguments");
+        let args: Vec<Node> = args.map(|a| named(a).collect()).unwrap_or_default();
+        let added = match (statement(call), method, &args[..]) {
+            (true, "extend", [list]) => string_list(*list, src),
+            (true, "append", [name]) => string(*name, src).map(|name| vec![name]),
+            _ => None,
+        };
+        self.grow_all(added);
     }
 
     /// What an explicit import or an attribute access names: every module-level name (imports
@@ -495,6 +609,39 @@ fn is_main_guard(node: Node, src: &[u8]) -> bool {
             ("__name__", "\"__main__\"" | "'__main__'")
                 | ("\"__main__\"" | "'__main__'", "__name__")
         )
+}
+
+/// Whether the definition `node` is a statement of its scope's own body (the module, a function,
+/// a class, the main guard `scope` is), which runs whenever that body does: not one under `if`,
+/// `try`, a loop, `with` or `match`.
+fn in_place(node: Node, scope: &str, src: &[u8]) -> bool {
+    let mut parent = node.parent();
+    if let Some(p) = parent.filter(|p| p.kind() == "decorated_definition") {
+        parent = p.parent();
+    }
+    let Some(parent) = parent else {
+        return false;
+    };
+    let owner = parent.parent().filter(|_| parent.kind() == "block");
+    parent.kind() == "module"
+        || owner.is_some_and(|o| match o.kind() {
+            "function_definition" | "class_definition" => true,
+            "if_statement" => {
+                scope == MAIN
+                    && o.parent().is_some_and(|m| m.kind() == "module")
+                    && is_main_guard(o, src)
+            }
+            _ => false,
+        })
+}
+
+/// Whether the expression `node` is a statement of the module itself, which runs once as the
+/// module loads: not one under `if`, `try`, a loop, in a function or a lambda.
+fn statement(node: Node) -> bool {
+    let parent = node.parent().filter(|p| p.kind() == "expression_statement");
+    parent
+        .and_then(|p| p.parent())
+        .is_some_and(|m| m.kind() == "module")
 }
 
 /// How many definitions the qualified name `scope` nests: none at the top level.
@@ -612,6 +759,10 @@ struct Locals {
     declared: HashMap<(String, String), bool>,
     /// The scopes that are class bodies.
     classes: HashSet<String>,
+    /// Every `def` and `class` in a function or class body, in source order: the position in
+    /// `written` it comes at, its scope and name, and whether it may not run (not in place)
+    /// after a binding of the name in its scope, which then stays the name's.
+    defs: Vec<(usize, String, String, bool)>,
     /// The value each `name = value` assigns, by the position of its binding in `written`.
     values: Vec<(usize, Value)>,
 }
@@ -619,6 +770,23 @@ struct Locals {
 impl Locals {
     fn bind(&mut self, scope: &str, name: &str, class: Class, how: Evidence) {
         (self.written).push((scope.to_string(), name.to_string(), class, how));
+    }
+
+    /// A `def` or `class` of `name` in the function or class body `scope`, `in_place` or under
+    /// `if`, `try`, a loop.
+    fn def(&mut self, scope: &str, name: &str, in_place: bool) {
+        let same = |s: &String, n: &String| s == scope && n == name;
+        let bound = self.written.iter().any(|(s, n, ..)| same(s, n))
+            || self.defs.iter().any(|(_, s, n, _)| same(s, n));
+        let at = self.written.len();
+        (self.defs).push((at, scope.to_string(), name.to_string(), !in_place && bound));
+        // Under `global` or `nonlocal`, it binds the name where the declaration points.
+        if self
+            .declared
+            .contains_key(&(scope.to_string(), name.to_string()))
+        {
+            self.bind(scope, name, Class::Unknown, Evidence::Assigned);
+        }
     }
 
     /// Binds a target: a name in `scope`, or `self.x` as the attribute `x` of the class whose
@@ -785,10 +953,13 @@ impl Locals {
     /// already lists it). A name declared `global` is bound at the module; one declared
     /// `nonlocal`, in the nearest enclosing function that binds it, class bodies skipped. An
     /// annotation decides; other bindings that disagree make the class unknown. A name its
-    /// scope binds once, by `name = value`, is also a constant holding that value.
-    fn finish(self) -> (Vec<Receiver>, Vec<Const>) {
+    /// scope binds once, by `name = value`, is also a constant holding that value. Last, the
+    /// definitions in a function whose name its last binding there is not (`Facts::locals`).
+    fn finish(self) -> (Vec<Receiver>, Vec<Const>, Vec<String>) {
+        let defs = (self.defs.iter()).map(|(_, scope, name, _)| (scope.as_str(), name.as_str()));
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
+            .chain(defs)
             .filter(|&(scope, name)| !self.declared.contains_key(&(scope.into(), name.into())))
             .collect();
         let home = |scope: &str, name: &str| -> String {
@@ -815,6 +986,31 @@ impl Locals {
         for key in &homes {
             *times.entry(key).or_default() += 1;
         }
+        // The last binding of each name in its function decides: a definition is hidden when the
+        // name is bound after it there, or from a nested function through `nonlocal`, which may
+        // run at any time. A class body's is not: `self.m()` reads a method through its class.
+        // ponytail: so a class-body `m = None` after `def m` leaves `self.m()` linked to it;
+        // `Resolver::member` would have to read hidden names, at the cost of
+        // `m = staticmethod(m)`'s right link.
+        let mut last: HashMap<(&str, &str), usize> = HashMap::new();
+        for (at, (home, name)) in homes.iter().enumerate() {
+            let at = match *home == self.written[at].0 {
+                true => at,
+                false => usize::MAX,
+            };
+            let latest = last.entry((home.as_str(), name.as_str())).or_default();
+            *latest = (*latest).max(at);
+        }
+        let mut defined: BTreeMap<(&str, &str), (usize, bool)> = BTreeMap::new();
+        for (at, scope, name, kept) in &self.defs {
+            if !self.classes.contains(scope) {
+                defined.insert((scope.as_str(), name.as_str()), (*at, *kept));
+            }
+        }
+        let hidden = (defined.into_iter())
+            .filter(|(key, (at, kept))| *kept || last.get(key).is_some_and(|latest| latest >= at))
+            .map(|((scope, name), _)| qualify(scope, name))
+            .collect();
         let consts = (self.values.into_iter())
             .filter(|(at, _)| times[&homes[*at]] == 1 && homes[*at].0 == self.written[*at].0)
             .map(|(at, value)| Const {
@@ -839,7 +1035,7 @@ impl Locals {
             .filter(|(_, (_, how))| *how != Evidence::Param)
             .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
-        (locals, consts)
+        (locals, consts, hidden)
     }
 }
 
@@ -849,8 +1045,9 @@ fn constructor(call: Node, src: &[u8]) -> Option<String> {
     Some(callee(function, src)).filter(|f| !f.starts_with('('))
 }
 
-/// The targets an assignment, a `for` or an `as` binds: names, and `self.x` attributes, also
-/// inside `a, (b, c)`, to `TARGET_DEPTH` nodes deep.
+/// The targets an assignment, a `for` or an `as` binds, or a `del` unbinds: names, and `self.x`
+/// attributes, also inside `a, (b, c)`, `a, *b` and `(a)`, to `TARGET_DEPTH` nodes deep; and
+/// items (`xs[0]`, `xs[:]`), which bind no name but change what `xs` holds.
 fn targets(node: Node) -> Vec<Node> {
     let mut out = Vec::new();
     targets_at(node, 0, &mut out);
@@ -861,9 +1058,17 @@ fn targets(node: Node) -> Vec<Node> {
 fn targets_at<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
         _ if depth >= TARGET_DEPTH => {}
-        "identifier" | "attribute" => out.push(node),
-        "pattern_list" | "tuple_pattern" | "list_pattern" | "tuple" | "list"
-        | "as_pattern_target" => named(node).for_each(|n| targets_at(n, depth + 1, out)),
+        "identifier" | "attribute" | "subscript" => out.push(node),
+        "pattern_list"
+        | "tuple_pattern"
+        | "list_pattern"
+        | "tuple"
+        | "list"
+        | "as_pattern_target"
+        | "expression_list"
+        | "list_splat_pattern"
+        | "list_splat"
+        | "parenthesized_expression" => named(node).for_each(|n| targets_at(n, depth + 1, out)),
         _ => {}
     }
 }

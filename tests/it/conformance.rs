@@ -685,6 +685,12 @@ fn python() {
             "methods.py::outside",
             "methods.py::shadowed",
             "methods.py::use",
+            "rebound.py::deleted",
+            "rebound.py::grown",
+            "rebound.py::nested",
+            "rebound.py::nested.inner",
+            "rebound.py::reach",
+            "rebound.py::replaced",
             "scopes.py::Helper",
             "scopes.py::Outer",
             "scopes.py::Outer.Helper",
@@ -710,6 +716,8 @@ fn python() {
             "src/billing/tax.py::vat",
             "stars/computed.py::named",
             "stars/computed.py::unnamed",
+            "stars/grown.py::grown",
+            "stars/grown.py::seed",
             "stars/literal.py::Shown",
             "stars/literal.py::listed",
             "stars/literal.py::unlisted",
@@ -1326,6 +1334,27 @@ fn python() {
                 INFERRED,
                 &["bindings.py::Store.stash"],
             ),
+            // The last top-level binding of a name decides: an assignment or a `del` after a
+            // definition leaves a name match alone, and a star import of a module whose
+            // `__all__` grows by `+=` takes what it adds.
+            (
+                "rebound.py::reach::replaced#0",
+                INFERRED,
+                &["rebound.py::replaced"],
+            ),
+            (
+                "rebound.py::reach::deleted#0",
+                INFERRED,
+                &["rebound.py::deleted"],
+            ),
+            (
+                "rebound.py::reach::grown#0",
+                EXACT,
+                &["stars/grown.py::grown"],
+            ),
+            // So does the last binding in a function: a nested definition rebound later is not
+            // what its name reaches, and no name match finds a nested one.
+            ("rebound.py::nested::inner#0", None, &[]),
             // A class body's names are in scope for its own statements, not for its methods.
             (
                 "scopes.py::Outer::Helper#0",

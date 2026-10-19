@@ -839,10 +839,21 @@ one for the area a change touches.
   Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
-  there for the whole scope (the safe side: a name match instead of `exact`). A write to an
+  there for the whole scope (the safe side: a name match instead of `exact`); at the top level
+  they, and a lambda's parameters, hide nothing, so `[h() for h in hs]` beside `def h()` stays
+  `exact` to the definition (hiding `h` there alone needs a scope of the comprehension's own). A write to an
   attribute from outside the class (`obj.x = ...` in another function) is not seen, so a
   class-body `x = C()` still types `self.x`. `__all__` is read only as one literal list or
-  tuple. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
+  tuple, grown by literal names in a statement of the module itself (`+=`, `.extend`,
+  `.append`); any other change to it, one under `if`, `try` or a loop, in a lambda or a
+  function, and an item set or deleted (`__all__[:] = ...`, `del __all__[0]`) make it computed. A name `del` unbinds (at the top level,
+  unless bound again), and a definition another binding of its scope follows (at the top level
+  or in a function, where a nested function's `nonlocal` binding counts as following), and one
+  under `if`, `try`, a loop, `with` or `match` after another binding of its name, which it may
+  leave in place, are hidden in their whole scope, wherever the call sits (the safe side: a name match instead of
+  `exact`). In a class body a binding after a method hides nothing: `self.m()` reads the method
+  through its class, right for `m = staticmethod(m)` and as `@property` is read for `m =
+  property(m)`, but a class-body `m = None` leaves `self.m()` linked to `def m`. A `**k` splat in a call is not read; a `*a` splat is read as one positional argument.
   Console scripts (`Pyproject::scripts`) are read as `"module:function"` strings only: the Poetry
   table form (`{ callable = "...", extras = [...] }`) is left out, and so are
   `[project.gui-scripts]` and `entry-points`. The block of an `if __name__ == "__main__":` is the

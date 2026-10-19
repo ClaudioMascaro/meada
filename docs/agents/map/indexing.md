@@ -200,7 +200,14 @@ modules updates it.
   its star imports, last binding first, since a later one rebinds the name (`stars_bind`: the
   resolver takes the first export that gives a name, so a star import after a definition
   rebinds it when its module exports it); what `import *` takes is `Facts::star`: the public
-  names, or a literal `__all__` alone.
+  names, or a literal `__all__` alone, grown by the literal names a statement of the module
+  itself adds (`+=`, `.extend`, `.append`: `statement`), else `Star::Computed` (also for an
+  item set or deleted, `Module::items`, and any other binding of `__all__`). The last binding of a name in its scope
+  decides: a definition another binding follows (at the top level, `Module::hidden`; in a
+  function, where a nested function's `nonlocal` binding follows any, `Locals::finish`), one
+  not `in_place` (under `if`, `try`, a loop, `with`, `match`) after another binding of its
+  name, and a name `del` unbinds (in any scope), are `Facts::locals`, which hide the name. A class body's
+  binding hides no method, which `Resolver::member` reads through its class.
   Its imports are the module as written (`.`, `..pkg`, `a.b`): `import a.b.c` binds `a`, `a.b`
   and `a.b.c` (dotted `Import::local`s); `from p import m` is an `Imported::Member`, a name
   `p` exports or else the submodule `p.m`; `from p import *` is `Imported::All`. `modules` resolves them against the repository root, then the roots
