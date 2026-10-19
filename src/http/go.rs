@@ -186,12 +186,21 @@ struct Go<'c, 'a> {
 }
 
 impl<'c, 'a> Go<'c, 'a> {
+    /// What `callee` (`pkg.Name`) names in a package outside the repository: only when its head
+    /// is the import itself, not a name typed as the package's class (`e := other()` with
+    /// `e.Default()`), which the resolver would also read as that package's.
+    fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
+        let (head, _) = callee.split_once('.').unwrap_or((callee, ""));
+        self.code.external(path, scope, head)?;
+        self.code.external(path, scope, callee)
+    }
+
     /// Whether the call `at` is a function of `router` that makes a router.
     fn makes(&self, router: &Router, (path, n): CallAt<'a>) -> bool {
         let Some(call) = self.code.call(path, n) else {
             return false;
         };
-        let external = self.code.external_of(path, call);
+        let external = self.external(path, &call.scope, &call.callee);
         match external.as_deref().and_then(split) {
             Some((package, name)) => package == router.package && router.made.contains(&name),
             None => false,
@@ -216,7 +225,7 @@ impl<'c, 'a> Go<'c, 'a> {
         prefix: Option<String>,
     ) -> bool {
         if let Value::Call(call) = value {
-            let stripped = self.code.external(path, scope, &call.callee);
+            let stripped = self.external(path, scope, &call.callee);
             let stripped = stripped.as_deref().and_then(split) == Some(("net/http", "StripPrefix"));
             if let (true, [given, inner]) = (stripped, &call.args[..]) {
                 let given = path_literal(self.code.value(path, scope, given));
@@ -248,7 +257,7 @@ impl<'c, 'a> Go<'c, 'a> {
     fn method(&self, path: &'a str, call: &'a Call) -> Option<String> {
         let method = match call.args.first()? {
             Value::Ref(name) => {
-                let external = self.code.external(path, &call.scope, name)?;
+                let external = self.external(path, &call.scope, name)?;
                 let (package, name) = split(&external)?;
                 let name = name
                     .strip_prefix("Method")
@@ -269,7 +278,7 @@ impl<'c, 'a> Go<'c, 'a> {
         if let Value::Call(call) = value
             && let [inner] = &call.args[..]
         {
-            let external = self.code.external(path, scope, &call.callee);
+            let external = self.external(path, scope, &call.callee);
             if external.as_deref().and_then(split) == Some(("net/http", "HandlerFunc")) {
                 return inner;
             }
@@ -364,22 +373,23 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             let Some(call) = code.call(path, n) else {
                 continue;
             };
-            let external = code.external_of(path, call);
-            let parents = match external.as_deref().and_then(split) {
-                // `http.HandleFunc(..)`: registers on the router of the package itself.
-                Some((package, name)) => {
-                    let own = ROUTERS.iter().filter(|r| r.default && r.package == package);
-                    if !own.flat_map(|r| r.routes).any(|(m, _)| *m == name) {
-                        continue;
-                    }
-                    vec![Place::Default]
-                }
-                None => match &call.receiver {
-                    Some(receiver) => go.places(path, &call.scope, receiver),
-                    None => continue,
-                },
+            // `http.HandleFunc(..)` registers on the router of the package itself; any other
+            // call is a method of a router, whatever its head's type reads as.
+            let external = go.external(path, &call.scope, &call.callee);
+            let package_call =
+                external
+                    .as_deref()
+                    .and_then(split)
+                    .is_some_and(|(package, name)| {
+                        let own = ROUTERS.iter().filter(|r| r.default && r.package == package);
+                        own.flat_map(|r| r.routes).any(|(m, _)| *m == name)
+                    });
+            let parents = match (package_call, &call.receiver) {
+                (true, _) => vec![Place::Default],
+                (false, Some(receiver)) => go.places(path, &call.scope, receiver),
+                (false, None) => continue,
             };
-            if groups && external.is_none() {
+            if groups && !package_call {
                 let prefix = (call.args.first())
                     .and_then(|p| path_literal(code.value(path, &call.scope, p)))
                     .and_then(|p| go_path(&p));

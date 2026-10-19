@@ -355,9 +355,11 @@ one for the area a change touches.
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
   file of a group (`Modules` gives the first candidate, which stands for them all) exports what
   any file of the group that names it in its `Facts::exports` gives (`Resolver::exports`, over
-  `file_exports`); files that define one name apart are `Binding::Several`, an `ambiguous`
+  `file_exports`); a method declared in another file of the group is found for its type too
+  (`Resolver::sibling_method`, in `member`); files that define one name apart are `Binding::Several`, an `ambiguous`
   call. The group is built from `Facts::package`, the package each file declares. A member
-  lookup (`Resolver::member`) still reads the class's own file. A language whose imports name a path rather than a file (Rust's
+  lookup (`Resolver::member`) reads the class's own file, then the group's others for a method
+  (`sibling_method`). A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -633,7 +635,21 @@ one for the area a change touches.
   than `StripPrefix` (a handler wrapper) is mounted nowhere. A mux or a router held in a struct field, a map or a slice is not followed (no marker).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
-  parentheses (past it the method is no definition). `DEFINITION_DEPTH` (128): a function
+  parentheses (past it the method is no definition, and a parameter, field, `var` or result
+  type read through more names no class). Receivers (`Walk::bound`, `finish`): a name is a
+  `Facts::receivers` row only when every binding of it in its function (parameters, the method
+  receiver, named results, `var`, `:=`) writes the same class, one scope per function and per
+  literal, so a name bound again to another type (in any block) or by `range`, a type switch or
+  a second result is a local that hides, and so is a name whose type a local of the function
+  hides (a local `type`, a type parameter; a type declaration's own parameters hide only in
+  the declaration, not in its methods). A `:=` or `var` holds from the end of its statement to
+  the end of its block, clause or statement, and the name is a receiver only if every call that
+  starts at the name in its function (and in the literals in it) lies inside the regions of its
+  bindings; a call before it, or after the block, may mean an outer name, so the name stays a
+  hiding local. A struct's named fields are receivers in the type's
+  scope; an embedded field, and so a promoted method, is not followed (a name match).
+  `Class::Called` is a call read as a value (`h.Counter()`, `shapes.NewCircle()`), the first
+  result only. `DEFINITION_DEPTH` (128): a function
   literal nested deeper is no definition (its parameters and calls are the enclosing one's).
   `CONSTRAINT_DEPTH` (64, `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`,
   parentheses) is not read, and the file is left out, as one that cannot be read (two

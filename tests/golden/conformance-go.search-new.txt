@@ -1,4 +1,5 @@
 example.com/acme/conformance store/store.go:9 New
 example.com/acme/conformance internal/http-utils/utils.go:3 NewRequest
 example.com/acme/conformance internal/shapes/shapes.go:19 NewCircle
+example.com/acme/conformance methods/types.go:63 NewCounter
 example.com/acme/conformance store/store_test.go:5 TestNew
