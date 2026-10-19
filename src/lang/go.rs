@@ -11,11 +11,12 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
-    Modules, Param, Receiver, Value, children, named, text,
+    Message, Modules, Param, Receiver, Value, children, named, text,
 };
 use crate::{Result, parent, qualify};
 
 mod build;
+mod messages;
 pub mod modfile;
 mod values;
 use values::Keep;
@@ -46,6 +47,10 @@ impl LanguagePack for Go {
 
     fn config_files(&self) -> &'static [&'static str] {
         &["**/go.mod"]
+    }
+
+    fn messages(&self, code: &crate::resolve::Code) -> Vec<Message> {
+        messages::messages(code)
     }
 
     fn modules(
@@ -437,7 +442,9 @@ impl Walk<'_> {
                     }
                 }
                 // `&p`: the name may be written through the pointer, so it holds no one value.
-                "unary_expression" => {
+                // ponytail: except as the `Topic` of a literal (confluent-kafka-go's `*string`),
+                // where a write through the pointer goes unseen; no pointer analysis.
+                "unary_expression" if !is_topic_pointer(node, src) => {
                     let operand = node.child_by_field_name("operand");
                     let address = node.child_by_field_name("operator");
                     if let (Some(operand), Some(address)) = (operand, address)
@@ -626,6 +633,15 @@ fn in_body(node: Node) -> bool {
             "function_declaration" | "method_declaration" | "func_literal"
         )
     })
+}
+
+/// Whether the `&name` `node` is the value of a `Topic:` field in a composite literal.
+fn is_topic_pointer(node: Node, src: &[u8]) -> bool {
+    let key = (node.parent())
+        .and_then(|element| element.parent())
+        .filter(|keyed| keyed.kind() == "keyed_element")
+        .and_then(|keyed| keyed.child_by_field_name("key"));
+    key.is_some_and(|key| text(key, src) == "Topic")
 }
 
 /// The `name` fields of a declaration (`a, b int`, `x, y = 1, 2`).

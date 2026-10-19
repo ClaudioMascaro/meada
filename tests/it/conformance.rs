@@ -2581,6 +2581,47 @@ fn go() {
             "internal/shapes/shapes.go::clamp",
             "internal/units/units.go::Meters",
             "legacy/old/old.go::Old",
+            "messages/confluent.go::ConfluentConsume",
+            "messages/confluent.go::ConfluentPattern",
+            "messages/confluent.go::ConfluentProduce",
+            "messages/queues.go::SqsConsume",
+            "messages/queues.go::SqsProduce",
+            "messages/rabbit.go::Audit",
+            "messages/rabbit.go::PublishAll",
+            "messages/rabbit.go::PublishUnknown",
+            "messages/rabbit.go::WorkJobs",
+            "messages/rabbit.go::channel",
+            "messages/sarama.go::SaramaGroup",
+            "messages/sarama.go::SaramaPartition",
+            "messages/sarama.go::SaramaProduce",
+            "messages/sarama.go::orderHandler",
+            "messages/sarama.go::orderHandler.Cleanup",
+            "messages/sarama.go::orderHandler.ConsumeClaim",
+            "messages/sarama.go::orderHandler.Setup",
+            "messages/segmentio.go::ConsumeOrders",
+            "messages/segmentio.go::ConsumeRefunds",
+            "messages/segmentio.go::ConsumeUnknown",
+            "messages/segmentio.go::EmitRefund",
+            "messages/segmentio.go::ProduceAll",
+            "messages/segmentio.go::ProduceMade",
+            "messages/segmentio.go::ProduceMessages",
+            "messages/segmentio.go::ProduceUnknown",
+            "messages/segmentio.go::ReadLoop",
+            "messages/segmentio.go::emit",
+            "messages/segmentio.go::newWriter",
+            "messages/shadowed.go::Outbox",
+            "messages/shadowed.go::Outbox.Publish",
+            "messages/shadowed.go::Outbox.WriteMessages",
+            "messages/shadowed.go::Outbox.XAdd",
+            "messages/shadowed.go::Shadowed",
+            "messages/streams.go::RedisConsume",
+            "messages/streams.go::RedisProduce",
+            "messages/subjects.go::NatsPublish",
+            "messages/subjects.go::NatsSubscribe",
+            "messages/subjects.go::NatsSubscribe.nats orders.created",
+            "messages/subjects.go::auditor",
+            "messages/subjects.go::auditor.onAudit",
+            "messages/subjects.go::onOrder",
             "main.go::main",
             "main.go::run",
             "methods/calls.go::run",
@@ -6340,4 +6381,341 @@ fn rust_redis_streams_are_channel_producers_and_consumers() {
     ];
     expected.sort();
     assert_eq!(channel_links(&json, "channel::redis::"), expected);
+}
+
+/// The channel sides of `file` in the Go fixture's `messages` package: the export, its producers
+/// as `(contract, site)` and its consumers as `(contract, via, site)`, sorted, with
+/// repository-relative sites. An unresolved side has the contract `channel::<broker>`.
+fn go_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
+    let dir = format!("messages/{file}::");
+    let (json, producers) = providers(case, "conformance-go", &dir);
+    let consumers = consumers(&json, &dir);
+    (json, producers, consumers)
+}
+
+/// The Kafka forms of the Go pack (spec #25, #82): segmentio/kafka-go, confluent-kafka-go and
+/// sarama, as the sides of each file and the links between them. A topic the writer names
+/// stands for its messages; a writer a function made, an environment read and a regular
+/// expression leave the side unresolved.
+#[test]
+fn go_kafka_clients_are_channel_producers_and_consumers() {
+    let at = |file: &str, rest: &str| format!("messages/{file}.go::{rest}");
+    let segmentio = |rest: &str| at("segmentio", rest);
+    let (json, producers, consumers) = go_channels("go_kafka_segmentio", "segmentio.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &segmentio("ProduceAll::orders.WriteMessages#0")
+            ),
+            (
+                "channel::kafka::payments.eu",
+                &segmentio("ProduceAll::payments.WriteMessages#0")
+            ),
+            (
+                "channel::kafka::audits",
+                &segmentio("ProduceMessages::bare.WriteMessages#0")
+            ),
+            (
+                "channel::kafka::audits.eu",
+                &segmentio("ProduceMessages::bare.WriteMessages#0")
+            ),
+            (
+                "channel::kafka::retries",
+                &segmentio("ProduceMessages::bare.WriteMessages#1")
+            ),
+            (
+                "channel::kafka::invoices",
+                &segmentio("ProduceMessages::bare.WriteMessages#1")
+            ),
+            (
+                "channel::kafka::refunds",
+                &segmentio("ProduceMade::w.WriteMessages#0")
+            ),
+            (
+                "channel::kafka::refund.requested",
+                &segmentio("EmitRefund::emit#0")
+            ),
+            (
+                "channel::kafka",
+                &segmentio("ProduceUnknown::w.WriteMessages#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::orders", "", &segmentio("ConsumeOrders")),
+            (
+                "channel::kafka::refunds.eu",
+                "",
+                &segmentio("ConsumeRefunds")
+            ),
+            ("channel::kafka::retries", "", &segmentio("ConsumeRefunds")),
+            ("channel::kafka::invoices", "", &segmentio("ConsumeRefunds")),
+            ("channel::kafka", "", &segmentio("ConsumeUnknown")),
+        ])
+    );
+
+    let confluent = |rest: &str| at("confluent", rest);
+    let (_, producers, consumers) = go_channels("go_kafka_confluent", "confluent.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &confluent("ConfluentProduce::p.Produce#0")
+            ),
+            (
+                "channel::kafka::orders",
+                &confluent("ConfluentProduce::p.Produce#1")
+            ),
+            (
+                "channel::kafka",
+                &confluent("ConfluentProduce::p.Produce#2")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            (
+                "channel::kafka::payments",
+                "",
+                &confluent("ConfluentConsume")
+            ),
+            (
+                "channel::kafka::refunds.eu",
+                "",
+                &confluent("ConfluentConsume")
+            ),
+            (
+                "channel::kafka::retries",
+                "",
+                &confluent("ConfluentConsume")
+            ),
+            ("channel::kafka", "", &confluent("ConfluentPattern")),
+        ])
+    );
+
+    let sarama = |rest: &str| at("sarama", rest);
+    let (_, producers, consumers) = go_channels("go_kafka_sarama", "sarama.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::kafka::orders",
+                &sarama("SaramaProduce::producer.SendMessage#0")
+            ),
+            (
+                "channel::kafka::payments",
+                &sarama("SaramaProduce::producer.SendMessage#1")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::kafka::refunds.eu", "", &sarama("SaramaPartition")),
+            (
+                "channel::kafka::orders",
+                "",
+                &sarama("orderHandler.ConsumeClaim")
+            ),
+            (
+                "channel::kafka::payments",
+                "",
+                &sarama("orderHandler.ConsumeClaim")
+            ),
+            (
+                "channel::kafka::invoices",
+                "",
+                &sarama("orderHandler.ConsumeClaim")
+            ),
+        ])
+    );
+
+    // The handler of a group is its `ConsumeClaim`; a reader's is the function that built it.
+    let links = channel_links(&json, "channel::kafka::");
+    for (consumer, producer, reason) in [
+        (
+            sarama("orderHandler.ConsumeClaim"),
+            segmentio("ProduceAll::orders.WriteMessages#0"),
+            "channel::kafka::orders",
+        ),
+        (
+            segmentio("ConsumeOrders"),
+            confluent("ConfluentProduce::p.Produce#1"),
+            "channel::kafka::orders",
+        ),
+        (
+            confluent("ConfluentConsume"),
+            segmentio("ProduceMessages::bare.WriteMessages#1"),
+            "channel::kafka::retries",
+        ),
+    ] {
+        assert!(
+            links.contains(&link(consumer, producer, reason, "exact")),
+            "{reason}"
+        );
+    }
+}
+
+/// The RabbitMQ forms of the Go pack: the default exchange reaches the queue its key names,
+/// exactly; another exchange is a binding match; an exchange from a parameter leaves the
+/// producer unresolved.
+#[test]
+fn go_amqp_channels_are_producers_consumers_and_bindings() {
+    let rabbit = |rest: &str| format!("messages/rabbit.go::{rest}");
+    let (json, producers, consumers) = go_channels("go_amqp", "rabbit.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::amqp::jobs",
+                &rabbit("PublishAll::ch.PublishWithContext#0")
+            ),
+            ("channel::amqp", &rabbit("PublishUnknown::ch.Publish#0")),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::amqp::jobs", "", &rabbit("WorkJobs")),
+            ("channel::amqp::audit", "", &rabbit("Audit")),
+        ])
+    );
+    let reason = "channel::amqp::audit binding events order.#";
+    let mut expected = vec![
+        link(
+            rabbit("WorkJobs"),
+            rabbit("PublishAll::ch.PublishWithContext#0"),
+            "channel::amqp::jobs",
+            "exact",
+        ),
+        link(
+            rabbit("Audit"),
+            rabbit("PublishAll::ch.PublishWithContext#1"),
+            reason,
+            "inferred",
+        ),
+        link(
+            rabbit("Audit"),
+            rabbit("PublishAll::ch.Publish#0"),
+            reason,
+            "inferred",
+        ),
+    ];
+    expected.sort();
+    assert_eq!(channel_links(&json, "channel::amqp::"), expected);
+}
+
+/// The queue clients of the Go pack: SQS queue names are the last segment of the queue URL,
+/// folded through `aws.String`, an environment read leaves the producer unresolved; NATS
+/// callbacks are the handlers, wildcards link as inferred; only a Redis read in a consumer
+/// group is a consumer.
+#[test]
+fn go_sqs_nats_and_redis_clients_are_channel_producers_and_consumers() {
+    let queues = |rest: &str| format!("messages/queues.go::{rest}");
+    let (json, producers, consumers) = go_channels("go_sqs", "queues.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::sqs::tasks",
+                &queues("SqsProduce::client.SendMessage#0")
+            ),
+            ("channel::sqs", &queues("SqsProduce::client.SendMessage#1")),
+            (
+                "channel::sqs::invoices",
+                &queues("SqsProduce::client.SendMessageBatch#0")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::sqs::tasks", "", &queues("SqsConsume")),
+            ("channel::sqs::reports", "", &queues("SqsConsume")),
+        ])
+    );
+    assert_eq!(
+        channel_links(&json, "channel::sqs::"),
+        vec![link(
+            queues("SqsConsume"),
+            queues("SqsProduce::client.SendMessage#0"),
+            "channel::sqs::tasks",
+            "exact"
+        )]
+    );
+
+    let subjects = |rest: &str| format!("messages/subjects.go::{rest}");
+    let (json, producers, consumers) = go_channels("go_nats", "subjects.go");
+    assert_eq!(
+        producers,
+        pairs(&[
+            (
+                "channel::nats::orders.created",
+                &subjects("NatsPublish::nc.Publish#0")
+            ),
+            (
+                "channel::nats::orders.updated",
+                &subjects("NatsPublish::nc.Publish#1")
+            ),
+        ])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            (
+                "channel::nats::orders.created",
+                "",
+                &subjects("NatsSubscribe.nats orders.created")
+            ),
+            ("channel::nats::orders.*", "", &subjects("onOrder")),
+            ("channel::nats::audit.>", "", &subjects("auditor.onAudit")),
+        ])
+    );
+    let links = channel_links(&json, "channel::nats::");
+    assert!(links.contains(&link(
+        subjects("onOrder"),
+        subjects("NatsPublish::nc.Publish#1"),
+        "channel::nats::orders.updated wildcard orders.*",
+        "inferred"
+    )));
+
+    let streams = |rest: &str| format!("messages/streams.go::{rest}");
+    let (json, producers, consumers) = go_channels("go_redis", "streams.go");
+    assert_eq!(
+        producers,
+        pairs(&[(
+            "channel::redis::orders",
+            &streams("RedisProduce::rdb.XAdd#0")
+        )])
+    );
+    assert_eq!(
+        consumers,
+        triples(&[
+            ("channel::redis::orders", "", &streams("RedisConsume")),
+            ("channel::redis::payments", "", &streams("RedisConsume")),
+        ])
+    );
+    assert_eq!(
+        channel_links(&json, "channel::redis::"),
+        vec![link(
+            streams("RedisConsume"),
+            streams("RedisProduce::rdb.XAdd#0"),
+            "channel::redis::orders",
+            "exact"
+        )]
+    );
+}
+
+/// A receiver that does not trace back to the library's constructor makes no side, whatever
+/// its methods are called.
+#[test]
+fn go_channel_methods_of_the_repositorys_own_types_are_no_sides() {
+    let (_, producers, consumers) = go_channels("go_shadowed", "shadowed.go");
+    assert_eq!((producers, consumers), (vec![], vec![]));
 }

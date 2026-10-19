@@ -2467,6 +2467,59 @@ impl<'a> Code<'a> {
         Some(format!("{package}.{}", written.rsplit('.').next()?))
     }
 
+    /// What the source says the value `name` (a parameter, a local, a constant or a field), written
+    /// in `scope` of `path`, is made by outside the repository, spelled as the imports name it: a
+    /// type it is written as (`github.com/segmentio/kafka-go.Writer`), or the function that made
+    /// it, with the methods called on the way (`github.com/rabbitmq/amqp091-go.Dial.Channel`).
+    /// A function of the repository stands for the type it writes as its result.
+    pub fn outside_origin(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
+        self.outside_from(path, scope, name, 0)
+    }
+
+    fn outside_from(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        depth: usize,
+    ) -> Option<String> {
+        if depth >= RECEIVER_DEPTH {
+            return None;
+        }
+        let r = self.resolver;
+        let binding = r.binding(path, scope, name);
+        let (at, within, held) = r.holder(&binding)?;
+        match r.receivers[at].get(&(within, held))? {
+            Class::Type(_) => self.outside_type(path, scope, name),
+            Class::Called(callee) => {
+                let head = callee.split('.').next()?;
+                if callee.contains('.')
+                    && matches!(r.binding(at, within, head), Binding::External(..))
+                {
+                    // A function of a package.
+                    return Some(r.imported_name(at, within, callee));
+                }
+                if let Binding::Def(t) = r.binding(at, within, callee) {
+                    // A function of the repository: the type its result writes.
+                    let Some(Class::Type(written)) = &r.defs[t.path][t.name].result else {
+                        return None;
+                    };
+                    let (seen, work) = (&mut r.seen(t.path, t.name), &mut Work::default());
+                    let found = r.resolve_as(t.path, t.name, written, seen, work, Reading::Path);
+                    let Binding::External(package, _) = found else {
+                        return None;
+                    };
+                    return Some(format!("{package}.{}", written.rsplit('.').next()?));
+                }
+                // A method of a value that was made outside.
+                let (receiver, member) = callee.rsplit_once('.')?;
+                let made = self.outside_from(at, within, receiver, depth + 1)?;
+                Some(format!("{made}.{member}"))
+            }
+            _ => None,
+        }
+    }
+
     /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
     /// its head among types and modules, so a function of the file that spells like a crate
     /// (`fn rocket()` calling `rocket::build()`) does not hide it.
@@ -3016,6 +3069,30 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The method `method` of the class that `name` (a type, or a name whose class the source
+    /// writes), written in `scope` of `path`, is an instance of: looked up through its family and
+    /// the other files of its package.
+    pub fn method(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        method: &'a str,
+    ) -> Option<Target<'a>> {
+        let r = self.resolver;
+        let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
+        let found = r.resolve_as(path, scope, name, seen, work, Reading::Value);
+        match r.instance(found, work) {
+            Binding::Def(t) | Binding::Instance(t) if r.is_class(t) => {
+                match r.member(t, method, work) {
+                    Binding::Def(t) => Some(t),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// The file `name`, written in `scope` of `path`, refers to as a whole module.
     pub fn module(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<&'a str> {
         match self.resolver.binding(path, scope, name) {
@@ -3229,6 +3306,12 @@ impl<'a> Code<'a> {
             ),
             Value::List(items) => Value::List(
                 (items.iter())
+                    .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
+                    .collect(),
+            ),
+            Value::New(callee, args) => Value::New(
+                callee.clone(),
+                (args.iter())
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
