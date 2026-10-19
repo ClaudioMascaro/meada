@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "main.go",
-      "hash": "49184fd9ca1a1ad76add9827c1b20738eec6bcfd83a23cd0140bde4751ee7969"
+      "hash": "6500200ebe1de3741b58ad2d1b6165c1d51dabe06b44e2cc8f3130fddd1a6840"
     },
     {
       "path": "worker/worker.go",
@@ -15,64 +15,96 @@
       "id": "example.com/gopkg/web::main.go::connect",
       "span": {
         "path": "main.go",
-        "start": 255,
-        "end": 316
+        "start": 293,
+        "end": 354
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::dup",
+      "span": {
+        "path": "main.go",
+        "start": 674,
+        "end": 699
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::encode",
       "span": {
         "path": "main.go",
-        "start": 352,
-        "end": 385
+        "start": 701,
+        "end": 734
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::localKit",
       "span": {
         "path": "main.go",
-        "start": 458,
-        "end": 475
+        "start": 807,
+        "end": 824
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::localKit.Greet",
       "span": {
         "path": "main.go",
-        "start": 477,
-        "end": 527
+        "start": 826,
+        "end": 876
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::main",
       "span": {
         "path": "main.go",
-        "start": 164,
-        "end": 203
+        "start": 202,
+        "end": 241
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::nested",
+      "span": {
+        "path": "main.go",
+        "start": 629,
+        "end": 672
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::peek",
       "span": {
         "path": "main.go",
-        "start": 318,
-        "end": 350
+        "start": 356,
+        "end": 388
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::shadowed",
       "span": {
         "path": "main.go",
-        "start": 387,
-        "end": 451
+        "start": 736,
+        "end": 800
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::testOnly",
+      "span": {
+        "path": "main.go",
+        "start": 549,
+        "end": 594
       }
     },
     {
       "id": "example.com/gopkg/web::main.go::welcome",
       "span": {
         "path": "main.go",
-        "start": 205,
-        "end": 253
+        "start": 243,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::windows",
+      "span": {
+        "path": "main.go",
+        "start": 596,
+        "end": 627
       }
     },
     {
@@ -92,8 +124,8 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 287,
-        "end": 314
+        "start": 325,
+        "end": 352
       }
     },
     {
@@ -103,8 +135,19 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 287,
-        "end": 302
+        "start": 325,
+        "end": 340
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::dup::api.Dup#0",
+      "caller": "example.com/gopkg/web::main.go::dup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 688,
+        "end": 697
       }
     },
     {
@@ -114,8 +157,8 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 369,
-        "end": 383
+        "start": 718,
+        "end": 732
       }
     },
     {
@@ -125,8 +168,8 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 179,
-        "end": 201
+        "start": 217,
+        "end": 239
       }
     },
     {
@@ -136,8 +179,19 @@
       "level": "exact",
       "span": {
         "path": "main.go",
-        "start": 191,
-        "end": 200
+        "start": 229,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::nested::nest.Boost#0",
+      "caller": "example.com/gopkg/web::main.go::nested",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 657,
+        "end": 670
       }
     },
     {
@@ -147,8 +201,8 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 333,
-        "end": 348
+        "start": 371,
+        "end": 386
       }
     },
     {
@@ -158,8 +212,19 @@
       "level": "exact",
       "span": {
         "path": "main.go",
-        "start": 437,
-        "end": 449
+        "start": 786,
+        "end": 798
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::testOnly::k.Helper#0",
+      "caller": "example.com/gopkg/web::main.go::testOnly",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 582,
+        "end": 592
       }
     },
     {
@@ -169,8 +234,19 @@
       "level": null,
       "span": {
         "path": "main.go",
-        "start": 237,
-        "end": 251
+        "start": 275,
+        "end": 289
+      }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::windows::k.WinOnly#0",
+      "caller": "example.com/gopkg/web::main.go::windows",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 614,
+        "end": 625
       }
     },
     {

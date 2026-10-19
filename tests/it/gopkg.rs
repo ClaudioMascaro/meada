@@ -118,9 +118,13 @@ fn an_import_reaches_the_exported_symbol_of_the_package_directory() {
             "{caller}"
         );
     }
-    // A directory the provider lacks, a module outside the workspace and a local that hides
-    // the import add nothing.
-    for caller in ["peek", "encode", "shadowed"] {
+    // A directory the provider lacks, a module outside the workspace, a local that hides the
+    // import, a name only a test file or a file built for another target defines, a directory of
+    // a nested module of the provider and a name two files of the directory define add nothing.
+    let none = [
+        "peek", "encode", "shadowed", "testOnly", "windows", "nested", "dup",
+    ];
+    for caller in none {
         assert!(at(&format!("main.go::{caller}::")).is_empty(), "{caller}");
     }
 }
@@ -209,5 +213,71 @@ fn a_require_on_a_module_two_repositories_provide_is_ambiguous() {
             ("example.com/gopkg/fork::text/text.go::Greet", "ambiguous"),
             ("example.com/gopkg/lib::text/text.go::Greet", "ambiguous"),
         ]
+    );
+}
+
+/// Replaces `from` by `to` in `file` of `repo`, which must hold it.
+fn replace(repo: &Path, file: &str, from: &str, to: &str) {
+    let text = fs::read_to_string(repo.join(file)).unwrap();
+    assert!(text.contains(from), "{file} lacks {from}");
+    fs::write(repo.join(file), text.replace(from, to)).unwrap();
+}
+
+#[test]
+fn a_replace_by_another_module_leaves_the_module_out_of_the_workspace() {
+    let (_, web) = pair("gopkg_replaced");
+    let go_mod = fs::read_to_string(web.join("go.mod")).unwrap();
+    let fork = "\nreplace example.com/shared/kit => example.com/fork/kit v1.0.0\n";
+    fs::write(web.join("go.mod"), go_mod + fork).unwrap();
+
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    assert!(links(&json, &format!("{WEB}go.mod")).is_empty());
+    assert!(links(&json, &format!("{WEB}main.go")).is_empty());
+    // The module `worker` requires is still the sibling's.
+    assert_eq!(links(&json, &format!("{WEB}worker/")).len(), 2);
+}
+
+#[test]
+fn a_module_path_without_a_dot_links_through_its_local_replace() {
+    let (lib, web) = pair("gopkg_dotless");
+    replace(&lib, "go.mod", "example.com/shared/kit", "kit");
+    replace(
+        &web,
+        "go.mod",
+        "example.com/shared/kit v1.2.0",
+        "kit v1.2.0",
+    );
+    replace(&web, "main.go", "example.com/shared/kit/", "kit/");
+    let go_mod = fs::read_to_string(web.join("go.mod")).unwrap();
+    fs::write(
+        web.join("go.mod"),
+        go_mod + "\nreplace kit => ../gopkg-lib\n",
+    )
+    .unwrap();
+
+    let json: Value = serde_json::from_str(&export(&web)).unwrap();
+
+    let at = |site: &str| links(&json, &format!("{WEB}{site}"));
+    let reason = "package::go::kit v1.2.0 (local none), range unchecked";
+    assert_eq!(
+        at("go.mod::require::kit"),
+        [(
+            "example.com/gopkg/web::go.mod::require::kit",
+            "example.com/gopkg/lib::go.mod",
+            "exact",
+            reason
+        )]
+    );
+    let found: Vec<_> = (at("main.go::welcome::").into_iter())
+        .map(|(_, p, l, r)| (p, l, r.to_string()))
+        .collect();
+    assert_eq!(
+        found,
+        [(
+            "example.com/gopkg/lib::text/text.go::Greet",
+            "exact",
+            format!("{reason}; import module path")
+        )]
     );
 }

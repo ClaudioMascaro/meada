@@ -815,6 +815,9 @@ struct Provided<'e> {
     /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
     /// asks (`candidates`), once for all.
     owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
+    /// The Go source files that are no tests, by directory. Built the first time a Go import
+    /// asks (`package`), once for all.
+    go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
 
 /// What an import of a package resolved to in one provider: what named the entry, the import's
@@ -844,6 +847,7 @@ impl<'e> Provided<'e> {
                 })
                 .collect(),
             owned: OnceCell::new(),
+            go_dirs: OnceCell::new(),
         }
     }
 
@@ -916,9 +920,19 @@ impl<'e> Provided<'e> {
             None if base == "." => String::new(),
             None => base.to_string(),
         };
-        let mut ids: Vec<String> = (self.files.iter())
-            .filter(|f| f.rsplit_once('/').map_or("", |(d, _)| d) == dir)
-            .filter(|f| f.ends_with(".go") && !f.ends_with("_test.go"))
+        let by_dir = self.go_dirs.get_or_init(|| {
+            let mut by_dir: HashMap<&str, Vec<&str>> = HashMap::new();
+            for &f in self.files.iter().filter(|f| f.ends_with(".go")) {
+                if !f.ends_with("_test.go") {
+                    by_dir
+                        .entry(f.rsplit_once('/').map_or("", |(d, _)| d))
+                        .or_default()
+                        .push(f);
+                }
+            }
+            by_dir
+        });
+        let mut ids: Vec<String> = (by_dir.get(dir.as_str()).into_iter().flatten())
             .filter(|f| self.owned_source(manifest, f))
             .filter_map(|f| self.reach(repository, f, chain, known))
             .collect();
@@ -1472,6 +1486,7 @@ pub fn surface(
         configs,
         shapes: HashMap::new(),
         owned: OnceCell::new(),
+        go_dirs: OnceCell::new(),
     };
     let mut queue = Vec::new();
     // Shapes cross through npm packages alone: no reader keeps one for a Python file.
@@ -2788,6 +2803,7 @@ mod tests {
             configs: &[],
             shapes: HashMap::new(),
             owned: OnceCell::new(),
+            go_dirs: OnceCell::new(),
         }
     }
 

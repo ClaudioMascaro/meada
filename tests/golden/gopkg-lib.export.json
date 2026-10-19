@@ -6,12 +6,24 @@
       "hash": "846337e0d0886517a90b59771876775dbf7fba314fc31312d259f580f8d284e1"
     },
     {
+      "path": "api/dup_a.go",
+      "hash": "58d0a705874282a435322a1cb7cfc64f7be383c6657d39faa95ba29e2af4c329"
+    },
+    {
+      "path": "api/dup_b.go",
+      "hash": "58d0a705874282a435322a1cb7cfc64f7be383c6657d39faa95ba29e2af4c329"
+    },
+    {
       "path": "cmd/app/main.go",
       "hash": "0b7ad745b3833bfb1c1a821abd6aaf3b335d5485369ac09a81ca3b37f5f91c7d"
     },
     {
       "path": "extras/extras.go",
       "hash": "8fddd9d115783771c7b249f419e1dbb77a51b4921234bbcf766a6d1b5faf739a"
+    },
+    {
+      "path": "text/helper_test.go",
+      "hash": "ccd5689b197ce9707c82ad6d16679ae454f22704057265f36f4f975d2d4b3f21"
     },
     {
       "path": "text/text.go",
@@ -44,6 +56,22 @@
       }
     },
     {
+      "id": "example.com/gopkg/lib::api/dup_a.go::Dup",
+      "span": {
+        "path": "api/dup_a.go",
+        "start": 82,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::api/dup_b.go::Dup",
+      "span": {
+        "path": "api/dup_b.go",
+        "start": 82,
+        "end": 95
+      }
+    },
+    {
       "id": "example.com/gopkg/lib::cmd/app/main.go::main",
       "span": {
         "path": "cmd/app/main.go",
@@ -57,6 +85,14 @@
         "path": "extras/extras.go",
         "start": 35,
         "end": 74
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/helper_test.go::Helper",
+      "span": {
+        "path": "text/helper_test.go",
+        "start": 88,
+        "end": 134
       }
     },
     {
@@ -86,6 +122,17 @@
         "path": "cmd/app/main.go",
         "start": 67,
         "end": 84
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/helper_test.go::Helper::Greet#0",
+      "caller": "example.com/gopkg/lib::text/helper_test.go::Helper",
+      "target": "example.com/gopkg/lib::text/text.go::Greet",
+      "level": "exact",
+      "span": {
+        "path": "text/helper_test.go",
+        "start": 119,
+        "end": 132
       }
     },
     {
@@ -141,6 +188,7 @@
       "name": "text",
       "members": [
         "example.com/gopkg/lib::cmd/app/main.go::main",
+        "example.com/gopkg/lib::text/helper_test.go::Helper",
         "example.com/gopkg/lib::text/text.go::Greet",
         "example.com/gopkg/lib::text/text.go::Shout"
       ]

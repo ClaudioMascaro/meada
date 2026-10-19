@@ -301,7 +301,7 @@ modules updates it.
   entry under `require` with the version as range; a `replace` to a local directory gives its
   entry, or one under `replace` when nothing here requires the module, the Cargo `path` form in
   `via`; a `replace` by anything else marks the entry `outside`, which reaches no provider). A call
-  from a `.go` file through an import whose first element has a dot resolves in the provider
+  from a `.go` file through an import of a module the nearest `go.mod` requires (a path with no dot included) resolves in the provider
   directory the import path names (`Provided::package`): the exported name of the one non-test
   source file of that directory (nested modules left out) that defines it, `exact`, `How::ModulePath`.
   Ecosystems (spec #24): everything above is npm's, behind `Ecosystem` (`Npm`, `Pypi`), which

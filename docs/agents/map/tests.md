@@ -211,7 +211,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `../../gopkg-lib/extras`), and `gopkg-fork` (a second provider of `kit`, added as a peer, which
   makes the `require` and the import `ambiguous`). The tests check each `require` link and reason,
   every import into `lib` (`exact`, `; import module path`), a directory the provider lacks, a
-  module outside the workspace and a local that hides the import (no link), and the freshness of
+  module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, and a `replace` by another module (no link), a module path with no dot, and the freshness of
   an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
   `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
 - **The loopback decider stub** (`tests/it/common/stub.rs`): `Stub::start(script: Vec<Reply>)`

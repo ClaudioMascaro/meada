@@ -11,6 +11,8 @@
 //! workspace, and nothing otherwise. Ranges are never checked, and neither `go.sum` nor the
 //! module proxy is read.
 
+use std::collections::{HashMap, HashSet};
+
 use super::cargo::relative;
 use super::{Entry, MAX_BYTES, Summary, directory, valid_name};
 use crate::lang::go::modfile;
@@ -30,10 +32,15 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     let dir = directory(path);
     let dir = if dir == "." { "" } else { dir };
     let file = modfile::read(&String::from_utf8_lossy(src));
+    // The first `replace` of a module decides, found once for all.
+    let mut replaced: HashMap<&str, &str> = HashMap::new();
+    for (old, new) in &file.replaces {
+        replaced.entry(old).or_insert(new);
+    }
     let via = |module: &str| {
-        let (_, target) = file.replaces.iter().find(|(old, _)| old == module)?;
+        let target = replaced.get(module)?;
         let local = target.starts_with("./") || target.starts_with("../");
-        let local = local || matches!(target.as_str(), "." | "..");
+        let local = local || matches!(*target, "." | "..");
         Some(match local.then(|| relative(dir, target)).flatten() {
             Some(at) if at.is_empty() => "path go.mod".to_string(),
             Some(at) => format!("path {at}/go.mod"),
@@ -41,8 +48,9 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         })
     };
     let mut dependencies: Vec<Entry> = Vec::new();
+    let mut seen: HashSet<&str> = HashSet::new();
     for (module, version) in &file.requires {
-        if valid_name(module) && !dependencies.iter().any(|e| e.name == *module) {
+        if valid_name(module) && seen.insert(module) {
             dependencies.push(Entry {
                 field: REQUIRE.to_string(),
                 name: module.clone(),
@@ -54,9 +62,8 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     }
     // A replaced module nobody here requires may be one a dependency requires.
     for (module, _) in &file.replaces {
-        let required = dependencies.iter().any(|e| e.name == *module);
         let via = via(module).filter(|v| v.starts_with("path "));
-        if via.is_some() && valid_name(module) && !required {
+        if via.is_some() && valid_name(module) && seen.insert(module) {
             dependencies.push(Entry {
                 field: REPLACE.to_string(),
                 name: module.clone(),
@@ -73,11 +80,11 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     }
 }
 
-/// Whether `specifier`, an import path, may name a module of the workspace: its first element
-/// has a dot, as every module path outside the standard library does.
+/// Whether `specifier`, an import path, may name a module of the workspace: any path that can be
+/// a contract name. A module path needs no dot (`module kit` with a local `replace`), and the
+/// standard library stays external since no `require` names it (`resolutions`).
 pub fn names_module(specifier: &str) -> bool {
-    let first = specifier.split('/').next().unwrap_or_default();
-    first.contains('.') && !first.starts_with('.') && valid_name(specifier)
+    valid_name(specifier)
 }
 
 /// What follows the module path `module` in the import path `specifier`, if it starts with it:
@@ -161,15 +168,36 @@ mod tests {
     }
 
     #[test]
-    fn an_import_path_names_a_module_only_outside_the_standard_library() {
+    fn an_import_path_may_name_a_module_and_the_standard_library_is_left_to_the_requires() {
         assert!(names_module("example.com/a/b"));
-        assert!(names_module("github.com/x/y"));
-        assert!(!names_module("net/http"));
-        assert!(!names_module("fmt"));
-        assert!(!names_module("./local"));
+        // A module path needs no dot: a local one is `module kit` with a `replace`.
+        assert!(names_module("kit/text"));
         assert!(!names_module(""));
+        assert!(!names_module("a:b"));
         assert_eq!(inside("example.com/a/b/c", "example.com/a"), Some("b/c"));
         assert_eq!(inside("example.com/a", "example.com/a"), Some(""));
         assert_eq!(inside("example.com/ab", "example.com/a"), None);
+    }
+
+    #[test]
+    fn a_go_mod_of_many_requires_and_replaces_reads_in_linear_time() {
+        let mut text = String::from(
+            "module example.com/app
+",
+        );
+        let mut n = 0;
+        while text.len() < MAX_BYTES / 2 {
+            text += &format!("require example.com/m{n} v1.0.0\n");
+            n += 1;
+        }
+        for i in 0..n {
+            text += &format!("replace example.com/m{i} => ./m{i}\n");
+            text += &format!("replace example.com/r{i} => ./r{i}\n");
+        }
+        let text = &text.as_bytes()[..text.len().min(MAX_BYTES)];
+        let start = std::time::Instant::now();
+        let s = read("go.mod", text);
+        assert!(s.dependencies.len() > n, "{}", s.dependencies.len());
+        assert!(start.elapsed().as_secs() < 2, "{:?}", start.elapsed());
     }
 }
