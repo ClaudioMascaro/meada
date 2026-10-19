@@ -309,8 +309,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
     let mut spent = 0;
-    // The children of each block the configuration keeps, by node id.
-    let mut live: HashSet<usize> = HashSet::new();
     // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
     // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
@@ -339,19 +337,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         let in_module = pure && scope == module && matches!(body, Body::Items);
         let deep = levels(&scope) >= DEFINITION_DEPTH;
         let mut locals = Vec::new();
-        // A `let mut` String the rest of its block only reads and appends to. Two in one scope
-        // under one name are told apart by no position the Reader has: neither is kept.
-        if !deep
-            && builders::candidate(node)
-            && let Some(name) = field(node, "pattern").filter(|p| p.kind() == "identifier")
-            && let Some(found) = builders::builder(node, src, &mut spent, &live)
-        {
-            let key = (scope.clone(), text(name, src).to_string());
-            if !clash.contains(&key) && candidates.insert(key.clone(), found).is_some() {
-                candidates.remove(&key);
-                clash.insert(key);
-            }
-        }
         match node.kind() {
             // Macro bodies are token trees; attributes are read by the item they sit on.
             "macro_definition" => {
@@ -841,8 +826,24 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             _ => built(node, &features, src, &mut renamed),
         };
-        if node.kind() == "block" {
-            live.extend(kids.iter().map(|k| k.id()));
+        // A `let mut` String the rest of its block only reads and appends to: the statements
+        // after it are the ones `kids` holds, read once (a sibling lookup costs the depth of the
+        // node). Two in one scope under one name are told apart by no position the Reader has:
+        // neither is kept.
+        if node.kind() == "block" && !deep {
+            for (at, kid) in kids.iter().enumerate() {
+                if builders::candidate(*kid)
+                    && let Some(name) = field(*kid, "pattern").filter(|p| p.kind() == "identifier")
+                    && let Some(found) =
+                        builders::builder(*kid, node, &kids[at + 1..], src, &mut spent)
+                {
+                    let key = (scope.clone(), text(name, src).to_string());
+                    if !clash.contains(&key) && candidates.insert(key.clone(), found).is_some() {
+                        candidates.remove(&key);
+                        clash.insert(key);
+                    }
+                }
+            }
         }
         stack.extend(kids.into_iter().rev().map(|child| Visit {
             node: child,

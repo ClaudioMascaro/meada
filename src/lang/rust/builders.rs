@@ -5,8 +5,6 @@
 //! Any other use (a push in a branch or a loop, `&mut url`, `write!(url, ..)`, a shadowing
 //! binding, a method that changes it) leaves the name unknown, as every `let mut` is.
 
-use std::collections::HashSet;
-
 use tree_sitter::Node;
 
 use super::{field, mutable};
@@ -84,6 +82,10 @@ struct Seen<'t> {
     grand: Node<'t>,
     /// Whether the node is part of a pattern (a binding, not a use).
     pattern: bool,
+    /// The nodes listed before and after it among its parent's children (every token, in a
+    /// token tree): a sibling lookup costs the depth of the node.
+    before: Option<Node<'t>>,
+    after: Option<Node<'t>>,
 }
 
 /// Whether `node` is a `let mut` that may be a builder.
@@ -91,32 +93,28 @@ pub(super) fn candidate(node: Node) -> bool {
     node.kind() == "let_declaration" && mutable(node)
 }
 
-/// The builder the `let mut` `node` makes; `None` when anything else may change the name, or the
-/// budget `spent` is used up. `live` holds the ids of the children of blocks that the file's
-/// configuration keeps.
+/// The builder the `let mut` `node` of `block` makes; `None` when anything else may change the
+/// name, or the budget `spent` is used up. `rest` is what follows it in the block, as `parse`
+/// reads the block's children once: a statement the file's configuration leaves out
+/// (`#[cfg(..)]` false) is not there, and neither is an attribute.
 pub(super) fn builder<'t>(
     node: Node<'t>,
+    block: Node<'t>,
+    rest: &[Node<'t>],
     src: &[u8],
     spent: &mut usize,
-    live: &HashSet<usize>,
 ) -> Option<Builder<'t>> {
     let pattern = field(node, "pattern").filter(|p| p.kind() == "identifier")?;
     let name = text(pattern, src);
     let init = field(node, "value")?;
-    let block = node.parent().filter(|b| b.kind() == "block")?;
     let from = node.end_byte();
     let is_name = |n: Node| n.kind() == "identifier" && text(n, src) == name;
     let mut steps = Vec::new();
     let mut stack: Vec<Seen> = Vec::new();
-    for stmt in std::iter::successors(node.next_sibling(), |s| s.next_sibling()) {
+    for &stmt in rest {
         *spent += 1;
         if *spent > BUILDER_BUDGET {
             return None;
-        }
-        // A statement the file's configuration leaves out (`#[cfg(..)]` false, decided where
-        // `parse` reads the block's children) is not in the code, and an attribute is no use.
-        if !live.contains(&stmt.id()) || stmt.kind() == "attribute_item" {
-            continue;
         }
         let appended = (stmt.kind() == "expression_statement")
             .then(|| named(stmt).next())
@@ -138,6 +136,8 @@ pub(super) fn builder<'t>(
             parent,
             grand: block,
             pattern: false,
+            before: None,
+            after: None,
         });
     }
     while let Some(seen) = stack.pop() {
@@ -172,11 +172,13 @@ pub(super) fn builder<'t>(
             "token_tree" => children(node).collect::<Vec<_>>(),
             _ => named(node).collect(),
         };
-        stack.extend(kids.into_iter().map(|child| Seen {
+        stack.extend(kids.iter().enumerate().map(|(at, &child)| Seen {
             node: child,
             parent: node,
             grand: parent,
             pattern: binds(child),
+            before: at.checked_sub(1).map(|at| kids[at]),
+            after: kids.get(at + 1).copied(),
         }));
     }
     Some(Builder {
@@ -196,8 +198,8 @@ fn append<'t>(
 ) -> Option<(Node<'t>, bool)> {
     match expr.kind() {
         "compound_assignment_expr" => {
-            let left = field(expr, "left").filter(|l| is_name(*l))?;
-            left.next_sibling().filter(|o| o.kind() == "+=")?;
+            field(expr, "left").filter(|l| is_name(*l))?;
+            field(expr, "operator").filter(|o| o.kind() == "+=")?;
             Some((field(expr, "right")?, false))
         }
         "call_expression" => {
@@ -223,6 +225,8 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
         node,
         parent,
         grand,
+        before,
+        after,
         ..
     } = seen;
     let is = |n: Option<Node>, other: Node| n.is_some_and(|n| n.id() == other.id());
@@ -238,8 +242,8 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
         "token_tree" => {
             let lone =
                 |n: Option<Node>, kinds: &[&str]| n.is_some_and(|n| kinds.contains(&n.kind()));
-            lone(node.prev_sibling(), &["(", ",", "&"])
-                && lone(node.next_sibling(), &[")", ","])
+            lone(before, &["(", ",", "&"])
+                && lone(after, &[")", ","])
                 && grand.kind() == "macro_invocation"
                 && field(grand, "macro").is_some_and(|m| READING_MACROS.contains(&text(m, src)))
         }
@@ -263,5 +267,68 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
                 | "await_expression"
                 | "type_cast_expression"
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use tree_sitter::{Node, Parser, Tree};
+
+    use super::builder;
+    use crate::lang::children;
+
+    /// A `let mut` String that `n` statements push to, add to and print, `depth` blocks deep.
+    fn block(n: usize, depth: usize) -> (String, Tree) {
+        let body = "s.push_str(\"a\"); s += \"b\"; println!(\"{}\", s);\n".repeat(n);
+        let src = format!(
+            "fn f() {}{{ let mut s = String::new();\n{body}}}{}\n",
+            "{ ".repeat(depth),
+            " }".repeat(depth)
+        );
+        let mut parser = Parser::new();
+        parser
+            .set_language(&tree_sitter_rust::LANGUAGE.into())
+            .unwrap();
+        let tree = parser.parse(&src, None).unwrap();
+        (src, tree)
+    }
+
+    /// How long the builder of the `let mut` in `src` takes to read its block.
+    fn read(src: &str, tree: &Tree, n: usize) -> Duration {
+        let at = src.find("let mut").unwrap();
+        let mut node = tree.root_node().descendant_for_byte_range(at, at).unwrap();
+        while node.kind() != "let_declaration" {
+            node = node.parent().unwrap();
+        }
+        let block = node.parent().unwrap();
+        let kids: Vec<Node> = children(block).collect();
+        let rest = &kids[kids.iter().position(|k| k.id() == node.id()).unwrap() + 1..];
+        let start = Instant::now();
+        let found = builder(node, block, rest, src.as_bytes(), &mut 0);
+        let took = start.elapsed();
+        assert_eq!(found.map(|b| b.steps.len()), Some(2 * n));
+        took
+    }
+
+    #[test]
+    fn a_builder_reads_a_block_in_the_same_time_at_any_depth() {
+        // A parent or sibling lookup walks down from the root of the tree (which balances a long
+        // list), so it costs the depth of the node: 2000 deep, the lookups this walk made took 90
+        // times as long as at the top, and one per print alone 30 times. Each statement must
+        // cost the same anywhere. The least of interleaved runs keeps the machine and its load
+        // out of the ratio.
+        let (n, depth) = (1000, 2000);
+        let (top, deep) = (block(n, 0), block(n, depth));
+        let (mut at_top, mut at_depth) = (Duration::MAX, Duration::MAX);
+        for _ in 0..5 {
+            at_top = at_top.min(read(&top.0, &top.1, n));
+            at_depth = at_depth.min(read(&deep.0, &deep.1, n));
+        }
+        assert!(
+            at_depth < at_top * 4,
+            "{at_top:?} at the top, {at_depth:?} {depth} deep"
+        );
     }
 }
