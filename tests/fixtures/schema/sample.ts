@@ -1,4 +1,4 @@
-// A sample of every fact the TypeScript pack stores, for the SCHEMA_VERSION guard in
+// A sample of every fact the TypeScript pack stores, for the schema version guard in
 // src/index.rs.
 import express, { Router } from "express";
 import * as path from "node:path";

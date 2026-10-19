@@ -219,7 +219,8 @@ one for the area a change touches.
   true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
   so a refresh equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set by
   `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
-  paths, never opening one, so a symlink changes nothing. A change to what is stored bumps `SCHEMA_VERSION`.
+  paths, never opening one, so a symlink changes nothing. A change to what is stored re-blesses
+  `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
@@ -237,7 +238,7 @@ one for the area a change touches.
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
 - New **document format or document data** (spec #21 tickets after #50): what is read from the
-  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` and
+  bytes goes in `document::Summary` (re-bless `tests/golden/schema.txt`), a reader beside `openapi.rs` and
   `asyncapi.rs` sees
   only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
   through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
@@ -304,15 +305,15 @@ one for the area a change touches.
   where `Local` is built after the contracts and the `exports` rows are written, just before
   `entry::find` stores its result; a new fact a pack declares is a `Facts` field first (as
   `programs` is). A kind the stored rows already name needs no schema change; a new column does
-  (`SCHEMA_VERSION`). Export entry points are filtered again at query time
+  (re-bless `tests/golden/schema.txt`). Export entry points are filtered again at query time
   (`entry::drop_imported_exports`): only `export` is dropped, never another kind. The walk (`Graph::process`),
   `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
   one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
   in `Descent::follow`, with its `Mark` (named in the `Mark` list of `map/queries.md`, which
-  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored bumps
-  `SCHEMA_VERSION`.
+  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored re-blesses
+  `tests/golden/schema.txt`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
@@ -406,15 +407,15 @@ one for the area a change touches.
   of the `symbols`, `calls` and `candidates` rows, and the chain's export must stay
   byte-identical. The in-memory order is normalized by path (`BTreeMap`s), so the switch covers
   nothing beyond that. Indexing runs on one thread, so there is no worker count to vary.
-- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
-  a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
-  `tests/golden/schema.v<version>.txt` (the facts of each pack's
-  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml`,
-  `sample.asyncapi.yaml` and `sample.package.json` there) and never re-blesses it in place: a change
-  fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
-  An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
-  so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
-  a file changed), which `status` cannot tell.
+- The schema version (`index::schema_version`) is derived from `tests/golden/schema.txt`, the
+  stored format: `SCHEMA`, the facts of each pack's `tests/fixtures/schema/sample.<extension>`
+  and the summaries of the document and manifest samples there. A unit test in `index.rs`
+  (`the_stored_format_matches_its_golden`) fails on any change to them until `MEADA_BLESS=1`
+  rewrites the golden, which changes the version; no number is kept by hand, so two branches
+  that change the format conflict only in the golden. An index with another version, or an
+  unreadable one, is deleted and rebuilt, and `status` says so. One whose stored facts do not
+  parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
+  cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
