@@ -225,6 +225,15 @@ one for the area a change touches.
   to a field called `X`, whatever it belongs to), is `Unknown` (`Resolver::redeclared`, read from
   the markers `Name.var` and `.Name` the Go pack stores as constants of no value); a `const` is
   never one.
+- **Go environment reads** (spec #25, #80): `os.Getenv("X")` is `Str([Env(X)])` and
+  `os.LookupEnv("X")` is so for the first name of a `:=` or `var` (`values::lookup_env`), through
+  `strings.TrimSuffix`/`TrimRight`/`TrimSpace` (`values::env_value`) of the read or of a name
+  `Std::note` saw bound to one earlier in the file (source order; a package-level `var` counts).
+  `if v == "" { v = .. }` and `v = strings.TrimX(v, ..)` leave `v` a constant when it holds a
+  read (`values::keeps_env`, `Walk::assigned`'s third field). `http/go/clients.rs` `one_read`
+  makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
+  head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
+  repository of another language joins by one more `common::xlang_go` entry.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file

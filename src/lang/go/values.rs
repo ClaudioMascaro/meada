@@ -3,7 +3,8 @@
 //! a `fmt.Sprintf` with a literal format, a `net/http` method constant, a name, a call, a
 //! function literal. Anything else is `Unknown`, so no kind reads a guess.
 
-use std::collections::BTreeSet;
+use std::cell::RefCell;
+use std::collections::{BTreeSet, HashMap};
 
 use tree_sitter::Node;
 
@@ -17,12 +18,18 @@ use crate::qualify;
 pub(super) const VALUE_DEPTH: usize = 64;
 
 /// The packages of the standard library whose values are folded where they are written
-/// (`fmt.Sprintf`, `http.MethodGet`): the name the file imports each by, unless the file spells
-/// that name some other way too.
+/// (`fmt.Sprintf`, `http.MethodGet`, `os.Getenv`, `strings.TrimSuffix`): the name the file
+/// imports each by, unless the file spells that name some other way too.
 #[derive(Default)]
 pub(super) struct Std {
     fmt: Option<String>,
     http: Option<String>,
+    os: Option<String>,
+    strings: Option<String>,
+    /// The names a statement of a function's own block binds once, by scope and name (`base :=
+    /// os.Getenv("X")`), with whether the value is an environment read. Filled in source order,
+    /// so a name is known where it is used after it is bound.
+    held: RefCell<HashMap<(String, String), bool>>,
 }
 
 impl Std {
@@ -35,7 +42,9 @@ impl Std {
                 .map(|_| local.to_string())
         };
         let (fmt, http) = (by("fmt"), by("net/http"));
-        let names: Vec<&str> = fmt.iter().chain(&http).map(String::as_str).collect();
+        let (os, strings) = (by("os"), by("strings"));
+        let all = [&fmt, &http, &os, &strings];
+        let names: Vec<&str> = all.iter().filter_map(|n| n.as_deref()).collect();
         let hidden = if names.is_empty() {
             BTreeSet::new()
         } else {
@@ -45,8 +54,38 @@ impl Std {
         Std {
             fmt: free(fmt),
             http: free(http),
+            os: free(os),
+            strings: free(strings),
+            held: RefCell::default(),
         }
     }
+
+    /// Notes that `name`, bound in `scope`, holds `value`.
+    pub(super) fn note(&self, scope: &str, name: &str, value: &Value) {
+        let env = is_env(value);
+        (self.held.borrow_mut()).insert((scope.to_string(), name.to_string()), env);
+    }
+
+    /// Whether `name`, written in `scope`, is bound by the nearest statement noted for it to an
+    /// environment read.
+    fn holds_env(&self, scope: &str, name: &str) -> bool {
+        let held = self.held.borrow();
+        let mut at = scope;
+        loop {
+            if let Some(env) = held.get(&(at.to_string(), name.to_string())) {
+                return *env;
+            }
+            if at.is_empty() {
+                return false;
+            }
+            at = crate::parent(at);
+        }
+    }
+}
+
+/// Whether `value` is nothing but one environment read.
+pub(super) fn is_env(value: &Value) -> bool {
+    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_)]))
 }
 
 /// Which of `names` the file spells other than as the package of a selector (`fmt.Sprintf`): a
@@ -139,10 +178,204 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
             if sprintf.is_some_and(|name| callee(function, src) == name) {
                 return sprintf_value(node, src, again);
             }
+            if let Some(env) = env_value(node, function, files, scope, again) {
+                return env;
+            }
             Value::Call(invocation(node, function, src, again))
         }
         _ => Value::Unknown,
     }
+}
+
+/// The environment read the call `node` is, or the trimmed one: `os.Getenv("X")`, and
+/// `strings.TrimSuffix(x, "/")`, `strings.TrimRight(x, "/")` or `strings.TrimSpace(x)` of one.
+/// The first is the value `Str([Env(X)])`; a trim keeps the read it trims, a name bound to a
+/// read included. Any other call of these functions (a name that is no literal, another
+/// argument that is no text, a trim of another value) is `Unknown`, and its arguments are not
+/// read again as a call's. `None` for any other call. Meada never reads the variable.
+fn env_value(
+    node: Node,
+    function: Node,
+    files: (&[u8], &Std),
+    scope: &str,
+    again: impl Fn(Node) -> Value + Copy,
+) -> Option<Value> {
+    let (src, std) = files;
+    let name = callee(function, src);
+    let (package, member) = name.split_once('.')?;
+    let args: Vec<Node> = arguments(node).collect();
+    if std.os.as_deref() == Some(package) && member == "Getenv" {
+        let read = env_name(&args, again).map(|env| Value::Str(vec![env]));
+        return Some(read.unwrap_or(Value::Unknown));
+    }
+    if std.strings.as_deref() != Some(package) {
+        return None;
+    }
+    let width = match member {
+        "TrimSuffix" | "TrimRight" => 2,
+        "TrimSpace" => 1,
+        _ => return None,
+    };
+    Some(trimmed(&args, width, files, scope, again).unwrap_or(Value::Unknown))
+}
+
+/// The read a trim of `width` arguments keeps, if it trims one.
+fn trimmed(
+    args: &[Node],
+    width: usize,
+    files: (&[u8], &Std),
+    scope: &str,
+    again: impl Fn(Node) -> Value + Copy,
+) -> Option<Value> {
+    if args.len() != width {
+        return None;
+    }
+    // The text trimmed away must be text: a second read there would make two bases.
+    if args.get(1).is_some_and(
+        |a| !matches!(again(*a), Value::Str(p) if p.iter().all(|p| matches!(p, Part::Text(_)))),
+    ) {
+        return None;
+    }
+    match again(args[0]) {
+        env @ Value::Str(_) if is_env(&env) => Some(env),
+        Value::Ref(held) if files.1.holds_env(scope, &held) => Some(Value::Ref(held)),
+        _ => None,
+    }
+}
+
+/// The variable `os.Getenv("X")` or `os.LookupEnv("X")` names, when its only argument is a
+/// non-empty string literal.
+fn env_name(args: &[Node], again: impl Fn(Node) -> Value) -> Option<Part> {
+    let [name] = args else {
+        return None;
+    };
+    match again(*name) {
+        Value::Str(parts) => match <[Part; 1]>::try_from(parts) {
+            Ok([Part::Text(name)]) if !name.is_empty() => Some(Part::Env(name)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether the assignment `node` leaves a name that holds an environment read bound to it: the
+/// fallback `if v == "" { v = .. }` (whatever the default is, Meada never reads it, unless it is
+/// another environment read), or the trim of the name by itself (`v = strings.TrimSuffix(v,
+/// "/")`).
+pub(super) fn keeps_env(node: Node, src: &[u8], std: &Std) -> bool {
+    let sides = (node.child_by_field_name("left"))
+        .zip(node.child_by_field_name("right"))
+        .zip(node.child_by_field_name("operator"));
+    let Some(((left, right), operator)) = sides else {
+        return false;
+    };
+    let (Some(target), Some(right)) = (only(left), only(right)) else {
+        return false;
+    };
+    if text(operator, src) != "=" || target.kind() != "identifier" {
+        return false;
+    }
+    let name = text(target, src);
+    trims_itself(right, src, std, name) || empties_to(node, src, name) && !reads_env(right, src)
+}
+
+/// The one expression of `list`, which is itself when it is no expression list.
+fn only(list: Node) -> Option<Node> {
+    match list.kind() {
+        "expression_list" => {
+            let mut all = named(list);
+            all.next().filter(|_| all.next().is_none())
+        }
+        _ => Some(list),
+    }
+}
+
+/// Whether `node` is `strings.TrimSuffix(name, "..")`, `strings.TrimRight(name, "..")` or
+/// `strings.TrimSpace(name)`.
+fn trims_itself(node: Node, src: &[u8], std: &Std, name: &str) -> bool {
+    let Some(function) = node.child_by_field_name("function") else {
+        return false;
+    };
+    let Some(strings) = std.strings.as_deref() else {
+        return false;
+    };
+    let args: Vec<Node> = arguments(node).collect();
+    let text_of = |a: &Node| {
+        matches!(
+            a.kind(),
+            "interpreted_string_literal" | "raw_string_literal"
+        )
+    };
+    match (callee(function, src).strip_prefix(strings), &args[..]) {
+        (Some(".TrimSpace"), [first]) => text(*first, src) == name,
+        (Some(".TrimSuffix" | ".TrimRight"), [first, cut]) => {
+            text(*first, src) == name && text_of(cut)
+        }
+        _ => false,
+    }
+}
+
+/// Whether the assignment `node` is the only statement of `if name == "" { .. }`, with no
+/// initializer and no `else`.
+fn empties_to(node: Node, src: &[u8], name: &str) -> bool {
+    let block = node.parent().filter(|p| p.kind() == "statement_list");
+    let alone = block.is_some_and(|b| named(b).count() == 1);
+    let block = block
+        .and_then(|b| b.parent())
+        .filter(|b| b.kind() == "block");
+    let branch = block.and_then(|b| b.parent()).filter(|i| {
+        i.kind() == "if_statement"
+            && i.child_by_field_name("alternative").is_none()
+            && i.child_by_field_name("initializer").is_none()
+            && i.child_by_field_name("consequence") == block
+    });
+    let condition = branch.and_then(|i| i.child_by_field_name("condition"));
+    let Some(condition) = condition.filter(|c| c.kind() == "binary_expression") else {
+        return false;
+    };
+    let (left, right) = (
+        condition.child_by_field_name("left"),
+        condition.child_by_field_name("right"),
+    );
+    let operator = condition.child_by_field_name("operator");
+    let empty = |n: Node| matches!(text(n, src), "\"\"" | "``");
+    let sides = left.zip(right).is_some_and(|(l, r)| {
+        (text(l, src) == name && empty(r)) || (empty(l) && text(r, src) == name)
+    });
+    alone && sides && operator.is_some_and(|o| text(o, src) == "==")
+}
+
+/// Whether the expression `node` names `Getenv` or `LookupEnv` anywhere.
+fn reads_env(node: Node, src: &[u8]) -> bool {
+    // An explicit stack: a crafted expression can nest deeper than the call stack allows.
+    let mut stack = vec![node];
+    while let Some(at) = stack.pop() {
+        if matches!(at.kind(), "identifier" | "field_identifier")
+            && matches!(text(at, src), "Getenv" | "LookupEnv")
+        {
+            return true;
+        }
+        stack.extend(named(at));
+    }
+    false
+}
+
+/// The first result of `os.LookupEnv("X")`, the call `node` as the one value of a `:=` or `var`.
+pub(super) fn lookup_env(
+    node: Node,
+    src: &[u8],
+    std: &Std,
+    scope: &str,
+    depth: usize,
+) -> Option<Value> {
+    let function = node.child_by_field_name("function")?;
+    let os = std.os.as_deref()?;
+    if node.kind() != "call_expression" || callee(function, src) != format!("{os}.LookupEnv") {
+        return None;
+    }
+    let args: Vec<Node> = arguments(node).collect();
+    let again = |n: Node| read(n, (src, std), scope, depth, 1);
+    env_name(&args, again).map(|env| Value::Str(vec![env]))
 }
 
 /// What `http.MethodGet` and the other `net/http` method constants spell.
@@ -341,6 +574,21 @@ mod tests {
             .find(|c| c.callee.ends_with('g'))
             .unwrap();
         call.args[0].clone()
+    }
+
+    #[test]
+    fn trims_of_a_read_nested_past_the_limit_are_no_read() {
+        let imports = "import (\"os\"\n\"strings\")\n";
+        let nested = |n: usize| {
+            let read = format!(
+                "{}os.Getenv(\"X\"){}",
+                "strings.TrimSpace(".repeat(n),
+                ")".repeat(n)
+            );
+            first_arg(&format!("package x\n{imports}func f(){{ g({read}) }}\n"))
+        };
+        assert!(is_env(&nested(10)));
+        assert!(!is_env(&nested(VALUE_DEPTH + 10)));
     }
 
     #[test]

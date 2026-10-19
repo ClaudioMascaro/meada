@@ -348,6 +348,26 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 }
 
+/// `url` with its environment reads made holes when it holds more than one: which variable is
+/// the base is unknown, so none is.
+fn one_read(url: Value) -> Value {
+    let Value::Str(parts) = url else {
+        return url;
+    };
+    let reads = parts.iter().filter(|p| matches!(p, Part::Env(_))).count();
+    let hole = |p: Part| {
+        if matches!(p, Part::Env(_)) {
+            Part::Hole
+        } else {
+            p
+        }
+    };
+    match reads {
+        0 | 1 => Value::Str(parts),
+        _ => Value::Str(parts.into_iter().map(hole).collect()),
+    }
+}
+
 /// Go consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
     if !code.pack().extensions().contains(&"go") {
@@ -382,7 +402,8 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
                     Method::Is(m) => Value::Str(vec![Part::Text(m.to_string())]),
                     Method::Argument(at) => args.get(*at)?.clone(),
                 };
-                fetch(&[based(base.as_deref(), args.get(url)?), method])
+                let url = one_read(based(base.as_deref(), args.get(url)?));
+                fetch(&[url, method])
             };
             for (site, at, read) in code.expand(path, n, &read) {
                 found.push(consumer(site, at, read, None));

@@ -1,0 +1,459 @@
+{
+  "repository": "example.com/xlang-go/api",
+  "files": [
+    {
+      "path": "audit.go",
+      "hash": "95627deebbe33b9198d0b54c5c3defd3cfab00c7c80dcd909e9a4c2d8dded24d"
+    },
+    {
+      "path": "main.go",
+      "hash": "d50254e2ae08a9726a1f799c11bfae4787e48ef074130e4170e0e605b654bc4e"
+    },
+    {
+      "path": "orders.go",
+      "hash": "76dd7d19539d03cecb3d0e451af4bfbef0795d6b318c5f70b57c40e8d0991da2"
+    },
+    {
+      "path": "pricing.go",
+      "hash": "a2bbf5f34439d5cdeba436daf8073be505886ff484bdb7f059a284796a982fb4"
+    },
+    {
+      "path": "stock.go",
+      "hash": "3c55485ff29ba64b7bec97e1bfa576270fc0405501c9a73f335aa0af3358ed68"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/xlang-go/api::audit.go::audit",
+      "span": {
+        "path": "audit.go",
+        "start": 107,
+        "end": 269
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::main.go::main",
+      "span": {
+        "path": "main.go",
+        "start": 33,
+        "end": 88
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::reserve",
+      "span": {
+        "path": "orders.go",
+        "start": 293,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::router",
+      "span": {
+        "path": "orders.go",
+        "start": 33,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::status",
+      "span": {
+        "path": "orders.go",
+        "start": 199,
+        "end": 291
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::priceOf",
+      "span": {
+        "path": "pricing.go",
+        "start": 133,
+        "end": 339
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::promotions",
+      "span": {
+        "path": "pricing.go",
+        "start": 381,
+        "end": 485
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock",
+      "span": {
+        "path": "stock.go",
+        "start": 119,
+        "end": 270
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/xlang-go/api::audit.go::audit::http.Post#0",
+      "caller": "example.com/xlang-go/api::audit.go::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "audit.go",
+        "start": 190,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::audit.go::audit::os.LookupEnv#0",
+      "caller": "example.com/xlang-go/api::audit.go::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "audit.go",
+        "start": 158,
+        "end": 181
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::audit.go::audit::strings.TrimRight#0",
+      "caller": "example.com/xlang-go/api::audit.go::audit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "audit.go",
+        "start": 200,
+        "end": 228
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::main.go::main::http.ListenAndServe#0",
+      "caller": "example.com/xlang-go/api::main.go::main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 48,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::main.go::main::router#0",
+      "caller": "example.com/xlang-go/api::main.go::main",
+      "target": "example.com/xlang-go/api::orders.go::router",
+      "level": "exact",
+      "span": {
+        "path": "main.go",
+        "start": 77,
+        "end": 85
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::reserve::audit#0",
+      "caller": "example.com/xlang-go/api::orders.go::reserve",
+      "target": "example.com/xlang-go/api::audit.go::audit",
+      "level": "exact",
+      "span": {
+        "path": "orders.go",
+        "start": 363,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::reserve::promotions#0",
+      "caller": "example.com/xlang-go/api::orders.go::reserve",
+      "target": "example.com/xlang-go/api::pricing.go::promotions",
+      "level": "exact",
+      "span": {
+        "path": "orders.go",
+        "start": 349,
+        "end": 361
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::router::http.NewServeMux#0",
+      "caller": "example.com/xlang-go/api::orders.go::router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "orders.go",
+        "start": 72,
+        "end": 90
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::router::mux.HandleFunc#0",
+      "caller": "example.com/xlang-go/api::orders.go::router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "orders.go",
+        "start": 92,
+        "end": 134
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::router::mux.HandleFunc#1",
+      "caller": "example.com/xlang-go/api::orders.go::router",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "orders.go",
+        "start": 136,
+        "end": 183
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::status::priceOf#0",
+      "caller": "example.com/xlang-go/api::orders.go::status",
+      "target": "example.com/xlang-go/api::pricing.go::priceOf",
+      "level": "exact",
+      "span": {
+        "path": "orders.go",
+        "start": 254,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::status::r.PathValue#0",
+      "caller": "example.com/xlang-go/api::orders.go::status",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "orders.go",
+        "start": 262,
+        "end": 279
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::orders.go::status::stock#0",
+      "caller": "example.com/xlang-go/api::orders.go::status",
+      "target": "example.com/xlang-go/api::stock.go::stock",
+      "level": "exact",
+      "span": {
+        "path": "orders.go",
+        "start": 282,
+        "end": 289
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::priceOf::http.Get#0",
+      "caller": "example.com/xlang-go/api::pricing.go::priceOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "pricing.go",
+        "start": 275,
+        "end": 337
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::priceOf::os.Getenv#0",
+      "caller": "example.com/xlang-go/api::pricing.go::priceOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "pricing.go",
+        "start": 193,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::priceOf::strings.TrimSuffix#0",
+      "caller": "example.com/xlang-go/api::pricing.go::priceOf",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "pricing.go",
+        "start": 284,
+        "end": 313
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::pricing.go::promotions::http.Get#0",
+      "caller": "example.com/xlang-go/api::pricing.go::promotions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "pricing.go",
+        "start": 433,
+        "end": 483
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::(call_expression).Get#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 228,
+        "end": 256
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::(call_expression).SetBaseURL#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 151,
+        "end": 216
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::client.R#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 228,
+        "end": 238
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::os.Getenv#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 192,
+        "end": 214
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::resty.New#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 151,
+        "end": 162
+      }
+    },
+    {
+      "id": "example.com/xlang-go/api::stock.go::stock::strings.TrimSpace#0",
+      "caller": "example.com/xlang-go/api::stock.go::stock",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "stock.go",
+        "start": 174,
+        "end": 215
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "http::GET::/orders/{}",
+      "site": "example.com/xlang-go/api::orders.go::status"
+    },
+    {
+      "contract": "http::POST::/orders/reserve",
+      "site": "example.com/xlang-go/api::orders.go::reserve"
+    },
+    {
+      "contract": "package::go::example.com/xlang-go/api",
+      "site": "example.com/xlang-go/api::go.mod"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::POST::/api/audit",
+      "site": "example.com/xlang-go/api::audit.go::audit::http.Post#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/prices/{}",
+      "site": "example.com/xlang-go/api::orders.go::status::priceOf#0",
+      "via": "env:WEB_URL"
+    },
+    {
+      "contract": "http::GET::/api/promotions",
+      "site": "example.com/xlang-go/api::pricing.go::promotions::http.Get#0",
+      "via": "host:web.example.com"
+    },
+    {
+      "contract": "http::GET::/api/stock",
+      "site": "example.com/xlang-go/api::stock.go::stock::(call_expression).Get#0",
+      "via": "env:STOCK_URL"
+    }
+  ],
+  "packages": [
+    {
+      "name": "example.com/xlang-go/api",
+      "repository": "example.com/xlang-go/api",
+      "directory": ".",
+      "ecosystem": "go"
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/xlang-go/api::audit.go::audit",
+        "example.com/xlang-go/api::orders.go::reserve",
+        "example.com/xlang-go/api::pricing.go::promotions"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "example.com/xlang-go/api::main.go::main",
+        "example.com/xlang-go/api::orders.go::router"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "example.com/xlang-go/api::orders.go::status",
+        "example.com/xlang-go/api::pricing.go::priceOf",
+        "example.com/xlang-go/api::stock.go::stock"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/xlang-go/api::audit.go::audit::http.Post#0",
+      "provider": "example.com/xlang-go/web::app/api/audit/route.ts::POST",
+      "contract": "http::POST::/api/audit",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/api::orders.go::status::priceOf#0",
+      "provider": "example.com/xlang-go/web::app/api/prices/[sku]/route.ts::GET",
+      "contract": "http::GET::/api/prices/{}",
+      "level": "inferred",
+      "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/api::pricing.go::promotions::http.Get#0",
+      "provider": "example.com/xlang-go/web::app/api/promotions/route.ts::GET",
+      "contract": "http::GET::/api/promotions",
+      "level": "exact",
+      "reason": "host web.example.com is served by example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/api::stock.go::stock::(call_expression).Get#0",
+      "provider": "example.com/xlang-go/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from STOCK_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/web::src/orders.ts::reserveOrder::fetch#0",
+      "provider": "example.com/xlang-go/api::orders.go::reserve",
+      "contract": "http::POST::/orders/reserve",
+      "level": "exact",
+      "reason": "host api.example.com is served by example.com/xlang-go/api"
+    },
+    {
+      "consumer": "example.com/xlang-go/web::src/sync.ts::syncOrders::orderStatus#0",
+      "provider": "example.com/xlang-go/api::orders.go::status",
+      "contract": "http::GET::/orders/{}",
+      "level": "inferred",
+      "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-go/api"
+    }
+  ]
+}

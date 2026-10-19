@@ -87,6 +87,26 @@ pub fn xlang_rust(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
+/// The cross-language fixture of the Go pack (spec #25) as siblings in one case directory: the
+/// TypeScript web app and the Go api service (net/http and resty), which call each other. A
+/// repository of another language that calls or serves the Go api is added the same way: one
+/// more `fixture_repo` of a fixture named `xlang-go-<role>`, with the `meada.toml` keys of the
+/// others.
+pub fn xlang_go(case: &str) -> (PathBuf, PathBuf) {
+    (
+        fixture_repo(
+            case,
+            "xlang-go-web",
+            Some("https://example.com/xlang-go/web.git"),
+        ),
+        fixture_repo(
+            case,
+            "xlang-go-api",
+            Some("git@example.com:xlang-go/api.git"),
+        ),
+    )
+}
+
 /// The chain with two loose ends added to the catalog's `meada.toml`: a bucket only the
 /// catalog declares, and a write of `orders` through a symbol it does not have. Returns the
 /// gateway, whose workspace holds all four repositories.

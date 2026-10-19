@@ -1,0 +1,14 @@
+example.com/xlang-go/web src/sync.ts:3 syncOrders
+  example.com/xlang-go/web src/orders.ts:4 orderStatus
+  →[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-go/api] example.com/xlang-go/api orders.go:12 status
+    example.com/xlang-go/api pricing.go:10 priceOf
+    →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web] example.com/xlang-go/web app/api/prices/[sku]/route.ts:1 GET
+    example.com/xlang-go/api stock.go:11 stock
+      →[inferred: base URL from STOCK_URL, a base_url_env of peer example.com/xlang-go/web] example.com/xlang-go/web app/api/stock/route.ts:1 GET
+  example.com/xlang-go/web src/orders.ts:9 reserveOrder
+    →[exact: host api.example.com is served by example.com/xlang-go/api] example.com/xlang-go/api orders.go:17 reserve
+      example.com/xlang-go/api pricing.go:19 promotions
+        →[exact: host web.example.com is served by example.com/xlang-go/web] example.com/xlang-go/web app/api/promotions/route.ts:1 GET
+      example.com/xlang-go/api audit.go:10 audit
+        →[inferred: base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web] example.com/xlang-go/web app/api/audit/route.ts:1 POST
+chain: inferred · 6 hops · 2 repos · 314 tokens

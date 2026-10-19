@@ -113,8 +113,9 @@ struct Walk<'s> {
     /// The plain names a statement of a function's own block binds to one value (`r :=
     /// gin.Default()`), by scope: constants when nothing else binds or assigns the name.
     held: Vec<(String, String, Value)>,
-    /// The names assigned again, with the scope the assignment is written in.
-    assigned: Vec<(String, String)>,
+    /// The names assigned again, with the scope the assignment is written in and whether the
+    /// assignment keeps an environment read (`keeps_env`): a name bound to one stays that read.
+    assigned: Vec<(String, String, bool)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
     /// The standard-library packages whose calls and constants the values fold.
@@ -195,7 +196,7 @@ impl Walk<'_> {
 
     /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
     /// a selector, which any package may write (`config.Base = ..`).
-    fn write(&mut self, scope: &str, targets: &[Node]) {
+    fn write(&mut self, scope: &str, targets: &[Node], keeps_env: bool) {
         for target in targets {
             let name = match target.kind() {
                 "identifier" => text(*target, self.src),
@@ -208,7 +209,8 @@ impl Walk<'_> {
                 }
                 _ => continue,
             };
-            self.assigned.push((scope.to_string(), name.to_string()));
+            let name = name.to_string();
+            self.assigned.push((scope.to_string(), name, keeps_env));
         }
     }
 
@@ -220,7 +222,13 @@ impl Walk<'_> {
         // The names assigned that no scope of the file binds: a variable another file of the
         // package declares.
         let mut elsewhere = BTreeSet::new();
-        for (scope, name) in std::mem::take(&mut self.assigned) {
+        // The names bound to an environment read: an assignment that keeps the read leaves them
+        // constants.
+        let env: HashSet<String> = (self.held.iter())
+            .filter(|(_, _, value)| values::is_env(value))
+            .map(|(scope, name, _)| qualify(scope, name))
+            .collect();
+        for (scope, name, keeps_env) in std::mem::take(&mut self.assigned) {
             let mut at = scope.as_str();
             // The binding the name refers to: the innermost scope that binds it.
             let found = loop {
@@ -233,6 +241,7 @@ impl Walk<'_> {
                 at = crate::parent(at);
             };
             match found {
+                Some(found) if keeps_env && env.contains(&found) => {}
                 Some(found) => _ = assigned.insert(found),
                 None if name != "_" => _ = elsewhere.insert(name),
                 None => {}
@@ -374,12 +383,14 @@ impl Walk<'_> {
                 "assignment_statement" | "range_clause" | "receive_statement" => {
                     if let Some(left) = node.child_by_field_name("left") {
                         let targets: Vec<Node> = named(left).chain([left]).collect();
-                        self.write(scope, &targets);
+                        let keeps = node.kind() == "assignment_statement"
+                            && values::keeps_env(node, src, &self.std);
+                        self.write(scope, &targets, keeps);
                     }
                 }
                 "inc_statement" | "dec_statement" => {
                     let targets: Vec<Node> = named(node).collect();
-                    self.write(scope, &targets);
+                    self.write(scope, &targets, false);
                 }
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
@@ -405,7 +416,7 @@ impl Walk<'_> {
                     if let (Some(operand), Some(address)) = (operand, address)
                         && text(address, src) == "&"
                     {
-                        self.write(scope, &[operand]);
+                        self.write(scope, &[operand], false);
                     }
                 }
                 "type_switch_statement" => {
@@ -534,12 +545,23 @@ impl Walk<'_> {
                 _ => vec![r],
             })
             .collect();
-        if let ([name], [value]) = (&left[..], &right[..])
+        // `v, ok := os.LookupEnv("X")`: the first result is the read, the other the name `ok`.
+        let lookup = match (&left[..], &right[..]) {
+            ([name, _], [call]) => {
+                values::lookup_env(*call, src, &self.std, scope, depth).map(|value| (name, value))
+            }
+            _ => None,
+        };
+        let one = match (&left[..], &right[..]) {
+            ([name], [value]) => Some((name, values::value(*value, src, &self.std, scope, depth))),
+            _ => None,
+        };
+        if let Some((name, value)) = lookup.or(one)
             && name.kind() == "identifier"
             && text(*name, src) != "_"
         {
-            let value = values::value(*value, src, &self.std, scope, depth);
             let name = text(*name, src).to_string();
+            self.std.note(scope, &name, &value);
             self.held.push((scope.to_string(), name, value));
         }
     }
@@ -1047,6 +1069,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         if node.kind() == "var_declaration" {
                             walk.vars.insert(name.to_string());
                         }
+                        walk.std.note("", name, &value);
                         walk.facts.consts.push(Const {
                             name: name.to_string(),
                             value,
