@@ -969,7 +969,8 @@ one for the area a change touches.
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
   nothing mounts.
 - Rust values (`lang/rust/values.rs`, `lang/rust/builders.rs`, spec #30 #131): `BUILDER_BUDGET`
-  (2^20 syntax nodes per file, over every `let mut`), `BUILDER_DEPTH` (64 builders read within
+  (2^20 syntax nodes per file, over every `let mut`, block by block in the order the blocks
+  open), `BUILDER_DEPTH` (64 builders read within
   one another), `BUILDER_SIZE` (4096, bytes of text plus parts) and `BUILDER_WORK` (2^22 size
   units per file, over every prefix folded and every read): a `let mut` String past the budget
   is unknown, and one read past the depth, the size or the work is a hole (`push_str(&s)` of
@@ -979,7 +980,10 @@ one for the area a change touches.
   (a statement `#[cfg]` leaves out, decided where the block is read, is not there); a push in
   a branch or a loop, `&mut s`, `write!(s, ..)`, an index or deref use (`s[..]`, `*s`), another
   binding of the name, a method that changes it (`insert`, `clear`) or a second builder of
-  that name in the scope leave it unknown. `format!` and `concat!` read
+  that name in the scope leave it unknown. A builder takes the statements after its `let` from
+  the one read of the block in `parse`, and its walk asks for no parent or sibling (each lookup
+  walks down from the root of the tree), so every node the budget counts costs the same at any
+  depth. `format!` and `concat!` read
   a literal format string and arguments that are a literal or a plain name; a spec such as
   `{:.*}` or `{:1$}`, a count that does not match or a `{`/`}` left alone are unknown; a macro
   of another name or one the file defines (`macro_rules!`, in this file only) is not read.
