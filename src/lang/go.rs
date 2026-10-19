@@ -337,6 +337,18 @@ impl Walk<'_> {
                         self.hold(scope, &names(node), right, depth);
                     }
                 }
+                // `&p`: the name may be written through the pointer, so it holds no one value.
+                "unary_expression" => {
+                    let operand = node.child_by_field_name("operand");
+                    let address = node.child_by_field_name("operator");
+                    if let (Some(operand), Some(address)) = (operand, address)
+                        && text(address, src) == "&"
+                        && operand.kind() == "identifier"
+                    {
+                        self.assigned
+                            .push((scope.to_string(), text(operand, src).to_string()));
+                    }
+                }
                 "type_switch_statement" => {
                     if let Some(alias) = node.child_by_field_name("alias") {
                         self.bind(scope, alias);
@@ -1110,6 +1122,8 @@ mod tests {
             "r := mk(); r = other()",
             "r := mk(); func() { r = other() }()",
             "r := mk(); for r = range xs {}",
+            "r := mk(); keep(&r)",
+            "r := mk(); func() { keep(&r) }()",
             "r := mk(); { r := other(); _ = r }",
             "r := mk(); if r := other(); r != nil {}",
             "if r := mk(); r != nil {}",

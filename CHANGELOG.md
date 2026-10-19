@@ -30,13 +30,18 @@ All notable changes to Meada are recorded here. The format follows
   is rebuilt once (new schema version).
 
 - Go HTTP providers (spec #25): `net/http` (`HandleFunc` and `Handle` on the package or a
-  `ServeMux`, Go 1.22 `METHOD host/path` patterns with the host dropped, `StripPrefix` mounts),
+  `ServeMux`, Go 1.22 `METHOD host/path` patterns with the host dropped, a mux given as the
+  handler of another under that pattern),
   gin (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `Handle`, `Any` on the engine
-  or a `Group`) and echo (the same, minus `Handle`). A path's `{id}`, `{id:[0-9]+}`, `:id` and
-  `*path` are one parameter segment; a route of every method is `http::ANY::<path>`. A router is
+  or a `Group`) and echo (the same, minus `Handle`). A path's `{id}` and `{id:[0-9]+}` are one
+  parameter segment, and for gin and echo `:id` and `*path` too (`net/http` reads `{name}`,
+  `{name...}` and `{$}` alone); a route of every method is `http::ANY::<path>`. A router is
   followed through assignments, arguments, return values and imports, so a function registering
   on the group it receives serves its routes under every prefix its callers give it; a prefix,
-  path or mount Meada cannot read serves nothing. A function literal is the route's inline
+  path or mount Meada cannot read serves nothing: a `ServeMux` reached only as an argument of a
+  call (`http.StripPrefix`, `echo.WrapHandler`, `gin.WrapH`, a middleware) is an unread mount.
+  A mux given as a handler sees the whole path, so its routes are served where they fall under
+  the outer pattern and for its method. A function literal is the route's inline
   handler. The Go pack now reads what a call is given, what a function returns and what a `:=`
   holds. The index is rebuilt once (new schema version).
 

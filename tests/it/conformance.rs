@@ -2646,17 +2646,22 @@ fn go() {
             "web/echo.go::EchoDynamic",
             "web/echo.go::EchoRoutes",
             "web/echo.go::EchoRoutes.DELETE /api/items/{}",
+            "web/echo.go::EchoWrapped",
             "web/echo.go::Item",
             "web/echo.go::RegisterBilling",
             "web/echo.go::Wide",
+            "web/echo.go::Wide2",
             "web/gin.go::Audit",
             "web/gin.go::GinCaptured",
+            "web/gin.go::GinEscaped",
             "web/gin.go::GinHidden",
             "web/gin.go::GinReassigned",
             "web/gin.go::GinRoutes",
             "web/gin.go::GinRoutes.DELETE /v1/users/{}",
             "web/gin.go::GinShadow",
+            "web/gin.go::GinWrapped",
             "web/gin.go::Hidden",
+            "web/gin.go::Hidden2",
             "web/gin.go::Mid",
             "web/gin.go::Operations",
             "web/gin.go::RegisterAudit",
@@ -2665,6 +2670,7 @@ fn go() {
             "web/gin.go::Show",
             "web/gin.go::Status",
             "web/gin.go::other",
+            "web/gin.go::setPath",
             "web/stdlib.go::CreateUser",
             "web/stdlib.go::Default",
             "web/stdlib.go::Echo",
@@ -2675,12 +2681,19 @@ fn go() {
             "web/stdlib.go::Home",
             "web/stdlib.go::Hosted",
             "web/stdlib.go::Ledger",
+            "web/stdlib.go::Literals",
             "web/stdlib.go::Mounted",
             "web/stdlib.go::Mux",
             "web/stdlib.go::Mux.DELETE /users/{}",
             "web/stdlib.go::Ping",
             "web/stdlib.go::Register",
+            "web/stdlib.go::Server",
+            "web/stdlib.go::Server.Routes",
             "web/stdlib.go::Stats",
+            "web/stdlib.go::Wrapped",
+            "web/stdlib.go::newAPI",
+            "web/stdlib.go::newGuarded",
+            "web/stdlib.go::newStripped",
             "worker/jobs/jobs.go::Run",
             "worker/main.go::main",
         ],
@@ -3124,10 +3137,23 @@ fn go_routes_are_providers_under_every_prefix() {
             "web/stdlib.go::Mux.DELETE /users/{}",
         ),
         ("http::GET::/ping", "web/stdlib.go::Ping"),
-        // A mux mounted through `StripPrefix`, and one given as the handler; the one a wrapper
-        // holds is served nowhere.
-        ("http::GET::/admin/stats", "web/stdlib.go::Stats"),
+        // A mux given as the handler sees the whole path: its routes are served where they fall
+        // under the outer pattern and for the outer method alone (`POST /a2` is outside `/sub/`,
+        // `POST /static/b` is not `GET`, `/exact/deeper` is below an exact pattern).
         ("http::GET::/plain/ledger", "web/stdlib.go::Ledger"),
+        ("http::GET::/sub/a1", "web/stdlib.go::Ledger"),
+        ("http::ANY::/sub/any", "web/stdlib.go::Ledger"),
+        ("http::GET::/static/a", "web/stdlib.go::Ledger"),
+        ("http::ANY::/exact", "web/stdlib.go::Ledger"),
+        // A mux a function returns is followed to where it is mounted. One inside
+        // `StripPrefix`, a middleware, `echo.WrapHandler` or `gin.WrapH`, or mounted on a router
+        // held in a field, is an unread mount: served nowhere (and no route for the call).
+        ("http::GET::/returned/k1", "web/stdlib.go::Ledger"),
+        // `net/http` has no `:name`; its `*` is a literal.
+        ("http::ANY::/star/*", "web/stdlib.go::Stats"),
+        // The route of the wrapper call is still read; its handler is not a function.
+        ("http::ANY::/legacy/{}", "web/echo.go"),
+        ("http::ANY::/legacy/{}", "web/gin.go"),
         // gin: nested groups, every method, `Handle`, `Any`, the last of several handlers and a
         // group made in a chain.
         ("http::GET::/v1/users/{}", "web/gin.go::Show"),

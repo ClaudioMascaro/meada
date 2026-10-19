@@ -94,3 +94,23 @@ func GinCaptured() {
 }
 
 func other() *g.Engine { return nil }
+
+// A mux inside `gin.WrapH` is mounted where Meada does not read.
+func GinWrapped() {
+	r := g.Default()
+	legacy := http.NewServeMux()
+	legacy.HandleFunc("GET /c2", Hidden2)
+	r.Any("/legacy/*rest", g.WrapH(http.StripPrefix("/legacy", legacy)))
+}
+
+func Hidden2(w http.ResponseWriter, r *http.Request) {}
+
+// A name whose address is taken may be written through the pointer.
+func GinEscaped() {
+	p := "/escaped"
+	setPath(&p)
+	r := g.Default()
+	r.GET(p, Show)
+}
+
+func setPath(p *string) { *p = "/other" }

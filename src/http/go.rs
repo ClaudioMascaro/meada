@@ -3,19 +3,22 @@
 //! (`r.Group("/v1")`), followed through assignments, arguments and return values
 //! (`Code::origins`); a route is a call of one of the router's methods on it. Where a route is
 //! served follows the mounts: a group is mounted on the router it is made on under its prefix, a
-//! `ServeMux` on the mux it is given to (`Handle(pattern, mux)`, or `StripPrefix(prefix, mux)`
-//! for a prefix), and `Code::origins` reads every router that reaches the receiver, so a
-//! function registering on the router it receives serves it under every prefix its callers
-//! give it. A mount Meada does not read serves nothing.
+//! `ServeMux` on the mux it is given to (`Handle(pattern, mux)`, where it keeps its own paths,
+//! served for the pattern's subtree and method alone), and `Code::origins` reads every router
+//! that reaches the receiver, so a function registering on the router it receives serves it
+//! under every prefix its callers give it. A mount Meada does not read serves nothing: a mux
+//! inside any other call (`http.StripPrefix`, `echo.WrapHandler`, a middleware) is one.
 //!
 //! The routers are the rows of `ROUTERS`: a package, what makes its routers, the method that
 //! makes a group, and the methods that register a route. Another router package is another row.
 
 use super::rust::actix_path;
 use super::{
-    ANY, CallAt, Mounts, PARAM, handler_site, join, normalize_path, path_literal, prefixes,
-    provider,
+    ANY, CallAt, Mounts, PARAM, PREFIX_DEPTH, PREFIX_WORK, handler_site, join, normalize_path,
+    path_literal, prefixes, provider,
 };
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::contract::Found;
 use crate::lang::{Call, Value, literal};
 use crate::resolve::Code;
@@ -53,6 +56,9 @@ struct Router {
     /// The methods that register a route, with the methods each serves.
     routes: &'static [(&'static str, Serves)],
     handler: Handler,
+    /// Whether `:name` and `*rest` segments are parameters (gin, echo). In `net/http` they are
+    /// literal, and only `{name}`, `{name...}` and `{$}` are not.
+    colon: bool,
     /// Whether the package has a router of its own that its functions register on
     /// (`http.HandleFunc`), and the mux it is served under no prefix.
     default: bool,
@@ -77,6 +83,7 @@ const ROUTERS: &[Router] = &[
         group: None,
         routes: &[("Handle", Serves::Pattern), ("HandleFunc", Serves::Pattern)],
         handler: Handler::Next,
+        colon: false,
         default: true,
     },
     Router {
@@ -85,6 +92,7 @@ const ROUTERS: &[Router] = &[
         group: Some("Group"),
         routes: GIN_ROUTES,
         handler: Handler::Last,
+        colon: true,
         default: false,
     },
     Router {
@@ -103,6 +111,7 @@ const ROUTERS: &[Router] = &[
             ("Any", Serves::Any),
         ],
         handler: Handler::Next,
+        colon: true,
         default: false,
     },
 ];
@@ -146,9 +155,10 @@ fn split(external: &str) -> Option<(&str, &str)> {
 }
 
 /// `path` as the segments of a path: each `{name}`, `{name:regex}` and `{rest...}` a parameter,
-/// the `{$}` that ends a pattern gone, and each `*rest` segment of gin and echo a parameter;
-/// `None` when a brace is not closed or `{$}` is not the end.
-fn go_path(path: &str) -> Option<String> {
+/// the `{$}` that ends a pattern gone, and, when `colon` (gin and echo), each `*rest` segment a
+/// parameter and each `:name` one; `None` when a brace is not closed, `{$}` is not the end, or a
+/// `:name` segment of `net/http` is a literal that no contract can spell.
+fn go_path(path: &str, colon: bool) -> Option<String> {
     let path = path
         .strip_suffix("{$}")
         .filter(|p| p.ends_with('/'))
@@ -157,15 +167,63 @@ fn go_path(path: &str) -> Option<String> {
         return None;
     }
     let path = actix_path(path)?;
-    let segments = path
-        .split('/')
-        .map(|s| if s.starts_with('*') { PARAM } else { s });
+    // ponytail: a literal `:name` segment of `net/http` would read as a parameter in a contract
+    // (`normalize_path`), so the route yields no provider.
+    if !colon && path.split('/').any(|s| s.starts_with(':')) {
+        return None;
+    }
+    let segments = path.split('/').map(|s| {
+        if colon && s.starts_with('*') {
+            PARAM
+        } else {
+            s
+        }
+    });
     Some(segments.collect::<Vec<_>>().join("/"))
 }
 
-/// The method and the path of a `net/http` pattern, `[METHOD ][HOST]/[PATH]`: the host is
-/// dropped, and the method is `None` for a pattern without one.
-fn pattern(pattern: &str) -> Option<(Option<String>, String)> {
+/// A `net/http` pattern, `[METHOD ][HOST]/[PATH]`: the host is dropped.
+#[derive(Clone)]
+struct Pattern {
+    /// `None` for a pattern without a method: every method.
+    method: Option<String>,
+    /// The path, normalized.
+    path: String,
+    /// Whether the path ends in `/` or `{name...}`: it holds everything below it.
+    subtree: bool,
+}
+
+impl Pattern {
+    /// Whether a route of a mux the pattern mounts, at `route` (normalized), is reached: a mux
+    /// sees the whole path, so the route must fall under the pattern.
+    fn holds(&self, route: &str) -> bool {
+        let segments = |p: &str| -> Vec<String> {
+            p.split('/')
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect()
+        };
+        let (outer, inner) = (segments(&self.path), segments(route));
+        let fits = outer.iter().zip(&inner).all(|(o, i)| o == i || o == PARAM);
+        fits && match self.subtree {
+            true => inner.len() >= outer.len(),
+            false => inner.len() == outer.len(),
+        }
+    }
+
+    /// The method a route of `method` is served for through the pattern: the pattern's own, when
+    /// the route has none or the same.
+    fn serves(&self, method: Option<&str>) -> Option<Option<String>> {
+        match (&self.method, method) {
+            (Some(m), Some(r)) if m != r => None,
+            (Some(m), _) => Some(Some(m.clone())),
+            (None, r) => Some(r.map(str::to_string)),
+        }
+    }
+}
+
+/// The pattern `pattern` of `net/http`, `None` when its method or its path cannot be read.
+fn pattern(pattern: &str) -> Option<Pattern> {
     let (method, rest) = match pattern.split_once([' ', '\t']) {
         Some((method, rest)) => (Some(method), rest.trim_start_matches([' ', '\t'])),
         None => (None, pattern),
@@ -174,7 +232,11 @@ fn pattern(pattern: &str) -> Option<(Option<String>, String)> {
         return None;
     }
     let path = &rest[rest.find('/')?..];
-    Some((method.map(str::to_string), go_path(path)?))
+    Some(Pattern {
+        method: method.map(str::to_string),
+        path: normalize_path(&go_path(path, false)?),
+        subtree: path.ends_with('/') && !path.ends_with("{$}") || path.ends_with("...}"),
+    })
 }
 
 /// `net/http`, the router whose mux a mount is read for.
@@ -182,7 +244,11 @@ const STDLIB: &Router = &ROUTERS[0];
 
 struct Go<'c, 'a> {
     code: &'c Code<'a>,
+    /// The groups of gin and echo under their prefixes.
     mounts: Mounts<'a, Place<'a>>,
+    /// The `ServeMux`es given as a handler, with the router and the pattern each is given
+    /// under. A mux with an empty list, or only unreadable patterns, is served nowhere.
+    patterns: BTreeMap<Place<'a>, Vec<(Place<'a>, Option<Pattern>)>>,
 }
 
 impl<'c, 'a> Go<'c, 'a> {
@@ -213,43 +279,84 @@ impl<'c, 'a> Go<'c, 'a> {
         origins.into_iter().map(Place::Made).collect()
     }
 
-    /// Mounts the `ServeMux`es that `value`, the handler of a call written in `scope` of
-    /// `path`, holds on `parents`: a mux itself is served under `prefix`, one inside
-    /// `StripPrefix(p, ..)` under `p` more. A mux inside any other call is mounted where Meada
-    /// cannot read: it has no parent, so it is served nowhere. Whether it found a mux.
+    /// The `ServeMux`es `value`, written in `scope` of `path`, may be.
+    fn muxes(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
+        let places = self.places(path, scope, value).into_iter();
+        let muxes = places.filter(|p| matches!(p, Place::Made(at) if self.makes(STDLIB, *at)));
+        muxes.collect()
+    }
+
+    /// Mounts the `ServeMux`es that `value`, the handler of a call written in `scope` of `path`,
+    /// holds on `parents` under `outer`. A mux inside a call (`http.StripPrefix`,
+    /// `echo.WrapHandler`, a middleware) is mounted where Meada does not read (`unread`). Whether
+    /// it found a mux.
     fn mount(
         &mut self,
-        (path, scope): (&'a str, &'a str),
+        at: (&'a str, &'a str),
         value: &'a Value,
         parents: &[Place<'a>],
-        prefix: Option<String>,
+        outer: Option<Pattern>,
     ) -> bool {
-        if let Value::Call(call) = value {
-            let stripped = self.external(path, scope, &call.callee);
-            let stripped = stripped.as_deref().and_then(split) == Some(("net/http", "StripPrefix"));
-            if let (true, [given, inner]) = (stripped, &call.args[..]) {
-                let given = path_literal(self.code.value(path, scope, given));
-                let prefix = match (prefix, given.and_then(|p| go_path(&p))) {
-                    (Some(above), Some(given)) => Some(join(&above, &given)),
-                    _ => None,
-                };
-                return self.mount((path, scope), inner, parents, prefix);
-            }
-            let mut found = false;
-            for arg in &call.args {
-                found |= self.mount((path, scope), arg, &[], None);
-            }
-            return found;
-        }
-        let places = self.places(path, scope, value).into_iter();
-        let muxes: Vec<Place> = places
-            .filter(|p| matches!(p, Place::Made(at) if self.makes(STDLIB, *at)))
-            .collect();
+        let muxes = self.muxes(at.0, at.1, value);
         for mux in &muxes {
-            let mounted = self.mounts.entry(*mux).or_default();
-            mounted.extend(parents.iter().map(|&p| (p, prefix.clone())));
+            let mounted = self.patterns.entry(*mux).or_default();
+            mounted.extend(parents.iter().map(|&p| (p, outer.clone())));
         }
-        !muxes.is_empty()
+        !muxes.is_empty() || self.unread(at, value)
+    }
+
+    /// Marks the `ServeMux`es `value` holds as mounted where Meada cannot read: they are served
+    /// nowhere. Whether it found a mux.
+    fn unread(&mut self, (path, scope): (&'a str, &'a str), value: &'a Value) -> bool {
+        let muxes = self.muxes(path, scope, value);
+        for mux in &muxes {
+            self.patterns.entry(*mux).or_default();
+        }
+        let mut found = !muxes.is_empty();
+        if let Value::Call(call) = value {
+            for arg in &call.args {
+                found |= self.unread((path, scope), arg);
+            }
+        }
+        found
+    }
+
+    /// The patterns a route registered on the mux `at` is reached through, one list for each way
+    /// the mux is served: none when it is mounted nowhere Meada reads, or too deep.
+    fn chains(
+        &self,
+        at: Place<'a>,
+        seen: &mut Vec<Place<'a>>,
+        work: &mut usize,
+    ) -> Option<Vec<Vec<&Pattern>>> {
+        let Place::Made(made) = at else {
+            return Some(vec![Vec::new()]);
+        };
+        if !self.makes(STDLIB, made) {
+            return Some(Vec::new());
+        }
+        let Some(parents) = self.patterns.get(&at) else {
+            return Some(vec![Vec::new()]);
+        };
+        // A mux mounted inside itself, through any depth, adds nothing.
+        if seen.contains(&at) {
+            return Some(Vec::new());
+        }
+        if seen.len() >= PREFIX_DEPTH {
+            return None;
+        }
+        seen.push(at);
+        let mut out = Vec::new();
+        for (parent, outer) in parents {
+            *work = work.checked_sub(1)?;
+            let Some(outer) = outer else { continue };
+            for mut chain in self.chains(*parent, seen, work)? {
+                chain.push(outer);
+                out.push(chain);
+            }
+        }
+        seen.pop();
+        Some(out)
     }
 
     /// The method a `Handle(method, ..)` call names: a string, or a constant of `net/http`
@@ -314,20 +421,35 @@ impl<'c, 'a> Go<'c, 'a> {
                 Place::Default => router.default.then(String::new),
                 Place::Made(at) => self.makes(router, at).then(String::new),
             };
-            let prefixes = prefixes(at, &self.mounts, &root, &mut Vec::new());
-            if prefixes.is_empty() {
+            // A mux sees the whole path of the muxes it is given to; the others add prefixes.
+            let (mut work, stdlib) = (PREFIX_WORK, std::ptr::eq(router, STDLIB));
+            let chains = match stdlib {
+                true => self
+                    .chains(at, &mut Vec::new(), &mut work)
+                    .unwrap_or_default(),
+                false => Vec::new(),
+            };
+            let prefixes = match stdlib {
+                true => Vec::new(),
+                false => prefixes(at, &self.mounts, &root, &mut Vec::new()),
+            };
+            if prefixes.is_empty() && chains.is_empty() {
                 continue;
             }
             // The method (`None`: every method), the path, and the position of the path.
             let (method, route, at) = match serves {
-                Serves::Method(m) => (Some(m.to_string()), read(0).and_then(|p| go_path(&p)), 0),
-                Serves::Any => (None, read(0).and_then(|p| go_path(&p)), 0),
+                Serves::Method(m) => (
+                    Some(m.to_string()),
+                    read(0).and_then(|p| go_path(&p, router.colon)),
+                    0,
+                ),
+                Serves::Any => (None, read(0).and_then(|p| go_path(&p, router.colon)), 0),
                 Serves::Given => match self.method(path, call) {
-                    Some(m) => (Some(m), read(1).and_then(|p| go_path(&p)), 1),
+                    Some(m) => (Some(m), read(1).and_then(|p| go_path(&p, router.colon)), 1),
                     None => continue,
                 },
                 Serves::Pattern => match read(0).and_then(|p| pattern(&p)) {
-                    Some((method, route)) => (method, Some(route), 0),
+                    Some(p) => (p.method, Some(p.path), 0),
                     None => continue,
                 },
             };
@@ -339,9 +461,23 @@ impl<'c, 'a> Go<'c, 'a> {
             };
             let Some(handler) = handler else { continue };
             let handler = self.unwrapped(path, scope, handler);
-            let method = method.unwrap_or_else(|| ANY.to_string());
+            // The method (`None`: every method) and the path of each way the route is served.
+            let route = normalize_path(&route);
+            let mut served = BTreeSet::new();
+            for chain in &chains {
+                let method = (chain.iter()).try_fold(method.clone(), |m, outer| {
+                    outer
+                        .holds(&route)
+                        .then(|| outer.serves(m.as_deref()))
+                        .flatten()
+                });
+                served.extend(method.map(|m| (m, route.clone())));
+            }
             for prefix in prefixes {
-                let full = normalize_path(&join(&prefix, &route));
+                served.insert((method.clone(), normalize_path(&join(&prefix, &route))));
+            }
+            for (method, full) in served {
+                let method = method.unwrap_or_else(|| ANY.to_string());
                 let site = handler_site(code, path, scope, Some(handler), &method, &full);
                 out.push(provider(site, format!("http::{method}::{full}")));
             }
@@ -357,6 +493,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut go = Go {
         code,
         mounts: Mounts::new(),
+        patterns: BTreeMap::new(),
     };
     let mut registrations = Vec::new();
     for (&path, facts) in code.files() {
@@ -392,21 +529,26 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             if groups && !package_call {
                 let prefix = (call.args.first())
                     .and_then(|p| path_literal(code.value(path, &call.scope, p)))
-                    .and_then(|p| go_path(&p));
+                    .and_then(|p| go_path(&p, true));
                 let mounted = go.mounts.entry(Place::Made((path, n))).or_default();
                 mounted.extend(parents.iter().map(|&p| (p, prefix.clone())));
             }
             if !routes {
                 continue;
             }
-            // A mux given as the handler is mounted; what is no mux is a route.
-            let mounts = member == "Handle" && !parents.is_empty();
-            let mounts = match (mounts, &call.args[..]) {
-                (true, [_, handler]) => {
-                    go.mount((path, &call.scope), handler, &parents, Some(String::new()))
+            // A mux given as the handler is mounted under the pattern, whatever router it is
+            // given to; a mux held by any other argument is an unread mount. What holds no mux
+            // is a route.
+            let at = (path, call.scope.as_str());
+            let mut mounts = false;
+            for (i, arg) in call.args.iter().enumerate() {
+                if member == "Handle" && call.args.len() == 2 && i == 1 {
+                    let outer = path_literal(code.value(path, at.1, &call.args[0]));
+                    mounts = go.mount(at, arg, &parents, outer.and_then(|p| pattern(&p)));
+                } else {
+                    go.unread(at, arg);
                 }
-                _ => false,
-            };
+            }
             if !mounts {
                 let at = parents.iter().copied();
                 registrations.extend(at.map(|at| Registration {
@@ -436,6 +578,7 @@ mod tests {
 
     #[test]
     fn a_path_has_each_parameter_spelling_as_one_segment() {
+        // gin and echo: `{..}` as the pattern of `net/http`, `:name` and `*rest` too.
         let cases = [
             ("/users/{id}", "/users/{}"),
             ("/users/{id:[0-9]+}", "/users/{}"),
@@ -450,35 +593,62 @@ mod tests {
             ("", "/"),
         ];
         for (written, normalized) in cases {
-            let path = go_path(written).map(|p| normalize_path(&p));
+            let path = go_path(written, true).map(|p| normalize_path(&p));
             assert_eq!(path.as_deref(), Some(normalized), "{written}");
         }
         for unreadable in ["/{id", "/id}", "/{a{b}", "/a/{$}/b", "{$}"] {
-            assert_eq!(go_path(unreadable), None, "{unreadable}");
+            assert_eq!(go_path(unreadable, true), None, "{unreadable}");
         }
+    }
+
+    #[test]
+    fn net_http_reads_only_braces_as_parameters() {
+        let read = |written: &str| go_path(written, false).map(|p| normalize_path(&p));
+        assert_eq!(read("/users/{id}").as_deref(), Some("/users/{}"));
+        assert_eq!(read("/files/{path...}").as_deref(), Some("/files/{}"));
+        // `*` is a literal there, and a `:name` segment one a contract cannot spell.
+        assert_eq!(read("/static/*").as_deref(), Some("/static/*"));
+        assert_eq!(read("/users/:id"), None);
     }
 
     #[test]
     fn a_pattern_has_a_method_and_loses_its_host() {
         let cases = [
-            ("/users", None, "/users"),
-            ("GET /users/{id}", Some("GET"), "/users/{}"),
-            ("POST   /users", Some("POST"), "/users"),
-            ("example.com/users", None, "/users"),
-            ("DELETE example.com/users/", Some("DELETE"), "/users"),
-            ("GET /{$}", Some("GET"), "/"),
-            ("/static/", None, "/static"),
+            ("/users", None, "/users", false),
+            ("GET /users/{id}", Some("GET"), "/users/{}", false),
+            ("POST   /users", Some("POST"), "/users", false),
+            ("example.com/users", None, "/users", false),
+            ("DELETE example.com/users/", Some("DELETE"), "/users", true),
+            ("GET /{$}", Some("GET"), "/", false),
+            ("/static/", None, "/static", true),
+            ("/files/{path...}", None, "/files/{}", true),
         ];
-        for (written, method, path) in cases {
-            let read = pattern(written).map(|(m, p)| (m, normalize_path(&p)));
-            assert_eq!(
-                read,
-                Some((method.map(str::to_string), path.to_string())),
-                "{written}"
-            );
+        for (written, method, path, subtree) in cases {
+            let read = pattern(written).map(|p| (p.method, p.path, p.subtree));
+            let expected = (method.map(str::to_string), path.to_string(), subtree);
+            assert_eq!(read, Some(expected), "{written}");
         }
         for unreadable in ["get /users", "GET users", "GET /{id", "example.com", ""] {
-            assert_eq!(pattern(unreadable), None, "{unreadable}");
+            assert!(pattern(unreadable).is_none(), "{unreadable}");
         }
+    }
+
+    #[test]
+    fn a_mux_mounted_by_a_pattern_serves_the_routes_under_it_for_its_method() {
+        let outer = |written: &str| pattern(written).unwrap();
+        let tree = outer("/sub/");
+        assert!(tree.holds("/sub") && tree.holds("/sub/a") && tree.holds("/sub/a/b"));
+        assert!(!tree.holds("/a2") && !tree.holds("/subtle"));
+        let exact = outer("/exact");
+        assert!(exact.holds("/exact") && !exact.holds("/exact/deeper"));
+        assert!(outer("/u/{id}/").holds("/u/5/x"));
+        assert!(!outer("/u/5/").holds("/u/{}/x"));
+        assert!(outer("/").holds("/anything/at/all"));
+        let get = outer("GET /static/");
+        assert_eq!(get.serves(None), Some(Some("GET".to_string())));
+        assert_eq!(get.serves(Some("GET")), Some(Some("GET".to_string())));
+        assert_eq!(get.serves(Some("POST")), None);
+        assert_eq!(tree.serves(None), Some(None));
+        assert_eq!(tree.serves(Some("POST")), Some(Some("POST".to_string())));
     }
 }

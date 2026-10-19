@@ -628,11 +628,24 @@ one for the area a change touches.
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
   in a block, an `if` or a loop), so a name bound again, assigned or shadowed holds no value
   (the `Hidden` binding wins); a function returns a value only for a `return` of one expression.
+  A name whose address is taken (`&p`) is no constant. A name bound in a block or an `if` hides
+  the name in the whole function for constants (absence only: a router or path written outside
+  the block after such a binding yields no provider; the receivers of the pack hold a name for a
+  region, constants do not).
 - `http/go.rs` (spec #25): a route is read only with a literal path and a literal prefix; a
-  `StripPrefix` prefix, a group prefix or a pattern Meada cannot read serves nothing. Only the
-  net/http calls of `ROUTERS` are routes (`mux.Handle` on a value that is no `ServeMux` is not);
-  middleware (`Use`, extra handlers) has no effect on the path, and a mux inside a call other
-  than `StripPrefix` (a handler wrapper) is mounted nowhere. A mux or a router held in a struct field, a map or a slice is not followed (no marker).
+  group prefix or a pattern Meada cannot read serves nothing. `net/http` reads `{name}`,
+  `{name...}` and `{$}` alone: a `:name` segment is a literal no contract can spell, so its route
+  has no provider, and `*` stays literal; gin and echo read `:name` and `*rest` as parameters.
+  A `ServeMux` is mounted only as the handler of a `Handle(pattern, mux)` (or a function
+  returning it) on a router Meada reads; it keeps its own paths, served for the pattern's
+  subtree (a trailing `/` or `{name...}`, else the exact path) and method alone, so a route
+  outside the pattern, or of another method, has no provider. A mux held by any other argument of
+  a route call (`http.StripPrefix`, `echo.WrapHandler`, `gin.WrapH`, any middleware), or given
+  to a router held in a field, a map or a slice, is an unread mount: served nowhere. A mux
+  nested deeper than `PREFIX_DEPTH` or through more mounts than `PREFIX_WORK` is served nowhere
+  too. `http.StripPrefix` and other middleware that rewrites paths are not modelled (spec #25).
+  Middleware (`Use`, extra handlers) has no effect on a gin or echo path. A router held in a
+  struct field, a map or a slice is not followed (no marker).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result

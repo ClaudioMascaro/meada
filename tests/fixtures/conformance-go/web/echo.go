@@ -1,6 +1,8 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -44,3 +46,13 @@ func EchoDynamic(prefix string) {
 	d := e.Group(prefix)
 	d.GET("/held", Item)
 }
+
+// A mux inside `echo.WrapHandler` is mounted where Meada does not read.
+func EchoWrapped() {
+	e := echo.New()
+	legacy := http.NewServeMux()
+	legacy.HandleFunc("GET /c1", Wide2)
+	e.Any("/legacy/*", echo.WrapHandler(http.StripPrefix("/legacy", legacy)))
+}
+
+func Wide2(w http.ResponseWriter, r *http.Request) {}

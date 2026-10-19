@@ -1222,6 +1222,17 @@ fn go() -> Vec<Case> {
             )),
         ),
         m(
+            "mux-chain",
+            gin(format!(
+                "func g() {{\n\tm0 := http.NewServeMux()\n{}\n\tm{LINKS}.HandleFunc(\"/a/x\", f)\n}}",
+                lines(LINKS, |i| format!(
+                    "\tm{} := http.NewServeMux()\n\tm{i}.Handle(\"/a/\", m{})",
+                    i + 1,
+                    i + 1
+                ))
+            )),
+        ),
+        m(
             "wrapped-muxes",
             gin(format!(
                 "func g() {{\n\tmux := http.NewServeMux()\n\thttp.Handle(\"/x\", {})\n}}",
