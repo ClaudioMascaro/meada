@@ -194,6 +194,11 @@ fn go_functions_are_found_by_name_and_list_callers_and_callees() {
             .context("methods/types.go::Counter.Bump", None)
             .unwrap(),
     );
+    // An `http.Get` whose URL a function computes: the consumer shows with no contract.
+    assert_golden(
+        "conformance-go.context-unresolved.txt",
+        &engine.context("client/net.go::Unresolved", None).unwrap(),
+    );
 }
 
 #[test]

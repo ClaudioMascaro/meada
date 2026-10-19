@@ -1,0 +1,20 @@
+example.com/acme/conformance client/net.go:68-72 Unresolved
+community: client#2
+processes: 1 (1 export; 1 repository): Unresolved (example.com/acme/conformance)
+func Unresolved(id int) {
+	http.Get(lookup())
+	http.Get(fmt.Sprintf("%x", id))
+	http.Get(Host + fmt.Sprintf("/odd/%[1]d", id))
+}
+callers: none
+callees:
+example.com/acme/conformance client/net.go:74 lookup
+example.com/acme/conformance client/net.go:70 (unresolved) fmt.Sprintf
+example.com/acme/conformance client/net.go:71 (unresolved) fmt.Sprintf
+example.com/acme/conformance client/net.go:69 (unresolved) http.Get
+example.com/acme/conformance client/net.go:70 (unresolved) http.Get
+example.com/acme/conformance client/net.go:71 (unresolved) http.Get
+contracts:
+example.com/acme/conformance client/net.go:69 consumes (unresolved) http.Get
+example.com/acme/conformance client/net.go:70 consumes (unresolved) http.Get
+example.com/acme/conformance client/net.go:71 consumes (unresolved) http.Get
