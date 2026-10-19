@@ -18,6 +18,10 @@
       "hash": "e4dcd4a1eac15dcb79254b7175ad12eebdfcb0889c88de5852ab456e118e0b08"
     },
     {
+      "path": "src/events.ts",
+      "hash": "dcbb8ddccbde8d8807df4005bd6ae576b0ea1feb43efa7372efddcedfbba3afa"
+    },
+    {
       "path": "src/orders.ts",
       "hash": "7e3a8c701891319bf6227916a09aa12b5886d937d7086e69863b67b971e73f79"
     },
@@ -57,6 +61,14 @@
         "path": "app/api/stock/route.ts",
         "start": 7,
         "end": 59
+      }
+    },
+    {
+      "id": "example.com/xlang-go/web::src/events.ts::announceShipment",
+      "span": {
+        "path": "src/events.ts",
+        "start": 192,
+        "end": 318
       }
     },
     {
@@ -130,6 +142,39 @@
       }
     },
     {
+      "id": "example.com/xlang-go/web::src/events.ts::Kafka#0",
+      "caller": "example.com/xlang-go/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 48,
+        "end": 103
+      }
+    },
+    {
+      "id": "example.com/xlang-go/web::src/events.ts::announceShipment::producer.send#0",
+      "caller": "example.com/xlang-go/web::src/events.ts::announceShipment",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 246,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/xlang-go/web::src/events.ts::kafka.producer#0",
+      "caller": "example.com/xlang-go/web::src/events.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/events.ts",
+        "start": 122,
+        "end": 138
+      }
+    },
+    {
       "id": "example.com/xlang-go/web::src/orders.ts::orderStatus::fetch#0",
       "caller": "example.com/xlang-go/web::src/orders.ts::orderStatus",
       "target": null,
@@ -175,6 +220,10 @@
     }
   ],
   "providers": [
+    {
+      "contract": "channel::kafka::orders.shipped",
+      "site": "example.com/xlang-go/web::src/events.ts::announceShipment::producer.send#0"
+    },
     {
       "contract": "http::GET::/api/prices/{}",
       "site": "example.com/xlang-go/web::app/api/prices/[sku]/route.ts::GET",
@@ -258,6 +307,13 @@
       "contract": "http::POST::/api/audit",
       "level": "inferred",
       "reason": "base URL from WEB_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
+      "consumer": "example.com/xlang-go/api::events.go::shipments.ConsumeClaim",
+      "provider": "example.com/xlang-go/web::src/events.ts::announceShipment::producer.send#0",
+      "contract": "channel::kafka::orders.shipped",
+      "level": "exact",
+      "reason": "channel::kafka::orders.shipped"
     },
     {
       "consumer": "example.com/xlang-go/api::orders.go::status::priceOf#0",

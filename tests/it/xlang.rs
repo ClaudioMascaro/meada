@@ -171,6 +171,28 @@ fn trace_down_from_a_typescript_producer_reaches_the_rust_handler_of_the_topic()
     assert_golden("xlang-rust.trace-channel-down.txt", &answer);
 }
 
+/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
+/// service consumes it in Go (sarama), the `ConsumeClaim` of the handler type being the handler
+/// (spec #25, #82).
+#[test]
+fn trace_down_from_a_typescript_producer_reaches_the_go_handler_of_the_topic() {
+    let (web, _) = xlang_go("xlang_go_channel_down");
+
+    let answer = Engine::open(&web)
+        .unwrap()
+        .trace(Start::From("announceShipment"), Direction::Down, None)
+        .unwrap();
+
+    assert!(
+        answer.contains(
+            "→[exact: channel::kafka::orders.shipped] example.com/xlang-go/api \
+             events.go:14 shipments.ConsumeClaim"
+        ),
+        "{answer}"
+    );
+    assert_golden("xlang-go.trace-channel-down.txt", &answer);
+}
+
 #[test]
 fn trace_up_crosses_into_rust_and_back_to_typescript() {
     let (web, _) = xlang_rust("xlang_rust_up");
