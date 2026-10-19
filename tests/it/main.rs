@@ -27,6 +27,7 @@ mod processes;
 mod pypi;
 mod query;
 mod resources;
+mod self_index;
 mod stale;
 mod trace;
 mod urls;

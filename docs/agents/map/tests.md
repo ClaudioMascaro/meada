@@ -29,7 +29,7 @@ modules updates it.
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `query` (search/context), `workspace` (peers, status, config errors), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
