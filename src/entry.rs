@@ -204,6 +204,8 @@ fn channels(local: &Local) -> Vec<EntryPoint> {
 fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
     // Each definition the rows name, once: a file that re-exports it names it again.
     let mut targets = BTreeSet::new();
+    // The set an exporter's `__all__` is, once.
+    let mut takers = HashMap::new();
     for e in local.exported {
         let (Some(file), Some(target)) = (&e.file, &e.target) else {
             continue;
@@ -212,7 +214,10 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         // reaches it, but it is that file's own.
         if let (Some(name), Some(exporter)) = (&e.name, local.files.get(e.path.as_str()))
             && exporter.star.is_public_set()
-            && !exporter.star.takes(name)
+            && !takers
+                .entry(e.path.as_str())
+                .or_insert_with(|| exporter.star.taker())
+                .takes(name)
         {
             continue;
         }

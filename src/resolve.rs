@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Binds, Call, Class, Def, Export, Facts, Imported, Kind, LanguagePack, Modules, Param, Part,
-    Reaches, Star, Step, Ty, Value,
+    Binds, Call, Class, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Modules, Param,
+    Part, Reaches, Star, Step, Taker, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -38,8 +38,9 @@ static NAMESPACE: Imported = Imported::Namespace;
 /// An `exports` row: the name, the file and the definition in it.
 type Row<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
 
-/// Where a file's star exports (`Export::All`) and the exports of each name sit in its
-/// `Facts::exports`, each list in order: a name is looked up without a scan of them all.
+/// Where a file's star entries (`Export::All`, `Imported::All`) and those of each name sit in
+/// its `Facts::exports` or its `Facts::imports`, each list in order: a name is looked up
+/// without a scan of them all.
 #[derive(Default)]
 struct Named<'a> {
     stars: Vec<usize>,
@@ -47,7 +48,7 @@ struct Named<'a> {
 }
 
 impl<'a> Named<'a> {
-    fn new(exports: &'a [Export]) -> Self {
+    fn exports(exports: &'a [Export]) -> Self {
         let mut named = Self::default();
         for (at, export) in exports.iter().enumerate() {
             match export {
@@ -60,7 +61,24 @@ impl<'a> Named<'a> {
         named
     }
 
-    /// Where the exports of `name` sit.
+    /// The imports by the `local` they bind (a pack's scoped ones under the qualified name:
+    /// `inner.c`, `inner.*`), and those of every name (`Imported::All`) among the stars.
+    fn imports(imports: &'a [Import]) -> Self {
+        let mut named = Self::default();
+        for (at, import) in imports.iter().enumerate() {
+            named
+                .names
+                .entry(import.local.as_str())
+                .or_default()
+                .push(at);
+            if matches!(import.name, Imported::All) {
+                named.stars.push(at);
+            }
+        }
+        named
+    }
+
+    /// Where the entries of `name` sit.
     fn of(&self, name: &str) -> &[usize] {
         self.names.get(name).map_or(&[], Vec::as_slice)
     }
@@ -75,14 +93,6 @@ pub fn call_at(calls: &[Call], range: &std::ops::Range<usize>) -> Option<usize> 
     match calls.get(at) {
         Some(c) if c.range == *range => Some(at),
         _ => calls.iter().position(|c| c.range == *range),
-    }
-}
-
-/// Whether `local` is `name` bound inside `scope` (`scope.name`, or `name` at the top level).
-fn bound_in(local: &str, scope: &str, name: &str) -> bool {
-    match scope {
-        "" => local == name,
-        scope => local.strip_prefix(scope).and_then(|l| l.strip_prefix('.')) == Some(name),
     }
 }
 
@@ -256,6 +266,14 @@ pub struct Resolver<'a> {
     receivers: HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
     /// Each file's `Facts::exports`, by the name they give.
     named: HashMap<&'a str, Named<'a>>,
+    /// Each file's `Facts::imports`, by the `local` they bind.
+    by_local: HashMap<&'a str, Named<'a>>,
+    /// Each file's `Facts::externs`.
+    externs: HashMap<&'a str, HashSet<&'a str>>,
+    /// The files with a path import (`Imported::Path`).
+    pathed: HashSet<&'a str>,
+    /// What each file's star import takes (`Facts::star`).
+    takers: HashMap<&'a str, Taker<'a>>,
     /// Every class's family, linearized once.
     families: HashMap<Target<'a>, Family<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
@@ -339,7 +357,23 @@ impl<'a> Resolver<'a> {
             })
             .collect();
         let named = (files.iter())
-            .map(|(path, facts)| (*path, Named::new(&facts.exports)))
+            .map(|(path, facts)| (*path, Named::exports(&facts.exports)))
+            .collect();
+        let by_local = (files.iter())
+            .map(|(path, facts)| (*path, Named::imports(&facts.imports)))
+            .collect();
+        let externs = files
+            .iter()
+            .map(|(path, facts)| (*path, facts.externs.iter().map(String::as_str).collect()))
+            .collect();
+        let pathed = (files.iter())
+            .filter(|(_, facts)| {
+                (facts.imports.iter()).any(|i| matches!(i.name, Imported::Path(_)))
+            })
+            .map(|(path, _)| *path)
+            .collect();
+        let takers = (files.iter())
+            .map(|(path, facts)| (*path, facts.star.taker()))
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
@@ -397,6 +431,10 @@ impl<'a> Resolver<'a> {
             locals,
             receivers,
             named,
+            by_local,
+            externs,
+            pathed,
+            takers,
             families: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
@@ -668,8 +706,12 @@ impl<'a> Resolver<'a> {
         if let Some((exported, _)) = self.named[path].names.get_key_value(dotted.as_str()) {
             return self.export_as(path, exported, seen, value);
         }
-        let mut imports = self.files[path].imports.iter().rev();
-        match imports.find(|i| i.local == module.name && matches!(i.name, Imported::Namespace)) {
+        let imports = &self.files[path].imports;
+        let at = self.by_local[path].of(module.name).iter().rev();
+        let namespace = at
+            .map(|&at| &imports[at])
+            .find(|i| matches!(i.name, Imported::Namespace));
+        match namespace {
             Some(i) => match self.import(path, "", &i.source, &i.name, seen) {
                 Binding::Module(m) => self.export_as(m, member, seen, value),
                 _ => Binding::Unknown,
@@ -940,8 +982,9 @@ impl<'a> Resolver<'a> {
             let mut at = Some(scope);
             let target = loop {
                 let Some(s) = at else { break None };
-                let found = imports.iter().rev().find_map(|i| match &i.name {
-                    Imported::Path(t) if bound_in(&i.local, s, head) => Some(t),
+                let bound = self.by_local[path].of(&crate::qualify(s, head));
+                let found = bound.iter().rev().find_map(|&at| match &imports[at].name {
+                    Imported::Path(t) => Some(t),
                     _ => None,
                 });
                 if found.is_some() {
@@ -957,8 +1000,8 @@ impl<'a> Resolver<'a> {
             name = next;
         }
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
-        let imports = imports.iter().rev();
-        match imports.map(|i| (i, &i.name)).find(|(i, _)| i.local == head) {
+        let latest = self.by_local[path].of(head).last();
+        match latest.map(|&at| (&imports[at], &imports[at].name)) {
             Some((i, Imported::Namespace)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
                 format!("{}.{n}{rest}", i.source)
@@ -1173,7 +1216,13 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         top: bool,
     ) -> Binding<'a> {
-        let given = (self.files[path].imports.iter().rev()).map(|import| {
+        // Only the imports that bind `name` or every name may give it, the latest first.
+        let (imports, index) = (&self.files[path].imports, &self.by_local[path]);
+        let mut at = [index.of(name), index.stars.as_slice()].concat();
+        at.sort_unstable();
+        at.dedup();
+        let given = at.into_iter().rev().map(|at| {
+            let import = &imports[at];
             let scoped = matches!(import.name, Imported::Path(_) | Imported::Glob { .. });
             // A module declared in the file (Rust's `mod x;`) is in scope where its
             // definition is.
@@ -1196,7 +1245,7 @@ impl<'a> Resolver<'a> {
         if top && let Some(found) = self.globs(path, "", name, false, seen) {
             return found;
         }
-        if !self.files[path].externs.iter().any(|n| n == name) {
+        if !self.externs[path].contains(name) {
             return Binding::Unknown;
         }
         match self.module(path, name) {
@@ -1216,9 +1265,14 @@ impl<'a> Resolver<'a> {
         name: &'a str,
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
-        for import in self.files[path].imports.iter().rev() {
+        let imports = &self.files[path].imports;
+        for &at in self.by_local[path]
+            .of(&crate::qualify(scope, name))
+            .iter()
+            .rev()
+        {
+            let import = &imports[at];
             if let Imported::Path(target) = &import.name
-                && bound_in(&import.local, scope, name)
                 && !seen.aliases.contains(&(path, target.as_str()))
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
@@ -1243,8 +1297,13 @@ impl<'a> Resolver<'a> {
         public: bool,
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
-        let imports = self.files[path].imports.iter().enumerate();
-        for (at, import) in imports.rev() {
+        let imports = &self.files[path].imports;
+        for &at in self.by_local[path]
+            .of(&crate::qualify(scope, "*"))
+            .iter()
+            .rev()
+        {
+            let import = &imports[at];
             let Imported::Glob {
                 path: target,
                 inside,
@@ -1253,7 +1312,7 @@ impl<'a> Resolver<'a> {
             else {
                 continue;
             };
-            if (public && !re_exports) || !bound_in(&import.local, scope, "*") {
+            if public && !re_exports {
                 continue;
             }
             if seen.depth >= LINK_DEPTH {
@@ -1368,7 +1427,7 @@ impl<'a> Resolver<'a> {
     /// (`Seen::looped`) is absent, so that an earlier binding gives the name; one cut at
     /// `LINK_DEPTH` stays unknown.
     fn star(&self, path: &'a str, name: &'a str, seen: &mut Seen<'a>) -> Option<Binding<'a>> {
-        if !self.files[path].star.takes(name) {
+        if !self.takers[path].takes(name) {
             return self.globs(path, "", name, true, seen);
         }
         let outer = std::mem::take(&mut seen.looped);
@@ -1575,7 +1634,8 @@ impl<'a> Resolver<'a> {
             for export in &facts.exports {
                 let found = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
-                        if private.contains(exported.as_str()) && !facts.star.takes(exported) {
+                        if private.contains(exported.as_str()) && !self.takers[path].takes(exported)
+                        {
                             continue;
                         }
                         self.rows(path, exported, private.contains(exported.as_str()))
@@ -1656,7 +1716,7 @@ impl<'a> Resolver<'a> {
                     }
                     Export::All { .. } => None,
                 });
-                out.extend(named.filter(|n| facts.star.takes(n)));
+                out.extend(named.filter(|n| self.takers[m].takes(n)));
                 self.glob_names(m, done, out);
             }
         }
@@ -2005,10 +2065,7 @@ impl<'a> Code<'a> {
             return None;
         };
         // A crate a pack's path import (Rust's `use`) names: the whole path, as `external` spells it.
-        let pathed = self.resolver.files[path]
-            .imports
-            .iter()
-            .any(|i| matches!(i.name, Imported::Path(_)));
+        let pathed = self.resolver.pathed.contains(path);
         if pathed && matches!(name, Imported::Namespace) {
             let full = self.resolver.imported_name(path, scope, chain);
             let rest = full.strip_prefix(specifier)?;
@@ -3009,7 +3066,6 @@ fn unbind(value: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::Import;
     use crate::lang::python::Python;
 
     /// A Python file of `n` classes, each but the first deriving from the one before and

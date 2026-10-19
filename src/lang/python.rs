@@ -415,6 +415,10 @@ struct Module {
     /// Every top-level binding in statement order: a name (`Export::Local`, `del` included) or
     /// a star import (`Export::All`).
     bindings: Vec<Export>,
+    /// The names among `bindings`.
+    bound: HashSet<String>,
+    /// Whether a star import is among `bindings`.
+    star: bool,
     /// The names a top-level `def` or `class` binds.
     defs: HashSet<String>,
     /// The names whose last top-level binding leaves no call reaching what they were bound to:
@@ -430,10 +434,7 @@ impl Module {
     /// A top-level `def` or `class`; one not `in_place` (under `if`, `try`, a loop) may not run,
     /// so a name bound before it, a star import included, stays hidden.
     fn def(&mut self, name: &str, in_place: bool) {
-        let bound = self.bindings.iter().any(|b| match b {
-            Export::Local { exported, .. } => exported == name,
-            _ => true,
-        });
+        let bound = self.star || self.bound.contains(name);
         self.name(name);
         self.defs.insert(name.to_string());
         match in_place || !bound {
@@ -464,9 +465,12 @@ impl Module {
     fn import(&mut self, imports: &[Import]) {
         for import in imports {
             match import.name {
-                Imported::All => self.bindings.push(Export::All {
-                    source: import.source.clone(),
-                }),
+                Imported::All => {
+                    self.star = true;
+                    self.bindings.push(Export::All {
+                        source: import.source.clone(),
+                    });
+                }
                 _ if !import.local.contains('.') => self.name(&import.local),
                 _ => {}
             }
@@ -475,6 +479,7 @@ impl Module {
 
     /// A top-level binding of `name`: `__all__` bound by anything but a literal is computed.
     fn name(&mut self, name: &str) {
+        self.bound.insert(name.to_string());
         self.bindings.push(Export::Local {
             exported: name.to_string(),
             local: name.to_string(),
@@ -765,21 +770,26 @@ struct Locals {
     defs: Vec<(usize, String, String, bool)>,
     /// The value each `name = value` assigns, by the position of its binding in `written`.
     values: Vec<(usize, Value)>,
+    /// The position in `values` of the latest value each scope and name was assigned.
+    latest: HashMap<(String, String), usize>,
+    /// Every scope and name bound or defined so far.
+    bound: HashSet<(String, String)>,
 }
 
 impl Locals {
     fn bind(&mut self, scope: &str, name: &str, class: Class, how: Evidence) {
+        self.bound.insert((scope.to_string(), name.to_string()));
         (self.written).push((scope.to_string(), name.to_string(), class, how));
     }
 
     /// A `def` or `class` of `name` in the function or class body `scope`, `in_place` or under
     /// `if`, `try`, a loop.
     fn def(&mut self, scope: &str, name: &str, in_place: bool) {
-        let same = |s: &String, n: &String| s == scope && n == name;
-        let bound = self.written.iter().any(|(s, n, ..)| same(s, n))
-            || self.defs.iter().any(|(_, s, n, _)| same(s, n));
+        let key = (scope.to_string(), name.to_string());
+        let bound = self.bound.contains(&key);
         let at = self.written.len();
         (self.defs).push((at, scope.to_string(), name.to_string(), !in_place && bound));
+        self.bound.insert(key);
         // Under `global` or `nonlocal`, it binds the name where the declaration points.
         if self
             .declared
@@ -880,9 +890,17 @@ impl Locals {
         {
             let value = value(right, src);
             if left.kind() == "identifier" || matches!(value, Value::Call(_)) {
-                self.values.push((at, value));
+                self.assigned(at, value);
             }
         }
+    }
+
+    /// The value the binding at `written[at]` holds.
+    fn assigned(&mut self, at: usize, value: Value) {
+        let (scope, name, ..) = &self.written[at];
+        let key = (scope.clone(), name.clone());
+        self.latest.insert(key, self.values.len());
+        self.values.push((at, value));
     }
 
     /// `with C(...) as x`: `x` holds what `C(...)` gives, as `x = C(...)` does.
@@ -895,8 +913,9 @@ impl Locals {
         match (call, name) {
             (Some(call), Some(name)) => {
                 let class = constructor(call, src).map_or(Class::Unknown, Class::Named);
-                self.values.push((self.written.len(), value(call, src)));
+                let (at, value) = (self.written.len(), value(call, src));
                 self.bind(scope, text(name, src), class, Evidence::Assigned);
+                self.assigned(at, value);
             }
             _ => {
                 for target in targets(alias) {
@@ -935,12 +954,8 @@ impl Locals {
             }
             _ => return false,
         };
-        let Locals {
-            written, values, ..
-        } = self;
-        let latest = (values.iter_mut().rev())
-            .find(|(at, _)| written[*at].0 == scope && written[*at].1 == name);
-        let Some((_, Value::List(items))) = latest else {
+        let latest = (self.latest.get(&(scope.to_string(), name.to_string()))).copied();
+        let Some((_, Value::List(items))) = latest.map(|i| &mut self.values[i]) else {
             return false;
         };
         if let Value::List(more) = value(added, src) {
