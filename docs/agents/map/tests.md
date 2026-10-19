@@ -4,6 +4,10 @@ Detail behind the [architecture map](../architecture.md), which keeps the flow, 
 seams, invariants and Known ceilings. The code wins over this file, and a change to these
 modules updates it.
 
+Reviewing a change to an `*.export.json` golden: `cargo run --example golden_diff` (no argument
+diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
+`--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
+
 - Test modules of `tests/it/` by subject: `docs` (the repository map against the code:
   `ponytail:` limits in Known ceilings, entry point kinds and process marks in their lists),
   `conformance` (pack; for Python also its HTTP providers and consumers
