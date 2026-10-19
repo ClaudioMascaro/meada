@@ -244,6 +244,11 @@ All notable changes to Meada are recorded here. The format follows
   index: each name it exports is looked up among the file's exports, and the functions and
   methods of each export entry point among its definitions, by name rather than by reading
   them all.
+- A file of thousands of imports, of names in a literal `__all__`, or of Python definitions and
+  additions to a list (`xs += [...]`, `xs = xs + [...]`) no longer takes time quadratic in
+  their count to index: each name is looked up among the file's imports, externs and
+  `__all__`, each Python definition among the names bound before it, and each addition among
+  the values assigned before it, by name rather than by reading them all.
 - A Rust `let mut` String in a block nested deep in other blocks no longer costs, for each
   statement after it, time in proportion to the depth: its statements are read once from the
   block instead of being looked up from the root of the tree, so a thousand `let mut`s a

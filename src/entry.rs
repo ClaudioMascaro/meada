@@ -204,6 +204,8 @@ fn channels(local: &Local) -> Vec<EntryPoint> {
 fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
     // Each definition the rows name, once: a file that re-exports it names it again.
     let mut targets = BTreeSet::new();
+    // The set an exporter's `__all__` is, once.
+    let mut takers = HashMap::new();
     for e in local.exported {
         let (Some(file), Some(target)) = (&e.file, &e.target) else {
             continue;
@@ -212,7 +214,10 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         // reaches it, but it is that file's own.
         if let (Some(name), Some(exporter)) = (&e.name, local.files.get(e.path.as_str()))
             && exporter.star.is_public_set()
-            && !exporter.star.takes(name)
+            && !takers
+                .entry(e.path.as_str())
+                .or_insert_with(|| exporter.star.taker())
+                .takes(name)
         {
             continue;
         }
@@ -414,6 +419,17 @@ mod tests {
         let start = std::time::Instant::now();
         assert_eq!(export_doors(Star::Public, &names).len(), names.len());
         // Each export read every definition of its file: minutes here.
+        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn a_file_of_many_all_names_finds_its_doors_in_linear_time() {
+        let names: Vec<String> = (0..30_000).map(|i| format!("f{i}")).collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let listed = (0..500_000).map(|i| format!("n{i}")).collect();
+        let start = std::time::Instant::now();
+        assert!(export_doors(Star::Only(listed), &names).is_empty());
+        // Each export was looked up in `__all__` one by one: minutes here.
         assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
     }
 

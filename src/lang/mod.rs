@@ -2,7 +2,7 @@
 //! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
 //! A pack never touches the index or other files.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -414,7 +414,8 @@ pub enum Star {
 }
 
 impl Star {
-    /// Whether a star import takes the export `name`.
+    /// Whether a star import takes the export `name`. A literal `__all__` is read for each
+    /// name: ask `taker` for many.
     pub fn takes(&self, name: &str) -> bool {
         match self {
             Star::ExceptDefault => name != "default",
@@ -423,10 +424,35 @@ impl Star {
         }
     }
 
+    /// `takes` for many names: a literal `__all__` is looked up, not scanned.
+    pub fn taker(&self) -> Taker<'_> {
+        let only = match self {
+            Star::Only(names) => names.iter().map(String::as_str).collect(),
+            _ => HashSet::new(),
+        };
+        Taker { star: self, only }
+    }
+
     /// Whether the pack names a public set: every export but those a star import leaves out is
     /// one. `ExceptDefault` names none, since a default export is as public as any.
     pub fn is_public_set(&self) -> bool {
         !matches!(self, Star::ExceptDefault)
+    }
+}
+
+/// `Star::takes`, with a literal `__all__` held as a set.
+pub struct Taker<'a> {
+    star: &'a Star,
+    only: HashSet<&'a str>,
+}
+
+impl Taker<'_> {
+    /// Whether a star import takes the export `name`.
+    pub fn takes(&self, name: &str) -> bool {
+        match self.star {
+            Star::Only(_) => self.only.contains(name),
+            star => star.takes(name),
+        }
     }
 }
 
