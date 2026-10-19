@@ -233,7 +233,14 @@ true` lê `[workspace.package]`. A ligação é `exact`, com a faixa como escrit
 (faixas Cargo não são conferidas), e um `use` do crate (pelo nome de `[lib] name`, se houver, ou
 pela chave de uma dependência renomeada) chega aos itens públicos do provedor pelos seus `pub use`,
 também `exact`, com `; import crate name` no fim da razão. Uma dependência fora do workspace não
-aparece.
+aparece. Em Go, cada `go.mod` com `module` vira o contrato `package::go::<caminho do módulo>`, e cada
+`require`, e cada `replace` para uma pasta local, se liga ao provedor desse módulo no workspace: o
+`replace` que sai do repositório (`../outro`) é resolvido só pelo texto, como o `path` do Cargo, e um
+`replace` por outro módulo deixa o módulo de fora. A ligação é `exact`, com a versão do `require`
+como faixa, `(local none)` (um `go.mod` não tem versão) e `range unchecked`, e um import de
+`<módulo>/<pasta>` chega às funções, tipos e métodos exportados da pasta correspondente no
+provedor, também `exact` quando a pasta existe, com `; import module path` no fim da razão. Não lê
+`go.sum` nem consulta o proxy de módulos.
 Não lê lockfile (`Cargo.lock` incluído) nem consulta o registro npm, o PyPI ou o crates.io. O Meada também aponta o *drift* de formato: os campos que um consumidor `fetch` lê da resposta já interpretada e que a rota que ele chama não devolve, comparados com o formato da rota (documento OpenAPI, schema zod ou objetos literais do handler). O `trace` termina a linha da ligação com `drift: missing <caminho>`, o `context` de uma rota diz de onde vem o formato e lista cada consumidor que lê campos da resposta, com o drift e o nível e as leituras não conferidas sob uma parte aberta quando há, o `search` com o tipo `drift` lista todo o drift, e o `meada status` conta as leituras ausentes dos consumidores de cada repositório (quem conta é o repositório do consumidor; o do provedor não mostra nada). O `meada export` traz as comunidades de cada repositório: grupos de símbolos que se chamam mais entre si do que com o resto, achados pelo algoritmo de Leiden sem nada aleatório e só com aritmética inteira, e nomeados pela pasta onde vive a maioria dos seus membros (`src`, `src#2`), iguais em toda máquina. Cada ligação tem o nível `exact`,
 `declared`, `inferred`, `decided` ou `ambiguous`; uma chamada cuja URL não dá para resolver
 aparece como não resolvida e só vira ligação por uma decisão, no nível `decided`, e uma rota que o Meada não sabe onde é servida fica fora do mapa em vez de

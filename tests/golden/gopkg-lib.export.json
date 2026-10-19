@@ -1,0 +1,234 @@
+{
+  "repository": "example.com/gopkg/lib",
+  "files": [
+    {
+      "path": "api/client.go",
+      "hash": "846337e0d0886517a90b59771876775dbf7fba314fc31312d259f580f8d284e1"
+    },
+    {
+      "path": "api/dup_a.go",
+      "hash": "58d0a705874282a435322a1cb7cfc64f7be383c6657d39faa95ba29e2af4c329"
+    },
+    {
+      "path": "api/dup_b.go",
+      "hash": "58d0a705874282a435322a1cb7cfc64f7be383c6657d39faa95ba29e2af4c329"
+    },
+    {
+      "path": "cmd/app/main.go",
+      "hash": "0b7ad745b3833bfb1c1a821abd6aaf3b335d5485369ac09a81ca3b37f5f91c7d"
+    },
+    {
+      "path": "extras/extras.go",
+      "hash": "8fddd9d115783771c7b249f419e1dbb77a51b4921234bbcf766a6d1b5faf739a"
+    },
+    {
+      "path": "text/helper_test.go",
+      "hash": "ccd5689b197ce9707c82ad6d16679ae454f22704057265f36f4f975d2d4b3f21"
+    },
+    {
+      "path": "text/text.go",
+      "hash": "5368d5a95efc569ee8c1446b26b27d1799783b570a8819826e5bd661e2403ae6"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/gopkg/lib::api/client.go::Client",
+      "span": {
+        "path": "api/client.go",
+        "start": 57,
+        "end": 87
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::api/client.go::Client.Create",
+      "span": {
+        "path": "api/client.go",
+        "start": 226,
+        "end": 301
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::api/client.go::NewClient",
+      "span": {
+        "path": "api/client.go",
+        "start": 119,
+        "end": 196
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::api/dup_a.go::Dup",
+      "span": {
+        "path": "api/dup_a.go",
+        "start": 82,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::api/dup_b.go::Dup",
+      "span": {
+        "path": "api/dup_b.go",
+        "start": 82,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::cmd/app/main.go::main",
+      "span": {
+        "path": "cmd/app/main.go",
+        "start": 52,
+        "end": 86
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::extras/extras.go::Boost",
+      "span": {
+        "path": "extras/extras.go",
+        "start": 35,
+        "end": 74
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/helper_test.go::Helper",
+      "span": {
+        "path": "text/helper_test.go",
+        "start": 88,
+        "end": 134
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/text.go::Greet",
+      "span": {
+        "path": "text/text.go",
+        "start": 53,
+        "end": 118
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/text.go::Shout",
+      "span": {
+        "path": "text/text.go",
+        "start": 147,
+        "end": 205
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/gopkg/lib::cmd/app/main.go::main::text.Greet#0",
+      "caller": "example.com/gopkg/lib::cmd/app/main.go::main",
+      "target": "example.com/gopkg/lib::text/text.go::Greet",
+      "level": "exact",
+      "span": {
+        "path": "cmd/app/main.go",
+        "start": 67,
+        "end": 84
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/helper_test.go::Helper::Greet#0",
+      "caller": "example.com/gopkg/lib::text/helper_test.go::Helper",
+      "target": "example.com/gopkg/lib::text/text.go::Greet",
+      "level": "exact",
+      "span": {
+        "path": "text/helper_test.go",
+        "start": 119,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/text.go::Greet::Shout#0",
+      "caller": "example.com/gopkg/lib::text/text.go::Greet",
+      "target": "example.com/gopkg/lib::text/text.go::Shout",
+      "level": "exact",
+      "span": {
+        "path": "text/text.go",
+        "start": 94,
+        "end": 116
+      }
+    },
+    {
+      "id": "example.com/gopkg/lib::text/text.go::Shout::strings.ToUpper#0",
+      "caller": "example.com/gopkg/lib::text/text.go::Shout",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "text/text.go",
+        "start": 185,
+        "end": 203
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::go::example.com/shared/extras",
+      "site": "example.com/gopkg/lib::extras/go.mod"
+    },
+    {
+      "contract": "package::go::example.com/shared/kit",
+      "site": "example.com/gopkg/lib::go.mod"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "example.com/shared/extras",
+      "repository": "example.com/gopkg/lib",
+      "directory": "extras",
+      "ecosystem": "go"
+    },
+    {
+      "name": "example.com/shared/kit",
+      "repository": "example.com/gopkg/lib",
+      "directory": ".",
+      "ecosystem": "go"
+    }
+  ],
+  "communities": [
+    {
+      "name": "text",
+      "members": [
+        "example.com/gopkg/lib::cmd/app/main.go::main",
+        "example.com/gopkg/lib::text/helper_test.go::Helper",
+        "example.com/gopkg/lib::text/text.go::Greet",
+        "example.com/gopkg/lib::text/text.go::Shout"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/gopkg/web::go.mod::require::example.com/shared/kit",
+      "provider": "example.com/gopkg/lib::go.mod",
+      "contract": "package::go::example.com/shared/kit",
+      "level": "exact",
+      "reason": "package::go::example.com/shared/kit v1.2.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/gopkg/web::main.go::connect::api.NewClient#0",
+      "provider": "example.com/gopkg/lib::api/client.go::NewClient",
+      "contract": "package::go::example.com/shared/kit",
+      "level": "exact",
+      "reason": "package::go::example.com/shared/kit v1.2.0 (local none), range unchecked; import module path"
+    },
+    {
+      "consumer": "example.com/gopkg/web::main.go::welcome::k.Greet#0",
+      "provider": "example.com/gopkg/lib::text/text.go::Greet",
+      "contract": "package::go::example.com/shared/kit",
+      "level": "exact",
+      "reason": "package::go::example.com/shared/kit v1.2.0 (local none), range unchecked; import module path"
+    },
+    {
+      "consumer": "example.com/gopkg/web::worker/go.mod::require::example.com/shared/extras",
+      "provider": "example.com/gopkg/lib::extras/go.mod",
+      "contract": "package::go::example.com/shared/extras",
+      "level": "exact",
+      "reason": "package::go::example.com/shared/extras v0.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/gopkg/web::worker/worker.go::Run::extras.Boost#0",
+      "provider": "example.com/gopkg/lib::extras/extras.go::Boost",
+      "contract": "package::go::example.com/shared/extras",
+      "level": "exact",
+      "reason": "package::go::example.com/shared/extras v0.0.0 (local none), range unchecked; import module path"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ use super::{
 use crate::{Result, parent, qualify};
 
 mod build;
-mod modfile;
+pub mod modfile;
 mod values;
 
 /// How many segments of a member chain a callee keeps, and how many wrappers (`*`, `[T]`,
