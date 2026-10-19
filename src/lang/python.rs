@@ -1857,36 +1857,72 @@ mod tests {
         assert_eq!(nesting(&held(&consts(&src), "x")), n);
     }
 
-    #[test]
-    fn a_file_of_many_definitions_and_additions_parses_in_linear_time() {
-        use std::fmt::Write;
+    // The three scans below are fed `Module` and `Locals` directly: a debug parse costs tens of
+    // microseconds a line, too many for a file whose names could square into seconds.
 
-        let (fillers, more) = (200_000, 40_000);
-        let mut src = String::from("c0 = []\n");
-        for i in 0..fillers {
-            writeln!(src, "z{i} = []").unwrap();
-        }
-        for _ in 0..more {
-            src += "c0 += [1]\n";
-        }
-        for i in 0..more {
-            writeln!(src, "def f{i}(): pass").unwrap();
-        }
-        src += "class C:\n";
-        for i in 0..more {
-            writeln!(src, "    def m{i}(self): pass").unwrap();
+    #[test]
+    fn a_module_of_many_names_binds_each_definition_in_linear_time() {
+        let (names, defs) = (400_000, 30_000);
+        let mut module = Module::default();
+        for i in 0..names {
+            module.name(&format!("z{i}"));
         }
         let start = std::time::Instant::now();
-        let parsed = facts(&src);
-        // Each addition looked its list up among the values assigned before it, each
-        // definition among the bindings of its scope, one by one: minutes here.
+        for i in 0..defs {
+            module.def(&format!("f{i}"), true);
+        }
+        // Each definition looked its name up among the module's bindings one by one: minutes
+        // here.
         let took = start.elapsed();
-        let count = |kind| parsed.defs.iter().filter(|d| d.kind == kind).count();
-        assert_eq!((count(Kind::Function), count(Kind::Method)), (more, more));
-        let Value::List(items) = held(&parsed.consts, "c0") else {
-            panic!("c0 is no list");
+        assert_eq!(module.defs.len(), defs);
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_function_of_many_names_binds_each_definition_in_linear_time() {
+        let (names, defs) = (300_000, 40_000);
+        let mut locals = Locals::default();
+        for i in 0..names {
+            locals.bind("g", &format!("z{i}"), Class::Unknown, Evidence::Assigned);
+        }
+        let start = std::time::Instant::now();
+        for i in 0..defs {
+            locals.def("g", &format!("h{i}"), true);
+        }
+        // Each definition looked its name up among the function's bindings and definitions one
+        // by one: minutes here.
+        let took = start.elapsed();
+        assert_eq!(locals.defs.len(), defs);
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_scope_of_many_values_extends_each_list_in_linear_time() {
+        let (values, more) = (300_000, 40_000);
+        let mut parser = Parser::new();
+        parser
+            .set_language(&tree_sitter_python::LANGUAGE.into())
+            .unwrap();
+        // One statement of each kind, assigned again and again.
+        let mut parse = |src: &'static str| (parser.parse(src, None).unwrap(), src.as_bytes());
+        let (list, filler, add) = (parse("c0 = []\n"), parse("z = []\n"), parse("c0 += [1]\n"));
+        let mut locals = Locals::default();
+        let mut run = |(tree, src): &(tree_sitter::Tree, &[u8]), times| {
+            let statement = tree.root_node().named_child(0).unwrap().named_child(0);
+            for _ in 0..times {
+                locals.assign(statement.unwrap(), "", src);
+            }
         };
-        assert_eq!(items.len(), more);
+        run(&list, 1);
+        run(&filler, values);
+        let start = std::time::Instant::now();
+        run(&add, more);
+        // Each addition looked its list up among the values assigned before it one by one:
+        // minutes here.
+        let took = start.elapsed();
+        let (written, held) = (&locals.written, &locals.values);
+        let list = held.iter().find(|(at, _)| written[*at].1 == "c0");
+        assert!(matches!(list, Some((_, Value::List(items))) if items.len() == more));
         assert!(took.as_secs() < 20, "{took:?}");
     }
 }
