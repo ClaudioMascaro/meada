@@ -10,10 +10,10 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout, Modules,
-    Param, Value, children, named, text,
+    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
+    Modules, Param, Receiver, Value, children, named, text,
 };
-use crate::{Result, qualify};
+use crate::{Result, parent, qualify};
 
 mod build;
 mod modfile;
@@ -101,12 +101,64 @@ struct Walk<'s> {
     facts: Facts,
     /// The locals recorded so far, so each is listed once.
     locals: BTreeSet<String>,
+    /// Every binding of a name in a scope, with the class the source writes for it (`None` when
+    /// it writes none). A name all its bindings give one class is a receiver (`finish`).
+    bound: BTreeMap<(String, String), Vec<Option<Class>>>,
 }
 
 impl Walk<'_> {
+    /// A name bound in `scope` to a value of no class the source writes.
     fn local(&mut self, scope: &str, name: &str) {
-        if name != "_" && self.locals.insert(qualify(scope, name)) {
+        self.bind_as(scope, name, None, true);
+    }
+
+    /// A name bound in `scope`, holding `class` when the source writes it. A `local` hides the
+    /// outer names it spells; a parameter or a field is no local.
+    fn bind_as(&mut self, scope: &str, name: &str, class: Option<Class>, local: bool) {
+        if name == "_" {
+            return;
+        }
+        if local && self.locals.insert(qualify(scope, name)) {
             self.facts.locals.push(qualify(scope, name));
+        }
+        (self.bound.entry((scope.into(), name.into())).or_default()).push(class);
+    }
+
+    /// The names a parameter list binds, with the type each writes: parameters (`local` false,
+    /// which `Def::params` lists), or the receiver and the named results of a function.
+    fn typed_params(&mut self, scope: &str, list: Option<Node>, local: bool) {
+        for param in list.into_iter().flat_map(named) {
+            let ty = param.child_by_field_name("type");
+            let ty = ty.filter(|_| param.kind() == "parameter_declaration");
+            let class = ty.and_then(|t| type_name(t, self.src)).map(Class::Type);
+            for name in names(param) {
+                self.bind_as(scope, text(name, self.src), class.clone(), local);
+            }
+        }
+    }
+
+    /// The names a `var` or `:=` binds, each with the class its type or its value writes: the
+    /// type, else the value at its place (`a, b := T{}, U{}`), else, of one call giving several
+    /// values, the first.
+    fn assigned(
+        &mut self,
+        scope: &str,
+        left: &[Node],
+        ty: Option<Node>,
+        values: Option<Node>,
+        local: bool,
+    ) {
+        let src = self.src;
+        let values: Vec<Node> = values.into_iter().flat_map(named).collect();
+        let written = ty.and_then(|t| type_name(t, src)).map(Class::Type);
+        for (at, name) in left.iter().enumerate() {
+            let class = match values.len() {
+                _ if ty.is_some() => written.clone(),
+                n if n == left.len() => value_class(values[at], src),
+                1 if at == 0 => value_class(values[0], src),
+                _ => None,
+            };
+            self.bind_as(scope, text(*name, src), class, local);
         }
     }
 
@@ -123,7 +175,7 @@ impl Walk<'_> {
         }
     }
 
-    /// The names a parameter list binds.
+    /// The names a parameter list binds, of no class the source writes.
     fn bind_params(&mut self, scope: &str, list: Option<Node>) {
         for param in list.into_iter().flat_map(named) {
             for name in names(param) {
@@ -163,14 +215,26 @@ impl Walk<'_> {
                         ));
                     }
                 }
-                "short_var_declaration" | "range_clause" | "receive_statement"
+                "short_var_declaration" => {
+                    if let Some(left) = node.child_by_field_name("left") {
+                        let left = identifiers(left);
+                        let right = node.child_by_field_name("right");
+                        self.assigned(scope, &left, None, right, true);
+                    }
+                }
+                "range_clause" | "receive_statement"
                     if children(node).any(|c| c.kind() == ":=") =>
                 {
                     if let Some(left) = node.child_by_field_name("left") {
                         self.bind(scope, left);
                     }
                 }
-                "var_spec" | "const_spec" | "type_spec" | "type_alias" => {
+                "var_spec" | "const_spec" => {
+                    let ty = node.child_by_field_name("type");
+                    let value = node.child_by_field_name("value");
+                    self.assigned(scope, &names(node), ty, value, true);
+                }
+                "type_spec" | "type_alias" => {
                     for name in names(node) {
                         self.local(scope, text(name, src));
                     }
@@ -197,13 +261,61 @@ impl Walk<'_> {
         }
     }
 
+    /// Turns the names whose every binding writes one class into receivers, and drops the written
+    /// results and receivers whose type a local hides: the shared side reads a type among types
+    /// and modules, so a local type of the same name (or a type parameter) would be missed.
+    fn finish(&mut self) {
+        let hides = |locals: &BTreeSet<String>, scope: &str, class: &Class| {
+            let Class::Type(ty) = class else {
+                return false;
+            };
+            let head = ty.split('.').next().unwrap_or(ty);
+            let mut scope = scope;
+            loop {
+                if locals.contains(&qualify(scope, head)) {
+                    return true;
+                }
+                if scope.is_empty() {
+                    return false;
+                }
+                scope = parent(scope);
+            }
+        };
+        let mut taken = BTreeSet::new();
+        for ((scope, name), events) in std::mem::take(&mut self.bound) {
+            let Some(Some(class)) = events.first() else {
+                continue;
+            };
+            if events.iter().any(|e| e.as_ref() != Some(class))
+                || hides(&self.locals, &scope, class)
+            {
+                continue;
+            }
+            taken.insert(qualify(&scope, &name));
+            let class = class.clone();
+            self.facts.receivers.push(Receiver { scope, name, class });
+        }
+        self.facts.locals.retain(|l| !taken.contains(l));
+        for def in &mut self.facts.defs {
+            if def
+                .result
+                .as_ref()
+                .is_some_and(|c| hides(&self.locals, &def.name, c))
+            {
+                def.result = None;
+            }
+        }
+    }
+
     /// The `Kind::Inline` definition of the function `node` (a literal, or a blank `func _`)
     /// written in `scope`, with its parameters, and the names its results bind: its name.
     fn inline(&mut self, scope: &str, node: Node) -> String {
         let name = qualify(scope, &format!("@{}", node.start_byte()));
-        let params = params(node.child_by_field_name("parameters"), self.src);
+        let list = node.child_by_field_name("parameters");
+        let params = params(list, self.src);
         (self.facts.defs).push(def(name.clone(), Kind::Inline, node.byte_range(), params));
-        self.bind_params(&name, result_list(node));
+        self.typed_params(&name, list, false);
+        self.typed_params(&name, result_list(node), true);
         self.bind_type_params(&name, node);
         name
     }
@@ -213,6 +325,72 @@ impl Walk<'_> {
 fn names(node: Node) -> Vec<Node> {
     let mut cursor = node.walk();
     node.children_by_field_name("name", &mut cursor).collect()
+}
+
+/// The identifiers of the left side of a `:=`.
+fn identifiers(node: Node) -> Vec<Node> {
+    match node.kind() {
+        "identifier" => vec![node],
+        _ => named(node).filter(|n| n.kind() == "identifier").collect(),
+    }
+}
+
+/// The type a type expression names, through a pointer, type arguments and parentheses
+/// (`Store` for `*Store` and `Store[T]`), qualified by its package (`shapes.Circle`). A
+/// slice, a map, a function or any other type literal names none.
+fn type_name(node: Node, src: &[u8]) -> Option<String> {
+    let mut ty = node;
+    for _ in 0..PATH_DEPTH {
+        ty = match ty.kind() {
+            "type_identifier" => return Some(text(ty, src).to_string()),
+            "qualified_type" => {
+                let package = ty.child_by_field_name("package")?;
+                let name = ty.child_by_field_name("name")?;
+                return Some(format!("{}.{}", text(package, src), text(name, src)));
+            }
+            "generic_type" => ty.child_by_field_name("type")?,
+            "pointer_type" | "parenthesized_type" => named(ty).next()?,
+            _ => return None,
+        };
+    }
+    None
+}
+
+/// The class an expression gives, as far as it writes it: a composite literal (`T{}`, `&T{}`)
+/// is a `T`; a call is whatever the function it names returns (`Class::Called`).
+fn value_class(node: Node, src: &[u8]) -> Option<Class> {
+    let (mut node, mut address) = (node, false);
+    for _ in 0..PATH_DEPTH {
+        match node.kind() {
+            "parenthesized_expression" => node = named(node).next()?,
+            "unary_expression" if !address => {
+                let operator = node.child_by_field_name("operator")?;
+                if text(operator, src) != "&" {
+                    return None;
+                }
+                (node, address) = (node.child_by_field_name("operand")?, true);
+            }
+            "composite_literal" => {
+                return type_name(node.child_by_field_name("type")?, src).map(Class::Type);
+            }
+            "call_expression" if !address => {
+                let callee = callee(node.child_by_field_name("function")?, src);
+                return (!callee.starts_with('(')).then_some(Class::Called(callee));
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+/// The class a function's first result writes (`*Store` of `(*Store, error)`).
+fn result_class(node: Node, src: &[u8]) -> Option<Class> {
+    let result = node.child_by_field_name("result")?;
+    let ty = match result.kind() {
+        "parameter_list" => named(result).next()?.child_by_field_name("type")?,
+        _ => result,
+    };
+    type_name(ty, src).map(Class::Type)
 }
 
 /// A function's named results, when it names them.
@@ -421,6 +599,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         src,
         facts: Facts::default(),
         locals: BTreeSet::new(),
+        bound: BTreeMap::new(),
     };
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
@@ -448,12 +627,13 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     1 => name.to_string(),
                     n => format!("{name}#{n}"),
                 };
-                let params = params(node.child_by_field_name("parameters"), src);
+                let list = node.child_by_field_name("parameters");
                 let range = node.byte_range();
-                walk.facts
-                    .defs
-                    .push(def(name.clone(), Kind::Function, range, params));
-                walk.bind_params(&name, result_list(node));
+                let mut function = def(name.clone(), Kind::Function, range, params(list, src));
+                function.result = result_class(node, src);
+                walk.facts.defs.push(function);
+                walk.typed_params(&name, list, false);
+                walk.typed_params(&name, result_list(node), true);
                 walk.bind_type_params(&name, node);
                 if let Some(body) = body {
                     walk.body(&name, body);
@@ -468,11 +648,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     continue;
                 };
                 let qualified = format!("{ty}.{name}");
-                let params = params(node.child_by_field_name("parameters"), src);
-                let method = def(qualified.clone(), Kind::Method, node.byte_range(), params);
+                let list = node.child_by_field_name("parameters");
+                let range = node.byte_range();
+                let mut method = def(qualified.clone(), Kind::Method, range, params(list, src));
+                method.result = result_class(node, src);
                 walk.facts.defs.push(method);
-                walk.bind_params(&qualified, receiver);
-                walk.bind_params(&qualified, result_list(node));
+                walk.typed_params(&qualified, list, false);
+                walk.typed_params(&qualified, receiver, true);
+                walk.typed_params(&qualified, result_list(node), true);
                 for type_param in type_params {
                     walk.local(&qualified, type_param);
                 }
@@ -492,7 +675,19 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         Vec::new(),
                     ));
                     top.push(name.to_string());
+                    walk.bind_type_params(name, spec);
                     let ty = spec.child_by_field_name("type");
+                    for field in (ty.filter(|t| t.kind() == "struct_type").into_iter())
+                        .flat_map(named)
+                        .flat_map(named)
+                        .filter(|f| f.kind() == "field_declaration")
+                    {
+                        let class = field.child_by_field_name("type");
+                        let class = class.and_then(|t| type_name(t, src)).map(Class::Type);
+                        for field in names(field) {
+                            walk.bind_as(name, text(field, src), class.clone(), false);
+                        }
+                    }
                     for elem in ty
                         .filter(|t| t.kind() == "interface_type")
                         .into_iter()
@@ -504,12 +699,10 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         let Some(method) = method else { continue };
                         let params = params(elem.child_by_field_name("parameters"), src);
                         let qualified = format!("{name}.{}", text(method, src));
-                        walk.facts.defs.push(def(
-                            qualified,
-                            Kind::Method,
-                            elem.byte_range(),
-                            params,
-                        ));
+                        let range = elem.byte_range();
+                        let mut method = def(qualified, Kind::Method, range, params);
+                        method.result = result_class(elem, src);
+                        walk.facts.defs.push(method);
                     }
                 }
             }
@@ -521,6 +714,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     specs = named(*list).collect();
                 }
                 for spec in specs {
+                    let ty = spec.child_by_field_name("type");
+                    let value = spec.child_by_field_name("value");
+                    walk.assigned("", &names(spec), ty, value, false);
                     for name in names(spec).into_iter().map(|n| text(n, src)) {
                         if name == "_" {
                             continue;
@@ -540,6 +736,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             _ => walk.body("", node),
         }
     }
+    walk.finish();
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
     facts.exports = (top.into_iter().filter(|n| exported(n)))
@@ -596,6 +793,60 @@ mod tests {
         assert_eq!(inline, DEFINITION_DEPTH);
         let scope = &facts.calls.iter().find(|c| c.callee == "g").unwrap().scope;
         assert_eq!(scope.matches('@').count(), DEFINITION_DEPTH);
+    }
+
+    /// The receivers as `scope name = class`, sorted.
+    fn receivers(src: &str) -> Vec<String> {
+        let mut found: Vec<String> = (facts(src).receivers.into_iter())
+            .map(|r| match r.class {
+                Class::Type(n) => format!("{} {} = {n}", r.scope, r.name),
+                Class::Called(n) => format!("{} {} = {n}()", r.scope, r.name),
+                _ => format!("{} {} = ?", r.scope, r.name),
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn written_types_make_receivers() {
+        let src = "package x\n\n\
+            type T struct {\n\ta, b *p.A\n\tc []B\n\tC\n}\n\n\
+            func (t *T) M(x U, y ...V) (z W, err error) {\n\
+            \tvar v X\n\tq := &Y{}\n\tr, s := f()\n\tu := (g.H{})\n}\n";
+        assert_eq!(
+            receivers(src),
+            [
+                "T a = p.A",
+                "T b = p.A",
+                "T.M err = error",
+                "T.M q = Y",
+                "T.M r = f()",
+                "T.M t = T",
+                "T.M u = g.H",
+                "T.M v = X",
+                "T.M x = U",
+                "T.M z = W",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_name_bound_to_different_types_or_hidden_types_make_none() {
+        let src = "package x\n\n\
+            func f[T any](a *T, b B) {\n\ttype B int\n\tc := C{}\n\t{\n\t\tc := D{}\n\t}\n\
+            \td := E{}\n\td, e := g()\n}\n";
+        assert!(receivers(src).is_empty());
+    }
+
+    #[test]
+    fn a_type_wrapped_in_more_pointers_than_the_limit_is_no_receiver() {
+        let receivers = |n: usize| {
+            let src = format!("package x\n\nfunc f(a {}S) {{}}\n", "*".repeat(n));
+            receivers(&src)
+        };
+        assert_eq!(receivers(PATH_DEPTH - 1), ["f a = S"]);
+        assert!(receivers(PATH_DEPTH).is_empty());
     }
 
     #[test]

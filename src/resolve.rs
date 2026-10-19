@@ -782,7 +782,8 @@ impl<'a> Resolver<'a> {
                 let (seen, reading) = (&mut self.seen(path, scope), Reading::Path);
                 self.resolve_as(path, scope, class, seen, work, reading)
             }
-            Class::Returned(callee) => self.returned(path, scope, callee, work),
+            Class::Returned(callee) => self.returned(path, scope, callee, false, work),
+            Class::Called(callee) => self.returned(path, scope, callee, true, work),
             Class::Imported | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
@@ -796,16 +797,18 @@ impl<'a> Resolver<'a> {
     /// What a call to `callee`, written in `scope`, gives: the class its definition writes as
     /// its result (`Def::result`), the class itself for a constructor, or something outside the
     /// repository for a call that reaches outside. A call that is not exact gives nothing known.
-    /// Only `instance` calls it, so `RECEIVER_DEPTH` bounds a chain of results.
+    /// Only `instance` calls it, so `RECEIVER_DEPTH` bounds a chain of results. A callee written
+    /// as a `value` is read as an expression (`Class::Called`), a dotted one otherwise as a path.
     fn returned(
         &self,
         path: &'a str,
         scope: &'a str,
         callee: &'a str,
+        value: bool,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let (seen, path_reading) = (&mut self.seen(path, scope), Reading::Path);
-        let by_path = callee.rsplit_once('.');
+        let by_path = callee.rsplit_once('.').filter(|_| !value);
         let reading = if by_path.is_some() {
             path_reading
         } else {
@@ -856,11 +859,28 @@ impl<'a> Resolver<'a> {
             if let Some((name, _)) = self.defs[c.path].get_key_value(qualified.as_str()) {
                 return Binding::Def(Target { path: c.path, name });
             }
+            if let Some(found) = self.sibling_method(c, &qualified) {
+                return found;
+            }
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
             }
         }
         Binding::Unknown
+    }
+
+    /// The method `qualified` (`Type.method`) of `class` that another file of its package
+    /// declares (`Layout::shared`): Go declares methods apart from the type.
+    fn sibling_method(&self, class: Target<'a>, qualified: &str) -> Option<Binding<'a>> {
+        let group = &self.groups[*self.shared.get(class.path)?];
+        group
+            .files
+            .iter()
+            .filter(|f| **f != class.path)
+            .find_map(|&path| {
+                let (name, def) = self.defs[path].get_key_value(qualified)?;
+                (def.kind == Kind::Method).then_some(Binding::Def(Target { path, name }))
+            })
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the

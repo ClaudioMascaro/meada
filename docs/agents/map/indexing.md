@@ -353,7 +353,11 @@ modules updates it.
   Top-level `const` and `var` names are `Facts::consts` (no value yet); names bound inside a
   function (`:=`, `var`, `const` and `type` in a block, `range`, `select` receives, type switch
   bindings, named results, type parameters, a method's receiver and the type parameters its
-  type arguments name) are its locals. Exports are the top-level names that start with an
+  type arguments name) are its locals, unless every binding of the name in the function writes
+  one class (`Walk::finish`): then it is a `Receiver` (`Class::Type` for a parameter, the method
+  receiver, a named result, a `var` with a type, a composite literal; `Class::Called` for a
+  call, whose function's `Def::result` is its first result type). A struct's named fields are
+  receivers in the struct's scope. Exports are the top-level names that start with an
   upper-case letter. Imports: plain (`assumed_name`) and aliased ones are
   `Imported::Namespace`, a dot import `Imported::All`, a blank one nothing; a name two imports
   give is imported from the empty specifier, which names nothing (`unbind_clashes`). `parse`
@@ -395,7 +399,9 @@ modules updates it.
   which `call` answers as `Ambiguous` with exactly them), then the class's own `Class.m`, and
   `class` (the `receiver` keyword, `Self`) answers the block's type inside a block. `instance`
   reads `Class::Returned` through `returned`: the callee resolved as a call (a path with
-  `path_binding`), its definition's `Def::result` resolved from the function's own scope. A
+  `path_binding`), its definition's `Def::result` resolved from the function's own scope;
+  `Class::Called` (Go) reads the callee as a value expression instead, so `h.Counter()` follows
+  the receiver `h` to its class's method (`returned(.., value)`). A
   `Kind::Module` definition is a member chain like a function (`inner.helper`); one an import
   of its own name binds to a file (`mod store;`) has that file's exports as members; `lexical`
   stops climbing at one, so a module written in place does not see the names around it (only

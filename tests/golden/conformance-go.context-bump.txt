@@ -1,0 +1,30 @@
+example.com/acme/conformance methods/types.go:11-14 Counter.Bump
+community: methods#3
+processes: 16 (16 export; 1 repository): Capture (example.com/acme/conformance), FromClosure (example.com/acme/conformance), FromLiteral (example.com/acme/conformance), FromMethodResult (example.com/acme/conformance), FromPackageVar (example.com/acme/conformance), FromParam (example.com/acme/conformance), FromResult (example.com/acme/conformance), FromValueParam (example.com/acme/conformance), FromVar (example.com/acme/conformance), FromVarLiteral (example.com/acme/conformance), LocalType (example.com/acme/conformance), NotWritten (example.com/acme/conformance), Rebound (example.com/acme/conformance), ReboundByParam (example.com/acme/conformance), Counter.Twice (example.com/acme/conformance), Holder.Run (example.com/acme/conformance)
+func (c *Counter) Bump() int {
+	c.n++
+	return c.n
+}
+callers:
+example.com/acme/conformance methods/calls.go:13 FromParam
+example.com/acme/conformance methods/calls.go:17 FromValueParam
+example.com/acme/conformance methods/calls.go:22 FromVar
+example.com/acme/conformance methods/calls.go:24 FromVar
+example.com/acme/conformance methods/calls.go:29 FromLiteral
+example.com/acme/conformance methods/calls.go:31 FromLiteral
+example.com/acme/conformance methods/calls.go:36 FromVarLiteral
+example.com/acme/conformance methods/calls.go:42 FromResult
+example.com/acme/conformance methods/calls.go:45 FromResult
+example.com/acme/conformance methods/calls.go:59 FromMethodResult
+example.com/acme/conformance methods/calls.go:71 FromPackageVar
+example.com/acme/conformance methods/calls.go:72 FromPackageVar
+example.com/acme/conformance methods/calls.go:87 FromClosure
+example.com/acme/conformance methods/calls.go:98 NotWritten [inferred: one method named Bump]
+example.com/acme/conformance methods/calls.go:116 Rebound [inferred: one method named Bump]
+example.com/acme/conformance methods/calls.go:124 ReboundByParam [inferred: one method named Bump]
+example.com/acme/conformance methods/calls.go:131 LocalType [inferred: one method named Bump]
+example.com/acme/conformance methods/calls.go:145 Capture
+example.com/acme/conformance methods/types.go:18 Counter.Twice
+example.com/acme/conformance methods/types.go:19 Counter.Twice
+example.com/acme/conformance methods/types.go:53 Holder.Run
+callees: none
