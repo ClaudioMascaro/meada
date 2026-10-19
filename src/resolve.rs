@@ -332,6 +332,11 @@ pub struct Resolver<'a> {
 struct Group<'a> {
     files: Vec<&'a str>,
     tops: HashMap<&'a str, Vec<&'a str>>,
+    /// The files whose definition of each name (`defs`) is a method, in order.
+    methods: HashMap<&'a str, Vec<&'a str>>,
+    /// Where in `files` sit the files that name each name in their exports, and those with a
+    /// star export.
+    exporting: Named<'a>,
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
@@ -360,6 +365,16 @@ impl<'a> Resolver<'a> {
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
     ) -> Self {
+        let defs: HashMap<&str, HashMap<&str, &Def>> = files
+            .iter()
+            .map(|(path, facts)| {
+                let names = facts.defs.iter().map(|d| (d.name.as_str(), d)).collect();
+                (*path, names)
+            })
+            .collect();
+        let named: HashMap<&str, Named> = (files.iter())
+            .map(|(path, facts)| (*path, Named::exports(&facts.exports)))
+            .collect();
         let mut groups = Vec::new();
         let mut sharing = HashMap::new();
         for group in &shared {
@@ -380,21 +395,28 @@ impl<'a> Resolver<'a> {
                     }
                 }
             }
-            for &path in &members {
+            let (mut methods, mut exporting) = (HashMap::new(), Named::default());
+            for (at, &path) in members.iter().enumerate() {
+                let defs = defs[path].iter().filter(|(_, d)| d.kind == Kind::Method);
+                for (&name, _) in defs {
+                    methods.entry(name).or_insert_with(Vec::new).push(path);
+                }
+                let named: &Named = &named[path];
+                for &name in named.names.keys() {
+                    exporting.names.entry(name).or_default().push(at);
+                }
+                if !named.stars.is_empty() {
+                    exporting.stars.push(at);
+                }
                 sharing.insert(path, groups.len());
             }
             groups.push(Group {
                 files: members,
                 tops,
+                methods,
+                exporting,
             });
         }
-        let defs: HashMap<&str, HashMap<&str, &Def>> = files
-            .iter()
-            .map(|(path, facts)| {
-                let names = facts.defs.iter().map(|d| (d.name.as_str(), d)).collect();
-                (*path, names)
-            })
-            .collect();
         let written = (files.values())
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
@@ -436,9 +458,6 @@ impl<'a> Resolver<'a> {
                     .collect();
                 (*path, names)
             })
-            .collect();
-        let named = (files.iter())
-            .map(|(path, facts)| (*path, Named::exports(&facts.exports)))
             .collect();
         let by_local = (files.iter())
             .map(|(path, facts)| (*path, Named::imports(&facts.imports)))
@@ -956,14 +975,9 @@ impl<'a> Resolver<'a> {
     /// declares (`Layout::shared`): Go declares methods apart from the type.
     fn sibling_method(&self, class: Target<'a>, qualified: &str) -> Option<Binding<'a>> {
         let group = &self.groups[*self.shared.get(class.path)?];
-        group
-            .files
-            .iter()
-            .filter(|f| **f != class.path)
-            .find_map(|&path| {
-                let (name, def) = self.defs[path].get_key_value(qualified)?;
-                (def.kind == Kind::Method).then_some(Binding::Def(Target { path, name }))
-            })
+        let (&name, files) = group.methods.get_key_value(qualified)?;
+        let path = *files.iter().find(|f| **f != class.path)?;
+        Some(Binding::Def(Target { path, name }))
     }
 
     /// `member` of `class` in its blocks (`Facts::impls`): the inherent blocks' first, else the
@@ -1627,11 +1641,16 @@ impl<'a> Resolver<'a> {
         let Some(&group) = self.shared.get(path) else {
             return self.file_exports(path, name, seen, value);
         };
-        let files = self.groups[group].files.iter().filter(|f| {
-            let named = &self.named[**f];
-            !named.of(name).is_empty() || !named.stars.is_empty()
-        });
-        let found = files.filter_map(|&f| self.file_exports(f, name, seen, value));
+        // Only the files that name `name` in their exports, or export every name, may give it.
+        let Group {
+            files, exporting, ..
+        } = &self.groups[group];
+        let mut at = [exporting.of(name), exporting.stars.as_slice()].concat();
+        at.sort_unstable();
+        at.dedup();
+        let found = at
+            .into_iter()
+            .filter_map(|at| self.file_exports(files[at], name, seen, value));
         one(found.collect())
     }
 
@@ -3981,6 +4000,49 @@ mod tests {
         }
         // Each name was looked up among the function's parameters and their fields one by one,
         // to bind it and to tell it from a `let mut` around: minutes here.
+        let took = start.elapsed();
+        assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    #[test]
+    fn a_package_of_many_files_finds_each_method_and_export_in_linear_time() {
+        let n = 30_000;
+        let paths: Vec<String> = (0..n).map(|i| format!("p/f{i}.go")).collect();
+        let exported: Vec<String> = (0..n).map(|i| format!("e{i}")).collect();
+        // File `i` of one package declares the method `T.m{i}` and exports `e{i}`.
+        let facts: Vec<Facts> = (0..n)
+            .map(|i| Facts {
+                defs: vec![Def {
+                    kind: Kind::Method,
+                    ..module_def(&format!("T.m{i}"))
+                }],
+                exports: vec![Export::Local {
+                    exported: exported[i].clone(),
+                    local: exported[i].clone(),
+                }],
+                ..Facts::default()
+            })
+            .collect();
+        let files: BTreeMap<&str, &Facts> =
+            (paths.iter().map(String::as_str)).zip(&facts).collect();
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::with_shared(&files, modules, vec![paths.clone()], &Python);
+        let (first, class) = (
+            paths[0].as_str(),
+            Target {
+                path: &paths[0],
+                name: "T",
+            },
+        );
+        let start = std::time::Instant::now();
+        for i in 1..n {
+            let found = resolver.sibling_method(class, &format!("T.m{i}"));
+            assert!(matches!(found, Some(Binding::Def(t)) if t.path == paths[i]));
+            let seen = &mut resolver.seen(first, "");
+            assert!(resolver.exports(first, &exported[i], seen, false).is_some());
+        }
+        // Each name was looked up in every file of the package, for a method declared apart
+        // from its type and for an export of the package: minutes here.
         let took = start.elapsed();
         assert!(took.as_secs() < 20, "{took:?}");
     }
