@@ -19,6 +19,15 @@ func ConfluentProduce() {
 	p.Produce(&kafka.Message{TopicPartition: kafka.TopicPartition{Topic: &unknown}}, nil)
 }
 
+// The pointer is written through: the topic is not the one it was bound to.
+func ConfluentDeref() {
+	p, _ := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "kafka:9092"})
+	first := "first"
+	tp := kafka.TopicPartition{Topic: &first}
+	*tp.Topic = "second"
+	p.Produce(&kafka.Message{TopicPartition: tp}, nil)
+}
+
 func ConfluentConsume() {
 	c, _ := kafka.NewConsumer(&kafka.ConfigMap{"group.id": "orders"})
 	c.Subscribe("payments", nil)

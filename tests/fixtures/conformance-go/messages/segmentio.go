@@ -64,6 +64,26 @@ func ConsumeUnknown() *kafka.Reader {
 	return kafka.NewReader(kafka.ReaderConfig{Topic: os.Getenv("EVENTS_TOPIC")})
 }
 
+// A function of the repository that is called `NewWriter` is not kafka-go's: the topic it gives
+// its writer is not the argument's.
+type WriterConfig struct{ Topic string }
+
+func NewWriter(c WriterConfig) *kafka.Writer {
+	return &kafka.Writer{Topic: "real." + c.Topic}
+}
+
+func ProduceLookalike(ctx context.Context) {
+	w := NewWriter(WriterConfig{Topic: "fake"})
+	w.WriteMessages(ctx, kafka.Message{Value: []byte("l")})
+}
+
+// Wrappers nobody calls keep their parameter: the topic is unresolved, not absent.
+type Publisher struct{ w *kafka.Writer }
+
+func (p *Publisher) Send(ctx context.Context, topic string) {
+	p.w.WriteMessages(ctx, kafka.Message{Topic: topic})
+}
+
 func ReadLoop(ctx context.Context, r *kafka.Reader) {
 	for {
 		if _, err := r.ReadMessage(ctx); err != nil {

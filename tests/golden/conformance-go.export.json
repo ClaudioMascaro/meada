@@ -59,7 +59,7 @@
     },
     {
       "path": "messages/confluent.go",
-      "hash": "94cbfdc46922dbee88baa8d755cb5302486a9fc616a2676c68983be53127ac1f"
+      "hash": "1f46d24faf37391e8c2127e52c33a76d1f3c3a0bd817d55f13baf3d132fb9a15"
     },
     {
       "path": "messages/queues.go",
@@ -71,15 +71,15 @@
     },
     {
       "path": "messages/sarama.go",
-      "hash": "d451296b1b824fab1a961311da394653ed6eebeff7da0771032561f82ba632cf"
+      "hash": "0c031d806c48ef83747869c8857b1645cbc0ac8956c9af8d4c2eb406dadf7ef5"
     },
     {
       "path": "messages/segmentio.go",
-      "hash": "3468c2d804dab5df56338c946eacd89ab0e59cbbb6c2fe478121fb65ecefd0f2"
+      "hash": "f2e4a854d91ca72fa0e0a3a94b7dc85784e2fe2ab5c423a27ba1465def2111cb"
     },
     {
       "path": "messages/shadowed.go",
-      "hash": "f48a5c458038ec23f9342987cb8b35fa061ba5b1e5d6533df57ba86b6fa4d4ad"
+      "hash": "99c7222b4f833651e698577db3f5c31b31b622b9c0e675cdc6167a5a57876c05"
     },
     {
       "path": "messages/streams.go",
@@ -651,16 +651,24 @@
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
       "span": {
         "path": "messages/confluent.go",
-        "start": 638,
-        "end": 845
+        "start": 957,
+        "end": 1164
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref",
+      "span": {
+        "path": "messages/confluent.go",
+        "start": 715,
+        "end": 955
       }
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.go::ConfluentPattern",
       "span": {
         "path": "messages/confluent.go",
-        "start": 923,
-        "end": 1014
+        "start": 1242,
+        "end": 1333
       }
     },
     {
@@ -731,16 +739,16 @@
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaGroup",
       "span": {
         "path": "messages/sarama.go",
-        "start": 957,
-        "end": 1221
+        "start": 1153,
+        "end": 1417
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaPartition",
       "span": {
         "path": "messages/sarama.go",
-        "start": 345,
-        "end": 500
+        "start": 541,
+        "end": 696
       }
     },
     {
@@ -752,35 +760,43 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sarama.go::SaramaSend",
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 429,
+        "end": 539
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler",
       "span": {
         "path": "messages/sarama.go",
-        "start": 573,
-        "end": 594
+        "start": 769,
+        "end": 790
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Cleanup",
       "span": {
         "path": "messages/sarama.go",
-        "start": 674,
-        "end": 751
+        "start": 870,
+        "end": 947
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
       "span": {
         "path": "messages/sarama.go",
-        "start": 752,
-        "end": 955
+        "start": 948,
+        "end": 1151
       }
     },
     {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Setup",
       "span": {
         "path": "messages/sarama.go",
-        "start": 596,
-        "end": 673
+        "start": 792,
+        "end": 869
       }
     },
     {
@@ -816,11 +832,27 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::NewWriter",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2246,
+        "end": 2342
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceAll",
       "span": {
         "path": "messages/segmentio.go",
         "start": 157,
         "end": 451
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2344,
+        "end": 2492
       }
     },
     {
@@ -848,11 +880,35 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::Publisher",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2583,
+        "end": 2618
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2620,
+        "end": 2736
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::ReadLoop",
       "span": {
         "path": "messages/segmentio.go",
-        "start": 2070,
-        "end": 2197
+        "start": 2738,
+        "end": 2865
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/segmentio.go::WriterConfig",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2209,
+        "end": 2244
       }
     },
     {
@@ -875,40 +931,96 @@
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 139,
-        "end": 154
+        "start": 208,
+        "end": 223
       }
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 222,
-        "end": 287
+        "start": 291,
+        "end": 356
       }
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 156,
-        "end": 221
+        "start": 225,
+        "end": 290
       }
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 288,
-        "end": 353
+        "start": 357,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Service",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1259,
+        "end": 1286
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1288,
+        "end": 1376
       }
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Shadowed",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 355,
-        "end": 496
+        "start": 424,
+        "end": 565
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 795,
+        "end": 999
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 643,
+        "end": 710
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1001,
+        "end": 1125
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Sink",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1184,
+        "end": 1252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1202,
+        "end": 1250
       }
     },
     {
@@ -4383,8 +4495,8 @@
       "level": null,
       "span": {
         "path": "messages/confluent.go",
-        "start": 829,
-        "end": 840
+        "start": 1148,
+        "end": 1159
       }
     },
     {
@@ -4394,8 +4506,8 @@
       "level": null,
       "span": {
         "path": "messages/confluent.go",
-        "start": 732,
-        "end": 760
+        "start": 1051,
+        "end": 1079
       }
     },
     {
@@ -4405,8 +4517,8 @@
       "level": null,
       "span": {
         "path": "messages/confluent.go",
-        "start": 762,
-        "end": 819
+        "start": 1081,
+        "end": 1138
       }
     },
     {
@@ -4416,8 +4528,30 @@
       "level": null,
       "span": {
         "path": "messages/confluent.go",
-        "start": 673,
-        "end": 730
+        "start": 992,
+        "end": 1049
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref::kafka.NewProducer#0",
+      "caller": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/confluent.go",
+        "start": 748,
+        "end": 818
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref::p.Produce#0",
+      "caller": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/confluent.go",
+        "start": 903,
+        "end": 953
       }
     },
     {
@@ -4427,8 +4561,8 @@
       "level": null,
       "span": {
         "path": "messages/confluent.go",
-        "start": 967,
-        "end": 1012
+        "start": 1286,
+        "end": 1331
       }
     },
     {
@@ -4790,8 +4924,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 1101,
-        "end": 1160
+        "start": 1297,
+        "end": 1356
       }
     },
     {
@@ -4801,8 +4935,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 1162,
-        "end": 1219
+        "start": 1358,
+        "end": 1415
       }
     },
     {
@@ -4812,8 +4946,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 1010,
-        "end": 1072
+        "start": 1206,
+        "end": 1268
       }
     },
     {
@@ -4823,8 +4957,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 435,
-        "end": 498
+        "start": 631,
+        "end": 694
       }
     },
     {
@@ -4834,8 +4968,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 386,
-        "end": 433
+        "start": 582,
+        "end": 629
       }
     },
     {
@@ -4883,14 +5017,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sarama.go::SaramaSend::p.SendMessage#0",
+      "caller": "example.com/acme/conformance::messages/sarama.go::SaramaSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 485,
+        "end": 537
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim::claim.Messages#0",
       "caller": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
       "target": null,
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 885,
-        "end": 901
+        "start": 1081,
+        "end": 1097
       }
     },
     {
@@ -4900,8 +5045,8 @@
       "level": null,
       "span": {
         "path": "messages/sarama.go",
-        "start": 906,
-        "end": 938
+        "start": 1102,
+        "end": 1134
       }
     },
     {
@@ -5004,6 +5149,28 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::NewWriter#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+      "target": "example.com/acme/conformance::messages/segmentio.go::NewWriter",
+      "level": "exact",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2395,
+        "end": 2433
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::w.WriteMessages#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2435,
+        "end": 2490
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceMade::newWriter#0",
       "caller": "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
       "target": "example.com/acme/conformance::messages/segmentio.go::newWriter",
@@ -5081,14 +5248,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send::p.w.WriteMessages#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2683,
+        "end": 2734
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::ReadLoop::r.ReadMessage#0",
       "caller": "example.com/acme/conformance::messages/segmentio.go::ReadLoop",
       "target": null,
       "level": null,
       "span": {
         "path": "messages/segmentio.go",
-        "start": 2146,
-        "end": 2164
+        "start": 2814,
+        "end": 2832
       }
     },
     {
@@ -5114,14 +5292,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Service.Run::s.sink.WriteMessages#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1334,
+        "end": 1374
+      }
+    },
+    {
       "id": "example.com/acme/conformance::messages/shadowed.go::Shadowed::o.Publish#0",
       "caller": "example.com/acme/conformance::messages/shadowed.go::Shadowed",
       "target": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
       "level": "exact",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 444,
-        "end": 470
+        "start": 513,
+        "end": 539
       }
     },
     {
@@ -5131,8 +5320,8 @@
       "level": "exact",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 404,
-        "end": 442
+        "start": 473,
+        "end": 511
       }
     },
     {
@@ -5142,8 +5331,64 @@
       "level": "exact",
       "span": {
         "path": "messages/shadowed.go",
-        "start": 472,
-        "end": 494
+        "start": 541,
+        "end": 563
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::w.WriteMessages#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+        "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+      ],
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 888,
+        "end": 923
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::w.WriteMessages#1",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+        "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+      ],
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 962,
+        "end": 994
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport::nats.Publish#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 680,
+        "end": 708
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange::w.WriteMessages#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+        "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+      ],
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1085,
+        "end": 1120
       }
     },
     {
@@ -9681,11 +9926,27 @@
     },
     {
       "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref::p.Produce#0"
+    },
+    {
+      "contract": "channel::kafka",
       "site": "example.com/acme/conformance::messages/confluent.go::ConfluentProduce::p.Produce#2"
     },
     {
       "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::messages/sarama.go::SaramaSend::p.SendMessage#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::w.WriteMessages#0"
+    },
+    {
+      "contract": "channel::kafka",
       "site": "example.com/acme/conformance::messages/segmentio.go::ProduceUnknown::w.WriteMessages#0"
+    },
+    {
+      "contract": "channel::kafka",
+      "site": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send::p.w.WriteMessages#0"
     },
     {
       "contract": "channel::kafka::audits",
@@ -10743,17 +11004,32 @@
     {
       "name": "messages#3",
       "members": [
-        "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
-        "example.com/acme/conformance::messages/segmentio.go::newWriter"
+        "example.com/acme/conformance::messages/segmentio.go::NewWriter",
+        "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike"
       ]
     },
     {
       "name": "messages#4",
       "members": [
+        "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
+        "example.com/acme/conformance::messages/segmentio.go::newWriter"
+      ]
+    },
+    {
+      "name": "messages#5",
+      "members": [
         "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
         "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
         "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd",
-        "example.com/acme/conformance::messages/shadowed.go::Shadowed"
+        "example.com/acme/conformance::messages/shadowed.go::Shadowed",
+        "example.com/acme/conformance::messages/shadowed.go::ShadowedImport"
+      ]
+    },
+    {
+      "name": "messages#6",
+      "members": [
+        "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+        "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
       ]
     },
     {
@@ -12577,6 +12853,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref",
+      "kind": "export",
+      "label": "ConfluentDeref",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/confluent.go::ConfluentDeref::p.Produce#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::messages/confluent.go::ConfluentPattern::channel::kafka",
       "kind": "channel",
       "label": "channel::kafka (unresolved)",
@@ -12882,6 +13181,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::messages/sarama.go::SaramaSend",
+      "kind": "export",
+      "label": "SaramaSend",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/sarama.go::SaramaSend"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/sarama.go::SaramaSend::p.SendMessage#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim::channel::kafka::invoices",
       "kind": "channel",
       "label": "channel::kafka::invoices",
@@ -13054,6 +13376,36 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+      "kind": "export",
+      "label": "ProduceLookalike",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/segmentio.go::NewWriter"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::w.WriteMessages#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
       "kind": "export",
       "label": "ProduceMade",
@@ -13136,6 +13488,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
+      "kind": "export",
+      "label": "Publisher.Send",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send::p.w.WriteMessages#0",
+          "mark": "produces",
+          "contract": "channel::kafka"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::messages/segmentio.go::ReadLoop",
       "kind": "export",
       "label": "ReadLoop",
@@ -13146,6 +13521,27 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::messages/segmentio.go::ReadLoop"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+      "kind": "export",
+      "label": "Service.Run",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/shadowed.go::Service.Run"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
         }
       ]
     },
@@ -13181,6 +13577,91 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+      "kind": "export",
+      "label": "ShadowedBlock",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::w.WriteMessages#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+            "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::w.WriteMessages#1",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+            "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
+      "kind": "export",
+      "label": "ShadowedImport",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange",
+      "kind": "export",
+      "label": "ShadowedRange",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange::w.WriteMessages#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+            "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+          ]
         }
       ]
     },

@@ -2,6 +2,7 @@ example.com/acme/conformance store/store.go:9 New
 example.com/acme/conformance client/rest.go:53 newClient
 example.com/acme/conformance internal/http-utils/utils.go:3 NewRequest
 example.com/acme/conformance internal/shapes/shapes.go:19 NewCircle
+example.com/acme/conformance messages/segmentio.go:71 NewWriter
 example.com/acme/conformance messages/segmentio.go:31 newWriter
 example.com/acme/conformance methods/types.go:63 NewCounter
 example.com/acme/conformance web/stdlib.go:82 newAPI

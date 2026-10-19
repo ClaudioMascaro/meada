@@ -344,14 +344,25 @@ fn form<'a>(
 
 /// Whether the call `NewReader` of `call` is kafka-go's: a function of the package.
 fn is_kafka_reader<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> bool {
-    let Some((head, _)) = call.callee.split_once('.') else {
+    is_library(code, path, &call.scope, &call.callee, "NewReader")
+}
+
+/// Whether `callee`, written in `scope` of `path`, is the function `function` of kafka-go.
+fn is_library<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    callee: &'a str,
+    function: &str,
+) -> bool {
+    let Some((head, _)) = callee.split_once('.') else {
         return false;
     };
-    if code.external(path, &call.scope, head).is_none() {
+    if code.external(path, scope, head).is_none() {
         return false;
     }
-    let named = code.external(path, &call.scope, &call.callee);
-    named.is_some_and(|n| versionless(&n) == format!("{KAFKA_GO}.NewReader"))
+    let named = code.external(path, scope, callee);
+    named.is_some_and(|n| versionless(&n) == format!("{KAFKA_GO}.{function}"))
 }
 
 /// The topics of `kafka.NewReader(kafka.ReaderConfig{Topic:, GroupTopics:})`.
@@ -381,13 +392,21 @@ fn configured<'a>(
     receiver: &'a str,
 ) -> Option<Option<String>> {
     let ((file, constant), value) = code.constant(path, &call.scope, receiver)?;
+    let scope = crate::parent(constant);
     let config = match value {
-        Value::Call(made) if made.callee.ends_with("NewWriter") => made.args.first()?,
+        // Only the library's constructor: a function of the repository of the same name says
+        // nothing about the topic its writer has.
+        Value::Call(made) if is_library(code, file, scope, &made.callee, "NewWriter") => {
+            made.args.first()?
+        }
         Value::Call(_) => return None,
         value => value,
     };
+    // A `Topic` written after the literal (`w.Topic = ..`) may be any other.
+    if code.field_written("Topic") {
+        return Some(None);
+    }
     let topic = field(config, "Topic")??;
-    let scope = crate::parent(constant);
     let folded = code.value(file, scope, topic);
     let named = name(&folded).unwrap_or(None);
     // An empty topic leaves the messages to name it.

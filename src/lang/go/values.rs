@@ -367,6 +367,9 @@ pub(super) enum Keep {
     /// It is the fallback `if v == "" { v = .. }` to this value: the read stays when the value
     /// is plain (`plain`), since Meada never reads a default.
     Default(Value),
+    /// The address of a name is taken as the `Topic` of a `TopicPartition` literal: the name
+    /// stays a constant unless the scope writes through a dereference.
+    Pointer,
 }
 
 /// What the assignment `node`, written in `scope` at function literal nesting `depth`, does to

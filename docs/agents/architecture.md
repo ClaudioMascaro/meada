@@ -246,11 +246,13 @@ one for the area a change touches.
   `values::composite` gives `Value::New(Type, [Object(fields)])` for a struct written with its
   type and `Value::List` for a slice (`Code::eval` descends into `New`); `aws.String(x)` is `x`.
   A callback is the handler (`Handler::Inline`, or `Def` for a function or a method value
-  `a.onAudit`, through `Code::method`); a polling client's handler is the function containing
+  `a.onAudit`, through `Code::definition`); a polling client's handler is the function containing
   the call that names the topic, queue or stream (the `consume` default); a sarama group's is
-  the `ConsumeClaim` of the type its `Consume` is given. A writer that names a topic
-  (`kafka.Writer{Topic:}`) stands for its messages, read from `Code::constant` of the writer's
-  name; a writer a function made, or one with no topic, is read from each message. The
+  the `ConsumeClaim` of the type its `Consume` is given (`Code::method`, which serves nothing
+  else). A writer that names a topic (`kafka.Writer{Topic:}`, or the argument of kafka-go's own
+  `NewWriter`, never a repository function of that name) stands for its messages, read from
+  `Code::constant` of the writer's name, and a `Topic` field written anywhere in the repository
+  (`Code::field_written`, the markers of #79) leaves it unresolved; a writer a function made, or one with no topic, is read from each message. The
   `xlang-go-*` fixtures carry a TypeScript producer to the Go consumer group.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
   `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
@@ -685,9 +687,11 @@ one for the area a change touches.
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
   in a block, an `if` or a loop), so a name bound again, assigned or shadowed holds no value
   (the `Hidden` binding wins); a function returns a value only for a `return` of one expression.
-  A name whose address is taken (`&p`) is no constant, except `&p` as the `Topic:` of a literal
-  (confluent-kafka-go's `*string`; `ponytail:` in `Walk::body`): a write through that pointer is
-  not seen. A struct literal nests as deep as `VALUE_DEPTH`; one written by position, a map and
+  A name whose address is taken (`&p`) is no constant, except `&p` as the `Topic:` of a
+  `TopicPartition` literal (confluent-kafka-go's `*string`; `ponytail:` in `Walk::body`,
+  `Keep::Pointer`), unless the function, or one around or inside it, writes through a
+  dereference (`*x = ..`, `*x.Topic = ..`): no alias analysis, so `*q = ..` of another pointer
+  counts too. A struct literal nests as deep as `VALUE_DEPTH`; one written by position, a map and
   a literal of any other type are `Unknown`. A name bound in a block or an `if` hides
   the name in the whole function for constants (absence only: a router or path written outside
   the block after such a binding yields no provider; the receivers of the pack hold a name for a

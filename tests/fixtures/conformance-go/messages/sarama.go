@@ -13,6 +13,11 @@ func SaramaProduce() {
 	producer.SendMessage(message)
 }
 
+// A wrapper nobody calls keeps its parameter: the topic is unresolved, not absent.
+func SaramaSend(p sarama.SyncProducer, topic string) {
+	p.SendMessage(&sarama.ProducerMessage{Topic: topic})
+}
+
 func SaramaPartition() {
 	consumer, _ := sarama.NewConsumer([]string{"kafka:9092"}, nil)
 	consumer.ConsumePartition("refunds.eu", 0, sarama.OffsetNewest)

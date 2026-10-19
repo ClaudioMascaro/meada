@@ -2581,6 +2581,20 @@ fn go() {
             "internal/shapes/shapes.go::clamp",
             "internal/units/units.go::Meters",
             "legacy/old/old.go::Old",
+            "messages/confluent.go::ConfluentDeref",
+            "messages/sarama.go::SaramaSend",
+            "messages/segmentio.go::NewWriter",
+            "messages/segmentio.go::ProduceLookalike",
+            "messages/segmentio.go::Publisher",
+            "messages/segmentio.go::Publisher.Send",
+            "messages/segmentio.go::WriterConfig",
+            "messages/shadowed.go::Service",
+            "messages/shadowed.go::Service.Run",
+            "messages/shadowed.go::ShadowedBlock",
+            "messages/shadowed.go::ShadowedImport",
+            "messages/shadowed.go::ShadowedRange",
+            "messages/shadowed.go::Sink",
+            "messages/shadowed.go::Sink.WriteMessages",
             "messages/confluent.go::ConfluentConsume",
             "messages/confluent.go::ConfluentPattern",
             "messages/confluent.go::ConfluentProduce",
@@ -6441,6 +6455,16 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
                 "channel::kafka",
                 &segmentio("ProduceUnknown::w.WriteMessages#0")
             ),
+            // The repository's `NewWriter` is not kafka-go's, and a wrapper nobody calls keeps
+            // its parameter.
+            (
+                "channel::kafka",
+                &segmentio("ProduceLookalike::w.WriteMessages#0")
+            ),
+            (
+                "channel::kafka",
+                &segmentio("Publisher.Send::p.w.WriteMessages#0")
+            ),
         ])
     );
     assert_eq!(
@@ -6475,6 +6499,8 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
                 "channel::kafka",
                 &confluent("ConfluentProduce::p.Produce#2")
             ),
+            // The pointer is written through.
+            ("channel::kafka", &confluent("ConfluentDeref::p.Produce#0")),
         ])
     );
     assert_eq!(
@@ -6512,6 +6538,7 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
                 "channel::kafka::payments",
                 &sarama("SaramaProduce::producer.SendMessage#1")
             ),
+            ("channel::kafka", &sarama("SaramaSend::p.SendMessage#0")),
         ])
     );
     assert_eq!(
@@ -6718,4 +6745,14 @@ fn go_sqs_nats_and_redis_clients_are_channel_producers_and_consumers() {
 fn go_channel_methods_of_the_repositorys_own_types_are_no_sides() {
     let (_, producers, consumers) = go_channels("go_shadowed", "shadowed.go");
     assert_eq!((producers, consumers), (vec![], vec![]));
+}
+
+/// A field of the writer written after its literal (`w.Topic = ..`) leaves the topic unknown.
+#[test]
+fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
+    let (_, producers) = providers("go_kafka_written", "go-channels-written", "writer.go::");
+    assert_eq!(
+        producers,
+        pairs(&[("channel::kafka", "writer.go::Produce::w.WriteMessages#0")])
+    );
 }

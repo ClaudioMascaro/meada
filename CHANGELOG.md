@@ -105,7 +105,7 @@ All notable changes to Meada are recorded here. The format follows
   fields of a composite literal included; a name that cannot be folded, a pattern topic and a
   producer whose receiver does not come from the library are unresolved or no side. A callback
   client's handler is the callback, a polling client's the function that names the topic or
-  queue. `&topic` as the `Topic:` of a literal keeps the name a constant. The cross-language
+  queue. `&topic` as the `Topic:` of a `TopicPartition` keeps the name a constant unless the function writes through a pointer; a `Topic` field written anywhere leaves a writer's topic unresolved. The cross-language
   fixtures carry a TypeScript producer to a Go consumer group, with a golden `trace`. The index
   is not rebuilt (no schema change).
 
