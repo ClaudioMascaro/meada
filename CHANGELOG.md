@@ -65,6 +65,16 @@ All notable changes to Meada are recorded here. The format follows
   a client is read at its call sites, to any depth, with cycle detection. A path that cannot be
   folded is an unresolved consumer.
 
+- Go HTTP providers for chi and gorilla/mux (spec #25). chi: `Get`, `Post` and the other
+  methods, `Method`/`MethodFunc`, `Handle`/`HandleFunc` (every method), `Route(prefix, fn)` and
+  `Group(fn)` (the router `fn` receives, a literal or a named function, is the group, also passed on or held by a name) and
+  `Mount(prefix, router)`; `{id}`, `{id:regex}` and a trailing `*` are one parameter segment.
+  gorilla/mux: `HandleFunc`/`Handle` with `.Methods(..)` (one provider per method; every method
+  without it; an unreadable or doubled `Methods` serves nothing) and
+  `PathPrefix(prefix).Subrouter()`. Prefixes follow the router at any depth, with cycles cut;
+  a router mounted inside a call (a middleware) or given to a router Meada does not read is an
+  unread mount, and `http.StripPrefix` is not modelled.
+
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
   or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),

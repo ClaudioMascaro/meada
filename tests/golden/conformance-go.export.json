@@ -114,12 +114,20 @@
       "hash": "3250e445341dd781f77130aef7fca7d925afebcd4d550b7c299caac5cd1b5132"
     },
     {
+      "path": "web/chi.go",
+      "hash": "21e6b5c8dc0f1bb70c72c6919aff56a845cc85e33ec3270c3736f219264920b0"
+    },
+    {
       "path": "web/echo.go",
       "hash": "9b911c42769079e39713bc32dafd10d51ea97285218409c3efcd1a1cec4da4df"
     },
     {
       "path": "web/gin.go",
       "hash": "a4ac69654dcc9116cb468e91e9c4a843a7c6c93aecc2dc85884a12c2827ffeca"
+    },
+    {
+      "path": "web/gorilla.go",
+      "hash": "3a62afbc85956ff8c2379303bedd579f70c26ea257646ad0d56ffe3283c5fe44"
     },
     {
       "path": "web/stdlib.go",
@@ -1328,6 +1336,254 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAdmin",
+      "span": {
+        "path": "web/chi.go",
+        "start": 523,
+        "end": 579
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAny",
+      "span": {
+        "path": "web/chi.go",
+        "start": 352,
+        "end": 406
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAudit",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2644,
+        "end": 2771
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiEdit",
+      "span": {
+        "path": "web/chi.go",
+        "start": 295,
+        "end": 350
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiFiles",
+      "span": {
+        "path": "web/chi.go",
+        "start": 408,
+        "end": 464
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiGuard",
+      "span": {
+        "path": "web/chi.go",
+        "start": 687,
+        "end": 826
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHidden",
+      "span": {
+        "path": "web/chi.go",
+        "start": 581,
+        "end": 638
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2906,
+        "end": 3282
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiIndex",
+      "span": {
+        "path": "web/chi.go",
+        "start": 123,
+        "end": 179
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiMake",
+      "span": {
+        "path": "web/chi.go",
+        "start": 238,
+        "end": 293
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiNest",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2583,
+        "end": 2642
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4077,
+        "end": 4279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPing",
+      "span": {
+        "path": "web/chi.go",
+        "start": 66,
+        "end": 121
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4534,
+        "end": 4678
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "span": {
+        "path": "web/chi.go",
+        "start": 1017,
+        "end": 1926
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes.DELETE /things/{}",
+      "span": {
+        "path": "web/chi.go",
+        "start": 1229,
+        "end": 1276
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiShadow",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3426,
+        "end": 3517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiShow",
+      "span": {
+        "path": "web/chi.go",
+        "start": 181,
+        "end": 236
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTeam",
+      "span": {
+        "path": "web/chi.go",
+        "start": 466,
+        "end": 521
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2341,
+        "end": 2497
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3603,
+        "end": 3900
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2089,
+        "end": 2213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::chiMany",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4787,
+        "end": 4829
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::chiOther",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4744,
+        "end": 4785
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::deepRoutes",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2215,
+        "end": 2297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4406,
+        "end": 4479
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedNever",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4680,
+        "end": 4742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedStats",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4343,
+        "end": 4404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4281,
+        "end": 4341
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::teamRoutes",
+      "span": {
+        "path": "web/chi.go",
+        "start": 1928,
+        "end": 2017
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::unreadable",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3284,
+        "end": 3376
+      }
+    },
+    {
       "id": "example.com/acme/conformance::web/echo.go::Auth",
       "span": {
         "path": "web/echo.go",
@@ -1573,6 +1829,110 @@
         "path": "web/gin.go",
         "start": 2540,
         "end": 2581
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2243,
+        "end": 2474
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 593,
+        "end": 1461
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 999,
+        "end": 1046
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2476,
+        "end": 2577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1824,
+        "end": 2114
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxAny",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 236,
+        "end": 290
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxHidden",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 350,
+        "end": 407
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxIndex",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 64,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxMake",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 179,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxOrder",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 292,
+        "end": 348
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::MuxShow",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 122,
+        "end": 177
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1533,
+        "end": 1691
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::muxOther",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2579,
+        "end": 2621
       }
     },
     {
@@ -4480,6 +4840,985 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAudit::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2716,
+        "end": 2735
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAudit::r.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2675,
+        "end": 2739
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiAudit::r.Route#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiAudit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2741,
+        "end": 2769
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiGuard::h.ServeHTTP#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiGuard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 804,
+        "end": 821
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiGuard::http.HandlerFunc#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiGuard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 740,
+        "end": 824
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2949,
+        "end": 2964
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::chiMany#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": "example.com/acme/conformance::web/chi.go::chiMany",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3086,
+        "end": 3095
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::chiOther#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": "example.com/acme/conformance::web/chi.go::chiOther",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3020,
+        "end": 3030
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3217,
+        "end": 3245
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Mount#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3251,
+        "end": 3280
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Post#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3034,
+        "end": 3061
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Post#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3101,
+        "end": 3129
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Post#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3136,
+        "end": 3172
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2966,
+        "end": 3176
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::r.Route#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3178,
+        "end": 3249
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames::unreadable#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "target": "example.com/acme/conformance::web/chi.go::unreadable",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3267,
+        "end": 3279
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiNest::ChiAudit#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiNest",
+      "target": "example.com/acme/conformance::web/chi.go::ChiAudit",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2626,
+        "end": 2640
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiNest::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiNest",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2609,
+        "end": 2624
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4105,
+        "end": 4120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::chi.NewRouter#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4242,
+        "end": 4257
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedLoop#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4214,
+        "end": 4227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedStats#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedStats",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4195,
+        "end": 4211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedUsers#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4167,
+        "end": 4181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedUsers#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4259,
+        "end": 4277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::root.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4122,
+        "end": 4231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4563,
+        "end": 4578
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::chiOther#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": "example.com/acme/conformance::web/chi.go::chiOther",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4643,
+        "end": 4653
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::passedNever#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": "example.com/acme/conformance::web/chi.go::passedNever",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4656,
+        "end": 4672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::root.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4580,
+        "end": 4676
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::adminRoutes#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 1900,
+        "end": 1913
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1055,
+        "end": 1070
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::http.HandlerFunc#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1565,
+        "end": 1589
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Connect#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1336,
+        "end": 1364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Delete#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1204,
+        "end": 1277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1072,
+        "end": 1095
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Get#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1592,
+        "end": 1619
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Get#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1662,
+        "end": 1682
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Get#3",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1734,
+        "end": 1753
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Get#4",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1850,
+        "end": 1876
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Group#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1819,
+        "end": 1880
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Handle#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1544,
+        "end": 1590
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1514,
+        "end": 1542
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Head#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1279,
+        "end": 1304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Method#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1394,
+        "end": 1429
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Method#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1431,
+        "end": 1476
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Method#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1478,
+        "end": 1512
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Mount#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1882,
+        "end": 1914
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Options#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1306,
+        "end": 1334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Patch#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1157,
+        "end": 1202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Post#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1097,
+        "end": 1123
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Put#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1125,
+        "end": 1155
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Put#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1757,
+        "end": 1776
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1621,
+        "end": 1817
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Route#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1685,
+        "end": 1781
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Route#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1784,
+        "end": 1813
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Trace#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1366,
+        "end": 1392
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiShadow::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3470,
+        "end": 3485
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiShadow::chiOther#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiShadow",
+      "target": "example.com/acme/conformance::web/chi.go::chiOther",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3453,
+        "end": 3463
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiShadow::r.Post#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3487,
+        "end": 3515
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2368,
+        "end": 2383
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice::chi.NewRouter#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2395,
+        "end": 2410
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice::root.Mount#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2445,
+        "end": 2469
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice::root.Mount#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2471,
+        "end": 2495
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiTwice::shared.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2412,
+        "end": 2443
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::ChiGuard#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": "example.com/acme/conformance::web/chi.go::ChiGuard",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 3729,
+        "end": 3746
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3628,
+        "end": 3643
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::chi.NewRouter#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3656,
+        "end": 3671
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::guarded.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3673,
+        "end": 3707
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::http.HandlerFunc#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3870,
+        "end": 3897
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::http.NewServeMux#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3759,
+        "end": 3777
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::legacy.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3779,
+        "end": 3822
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::r.Mount#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3709,
+        "end": 3747
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::r.Mount#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3824,
+        "end": 3850
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiUnread::r.Mount#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3852,
+        "end": 3898
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::adminRoutes::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2127,
+        "end": 2142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::adminRoutes::deepRoutes#0",
+      "caller": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "target": "example.com/acme/conformance::web/chi.go::deepRoutes",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 2188,
+        "end": 2200
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::adminRoutes::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2144,
+        "end": 2169
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::adminRoutes::r.Mount#0",
+      "caller": "example.com/acme/conformance::web/chi.go::adminRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2171,
+        "end": 2201
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::deepRoutes::chi.NewMux#0",
+      "caller": "example.com/acme/conformance::web/chi.go::deepRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2250,
+        "end": 2262
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::deepRoutes::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::deepRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 2264,
+        "end": 2285
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop::passedLoop#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "target": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4464,
+        "end": 4477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4439,
+        "end": 4462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedNever::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedNever",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4714,
+        "end": 4740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedStats::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedStats",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4377,
+        "end": 4402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedUsers::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4315,
+        "end": 4339
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::teamRoutes::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::teamRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1961,
+        "end": 1980
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::teamRoutes::r.Get#1",
+      "caller": "example.com/acme/conformance::web/chi.go::teamRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1982,
+        "end": 2015
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::unreadable::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::unreadable",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3321,
+        "end": 3336
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::unreadable::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::unreadable",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 3338,
+        "end": 3364
+      }
+    },
+    {
       "id": "example.com/acme/conformance::web/echo.go::EchoDynamic::(call_expression).GET#0",
       "caller": "example.com/acme/conformance::web/echo.go::EchoDynamic",
       "target": null,
@@ -5371,6 +6710,633 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden::mux.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2293,
+        "end": 2308
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden::muxOther#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "target": "example.com/acme/conformance::web/gorilla.go::muxOther",
+      "level": "exact",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2354,
+        "end": 2364
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden::r.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2310,
+        "end": 2343
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden::r.HandleFunc#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2367,
+        "end": 2400
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden::r.HandleFunc#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2435,
+        "end": 2469
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1374,
+        "end": 1434
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 680,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 733,
+        "end": 804
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 806,
+        "end": 862
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#3",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 864,
+        "end": 924
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#4",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 926,
+        "end": 973
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#5",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 975,
+        "end": 1065
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#6",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1156,
+        "end": 1204
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#7",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1248,
+        "end": 1300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#8",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1374,
+        "end": 1449
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Name#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 864,
+        "end": 909
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Subrouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1122,
+        "end": 1154
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Subrouter#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1212,
+        "end": 1246
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Subrouter#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1338,
+        "end": 1371
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Subrouter#3",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1374,
+        "end": 1408
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::RegisterOrders#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "level": "exact",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1302,
+        "end": 1321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::RegisterOrders#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "level": "exact",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1323,
+        "end": 1372
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::api.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1156,
+        "end": 1189
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::api.PathPrefix#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1212,
+        "end": 1234
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::http.HandlerFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1088,
+        "end": 1112
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::mux.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 634,
+        "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.Handle#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1067,
+        "end": 1113
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 651,
+        "end": 678
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 680,
+        "end": 716
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 733,
+        "end": 781
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#3",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 806,
+        "end": 837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#4",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 864,
+        "end": 895
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#5",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 926,
+        "end": 957
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#6",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 975,
+        "end": 1047
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.PathPrefix#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1122,
+        "end": 1142
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.PathPrefix#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1338,
+        "end": 1359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.PathPrefix#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1374,
+        "end": 1396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::v2.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1248,
+        "end": 1285
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow::mux.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2524,
+        "end": 2539
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow::muxOther#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+      "target": "example.com/acme/conformance::web/gorilla.go::muxOther",
+      "level": "exact",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2507,
+        "end": 2517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow::r.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2541,
+        "end": 2575
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2046,
+        "end": 2112
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).Methods#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1889,
+        "end": 1935
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).Methods#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1937,
+        "end": 2000
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).Methods#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1937,
+        "end": 1984
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).Methods#3",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2002,
+        "end": 2044
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::(call_expression).Subrouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2046,
+        "end": 2078
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::mux.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1872,
+        "end": 1887
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::r.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1889,
+        "end": 1921
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::r.HandleFunc#1",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1937,
+        "end": 1969
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::r.HandleFunc#2",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2002,
+        "end": 2034
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread::r.PathPrefix#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 2046,
+        "end": 2066
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders::(call_expression).Methods#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1618,
+        "end": 1665
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders::(call_expression).Subrouter#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1581,
+        "end": 1616
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders::RegisterOrders#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "target": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "level": "exact",
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1667,
+        "end": 1689
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders::orders.HandleFunc#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1618,
+        "end": 1649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders::s.PathPrefix#0",
+      "caller": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1581,
+        "end": 1604
+      }
+    },
+    {
       "id": "example.com/acme/conformance::web/stdlib.go::Default::http.Handle#0",
       "caller": "example.com/acme/conformance::web/stdlib.go::Default",
       "target": null,
@@ -5989,6 +7955,14 @@
   ],
   "providers": [
     {
+      "contract": "http::ANY::/",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxIndex"
+    },
+    {
+      "contract": "http::ANY::/any",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAny"
+    },
+    {
       "contract": "http::ANY::/api/items/any",
       "site": "example.com/acme/conformance::web/echo.go::Wide"
     },
@@ -6003,6 +7977,14 @@
     {
       "contract": "http::ANY::/files/{}",
       "site": "example.com/acme/conformance::web/stdlib.go::Files"
+    },
+    {
+      "contract": "http::ANY::/handled",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAny"
+    },
+    {
+      "contract": "http::ANY::/handled",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxAny"
     },
     {
       "contract": "http::ANY::/health",
@@ -6033,8 +8015,20 @@
       "site": "example.com/acme/conformance::web/gin.go::Save"
     },
     {
+      "contract": "http::CONNECT::/probe",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
+    },
+    {
       "contract": "http::DELETE::/api/items/{}",
       "site": "example.com/acme/conformance::web/echo.go::EchoRoutes.DELETE /api/items/{}"
+    },
+    {
+      "contract": "http::DELETE::/inline",
+      "site": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline"
+    },
+    {
+      "contract": "http::DELETE::/things/{}",
+      "site": "example.com/acme/conformance::web/chi.go::ChiRoutes.DELETE /things/{}"
     },
     {
       "contract": "http::DELETE::/users/{}",
@@ -6049,8 +8043,20 @@
       "site": "example.com/acme/conformance::web/stdlib.go::Home"
     },
     {
+      "contract": "http::GET::/a/shared",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+    },
+    {
       "contract": "http::GET::/admin/audit",
       "site": "example.com/acme/conformance::web/gin.go::Audit"
+    },
+    {
+      "contract": "http::GET::/admin/deep/x",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+    },
+    {
+      "contract": "http::GET::/admin/stats",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
     },
     {
       "contract": "http::GET::/api/billing",
@@ -6061,24 +8067,88 @@
       "site": "example.com/acme/conformance::web/echo.go::Item"
     },
     {
+      "contract": "http::GET::/api/users",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::GET::/api/v2/users/{}",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::GET::/audit",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
+    },
+    {
+      "contract": "http::GET::/b/shared",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+    },
+    {
       "contract": "http::GET::/captured",
       "site": "example.com/acme/conformance::web/gin.go::Show"
+    },
+    {
+      "contract": "http::GET::/chain/c",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::GET::/files/{}",
+      "site": "example.com/acme/conformance::web/chi.go::ChiFiles"
     },
     {
       "contract": "http::GET::/files/{}",
       "site": "example.com/acme/conformance::web/gin.go::Serve"
     },
     {
+      "contract": "http::GET::/grouped",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
+    },
+    {
       "contract": "http::GET::/internal/billing",
       "site": "example.com/acme/conformance::web/echo.go::Billing"
+    },
+    {
+      "contract": "http::GET::/items/{}",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::GET::/items/{}/tags",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::GET::/lower",
+      "site": "example.com/acme/conformance::web/chi.go::ChiShow"
+    },
+    {
+      "contract": "http::GET::/method",
+      "site": "example.com/acme/conformance::web/chi.go::ChiShow"
     },
     {
       "contract": "http::GET::/mw/chained",
       "site": "example.com/acme/conformance::web/gin.go::Show"
     },
     {
+      "contract": "http::GET::/nested/audit",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
+    },
+    {
       "contract": "http::GET::/ops/status",
       "site": "example.com/acme/conformance::web/gin.go::Status"
+    },
+    {
+      "contract": "http::GET::/passed/loop",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
+    },
+    {
+      "contract": "http::GET::/passed/stats",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+    },
+    {
+      "contract": "http::GET::/passed/users",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
     },
     {
       "contract": "http::GET::/ping",
@@ -6093,6 +8163,22 @@
       "site": "example.com/acme/conformance::web/stdlib.go::Ledger"
     },
     {
+      "contract": "http::GET::/rooms",
+      "site": "example.com/acme/conformance::web/chi.go::ChiIndex"
+    },
+    {
+      "contract": "http::GET::/rooms/members/{}",
+      "site": "example.com/acme/conformance::web/chi.go::ChiShow"
+    },
+    {
+      "contract": "http::GET::/rooms/teams",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
+    },
+    {
+      "contract": "http::GET::/rooms/teams/{}/members",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
+    },
+    {
       "contract": "http::GET::/static/a",
       "site": "example.com/acme/conformance::web/stdlib.go::Ledger"
     },
@@ -6103,6 +8189,10 @@
     {
       "contract": "http::GET::/sub/a1",
       "site": "example.com/acme/conformance::web/stdlib.go::Ledger"
+    },
+    {
+      "contract": "http::GET::/users",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
     },
     {
       "contract": "http::GET::/users/{}",
@@ -6125,12 +8215,24 @@
       "site": "example.com/acme/conformance::web/echo.go::Item"
     },
     {
+      "contract": "http::HEAD::/items/{}/tags",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::HEAD::/probe",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
+    },
+    {
       "contract": "http::HEAD::/v1/users/{}",
       "site": "example.com/acme/conformance::web/gin.go::Show"
     },
     {
       "contract": "http::OPTIONS::/api/items/{}",
       "site": "example.com/acme/conformance::web/echo.go::Item"
+    },
+    {
+      "contract": "http::OPTIONS::/probe",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
     },
     {
       "contract": "http::OPTIONS::/v1/users/{}",
@@ -6141,12 +8243,40 @@
       "site": "example.com/acme/conformance::web/echo.go::Create"
     },
     {
+      "contract": "http::PATCH::/things/{}/patch",
+      "site": "example.com/acme/conformance::web/chi.go::ChiEdit"
+    },
+    {
       "contract": "http::PATCH::/v1/users/{}",
       "site": "example.com/acme/conformance::web/gin.go::Save"
     },
     {
       "contract": "http::POST::/api/items",
       "site": "example.com/acme/conformance::web/echo.go::Create"
+    },
+    {
+      "contract": "http::POST::/api/orders",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxOrder"
+    },
+    {
+      "contract": "http::POST::/items",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+    },
+    {
+      "contract": "http::POST::/lower",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+    },
+    {
+      "contract": "http::POST::/method",
+      "site": "example.com/acme/conformance::web/chi.go::ChiMake"
+    },
+    {
+      "contract": "http::POST::/shop/orders",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxOrder"
+    },
+    {
+      "contract": "http::POST::/things",
+      "site": "example.com/acme/conformance::web/chi.go::ChiMake"
     },
     {
       "contract": "http::POST::/users",
@@ -6165,8 +8295,24 @@
       "site": "example.com/acme/conformance::web/echo.go::Create"
     },
     {
+      "contract": "http::PUT::/named",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+    },
+    {
+      "contract": "http::PUT::/rooms/members/{}",
+      "site": "example.com/acme/conformance::web/chi.go::ChiEdit"
+    },
+    {
+      "contract": "http::PUT::/things/{}",
+      "site": "example.com/acme/conformance::web/chi.go::ChiEdit"
+    },
+    {
       "contract": "http::PUT::/v1/users/{}",
       "site": "example.com/acme/conformance::web/gin.go::Save"
+    },
+    {
+      "contract": "http::TRACE::/probe",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
     },
     {
       "contract": "package::go::example.com/acme/billing",
@@ -6692,19 +8838,86 @@
     {
       "name": "web",
       "members": [
+        "example.com/acme/conformance::web/chi.go::ChiAudit",
+        "example.com/acme/conformance::web/chi.go::ChiNest"
+      ]
+    },
+    {
+      "name": "web#10",
+      "members": [
+        "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+        "example.com/acme/conformance::web/gorilla.go::RegisterOrders"
+      ]
+    },
+    {
+      "name": "web#11",
+      "members": [
+        "example.com/acme/conformance::web/stdlib.go::Guard",
+        "example.com/acme/conformance::web/stdlib.go::Wrapped",
+        "example.com/acme/conformance::web/stdlib.go::newAPI",
+        "example.com/acme/conformance::web/stdlib.go::newGuarded",
+        "example.com/acme/conformance::web/stdlib.go::newStripped"
+      ]
+    },
+    {
+      "name": "web#12",
+      "members": [
+        "example.com/acme/conformance::web/stdlib.go::Mux",
+        "example.com/acme/conformance::web/stdlib.go::Register"
+      ]
+    },
+    {
+      "name": "web#2",
+      "members": [
+        "example.com/acme/conformance::web/chi.go::ChiGuard",
+        "example.com/acme/conformance::web/chi.go::ChiUnread"
+      ]
+    },
+    {
+      "name": "web#3",
+      "members": [
+        "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+        "example.com/acme/conformance::web/chi.go::ChiRebound",
+        "example.com/acme/conformance::web/chi.go::ChiShadow",
+        "example.com/acme/conformance::web/chi.go::chiMany",
+        "example.com/acme/conformance::web/chi.go::chiOther",
+        "example.com/acme/conformance::web/chi.go::passedNever",
+        "example.com/acme/conformance::web/chi.go::unreadable"
+      ]
+    },
+    {
+      "name": "web#4",
+      "members": [
+        "example.com/acme/conformance::web/chi.go::ChiPassed",
+        "example.com/acme/conformance::web/chi.go::passedLoop",
+        "example.com/acme/conformance::web/chi.go::passedStats",
+        "example.com/acme/conformance::web/chi.go::passedUsers"
+      ]
+    },
+    {
+      "name": "web#5",
+      "members": [
+        "example.com/acme/conformance::web/chi.go::ChiRoutes",
+        "example.com/acme/conformance::web/chi.go::adminRoutes",
+        "example.com/acme/conformance::web/chi.go::deepRoutes"
+      ]
+    },
+    {
+      "name": "web#6",
+      "members": [
         "example.com/acme/conformance::web/echo.go::EchoRoutes",
         "example.com/acme/conformance::web/echo.go::RegisterBilling"
       ]
     },
     {
-      "name": "web#2",
+      "name": "web#7",
       "members": [
         "example.com/acme/conformance::web/gin.go::GinEscaped",
         "example.com/acme/conformance::web/gin.go::setPath"
       ]
     },
     {
-      "name": "web#3",
+      "name": "web#8",
       "members": [
         "example.com/acme/conformance::web/gin.go::GinHidden",
         "example.com/acme/conformance::web/gin.go::GinRoutes",
@@ -6715,20 +8928,11 @@
       ]
     },
     {
-      "name": "web#4",
+      "name": "web#9",
       "members": [
-        "example.com/acme/conformance::web/stdlib.go::Guard",
-        "example.com/acme/conformance::web/stdlib.go::Wrapped",
-        "example.com/acme/conformance::web/stdlib.go::newAPI",
-        "example.com/acme/conformance::web/stdlib.go::newGuarded",
-        "example.com/acme/conformance::web/stdlib.go::newStripped"
-      ]
-    },
-    {
-      "name": "web#5",
-      "members": [
-        "example.com/acme/conformance::web/stdlib.go::Mux",
-        "example.com/acme/conformance::web/stdlib.go::Register"
+        "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+        "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+        "example.com/acme/conformance::web/gorilla.go::muxOther"
       ]
     }
   ],
@@ -9370,6 +11574,665 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/a/shared",
+      "kind": "route",
+      "label": "GET /a/shared",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/admin/deep/x",
+      "kind": "route",
+      "label": "GET /admin/deep/x",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/admin/stats",
+      "kind": "route",
+      "label": "GET /admin/stats",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/b/shared",
+      "kind": "route",
+      "label": "GET /b/shared",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/passed/stats",
+      "kind": "route",
+      "label": "GET /passed/stats",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAny::http::ANY::/any",
+      "kind": "route",
+      "label": "ANY /any",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAny"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAny::http::ANY::/handled",
+      "kind": "route",
+      "label": "ANY /handled",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAny"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiEdit::http::PATCH::/things/{}/patch",
+      "kind": "route",
+      "label": "PATCH /things/{}/patch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiEdit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiEdit::http::PUT::/rooms/members/{}",
+      "kind": "route",
+      "label": "PUT /rooms/members/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiEdit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiEdit::http::PUT::/things/{}",
+      "kind": "route",
+      "label": "PUT /things/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiEdit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiFiles::http::GET::/files/{}",
+      "kind": "route",
+      "label": "GET /files/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiFiles"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiHidden",
+      "kind": "export",
+      "label": "ChiHidden",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiHidden"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+      "kind": "export",
+      "label": "ChiHiddenNames",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiHiddenNames"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::chiOther"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::chiMany"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::unreadable"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiIndex::http::GET::/rooms",
+      "kind": "route",
+      "label": "GET /rooms",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiIndex"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiMake::http::POST::/method",
+      "kind": "route",
+      "label": "POST /method",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiMake"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiMake::http::POST::/things",
+      "kind": "route",
+      "label": "POST /things",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiMake"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiNest",
+      "kind": "export",
+      "label": "ChiNest",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiNest"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAudit"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "kind": "export",
+      "label": "ChiPassed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPassed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedUsers"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedStats"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedLoop"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedLoop",
+          "mark": "cycle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::CONNECT::/probe",
+      "kind": "route",
+      "label": "CONNECT /probe",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::GET::/grouped",
+      "kind": "route",
+      "label": "GET /grouped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::GET::/passed/loop",
+      "kind": "route",
+      "label": "GET /passed/loop",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::GET::/ping",
+      "kind": "route",
+      "label": "GET /ping",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::HEAD::/probe",
+      "kind": "route",
+      "label": "HEAD /probe",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::OPTIONS::/probe",
+      "kind": "route",
+      "label": "OPTIONS /probe",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::TRACE::/probe",
+      "kind": "route",
+      "label": "TRACE /probe",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "kind": "export",
+      "label": "ChiRebound",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiRebound"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::chiOther"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedNever"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "kind": "export",
+      "label": "ChiRoutes",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiRoutes"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::adminRoutes"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::deepRoutes"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiRoutes.DELETE /things/{}::http::DELETE::/things/{}",
+      "kind": "route",
+      "label": "DELETE /things/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiRoutes.DELETE /things/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiShadow",
+      "kind": "export",
+      "label": "ChiShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::chiOther"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiShow::http::GET::/lower",
+      "kind": "route",
+      "label": "GET /lower",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiShow::http::GET::/method",
+      "kind": "route",
+      "label": "GET /method",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiShow::http::GET::/rooms/members/{}",
+      "kind": "route",
+      "label": "GET /rooms/members/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/audit",
+      "kind": "route",
+      "label": "GET /audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/nested/audit",
+      "kind": "route",
+      "label": "GET /nested/audit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/passed/users",
+      "kind": "route",
+      "label": "GET /passed/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/rooms/teams",
+      "kind": "route",
+      "label": "GET /rooms/teams",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/rooms/teams/{}/members",
+      "kind": "route",
+      "label": "GET /rooms/teams/{}/members",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/users",
+      "kind": "route",
+      "label": "GET /users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTwice",
+      "kind": "export",
+      "label": "ChiTwice",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTwice"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiUnread",
+      "kind": "export",
+      "label": "ChiUnread",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiUnread"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::ChiGuard"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/echo.go::Auth",
       "kind": "export",
       "label": "Auth",
@@ -10025,6 +12888,301 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::web/gin.go"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
+      "kind": "export",
+      "label": "GorillaHidden",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::GorillaHidden"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gorilla.go::muxOther"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "kind": "export",
+      "label": "GorillaRoutes",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gorilla.go::RegisterOrders"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
+          "mark": "cycle"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline::http::DELETE::/inline",
+      "kind": "route",
+      "label": "DELETE /inline",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
+      "kind": "export",
+      "label": "GorillaShadow",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::GorillaShadow"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/gorilla.go::muxOther"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
+      "kind": "export",
+      "label": "GorillaUnread",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::GorillaUnread"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxAny::http::ANY::/handled",
+      "kind": "route",
+      "label": "ANY /handled",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxAny"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxHidden",
+      "kind": "export",
+      "label": "MuxHidden",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxHidden"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxIndex::http::ANY::/",
+      "kind": "route",
+      "label": "ANY /",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxIndex"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxMake::http::POST::/items",
+      "kind": "route",
+      "label": "POST /items",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxMake::http::POST::/lower",
+      "kind": "route",
+      "label": "POST /lower",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxOrder::http::POST::/api/orders",
+      "kind": "route",
+      "label": "POST /api/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxOrder::http::POST::/shop/orders",
+      "kind": "route",
+      "label": "POST /shop/orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxOrder"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::GET::/api/users",
+      "kind": "route",
+      "label": "GET /api/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::GET::/api/v2/users/{}",
+      "kind": "route",
+      "label": "GET /api/v2/users/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::GET::/chain/c",
+      "kind": "route",
+      "label": "GET /chain/c",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::GET::/items/{}",
+      "kind": "route",
+      "label": "GET /items/{}",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::GET::/items/{}/tags",
+      "kind": "route",
+      "label": "GET /items/{}/tags",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::HEAD::/items/{}/tags",
+      "kind": "route",
+      "label": "HEAD /items/{}/tags",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxShow::http::PUT::/named",
+      "kind": "route",
+      "label": "PUT /named",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxShow"
         }
       ]
     },
