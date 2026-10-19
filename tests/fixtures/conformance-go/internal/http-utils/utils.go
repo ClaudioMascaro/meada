@@ -1,0 +1,3 @@
+package httputils
+
+func NewRequest() {}

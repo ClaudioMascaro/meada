@@ -440,7 +440,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     for (&pack, files) in &groups {
         let layout = layouts.remove(&pack).expect("a layout per pack");
         roots.extend(layout.programs);
-        let resolver = Resolver::new(files, layout.modules, lang::pack(pack));
+        let resolver =
+            Resolver::with_shared(files, layout.modules, layout.shared, lang::pack(pack));
         let resolver = resolver.publishing(layout.published);
         resolvers.insert(pack, resolver.reaching(layout.reaches));
     }

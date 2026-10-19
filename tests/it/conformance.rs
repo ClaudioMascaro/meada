@@ -2516,6 +2516,251 @@ fn rust() {
     assert!(!export.contains("orphan.rs"));
 }
 
+/// The Go pack (spec #25): functions, methods by their receiver's type, types and interface
+/// methods; imports through the module path of `go.mod`, a `replace` and a nested module; one
+/// scope per package directory; and build constraints for `linux/amd64`.
+#[test]
+fn go() {
+    const OUTER: &str = "scopes/scopes.go::outer";
+    conform(
+        "conformance-go",
+        &[
+            "billing/invoice/invoice.go::Total",
+            "billing/invoice/invoice.go::round",
+            "forks/billing/invoice/invoice.go::Total",
+            "forks/billing/invoice/invoice.go::round",
+            "internal/http-utils/utils.go::NewRequest",
+            "internal/shapes/shapes.go::Circle",
+            "internal/shapes/shapes.go::Circle.Area",
+            "internal/shapes/shapes.go::Circle.Perimeter",
+            "internal/shapes/shapes.go::Each",
+            "internal/shapes/shapes.go::ID",
+            "internal/shapes/shapes.go::Label",
+            "internal/shapes/shapes.go::NewCircle",
+            "internal/shapes/shapes.go::Shape",
+            "internal/shapes/shapes.go::Shape.Area",
+            "internal/shapes/shapes.go::Shape.Perimeter",
+            "internal/shapes/shapes.go::clamp",
+            "internal/units/units.go::Meters",
+            "legacy/old/old.go::Old",
+            "main.go::main",
+            "main.go::run",
+            "report.go::report",
+            "scopes/clash.go::Clash",
+            "scopes/other.go::Other",
+            "scopes/scopes.go::Box",
+            "scopes/scopes.go::Box.Get",
+            "scopes/scopes.go::Generic",
+            "scopes/scopes.go::H",
+            "scopes/scopes.go::H.Serve",
+            "scopes/scopes.go::LocalConst",
+            "scopes/scopes.go::LocalType",
+            "scopes/scopes.go::Capture",
+            "scopes/scopes.go::ForInit",
+            "scopes/scopes.go::IfInit",
+            "scopes/scopes.go::Import",
+            "scopes/scopes.go::LiteralParam",
+            "scopes/scopes.go::Named",
+            "scopes/scopes.go::Param",
+            "scopes/scopes.go::Plain",
+            "scopes/scopes.go::Range",
+            "scopes/scopes.go::Select",
+            "scopes/scopes.go::ShortVar",
+            "scopes/scopes.go::SwitchInit",
+            "scopes/scopes.go::TypeSwitch",
+            "scopes/scopes.go::Var",
+            "scopes/scopes.go::outer",
+            "scopes/scopes.go::pick",
+            "scopes/scopes.go::run",
+            "store/client_test.go::TestClient",
+            "store/client_test.go::helper",
+            "store/disk_linux.go::onLinux",
+            "store/helpers.go::Exported",
+            "store/helpers.go::helper",
+            "store/store.go::New",
+            "store/store.go::Store",
+            "store/store.go::Store.Get",
+            "store/store.go::init",
+            "store/store.go::init#2",
+            "store/store.go::open",
+            "store/store_test.go::TestNew",
+            "store/sys_unix.go::sysOpen",
+            "worker/jobs/jobs.go::Run",
+            "worker/main.go::main",
+        ],
+        &[],
+        &[
+            // A function of the same file, and one called inside a function literal, which
+            // belongs to the function around it.
+            (
+                "internal/shapes/shapes.go::NewCircle::clamp#0",
+                EXACT,
+                &["internal/shapes/shapes.go::clamp"],
+            ),
+            (
+                "internal/shapes/shapes.go::Each::clamp#0",
+                EXACT,
+                &["internal/shapes/shapes.go::clamp"],
+            ),
+            // A parameter called is no definition.
+            ("internal/shapes/shapes.go::Each::visit#0", None, &[]),
+            // A plain import names the directory the module path gives; an aliased one too.
+            (
+                "main.go::main::shapes.NewCircle#0",
+                EXACT,
+                &["internal/shapes/shapes.go::NewCircle"],
+            ),
+            (
+                "main.go::run::shapes.Each#0",
+                EXACT,
+                &["internal/shapes/shapes.go::Each"],
+            ),
+            (
+                "report.go::report::sh.NewCircle#0",
+                EXACT,
+                &["internal/shapes/shapes.go::NewCircle"],
+            ),
+            // A dot import: the package's exports join the file scope.
+            (
+                "main.go::main::Meters#0",
+                EXACT,
+                &["internal/units/units.go::Meters"],
+            ),
+            ("main.go::main::run#0", EXACT, &["main.go::run"]),
+            // The standard library and modules outside the workspace are external.
+            ("main.go::main::fmt.Println#0", None, &[]),
+            ("main.go::main::str.ToUpper#0", None, &[]),
+            ("main.go::main::gin.Default#0", None, &[]),
+            // A function of another file of the package.
+            ("report.go::report::run#0", EXACT, &["main.go::run"]),
+            (
+                "store/store.go::New::helper#0",
+                EXACT,
+                &["store/helpers.go::helper"],
+            ),
+            // Each `init` is a symbol of its own; a blank function is none.
+            (
+                "store/store.go::init::open#0",
+                EXACT,
+                &["store/store.go::open"],
+            ),
+            (
+                "store/store.go::init#2::helper#0",
+                EXACT,
+                &["store/helpers.go::helper"],
+            ),
+            ("store/store.go::open#0", EXACT, &["store/store.go::open"]),
+            (
+                "store/helpers.go::Exported::open#0",
+                EXACT,
+                &["store/store.go::open"],
+            ),
+            // A test file of the package shares its scope; the external test package does not.
+            (
+                "store/store_test.go::TestNew::New#0",
+                EXACT,
+                &["store/store.go::New"],
+            ),
+            (
+                "store/store_test.go::TestNew::helper#0",
+                EXACT,
+                &["store/helpers.go::helper"],
+            ),
+            (
+                "store/client_test.go::TestClient::helper#0",
+                EXACT,
+                &["store/client_test.go::helper"],
+            ),
+            (
+                "store/client_test.go::TestClient::store.New#0",
+                EXACT,
+                &["store/store.go::New"],
+            ),
+            // An import names every file of the directory.
+            ("main.go::run::store.New#0", EXACT, &["store/store.go::New"]),
+            (
+                "main.go::run::store.Exported#0",
+                EXACT,
+                &["store/helpers.go::Exported"],
+            ),
+            ("main.go::run::store.helper#0", None, &[]),
+            (
+                "store/disk_linux.go::onLinux::helper#0",
+                EXACT,
+                &["store/helpers.go::helper"],
+            ),
+            // A `replace` to a local directory; a nested module owns its subtree.
+            (
+                "report.go::report::invoice.Total#0",
+                EXACT,
+                &["forks/billing/invoice/invoice.go::Total"],
+            ),
+            ("report.go::report::jobs.Run#0", None, &[]),
+            (
+                "worker/main.go::main::jobs.Run#0",
+                EXACT,
+                &["worker/jobs/jobs.go::Run"],
+            ),
+            ("worker/main.go::main::invoice.Total#0", None, &[]),
+            // Hidden names: a call through the inner binding is a name match at most.
+            ("scopes/scopes.go::Plain::outer#0", EXACT, &[OUTER]),
+            (
+                "scopes/scopes.go::Plain::store.New#0",
+                EXACT,
+                &["store/store.go::New"],
+            ),
+            ("scopes/other.go::Other::outer#0", EXACT, &[OUTER]),
+            ("scopes/scopes.go::ShortVar::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Var::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::IfInit::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::SwitchInit::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::ForInit::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Range::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::TypeSwitch::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Select::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Param::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Named::outer#0", INFERRED, &[OUTER]),
+            (
+                "scopes/scopes.go::LiteralParam::outer#0",
+                INFERRED,
+                &[OUTER],
+            ),
+            ("scopes/scopes.go::Capture::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Import::store.New#0", None, &[]),
+            // Type parameters, a receiver's type arguments, the receiver, local types and
+            // constants, and the parameters of a blank function and of a top-level literal.
+            ("scopes/scopes.go::Generic::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::Box.Get::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::H.Serve::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::LocalType::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::LocalConst::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::outer#0", INFERRED, &[OUTER]),
+            ("scopes/scopes.go::outer#1", INFERRED, &[OUTER]),
+            // Two imports that give one name leave it unknown.
+            ("scopes/clash.go::Clash::http.NewRequest#0", None, &[]),
+            // A build constraint after a block comment counts.
+            (
+                "store/store.go::New::sysOpen#0",
+                EXACT,
+                &["store/sys_unix.go::sysOpen"],
+            ),
+            // A replace by a module from outside makes the module of the repository outside.
+            ("report.go::report::old.Old#0", None, &[]),
+            (
+                "worker/main.go::main::old.Old#0",
+                EXACT,
+                &["legacy/old/old.go::Old"],
+            ),
+        ],
+    );
+    // Files the build constraints leave out for `linux/amd64` are not indexed.
+    let repo = fixture_repo("conformance_go_absent", "conformance-go", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(!export.contains("disk_windows.go"));
+    assert!(!export.contains("legacy.go"));
+    assert!(!export.contains("sys_other.go"));
+}
+
 /// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
 /// built in another module, one router under two prefixes, chained method routers, `any`, a
 /// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot

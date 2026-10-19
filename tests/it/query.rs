@@ -168,6 +168,27 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
 }
 
 #[test]
+fn go_functions_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_go",
+        "conformance-go",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    assert_golden(
+        "conformance-go.search-new.txt",
+        &engine.search("New", None, None).unwrap(),
+    );
+    // Callers through an import, from a test file of the package and from the external test
+    // package; callees in another file of the package and in the standard library.
+    assert_golden(
+        "conformance-go.context-new.txt",
+        &engine.context("store/store.go::New", None).unwrap(),
+    );
+}
+
+#[test]
 fn rust_programs_are_found_as_processes() {
     let repo = fixture_repo(
         "search_rust_programs",
