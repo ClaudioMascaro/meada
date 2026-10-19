@@ -120,7 +120,13 @@ fn section_diff(section: &str, base: &Value, head: &Value) -> String {
         changed += 1;
         for f in watched(section) {
             if bv.get(*f) != hv.get(*f) {
-                let label = format!("{f}: {} -> {}", short(f, bv.get(*f)), short(f, hv.get(*f)));
+                let (old, new) = (short(f, bv.get(*f)), short(f, hv.get(*f)));
+                // Another target, or other candidates of the same count, read alike in short.
+                let label = if old == new {
+                    format!("{f}: changed")
+                } else {
+                    format!("{f}: {old} -> {new}")
+                };
                 moves.entry(label).or_default().insert(k.clone());
             }
         }
@@ -244,5 +250,9 @@ mod tests {
         assert!(out.contains("level: ambiguous -> null: 1"), "{out}");
         assert!(!out.contains("symbols"), "{out}");
         assert_eq!(diff_docs(&base, &base), "");
+        let moved = json!({"calls": [{"id": "b", "target": "x::f", "level": "exact"}]});
+        let retargeted = json!({"calls": [{"id": "b", "target": "x::g", "level": "exact"}]});
+        let out = diff_docs(&moved, &retargeted);
+        assert!(out.contains("target: changed: 1"), "{out}");
     }
 }
