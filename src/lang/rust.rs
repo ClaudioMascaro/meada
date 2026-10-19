@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use tree_sitter::{Node, Parser};
 
 use std::ops::Range;
+use std::rc::Rc;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
@@ -129,16 +130,18 @@ impl LanguagePack for Rust {
     }
 
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
-        let tree = Tree::new(configs, files);
+        let tree = Rc::new(Tree::new(configs, files));
         let programs = (tree.bins())
             .filter(|bin| files[bin].defs.iter().any(|d| d.name == MAIN))
             .map(|bin| (bin.to_string(), MAIN.to_string()))
             .collect();
+        let lookup = Rc::clone(&tree);
         Ok(Layout {
             members: Some(tree.members()),
             published: Some(tree.published()),
             programs,
-            modules: Box::new(move |from, specifier| tree.lookup(from, specifier)),
+            modules: Box::new(move |from, specifier| lookup.lookup(from, specifier)),
+            reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
         })
     }
 

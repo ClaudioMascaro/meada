@@ -48,15 +48,16 @@ pub trait LanguagePack {
     -> Result<Modules>;
 
     /// What the config files and every parsed file of the language make of the repository,
-    /// built once per refresh (`Layout`): Rust builds its crates' module trees once for all four
-    /// answers. The default keeps every file, publishes them all and names no program, with
-    /// `modules` for how imports name files.
+    /// built once per refresh (`Layout`): Rust builds its crates' module trees once for all five
+    /// answers. The default keeps every file, publishes them all, names no program and lets a
+    /// name match reach every file, with `modules` for how imports name files.
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
         Ok(Layout {
             members: None,
             modules: self.modules(configs, files)?,
             published: None,
             programs: Vec::new(),
+            reaches: None,
         })
     }
 
@@ -168,6 +169,9 @@ pub enum Handler {
 /// the pack parses.
 pub type Modules = Box<dyn Fn(&str, &str) -> Vec<String>>;
 
+/// Whether code in a file (first argument) may call into another (second argument).
+pub type Reaches = Box<dyn Fn(&str, &str) -> bool>;
+
 /// What a language makes of the whole repository (`LanguagePack::layout`), from its config files
 /// and the facts of every file it parsed.
 pub struct Layout {
@@ -186,6 +190,10 @@ pub struct Layout {
     /// among the members: a Rust `fn main` starts a program only in a binary target's root,
     /// which `parse` of one file cannot know. `Facts::programs` still applies.
     pub programs: Vec<(String, String)>,
+    /// The definitions a name match may reach from a file, when the language says which: a
+    /// Rust crate calls into its own files and the libraries of the repository it depends on.
+    /// `None` reaches every file.
+    pub reaches: Option<Reaches>,
 }
 
 /// Every pack Meada ships, in a fixed order.

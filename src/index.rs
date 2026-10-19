@@ -434,7 +434,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let layout = layouts.remove(&pack).expect("a layout per pack");
         roots.extend(layout.programs);
         let resolver = Resolver::new(files, layout.modules, lang::pack(pack));
-        resolvers.insert(pack, resolver.publishing(layout.published));
+        let resolver = resolver.publishing(layout.published);
+        resolvers.insert(pack, resolver.reaching(layout.reaches));
     }
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
