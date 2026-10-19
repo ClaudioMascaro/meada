@@ -112,9 +112,10 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
                 .child_by_field_name("operator")
                 .is_some_and(|o| text(o, src) == "+") =>
         {
+            // By value: `&again` here runs clippy's needless_borrows_for_generic_args out of memory.
             let side = |field| {
                 node.child_by_field_name(field)
-                    .map_or(Value::Unknown, &again)
+                    .map_or(Value::Unknown, again)
             };
             concat(side("left"), side("right"))
         }
