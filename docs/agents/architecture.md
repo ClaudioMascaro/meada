@@ -571,11 +571,22 @@ one for the area a change touches.
   does not follow it either; nor a name its scope binds more than once, or an attribute not
   assigned a call once in its class); a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
-  makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
-  its ancestors in C3 order) longer than that is absent, so every member of the class is
-  unknown (a name match at most), and the linearization recurses no deeper down the bases. The
-  bases count from where the walk started, a family looked up for a member a base names
-  (`class Z(K.D)` linearizes `K`'s) included.
+  makes the names it may override unknown. `WRAPPER_DEPTH` (64): a wrapper more calls up than
+  that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):
+  folding values (`Code::expand`, `Code::value`) and tracing them to their origins
+  (`Code::origins`) charge each step to the file whose code it reads (a value folded, a part
+  copied, a call a wrapper climb reaches, a constant, parameter or return value followed);
+  past it, that file's values are unknown, the climb stops at its calls and no origin is found
+  through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
+  functions each calling or returning the next twice, ends. `EVAL_DEPTH` (256): a value
+  folded deeper than that, through the items of lists and objects, the constants it names and
+  the arguments callers pass, is unknown, and a value traced through more constants,
+  parameters and return values than that, each into the next, has no origin.
+  `FAMILY_DEPTH` (128): a class family (the class and its ancestors in C3 order) longer than
+  that is absent, so every member of the class is unknown (a name match at most), and the
+  linearization recurses no deeper down the bases. The bases count from where the walk
+  started, a family looked up for a member a base names (`class Z(K.D)` linearizes `K`'s)
+  included.
   `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
   re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
   or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
@@ -711,7 +722,8 @@ one for the area a change touches.
   by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
 - `lang/ts/uses.rs`: following call results (`Call::uses`) charges every node it visits and
-  every step it copies into a `const`'s uses to `USES_BUDGET` (2^20 per file); past it, the
+  every step it copies into a `const`'s uses or past a method call to `USES_BUDGET` (2^20 per
+  file), so a long method chain spends it; past it, the
   file's remaining calls have no uses, so their consumers read nothing and give no drift. A
   value is followed only in the function making the call, through the names a `const`
   declaration, a `for...of` variable or an array method's callback parameter binds (patterns
@@ -991,7 +1003,8 @@ one for the area a change touches.
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
   walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
   module included under several prefixes is read once for each), so the entries past it yield
-  no provider; what
+  no provider, and follows at most `INCLUDE_DEPTH` (64) `include()` calls, each of the next
+  module, so the routes of a module included deeper yield none; what
   an extension of `urlpatterns` adds other than a list literal is left out (marked in
   `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
   yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf

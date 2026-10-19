@@ -1756,6 +1756,38 @@ struct Written<'a> {
     at: (&'a str, usize),
 }
 
+/// What folding values and tracing where they come from may cost in one file, charged to the
+/// file whose code each step reads: each value of it folded, each part copied, each call of it
+/// a wrapper climb reaches and each constant, parameter or return value of it `Code::origins`
+/// follows. Past it, those values are unknown, the climb stops there and no origin is found
+/// through it.
+// ponytail: real files spend a few units per call; a crafted one doubling a string through
+// forty constants (`const b = a + a`), or a lattice of functions each calling or returning the
+// next twice, would cost 2^40.
+const EVAL_BUDGET: usize = 1 << 16;
+
+/// How deep folding one value recurses: into an item of a list or an object, the constant a
+/// name holds, the argument a caller passes for a parameter. Deeper, the value is unknown. It
+/// also bounds the constants, parameters and return values `Code::origins` follows, each into
+/// the next.
+// ponytail: real values nest a few levels; the limit keeps a crafted chain of thousands of
+// constants from overflowing the stack.
+const EVAL_DEPTH: usize = 256;
+
+/// How many wrapper calls `Code::expand` climbs from a call; at the limit, the site is read
+/// where the climb stops, its parameters unknown.
+// ponytail: real clients are wrapped a few levels deep; the limit keeps a crafted chain of
+// thousands of wrappers from overflowing the stack.
+const WRAPPER_DEPTH: usize = 64;
+
+/// Folding one value: the constants being folded (one met again folds to nothing), and how
+/// deep it is.
+#[derive(Default)]
+struct Fold<'a> {
+    held: Vec<(&'a str, &'a str)>,
+    nested: usize,
+}
+
 /// How many calls a builder chain is read through, down to what starts it.
 // ponytail: a chain of more builder calls than this is not read to its start; its calls past
 // the limit have no origin.
@@ -1808,6 +1840,8 @@ pub struct Code<'a> {
     full: &'a BTreeMap<&'a str, &'a Facts>,
     misses: RefCell<BTreeSet<&'a str>>,
     chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
+    /// What folding and tracing values has spent of each file's `EVAL_BUDGET`.
+    folded: RefCell<HashMap<&'a str, usize>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -1835,8 +1869,17 @@ impl<'a> Code<'a> {
             full,
             misses: RefCell::new(BTreeSet::new()),
             chains: RefCell::new(HashMap::new()),
+            folded: RefCell::new(HashMap::new()),
             pack,
         }
+    }
+
+    /// Charges `cost` to the `EVAL_BUDGET` of `file`; `false` once it is spent.
+    fn charge(&self, file: &'a str, cost: usize) -> bool {
+        let mut folded = self.folded.borrow_mut();
+        let spent = folded.entry(file).or_default();
+        *spent = spent.saturating_add(cost);
+        *spent <= EVAL_BUDGET
     }
 
     /// The language pack whose files these are.
@@ -2156,6 +2199,16 @@ impl<'a> Code<'a> {
         trail.out.into_iter().collect()
     }
 
+    /// Whether `trail` may follow `flow`: not one it is following (a cycle), at most
+    /// `EVAL_DEPTH` deep, and charged to the `EVAL_BUDGET` of the file it reads.
+    fn follows(&self, trail: &Trail<'a>, flow: &Flow<'a>) -> bool {
+        let file = match flow {
+            Flow::Const(at, _) => at,
+            Flow::Param(function, _) | Flow::Returns(function) => function.path,
+        };
+        !trail.busy.contains(flow) && trail.busy.len() < EVAL_DEPTH && self.charge(file, 1)
+    }
+
     fn flow(&self, path: &'a str, scope: &'a str, value: &'a Value, trail: &mut Trail<'a>) {
         match value {
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
@@ -2247,7 +2300,7 @@ impl<'a> Code<'a> {
         else {
             return;
         };
-        if trail.busy.contains(&Flow::Returns(function)) {
+        if !self.follows(trail, &Flow::Returns(function)) {
             return;
         }
         trail.busy.push(Flow::Returns(function));
@@ -2355,7 +2408,7 @@ impl<'a> Code<'a> {
                 let Some(found) = found else {
                     return;
                 };
-                if trail.busy.contains(&Flow::Const(at, constant)) {
+                if !self.follows(trail, &Flow::Const(at, constant)) {
                     return;
                 }
                 trail.busy.push(Flow::Const(at, constant));
@@ -2376,7 +2429,7 @@ impl<'a> Code<'a> {
                         .map(|c| (c.path, c.index))
                         .collect(),
                 };
-                if trail.busy.contains(&Flow::Param(function, n)) {
+                if !self.follows(trail, &Flow::Param(function, n)) {
                     return;
                 }
                 trail.busy.push(Flow::Param(function, n));
@@ -2458,7 +2511,7 @@ impl<'a> Code<'a> {
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
-        unbind(self.eval(path, scope, value, &[], 0, &mut Vec::new(), &mut None))
+        unbind(self.eval(path, scope, value, &[], 0, &mut Fold::default(), &mut None))
     }
 
     /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
@@ -2676,18 +2729,21 @@ impl<'a> Code<'a> {
             kwargs,
             ..
         } = written;
+        let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
+        if !self.charge(site, 1) {
+            return;
+        }
         let mut wants = None;
         let values: Vec<Value> = args
             .iter()
-            .map(|a| self.eval(path, scope, a, frames, 0, &mut Vec::new(), &mut wants))
+            .map(|a| self.eval(path, scope, a, frames, 0, &mut Fold::default(), &mut wants))
             .collect();
         let kwargs: Vec<(String, Value)> = (kwargs.iter())
             .map(|(k, v)| {
-                let v = self.eval(path, scope, v, frames, 0, &mut Vec::new(), &mut wants);
+                let v = self.eval(path, scope, v, frames, 0, &mut Fold::default(), &mut wants);
                 (k.clone(), v)
             })
             .collect();
-        let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if let Some(found) = read(&values, &kwargs) {
             out.push(Expanded {
                 site: (site, at),
@@ -2710,7 +2766,8 @@ impl<'a> Code<'a> {
         let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
             .copied()
             .collect();
-        if callers.is_empty() {
+        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
+        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
             let values: Vec<Value> = values.into_iter().map(unbind).collect();
             let kwargs: Vec<(String, Value)> =
                 kwargs.into_iter().map(|(k, v)| (k, unbind(v))).collect();
@@ -2734,7 +2791,8 @@ impl<'a> Code<'a> {
 
     /// `value` with its names folded. `frames[depth..]` bind the parameters of the function
     /// enclosing `scope` and of its callers, innermost first; a parameter no frame binds stays
-    /// a `Ref`, and its function is recorded in `wants`.
+    /// a `Ref`, and its function is recorded in `wants`. Past `EVAL_DEPTH` or the file's
+    /// `EVAL_BUDGET` the value is unknown.
     #[allow(clippy::too_many_arguments)]
     fn eval(
         &self,
@@ -2743,10 +2801,14 @@ impl<'a> Code<'a> {
         value: &'a Value,
         frames: &[Frame<'a>],
         depth: usize,
-        seen: &mut Vec<(&'a str, &'a str)>,
+        fold: &mut Fold<'a>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        match value {
+        if fold.nested >= EVAL_DEPTH || !self.charge(path, 1) {
+            return Value::Unknown;
+        }
+        fold.nested += 1;
+        let folded = match value {
             Value::Str(parts) => {
                 let mut out = Vec::new();
                 for part in parts {
@@ -2754,8 +2816,13 @@ impl<'a> Code<'a> {
                         out.push(part.clone());
                         continue;
                     };
-                    match self.name(path, scope, name, frames, depth, seen, wants) {
-                        Value::Str(parts) => out.extend(parts),
+                    match self.name(path, scope, name, frames, depth, fold, wants) {
+                        // The parts copied are charged: a string doubled through constants grows
+                        // faster than the values visited.
+                        Value::Str(parts) => match self.charge(path, parts.len()) {
+                            true => out.extend(parts),
+                            false => out.push(Part::Hole),
+                        },
                         Value::Ref(name) => out.push(Part::Ref(name)),
                         _ => out.push(Part::Hole),
                     }
@@ -2766,19 +2833,21 @@ impl<'a> Code<'a> {
                 properties
                     .iter()
                     .map(|(k, v)| {
-                        let v = self.eval(path, scope, v, frames, depth, seen, wants);
+                        let v = self.eval(path, scope, v, frames, depth, fold, wants);
                         (k.clone(), v)
                     })
                     .collect(),
             ),
             Value::List(items) => Value::List(
                 (items.iter())
-                    .map(|v| self.eval(path, scope, v, frames, depth, seen, wants))
+                    .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
-            Value::Ref(name) => self.name(path, scope, name, frames, depth, seen, wants),
+            Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
             other => other.clone(),
-        }
+        };
+        fold.nested -= 1;
+        folded
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2789,21 +2858,21 @@ impl<'a> Code<'a> {
         name: &'a str,
         frames: &[Frame<'a>],
         depth: usize,
-        seen: &mut Vec<(&'a str, &'a str)>,
+        fold: &mut Fold<'a>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
         match self.resolver.binding(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
-                if seen.contains(&(at, constant)) {
+                if fold.held.contains(&(at, constant)) {
                     return Value::Unknown;
                 }
                 let Some((value, within)) = self.held(at, constant) else {
                     return Value::Unknown;
                 };
-                seen.push((at, constant));
-                let folded = self.eval(at, within, value, frames, depth, seen, wants);
-                seen.pop();
+                fold.held.push((at, constant));
+                let folded = self.eval(at, within, value, frames, depth, fold, wants);
+                fold.held.pop();
                 folded
             }
             // `*args` and `**kwargs` hold what no single argument gives.
@@ -2825,7 +2894,7 @@ impl<'a> Code<'a> {
                     let param = self.param(function, n);
                     let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
                         (Some(arg), _) => {
-                            self.eval(frame.path, &call.scope, arg, frames, depth + 1, seen, wants)
+                            self.eval(frame.path, &call.scope, arg, frames, depth + 1, fold, wants)
                         }
                         // A left-out argument takes the parameter's default.
                         (None, Some(default)) => self.eval(
@@ -2834,7 +2903,7 @@ impl<'a> Code<'a> {
                             default,
                             frames,
                             depth,
-                            seen,
+                            fold,
                             wants,
                         ),
                         (None, None) if field.is_some() => return Value::Unknown,
@@ -2865,7 +2934,7 @@ impl<'a> Code<'a> {
                             default,
                             frames,
                             depth,
-                            seen,
+                            fold,
                             wants,
                         ),
                         (Some(read), _) => read,
@@ -3640,6 +3709,134 @@ mod tests {
             calls.reverse();
         }
         assert_eq!(call_at(&calls, &(0..1)), None);
+    }
+
+    /// The URL each site the expansion of the `fetch` in `src` reaches gives it, as text; `None`
+    /// for one with a part not known.
+    fn fetched(src: &str) -> Vec<Option<String>> {
+        use crate::lang::ts::TsJs;
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        let code = Code::new(&resolver, &files, crate::lang::pack(0));
+        let n = (facts.calls.iter())
+            .position(|c| c.callee == "fetch")
+            .unwrap();
+        // A parameter makes the function around the call a wrapper, read at its callers.
+        let url = |args: &[Value], _: &Keywords| match args.first()? {
+            Value::Ref(_) => None,
+            url => Some(url.clone()),
+        };
+        (code.expand("a.ts", n, &url).into_iter())
+            .map(|(_, _, url)| match url {
+                Value::Str(parts) => crate::lang::literal(&parts),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_value_folded_deeper_than_the_limit_is_unknown() {
+        let chain = |n: usize| {
+            let consts: String = (0..n)
+                .map(|i| format!("const a{} = a{i};\n", i + 1))
+                .collect();
+            fetched(&format!("const a0 = '/a';\n{consts}fetch(a{n});\n"))
+        };
+        // The argument, the `n` constants and the literal they end at: `n + 2` values folded
+        // within one another.
+        assert_eq!(chain(EVAL_DEPTH - 2), [Some("/a".to_string())]);
+        assert_eq!(chain(EVAL_DEPTH - 1), [None]);
+        // Far past it, the fold still ends before the stack does.
+        assert_eq!(chain(20 * EVAL_DEPTH), [None]);
+    }
+
+    #[test]
+    fn a_string_doubled_past_the_budget_has_parts_not_known() {
+        let doubled = |n: usize| {
+            let consts: String = (0..n)
+                .map(|i| format!("const s{} = s{i} + s{i};\n", i + 1))
+                .collect();
+            fetched(&format!("const s0 = '/a';\n{consts}fetch(s{n});\n"))
+        };
+        assert_eq!(doubled(4), [Some("/a".repeat(16))]);
+        // Forty doublings would fold 2^40 parts.
+        assert_eq!(doubled(40), [None]);
+    }
+
+    #[test]
+    fn a_wrapper_deeper_than_the_limit_is_read_where_the_climb_stops() {
+        let wrapped = |n: usize| {
+            let wrappers: String = (0..n)
+                .map(|i| format!("function w{}(u) {{ return w{i}(u); }}\n", i + 1))
+                .collect();
+            fetched(&format!(
+                "function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n"
+            ))
+        };
+        assert_eq!(wrapped(WRAPPER_DEPTH - 1), [Some("/a".to_string())]);
+        assert_eq!(wrapped(WRAPPER_DEPTH), [None]);
+    }
+
+    #[test]
+    fn a_lattice_of_wrappers_is_climbed_within_the_budget() {
+        // Each wrapper calls the one below twice: 2^n ways up from the `fetch`.
+        let lattice = |n: usize| {
+            let wrappers: String = (0..n)
+                .map(|i| format!("function w{}(u) {{ w{i}(u); return w{i}(u); }}\n", i + 1))
+                .collect();
+            fetched(&format!(
+                "function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n"
+            ))
+        };
+        assert_eq!(lattice(3), vec![Some("/a".to_string()); 8]);
+        let ways = lattice(40);
+        assert!(
+            !ways.is_empty() && ways.len() < EVAL_BUDGET,
+            "{}",
+            ways.len()
+        );
+    }
+
+    /// The callees of the calls `p` may hold at the top of the Python file `src`.
+    fn origins_of_p(src: &str) -> Vec<String> {
+        let facts = Python.parse("a.py", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.py", &facts)]);
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let code = Code::new(&resolver, &files, &Python);
+        (code.origins("a.py", "", "p").into_iter())
+            .map(|(_, n)| facts.calls[n].callee.clone())
+            .collect()
+    }
+
+    #[test]
+    fn a_value_traced_deeper_than_the_limit_has_no_origin() {
+        let returned = |n: usize| {
+            let defs: String = (0..n)
+                .map(|i| format!("def k{}():\n    return k{i}()\n", i + 1))
+                .collect();
+            origins_of_p(&format!("def k0():\n    return make()\n{defs}p = k{n}()\n"))
+        };
+        // The constant `p` and the `n + 1` functions that hand on what `make()` made.
+        assert_eq!(returned(EVAL_DEPTH - 2), ["make"]);
+        assert_eq!(returned(EVAL_DEPTH - 1), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_lattice_of_returns_is_traced_within_the_budget() {
+        // Each function returns the one below in two places: 2^n ways down to `make()`.
+        let lattice = |n: usize| {
+            let defs: String = (0..n)
+                .map(|i| {
+                    let call = format!("return k{i}()");
+                    format!("def k{}():\n    if c:\n        {call}\n    {call}\n", i + 1)
+                })
+                .collect();
+            origins_of_p(&format!("def k0():\n    return make()\n{defs}p = k{n}()\n"))
+        };
+        assert_eq!(lattice(3), ["make"]);
+        assert_eq!(lattice(40), ["make"]);
     }
 
     #[test]

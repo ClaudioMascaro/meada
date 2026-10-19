@@ -3468,8 +3468,9 @@ fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
     assert_eq!(json["providers"], serde_json::json!([]));
 }
 
-/// The leaf routes of a ladder of `levels` URLconfs, each including the next twice.
-fn django_ladder(case: &str, levels: usize) -> Vec<String> {
+/// The leaf routes of a ladder of `levels` URLconfs, each including the next under each of
+/// `prefixes`.
+fn django_ladder(case: &str, levels: usize, prefixes: &[&str]) -> Vec<String> {
     let repo = fixture_repo(case, "python-django", Some(ORIGIN));
     let dir = repo.join("ladder");
     std::fs::create_dir(&dir).unwrap();
@@ -3480,9 +3481,8 @@ fn django_ladder(case: &str, levels: usize) -> Vec<String> {
         let include =
             |prefix: &str| format!("    path(\"{prefix}/\", include(\"ladder.l{next}\")),\n");
         let src = format!(
-            "from django.urls import include, path\n\nurlpatterns = [\n{}{}]\n",
-            include("a"),
-            include("b")
+            "from django.urls import include, path\n\nurlpatterns = [\n{}]\n",
+            prefixes.iter().map(|p| include(p)).collect::<String>()
         );
         std::fs::write(dir.join(format!("l{n}.py")), src).unwrap();
     }
@@ -3501,16 +3501,25 @@ fn django_ladder(case: &str, levels: usize) -> Vec<String> {
 #[test]
 fn python_django_includes_are_read_to_a_budget() {
     // A module included under two prefixes serves its routes under both.
-    let mut routes = django_ladder("python_django_diamond", 2);
+    let mut routes = django_ladder("python_django_diamond", 2, &["a", "b"]);
     routes.sort();
     assert_eq!(
         routes,
         ["/a/a/x", "/a/b/x", "/b/a/x", "/b/b/x"].map(|p| format!("http::ANY::{p}"))
     );
     // A ladder of 24 levels has 2^24 paths: the budget stops the walk well before them.
-    let routes = django_ladder("python_django_ladder", 24);
+    let routes = django_ladder("python_django_ladder", 24, &["a", "b"]);
     assert!(!routes.is_empty());
     assert!(routes.len() < 1 << 20, "{}", routes.len());
+}
+
+#[test]
+fn python_django_includes_are_followed_to_a_depth() {
+    // `INCLUDE_DEPTH` (64) includes, each of the next module.
+    let chain =
+        |levels: usize| django_ladder(&format!("python_django_chain_{levels}"), levels, &["a"]);
+    assert_eq!(chain(64), [format!("http::ANY::{}/x", "/a".repeat(64))]);
+    assert_eq!(chain(65), Vec::<String>::new());
 }
 
 #[test]

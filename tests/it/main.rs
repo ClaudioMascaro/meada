@@ -19,6 +19,7 @@ mod documents;
 mod drift;
 mod freshness;
 mod gateway;
+mod hostile;
 mod index;
 mod items;
 mod mcp;

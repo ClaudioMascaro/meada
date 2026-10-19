@@ -14,10 +14,10 @@ use crate::lang::{Step, Ty};
 
 /// What following values may cost in one file: every node visited, by the climb from a call or
 /// by the scan of a function for a name's uses, and every step copied when a `const` is
-/// followed. Past it, the file's remaining calls have no uses: they read nothing, so they give
-/// no drift.
+/// followed or a method called. Past it, the file's remaining calls have no uses: they read
+/// nothing, so they give no drift.
 // ponytail: one budget per file; real files spend a few thousand, a crafted chain of `const`s
-// would otherwise cost the square of its length.
+// would otherwise cost the square of its length, and a chain of method calls the cube.
 const USES_BUDGET: usize = 1 << 20;
 
 /// How deep a destructuring pattern is followed: a name nested deeper than this many fields or
@@ -125,6 +125,11 @@ impl<'t> Uses<'t> {
                     "call_expression" if is("function") => match steps.pop() {
                         Some(Step::Field(method)) => {
                             // `json<T>()`: the type argument declares what the method returns.
+                            // The copy is charged, or every call of a long chain would copy the
+                            // rest of it at each step: the cube of its length.
+                            if !self.charge(steps.len()) {
+                                return Vec::new();
+                            }
                             let called = [steps.clone(), vec![Step::Call(method.clone())]].concat();
                             if !self.type_argument(parent, &called, &mut out) {
                                 return Vec::new();
@@ -630,6 +635,15 @@ mod tests {
         assert!(uses(&chain(100)).contains(&want));
         // Each `const` copies the steps so far: the cost grows with the square of the chain.
         assert_eq!(uses(&chain(2_000)), Vec::<Vec<Step>>::new());
+    }
+
+    #[test]
+    fn a_long_method_chain_spends_the_budget_of_the_calls_after_it() {
+        let after = |n: usize| uses(&format!("a{};\nfetch(u).json();\n", ".m()".repeat(n)));
+        assert_eq!(after(3), [vec![Step::Call("json".into())]]);
+        // Each call of the chain climbs the rest of it, copying the steps read so far at every
+        // call: the cost grows with the cube of the chain.
+        assert_eq!(after(600), Vec::<Vec<Step>>::new());
     }
 
     #[test]

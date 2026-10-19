@@ -224,6 +224,17 @@ All notable changes to Meada are recorded here. The format follows
 - A class whose base is named through a member of a class with a family close to 128 classes
   long (`class Z(K.D)`) no longer resolves its members differently depending on which class was
   read first.
+- Values folded or traced through a crafted file no longer hang indexing or exhaust memory, in
+  every language: a string doubled through forty constants (`const b = a + a`), a chain of
+  thousands of constants, parameters or return values, and a lattice of functions each calling
+  or returning the next twice now stop at a budget of 2^16 steps per file or 256 levels deep,
+  past which the value is unknown and no origin is found through it. A client wrapped more than
+  64 functions deep is read where the climb stops, its parameters unknown.
+- A TypeScript method chain of a thousand calls (`a.m().m()...`) no longer costs time cubic in
+  its length: the steps each call copies are charged to the file's budget for reading call
+  results, and the calls past it read nothing.
+- A Django URLconf chain of thousands of `include()` calls no longer overflows the stack while
+  indexing: past 64 includes, the routes of the modules included deeper yield no provider.
 
 ## [0.1.0] - Unreleased
 

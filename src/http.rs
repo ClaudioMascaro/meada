@@ -1369,6 +1369,11 @@ const DJANGO_INCLUDE: &str = "django.urls.include";
 /// budget the remaining entries yield no provider.
 // ponytail: real projects have a few thousand routes at most; 2^15 entries is far past them.
 const URLCONF_BUDGET: usize = 1 << 15;
+/// How many `include()` calls deep `django` follows a URLconf: the routes of a module included
+/// deeper yield no provider.
+// ponytail: real projects nest a few levels of `include()`; the limit keeps a crafted chain of
+// thousands of modules from overflowing the stack, which the budget alone would not.
+const INCLUDE_DEPTH: usize = 64;
 const DJANGO_HTTP: &str = "django.views.decorators.http.";
 
 /// A `re_path()` pattern as a route: literal text and simple named groups (`(?P<name>...)`),
@@ -1659,7 +1664,7 @@ fn urlconf<'a>(
                 continue;
             };
             if is_call(code, origin, DJANGO_INCLUDE) {
-                if stack.contains(&origin) {
+                if stack.contains(&origin) || stack.len() >= INCLUDE_DEPTH {
                     continue;
                 }
                 stack.push(origin);
