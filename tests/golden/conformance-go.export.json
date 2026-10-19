@@ -8731,29 +8731,21 @@
       "name": "methods",
       "members": [
         "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area",
+        "example.com/acme/conformance::methods/calls.go::Capture",
+        "example.com/acme/conformance::methods/calls.go::FromClosure",
         "example.com/acme/conformance::methods/calls.go::FromInterface",
         "example.com/acme/conformance::methods/calls.go::FromQualifiedType",
-        "example.com/acme/conformance::methods/calls.go::FromResult",
+        "example.com/acme/conformance::methods/calls.go::FromSecondResult",
+        "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+        "example.com/acme/conformance::methods/calls.go::run",
         "example.com/acme/conformance::methods/types.go::Holder.Run",
-        "example.com/acme/conformance::methods/types.go::NewCounter",
-        "example.com/acme/conformance::methods/types.go::Open",
+        "example.com/acme/conformance::methods/types.go::Log.Add",
+        "example.com/acme/conformance::methods/types.go::Pair",
         "example.com/acme/conformance::methods/types.go::Sink.Flush"
       ]
     },
     {
       "name": "methods#2",
-      "members": [
-        "example.com/acme/conformance::methods/calls.go::Capture",
-        "example.com/acme/conformance::methods/calls.go::FromClosure",
-        "example.com/acme/conformance::methods/calls.go::FromSecondResult",
-        "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
-        "example.com/acme/conformance::methods/calls.go::run",
-        "example.com/acme/conformance::methods/types.go::Log.Add",
-        "example.com/acme/conformance::methods/types.go::Pair"
-      ]
-    },
-    {
-      "name": "methods#3",
       "members": [
         "example.com/acme/conformance::methods/calls.go::ForInitShadow",
         "example.com/acme/conformance::methods/calls.go::IfInitShadow",
@@ -8762,12 +8754,13 @@
       ]
     },
     {
-      "name": "methods#4",
+      "name": "methods#3",
       "members": [
         "example.com/acme/conformance::methods/calls.go::FromLiteral",
         "example.com/acme/conformance::methods/calls.go::FromMethodResult",
         "example.com/acme/conformance::methods/calls.go::FromPackageVar",
         "example.com/acme/conformance::methods/calls.go::FromParam",
+        "example.com/acme/conformance::methods/calls.go::FromResult",
         "example.com/acme/conformance::methods/calls.go::FromValueParam",
         "example.com/acme/conformance::methods/calls.go::FromVar",
         "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
@@ -8777,18 +8770,20 @@
         "example.com/acme/conformance::methods/calls.go::ReboundByParam",
         "example.com/acme/conformance::methods/types.go::Counter.Bump",
         "example.com/acme/conformance::methods/types.go::Counter.Twice",
-        "example.com/acme/conformance::methods/types.go::Holder.Counter"
+        "example.com/acme/conformance::methods/types.go::Holder.Counter",
+        "example.com/acme/conformance::methods/types.go::NewCounter",
+        "example.com/acme/conformance::methods/types.go::Open"
       ]
     },
     {
-      "name": "methods#5",
+      "name": "methods#4",
       "members": [
         "example.com/acme/conformance::methods/calls.go::FromSibling",
         "example.com/acme/conformance::methods/reset.go::Counter.Reset"
       ]
     },
     {
-      "name": "methods#6",
+      "name": "methods#5",
       "members": [
         "example.com/acme/conformance::methods/types.go::Box.M",
         "example.com/acme/conformance::methods/types.go::T.Ping"
