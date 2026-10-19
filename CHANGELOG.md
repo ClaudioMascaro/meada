@@ -205,10 +205,10 @@ All notable changes to Meada are recorded here. The format follows
   that binding, and a star import of a module whose `__all__` is computed rebinds a name to
   nothing known.
 - A Python top-level name bound again after its definition (`def x(): ...`, then `x = 1`, an
-  import of `x` or any other binding, a function's `global x` included) is no longer linked
-  `exact` to that definition: the last binding decides, and a call reaches the definition by
-  name match at most. So is a function's nested `def` or `class` bound again in that function,
-  or by a nested function's `nonlocal`. A definition under `if`, `try`, a loop, `with` or
+  import of `x` or any other binding, a function's `global x` included, a `def x()` under it
+  too) is no longer linked `exact` to that definition: the last binding decides, and a call
+  reaches the definition by name match at most. So is a function's nested `def` or `class`
+  bound again in that function, or by a nested function's `nonlocal` (a `def` under it too). A definition under `if`, `try`, a loop, `with` or
   `match` may not run, so after another binding of its name (`try: from collections import
   OrderedDict`, `except ImportError: class OrderedDict(dict): ...`) it leaves the name to no
   `exact` link either. After `del x` the name reaches nothing it was bound to before, at the top

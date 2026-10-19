@@ -3381,6 +3381,23 @@ mod tests {
     }
 
     #[test]
+    fn a_definition_under_global_or_nonlocal_rebinds_its_name() {
+        // `def x()` in a function that declares `global x` binds the module's `x` whenever the
+        // function runs, and one under `nonlocal g` the enclosing function's `g`.
+        let global = "def x():\n    pass\ndef setup():\n    global x\n    def x():\n        pass\n";
+        let nonlocal = "def f():\n    def g():\n        pass\n    def h():\n        nonlocal g\n        \
+                        def g():\n            pass\n";
+        for (main, name) in [
+            (format!("{global}x()\n"), "x"),
+            (format!("{global}def k():\n    x()\n"), "x"),
+            (format!("{nonlocal}    g()\n"), "g"),
+        ] {
+            let found = exact_in(&Python, &owned(&[("main.py", &main)]), "main.py", name);
+            assert_eq!(found, None, "{main}");
+        }
+    }
+
+    #[test]
     fn a_conditional_definition_after_a_binding_hides_it() {
         // A `def` or `class` under `if`, `try` or a loop may not run: when the name was bound
         // before it, the name may still be that binding, at the top level or in a function.

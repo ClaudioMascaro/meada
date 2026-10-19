@@ -777,6 +777,13 @@ impl Locals {
             || self.defs.iter().any(|(_, s, n, _)| same(s, n));
         let at = self.written.len();
         (self.defs).push((at, scope.to_string(), name.to_string(), !in_place && bound));
+        // Under `global` or `nonlocal`, it binds the name where the declaration points.
+        if self
+            .declared
+            .contains_key(&(scope.to_string(), name.to_string()))
+        {
+            self.bind(scope, name, Class::Unknown, Evidence::Assigned);
+        }
     }
 
     /// Binds a target: a name in `scope`, or `self.x` as the attribute `x` of the class whose
