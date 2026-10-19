@@ -44,7 +44,7 @@ modules updates it.
   timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`.
 - `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
   `Config::from_env` (the four `MEADA_DECIDER_*` variables, read nowhere else: errors name the
-  variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.13` and needs the key, `chat`
+  variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.14` and needs the key, `chat`
   needs URL and model; HTTPS except to a loopback host), `Question` (the excerpt: call
   expression, the enclosing span read from disk only when the pack's parse of the file says
   that symbol is a function, method or inline function (`function_like`), so a call in a class
