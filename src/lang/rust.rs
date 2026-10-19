@@ -142,6 +142,7 @@ impl LanguagePack for Rust {
             programs,
             modules: Box::new(move |from, specifier| lookup.lookup(from, specifier)),
             reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
+            shared: Vec::new(),
         })
     }
 

@@ -11,6 +11,7 @@ use tree_sitter::Node;
 use crate::Result;
 use crate::resolve::{Code, Keywords};
 
+pub mod go;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -58,6 +59,7 @@ pub trait LanguagePack {
             published: None,
             programs: Vec::new(),
             reaches: None,
+            shared: Vec::new(),
         })
     }
 
@@ -194,10 +196,16 @@ pub struct Layout {
     /// Rust crate calls into its own files and the libraries of the repository it depends on.
     /// `None` reaches every file.
     pub reaches: Option<Reaches>,
+    /// The groups of files that share one top-level scope, each sorted (a file in none has a
+    /// scope of its own): a Go package is the files of one directory that declare one package.
+    /// Each file sees the top-level definitions and constants of the others, private ones
+    /// included, after its own names and imports, and an import that names one of them names
+    /// them all: a member is what any of them exports, several that define it `ambiguous`.
+    pub shared: Vec<Vec<String>>,
 }
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust, &go::Go];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -288,10 +296,15 @@ pub struct Facts {
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
-    /// Whether the file opens with an inner `#![cfg(..)]` that is false for the target: it is
-    /// left out of the crate, as if no `mod` reached it.
+    /// Whether the file is left out of the build for the target: a Rust file that opens with an
+    /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
+    /// constraints exclude it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unbuilt: bool,
+    /// The package the file declares (Go's `package` clause), which `layout` groups files by
+    /// (`Layout::shared`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub package: String,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,

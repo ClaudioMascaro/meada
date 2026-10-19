@@ -32,7 +32,7 @@ one for the area a change touches.
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
-  language adapter and the TS/JS, Python and Rust packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `http/rust.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
@@ -341,7 +341,17 @@ one for the area a change touches.
   and leave the export), `Layout::modules` (by default the pack's `modules`), `Layout::published`
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
   files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
-  Rust's are its crate's and those of the repository's libraries it depends on. A language whose imports name a path rather than a file (Rust's
+  Rust's are its crate's and those of the repository's libraries it depends on. A language whose
+  files share one scope (a Go package: the files of one directory that declare one package; Java,
+  Kotlin and C# packages next) says which through `Layout::shared`, groups of files that
+  `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
+  among the top-level definitions and constants of the others in its group, private ones
+  included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
+  file of a group (`Modules` gives the first candidate, which stands for them all) exports what
+  any file of the group that names it in its `Facts::exports` gives (`Resolver::exports`, over
+  `file_exports`); files that define one name apart are `Binding::Several`, an `ambiguous`
+  call. The group is built from `Facts::package`, the package each file declares. A member
+  lookup (`Resolver::member`) still reads the class's own file. A language whose imports name a path rather than a file (Rust's
   `use a::b as c`) writes `Imported::Path` (what the dotted callee-like name gives, resolved
   from the scope of the import's own `local`, which a pack qualifies by the scope that holds
   it: `inner.c`, `f.c`) and `Imported::Glob` (every name the module the path gives takes:
@@ -605,6 +615,19 @@ one for the area a change touches.
   The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
   a walk, the families being linearized give up and none is kept: each is linearized again when
   asked for, and does not depend on the walk that first reached it.
+- `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many segments of a selector chain (a
+  longer one is its node kind) and a receiver's type is read through that many `*`, type
+  arguments and parentheses (past it the method is no definition). `CONSTRAINT_DEPTH` (64,
+  `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`, parentheses) is not read,
+  and the file is left out, as one that cannot be read is. Build constraints hold for one
+  target (`linux`, `amd64`, `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false);
+  a legacy `// +build` line alone is not read. A plain import binds the name the Go tools
+  assume for its path (`assumed_name`: the last element, the one before a `vN`, without `go-`,
+  up to the first character no identifier holds), not the package clause of the directory it
+  names, so a package whose clause differs from its directory is reached by its alias alone.
+  An import of two modules of the repository that declare one path names nothing unless a
+  `replace` picks one; a `replace` to a directory outside the repository, and a `vendor/`
+  directory, are not followed.
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,

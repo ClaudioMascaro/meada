@@ -294,6 +294,17 @@ pub struct Resolver<'a> {
     /// them and the last of one specifier alone, and how many of them each top-level name comes
     /// before: those written after its last binding (`rebound`).
     later: HashMap<&'a str, (Vec<&'a str>, HashMap<&'a str, usize>)>,
+    /// The group of files each file shares its top-level scope with (`Layout::shared`), by its
+    /// place in `groups`.
+    shared: HashMap<&'a str, usize>,
+    groups: Vec<Group<'a>>,
+}
+
+/// Files that share one top-level scope (`Layout::shared`), sorted, and the files whose top
+/// level binds each name: a definition that is no method, or a constant.
+struct Group<'a> {
+    files: Vec<&'a str>,
+    tops: HashMap<&'a str, Vec<&'a str>>,
 }
 
 /// A block of members of a class (`lang::Impl`): its file and scope, and for a trait's block,
@@ -306,11 +317,50 @@ struct Block<'a> {
 }
 
 impl<'a> Resolver<'a> {
+    #[cfg(test)]
     pub fn new(
         files: &'a BTreeMap<&'a str, &'a Facts>,
         modules: Modules,
         language: &dyn LanguagePack,
     ) -> Self {
+        Self::with_shared(files, modules, Vec::new(), language)
+    }
+
+    /// `new`, with the groups of files that share one top-level scope (`Layout::shared`).
+    pub fn with_shared(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        shared: Vec<Vec<String>>,
+        language: &dyn LanguagePack,
+    ) -> Self {
+        let mut groups = Vec::new();
+        let mut sharing = HashMap::new();
+        for group in &shared {
+            let members: Vec<&str> = (group.iter())
+                .filter_map(|p| files.get_key_value(p.as_str()).map(|(p, _)| *p))
+                .collect();
+            let mut tops: HashMap<&str, Vec<&str>> = HashMap::new();
+            for &path in &members {
+                let facts = files[path];
+                let defs = (facts.defs.iter())
+                    .filter(|d| d.kind != Kind::Method)
+                    .map(|d| d.name.as_str());
+                let names = defs.chain(facts.consts.iter().map(|c| c.name.as_str()));
+                for name in names.filter(|n| !n.contains('.')) {
+                    let found = tops.entry(name).or_default();
+                    if found.last() != Some(&path) {
+                        found.push(path);
+                    }
+                }
+            }
+            for &path in &members {
+                sharing.insert(path, groups.len());
+            }
+            groups.push(Group {
+                files: members,
+                tops,
+            });
+        }
         let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
             .map(|(path, facts)| {
@@ -412,6 +462,8 @@ impl<'a> Resolver<'a> {
             stars_bind,
             strict: language.strict(),
             later,
+            shared: sharing,
+            groups,
         };
         let mut work = Work::default();
         for (path, facts) in files {
@@ -1146,7 +1198,28 @@ impl<'a> Resolver<'a> {
                 return found;
             }
         }
-        self.imported_in(path, name, seen, top)
+        match self.imported_in(path, name, seen, top) {
+            Binding::Unknown if top && !seen.cut => {
+                self.sibling(path, name).unwrap_or(Binding::Unknown)
+            }
+            found => found,
+        }
+    }
+
+    /// What the top level of the other files `path` shares its scope with (`Layout::shared`)
+    /// binds `name` to: a definition or a constant, `Several` when files define it apart.
+    fn sibling(&self, path: &'a str, name: &'a str) -> Option<Binding<'a>> {
+        let group = &self.groups[*self.shared.get(path)?];
+        let found = (group.tops.get(name)?.iter())
+            .filter(|f| **f != path)
+            .map(|&f| match self.def(f, name) {
+                Binding::Unknown => {
+                    let constant = self.consts[f].get(name).copied().unwrap_or(name);
+                    Binding::Const(f, constant)
+                }
+                def => def,
+            });
+        one(found.collect())
     }
 
     /// What the file's imports bind `name` to. Several imports may bind one name: the latest
@@ -1415,8 +1488,29 @@ impl<'a> Resolver<'a> {
     /// `export_as`, or `None` when `path` exports no `name`, so that another star may bind it.
     /// An export of what is not known (a constant, something from outside the repository, an
     /// export cut more than `LINK_DEPTH` links deep, where `seen` records the cut) is still the
-    /// name's: no other star binds it.
+    /// name's: no other star binds it. A file that shares its scope (`Layout::shared`) exports
+    /// what the files of its group that name it in their exports give, `Several` when they
+    /// define it apart.
     fn exports(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        seen: &mut Seen<'a>,
+        value: bool,
+    ) -> Option<Binding<'a>> {
+        let Some(&group) = self.shared.get(path) else {
+            return self.file_exports(path, name, seen, value);
+        };
+        let files = self.groups[group].files.iter().filter(|f| {
+            let named = &self.named[**f];
+            !named.of(name).is_empty() || !named.stars.is_empty()
+        });
+        let found = files.filter_map(|&f| self.file_exports(f, name, seen, value));
+        one(found.collect())
+    }
+
+    /// `exports` of the one file `path`.
+    fn file_exports(
         &self,
         path: &'a str,
         name: &'a str,
@@ -1693,6 +1787,33 @@ fn latest<'a>(
         Some(_) if before => Some(Binding::Unknown),
         found => found,
     }
+}
+
+/// The one binding several files that share a scope give a name, when they give the same one:
+/// `None` when none gives it, `Several` when they define it apart, unknown otherwise.
+fn one(found: Vec<Binding>) -> Option<Binding> {
+    let mut distinct: Vec<Binding> = Vec::new();
+    for binding in found {
+        if !distinct.iter().any(|d| same(d, &binding)) {
+            distinct.push(binding);
+        }
+    }
+    if distinct.len() < 2 {
+        return distinct.pop();
+    }
+    let defs: Option<Vec<Target>> = (distinct.iter())
+        .map(|b| match b {
+            Binding::Def(t) => Some(*t),
+            _ => None,
+        })
+        .collect();
+    Some(match defs {
+        Some(mut all) => {
+            all.sort();
+            Binding::Several(all)
+        }
+        None => Binding::Unknown,
+    })
 }
 
 /// Whether two bindings are the same one, as two `export *` must give a name for a module to

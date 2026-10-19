@@ -8,6 +8,20 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Go language pack (spec #25): `.go` files with no Go toolchain. Functions, methods named
+  `Type.Method` (pointer and value receivers alike), structs, interfaces and other named types,
+  and interface methods (`Interface.Method`); a function literal is no definition, its calls
+  belong to the function around it. An import names a package directory through the module path
+  of the `go.mod` that owns it (a nested module owns its subtree, two modules of one path name
+  none), or through a `replace` to a local directory of the repository; plain, aliased, dot and
+  blank imports. The files of one directory that declare one package share their top-level
+  scope, `_test.go` files included, and an import names them all; the standard library and
+  modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
+  target (gc, no cgo): a file whose name ends in another system or architecture, or whose
+  `//go:build` line is false, is left out. Exports are the names that start with an upper-case
+  letter. The language-neutral seam `Layout::shared` gives a group of files one scope. The index
+  is rebuilt once (new schema version).
+
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
   or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),

@@ -83,8 +83,9 @@ modules updates it.
   `fetch` for TS/JS, none for Python), and the `Facts`/`Value` types, plus the tree-sitter
   helpers (`named`, `children`, `text`) every pack shares. `PACKS` lists `lang/ts.rs` (`.ts .tsx
   .js .jsx .mjs .cjs`, reads `tsconfig.json`), `lang/python.rs` (`.py`, reads
-  `pyproject.toml`: `.pyi` and notebooks are not read) and `lang/rust.rs` (`.rs`, reads every
-  `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below).
+  `pyproject.toml`: `.pyi` and notebooks are not read), `lang/rust.rs` (`.rs`, reads every
+  `Cargo.toml` through the `**/Cargo.toml` config name, receiver keyword `Self`, see below) and
+  `lang/go.rs` (`.go`, reads every `go.mod` through `**/go.mod`, see below).
   `refresh` reads a `**/<name>` config at any depth from the walk, in path order, and any
   config through `read_config` (up to one byte past `package::MAX_BYTES`, no symbolic link,
   as a manifest is); it groups the
@@ -343,6 +344,23 @@ modules updates it.
   (`parse` collects them per scope and name; the Reader substitutes the text the pushes before
   the read position hold, memoized per push).
   `args`, `receiver` and `return_values` are not stored (the constants arrived with schema version 28).
+- `lang/go.rs` (spec #25) yields functions (`Kind::Function`), methods named by their
+  receiver's type (`Type.Method`, `*T` and `T[K]` alike, `Kind::Method`), every named type
+  and alias (`Kind::Class`) and interface methods (`Interface.Method`); a function literal
+  is no definition, its calls and parameters belong to the function around it. Top-level
+  `const` and `var` names are `Facts::consts` (no value yet); names bound inside a function
+  (`:=`, `var`, `const` and `type` in a block, `range`, `select` receives, type switch
+  bindings, named results, a method's receiver, a literal's parameters) are its locals.
+  Exports are the top-level names that start with an upper-case letter. Imports: plain
+  (`assumed_name`) and aliased ones are `Imported::Namespace`, a dot import `Imported::All`,
+  a blank one nothing. `parse` evaluates the build constraints (`lang/go/build.rs`: file
+  name suffixes and the `//go:build` line of the header, for `linux/amd64`) and marks a file
+  they exclude `Facts::unbuilt`, which `layout` leaves out of `members`. `layout` reads the
+  `go.mod` files once (`lang/go/modfile.rs`: `module` and local `replace` directives, a line
+  format read with no parser crate) and answers `modules` with the non-test files of the
+  directory an import names (`Modules::dir`: a `replace` of the importing file's module, else
+  the longest module path of the repository, a directory its module owns), and `shared` with
+  the files of each directory and `Facts::package`.
 - `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
