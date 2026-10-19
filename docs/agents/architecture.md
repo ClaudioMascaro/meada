@@ -560,7 +560,7 @@ one for the area a change touches.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ). An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
-  `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `tsconfig.json`, `jsconfig.json`) is read up to one
+  `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `package::MAX_BYTES`, and a provider document up to one byte past
   `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
   holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A

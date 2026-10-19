@@ -3,7 +3,7 @@
 //! `go.mod` that owns it (`modfile.rs`), the files of one package share their top-level scope
 //! (`Layout::shared`), and build constraints are evaluated for one fixed target (`build.rs`).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 
 use tree_sitter::{Node, Parser};
@@ -352,6 +352,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         locals: BTreeSet::new(),
     };
     let mut top = Vec::new();
+    let mut inits: HashMap<&str, usize> = HashMap::new();
     for node in named(tree.root_node()) {
         match node.kind() {
             "package_clause" => {
@@ -362,16 +363,29 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let Some(name) = node.child_by_field_name("name").map(|n| text(n, src)) else {
                     continue;
                 };
-                let list = node.child_by_field_name("parameters");
-                let params = params(list, src);
+                let body = node.child_by_field_name("body");
+                // A blank function names no symbol: its calls are the file's.
+                if name == "_" {
+                    body.into_iter().for_each(|b| walk.body("", b));
+                    continue;
+                }
+                // Each `init` (the one name a file may declare twice) is a symbol of its own.
+                let n = inits.entry(name).or_insert(0);
+                *n += 1;
+                let name = match *n {
+                    1 => name.to_string(),
+                    n => format!("{name}#{n}"),
+                };
+                let params = params(node.child_by_field_name("parameters"), src);
+                let range = node.byte_range();
                 walk.facts
                     .defs
-                    .push(def(name.into(), Kind::Function, node.byte_range(), params));
-                top.push(name.to_string());
-                walk.bind_params(name, result_list(node));
-                if let Some(body) = node.child_by_field_name("body") {
-                    walk.body(name, body);
+                    .push(def(name.clone(), Kind::Function, range, params));
+                walk.bind_params(&name, result_list(node));
+                if let Some(body) = body {
+                    walk.body(&name, body);
                 }
+                top.push(name);
             }
             "method_declaration" => {
                 let receiver = node.child_by_field_name("receiver");

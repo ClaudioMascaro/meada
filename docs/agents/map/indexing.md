@@ -347,7 +347,9 @@ modules updates it.
 - `lang/go.rs` (spec #25) yields functions (`Kind::Function`), methods named by their
   receiver's type (`Type.Method`, `*T` and `T[K]` alike, `Kind::Method`), every named type
   and alias (`Kind::Class`) and interface methods (`Interface.Method`); a function literal
-  is no definition, its calls and parameters belong to the function around it. Top-level
+  is no definition, its calls and parameters belong to the function around it; a second
+  `init` of a file is `init#2` (and so on), and a blank `func _()` is none (its calls are the
+  file's). Top-level
   `const` and `var` names are `Facts::consts` (no value yet); names bound inside a function
   (`:=`, `var`, `const` and `type` in a block, `range`, `select` receives, type switch
   bindings, named results, a method's receiver, a literal's parameters) are its locals.

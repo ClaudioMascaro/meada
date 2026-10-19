@@ -17,3 +17,16 @@ func (s *Store) Get(key string) string {
 }
 
 func open() {}
+
+// A package may hold several `init` functions, and blank ones no code names.
+func init() {
+	open()
+}
+
+func init() {
+	helper()
+}
+
+func _() {
+	open()
+}

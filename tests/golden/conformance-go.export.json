@@ -47,7 +47,7 @@
     },
     {
       "path": "store/store.go",
-      "hash": "dfdecf999a42c6f12cc96c5b819a3f9f82c9bb8b012ee9d4e4fb7decc16e5e4c"
+      "hash": "542c51c202d07b31124d955f483064d4865816930f6eb95059adcb9435f47a3f"
     },
     {
       "path": "store/store_test.go",
@@ -421,6 +421,22 @@
         "path": "store/store.go",
         "start": 155,
         "end": 218
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::store/store.go::init",
+      "span": {
+        "path": "store/store.go",
+        "start": 314,
+        "end": 337
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::store/store.go::init#2",
+      "span": {
+        "path": "store/store.go",
+        "start": 339,
+        "end": 364
       }
     },
     {
@@ -1034,6 +1050,39 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/store.go::init#2::helper#0",
+      "caller": "example.com/acme/conformance::store/store.go::init#2",
+      "target": "example.com/acme/conformance::store/helpers.go::helper",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 354,
+        "end": 362
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::store/store.go::init::open#0",
+      "caller": "example.com/acme/conformance::store/store.go::init",
+      "target": "example.com/acme/conformance::store/store.go::open",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 329,
+        "end": 335
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::store/store.go::open#0",
+      "caller": "example.com/acme/conformance::store/store.go",
+      "target": "example.com/acme/conformance::store/store.go::open",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 378,
+        "end": 384
+      }
+    },
+    {
       "id": "example.com/acme/conformance::store/store_test.go::TestNew::New#0",
       "caller": "example.com/acme/conformance::store/store_test.go::TestNew",
       "target": "example.com/acme/conformance::store/store.go::New",
@@ -1131,11 +1180,18 @@
         "example.com/acme/conformance::store/client_test.go::TestClient",
         "example.com/acme/conformance::store/client_test.go::helper",
         "example.com/acme/conformance::store/disk_linux.go::onLinux",
-        "example.com/acme/conformance::store/helpers.go::Exported",
         "example.com/acme/conformance::store/helpers.go::helper",
         "example.com/acme/conformance::store/store.go::New",
-        "example.com/acme/conformance::store/store.go::open",
+        "example.com/acme/conformance::store/store.go::init#2",
         "example.com/acme/conformance::store/store_test.go::TestNew"
+      ]
+    },
+    {
+      "name": "store#2",
+      "members": [
+        "example.com/acme/conformance::store/helpers.go::Exported",
+        "example.com/acme/conformance::store/store.go::init",
+        "example.com/acme/conformance::store/store.go::open"
       ]
     },
     {

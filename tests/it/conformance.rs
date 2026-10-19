@@ -2570,6 +2570,8 @@ fn go() {
             "store/store.go::New",
             "store/store.go::Store",
             "store/store.go::Store.Get",
+            "store/store.go::init",
+            "store/store.go::init#2",
             "store/store.go::open",
             "store/store_test.go::TestNew",
             "worker/jobs/jobs.go::Run",
@@ -2625,6 +2627,18 @@ fn go() {
                 EXACT,
                 &["store/helpers.go::helper"],
             ),
+            // Each `init` is a symbol of its own; a blank function is none.
+            (
+                "store/store.go::init::open#0",
+                EXACT,
+                &["store/store.go::open"],
+            ),
+            (
+                "store/store.go::init#2::helper#0",
+                EXACT,
+                &["store/helpers.go::helper"],
+            ),
+            ("store/store.go::open#0", EXACT, &["store/store.go::open"]),
             (
                 "store/helpers.go::Exported::open#0",
                 EXACT,
