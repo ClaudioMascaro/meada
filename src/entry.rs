@@ -233,7 +233,11 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
             let own = match def.kind {
                 Kind::Function => true,
                 // A method of an exported class; a constructor is reached as `new Class`.
-                Kind::Method => class && !def.name.ends_with(".constructor"),
+                Kind::Method => {
+                    class
+                        && !def.name.ends_with(".constructor")
+                        && !facts.hidden.contains(&def.name)
+                }
                 _ => false,
             };
             if own && let Some(name) = local.names.def(file, &def.name) {

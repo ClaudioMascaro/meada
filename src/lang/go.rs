@@ -901,6 +901,10 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let mut function = def(name.clone(), Kind::Function, range, params(list, src));
                 function.result = result_class(node, src);
                 walk.facts.defs.push(function);
+                // `func main` of package `main` starts a program.
+                if name == "main" && walk.facts.package == "main" {
+                    walk.facts.programs.push(name.clone());
+                }
                 walk.typed_params(&name, list, false);
                 walk.typed_params(&name, result_list(node), true);
                 walk.bind_type_params(&name, node);
@@ -921,6 +925,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let range = node.byte_range();
                 let mut method = def(qualified.clone(), Kind::Method, range, params(list, src));
                 method.result = result_class(node, src);
+                if !exported(name) {
+                    walk.facts.hidden.push(qualified.clone());
+                }
                 walk.facts.defs.push(method);
                 walk.typed_params(&qualified, list, false);
                 walk.typed_params(&qualified, receiver, true);
@@ -968,6 +975,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                         let Some(method) = method else { continue };
                         let params = params(elem.child_by_field_name("parameters"), src);
                         let qualified = format!("{name}.{}", text(method, src));
+                        if !exported(text(method, src)) {
+                            walk.facts.hidden.push(qualified.clone());
+                        }
                         let range = elem.byte_range();
                         let mut method = def(qualified, Kind::Method, range, params);
                         method.result = result_class(elem, src);

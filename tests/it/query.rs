@@ -213,6 +213,22 @@ fn rust_programs_are_found_as_processes() {
 }
 
 #[test]
+fn go_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "context_go_programs",
+        "conformance-go",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // `func main` in package `main`, not the one in package `store`.
+    assert_golden(
+        "conformance-go.search-process-main.txt",
+        &engine.search("main", Some("process"), None).unwrap(),
+    );
+}
+
+#[test]
 fn python_programs_are_found_as_processes_and_shown_with_their_range() {
     let repo = fixture_repo(
         "context_python_programs",
