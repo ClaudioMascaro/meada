@@ -250,6 +250,9 @@ pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
+    /// constant marked `.Name` (Go). A variable of such a name holds no one value.
+    written: HashSet<&'a str>,
     /// The other names bindings make (`Facts::locals`): each hides an outer name.
     locals: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::receivers`, by scope and name.
@@ -368,6 +371,10 @@ impl<'a> Resolver<'a> {
                 (*path, names)
             })
             .collect();
+        let written = (files.values())
+            .flat_map(|f| f.consts.iter())
+            .filter_map(|c| c.name.strip_prefix('.'))
+            .collect();
         let consts = files
             .iter()
             .map(|(path, facts)| {
@@ -443,6 +450,7 @@ impl<'a> Resolver<'a> {
         let mut resolver = Self {
             files,
             defs,
+            written,
             consts,
             locals,
             receivers,
@@ -734,11 +742,10 @@ impl<'a> Resolver<'a> {
         self.defs[t.path][t.name].kind == Kind::Class
     }
 
-    /// What a parameter or a local holds, as far as the source writes its class: an instance
-    /// of a class of the repository, something from outside it, or unknown (also more than
-    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
-    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
-        let (path, scope, name) = match binding {
+    /// The file, scope and name under which `Facts::receivers` may hold the class of what
+    /// `binding` is: a parameter, a local, a constant.
+    fn holder(&self, binding: &Binding<'a>) -> Option<(&'a str, &'a str, &'a str)> {
+        Some(match *binding {
             Binding::Param(f, n, field) => {
                 let param = &self.defs[f.path][f.name].params[n];
                 let name = match field {
@@ -753,7 +760,16 @@ impl<'a> Resolver<'a> {
                 Some((scope, name)) => (path, scope, name),
                 None => (path, "", constant),
             },
-            other => return other,
+            _ => return None,
+        })
+    }
+
+    /// What a parameter or a local holds, as far as the source writes its class: an instance
+    /// of a class of the repository, something from outside it, or unknown (also more than
+    /// `RECEIVER_DEPTH` receivers deep). Other bindings stay as they are.
+    fn instance(&self, binding: Binding<'a>, work: &mut Work<'a>) -> Binding<'a> {
+        let Some((path, scope, name)) = self.holder(&binding) else {
+            return binding;
         };
         let Some(class) = self.receivers[path].get(&(scope, name)) else {
             return Binding::Unknown;
@@ -1224,6 +1240,24 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         }
+    }
+
+    /// Whether the top-level name `name` of `path` is not the one thing its constant says (Go: a
+    /// variable another file of the package assigns, or any file of the repository writes
+    /// through a selector). In the first case another file `path` shares its scope with
+    /// (`Layout::shared`) binds the name too.
+    fn redeclared(&self, path: &'a str, name: &str) -> bool {
+        // A variable (`Name.var`) some file writes through a selector, in any package.
+        let marked = format!("{name}.var");
+        if self.written.contains(name) && self.consts[path].contains(marked.as_str()) {
+            return true;
+        }
+        let Some(&group) = self.shared.get(path) else {
+            return false;
+        };
+        let tops = &self.groups[group].tops;
+        tops.get(name)
+            .is_some_and(|files| files.iter().any(|f| *f != path))
     }
 
     /// What the top level of the other files `path` shares its scope with (`Layout::shared`)
@@ -1987,10 +2021,17 @@ struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
     out: BTreeSet<(&'a str, usize)>,
+    /// Each origin of `out` with the calls of the functions whose return values the walk went
+    /// through to it, outermost first (`Code::value_origins_through`).
+    through: BTreeSet<Through<'a>>,
     /// The methods of the builder chains being followed, which the library they start at must
     /// pass through (`LanguagePack::passes`).
     steps: Vec<&'a str>,
 }
+
+/// A call a value comes from (its file and position) and the calls of the functions the walk
+/// went through to reach it, outermost first.
+pub type Through<'a> = ((&'a str, usize), Vec<(&'a str, usize)>);
 
 /// The method a call's callee names (`x.y.get` is `get`).
 fn method(callee: &str) -> &str {
@@ -2296,6 +2337,26 @@ impl<'a> Code<'a> {
             .then(|| self.resolver.imported_name(path, scope, callee))
     }
 
+    /// The type outside the repository that the source writes for the name `name` (`c *http.Client`
+    /// is `net/http.Client`), written in `scope` of `path`: a parameter, a local, a constant or a
+    /// field. A type is written as a path, so an import in the file that writes it names the
+    /// package.
+    pub fn outside_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
+        let binding = self.resolver.binding(path, scope, name);
+        let (at, within, held) = self.resolver.holder(&binding)?;
+        let Class::Type(written) = self.resolver.receivers[at].get(&(within, held))? else {
+            return None;
+        };
+        let (seen, work) = (&mut self.resolver.seen(at, within), &mut Work::default());
+        let found = self
+            .resolver
+            .resolve_as(at, within, written, seen, work, Reading::Path);
+        let Binding::External(package, _) = found else {
+            return None;
+        };
+        Some(format!("{package}.{}", written.rsplit('.').next()?))
+    }
+
     /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
     /// its head among types and modules, so a function of the file that spells like a crate
     /// (`fn rocket()` calling `rocket::build()`) does not hide it.
@@ -2354,6 +2415,20 @@ impl<'a> Code<'a> {
         let mut trail = Trail::default();
         self.flow_name(path, scope, name, &mut trail);
         trail.out.into_iter().collect()
+    }
+
+    /// `value_origins` with, for each origin, the calls of the functions of the repository the
+    /// walk went through to reach it, outermost first: two objects the same function makes
+    /// differ by the call that made each.
+    pub fn value_origins_through(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+    ) -> Vec<Through<'a>> {
+        let mut trail = Trail::default();
+        self.flow(path, scope, value, &mut trail);
+        trail.through.into_iter().collect()
     }
 
     /// `origins` of a value as written.
@@ -2442,6 +2517,13 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Records the call at `index` of `path` as an origin, with the calls the walk came through.
+    fn reached(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
+        trail.out.insert((path, index));
+        let frames = trail.frames.iter().map(|f| (f.path, f.index)).collect();
+        trail.through.insert(((path, index), frames));
+    }
+
     /// The origins of the call at `index` of `path`, where a chain stops: what a function of
     /// the repository returns, the value the call is made on, or the call itself.
     fn flow_from(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
@@ -2450,7 +2532,7 @@ impl<'a> Code<'a> {
             Resolution::Exact(t) if !self.resolver.is_class(t) => t,
             _ if self.pack.fluent() => match self.receiver(path, index) {
                 None => {
-                    trail.out.insert((path, index));
+                    self.reached(path, index, trail);
                     return;
                 }
                 Some(Value::Call(_)) => return,
@@ -2460,7 +2542,7 @@ impl<'a> Code<'a> {
                 }
             },
             _ => {
-                trail.out.insert((path, index));
+                self.reached(path, index, trail);
                 return;
             }
         };
@@ -3065,7 +3147,7 @@ impl<'a> Code<'a> {
         match self.resolver.binding(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
-                if fold.held.contains(&(at, constant)) {
+                if fold.held.contains(&(at, constant)) || self.resolver.redeclared(at, constant) {
                     return Value::Unknown;
                 }
                 let Some((value, within)) = self.held(at, constant) else {

@@ -1,5 +1,5 @@
 example.com/acme/conformance methods/types.go:11-14 Counter.Bump
-community: methods#4
+community: methods#3
 processes: 16 (16 export; 1 repository): Capture (example.com/acme/conformance), FromClosure (example.com/acme/conformance), FromLiteral (example.com/acme/conformance), FromMethodResult (example.com/acme/conformance), FromPackageVar (example.com/acme/conformance), FromParam (example.com/acme/conformance), FromResult (example.com/acme/conformance), FromValueParam (example.com/acme/conformance), FromVar (example.com/acme/conformance), FromVarLiteral (example.com/acme/conformance), LocalType (example.com/acme/conformance), NotWritten (example.com/acme/conformance), Rebound (example.com/acme/conformance), ReboundByParam (example.com/acme/conformance), Counter.Twice (example.com/acme/conformance), Holder.Run (example.com/acme/conformance)
 func (c *Counter) Bump() int {
 	c.n++

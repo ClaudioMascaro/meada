@@ -1754,6 +1754,7 @@ impl ContractKind for Http {
         found.extend(axum(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
+        found.extend(go::consumers(code));
         found.extend(decorated(code));
         found.extend(django(code));
         found

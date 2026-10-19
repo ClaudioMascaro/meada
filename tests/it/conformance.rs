@@ -2527,6 +2527,44 @@ fn go() {
         &[
             "billing/invoice/invoice.go::Total",
             "billing/invoice/invoice.go::round",
+            "client/flags.go::Configure",
+            "client/net.go::Cache",
+            "client/net.go::Cache.Get",
+            "client/net.go::Clients",
+            "client/net.go::Formats",
+            "client/net.go::Lookup",
+            "client/net.go::Package",
+            "client/net.go::Requests",
+            "client/net.go::Unresolved",
+            "client/net.go::Urls",
+            "client/net.go::Written",
+            "client/net.go::init",
+            "client/net.go::lookup",
+            "client/rest.go::Factory",
+            "client/rest.go::Gateway",
+            "client/rest.go::Gateway.Items",
+            "client/rest.go::Mixed",
+            "client/rest.go::Other",
+            "client/rest.go::Reassigned",
+            "client/rest.go::Rest",
+            "client/rest.go::Returned",
+            "client/rest.go::Reused",
+            "client/rest.go::Separate",
+            "client/rest.go::Typed",
+            "client/rest.go::Wrapper",
+            "client/rest.go::fetchBase",
+            "client/rest.go::fetchJSON",
+            "client/rest.go::newClient",
+            "client/rest.go::plainClient",
+            "client/routes/routes.go::Move",
+            "client/tenants.go::Rename",
+            "client/wrappers.go::Cycle",
+            "client/wrappers.go::Wrapped",
+            "client/wrappers.go::get",
+            "client/wrappers.go::getUser",
+            "client/wrappers.go::ping",
+            "client/wrappers.go::pong",
+            "client/wrappers.go::send",
             "forks/billing/invoice/invoice.go::Total",
             "forks/billing/invoice/invoice.go::round",
             "internal/http-utils/utils.go::NewRequest",
@@ -3334,6 +3372,212 @@ fn go_routes_are_providers_under_every_prefix() {
     assert_eq!(actual, expected);
 }
 
+/// The consumers of the Go fixture's `client/` (spec #25): `net/http` calls and requests, resty
+/// requests with the base of their client, URLs folded from literals, `+`, `fmt.Sprintf`,
+/// constants and package-level names (of the package, of another file and of another package), and
+/// wrappers read at their call sites. A path that cannot be evaluated is an unresolved consumer.
+#[test]
+fn go_http_calls_are_consumers_with_their_urls_folded() {
+    let repo = fixture_repo("go_consumers", "conformance-go", Some(ORIGIN));
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    let api = "host:api.example.com";
+    let net = |function: &str, call: &str| format!("client/net.go::{function}::{call}");
+    let wrap = |function: &str, call: &str| format!("client/wrappers.go::{function}::{call}");
+    let rest = |function: &str, call: &str| format!("client/rest.go::{function}::{call}");
+    let chain = |verb: &str, n: usize| format!("(call_expression).{verb}#{n}");
+    let expected = triples(&[
+        // The package, a `Client`, the default client and a client written as a literal.
+        ("http::GET::/health", api, &net("Package", "http.Get#0")),
+        ("http::HEAD::/ping", api, &net("Package", "http.Head#0")),
+        ("http::POST::/items", api, &net("Package", "http.Post#0")),
+        (
+            "http::POST::/forms",
+            api,
+            &net("Package", "http.PostForm#0"),
+        ),
+        ("http::GET::/on-client", api, &net("Clients", "c.Get#0")),
+        ("http::HEAD::/on-client", api, &net("Clients", "c.Head#0")),
+        ("http::POST::/on-client", api, &net("Clients", "c.Post#0")),
+        (
+            "http::POST::/on-client",
+            api,
+            &net("Clients", "c.PostForm#0"),
+        ),
+        (
+            "http::GET::/on-default",
+            api,
+            &net("Clients", "http.DefaultClient.Get#0"),
+        ),
+        ("http::GET::/on-local", api, &net("Clients", "local.Get#0")),
+        // The construction of a request is the consumer; a method that is no literal is open.
+        (
+            "http::GET::/req/get",
+            api,
+            &net("Requests", "http.NewRequest#0"),
+        ),
+        (
+            "http::POST::/req/post",
+            api,
+            &net("Requests", "http.NewRequest#1"),
+        ),
+        (
+            "http::DELETE::/req/delete",
+            api,
+            &net("Requests", "http.NewRequestWithContext#0"),
+        ),
+        (
+            "unresolved",
+            api,
+            &net("Requests", "http.NewRequestWithContext#1"),
+        ),
+        // Literals, `+`, `fmt.Sprintf`, constants and names of the package and of others.
+        ("http::GET::/raw", api, &net("Urls", "http.Get#0")),
+        ("http::GET::/users/{}", api, &net("Urls", "http.Get#1")),
+        (
+            "http::GET::/users/{}/orders",
+            api,
+            &net("Urls", "http.Get#2"),
+        ),
+        ("http::GET::/search/{}", api, &net("Urls", "http.Get#3")),
+        ("http::GET::/orders", api, &net("Urls", "http.Get#4")),
+        ("http::GET::/users/{}", api, &net("Urls", "http.Get#5")),
+        ("http::GET::/v2/teams", api, &net("Urls", "http.Get#6")),
+        // A variable assigned in a function, in another file or in another package holds no value.
+        ("unresolved", "", &net("Urls", "http.Get#7")),
+        ("unresolved", "", &net("Urls", "http.Get#8")),
+        ("unresolved", "", &net("Urls", "http.Get#9")),
+        ("unresolved", "", &net("Unresolved", "http.Get#0")),
+        ("unresolved", "", &net("Unresolved", "http.Get#1")),
+        ("unresolved", "", &net("Unresolved", "http.Get#2")),
+        // Wrappers: one level, two levels, a method parameter, an unreadable argument, a cycle.
+        ("http::GET::/wrapped", api, &wrap("Wrapped", "get#0")),
+        ("http::GET::/users/42", api, &wrap("Wrapped", "getUser#0")),
+        ("http::PUT::/wrapped/put", api, &wrap("Wrapped", "send#0")),
+        ("unresolved", "", &wrap("Wrapped", "get#1")),
+        ("http::GET::/cycle", api, &wrap("Cycle", "ping#0")),
+        ("http::GET::/", api, &wrap("pong", "ping#0")),
+        // resty: the base URL of the client that issued the request.
+        (
+            "http::GET::/invoices",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Get", 0)),
+        ),
+        (
+            "http::POST::/invoices",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Post", 0)),
+        ),
+        (
+            "http::PUT::/invoices/1",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Put", 0)),
+        ),
+        (
+            "http::PATCH::/invoices/1",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Patch", 0)),
+        ),
+        (
+            "http::DELETE::/invoices/1",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Delete", 0)),
+        ),
+        (
+            "http::HEAD::/invoices",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Head", 0)),
+        ),
+        (
+            "http::OPTIONS::/invoices",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Options", 0)),
+        ),
+        (
+            "http::GET::/executed",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Execute", 0)),
+        ),
+        (
+            "http::POST::/executed",
+            "host:billing.example.com",
+            &rest("Rest", &chain("Execute", 1)),
+        ),
+        (
+            "http::GET::/stored",
+            "host:billing.example.com",
+            &rest("Rest", "req.Get#0"),
+        ),
+        (
+            "http::GET::/absolute",
+            "host:other.example.com",
+            &rest("Rest", &chain("Get", 1)),
+        ),
+        (
+            "http::GET::/entries",
+            "host:ledger.example.com",
+            &rest("Separate", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/plain",
+            "host:bare.example.com",
+            &rest("Separate", &chain("Get", 1)),
+        ),
+        // A client written as a type has no base; a client of two bases has an unknown one.
+        ("http::GET::/typed", "", &rest("Typed", &chain("Get", 0))),
+        ("http::GET::/typed-request", "", &rest("Typed", "r.Get#0")),
+        (
+            "http::GET::/items",
+            "",
+            &rest("Gateway.Items", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/plain",
+            api,
+            &rest("Gateway.Items", "g.plain.Get#0"),
+        ),
+        (
+            "http::GET::/returned",
+            "host:returned.example.com",
+            &rest("Returned", &chain("Get", 0)),
+        ),
+        ("http::GET::/reused", "", &rest("Reused", &chain("Get", 0))),
+        (
+            "http::GET::/wrapped-rest",
+            "host:billing.example.com",
+            &rest("Wrapper", "fetchJSON#0"),
+        ),
+        // Two clients one factory makes keep their own bases; a wrapper given a traced client and
+        // one that is not has an unknown base; a client assigned again is no consumer.
+        (
+            "http::GET::/from-a",
+            "host:a.example.com",
+            &rest("Factory", &chain("Get", 1)),
+        ),
+        ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
+        ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
+        ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        // A package variable another package writes through a selector (`config.Base = ..`,
+        // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
+        // to the constant `Host`.
+        ("http::GET::/a", "", &net("Written", "http.Get#0")),
+        ("unresolved", "", &net("Written", "http.Get#1")),
+        ("unresolved", "", &net("Written", "http.Get#2")),
+        ("http::GET::/stable", api, &net("Written", "http.Get#3")),
+        // A flag, width or precision makes a hole; `%d` prints integers only.
+        ("http::GET::/pad/{}", api, &net("Formats", "http.Get#0")),
+        ("http::GET::/prec/{}", api, &net("Formats", "http.Get#1")),
+        ("http::GET::/num/{}", api, &net("Formats", "http.Get#2")),
+        ("http::GET::/v2/items/7", api, &net("Formats", "http.Get#3")),
+        (
+            "http::GET::/plain/ab/{}",
+            api,
+            &net("Formats", "http.Get#4"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "client/"), expected);
+}
+
 /// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
 /// built in another module, one router under two prefixes, chained method routers, `any`, a
 /// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot
@@ -3626,6 +3870,34 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(export.contains("http::GET::/r10\""));
     assert!(!export.contains("http::GET::/r2999\""));
+}
+
+/// A resty client followed back through setters is followed only as far as the limit
+/// (`CLIENT_DEPTH`, 64: the setters, `SetBaseURL` and `R()` count): a request at the limit has
+/// its base, one past it is no consumer.
+#[test]
+fn a_long_resty_setter_chain_is_followed_up_to_its_limit() {
+    const LAST: usize = 61;
+    let repo = fixture_repo("go_setters_long", "conformance-go", Some(ORIGIN));
+    let mut long = String::from("package client\n\nimport \"github.com/go-resty/resty/v2\"\n");
+    for n in [LAST, LAST + 1] {
+        let setters = ".SetTimeout(1)".repeat(n);
+        long += &format!(
+            "\nfunc Setters{n}() {{\n\tresty.New().SetBaseURL(\"https://deep.example.com\"){setters}\
+             .R().Get(\"/s{n}\")\n}}\n"
+        );
+    }
+    std::fs::write(repo.join("client/long.go"), long).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let found = consumers(&json, "client/long.go");
+    let site = format!("client/long.go::Setters{LAST}::(call_expression).Get#0");
+    let expected = triples(&[(
+        &format!("http::GET::/s{LAST}"),
+        "host:deep.example.com",
+        &site,
+    )]);
+    assert_eq!(found, expected);
 }
 
 /// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.
