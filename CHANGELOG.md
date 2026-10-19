@@ -249,6 +249,9 @@ All notable changes to Meada are recorded here. The format follows
   their count to index: each name is looked up among the file's imports, externs and
   `__all__`, each Python definition among the names bound before it, and each addition among
   the values assigned before it, by name rather than by reading them all.
+- A value followed through a file of thousands of functions or constants, or a name read in a
+  function of thousands of parameters, no longer takes time quadratic in their count: each
+  definition, constant and parameter is looked up by name rather than by reading them all.
 - A Rust `let mut` String in a block nested deep in other blocks no longer costs, for each
   statement after it, time in proportion to the depth: its statements are read once from the
   block instead of being looked up from the root of the tree, so a thousand `let mut`s a
