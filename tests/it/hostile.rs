@@ -1199,6 +1199,14 @@ fn go() -> Vec<Case> {
         let head = "package h\n\nimport (\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n)\n";
         format!("{head}\nfunc f(c *gin.Context) {{}}\n\n{body}\n")
     };
+    let chi = |body: String| {
+        let head = "package h\n\nimport (\n\t\"net/http\"\n\n\t\"github.com/go-chi/chi/v5\"\n)\n";
+        format!("{head}\nfunc f(w http.ResponseWriter, r *http.Request) {{}}\n\n{body}\n")
+    };
+    let mux = |body: String| {
+        let head = "package h\n\nimport (\n\t\"net/http\"\n\n\t\"github.com/gorilla/mux\"\n)\n";
+        format!("{head}\nfunc f(w http.ResponseWriter, r *http.Request) {{}}\n\n{body}\n")
+    };
     vec![
         // Routers: groups made on groups past `PREFIX_DEPTH`, a registration function reaching
         // the next one with a group, and a mux inside calls nested past the value depth.
@@ -1219,6 +1227,70 @@ fn go() -> Vec<Case> {
                         i + 1
                     )
                 })
+            )),
+        ),
+        // chi and gorilla/mux: `Route` literals nested past the definition depth, a named
+        // function reaching the next with its subrouter, `Mount` and `PathPrefix` chains past
+        // `PREFIX_DEPTH`, and `Methods` chained past the value depth.
+        m(
+            "chi route literals",
+            chi(format!(
+                "func g() {{\n\tr := chi.NewRouter()\n\t{}\n}}",
+                nest(
+                    "r.Route(\"/a\", func(r chi.Router) { ",
+                    "r.Get(\"/x\", f)",
+                    " })",
+                    DEEP
+                )
+            )),
+        ),
+        m(
+            "chi route functions",
+            chi(format!(
+                "func g() {{ chi.NewRouter().Route(\"/a\", c0) }}\n{}\nfunc c{LINKS}(r chi.Router) {{ r.Get(\"/x\", f) }}",
+                lines(LINKS, |i| format!(
+                    "func c{i}(r chi.Router) {{ r.Route(\"/a\", c{}) }}",
+                    i + 1
+                ))
+            )),
+        ),
+        m(
+            "chi passed subrouters",
+            chi(format!(
+                "func g() {{ chi.NewRouter().Route(\"/a\", c0) }}\n{}\nfunc p{LINKS}(r chi.Router) {{ r.Get(\"/x\", f) }}",
+                lines(LINKS, |i| format!(
+                    "func c{i}(r chi.Router) {{ s := r; p{i}(s); p{i}(r); c{}(s) }}\nfunc p{i}(r chi.Router) {{ p{}(r) }}",
+                    i + 1,
+                    i + 1
+                ))
+            )),
+        ),
+        m(
+            "chi mounts",
+            chi(format!(
+                "func g() {{\n\tm0 := chi.NewRouter()\n{}\n\tm{LINKS}.Get(\"/x\", f)\n}}",
+                lines(LINKS, |i| format!(
+                    "\tm{} := chi.NewRouter()\n\tm{i}.Mount(\"/a\", m{})",
+                    i + 1,
+                    i + 1
+                ))
+            )),
+        ),
+        m(
+            "gorilla subrouters",
+            mux(format!(
+                "func g() {{\n\ts0 := mux.NewRouter()\n{}\n\ts{LINKS}.HandleFunc(\"/x\", f)\n}}",
+                lines(LINKS, |i| format!(
+                    "\ts{} := s{i}.PathPrefix(\"/a\").Subrouter()",
+                    i + 1
+                ))
+            )),
+        ),
+        m(
+            "gorilla methods",
+            mux(format!(
+                "func g() {{ mux.NewRouter().HandleFunc(\"/x\", f){} }}",
+                ".Methods(\"GET\")".repeat(DEEP)
             )),
         ),
         m(

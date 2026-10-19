@@ -36,7 +36,7 @@ one for the area a change touches.
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `http/rust.rs`, `http/go.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
-  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`: net/http, gin and echo), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`: net/http, gin, echo, chi and gorilla/mux), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
   #24, #30 and #25). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
@@ -197,10 +197,16 @@ one for the area a change touches.
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
-- New **Go router** (spec #25; chi and gorilla, #78): a row of `ROUTERS` in `http/go.rs` (the
-  package, the functions that make a router, the method that makes a group, the route methods
-  with the methods each serves, where the handler sits); `Go::provide` reads the routers through
-  `Code::origins` and `prefixes`, as the Rust kinds do. The pack gives it `Call::args`,
+- New **Go router** (spec #25; net/http, gin, echo, chi and gorilla): a row of `ROUTERS` in
+  `http/go.rs` (the package, the functions that make a router, the methods that make a group
+  (a `Form`: `Group(prefix)`, chi's `Group(fn)` and `Route(prefix, fn)`, gorilla's
+  `PathPrefix(prefix).Subrouter()`) or mount a router (chi's `Mount`), the route methods with
+  the methods each serves, where the handler sits, which path spellings are parameters);
+  `Go::provide` reads the routers through `Code::origins` and `prefixes`, as the Rust kinds do.
+  The function a `Route` or `Group` call is given (`Go::callbacks`) binds its first parameter to
+  that group, which `Code::origins` does not see; `Go::reach` follows it from there through the
+  exact callers that pass the parameter on and the names bound once to it (`Code::param_of`,
+  `Code::param_args`, `Code::constant`). The pack gives it `Call::args`,
   `Call::receiver`, the constants a function binds once (`Facts::consts`) and what it returns
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
@@ -654,6 +660,20 @@ one for the area a change touches.
   too. `http.StripPrefix` and other middleware that rewrites paths are not modelled (spec #25).
   Middleware (`Use`, extra handlers) has no effect on a gin or echo path. A router held in a
   struct field, a map or a slice is not followed (no marker).
+  chi: `*` is a parameter segment, `:name` a literal no contract can spell (no provider);
+  `Mount(prefix, router)` follows the router like a group, any router inside a call of the
+  handler argument (a middleware), and a `ServeMux` given to `Mount`, are unread mounts (chi's
+  `Mount` leaves the request path alone, so the mux would see its full path under the mount's
+  prefix: combining those chains with the router's prefixes is not modelled); `With(..)` is not
+  a group. A `Route` or `Group` function binds its first parameter to the group of that call,
+  and the group is followed from there through exact calls (`users(r)`) and names bound once
+  (`sub := r`), at most `PREFIX_DEPTH` hops and `PREFIX_WORK` parameters (past it the group is
+  served nowhere); a call found only by a name passes nothing on, and a parameter
+  rebound anywhere in the function hides it in the whole function. gorilla: `.Methods(..)`
+  restricts the call it is chained on through `Name`, `Schemes`, `Headers`, `Queries` and
+  `Host`; arguments Meada cannot read, no argument and a second `Methods` serve nothing;
+  `Path(..).HandlerFunc`, `NewRoute`, `Host` subrouters and `StrictSlash(..)` chains are not
+  read (a router made by a call that is not `NewRouter` has no provider).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result

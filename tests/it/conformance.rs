@@ -2644,6 +2644,37 @@ fn go() {
             "tools/ext_test.go::main",
             "tools/runner.go::Runner",
             "tools/runner.go::Runner.main",
+            "web/chi.go::ChiAdmin",
+            "web/chi.go::ChiAny",
+            "web/chi.go::ChiAudit",
+            "web/chi.go::ChiEdit",
+            "web/chi.go::ChiFiles",
+            "web/chi.go::ChiGuard",
+            "web/chi.go::ChiHidden",
+            "web/chi.go::ChiHiddenNames",
+            "web/chi.go::ChiIndex",
+            "web/chi.go::ChiMake",
+            "web/chi.go::ChiNest",
+            "web/chi.go::ChiPassed",
+            "web/chi.go::ChiPing",
+            "web/chi.go::ChiRoutes",
+            "web/chi.go::ChiRoutes.DELETE /things/{}",
+            "web/chi.go::ChiRebound",
+            "web/chi.go::ChiShadow",
+            "web/chi.go::ChiShow",
+            "web/chi.go::ChiTeam",
+            "web/chi.go::ChiTwice",
+            "web/chi.go::ChiUnread",
+            "web/chi.go::adminRoutes",
+            "web/chi.go::chiMany",
+            "web/chi.go::chiOther",
+            "web/chi.go::deepRoutes",
+            "web/chi.go::passedLoop",
+            "web/chi.go::passedNever",
+            "web/chi.go::passedStats",
+            "web/chi.go::passedUsers",
+            "web/chi.go::teamRoutes",
+            "web/chi.go::unreadable",
             "web/echo.go::Auth",
             "web/echo.go::Billing",
             "web/echo.go::Create",
@@ -2675,6 +2706,19 @@ fn go() {
             "web/gin.go::Status",
             "web/gin.go::other",
             "web/gin.go::setPath",
+            "web/gorilla.go::GorillaHidden",
+            "web/gorilla.go::GorillaRoutes",
+            "web/gorilla.go::GorillaRoutes.DELETE /inline",
+            "web/gorilla.go::GorillaShadow",
+            "web/gorilla.go::GorillaUnread",
+            "web/gorilla.go::MuxAny",
+            "web/gorilla.go::MuxHidden",
+            "web/gorilla.go::MuxIndex",
+            "web/gorilla.go::MuxMake",
+            "web/gorilla.go::MuxOrder",
+            "web/gorilla.go::MuxShow",
+            "web/gorilla.go::RegisterOrders",
+            "web/gorilla.go::muxOther",
             "web/stdlib.go::CreateUser",
             "web/stdlib.go::Default",
             "web/stdlib.go::Echo",
@@ -3118,11 +3162,38 @@ fn go() {
     assert!(!export.contains("sys_other.go"));
 }
 
-/// The routers of the Go fixture (spec #25): `net/http` patterns, and gin and echo groups, with
-/// every prefix a router is registered under, a group passed to or returned from a function, a
-/// function literal as the handler and a router reached under two prefixes. A name a block, a
-/// loop, a literal or an assignment binds again, an import a local hides and a prefix Meada
-/// cannot read leave no provider.
+/// A chi subrouter passed on through exact calls is followed to a limit: a chain of ten
+/// functions is served under the prefix of its `Route`, one past the limit is served nowhere.
+#[test]
+fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
+    let repo = fixture_repo("go_chi_chain", "conformance-go", Some(ORIGIN));
+    let chain = |name: &str, links: usize| {
+        let calls: String = (0..links)
+            .map(|i| format!("func {name}{i}(r chi.Router) {{ {name}{}(r) }}\n", i + 1))
+            .collect();
+        format!(
+            "{calls}func {name}{links}(r chi.Router) {{ r.Get(\"/end\", {name}Last) }}\nfunc {name}Last() {{}}\n"
+        )
+    };
+    let source = format!(
+        "package web\n\nimport \"github.com/go-chi/chi/v5\"\n\n\
+         func Chains() {{\n\tr := chi.NewRouter()\n\
+         \tr.Route(\"/short\", short0)\n\tr.Route(\"/long\", long0)\n}}\n{}{}",
+        chain("short", 10),
+        chain("long", 70)
+    );
+    std::fs::write(repo.join("web/chain.go"), source).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/short/end"));
+    assert!(!export.contains("http::GET::/long/end"));
+}
+
+/// The routers of the Go fixture (spec #25): `net/http` patterns, and gin, echo, chi and
+/// gorilla/mux groups, with every prefix a router is registered under (chi's `Route`, `Group`
+/// and `Mount`, gorilla's `PathPrefix(..).Subrouter()`), a group passed to or returned from a
+/// function, a function literal as the handler and a router reached under two prefixes. A name
+/// a block, a loop, a literal or an assignment binds again, an import a local hides, a router
+/// mounted inside a call and a prefix or a method Meada cannot read leave no provider.
 #[test]
 fn go_routes_are_providers_under_every_prefix() {
     let (_, actual) = providers("go_routes", "conformance-go", "web/");
@@ -3196,6 +3267,68 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::GET::/static/{}", "web/echo.go::Wide"),
         ("http::GET::/api/billing", "web/echo.go::Billing"),
         ("http::GET::/internal/billing", "web/echo.go::Billing"),
+        // chi: every method, `Method`, `HandleFunc` and `Handle` for every method, a wildcard.
+        ("http::GET::/ping", "web/chi.go::ChiPing"),
+        ("http::POST::/things", "web/chi.go::ChiMake"),
+        ("http::PUT::/things/{}", "web/chi.go::ChiEdit"),
+        ("http::PATCH::/things/{}/patch", "web/chi.go::ChiEdit"),
+        (
+            "http::DELETE::/things/{}",
+            "web/chi.go::ChiRoutes.DELETE /things/{}",
+        ),
+        ("http::HEAD::/probe", "web/chi.go::ChiPing"),
+        ("http::OPTIONS::/probe", "web/chi.go::ChiPing"),
+        ("http::CONNECT::/probe", "web/chi.go::ChiPing"),
+        ("http::TRACE::/probe", "web/chi.go::ChiPing"),
+        ("http::GET::/method", "web/chi.go::ChiShow"),
+        ("http::POST::/method", "web/chi.go::ChiMake"),
+        ("http::GET::/lower", "web/chi.go::ChiShow"),
+        ("http::ANY::/any", "web/chi.go::ChiAny"),
+        ("http::ANY::/handled", "web/chi.go::ChiAny"),
+        ("http::GET::/files/{}", "web/chi.go::ChiFiles"),
+        // `Route` with a literal, nested and a named function; `Group` adds no prefix.
+        ("http::GET::/rooms", "web/chi.go::ChiIndex"),
+        ("http::GET::/rooms/members/{}", "web/chi.go::ChiShow"),
+        ("http::PUT::/rooms/members/{}", "web/chi.go::ChiEdit"),
+        ("http::GET::/rooms/teams", "web/chi.go::ChiTeam"),
+        ("http::GET::/rooms/teams/{}/members", "web/chi.go::ChiTeam"),
+        ("http::GET::/grouped", "web/chi.go::ChiPing"),
+        // `Mount` of a router a function returns, mounted again inside it, and one router under
+        // two prefixes.
+        ("http::GET::/admin/stats", "web/chi.go::ChiAdmin"),
+        ("http::GET::/admin/deep/x", "web/chi.go::ChiAdmin"),
+        ("http::GET::/a/shared", "web/chi.go::ChiAdmin"),
+        ("http::GET::/b/shared", "web/chi.go::ChiAdmin"),
+        // The subrouter of a `Route` function passed on to a function, through a name and to
+        // itself, and the same function called with another router.
+        ("http::GET::/passed/users", "web/chi.go::ChiTeam"),
+        ("http::GET::/users", "web/chi.go::ChiTeam"),
+        ("http::GET::/passed/stats", "web/chi.go::ChiAdmin"),
+        ("http::GET::/passed/loop", "web/chi.go::ChiPing"),
+        // A router nested under itself: the cycle adds nothing.
+        ("http::GET::/audit", "web/chi.go::ChiTeam"),
+        ("http::GET::/nested/audit", "web/chi.go::ChiTeam"),
+        // gorilla/mux: every method without `.Methods(..)`, one provider for each method it
+        // names, a regular expression in a parameter, and `Name` between the two calls.
+        ("http::ANY::/", "web/gorilla.go::MuxIndex"),
+        ("http::GET::/items/{}", "web/gorilla.go::MuxShow"),
+        ("http::GET::/items/{}/tags", "web/gorilla.go::MuxShow"),
+        ("http::HEAD::/items/{}/tags", "web/gorilla.go::MuxShow"),
+        ("http::POST::/items", "web/gorilla.go::MuxMake"),
+        ("http::PUT::/named", "web/gorilla.go::MuxShow"),
+        ("http::POST::/lower", "web/gorilla.go::MuxMake"),
+        (
+            "http::DELETE::/inline",
+            "web/gorilla.go::GorillaRoutes.DELETE /inline",
+        ),
+        ("http::ANY::/handled", "web/gorilla.go::MuxAny"),
+        // Subrouters of `PathPrefix`, nested, chained, and passed to a function under two
+        // prefixes (the cycle adds nothing).
+        ("http::GET::/api/users", "web/gorilla.go::MuxShow"),
+        ("http::GET::/api/v2/users/{}", "web/gorilla.go::MuxShow"),
+        ("http::GET::/chain/c", "web/gorilla.go::MuxShow"),
+        ("http::POST::/api/orders", "web/gorilla.go::MuxOrder"),
+        ("http::POST::/shop/orders", "web/gorilla.go::MuxOrder"),
     ]);
     expected.sort();
     assert_eq!(actual, expected);

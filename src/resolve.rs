@@ -2777,6 +2777,38 @@ impl<'a> Code<'a> {
         )
     }
 
+    /// The function and the position of the plain parameter `name`, written in `path` within
+    /// `scope`, is (a closure's capture included); `None` when a binding in between hides it.
+    pub fn param_of(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(Target<'a>, usize)> {
+        match self
+            .resolver
+            .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
+        {
+            Binding::Param(function, n, None) => Some((function, n)),
+            _ => None,
+        }
+    }
+
+    /// The arguments the exact callers of `function` pass for its parameter `n` (a call found
+    /// only by a name passes any object), each with the path and the scope it is written in.
+    pub fn param_args(&self, function: Target<'a>, n: usize) -> Vec<(&'a str, &'a str, &'a Value)> {
+        let callers = self.resolver.callers.get(&function).into_iter().flatten();
+        let args = callers.filter_map(|c| {
+            let arg = self.arg(c.path, c.index, function, n)?;
+            Some((
+                c.path,
+                self.resolver.files[c.path].calls[c.index].scope.as_str(),
+                arg,
+            ))
+        });
+        args.collect()
+    }
+
     /// Whether `name`, written in `path` within `scope`, is no binding of the file at all: a
     /// global such as `Response`. A local binding of the name hides the global.
     pub fn is_global(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
