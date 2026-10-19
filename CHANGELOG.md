@@ -57,7 +57,7 @@ All notable changes to Meada are recorded here. The format follows
 
 - Go HTTP providers for chi and gorilla/mux (spec #25). chi: `Get`, `Post` and the other
   methods, `Method`/`MethodFunc`, `Handle`/`HandleFunc` (every method), `Route(prefix, fn)` and
-  `Group(fn)` (the router `fn` receives, a literal or a named function, is the group) and
+  `Group(fn)` (the router `fn` receives, a literal or a named function, is the group, also passed on or held by a name) and
   `Mount(prefix, router)`; `{id}`, `{id:regex}` and a trailing `*` are one parameter segment.
   gorilla/mux: `HandleFunc`/`Handle` with `.Methods(..)` (one provider per method; every method
   without it; an unreadable or doubled `Methods` serves nothing) and

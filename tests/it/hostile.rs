@@ -1255,6 +1255,17 @@ fn go() -> Vec<Case> {
             )),
         ),
         m(
+            "chi passed subrouters",
+            chi(format!(
+                "func g() {{ chi.NewRouter().Route(\"/a\", c0) }}\n{}\nfunc p{LINKS}(r chi.Router) {{ r.Get(\"/x\", f) }}",
+                lines(LINKS, |i| format!(
+                    "func c{i}(r chi.Router) {{ s := r; p{i}(s); p{i}(r); c{}(s) }}\nfunc p{i}(r chi.Router) {{ p{}(r) }}",
+                    i + 1,
+                    i + 1
+                ))
+            )),
+        ),
+        m(
             "chi mounts",
             chi(format!(
                 "func g() {{\n\tm0 := chi.NewRouter()\n{}\n\tm{LINKS}.Get(\"/x\", f)\n}}",

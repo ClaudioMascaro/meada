@@ -362,27 +362,68 @@ impl<'c, 'a> Go<'c, 'a> {
     }
 
     /// The places the routers that `value`, written in `scope` of `path`, may be are served at:
-    /// the ones it flows from, and the groups whose function receives it as its first parameter.
+    /// the ones it flows from, and the groups whose function receives it as its first parameter,
+    /// reached through the exact callers that pass the parameter on (`users(r)`) and the names
+    /// that hold it (`sub := r`).
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
         let origins = self.code.value_origins(path, scope, value);
         let mut places: Vec<Place> = origins.into_iter().map(Place::Made).collect();
-        if let Value::Ref(name) = value {
-            // The function itself or one it is written in (a closure captures the parameter).
-            let mut within = scope;
-            loop {
-                let function = Target { path, name: within };
-                if let Some(groups) = self.callbacks.get(&function)
-                    && self.code.is_param(path, scope, name, function, 0)
-                {
-                    places.extend(groups);
-                }
-                if within.is_empty() {
-                    break;
-                }
-                within = crate::parent(within);
-            }
+        let (mut groups, mut seen) = (Vec::new(), Vec::new());
+        if self.reach(path, scope, value, 0, &mut seen, &mut groups) {
+            places.extend(groups);
         }
+        places.sort();
+        places.dedup();
         places
+    }
+
+    /// Adds to `out` the groups the parameter `value` names stands for. Whether it read them all:
+    /// past `PREFIX_DEPTH` hops or `PREFIX_WORK` parameters it reads none.
+    // ponytail: a group passed on through more than `PREFIX_DEPTH` exact calls and names, or
+    // reached through more than `PREFIX_WORK` parameters, is served nowhere rather than under a
+    // part of its callers.
+    fn reach(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        depth: usize,
+        seen: &mut Vec<(Target<'a>, usize)>,
+        out: &mut Vec<Place<'a>>,
+    ) -> bool {
+        let Value::Ref(name) = value else {
+            return true;
+        };
+        if depth >= PREFIX_DEPTH || seen.len() >= PREFIX_WORK {
+            return false;
+        }
+        // A name bound once to another (`sub := r`) is that name.
+        if let Some(((at, constant), held)) = self.code.constant(path, scope, name) {
+            return match held {
+                Value::Ref(_) => {
+                    self.reach(at, crate::parent(constant), held, depth + 1, seen, out)
+                }
+                _ => true,
+            };
+        }
+        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+            return true;
+        };
+        if let Some(groups) = self.callbacks.get(&function)
+            && n == 0
+        {
+            out.extend(groups);
+        }
+        if seen.contains(&(function, n)) {
+            return true;
+        }
+        seen.push((function, n));
+        let args = self.code.param_args(function, n);
+        let mut read = true;
+        for (path, scope, arg) in args {
+            read &= self.reach(path, scope, arg, depth + 1, seen, out);
+        }
+        read
     }
 
     /// The routers of `router` that `value`, written in `scope` of `path`, may be.
@@ -473,8 +514,9 @@ impl<'c, 'a> Go<'c, 'a> {
 
     /// Mounts the routers of `router` that `value`, the handler of a call written in `scope` of
     /// `path`, may be on `parents` under `prefix` (`None`: it cannot be read), and the others it
-    /// holds nowhere Meada reads (`unread`): chi strips the prefix, so a `ServeMux` mounted this
-    /// way does not see its own paths.
+    /// holds nowhere Meada reads (`unread`). A `ServeMux` mounted this way sees the full path
+    /// (chi only advances its own routing path), which would combine the mux's chains with the
+    /// router's prefixes: it is not modelled.
     fn mount_router(
         &mut self,
         at: (&'a str, &'a str),
@@ -565,7 +607,7 @@ impl<'c, 'a> Go<'c, 'a> {
                 name.to_uppercase()
             }
             arg => match self.code.value(path, scope, arg) {
-                Value::Str(parts) => literal(&parts)?,
+                Value::Str(parts) => literal(&parts)?.to_uppercase(),
                 _ => return None,
             },
         };

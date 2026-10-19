@@ -95,7 +95,7 @@
     },
     {
       "path": "web/chi.go",
-      "hash": "2778362acc5c85ec8bedeb0904388290029303220f3c34227c345f51027bc46f"
+      "hash": "21e6b5c8dc0f1bb70c72c6919aff56a845cc85e33ec3270c3736f219264920b0"
     },
     {
       "path": "web/echo.go",
@@ -107,7 +107,7 @@
     },
     {
       "path": "web/gorilla.go",
-      "hash": "9ce5094f18862adc25bc15e2e6cd23e4f50c4b325665eff40e154331bfdc6270"
+      "hash": "3a62afbc85956ff8c2379303bedd579f70c26ea257646ad0d56ffe3283c5fe44"
     },
     {
       "path": "web/stdlib.go",
@@ -1095,8 +1095,8 @@
       "id": "example.com/acme/conformance::web/chi.go::ChiAudit",
       "span": {
         "path": "web/chi.go",
-        "start": 2608,
-        "end": 2735
+        "start": 2644,
+        "end": 2771
       }
     },
     {
@@ -1135,8 +1135,8 @@
       "id": "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
       "span": {
         "path": "web/chi.go",
-        "start": 2870,
-        "end": 3246
+        "start": 2906,
+        "end": 3282
       }
     },
     {
@@ -1159,8 +1159,16 @@
       "id": "example.com/acme/conformance::web/chi.go::ChiNest",
       "span": {
         "path": "web/chi.go",
-        "start": 2547,
-        "end": 2606
+        "start": 2583,
+        "end": 2642
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4077,
+        "end": 4279
       }
     },
     {
@@ -1172,11 +1180,19 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4534,
+        "end": 4678
+      }
+    },
+    {
       "id": "example.com/acme/conformance::web/chi.go::ChiRoutes",
       "span": {
         "path": "web/chi.go",
         "start": 1017,
-        "end": 1890
+        "end": 1926
       }
     },
     {
@@ -1191,8 +1207,8 @@
       "id": "example.com/acme/conformance::web/chi.go::ChiShadow",
       "span": {
         "path": "web/chi.go",
-        "start": 3390,
-        "end": 3481
+        "start": 3426,
+        "end": 3517
       }
     },
     {
@@ -1215,64 +1231,96 @@
       "id": "example.com/acme/conformance::web/chi.go::ChiTwice",
       "span": {
         "path": "web/chi.go",
-        "start": 2305,
-        "end": 2461
+        "start": 2341,
+        "end": 2497
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiUnread",
       "span": {
         "path": "web/chi.go",
-        "start": 3567,
-        "end": 3864
+        "start": 3603,
+        "end": 3900
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::adminRoutes",
       "span": {
         "path": "web/chi.go",
-        "start": 2053,
-        "end": 2177
+        "start": 2089,
+        "end": 2213
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::chiMany",
       "span": {
         "path": "web/chi.go",
-        "start": 3909,
-        "end": 3951
+        "start": 4787,
+        "end": 4829
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::chiOther",
       "span": {
         "path": "web/chi.go",
-        "start": 3866,
-        "end": 3907
+        "start": 4744,
+        "end": 4785
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::deepRoutes",
       "span": {
         "path": "web/chi.go",
-        "start": 2179,
-        "end": 2261
+        "start": 2215,
+        "end": 2297
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4406,
+        "end": 4479
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedNever",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4680,
+        "end": 4742
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedStats",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4343,
+        "end": 4404
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4281,
+        "end": 4341
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::teamRoutes",
       "span": {
         "path": "web/chi.go",
-        "start": 1892,
-        "end": 1981
+        "start": 1928,
+        "end": 2017
       }
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::unreadable",
       "span": {
         "path": "web/chi.go",
-        "start": 3248,
-        "end": 3340
+        "start": 3284,
+        "end": 3376
       }
     },
     {
@@ -1527,8 +1575,8 @@
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
       "span": {
         "path": "web/gorilla.go",
-        "start": 2194,
-        "end": 2425
+        "start": 2243,
+        "end": 2474
       }
     },
     {
@@ -1536,31 +1584,31 @@
       "span": {
         "path": "web/gorilla.go",
         "start": 593,
-        "end": 1412
+        "end": 1461
       }
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes.DELETE /inline",
       "span": {
         "path": "web/gorilla.go",
-        "start": 950,
-        "end": 997
+        "start": 999,
+        "end": 1046
       }
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
       "span": {
         "path": "web/gorilla.go",
-        "start": 2427,
-        "end": 2528
+        "start": 2476,
+        "end": 2577
       }
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::GorillaUnread",
       "span": {
         "path": "web/gorilla.go",
-        "start": 1775,
-        "end": 2065
+        "start": 1824,
+        "end": 2114
       }
     },
     {
@@ -1615,16 +1663,16 @@
       "id": "example.com/acme/conformance::web/gorilla.go::RegisterOrders",
       "span": {
         "path": "web/gorilla.go",
-        "start": 1484,
-        "end": 1642
+        "start": 1533,
+        "end": 1691
       }
     },
     {
       "id": "example.com/acme/conformance::web/gorilla.go::muxOther",
       "span": {
         "path": "web/gorilla.go",
-        "start": 2530,
-        "end": 2572
+        "start": 2579,
+        "end": 2621
       }
     },
     {
@@ -3312,8 +3360,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2680,
-        "end": 2699
+        "start": 2716,
+        "end": 2735
       }
     },
     {
@@ -3323,8 +3371,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2639,
-        "end": 2703
+        "start": 2675,
+        "end": 2739
       }
     },
     {
@@ -3334,8 +3382,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2705,
-        "end": 2733
+        "start": 2741,
+        "end": 2769
       }
     },
     {
@@ -3367,8 +3415,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2913,
-        "end": 2928
+        "start": 2949,
+        "end": 2964
       }
     },
     {
@@ -3378,8 +3426,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 3050,
-        "end": 3059
+        "start": 3086,
+        "end": 3095
       }
     },
     {
@@ -3389,8 +3437,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 2984,
-        "end": 2994
+        "start": 3020,
+        "end": 3030
       }
     },
     {
@@ -3400,8 +3448,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3181,
-        "end": 3209
+        "start": 3217,
+        "end": 3245
       }
     },
     {
@@ -3411,8 +3459,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3215,
-        "end": 3244
+        "start": 3251,
+        "end": 3280
       }
     },
     {
@@ -3422,8 +3470,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2998,
-        "end": 3025
+        "start": 3034,
+        "end": 3061
       }
     },
     {
@@ -3433,8 +3481,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3065,
-        "end": 3093
+        "start": 3101,
+        "end": 3129
       }
     },
     {
@@ -3444,8 +3492,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3100,
-        "end": 3136
+        "start": 3136,
+        "end": 3172
       }
     },
     {
@@ -3455,8 +3503,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2930,
-        "end": 3140
+        "start": 2966,
+        "end": 3176
       }
     },
     {
@@ -3466,8 +3514,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3142,
-        "end": 3213
+        "start": 3178,
+        "end": 3249
       }
     },
     {
@@ -3477,8 +3525,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 3231,
-        "end": 3243
+        "start": 3267,
+        "end": 3279
       }
     },
     {
@@ -3488,8 +3536,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 2590,
-        "end": 2604
+        "start": 2626,
+        "end": 2640
       }
     },
     {
@@ -3499,8 +3547,129 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2573,
-        "end": 2588
+        "start": 2609,
+        "end": 2624
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4105,
+        "end": 4120
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::chi.NewRouter#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4242,
+        "end": 4257
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedLoop#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4214,
+        "end": 4227
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedStats#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedStats",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4195,
+        "end": 4211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedUsers#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4167,
+        "end": 4181
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::passedUsers#1",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4259,
+        "end": 4277
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiPassed::root.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4122,
+        "end": 4231
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::chi.NewRouter#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4563,
+        "end": 4578
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::chiOther#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": "example.com/acme/conformance::web/chi.go::chiOther",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4643,
+        "end": 4653
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::passedNever#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": "example.com/acme/conformance::web/chi.go::passedNever",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4656,
+        "end": 4672
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRebound::root.Route#0",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4580,
+        "end": 4676
       }
     },
     {
@@ -3510,8 +3679,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 1864,
-        "end": 1877
+        "start": 1900,
+        "end": 1913
       }
     },
     {
@@ -3532,8 +3701,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1529,
-        "end": 1553
+        "start": 1565,
+        "end": 1589
       }
     },
     {
@@ -3576,8 +3745,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1556,
-        "end": 1583
+        "start": 1592,
+        "end": 1619
       }
     },
     {
@@ -3587,8 +3756,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1626,
-        "end": 1646
+        "start": 1662,
+        "end": 1682
       }
     },
     {
@@ -3598,8 +3767,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1698,
-        "end": 1717
+        "start": 1734,
+        "end": 1753
       }
     },
     {
@@ -3609,8 +3778,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1814,
-        "end": 1840
+        "start": 1850,
+        "end": 1876
       }
     },
     {
@@ -3620,8 +3789,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1783,
-        "end": 1844
+        "start": 1819,
+        "end": 1880
       }
     },
     {
@@ -3631,8 +3800,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1508,
-        "end": 1554
+        "start": 1544,
+        "end": 1590
       }
     },
     {
@@ -3642,8 +3811,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1478,
-        "end": 1506
+        "start": 1514,
+        "end": 1542
       }
     },
     {
@@ -3680,14 +3849,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Method#2",
+      "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 1478,
+        "end": 1512
+      }
+    },
+    {
       "id": "example.com/acme/conformance::web/chi.go::ChiRoutes::r.Mount#0",
       "caller": "example.com/acme/conformance::web/chi.go::ChiRoutes",
       "target": null,
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1846,
-        "end": 1878
+        "start": 1882,
+        "end": 1914
       }
     },
     {
@@ -3741,8 +3921,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1721,
-        "end": 1740
+        "start": 1757,
+        "end": 1776
       }
     },
     {
@@ -3752,8 +3932,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1585,
-        "end": 1781
+        "start": 1621,
+        "end": 1817
       }
     },
     {
@@ -3763,8 +3943,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1649,
-        "end": 1745
+        "start": 1685,
+        "end": 1781
       }
     },
     {
@@ -3774,8 +3954,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1748,
-        "end": 1777
+        "start": 1784,
+        "end": 1813
       }
     },
     {
@@ -3796,8 +3976,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3434,
-        "end": 3449
+        "start": 3470,
+        "end": 3485
       }
     },
     {
@@ -3807,8 +3987,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 3417,
-        "end": 3427
+        "start": 3453,
+        "end": 3463
       }
     },
     {
@@ -3818,8 +3998,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3451,
-        "end": 3479
+        "start": 3487,
+        "end": 3515
       }
     },
     {
@@ -3829,8 +4009,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2332,
-        "end": 2347
+        "start": 2368,
+        "end": 2383
       }
     },
     {
@@ -3840,8 +4020,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2359,
-        "end": 2374
+        "start": 2395,
+        "end": 2410
       }
     },
     {
@@ -3851,8 +4031,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2409,
-        "end": 2433
+        "start": 2445,
+        "end": 2469
       }
     },
     {
@@ -3862,8 +4042,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2435,
-        "end": 2459
+        "start": 2471,
+        "end": 2495
       }
     },
     {
@@ -3873,8 +4053,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2376,
-        "end": 2407
+        "start": 2412,
+        "end": 2443
       }
     },
     {
@@ -3884,8 +4064,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 3693,
-        "end": 3710
+        "start": 3729,
+        "end": 3746
       }
     },
     {
@@ -3895,8 +4075,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3592,
-        "end": 3607
+        "start": 3628,
+        "end": 3643
       }
     },
     {
@@ -3906,8 +4086,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3620,
-        "end": 3635
+        "start": 3656,
+        "end": 3671
       }
     },
     {
@@ -3917,8 +4097,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3637,
-        "end": 3671
+        "start": 3673,
+        "end": 3707
       }
     },
     {
@@ -3928,8 +4108,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3834,
-        "end": 3861
+        "start": 3870,
+        "end": 3897
       }
     },
     {
@@ -3939,8 +4119,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3723,
-        "end": 3741
+        "start": 3759,
+        "end": 3777
       }
     },
     {
@@ -3950,8 +4130,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3743,
-        "end": 3786
+        "start": 3779,
+        "end": 3822
       }
     },
     {
@@ -3961,8 +4141,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3673,
-        "end": 3711
+        "start": 3709,
+        "end": 3747
       }
     },
     {
@@ -3972,8 +4152,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3788,
-        "end": 3814
+        "start": 3824,
+        "end": 3850
       }
     },
     {
@@ -3983,8 +4163,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3816,
-        "end": 3862
+        "start": 3852,
+        "end": 3898
       }
     },
     {
@@ -3994,8 +4174,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2091,
-        "end": 2106
+        "start": 2127,
+        "end": 2142
       }
     },
     {
@@ -4005,8 +4185,8 @@
       "level": "exact",
       "span": {
         "path": "web/chi.go",
-        "start": 2152,
-        "end": 2164
+        "start": 2188,
+        "end": 2200
       }
     },
     {
@@ -4016,8 +4196,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2108,
-        "end": 2133
+        "start": 2144,
+        "end": 2169
       }
     },
     {
@@ -4027,8 +4207,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2135,
-        "end": 2165
+        "start": 2171,
+        "end": 2201
       }
     },
     {
@@ -4038,8 +4218,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2214,
-        "end": 2226
+        "start": 2250,
+        "end": 2262
       }
     },
     {
@@ -4049,8 +4229,63 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 2228,
-        "end": 2249
+        "start": 2264,
+        "end": 2285
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop::passedLoop#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "target": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "level": "exact",
+      "span": {
+        "path": "web/chi.go",
+        "start": 4464,
+        "end": 4477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedLoop::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedLoop",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4439,
+        "end": 4462
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedNever::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedNever",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4714,
+        "end": 4740
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedStats::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedStats",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4377,
+        "end": 4402
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/chi.go::passedUsers::r.Get#0",
+      "caller": "example.com/acme/conformance::web/chi.go::passedUsers",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/chi.go",
+        "start": 4315,
+        "end": 4339
       }
     },
     {
@@ -4060,8 +4295,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1925,
-        "end": 1944
+        "start": 1961,
+        "end": 1980
       }
     },
     {
@@ -4071,8 +4306,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 1946,
-        "end": 1979
+        "start": 1982,
+        "end": 2015
       }
     },
     {
@@ -4082,8 +4317,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3285,
-        "end": 3300
+        "start": 3321,
+        "end": 3336
       }
     },
     {
@@ -4093,8 +4328,8 @@
       "level": null,
       "span": {
         "path": "web/chi.go",
-        "start": 3302,
-        "end": 3328
+        "start": 3338,
+        "end": 3364
       }
     },
     {
@@ -4995,8 +5230,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2244,
-        "end": 2259
+        "start": 2293,
+        "end": 2308
       }
     },
     {
@@ -5006,8 +5241,8 @@
       "level": "exact",
       "span": {
         "path": "web/gorilla.go",
-        "start": 2305,
-        "end": 2315
+        "start": 2354,
+        "end": 2364
       }
     },
     {
@@ -5017,8 +5252,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2261,
-        "end": 2294
+        "start": 2310,
+        "end": 2343
       }
     },
     {
@@ -5028,8 +5263,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2318,
-        "end": 2351
+        "start": 2367,
+        "end": 2400
       }
     },
     {
@@ -5039,8 +5274,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2386,
-        "end": 2420
+        "start": 2435,
+        "end": 2469
       }
     },
     {
@@ -5050,8 +5285,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1325,
-        "end": 1385
+        "start": 1374,
+        "end": 1434
       }
     },
     {
@@ -5106,7 +5341,7 @@
       "span": {
         "path": "web/gorilla.go",
         "start": 926,
-        "end": 1016
+        "end": 973
       }
     },
     {
@@ -5116,8 +5351,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1107,
-        "end": 1155
+        "start": 975,
+        "end": 1065
       }
     },
     {
@@ -5127,8 +5362,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1199,
-        "end": 1251
+        "start": 1156,
+        "end": 1204
       }
     },
     {
@@ -5138,8 +5373,19 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1325,
-        "end": 1400
+        "start": 1248,
+        "end": 1300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::(call_expression).Methods#8",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 1374,
+        "end": 1449
       }
     },
     {
@@ -5160,8 +5406,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1073,
-        "end": 1105
+        "start": 1122,
+        "end": 1154
       }
     },
     {
@@ -5171,8 +5417,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1163,
-        "end": 1197
+        "start": 1212,
+        "end": 1246
       }
     },
     {
@@ -5182,8 +5428,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1289,
-        "end": 1322
+        "start": 1338,
+        "end": 1371
       }
     },
     {
@@ -5193,8 +5439,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1325,
-        "end": 1359
+        "start": 1374,
+        "end": 1408
       }
     },
     {
@@ -5204,8 +5450,8 @@
       "level": "exact",
       "span": {
         "path": "web/gorilla.go",
-        "start": 1253,
-        "end": 1272
+        "start": 1302,
+        "end": 1321
       }
     },
     {
@@ -5215,8 +5461,8 @@
       "level": "exact",
       "span": {
         "path": "web/gorilla.go",
-        "start": 1274,
-        "end": 1323
+        "start": 1323,
+        "end": 1372
       }
     },
     {
@@ -5226,8 +5472,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1107,
-        "end": 1140
+        "start": 1156,
+        "end": 1189
       }
     },
     {
@@ -5237,8 +5483,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1163,
-        "end": 1185
+        "start": 1212,
+        "end": 1234
       }
     },
     {
@@ -5248,8 +5494,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1039,
-        "end": 1063
+        "start": 1088,
+        "end": 1112
       }
     },
     {
@@ -5270,8 +5516,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1018,
-        "end": 1064
+        "start": 1067,
+        "end": 1113
       }
     },
     {
@@ -5337,7 +5583,18 @@
       "span": {
         "path": "web/gorilla.go",
         "start": 926,
-        "end": 998
+        "end": 957
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes::r.HandleFunc#6",
+      "caller": "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "web/gorilla.go",
+        "start": 975,
+        "end": 1047
       }
     },
     {
@@ -5347,8 +5604,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1073,
-        "end": 1093
+        "start": 1122,
+        "end": 1142
       }
     },
     {
@@ -5358,8 +5615,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1289,
-        "end": 1310
+        "start": 1338,
+        "end": 1359
       }
     },
     {
@@ -5369,8 +5626,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1325,
-        "end": 1347
+        "start": 1374,
+        "end": 1396
       }
     },
     {
@@ -5380,8 +5637,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1199,
-        "end": 1236
+        "start": 1248,
+        "end": 1285
       }
     },
     {
@@ -5391,8 +5648,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2475,
-        "end": 2490
+        "start": 2524,
+        "end": 2539
       }
     },
     {
@@ -5402,8 +5659,8 @@
       "level": "exact",
       "span": {
         "path": "web/gorilla.go",
-        "start": 2458,
-        "end": 2468
+        "start": 2507,
+        "end": 2517
       }
     },
     {
@@ -5413,8 +5670,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 2492,
-        "end": 2526
+        "start": 2541,
+        "end": 2575
       }
     },
     {
@@ -5424,8 +5681,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1997,
-        "end": 2063
+        "start": 2046,
+        "end": 2112
       }
     },
     {
@@ -5435,8 +5692,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1840,
-        "end": 1886
+        "start": 1889,
+        "end": 1935
       }
     },
     {
@@ -5446,8 +5703,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1888,
-        "end": 1951
+        "start": 1937,
+        "end": 2000
       }
     },
     {
@@ -5457,8 +5714,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1888,
-        "end": 1935
+        "start": 1937,
+        "end": 1984
       }
     },
     {
@@ -5468,8 +5725,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1953,
-        "end": 1995
+        "start": 2002,
+        "end": 2044
       }
     },
     {
@@ -5479,8 +5736,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1997,
-        "end": 2029
+        "start": 2046,
+        "end": 2078
       }
     },
     {
@@ -5490,8 +5747,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1823,
-        "end": 1838
+        "start": 1872,
+        "end": 1887
       }
     },
     {
@@ -5501,8 +5758,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1840,
-        "end": 1872
+        "start": 1889,
+        "end": 1921
       }
     },
     {
@@ -5512,8 +5769,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1888,
-        "end": 1920
+        "start": 1937,
+        "end": 1969
       }
     },
     {
@@ -5523,8 +5780,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1953,
-        "end": 1985
+        "start": 2002,
+        "end": 2034
       }
     },
     {
@@ -5534,8 +5791,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1997,
-        "end": 2017
+        "start": 2046,
+        "end": 2066
       }
     },
     {
@@ -5545,8 +5802,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1569,
-        "end": 1616
+        "start": 1618,
+        "end": 1665
       }
     },
     {
@@ -5556,8 +5813,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1532,
-        "end": 1567
+        "start": 1581,
+        "end": 1616
       }
     },
     {
@@ -5567,8 +5824,8 @@
       "level": "exact",
       "span": {
         "path": "web/gorilla.go",
-        "start": 1618,
-        "end": 1640
+        "start": 1667,
+        "end": 1689
       }
     },
     {
@@ -5578,8 +5835,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1569,
-        "end": 1600
+        "start": 1618,
+        "end": 1649
       }
     },
     {
@@ -5589,8 +5846,8 @@
       "level": null,
       "span": {
         "path": "web/gorilla.go",
-        "start": 1532,
-        "end": 1555
+        "start": 1581,
+        "end": 1604
       }
     },
     {
@@ -6372,6 +6629,10 @@
       "site": "example.com/acme/conformance::web/gorilla.go::MuxShow"
     },
     {
+      "contract": "http::GET::/lower",
+      "site": "example.com/acme/conformance::web/chi.go::ChiShow"
+    },
+    {
       "contract": "http::GET::/method",
       "site": "example.com/acme/conformance::web/chi.go::ChiShow"
     },
@@ -6386,6 +6647,18 @@
     {
       "contract": "http::GET::/ops/status",
       "site": "example.com/acme/conformance::web/gin.go::Status"
+    },
+    {
+      "contract": "http::GET::/passed/loop",
+      "site": "example.com/acme/conformance::web/chi.go::ChiPing"
+    },
+    {
+      "contract": "http::GET::/passed/stats",
+      "site": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+    },
+    {
+      "contract": "http::GET::/passed/users",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
     },
     {
       "contract": "http::GET::/ping",
@@ -6430,6 +6703,10 @@
     {
       "contract": "http::GET::/sub/a1",
       "site": "example.com/acme/conformance::web/stdlib.go::Ledger"
+    },
+    {
+      "contract": "http::GET::/users",
+      "site": "example.com/acme/conformance::web/chi.go::ChiTeam"
     },
     {
       "contract": "http::GET::/users/{}",
@@ -6497,6 +6774,10 @@
     },
     {
       "contract": "http::POST::/items",
+      "site": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+    },
+    {
+      "contract": "http::POST::/lower",
       "site": "example.com/acme/conformance::web/gorilla.go::MuxMake"
     },
     {
@@ -6773,6 +7054,13 @@
     {
       "name": "web#10",
       "members": [
+        "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
+        "example.com/acme/conformance::web/gorilla.go::RegisterOrders"
+      ]
+    },
+    {
+      "name": "web#11",
+      "members": [
         "example.com/acme/conformance::web/stdlib.go::Guard",
         "example.com/acme/conformance::web/stdlib.go::Wrapped",
         "example.com/acme/conformance::web/stdlib.go::newAPI",
@@ -6781,7 +7069,7 @@
       ]
     },
     {
-      "name": "web#11",
+      "name": "web#12",
       "members": [
         "example.com/acme/conformance::web/stdlib.go::Mux",
         "example.com/acme/conformance::web/stdlib.go::Register"
@@ -6798,14 +7086,25 @@
       "name": "web#3",
       "members": [
         "example.com/acme/conformance::web/chi.go::ChiHiddenNames",
+        "example.com/acme/conformance::web/chi.go::ChiRebound",
         "example.com/acme/conformance::web/chi.go::ChiShadow",
         "example.com/acme/conformance::web/chi.go::chiMany",
         "example.com/acme/conformance::web/chi.go::chiOther",
+        "example.com/acme/conformance::web/chi.go::passedNever",
         "example.com/acme/conformance::web/chi.go::unreadable"
       ]
     },
     {
       "name": "web#4",
+      "members": [
+        "example.com/acme/conformance::web/chi.go::ChiPassed",
+        "example.com/acme/conformance::web/chi.go::passedLoop",
+        "example.com/acme/conformance::web/chi.go::passedStats",
+        "example.com/acme/conformance::web/chi.go::passedUsers"
+      ]
+    },
+    {
+      "name": "web#5",
       "members": [
         "example.com/acme/conformance::web/chi.go::ChiRoutes",
         "example.com/acme/conformance::web/chi.go::adminRoutes",
@@ -6813,21 +7112,21 @@
       ]
     },
     {
-      "name": "web#5",
+      "name": "web#6",
       "members": [
         "example.com/acme/conformance::web/echo.go::EchoRoutes",
         "example.com/acme/conformance::web/echo.go::RegisterBilling"
       ]
     },
     {
-      "name": "web#6",
+      "name": "web#7",
       "members": [
         "example.com/acme/conformance::web/gin.go::GinEscaped",
         "example.com/acme/conformance::web/gin.go::setPath"
       ]
     },
     {
-      "name": "web#7",
+      "name": "web#8",
       "members": [
         "example.com/acme/conformance::web/gin.go::GinHidden",
         "example.com/acme/conformance::web/gin.go::GinRoutes",
@@ -6838,18 +7137,11 @@
       ]
     },
     {
-      "name": "web#8",
+      "name": "web#9",
       "members": [
         "example.com/acme/conformance::web/gorilla.go::GorillaHidden",
         "example.com/acme/conformance::web/gorilla.go::GorillaShadow",
         "example.com/acme/conformance::web/gorilla.go::muxOther"
-      ]
-    },
-    {
-      "name": "web#9",
-      "members": [
-        "example.com/acme/conformance::web/gorilla.go::GorillaRoutes",
-        "example.com/acme/conformance::web/gorilla.go::RegisterOrders"
       ]
     }
   ],
@@ -8619,6 +8911,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiAdmin::http::GET::/passed/stats",
+      "kind": "route",
+      "label": "GET /passed/stats",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiAdmin"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiAny::http::ANY::/any",
       "kind": "route",
       "label": "ANY /any",
@@ -8815,6 +9121,49 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPassed",
+      "kind": "export",
+      "label": "ChiPassed",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPassed"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedUsers"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedStats"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedLoop"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedLoop",
+          "mark": "cycle"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::CONNECT::/probe",
       "kind": "route",
       "label": "CONNECT /probe",
@@ -8832,6 +9181,20 @@
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::GET::/grouped",
       "kind": "route",
       "label": "GET /grouped",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiPing"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiPing::http::GET::/passed/loop",
+      "kind": "route",
+      "label": "GET /passed/loop",
       "steps": [
         {
           "depth": 0,
@@ -8899,6 +9262,34 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiRebound",
+      "kind": "export",
+      "label": "ChiRebound",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiRebound"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::chiOther"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::web/chi.go::passedNever"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiRoutes",
       "kind": "export",
       "label": "ChiRoutes",
@@ -8962,6 +9353,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiShow::http::GET::/lower",
+      "kind": "route",
+      "label": "GET /lower",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiShow"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiShow::http::GET::/method",
       "kind": "route",
       "label": "GET /method",
@@ -9018,6 +9423,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/passed/users",
+      "kind": "route",
+      "label": "GET /passed/users",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/rooms/teams",
       "kind": "route",
       "label": "GET /rooms/teams",
@@ -9035,6 +9454,20 @@
       "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/rooms/teams/{}/members",
       "kind": "route",
       "label": "GET /rooms/teams/{}/members",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/chi.go::ChiTeam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/chi.go::ChiTeam::http::GET::/users",
+      "kind": "route",
+      "label": "GET /users",
       "steps": [
         {
           "depth": 0,
@@ -9884,6 +10317,20 @@
       "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxMake::http::POST::/items",
       "kind": "route",
       "label": "POST /items",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::web/gorilla.go::MuxMake"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::web/gorilla.go::MuxMake::http::POST::/lower",
+      "kind": "route",
+      "label": "POST /lower",
       "steps": [
         {
           "depth": 0,

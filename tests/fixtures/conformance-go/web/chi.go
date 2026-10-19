@@ -46,6 +46,7 @@ func ChiRoutes() http.Handler {
 	r.Trace("/probe", ChiPing)
 	r.Method("GET", "/method", ChiShow)
 	r.Method(http.MethodPost, "/method", ChiMake)
+	r.Method("get", "/lower", ChiShow)
 	r.HandleFunc("/any", ChiAny)
 	r.Handle("/handled", http.HandlerFunc(ChiAny))
 	r.Get("/files/*", ChiFiles)
@@ -148,6 +149,47 @@ func ChiUnread() {
 	legacy.HandleFunc("GET /legacy", ChiHidden)
 	r.Mount("/legacy", legacy)
 	r.Mount("/plain", http.HandlerFunc(ChiHidden))
+}
+
+// The subrouter a `Route` function receives, passed on to a function, through a name or to
+// itself (the cycle adds nothing), and a function called with another router too.
+func ChiPassed() {
+	root := chi.NewRouter()
+	root.Route("/passed", func(r chi.Router) {
+		passedUsers(r)
+		sub := r
+		passedStats(sub)
+		passedLoop(r)
+	})
+	other := chi.NewRouter()
+	passedUsers(other)
+}
+
+func passedUsers(r chi.Router) {
+	r.Get("/users", ChiTeam)
+}
+
+func passedStats(r chi.Router) {
+	r.Get("/stats", ChiAdmin)
+}
+
+func passedLoop(r chi.Router) {
+	r.Get("/loop", ChiPing)
+	passedLoop(r)
+}
+
+// A name rebound to another router is none of them.
+func ChiRebound() {
+	root := chi.NewRouter()
+	root.Route("/rebound", func(r chi.Router) {
+		sub := r
+		sub = chiOther()
+		passedNever(sub)
+	})
+}
+
+func passedNever(r chi.Router) {
+	r.Get("/never", ChiHidden)
 }
 
 func chiOther() chi.Router { return nil }

@@ -2655,9 +2655,11 @@ fn go() {
             "web/chi.go::ChiIndex",
             "web/chi.go::ChiMake",
             "web/chi.go::ChiNest",
+            "web/chi.go::ChiPassed",
             "web/chi.go::ChiPing",
             "web/chi.go::ChiRoutes",
             "web/chi.go::ChiRoutes.DELETE /things/{}",
+            "web/chi.go::ChiRebound",
             "web/chi.go::ChiShadow",
             "web/chi.go::ChiShow",
             "web/chi.go::ChiTeam",
@@ -2667,6 +2669,10 @@ fn go() {
             "web/chi.go::chiMany",
             "web/chi.go::chiOther",
             "web/chi.go::deepRoutes",
+            "web/chi.go::passedLoop",
+            "web/chi.go::passedNever",
+            "web/chi.go::passedStats",
+            "web/chi.go::passedUsers",
             "web/chi.go::teamRoutes",
             "web/chi.go::unreadable",
             "web/echo.go::Auth",
@@ -3156,6 +3162,32 @@ fn go() {
     assert!(!export.contains("sys_other.go"));
 }
 
+/// A chi subrouter passed on through exact calls is followed to a limit: a chain of ten
+/// functions is served under the prefix of its `Route`, one past the limit is served nowhere.
+#[test]
+fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
+    let repo = fixture_repo("go_chi_chain", "conformance-go", Some(ORIGIN));
+    let chain = |name: &str, links: usize| {
+        let calls: String = (0..links)
+            .map(|i| format!("func {name}{i}(r chi.Router) {{ {name}{}(r) }}\n", i + 1))
+            .collect();
+        format!(
+            "{calls}func {name}{links}(r chi.Router) {{ r.Get(\"/end\", {name}Last) }}\nfunc {name}Last() {{}}\n"
+        )
+    };
+    let source = format!(
+        "package web\n\nimport \"github.com/go-chi/chi/v5\"\n\n\
+         func Chains() {{\n\tr := chi.NewRouter()\n\
+         \tr.Route(\"/short\", short0)\n\tr.Route(\"/long\", long0)\n}}\n{}{}",
+        chain("short", 10),
+        chain("long", 70)
+    );
+    std::fs::write(repo.join("web/chain.go"), source).unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(export.contains("http::GET::/short/end"));
+    assert!(!export.contains("http::GET::/long/end"));
+}
+
 /// The routers of the Go fixture (spec #25): `net/http` patterns, and gin, echo, chi and
 /// gorilla/mux groups, with every prefix a router is registered under (chi's `Route`, `Group`
 /// and `Mount`, gorilla's `PathPrefix(..).Subrouter()`), a group passed to or returned from a
@@ -3250,6 +3282,7 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::TRACE::/probe", "web/chi.go::ChiPing"),
         ("http::GET::/method", "web/chi.go::ChiShow"),
         ("http::POST::/method", "web/chi.go::ChiMake"),
+        ("http::GET::/lower", "web/chi.go::ChiShow"),
         ("http::ANY::/any", "web/chi.go::ChiAny"),
         ("http::ANY::/handled", "web/chi.go::ChiAny"),
         ("http::GET::/files/{}", "web/chi.go::ChiFiles"),
@@ -3266,6 +3299,12 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::GET::/admin/deep/x", "web/chi.go::ChiAdmin"),
         ("http::GET::/a/shared", "web/chi.go::ChiAdmin"),
         ("http::GET::/b/shared", "web/chi.go::ChiAdmin"),
+        // The subrouter of a `Route` function passed on to a function, through a name and to
+        // itself, and the same function called with another router.
+        ("http::GET::/passed/users", "web/chi.go::ChiTeam"),
+        ("http::GET::/users", "web/chi.go::ChiTeam"),
+        ("http::GET::/passed/stats", "web/chi.go::ChiAdmin"),
+        ("http::GET::/passed/loop", "web/chi.go::ChiPing"),
         // A router nested under itself: the cycle adds nothing.
         ("http::GET::/audit", "web/chi.go::ChiTeam"),
         ("http::GET::/nested/audit", "web/chi.go::ChiTeam"),
@@ -3277,6 +3316,7 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::HEAD::/items/{}/tags", "web/gorilla.go::MuxShow"),
         ("http::POST::/items", "web/gorilla.go::MuxMake"),
         ("http::PUT::/named", "web/gorilla.go::MuxShow"),
+        ("http::POST::/lower", "web/gorilla.go::MuxMake"),
         (
             "http::DELETE::/inline",
             "web/gorilla.go::GorillaRoutes.DELETE /inline",

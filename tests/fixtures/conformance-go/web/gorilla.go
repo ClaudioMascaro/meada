@@ -27,6 +27,7 @@ func GorillaRoutes() *mux.Router {
 	r.HandleFunc("/items/{id:[0-9]+}/tags", MuxShow).Methods("GET", "HEAD")
 	r.HandleFunc("/items", MuxMake).Methods(http.MethodPost)
 	r.HandleFunc("/named", MuxShow).Name("named").Methods("PUT")
+	r.HandleFunc("/lower", MuxMake).Methods("post")
 	r.HandleFunc("/inline", func(w http.ResponseWriter, r *http.Request) {}).Methods("DELETE")
 	r.Handle("/handled", http.HandlerFunc(MuxAny))
 	api := r.PathPrefix("/api").Subrouter()

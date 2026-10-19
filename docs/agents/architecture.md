@@ -204,7 +204,9 @@ one for the area a change touches.
   the methods each serves, where the handler sits, which path spellings are parameters);
   `Go::provide` reads the routers through `Code::origins` and `prefixes`, as the Rust kinds do.
   The function a `Route` or `Group` call is given (`Go::callbacks`) binds its first parameter to
-  that group, which `Code::origins` does not see. The pack gives it `Call::args`,
+  that group, which `Code::origins` does not see; `Go::reach` follows it from there through the
+  exact callers that pass the parameter on and the names bound once to it (`Code::param_of`,
+  `Code::param_args`, `Code::constant`). The pack gives it `Call::args`,
   `Call::receiver`, the constants a function binds once (`Facts::consts`) and what it returns
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
@@ -660,10 +662,13 @@ one for the area a change touches.
   struct field, a map or a slice is not followed (no marker).
   chi: `*` is a parameter segment, `:name` a literal no contract can spell (no provider);
   `Mount(prefix, router)` follows the router like a group, any router inside a call of the
-  handler argument (a middleware), and a `ServeMux` given to `Mount` (chi strips the prefix, so
-  it would not see its own paths), are unread mounts; `With(..)` is not a group. A `Route` or
-  `Group` function binds its first parameter only to the group of that call: the subrouter it
-  passes on to another function (`users(r)`) is not followed from there, and a parameter
+  handler argument (a middleware), and a `ServeMux` given to `Mount`, are unread mounts (chi's
+  `Mount` leaves the request path alone, so the mux would see its full path under the mount's
+  prefix: combining those chains with the router's prefixes is not modelled); `With(..)` is not
+  a group. A `Route` or `Group` function binds its first parameter to the group of that call,
+  and the group is followed from there through exact calls (`users(r)`) and names bound once
+  (`sub := r`), at most `PREFIX_DEPTH` hops and `PREFIX_WORK` parameters (past it the group is
+  served nowhere); a call found only by a name passes nothing on, and a parameter
   rebound anywhere in the function hides it in the whole function. gorilla: `.Methods(..)`
   restricts the call it is chained on through `Name`, `Schemes`, `Headers`, `Queries` and
   `Host`; arguments Meada cannot read, no argument and a second `Methods` serve nothing;
