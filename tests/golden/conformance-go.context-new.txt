@@ -1,0 +1,17 @@
+example.com/acme/conformance store/store.go:9-13 New
+community: store
+processes: 3 (3 export; 1 repository): Plain (example.com/acme/conformance), TestClient (example.com/acme/conformance), TestNew (example.com/acme/conformance)
+func New() *Store {
+	helper()
+	open()
+	return &Store{name: fmt.Sprintf("store-%d", 1)}
+}
+callers:
+example.com/acme/conformance main.go:27 run
+example.com/acme/conformance scopes/scopes.go:16 Plain
+example.com/acme/conformance store/client_test.go:13 TestClient
+example.com/acme/conformance store/store_test.go:6 TestNew
+callees:
+example.com/acme/conformance store/helpers.go:3 helper
+example.com/acme/conformance store/store.go:19 open
+example.com/acme/conformance store/store.go:12 (unresolved) fmt.Sprintf
