@@ -235,6 +235,10 @@ All notable changes to Meada are recorded here. The format follows
   results, and the calls past it read nothing.
 - A Django URLconf chain of thousands of `include()` calls no longer overflows the stack while
   indexing: past 64 includes, the routes of the modules included deeper yield no provider.
+- A file of thousands of top-level names no longer takes time quadratic in their count to
+  index: each name it exports is looked up among the file's exports, and the functions and
+  methods of each export entry point among its definitions, by name rather than by reading
+  them all.
 
 ## [0.1.0] - Unreleased
 

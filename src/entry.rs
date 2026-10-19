@@ -7,13 +7,13 @@
 //! identifier: `<repository>::<path>::<handler>::http::GET::/users/{}`. An export's is the
 //! symbol's own identity. No score or threshold picks them: every one gets its process.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::channel;
 use crate::contract::Names;
 use crate::http;
-use crate::lang::{Facts, Kind};
-use crate::resolve::Exported;
+use crate::lang::{Def, Facts, Kind};
+use crate::resolve::{Exported, scope_of};
 
 /// What kind of door an entry point is. A new kind adds a variant, its `name` and `parse`
 /// arms and its finder in `find`; the walk and the export need nothing else.
@@ -202,12 +202,10 @@ fn channels(local: &Local) -> Vec<EntryPoint> {
 
 /// The exported functions and methods no call reaches, but for route handlers.
 fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
-    let mut defs = BTreeSet::new();
+    // Each definition the rows name, once: a file that re-exports it names it again.
+    let mut targets = BTreeSet::new();
     for e in local.exported {
         let (Some(file), Some(target)) = (&e.file, &e.target) else {
-            continue;
-        };
-        let Some(facts) = local.files.get(file.as_str()) else {
             continue;
         };
         // A name the exporting file keeps out of a star import is no door: an import still
@@ -218,20 +216,28 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         {
             continue;
         }
-        let class = (facts.defs.iter()).any(|d| d.name == *target && d.kind == Kind::Class);
-        for def in &facts.defs {
+        targets.insert((file.as_str(), target.as_str()));
+    }
+    let mut keyed = HashMap::new();
+    let mut defs = BTreeSet::new();
+    for (file, target) in targets {
+        let Some(facts) = local.files.get(file) else {
+            continue;
+        };
+        let named = (keyed.entry(file).or_insert_with(|| keyed_defs(facts)))
+            .get(target)
+            .map_or(&[][..], Vec::as_slice);
+        // The functions and classes of that name, and the methods of a class of that name.
+        let class = named.iter().any(|d| d.kind == Kind::Class);
+        for def in named {
             let own = match def.kind {
-                Kind::Function => def.name == *target,
+                Kind::Function => true,
                 // A method of an exported class; a constructor is reached as `new Class`.
-                Kind::Method => {
-                    let method = def.name.strip_prefix(target.as_str());
-                    let method = method.and_then(|m| m.strip_prefix('.'));
-                    class && method.is_some_and(|m| !m.contains('.') && m != "constructor")
-                }
+                Kind::Method => class && !def.name.ends_with(".constructor"),
                 _ => false,
             };
-            if let Some(name) = local.names.def(file, &def.name).filter(|_| own) {
-                defs.insert((file.as_str(), name));
+            if own && let Some(name) = local.names.def(file, &def.name) {
+                defs.insert((file, name));
             }
         }
     }
@@ -244,6 +250,21 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         found.push(EntryPoint::of_symbol(id, EntryKind::Export, name));
     }
     found
+}
+
+/// A file's functions and classes by their name and its methods by their class's, so that an
+/// export finds its own definitions without a scan of them all.
+fn keyed_defs(facts: &Facts) -> HashMap<&str, Vec<&Def>> {
+    let mut keyed: HashMap<&str, Vec<&Def>> = HashMap::new();
+    for def in &facts.defs {
+        let key = match def.kind {
+            Kind::Function | Kind::Class => def.name.as_str(),
+            Kind::Method => scope_of(&def.name),
+            _ => continue,
+        };
+        keyed.entry(key).or_default().push(def);
+    }
+    keyed
 }
 
 #[cfg(test)]
@@ -384,6 +405,16 @@ mod tests {
             export_doors(Star::ExceptDefault, &names),
             ["_hidden", "default", "listed", "shown"]
         );
+    }
+
+    #[test]
+    fn a_file_of_many_exports_finds_its_doors_in_linear_time() {
+        let names: Vec<String> = (0..50_000).map(|i| format!("f{i}")).collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let start = std::time::Instant::now();
+        assert_eq!(export_doors(Star::Public, &names).len(), names.len());
+        // Each export read every definition of its file: minutes here.
+        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
     }
 
     #[test]
