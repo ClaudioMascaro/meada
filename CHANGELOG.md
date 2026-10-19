@@ -28,6 +28,14 @@ All notable changes to Meada are recorded here. The format follows
   (`inferred`, or `ambiguous` with every candidate), and a call through an interface stops at
   the interface method. A promoted method of an embedded struct is a name match. The index
   is rebuilt once (new schema version).
+- Go packages (spec #25): each `go.mod` with a `module` provides `package::go::<module path>`, and
+  each `require`, and each `replace` to a local directory (in the repository or, when it leaves it,
+  in another repository of the workspace, resolved from the text and the repositories' roots),
+  links to the workspace provider of that module; a `replace` by another module leaves the module
+  out. The link is `exact`, the reason `package::go::<module path> <version> (local none), range
+  unchecked`. An import of `<module path>/<directory>` reaches the exported names of that
+  directory of the provider, `exact` when the directory exists, with `; import module path` ending
+  the reason. `go.sum` and the module proxy are never read.
 
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`

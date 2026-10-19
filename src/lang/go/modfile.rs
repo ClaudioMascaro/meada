@@ -1,12 +1,15 @@
-//! `go.mod` files, read as the line format they are, with no parser crate: the module path and
-//! the `replace` directives that point to a local directory. A directive is one line
-//! (`replace a => ./a`) or a block of them (`replace (` ... `)`), and `//` starts a comment.
+//! `go.mod` files, read as the line format they are, with no parser crate: the module path, the
+//! `require` entries and the `replace` directives (the package contracts read the first two,
+//! the imports the last). A directive is one line (`replace a => ./a`) or a block of them
+//! (`replace (` ... `)`), and `//` starts a comment.
 
 /// What one `go.mod` declares.
 #[derive(Debug, Default, PartialEq)]
 pub struct ModFile {
     /// The `module` path.
     pub module: Option<String>,
+    /// Each `require`, as the module path and the version, as written.
+    pub requires: Vec<(String, String)>,
     /// Each `replace`, as the module path it replaces and the path or module that replaces it,
     /// as written.
     pub replaces: Vec<(String, String)>,
@@ -37,6 +40,9 @@ pub fn read(text: &str) -> ModFile {
         };
         match (directive.as_str(), args) {
             ("module", [path, ..]) => file.module = Some(path.to_string()),
+            ("require", [path, version, ..]) => {
+                file.requires.push((path.to_string(), version.to_string()));
+            }
             ("replace", args) => {
                 let Some(arrow) = args.iter().position(|a| *a == "=>") else {
                     continue;
@@ -195,6 +201,7 @@ mod tests {
             file,
             ModFile {
                 module: Some("example.com/shop".into()),
+                requires: vec![("example.com/billing".into(), "v0.1.0".into())],
                 replaces: vec![
                     ("example.com/billing".into(), "./billing".into()),
                     ("example.com/legacy".into(), "../legacy".into()),

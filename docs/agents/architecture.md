@@ -36,8 +36,8 @@ one for the area a change touches.
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs`, `http/rust.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
-  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers), resource and channel kinds. `package.rs`: npm, PyPI and Cargo packages as contracts (specs #22,
-  #24 and #30). Detail:
+  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
+  #24, #30 and #25). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
   shape a contract carries, and the shapes read from a handler's returned literals and zod
@@ -84,7 +84,7 @@ one for the area a change touches.
   from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
-  a renamed crate has its own site),
+  a renamed crate has its own site) or `package::go::<module path>` (the `module` of a `go.mod`),
   provided at `<repository>::<manifest path>` (such as `example.com/pkg/shared::package.json` or
   `example.com/pkg/pylib::pyproject.toml`) and consumed at `<repository>::<manifest
   path>::<field>::<name>` (PyPI fields: `project.dependencies`, `tool.poetry.dependencies`, and
@@ -198,7 +198,7 @@ one for the area a change touches.
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
   constant holds, for what it must not leave unmounted.
 - New **package ecosystem** (spec #22 user story 26, track B packs): a variant of
-  `package::Ecosystem` (npm and PyPI today) plugs in another manifest format (`Cargo.toml`,
+  `package::Ecosystem` (npm, PyPI, Cargo and Go today) plugs in another manifest format (`Cargo.toml`,
   `go.mod`) without a new kind of contract. `Ecosystem::of` names the manifest files by file
   name, which `package::is_manifest` makes `manifests_found` (`index.rs`) stamp into
   `manifests`; `Ecosystem::read` (behind `package::read_manifest`) turns the bytes into the same
@@ -207,13 +207,17 @@ one for the area a change touches.
   routes it to the same `declare`, `consume`, `link`, `place` and `reached`; `Providers` is
   keyed by ecosystem and name, so two ecosystems never link; and the reason grammar
   (`reason`) stays one function, with `Ecosystem::flag` checking the range (npm semver through
-  `flag`; PyPI's and Cargo's are never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
+  `flag`; PyPI's, Cargo's and Go's are never evaluated, `range unchecked`) and `Ecosystem::reaches` holding a
   range rule like npm's `workspace:`. Which ecosystem a call through an import belongs to is
-  its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file), and resolving the import into the provider is the
+  its file's (`Ecosystem::of_source`; Cargo's for a `.rs` file, Go's for a `.go` one), and resolving the import into the provider is the
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
   `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
   the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
-  `Provided::resolve` from the crate's library root, `How::CrateName`). A step outside
+  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: `go::names_module`, the
+  import path matched to the longest module path of the nearest `go.mod`'s entries
+  (`go::inside`), then `Provided::package` looks in the one directory of the provider the rest
+  names, `How::ModulePath`; `go::read` takes `require` and `replace` from `lang::go::modfile`, the
+  Go pack's one `go.mod` reader, and gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside
   `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in
   `index::read_manifests` over the whole manifest list after the reads, fills the `workspace =
   true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
@@ -568,6 +572,10 @@ one for the area a change touches.
   holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A
   pack config, at the root or at any depth (`**/`), is read through no symbolic link
   (`read_config`), as the walk follows none.
+- `package/go.rs`: a `replace` applies to every version of the module it names (its old version is
+  read and dropped, as `lang/go/modfile.rs` does for imports); a `go.work` is not read; a `vendor/`
+  directory and an `internal/` package are no different from any other directory of the provider;
+  a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the

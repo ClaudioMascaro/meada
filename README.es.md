@@ -241,7 +241,15 @@ workspace; `package =` da el nombre real de una dependencia renombrada, `workspa
 `exact`, con el rango como está escrito y `range unchecked` (los rangos Cargo no se comprueban), y
 un `use` del crate (por el `[lib] name`, si lo hay, o por la clave de una dependencia renombrada)
 llega a los ítems públicos del proveedor por sus `pub use`, también `exact`, con `; import crate
-name` al final de la razón. Una dependencia fuera del workspace no aparece. No lee lockfile
+name` al final de la razón. Una dependencia fuera del workspace no aparece. En Go, cada `go.mod`
+con `module` se vuelve el contrato `package::go::<ruta del módulo>`, y cada `require`, y cada
+`replace` a una carpeta local, se enlaza con el proveedor de ese módulo en el workspace: un
+`replace` que sale del repositorio (`../otro`) se resuelve solo por el texto, como el `path` de
+Cargo, y un `replace` por otro módulo deja el módulo fuera. El enlace es `exact`, con la versión
+del `require` como rango, `(local none)` (un `go.mod` no tiene versión) y `range unchecked`, y un
+import de `<módulo>/<carpeta>` llega a las funciones, tipos y métodos exportados de esa carpeta en
+el proveedor, también `exact` cuando la carpeta existe, con `; import module path` al final de la
+razón. No lee `go.sum` ni consulta el proxy de módulos. No lee lockfile
 (`Cargo.lock` incluido) ni consulta el registro npm, PyPI ni crates.io. Meada también señala el *drift* de forma: los campos que un consumidor `fetch` lee de la respuesta ya interpretada y que la ruta que llama no devuelve, comparados con la forma de la ruta (un documento OpenAPI, un schema zod o los objetos literales de su handler). `trace` termina la línea del enlace con `drift: missing <camino>`, `context` de una ruta dice de dónde viene su forma y lista cada consumidor que lee campos de la respuesta, con su drift y nivel y las lecturas no comprobadas bajo una parte abierta cuando las hay, `search` con el tipo `drift` lista todo el drift, y `meada status` cuenta las lecturas ausentes de los consumidores de cada repositorio (las cuenta el repositorio del consumidor; el del proveedor no muestra nada). `meada export` trae las comunidades de cada repositorio: grupos de símbolos que se llaman más entre sí que con el resto, hallados con el algoritmo de Leiden sin nada aleatorio y solo con aritmética entera, y nombrados por la carpeta donde vive la mayoría de sus miembros (`src`, `src#2`), iguales en cada máquina. Cada enlace tiene el nivel `exact`, `declared`, `inferred`, `decided` o `ambiguous`; una llamada cuya URL no
 se puede resolver aparece como no resuelta y solo se vuelve enlace por una decisión, en el nivel
 `decided`, y una ruta que Meada no sabe dónde se sirve queda fuera del mapa en vez de ser

@@ -16,7 +16,7 @@ use super::{
 use crate::{Result, parent, qualify};
 
 mod build;
-mod modfile;
+pub mod modfile;
 
 /// How many segments of a member chain a callee keeps, and how many wrappers (`*`, `[T]`,
 /// parentheses) a receiver's type is read through; a longer one is its node kind, or names no

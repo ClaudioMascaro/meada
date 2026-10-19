@@ -1,0 +1,4 @@
+example.com/gopkg/web main.go:18 k.Greet
+  →[exact: package::go::example.com/shared/kit v1.2.0 (local none), range unchecked; import module path] example.com/gopkg/lib text/text.go:6 Greet
+    example.com/gopkg/lib text/text.go:11 Shout
+chain: exact · 1 hops · 2 repos · 72 tokens

@@ -235,7 +235,15 @@ the real name of a renamed dependency, `workspace = true` reads `[workspace.depe
 written and `range unchecked` (Cargo ranges are not checked), and a `use` of the crate (by its
 `[lib] name`, if any, or by the key of a renamed dependency) reaches the provider's public items
 through its `pub use` re-exports, also `exact`, with `; import crate name` ending the reason. A
-dependency outside the workspace appears nowhere. It reads no lockfile (`Cargo.lock`
+dependency outside the workspace appears nowhere. In Go, each `go.mod` with a `module` becomes
+the contract `package::go::<module path>`, and each `require`, and each `replace` to a local
+directory, links to that module's provider in the workspace: a `replace` that leaves the
+repository (`../other`) is resolved from the text alone, like Cargo's `path`, and a `replace` by
+another module leaves the module out. The link is `exact`, with the `require` version as the
+range, `(local none)` (a `go.mod` has no version) and `range unchecked`, and an import of
+`<module>/<directory>` reaches the exported functions, types and methods of that directory in the
+provider, also `exact` when the directory exists, with `; import module path` ending the reason.
+It reads neither `go.sum` nor the module proxy. It reads no lockfile (`Cargo.lock`
 included) and queries neither the npm registry, PyPI nor crates.io. Meada also reports shape drift: the fields a `fetch` consumer reads from the parsed response that the route it calls does not return, compared with the route's shape (an OpenAPI document, a zod schema or the object literals of its handler). `trace` ends the link line with `drift: missing <path>`, `context` on a route names where its shape comes from and lists each consumer that reads fields of the response, with its drift and level and the reads not checked under an open part when there are any, `search` with the kind `drift` lists all the drift, and `meada status` counts the missing reads of each repository's consumers (the consumer's repository counts them; the provider's shows nothing). `meada export` carries each repository's communities: groups of symbols that call each other more than they call the rest, found with the Leiden algorithm with nothing random and integer arithmetic only, and named after the directory most of their members live in (`src`, `src#2`), the same on every machine. Each link has the level `exact`, `declared`, `inferred`, `decided` or `ambiguous`; a call whose URL cannot be
 resolved shows up as unresolved and becomes a link only through a decision, at the level
 `decided`, and a route Meada cannot place stays out of the map rather than being guessed. Broker
