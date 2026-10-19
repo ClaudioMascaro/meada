@@ -219,7 +219,8 @@ one for the area a change touches.
   true` entries and `version.workspace = true` of each `Cargo.toml` from the nearest one above it,
   so a refresh equals a cold export. `Ecosystem::reaches` takes the repositories' roots (`Export::root`, set by
   `Engine::exports`) for a Cargo `path` that leaves its repository: it folds both locations as
-  paths, never opening one, so a symlink changes nothing. A change to what is stored bumps `SCHEMA_VERSION`.
+  paths, never opening one, so a symlink changes nothing. A change to what is stored re-blesses
+  `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`), matching a call's
   method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
@@ -237,7 +238,7 @@ one for the area a change touches.
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
 - New **document format or document data** (spec #21 tickets after #50): what is read from the
-  bytes goes in `document::Summary` (bump `SCHEMA_VERSION`), a reader beside `openapi.rs` and
+  bytes goes in `document::Summary` (re-bless `tests/golden/schema.txt`), a reader beside `openapi.rs` and
   `asyncapi.rs` sees
   only `serde_json::Value`, a problem is a `Problem` variant rendered in `document::report`
   through `Msg`, and contracts come from `Summary` at query time in the kind's `declare`
@@ -304,15 +305,15 @@ one for the area a change touches.
   where `Local` is built after the contracts and the `exports` rows are written, just before
   `entry::find` stores its result; a new fact a pack declares is a `Facts` field first (as
   `programs` is). A kind the stored rows already name needs no schema change; a new column does
-  (`SCHEMA_VERSION`). Export entry points are filtered again at query time
+  (re-bless `tests/golden/schema.txt`). Export entry points are filtered again at query time
   (`entry::drop_imported_exports`): only `export` is dropped, never another kind. The walk (`Graph::process`),
   `trace` from `process::<identity>` and `Export::processes` need nothing else: they read the
   stored entry points. A process is walked on demand from the stored calls and the links of the
   query, never stored; a new thing the walk must follow is one more `Edge` in `Graph::edges` (the
   one place that says which edges a step expands, which `Graph::processes_of` inverts for `context`) and its arm
   in `Descent::follow`, with its `Mark` (named in the `Mark` list of `map/queries.md`, which
-  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored bumps
-  `SCHEMA_VERSION`.
+  `tests/it/docs.rs` checks) and its line in `Walk::show`. A change to what is stored re-blesses
+  `tests/golden/schema.txt`.
 - New **level**: add the variant to `Level` in `contract.rs` and keep the order strongest first,
   since `Ord` makes a chain's weakest link the max. `Level::name`/`parse` are the only place names
   live; `engine.rs` and `trace.rs` render through them.
@@ -406,15 +407,15 @@ one for the area a change touches.
   of the `symbols`, `calls` and `candidates` rows, and the chain's export must stay
   byte-identical. The in-memory order is normalized by path (`BTreeMap`s), so the switch covers
   nothing beyond that. Indexing runs on one thread, so there is no worker count to vary.
-- `SCHEMA_VERSION` (`index.rs`) bumps on any change to `SCHEMA`, to the facts a pack stores or to
-  a document's or manifest's stored `summary`. A unit test in `index.rs` keeps all of them in
-  `tests/golden/schema.v<version>.txt` (the facts of each pack's
-  `tests/fixtures/schema/sample.<extension>`, the summaries of `sample.openapi.yaml`,
-  `sample.asyncapi.yaml` and `sample.package.json` there) and never re-blesses it in place: a change
-  fails until the bump, then `MEADA_BLESS=1` writes the new version's file and removes the old.
-  An index with another version, or an unreadable one, is deleted and rebuilt, and `status` says
-  so. One whose stored facts do not parse is rebuilt by the first refresh that reads them (when
-  a file changed), which `status` cannot tell.
+- The schema version (`index::schema_version`) is derived from `tests/golden/schema.txt`, the
+  stored format: `SCHEMA`, the facts of each pack's `tests/fixtures/schema/sample.<extension>`
+  and the summaries of the document and manifest samples there. A unit test in `index.rs`
+  (`the_stored_format_matches_its_golden`) fails on any change to them until `MEADA_BLESS=1`
+  rewrites the golden, which changes the version; no number is kept by hand, so two branches
+  that change the format conflict only in the golden. An index with another version, or an
+  unreadable one, is deleted and rebuilt, and `status` says so. One whose stored facts do not
+  parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
+  cannot tell.
 - The index holds no source text and no values, apart from the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
@@ -570,11 +571,22 @@ one for the area a change touches.
   does not follow it either; nor a name its scope binds more than once, or an attribute not
   assigned a call once in its class); a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
-  makes the names it may override unknown. `FAMILY_DEPTH` (128): a class family (the class and
-  its ancestors in C3 order) longer than that is absent, so every member of the class is
-  unknown (a name match at most), and the linearization recurses no deeper down the bases. The
-  bases count from where the walk started, a family looked up for a member a base names
-  (`class Z(K.D)` linearizes `K`'s) included.
+  makes the names it may override unknown. `WRAPPER_DEPTH` (64): a wrapper more calls up than
+  that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):
+  folding values (`Code::expand`, `Code::value`) and tracing them to their origins
+  (`Code::origins`) charge each step to the file whose code it reads (a value folded, a part
+  copied, a call a wrapper climb reaches, a constant, parameter or return value followed);
+  past it, that file's values are unknown, the climb stops at its calls and no origin is found
+  through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
+  functions each calling or returning the next twice, ends. `EVAL_DEPTH` (256): a value
+  folded deeper than that, through the items of lists and objects, the constants it names and
+  the arguments callers pass, is unknown, and a value traced through more constants,
+  parameters and return values than that, each into the next, has no origin.
+  `FAMILY_DEPTH` (128): a class family (the class and its ancestors in C3 order) longer than
+  that is absent, so every member of the class is unknown (a name match at most), and the
+  linearization recurses no deeper down the bases. The bases count from where the walk
+  started, a family looked up for a member a base names (`class Z(K.D)` linearizes `K`'s)
+  included.
   `LINK_DEPTH` (64): a name followed through more links than that, each into the next (a file
   re-exporting it from another: `export { x } from`, `export * from`, a Python `from m import x`
   or `import *`, a Rust `pub use`; a Rust alias, `use a as b`, or glob, `use m::*`), is unknown
@@ -710,7 +722,8 @@ one for the area a change touches.
   by many files gives as many hops (the spec lists them all; no marker). Only a call whose callee's head is the import crosses: a `const` alias or a
   client bound from it (`const c = new Client(); c.run()`) does not (no marker).
 - `lang/ts/uses.rs`: following call results (`Call::uses`) charges every node it visits and
-  every step it copies into a `const`'s uses to `USES_BUDGET` (2^20 per file); past it, the
+  every step it copies into a `const`'s uses or past a method call to `USES_BUDGET` (2^20 per
+  file), so a long method chain spends it; past it, the
   file's remaining calls have no uses, so their consumers read nothing and give no drift. A
   value is followed only in the function making the call, through the names a `const`
   declaration, a `for...of` variable or an array method's callback parameter binds (patterns
@@ -990,7 +1003,8 @@ one for the area a change touches.
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
   walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
   module included under several prefixes is read once for each), so the entries past it yield
-  no provider; what
+  no provider, and follows at most `INCLUDE_DEPTH` (64) `include()` calls, each of the next
+  module, so the routes of a module included deeper yield none; what
   an extension of `urlpatterns` adds other than a list literal is left out (marked in
   `lang/python.rs`), and a single `urlpatterns = [...] + other` (no list literal as a whole)
   yields no entry; `django.conf.urls.url`, a view wrapped in a call in the URLconf

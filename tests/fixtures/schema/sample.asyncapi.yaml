@@ -1,5 +1,5 @@
 # A sample of what an AsyncAPI document read stores (`documents.summary`), for the
-# SCHEMA_VERSION guard in src/index.rs.
+# schema version guard in src/index.rs.
 asyncapi: 3.0.0
 info:
   title: Sample

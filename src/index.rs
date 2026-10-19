@@ -24,9 +24,16 @@ use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
 use crate::trace::Process;
 
-/// Bump on any change to `SCHEMA`, to the facts a pack stores or to a document's or a
-/// manifest's stored `summary`: an index with another version is deleted and rebuilt.
-const SCHEMA_VERSION: i64 = 37;
+/// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
+/// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
+/// to the facts a pack stores or to a document's or a manifest's stored `summary` changes the
+/// version, and an index with another version is deleted and rebuilt.
+fn schema_version() -> i32 {
+    let hash = blake3::hash(include_bytes!("../tests/golden/schema.txt"));
+    let [a, b, c, d, ..] = *hash.as_bytes();
+    // A new SQLite file starts at `user_version` 0, which an odd version never equals.
+    i32::from_le_bytes([a, b, c, d]) | 1
+}
 
 /// `meta` holds the repository identity and the BLAKE3 of the packs' config files.
 /// `files.mtime` (nanoseconds) and `size` are the stat seen when the file was hashed; `mtime`
@@ -123,8 +130,8 @@ pub fn state(root: &Path) -> State {
     else {
         return State::OtherSchema;
     };
-    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0));
-    if version.ok() != Some(SCHEMA_VERSION) {
+    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0));
+    if version.ok() != Some(schema_version()) {
         return State::OtherSchema;
     }
     match db.query_row("SELECT count(*) FROM files WHERE resolved != ''", [], |r| {
@@ -144,16 +151,16 @@ pub fn open(root: &Path) -> Result<Connection> {
     let db = Connection::open(&path)?;
     // An unreadable file counts as a mismatch: `.meada/` is Meada's own directory.
     let version = db
-        .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+        .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
         .ok();
-    if version == Some(SCHEMA_VERSION) {
+    if version == Some(schema_version()) {
         return Ok(db);
     }
     drop(db);
     let _ = fs::remove_file(&path);
     let db = Connection::open(&path)?;
     db.execute_batch(SCHEMA)?;
-    db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    db.pragma_update(None, "user_version", schema_version())?;
     Ok(db)
 }
 
@@ -211,7 +218,7 @@ struct Rows {
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
 /// repository, since constants and client wrappers reach across files. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files. Stored facts
-/// that do not parse (a change that missed its `SCHEMA_VERSION` bump) rebuild the index.
+/// that do not parse (a change whose golden was not re-blessed) rebuild the index.
 ///
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
@@ -382,8 +389,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .map(|(path, facts)| Some((path, serde_json::from_str(&facts).ok()?)))
         .collect();
     let Some(kept) = kept else {
-        // Facts this version cannot read, stored before a change that missed its version
-        // bump: rebuild, as for another version. Without the identity, the next pass starts
+        // Facts this version cannot read, stored before a change whose golden was not
+        // re-blessed: rebuild, as for another version. Without the identity, the next pass starts
         // over and keeps nothing.
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
@@ -1552,7 +1559,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{SCHEMA, SCHEMA_VERSION, read_config, refresh_stamped};
+    use super::{SCHEMA, read_config, refresh_stamped};
     use crate::{document, lang, package};
 
     #[test]
@@ -1613,12 +1620,12 @@ mod tests {
         assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
-    /// What an index of this version stores: `SCHEMA`, then the facts each pack stores for its
-    /// sample in `tests/fixtures/schema/`, then the summary of each provider document sample. Its golden is keyed by `SCHEMA_VERSION` and never
-    /// rewritten in place, so a change fails until the version is bumped; `MEADA_BLESS=1` then
-    /// writes the new version's golden and removes the old one.
+    /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
+    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample.
+    /// Its golden is the schema version's source (`schema_version`), so a change fails until
+    /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
-    fn the_stored_format_changes_only_with_the_schema_version() {
+    fn the_stored_format_matches_its_golden() {
         let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
         let mut actual = SCHEMA.trim_start().to_string();
         for pack in lang::packs() {
@@ -1652,26 +1659,16 @@ mod tests {
         let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
         actual += &format!("\nsample.tsconfig.json\n{summary}\n");
 
-        let golden = tests.join(format!("golden/schema.v{SCHEMA_VERSION}.txt"));
-        let Ok(expected) = fs::read_to_string(&golden) else {
-            assert!(
-                std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1"),
-                "missing {}; run with MEADA_BLESS=1 to create it",
-                golden.display()
-            );
-            for old in fs::read_dir(tests.join("golden")).unwrap() {
-                let old = old.unwrap().file_name().into_string().unwrap();
-                if old.starts_with("schema.v") && old.ends_with(".txt") {
-                    fs::remove_file(tests.join("golden").join(old)).unwrap();
-                }
-            }
+        let golden = tests.join("golden/schema.txt");
+        if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {
             fs::write(&golden, actual).unwrap();
             return;
-        };
+        }
+        let expected = fs::read_to_string(&golden).unwrap();
         assert!(
             actual == expected,
-            "the stored format differs from {}: bump SCHEMA_VERSION, then rerun with \
-             MEADA_BLESS=1 to write the new version's golden\n--- actual ---\n{actual}",
+            "the stored format differs from {}: rerun with MEADA_BLESS=1 to rewrite it, which \
+             changes the schema version\n--- actual ---\n{actual}",
             golden.display()
         );
     }

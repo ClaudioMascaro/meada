@@ -22,8 +22,15 @@ a review finding.
   Python `with ... as`, `except ... as`, `:=`, comprehension targets, lambda parameters,
   `global` and `nonlocal`, `match`/`case` captures, an import inside a function or class,
   compound targets (unpacking, `self.x` inside one), names a closure captures; in TypeScript
-  parameters, `catch` bindings and destructuring. A call after the rebinding resolves through
-  the inner binding, or by name match, and never to the outer definition.
+  parameters, `catch` bindings and destructuring; in Rust a shadowing `let` (also inside a
+  block, a loop or a closure), function, nested `fn` and closure parameters, `for`, `match`,
+  `if let` and `while let` patterns, and a `let mut` or a plain assignment (a reassigned name is
+  no constant). A call after the rebinding resolves through the inner binding, or by name
+  match, and never to the outer definition. In Rust an inline `mod {}` is a scope boundary: its
+  body sees by bare name its own items and the `use`s inside it, never the enclosing file's
+  items or `use`s (those take `super::`). Values and types/modules are separate namespaces: a
+  `let` or a parameter leaves a path head (`a::f`) bound as before, and a `fn` leaves a `mod` of
+  the same name bound as before.
 - **Opaque outside.** A base class or a receiver whose class comes from outside the repository
   stays opaque: its members resolve to nothing, and reaching it before a repository class in the
   method order leaves the member unknown.
@@ -54,6 +61,11 @@ indexing carries on.
 - Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
   `docs/agents/architecture.md` (`tests/it/docs.rs` checks the name is there), and a unit test
   feeds it an input past the limit.
+
+## Known ceilings
+
+A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
+implemented, or reported as blocked.
 
 ## Docs move with the capability
 

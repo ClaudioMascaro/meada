@@ -1,5 +1,5 @@
 # A sample of what an OpenAPI document read stores (`documents.summary`), for the
-# SCHEMA_VERSION guard in src/index.rs.
+# schema version guard in src/index.rs.
 openapi: 3.1.0
 info:
   title: Sample
