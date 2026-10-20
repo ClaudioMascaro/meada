@@ -4808,6 +4808,9 @@ mod tests {
         // Each way up is its own site, whichever of the two calls of a level it climbed.
         let way = "w0(u) > w1(u) > w2(u) > w3('/a')";
         assert_eq!(climbed(&source(3)), vec![way; 8]);
+        // The eight ways are eight different climbs: the calls written alike are not the same.
+        let at = climbed_at(&source(3));
+        assert_eq!(at.iter().collect::<BTreeSet<_>>().len(), 8, "{at:?}");
         let ways = lattice(40);
         assert!(
             !ways.is_empty() && ways.len() < EVAL_BUDGET,
@@ -5406,6 +5409,16 @@ mod tests {
     /// The wrapper calls `expand_frames` climbs to each site of the `fetch` of `src`, as written,
     /// from the call in the wrapper to the site, one line per site.
     fn climbed(src: &str) -> Vec<String> {
+        climbed_with(src, &|text, _| text)
+    }
+
+    /// `climbed`, each call followed by its position among the calls of the file, which tells
+    /// two calls written alike apart.
+    fn climbed_at(src: &str) -> Vec<String> {
+        climbed_with(src, &|text, index| format!("{text}#{index}"))
+    }
+
+    fn climbed_with(src: &str, show: &dyn Fn(String, usize) -> String) -> Vec<String> {
         let sources = [("a.ts", src)];
         over(ts(), &sources, |code| {
             let path = code.files().get_key_value("a.ts").unwrap().0;
@@ -5419,7 +5432,7 @@ mod tests {
             let mut lines = Vec::new();
             for expanded in code.expand_frames(path, at, &url) {
                 let frames = (expanded.frames.iter())
-                    .map(|f| written(code, &sources, f.path, f.index))
+                    .map(|f| show(written(code, &sources, f.path, f.index), f.index))
                     .collect::<Vec<_>>();
                 lines.push(frames.join(" > "));
             }
@@ -5483,22 +5496,18 @@ mod tests {
 
     #[test]
     fn a_parameter_is_reached_through_an_exact_caller_and_not_a_name_matched_one() {
-        let def = "def use(r):\n    return r\n";
-        let exact = format!("{def}\ndef go():\n    use(Router())\n");
-        // `thing` is of no class Meada can tell, so `thing.use` is only a name match for `use`.
+        let def = "class S:\n    def use(self, r):\n        return r\n";
+        // `s` is an `S`, so `s.use` is exact.
+        let exact = format!("{def}\ndef go():\n    s = S()\n    s.use(Router())\n");
+        // `thing` is of no class Meada can tell, so `thing.use` is only a name match for the
+        // method `use` (`Inferred`), which may be called on any object.
         let matched = "\ndef other(thing):\n    thing.use(Other())\n";
         let both = format!("{exact}{matched}");
-        assert_eq!(
-            held_by(py(), &[("a.py", &exact)], "a.py", "use", "r"),
-            ["a.py Router"]
-        );
-        assert_eq!(
-            held_by(py(), &[("a.py", &both)], "a.py", "use", "r"),
-            ["a.py Router"]
-        );
+        let param = |src: &str| held_by(py(), &[("a.py", src)], "a.py", "S.use", "r");
+        assert_eq!(param(&exact), ["a.py Router"]);
+        assert_eq!(param(&both), ["a.py Router"]);
         let only = format!("{def}{matched}");
-        let nothing = held_by(py(), &[("a.py", &only)], "a.py", "use", "r");
-        assert_eq!(nothing, Vec::<String>::new());
+        assert_eq!(param(&only), Vec::<String>::new());
     }
 
     #[test]
@@ -5626,7 +5635,8 @@ mod tests {
         // The repository's `route` is the only method of that name it defines.
         let defs = "struct Mine;\nimpl Mine { fn route(&self) -> Mine { Mine } }\n";
         // `build` is no function Meada knows, so `route` on its result is a name match for the
-        // repository's: the chain starts at no outside constructor.
+        // repository's. The chain starts at no outside constructor, and the `passes` filter
+        // empties it: an origin with no outside name does not survive a step above it.
         let (plain, _) = built(defs, "let r = build().route(\"/a\");");
         assert_eq!(plain, Vec::<String>::new());
         let (plain, _) = built(defs, "let r = build().layer(l).route(\"/a\");");
@@ -5686,6 +5696,7 @@ mod tests {
 
     #[test]
     fn a_use_imported_module_function_is_direct() {
+        // An associated function of a type the `use` names.
         let src = "use reqwest::Client;\nfn main() { Client::new(); }\n";
         assert_eq!(
             read_names(rust(), &[("main.rs", src)], "main.rs"),
@@ -5693,6 +5704,19 @@ mod tests {
                 "Client.new: external=reqwest.Client.new by_path=reqwest.Client.new direct=true \
               import=reqwest Client.new"
             ]
+        );
+        // A function of a module the `use` names, and a function the `use` names itself.
+        let module = "use reqwest;\nfn main() { reqwest::get(u); }\n";
+        assert_eq!(
+            read_names(rust(), &[("main.rs", module)], "main.rs"),
+            [
+                "reqwest.get: external=reqwest.get by_path=reqwest.get direct=true import=reqwest get"
+            ]
+        );
+        let item = "use reqwest::get;\nfn main() { get(u); }\n";
+        assert_eq!(
+            read_names(rust(), &[("main.rs", item)], "main.rs"),
+            ["get: external=reqwest.get by_path=reqwest.get direct=true import=reqwest get"]
         );
     }
 
