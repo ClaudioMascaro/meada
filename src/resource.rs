@@ -17,7 +17,7 @@ use crate::workspace::Repository;
 pub struct Resource;
 
 /// The start of every resource contract identifier.
-pub const PREFIX: &str = "resource::";
+const PREFIX: &str = "resource::";
 
 /// The contract identifier of `resource`: `resource::<kind>::<id>`.
 fn contract(resource: &config::Resource) -> String {

@@ -205,11 +205,25 @@ pub struct Related<'e> {
 /// ties, and the line.
 pub type Hit = (u8, String, String);
 
-/// The engine fixes the phase order, and the kinds answer in `KINDS` order: every kind's
-/// `declare` over every repository, then every kind's `workspace_step` over all of them, then
-/// `link`, then the decisions replay, then every kind's `after_links`. The decisions are
-/// kind-free and a pass over the links must see the decided ones, so they sit between. A new
-/// kind appends to `KINDS`: the order of the list is the order of the steps and of the output.
+/// A contract kind: the whole interface of one, so that the engine, the open items, the
+/// decisions, the trace and the entry points ask a kind instead of naming it. Every question
+/// but `prefix`, `extract` and `link` has a default body; a kind overrides only what it
+/// answers differently. The questions are listed in the order the engine asks them.
+///
+/// The engine fixes the phase order, and the kinds answer in `KINDS` order: `extract` and
+/// `entry` when the index is written; then every kind's `declare` over every repository, then
+/// every kind's `workspace_step` over all of them, then `link`, then the decisions replay,
+/// then every kind's `after_links`. The decisions are kind-free and a pass over the links must
+/// see the decided ones, so they sit between. The queries ask the rest of the questions.
+///
+/// One rule for "unresolved": a side is unresolved when its contract is absent (a consumer
+/// whose contract could not be read: skipped by `link`, an open item whose candidates each
+/// provider's kind answers, a dead edge in the trace) or when its kind says so of the
+/// identifier (`unresolved`: never linked, never an open item, shown with the unresolved
+/// suffix).
+///
+/// A new kind appends to `KINDS`: the order of the list is the order of the steps and of the
+/// output.
 pub trait ContractKind {
     /// The identifier prefix: `http` for `http::GET::/users`.
     fn prefix(&self) -> &'static str;
@@ -217,6 +231,13 @@ pub trait ContractKind {
     /// The contracts one language pack's files provide and consume, read from the pack's
     /// facts and the values `code` evaluates.
     fn extract(&self, code: &Code) -> Vec<Found>;
+
+    /// Which entry point kind a `role` side of `contract` makes. It is a function of the
+    /// contract alone, since entry points are stored when the index is written: changing an
+    /// answer needs a reindex.
+    fn entry(&self, _role: Role, _contract: &str) -> Option<EntryKind> {
+        None
+    }
 
     /// Adds to `export`, the index content of `repo`, the sides `repo` declares for this kind
     /// in its `meada.toml`, keeping the lists sorted: a kind fed by configuration rather than
@@ -228,57 +249,6 @@ pub trait ContractKind {
     /// order), after every kind's `declare` has run on every repository: a step that needs
     /// all of them, such as an index of the providers of the whole workspace.
     fn workspace_step(&self, _exports: &mut [Export]) {}
-
-    /// The words for a provider and a consumer of this kind when `context` lists a contract
-    /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
-    fn sides(&self) -> Option<(&'static str, &'static str)> {
-        None
-    }
-
-    /// How `context` lists `contract`, a contract of this kind, by the words of `sides`
-    /// (default); `None` when it lists none (`context` then reads the argument as a symbol).
-    fn view(&self, _contract: &str) -> Option<View> {
-        self.sides().map(|(provider, consumer)| View {
-            provider,
-            consumer: Some(consumer),
-            carried: "payload",
-            drift: false,
-        })
-    }
-
-    /// The sides of `export` that reach `contract` through another name, besides the sides that
-    /// hold it, which the engine lists: none by default (channels: wildcard producers and
-    /// consumers, the publishes its bindings route to a queue, and the bindings themselves).
-    /// `exports` are the workspace's.
-    fn related_sides<'e>(
-        &self,
-        _exports: &'e [Export],
-        _export: &'e Export,
-        _contract: &str,
-    ) -> Vec<Related<'e>> {
-        Vec::new()
-    }
-
-    /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
-    /// line of each provider sitting at it: none by default (channels: the publish and the
-    /// queues its bindings route it to, a publish having no contract of its own). `exports` are
-    /// the workspace's.
-    fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
-        Vec::new()
-    }
-
-    /// The sections a symbol's `context` adds after its callees, as lines (packages:
-    /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
-    /// the workspace's, and `symbol` the identity of a symbol of it.
-    fn context_sections(
-        &self,
-        _exports: &[Export],
-        _repos: &[Repository],
-        _links: &[Link],
-        _symbol: &str,
-    ) -> Vec<String> {
-        Vec::new()
-    }
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
@@ -335,6 +305,63 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// The words for a provider and a consumer of this kind when `context` lists a contract
+    /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
+    fn sides(&self) -> Option<(&'static str, &'static str)> {
+        None
+    }
+
+    /// How `context` lists `contract`, a contract of this kind, by the words of `sides`
+    /// (default); `None` when it lists none (`context` then reads the argument as a symbol).
+    fn view(&self, _contract: &str) -> Option<View> {
+        self.sides().map(|(provider, consumer)| View {
+            provider,
+            consumer: Some(consumer),
+            carried: "payload",
+            drift: false,
+        })
+    }
+
+    /// The sides of `export` that reach `contract` through another name, besides the sides that
+    /// hold it, which the engine lists: none by default (channels: wildcard producers and
+    /// consumers, the publishes its bindings route to a queue, and the bindings themselves).
+    /// `exports` are the workspace's.
+    fn related_sides<'e>(
+        &self,
+        _exports: &'e [Export],
+        _export: &'e Export,
+        _contract: &str,
+    ) -> Vec<Related<'e>> {
+        Vec::new()
+    }
+
+    /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
+    /// line of each provider sitting at it: none by default (channels: the publish and the
+    /// queues its bindings route it to, a publish having no contract of its own). `exports` are
+    /// the workspace's.
+    fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The sections a symbol's `context` adds after its callees, as lines (packages:
+    /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
+    /// the workspace's, and `symbol` the identity of a symbol of it.
+    fn context_sections(
+        &self,
+        _exports: &[Export],
+        _repos: &[Repository],
+        _links: &[Link],
+        _symbol: &str,
+    ) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The providers a trace start text names, among `providers` (contract, site). The trace
+    /// takes the union of every kind's answer.
+    fn starts<'a>(&self, _from: &str, _providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        Vec::new()
+    }
+
     /// The status lines of `repository` (whose index content is `export`) about this kind,
     /// given the links of the workspace.
     fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
@@ -355,19 +382,6 @@ pub trait ContractKind {
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
     fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
         false
-    }
-
-    /// The providers a trace start text names, among `providers` (contract, site). The trace
-    /// takes the union of every kind's answer.
-    fn starts<'a>(&self, _from: &str, _providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
-        Vec::new()
-    }
-
-    /// Which entry point kind a `role` side of `contract` makes. It is a function of the
-    /// contract alone, since entry points are stored when the index is written: changing an
-    /// answer needs a reindex.
-    fn entry(&self, _role: Role, _contract: &str) -> Option<EntryKind> {
-        None
     }
 }
 

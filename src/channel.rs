@@ -23,7 +23,7 @@ pub struct Channel;
 const SIDES: (&str, &str) = ("producer", "consumer");
 
 /// The start of every channel contract identifier.
-pub const PREFIX: &str = "channel::";
+const PREFIX: &str = "channel::";
 
 /// The contract identifier of the channel `name` of `broker`, kept as evaluated. A side whose
 /// name could not be evaluated is `channel::<broker>`: it names its broker kind, never links
@@ -91,7 +91,7 @@ fn call(m: &lang::Message) -> Site {
 }
 
 /// The broker kind and the name of a channel contract; no name for an unresolved side.
-pub fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
+fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
     let rest = contract.strip_prefix(PREFIX)?;
     Some(match rest.split_once("::") {
         Some((broker, name)) => (broker, Some(name)),
@@ -354,7 +354,7 @@ fn merge<'a>(own: impl Iterator<Item = &'a mut Option<Shape>>, shape: &Option<Sh
 /// contract; at `inferred` when the consumer's name is a wildcard pattern of the same broker
 /// kind that matches the producer's (`wildcard`), reason `<produced> wildcard <pattern>`. An
 /// unresolved side reaches nothing.
-pub fn fits(produced: &str, consumed: &str) -> Option<(Level, String)> {
+fn fits(produced: &str, consumed: &str) -> Option<(Level, String)> {
     let (Some((broker, Some(name))), Some((kind, Some(pattern)))) =
         (parse(produced), parse(consumed))
     else {
