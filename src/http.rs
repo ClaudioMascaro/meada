@@ -666,6 +666,11 @@ impl ContractKind for Http {
             .collect()
     }
 
+    /// The drift of the links, once the decisions are replayed (`drift`).
+    fn after_links(&self, links: &mut [Link], exports: &[IndexExport]) {
+        drift(links, exports);
+    }
+
     /// A route is labelled by its method and path.
     fn label(&self, contract: &str) -> String {
         match route(contract) {

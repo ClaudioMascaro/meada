@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
@@ -1865,6 +1866,26 @@ impl ContractKind for Packages {
         packages.sort_by(|a, b| (&a.name, &a.directory).cmp(&(&b.name, &b.directory)));
         export.packages = packages;
         index::sort_providers(&mut export.providers);
+    }
+
+    /// The steps that need every repository's packages: the dependency entries, the imports
+    /// (which resolve into a provider wherever it lives), the export entry points a call
+    /// reaches through a package import of their own repository (a monorepo: no door, at any
+    /// level; an entry point of another kind stays one), and the shapes imported from a
+    /// package (issue #175).
+    fn workspace_step(&self, exports: &mut [Export]) {
+        let providers = Providers::new(exports);
+        consume(exports, &providers);
+        import(exports, &providers);
+        for export in exports.iter_mut() {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            entry::drop_imported_exports(&mut export.entry_points, &imported);
+        }
+        shapes(exports, &providers);
     }
 
     /// The dependency entry links to the providers of its package: one candidate is `exact`,
