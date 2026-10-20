@@ -1,5 +1,12 @@
 //! The shared resolution (ADR 0007): connects each call a language pack found to the
 //! definitions it reaches, with Meada's own scope and import resolution and no types.
+//!
+//! Two questions read a name or a value. `Code::origins` asks what made a value (the call of a
+//! library's constructor or factory, or what the source declares a name is), with the evidence
+//! policy the reader needs: `Values` follows the flow of values (constants, imports, arguments,
+//! returns), `Constants` only `const` bindings, `Declarations` what the source declares.
+//! `Code::outside` asks what an import from outside binds a name to. The walks behind both are
+//! private; `Code::expand` reads the wrappers a value passes through.
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -2521,7 +2528,7 @@ impl<'a> Code<'a> {
         else {
             return None;
         };
-        // A crate a pack's path import (Rust's `use`) names: the whole path, as `external` spells it.
+        // A crate a pack's path import (Rust's `use`) names: the whole path, as `Code::outside` spells it.
         let pathed = self.resolver.pathed.contains(path);
         if pathed && matches!(name, Imported::Namespace) {
             let full = self.resolver.imported_name(path, scope, chain);
@@ -2837,13 +2844,6 @@ impl<'a> Code<'a> {
         self.resolver.written.contains(field)
     }
 
-    /// `external` of the callee of `call`, written in `path`, read as a path when the call is
-    /// one (`Code::outside` with `Call::by_path`).
-    pub fn external_of(&self, path: &'a str, call: &'a Call) -> Option<String> {
-        let outside = self.outside(path, &call.scope, &call.callee, call.by_path)?;
-        Some(outside.spelled)
-    }
-
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
     /// position, or by the parameter's name among its keyword arguments. A method called on
     /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
@@ -2928,8 +2928,8 @@ impl<'a> Code<'a> {
                     let steps = trail.steps.split_off(mark);
                     trail.out.retain(|&(p, n), _| {
                         let call = &self.resolver.files[p].calls[n];
-                        match self.external_of(p, call) {
-                            Some(origin) => steps.iter().all(|m| self.pack.passes(&origin, m)),
+                        match self.outside(p, &call.scope, &call.callee, call.by_path) {
+                            Some(o) => steps.iter().all(|m| self.pack.passes(&o.spelled, m)),
                             None => steps.is_empty(),
                         }
                     });
@@ -2938,7 +2938,8 @@ impl<'a> Code<'a> {
                     let outside = !matched
                         || (trail.out.keys()).all(|&(p, n)| {
                             let call = &self.resolver.files[p].calls[n];
-                            self.external_of(p, call).is_some()
+                            self.outside(p, &call.scope, &call.callee, call.by_path)
+                                .is_some()
                         });
                     if outside {
                         for (origin, routes) in std::mem::take(&mut trail.out) {

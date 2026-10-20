@@ -128,8 +128,8 @@ modules updates it.
   function") or `Handler::Inline {path, def}`; `Role::Publish {exchange}` (a publish to a named
   exchange, `name` the routing key) and `Role::Binding {exchange, pattern}` (`name` the queue)
   are the RabbitMQ roles that are neither a plain producer nor a consumer. `name` is `None`
-  when it cannot be evaluated (an unresolved side). The pack reads facts through `Code` (values, `Code::origin`,
-  `Code::expand`) and reports; the channel kind turns the output into contracts. TS/JS library
+  when it cannot be evaluated (an unresolved side). The pack reads facts through `Code` (values, `Code::origins`,
+  `Code::outside`, `Code::expand`) and reports; the channel kind turns the output into contracts. TS/JS library
   forms live in `lang/ts/messages.rs`: kafkajs `send({topic})` on a `new Kafka().producer()`,
   `subscribe({topic})` or `({topics})` on a `new Kafka().consumer()`, with the handler of the
   first `run({eachMessage|eachBatch})` on the same consumer binding (else the function whose
@@ -155,9 +155,10 @@ modules updates it.
   connect()` or `const channel = await conn.createChannel()` is a traced binding. Both are in
   every export (`Kafka#0` and the like: unresolved calls, no target).
 - Python message forms live in `lang/python/messages.rs`, which finds the client of a call with
-  `Code::origins` (not `Code::origin`, which does not follow `self.x`, parameters or returns) and
+  `Code::origins` with `Follow::Values` (which follows `self.x`, parameters and returns, as
+  `Follow::Constants` does not) and
   names the constructor it reached from the file's imports (`Code::imported`:
-  `confluent_kafka.Producer`, however it is imported; `Code::external` also answers for a method
+  `confluent_kafka.Producer`, however it is imported; `Code::outside` also answers for a method
   of a typed local, so it is not used). One `channel()` or `client()` above a constructor is
   followed (`pika.BlockingConnection.channel`, `boto3.Session.client`), also when the client is a
   call written in place (`boto3.client("sqs").send_message(...)`): `head` takes the call that
@@ -182,7 +183,8 @@ modules updates it.
   (`frameworks::made`). `VERBS` (the `Method` constants) lives there too.
 - Rust message forms live in `lang/rust/messages.rs`, beside the TS and Python ones and without
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
-  (suffix-matched on `Code::external`) and the methods that hand back the same object
+  (suffix-matched on `Code::outside`, without the path flag, over the constructor the
+  `Follow::Values` origin reached) and the methods that hand back the same object
   (`passes`, which `RustPack::passes` falls through to, so `flow` follows `set`, `create_channel`,
   `connect` and the like). Forms: rdkafka `send` of a `FutureRecord::to(topic)` or
   `BaseRecord::to(topic)` (the record is found from the argument, down its chain) and
@@ -424,29 +426,35 @@ modules updates it.
   `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
   with them; a call found only by a name match (`data.get(...)` matched to a wrapper method,
   or a bare name no import binds; `Resolver::callers` keeps `exact` calls alone) is not climbed, since it may be on any
-  object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, name)` (and
-  `value_origins` for a value as written) is the shared value flow: the call sites whose result
-  a name may hold, followed through constants, imports and module attributes, the arguments
-  every caller passes to a parameter (a caller found only by a name match is not climbed, as in
-  `Code::expand`), the values a function of the repository returns (its
-  parameters then bound by that call only) and the items of a list or tuple; an attribute
-  assigned a call once in its class (`self.client = Client()`) counts as a constant; a call that
-  reaches no function of the repository is the origin. A constant, parameter or function met
-  again on one path (a cycle) adds nothing. `Code::external(path, scope, callee)` names what an
-  import from outside the repository binds a callee to (`fastapi.APIRouter`,
-  `express.default`): contract kinds recognize framework constructors with it.
+  object or reach another function, so a wrapper with no other caller is read where it stands. `Code::origins(path, scope, of, follow)` is
+  the one origin question: what made the value of a name or a value as written (the call of a
+  library's constructor or factory, or what the source declares a name is), with the methods
+  called on the way, and every route the walk took to it. The evidence policy picks the walk, and
+  each reader asks the one it needs. `Follow::Values` (Python, Rust, Go's routers and request
+  clients, Express) is the shared value flow: the call sites whose result a name may hold,
+  followed through constants, imports and module attributes, the arguments every caller passes to
+  a parameter (a caller found only by a name match is not climbed, as in `Code::expand`), the
+  values a function of the repository returns (its parameters then bound by that call only) and
+  the items of a list or tuple; an attribute assigned a call once in its class
+  (`self.client = Client()`) counts as a constant; a call that reaches no function of the
+  repository is the origin. A constant, parameter or function met again on one path (a cycle) adds
+  nothing. `Follow::Constants` (the TypeScript forms) follows `const` bindings alone (same file
+  and imported) down to an import whose module is outside the repository, so a parameter or a
+  return value has no origin; the answer carries the maker's form (`new`, a call or the bare
+  name), what it names outside, the methods called on the way and, as `held`, the constant the
+  name refers to, which pairs the calls made on the same client. `Follow::Declarations` (Go's
+  typed clients and forms) reads what the source declares the name is: a written type, or the
+  call it was declared from through the methods called on the way. `Code::outside(path, scope,
+  name, by_path)` names what an import from outside the repository binds a name to
+  (`fastapi.APIRouter`, `express.default`): the package and name there, the name as the file's
+  imports spell it and whether its head is the import itself. Contract kinds recognize framework
+  constructors with it; with `by_path` the name is a path (Rust's `a::b::f()`) whose head is read
+  among types and modules. `Code::expand(Expand::Constructed { held, at }, read)` is the
+  expansion over the arguments of the `new` a `held` constant holds, on behalf of the call `at`
+  made on it. `Code::pack()` is the pack of the files.
   `Code::definition` resolves a name or a member chain (`views.index`) to a definition,
   `Code::module` a name to the file it binds as a whole module, and `Code::import_file` an
   import specifier (`shop.orders.urls`) to its file.
-  `Code::origin(path, scope, chain) -> Option<Origin {package, expr, binding}>` is the
-  **receiver tracing** every message library form relies on: it follows a name or member chain
-  through `const` bindings (same file and imported) down to an import whose module is outside
-  the repository (`Binding::External` keeps the specifier and imported name), and spells what
-  the code did with it from that name: `new Kafka().producer()` for `kafkajs`. A namespace import
-  adds no name, a default import is `default`; `binding` is the constant the chain's head names
-  (how a pack pairs calls on the same client). `Code::expand(Expand::Constructed { held: binding, at }, read)`
-  is the same expansion over the arguments of the `new` a binding holds, on behalf of the call
-  `at` made on it. `Code::pack()` is the pack of the files. `Code::imported(path, scope, chain)` is the same
-  tracing without `const`s: the specifier and spelled chain when the chain's head is itself an
-  import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
+  `Code::imported(path, scope, chain)` reads the head alone, without `const`s: the specifier and
+  spelled chain when the chain's head is itself an import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
   what each file exports, as `export` reads it, for the `exports` table.

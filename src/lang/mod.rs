@@ -119,9 +119,11 @@ pub trait LanguagePack {
 
     /// The producer and consumer calls of the message libraries the pack knows (spec #20),
     /// read from its files' facts through `code`: a call counts only when its receiver traces
-    /// back to the library's package (`Code::origin`), and its channel name is evaluated like
-    /// a URL, client wrappers included (`Code::expand`). The channel contract kind turns them
-    /// into contracts; a pack never touches the index.
+    /// back to the library's package, each pack asking the origin question its language needs
+    /// (`Code::origins`: `Constants` for TypeScript, `Declarations` for Go, `Values` for Python
+    /// and Rust), and its channel name is evaluated like a URL, client wrappers included
+    /// (`Code::expand`). The channel contract kind turns them into contracts; a pack never
+    /// touches the index.
     fn messages(&self, _code: &Code) -> Vec<Message> {
         Vec::new()
     }
