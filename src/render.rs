@@ -152,3 +152,22 @@ pub(crate) fn line_of(src: &[u8], offset: i64) -> usize {
     let before = &src[..(offset.max(0) as usize).min(src.len())];
     before.iter().filter(|&&b| b == b'\n').count() + 1
 }
+/// 0 when `name` is `needle`, 1 when it starts with it, 2 when it contains it.
+pub(crate) fn rank(name: &str, needle: &str) -> Option<u8> {
+    match () {
+        _ if name == needle => Some(0),
+        _ if name.starts_with(needle) => Some(1),
+        _ if name.contains(needle) => Some(2),
+        _ => None,
+    }
+}
+
+/// `name:` followed by the items, or `name: none`.
+pub(crate) fn section(name: &str, items: Vec<String>) -> Vec<String> {
+    if items.is_empty() {
+        return vec![format!("{name}: none")];
+    }
+    let mut lines = vec![format!("{name}:")];
+    lines.extend(items);
+    lines
+}

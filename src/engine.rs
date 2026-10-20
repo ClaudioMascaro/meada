@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::contract::{self, ContractKind, KINDS, Level, Link, Role, Search, View};
+use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::Msg;
-use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, unresolved};
+use crate::render::{
+    DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
+};
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
@@ -167,8 +169,8 @@ impl Engine {
     }
 
     /// `decision_report`, with, for each repository of the workspace, in workspace order, the
-    /// status lines about its resources (a `via` that names no symbol, a resource no link
-    /// reaches) and its documents (one ignored, a route listed twice).
+    /// status lines: each kind's own (a `via` that names no symbol, a resource no link reaches),
+    /// its documents' (one ignored, a route listed twice) and the shape drift's.
     pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
         self.refresh()?;
         let exports = self.exports()?;
@@ -330,7 +332,7 @@ impl Engine {
         let exports = self.exports()?;
         let needle = query.to_lowercase();
         // (rank, identity to break ties, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut hits: Vec<Hit> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
             if symbols {
@@ -415,7 +417,7 @@ impl Engine {
         self.refresh()?;
         let needle = query.to_lowercase();
         // (rank, path to break ties, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut hits: Vec<Hit> = Vec::new();
         for (export, repo) in self.exports()?.iter().zip(&self.workspace.repos) {
             for doc in &export.documents {
                 let Some(shown) = doc.summary.shown() else {
@@ -458,7 +460,7 @@ impl Engine {
         self.refresh()?;
         let needle = query.to_lowercase();
         // (rank, repository and name to break ties, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut hits: Vec<Hit> = Vec::new();
         for export in self.exports()? {
             for c in &export.communities {
                 let Some(r) = rank(&c.name.to_lowercase(), &needle) else {
@@ -478,7 +480,7 @@ impl Engine {
         self.refresh()?;
         let needle = query.to_lowercase();
         // (rank, identity to break ties, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut hits: Vec<Hit> = Vec::new();
         for export in self.exports()? {
             for e in &export.entry_points {
                 let Some(r) = rank(&e.label.to_lowercase(), &needle) else {
@@ -496,7 +498,7 @@ impl Engine {
     fn search_items(&self, query: &str, kind: ItemKind, budget: Option<usize>) -> Result<String> {
         let needle = query.to_lowercase();
         // (rank, id, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
+        let mut hits: Vec<Hit> = Vec::new();
         for item in self.open_items()?.into_iter().filter(|i| i.kind == kind) {
             let name = item.enclosing.as_ref().map(|e| e.name.to_lowercase());
             let last = name.as_deref().and_then(|n| n.rsplit('.').next());
@@ -967,13 +969,13 @@ pub fn status(dir: &Path) -> Result<String> {
     let here = &workspace.repos[0].root;
     let indexed =
         |m: &crate::workspace::Repository| matches!(index::state(&m.root), State::Indexed { .. });
-    // A failure to open or refresh drops the decision and resource lines, not the whole status.
+    // A failure to open or refresh drops the decision and status lines, not the whole status.
     let engine = workspace
         .repos
         .iter()
         .all(indexed)
         .then(|| Engine::open(dir));
-    let (evaluations, resources) = match engine {
+    let (evaluations, status_lines) = match engine {
         Some(Ok(engine)) => engine.status_report().unwrap_or_default(),
         _ => Default::default(),
     };
@@ -992,20 +994,10 @@ pub fn status(dir: &Path) -> Result<String> {
         for e in evaluations.iter().filter(|e| e.repository == m.identity) {
             lines.extend(e.lines().map(|l| format!("  {l}")));
         }
-        lines.extend((resources.get(n).into_iter().flatten()).map(|l| format!("  {l}")));
+        lines.extend((status_lines.get(n).into_iter().flatten()).map(|l| format!("  {l}")));
     }
     lines.extend(workspace.missing.iter().map(Missing::text));
     Ok(lines.iter().map(|l| format!("{l}\n")).collect())
-}
-
-/// 0 when `name` is `needle`, 1 when it starts with it, 2 when it contains it.
-pub(crate) fn rank(name: &str, needle: &str) -> Option<u8> {
-    match () {
-        _ if name == needle => Some(0),
-        _ if name.starts_with(needle) => Some(1),
-        _ if name.contains(needle) => Some(2),
-        _ => None,
-    }
 }
 
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
@@ -1016,7 +1008,7 @@ const WORDS_AFTER: [&str; 5] = ["drift", "community", "process", "ambiguous", "u
 /// Every `kind` word of `search`, in the order its error names them: the engine's own, the
 /// kinds' filter words in kinds order, `document`, the kinds' own-renderer words, then the rest
 /// of the engine's.
-fn kind_words() -> impl Iterator<Item = &'static str> {
+pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
     let kinds = |own: bool| {
         (KINDS.iter().map(|k| k.search_word()))
             .filter(move |s| matches!(s, Search::Own(_)) == own)
@@ -1119,23 +1111,13 @@ fn processes_line(found: &[(usize, &EntryPoint)], repos: &[Repository], room: us
 }
 
 /// The `hits` `(rank, tie-break key, line)` sorted and cut at `budget`, or the answer for none.
-fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<usize>) -> String {
+fn hits_answer(query: &str, mut hits: Vec<Hit>, budget: Option<usize>) -> String {
     hits.sort();
     if hits.is_empty() {
         return format!("no matches for `{query}`\n");
     }
     let lines: Vec<String> = hits.into_iter().map(|(_, _, line)| line).collect();
     render::budgeted(&lines, budget)
-}
-
-/// `name:` followed by the items, or `name: none`.
-pub(crate) fn section(name: &str, items: Vec<String>) -> Vec<String> {
-    if items.is_empty() {
-        return vec![format!("{name}: none")];
-    }
-    let mut lines = vec![format!("{name}:")];
-    lines.extend(items);
-    lines
 }
 
 #[cfg(test)]
