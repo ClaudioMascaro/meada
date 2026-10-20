@@ -75,6 +75,14 @@ function's own parameters. Each call site of the wrapper is a consumer or produc
 arguments in place of the parameters, through any number of wrapper levels.
 _Avoid_: API client, helper, fetcher
 
+**Origin**:
+What made a value the code reads: the call of a library's constructor or factory, or what the
+source declares a name is, with the methods called on the way. A contract kind accepts a router,
+client or producer only on an origin it knows. The evidence the walk accepts is a policy the
+reader picks: the flow of values (constants, imports, arguments, returns), `const` bindings
+alone, or the declarations the source writes.
+_Avoid_: maker, provenance
+
 **Contract**:
 What one repository exposes and another depends on, such as an HTTP route, a channel, a package
 or a shared resource.

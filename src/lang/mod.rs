@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tree_sitter::Node;
 
 use crate::Result;
-use crate::resolve::{Code, Keywords};
+use crate::resolve::{Code, Expand, Expanded, Keywords};
 
 pub mod go;
 pub mod python;
@@ -119,9 +119,11 @@ pub trait LanguagePack {
 
     /// The producer and consumer calls of the message libraries the pack knows (spec #20),
     /// read from its files' facts through `code`: a call counts only when its receiver traces
-    /// back to the library's package (`Code::origin`), and its channel name is evaluated like
-    /// a URL, client wrappers included (`Code::expand`). The channel contract kind turns them
-    /// into contracts; a pack never touches the index.
+    /// back to the library's package, each pack asking the origin question its language needs
+    /// (`Code::origins`: `Constants` for TypeScript, `Declarations` for Go, `Values` for Python
+    /// and Rust), and its channel name is evaluated like a URL, client wrappers included
+    /// (`Code::expand`). The channel contract kind turns them into contracts; a pack never
+    /// touches the index.
     fn messages(&self, _code: &Code) -> Vec<Message> {
         Vec::new()
     }
@@ -860,16 +862,22 @@ pub fn produce<'a>(
     broker: &'static str,
     read: Read,
 ) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .flat_map(|(site, at, names)| {
-            names.into_iter().map(move |name| Message {
-                broker,
-                name,
-                path: site.into(),
-                call: at,
-                role: Role::Producer,
-            })
-        })
+    (code.expand(Expand::Call(path, n), read).into_iter())
+        .flat_map(
+            |Expanded {
+                 site: (site, at),
+                 found: names,
+                 ..
+             }| {
+                names.into_iter().map(move |name| Message {
+                    broker,
+                    name,
+                    path: site.into(),
+                    call: at,
+                    role: Role::Producer,
+                })
+            },
+        )
         .collect()
 }
 
@@ -883,20 +891,26 @@ pub fn consume<'a>(
     read: Read,
     handler: Option<Handler>,
 ) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .flat_map(|(site, at, names)| {
-            let handler = handler.clone().unwrap_or_else(|| Handler::Def {
-                path: site.into(),
-                name: code.files()[site].calls[at].scope.clone(),
-            });
-            names.into_iter().map(move |name| Message {
-                broker,
-                name,
-                path: site.into(),
-                call: at,
-                role: Role::Consumer(handler.clone()),
-            })
-        })
+    (code.expand(Expand::Call(path, n), read).into_iter())
+        .flat_map(
+            |Expanded {
+                 site: (site, at),
+                 found: names,
+                 ..
+             }| {
+                let handler = handler.clone().unwrap_or_else(|| Handler::Def {
+                    path: site.into(),
+                    name: code.files()[site].calls[at].scope.clone(),
+                });
+                names.into_iter().map(move |name| Message {
+                    broker,
+                    name,
+                    path: site.into(),
+                    call: at,
+                    role: Role::Consumer(handler.clone()),
+                })
+            },
+        )
         .collect()
 }
 
@@ -926,37 +940,49 @@ pub type ReadBinding<'a> =
 
 /// An AMQP publish at each site an expansion found (`publication`).
 pub fn publish<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadPublish) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .map(|(site, at, (exchange, key))| {
-            let (name, role) = publication(exchange, key);
-            Message {
-                broker: "amqp",
-                name,
-                path: site.into(),
-                call: at,
-                role,
-            }
-        })
+    (code.expand(Expand::Call(path, n), read).into_iter())
+        .map(
+            |Expanded {
+                 site: (site, at),
+                 found: (exchange, key),
+                 ..
+             }| {
+                let (name, role) = publication(exchange, key);
+                Message {
+                    broker: "amqp",
+                    name,
+                    path: site.into(),
+                    call: at,
+                    role,
+                }
+            },
+        )
         .collect()
 }
 
 /// An AMQP binding of a queue to an exchange at each site an expansion found.
 pub fn bind<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadBinding) -> Vec<Message> {
-    (code.expand(path, n, read).into_iter())
-        .filter_map(|(site, at, bound)| {
-            // ponytail: a binding that cannot be fully evaluated is dropped, not shown as
-            // unresolved.
-            let (Some(queue), Some(exchange), Some(pattern)) = bound else {
-                return None;
-            };
-            Some(Message {
-                broker: "amqp",
-                name: Some(queue),
-                path: site.into(),
-                call: at,
-                role: Role::Binding { exchange, pattern },
-            })
-        })
+    (code.expand(Expand::Call(path, n), read).into_iter())
+        .filter_map(
+            |Expanded {
+                 site: (site, at),
+                 found: bound,
+                 ..
+             }| {
+                // ponytail: a binding that cannot be fully evaluated is dropped, not shown as
+                // unresolved.
+                let (Some(queue), Some(exchange), Some(pattern)) = bound else {
+                    return None;
+                };
+                Some(Message {
+                    broker: "amqp",
+                    name: Some(queue),
+                    path: site.into(),
+                    call: at,
+                    role: Role::Binding { exchange, pattern },
+                })
+            },
+        )
         .collect()
 }
 

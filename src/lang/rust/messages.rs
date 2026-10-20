@@ -1,9 +1,11 @@
 //! The message libraries of the Rust pack (spec #30): rdkafka, lapin, aws-sdk-sqs, async-nats
 //! and the redis crate. A form is a method called on a client that traces back to the library's
-//! constructor (`Code::value_origins`, the constructor named by the file's `use` declarations),
-//! so a `send` or a `publish` on anything else is no producer. The methods that make a client of
-//! another (`create_channel`, `get_connection`, the setters of a builder) are listed per library
-//! (`LanguagePack::passes`), as for the HTTP clients.
+//! constructor (`Code::origins` with `Follow::Values`, the constructor named by the file's `use`
+//! declarations), so a `send` or a `publish` on anything else is no producer. The constructor is
+//! named by `Code::outside` without the path flag, as the forms always read it: a name whose head
+//! is not the import itself (a method of a value made from it) is accepted too. The methods that
+//! make a client of another (`create_channel`, `get_connection`, the setters of a builder) are
+//! listed per library (`LanguagePack::passes`), as for the HTTP clients.
 //!
 //! Every client of these crates is polled or streamed, so the function that holds the call
 //! naming the topic or the queue handles what it receives.
@@ -11,7 +13,7 @@
 use crate::lang::{
     Call, Message, Value, bind, channel_name as name, consume, produce, publish, queue_name, topics,
 };
-use crate::resolve::{Code, Keywords};
+use crate::resolve::{Code, Follow, Keywords, Of};
 
 /// How many calls of a builder chain (`Code::chain`) a form is read through:
 /// `FutureRecord::to(t).payload(p).key(k)` and `client.send_message().message_body(b).queue_url(u)`
@@ -203,6 +205,16 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
+/// The spelling of what the callee of `call`, written in `path`, names outside the repository,
+/// as the file's imports spell it: `Code::outside` read as a value, not a path, whatever its head
+/// is.
+fn outside_spelling<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<String> {
+    Some(
+        code.outside(path, &call.scope, &call.callee, false)?
+            .spelled,
+    )
+}
+
 /// The client that `receiver`, written in `scope` of `path`, traces back to: the library of the
 /// first constructor it may be, named by the file's imports.
 fn client<'a>(
@@ -218,12 +230,12 @@ fn client<'a>(
         _ => None,
     };
     let origins = match held {
-        Some((within, value)) => code.value_origins(path, within, value),
-        None => code.value_origins(path, scope, receiver),
+        Some((within, value)) => code.origins(path, within, Of::Value(value), Follow::Values),
+        None => code.origins(path, scope, Of::Value(receiver), Follow::Values),
     };
-    origins.into_iter().find_map(|(at, i)| {
-        let ctor = code.call(at, i)?;
-        let origin = code.external(at, &ctor.scope, &ctor.callee)?;
+    origins.into_iter().find_map(|o| {
+        let (at, i) = o.call?;
+        let origin = outside_spelling(code, at, code.call(at, i)?)?;
         LIBRARIES.iter().find(|l| l.made(&origin)).map(|l| l.client)
     })
 }
@@ -237,7 +249,7 @@ fn record<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<(&'a str, usiz
     let chain = chain(code, file, at)?;
     let at = chain.into_iter().find(|&at| {
         let call = code.call(file, at);
-        let origin = call.and_then(|c| code.external(file, &c.scope, &c.callee));
+        let origin = call.and_then(|c| outside_spelling(code, file, c));
         origin.is_some_and(|o| {
             o.starts_with("rdkafka.")
                 && (o.ends_with(".FutureRecord.to") || o.ends_with(".BaseRecord.to"))
@@ -322,7 +334,7 @@ fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
     let start = calls
         .last()
         .filter(|c| !matches!(c.receiver, Some(Value::Call(_))));
-    let origin = start.and_then(|c| code.external(file, &c.scope, &c.callee));
+    let origin = start.and_then(|c| outside_spelling(code, file, c));
     group && origin.is_some_and(|o| o.starts_with("redis.") && o.contains(".StreamReadOptions."))
 }
 

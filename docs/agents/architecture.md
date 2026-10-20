@@ -34,7 +34,10 @@ one for the area a change touches.
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
-  and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
+  and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
+  (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
+  forms), `Code::outside` for what an import from outside binds a name to, and `Code::expand`
+  for wrappers). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs`: the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
@@ -219,16 +222,16 @@ one for the area a change touches.
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **Go HTTP client** (spec #25, #79): `http/go/clients.rs` reads `net/http` calls (on the
   package, a `Client`, `DefaultClient`), `NewRequest(WithContext)` and resty requests as
-  consumers; a call is a function of a library when `Code::outside_call` says so (its head is the
+  consumers; a call is a function of a library when `Code::outside` says so (`direct`: its head is the
   import itself, the one check the Go routers, clients and channels share), and a receiver is a
-  client of a library when `Code::outside_type` (the type a typed
-  parameter, field or `:=` names, qualified by its import path) says so. The URL is folded in
+  client of a library when `Code::origins` with `Follow::Declarations` answers the form `Type`
+  (the type a typed parameter, field or `:=` names, qualified by its import path). The URL is folded in
   `lang/go/values.rs` at parse time (`+`, `fmt.Sprintf` verbs as holes, `net/http` method
   constants, package-level `const` and a `var` nothing assigns, in the package or in another one
   by import), and a resty base is the value of the `SetBaseURL` argument on the chain (or the
   statement) that built the client. A base belongs to one client, not to the call that makes
   clients: a client is the `resty.New()` call with the calls of the repository's functions it
-  came through (`Code::value_origins_through`), so two clients one factory makes keep their own
+  came through (`Code::origins` with `Follow::Values`, each route's climbed calls), so two clients one factory makes keep their own
   bases, and a `SetBaseURL` inside the factory reaches every client it makes. A client held in a
   struct field (`c.rc`, `Code::field`) holds the clients of the values every composite literal
   of the repository gives that field of that type (`Code::field_values`, read from the marker
@@ -260,8 +263,8 @@ one for the area a change touches.
 - **Go channels** (spec #25, #82): `lang/go/messages.rs` lists each library (`LIBRARIES`: the
   import path without its module's major version, `modfile::unversioned`, which the Go routers
   and clients use too, and the constructors that make its client)
-  and reads a call when `Code::outside_origin` traces its receiver to one of them (the class-based
-  twin of `outside_type`: it also follows `x, err := f()`, a repository function that returns a
+  and reads a call when `Code::origins` with `Follow::Declarations` traces its receiver to one of them (the
+  same question as the written-type read of the clients, with the constructor's steps: it also follows `x, err := f()`, a repository function that returns a
   library type, and a method on a value the library made, such as `conn.Channel()`). The
   channel name goes through `Code::expand`, struct fields of a composite literal included:
   `values::composite` gives `Value::New(Type, [Object(fields)])` for a struct written with its
@@ -305,8 +308,9 @@ one for the area a change touches.
   `tests/golden/schema.txt`.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
-  method and the `Code::origin` of its receiver (package and `expr`; Python: the constructors
-  `Code::origins` finds, named by the file's imports), reading the name through `Code::expand` (a reader that
+  method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
+  `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
   <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
@@ -468,7 +472,7 @@ one for the area a change touches.
   well as methods by name. A pack whose types are closed (`LanguagePack::strict`, Rust) has a
   member its blocks lack on a type the receiver or the path head writes resolve to nothing
   (`Resolver::lacks`: a derive, a blanket or outside trait), not by name, and its attribute
-  calls (`Call::decorates`) resolve to nothing, read only through `Code::external_of`. A pack that has program entry points fills
+  calls (`Call::decorates`) resolve to nothing, read only through `Code::outside` with the path flag. A pack that has program entry points fills
   `Facts::programs` in `parse` (it sees the path and the source; default: none) with the
   `Def::name` of each definition that starts a program; each becomes an entry point of kind
   `program`, labelled by its qualified name, and the conformance test lists them. Where the
@@ -835,7 +839,7 @@ one for the area a change touches.
   rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
   `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
   tree's depth.
-- `resolve.rs` (`Code::origin`): only `const` bindings with a plain name are followed; a client
+- `resolve.rs` (`Code::origins` with `Follow::Constants`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a
   binding (`new Kafka().producer().send`), is not recognized (no marker).
 - `lang/ts/messages.rs`: a kafkajs handler passed through a wrapper's parameter is not followed
@@ -860,7 +864,7 @@ one for the area a change touches.
   function that subscribes. The streams of an `xreadgroup` are read from a dict literal (or a
   constant folded to one); a dict built otherwise is an unresolved stream.
 - `lang/rust/messages.rs`: a client is recognized when its receiver traces back to the library's
-  constructor (`Code::value_origins`, then `Code::external`, one constructor per `LIBRARIES`
+  constructor (`Code::origins` with `Follow::Values`, then `Code::outside`, one constructor per `LIBRARIES`
   entry); a client held in a struct field, passed as `&mut con` to a parameter, or rebound by
   assignment is not followed. `lapin` `set_delegate` closures are not followed (the function
   that holds `basic_consume` handles). A Kafka topic starting with `^` is unresolved; an

@@ -11,7 +11,7 @@ modules updates it.
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http/ts/clients.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`; only in a pack whose `globals` has it; each with `Found::shape` from `response_reads`, spec #23: over the frames
-  `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
+  `Code::expand` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`http/python/clients.rs`, below), Next.js app-router
@@ -70,8 +70,8 @@ modules updates it.
   is a mount node, a handler is one too. A handler any call names (`.service(h)`,
   `routes![a, b]`) is served only where a mount Meada reads puts it, one no call names at its own
   path; a scope or a mount prefix Meada cannot read serves nothing (never the root). `routes![..]`
-  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::external_of` reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate's root; `Code::mentions` tells whether a file refers to a name, which, over the handler's crate (every crate when `Code::published` says its file may be imported), decides whether an unregistered handler is served at its own path), reached through `Code::origins`: a route counts only
-  on a receiver that traces back to its framework's constructor (`Code::external`; Express
+  is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::outside` with the path flag reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate's root; `Code::mentions` tells whether a file refers to a name, which, over the handler's crate (every crate when `Code::published` says its file may be imported), decides whether an unregistered handler is served at its own path), reached through `Code::origins` with `Follow::Values`: a route counts only
+  on a receiver that traces back to its framework's constructor (named by `Code::outside`; Express
   also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,
   `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
@@ -107,9 +107,9 @@ modules updates it.
   `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
   `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
   the provider's site. Python clients (`consumers` in `http/python/clients.rs`, from `LIBRARIES`: `requests`, `httpx`,
-  `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
+  `aiohttp`): a call is a consumer when `Code::outside` names it a module function of a
   library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
-  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
+  is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` (`Follow::Values`) traces back
   to a constructor of the library (`Session()`, `Client()`, `AsyncClient()`,
   `ClientSession()`): assigned in the scope, bound by `with`, a module name, a `self`
   attribute, or a parameter the callers pass one to, or a value a function of the repository
@@ -122,7 +122,7 @@ modules updates it.
   followed to its constructor by `fluent`, and every method on the way listed by `passes`:
   any other method on an outside value ends the chain) and `ureq` (module functions; clients `agent()`,
   `Agent::new*`, `AgentBuilder::new`). The receiver of a chain (`Client::new().get(..)`,
-  `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::value_origins`. The method
+  `builder.build()?.get(..)`) is `Call::receiver`, read by `Code::origins` with `Follow::Values`. The method
   is the name, or `request(Method::X, url)` (reqwest: a `Method` of `reqwest`, `http`, `hyper`,
   `axum` or `actix_web`, written in full or imported with `use`) and `request("X", url)`
   (ureq). `lang/rust/values.rs` folds the URL like any `Value`: literals, `+` (one side a

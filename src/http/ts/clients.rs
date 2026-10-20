@@ -1,6 +1,6 @@
 //! TypeScript and JavaScript consumers (spec #23): `fetch(url, init)`, only in a pack whose
 //! globals bind `fetch` (also a call to a parameter defaulting to `fetch`). A client wrapper is
-//! read at each of its call sites through `Code::expand_frames`, and the shape the consumer reads
+//! read at each of its call sites through `Code::expand`, and the shape the consumer reads
 //! of the response is the field paths `response_reads` reads over the frames climbed. Seams of
 //! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
 
@@ -9,7 +9,7 @@ use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
 use crate::lang::{Step, Ty};
 use crate::literals::Literals;
-use crate::resolve::{Code, Expanded, Frame, Target};
+use crate::resolve::{Code, Expand, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
 
 /// `fetch` consumers with the shape each reads of its response (spec #23).
@@ -25,7 +25,7 @@ pub(in crate::http) fn consumers(code: &Code, literals: &mut Literals) -> Vec<Fo
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            let expanded = code.expand_frames(path, n, &|args, _| fetch(args));
+            let expanded = code.expand(Expand::Call(path, n), &|args, _| fetch(args));
             for Expanded {
                 site: (site, at),
                 frames,

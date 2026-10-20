@@ -1,12 +1,14 @@
 //! The message libraries of the Python pack (spec #20, #73). A form is a method called on a
-//! client that traces back to the library's constructor (`Code::origins`), imported from the
-//! library's package: a `produce` on anything else is no producer.
+//! client that traces back to the library's constructor (`Code::origins` with `Follow::Values`
+//! on the receiver), imported from the library's package: a `produce` on anything else is no
+//! producer. The constructor is named by `Code::imported`, the head of its callee, not by the
+//! `outside` an origin carries, which reads the whole name.
 
 use crate::lang::{
     Call, Handler, Message, Value, bind, channel_name as name, consume, literal, produce, publish,
     queue_name, topic, topics,
 };
-use crate::resolve::{Code, Keywords};
+use crate::resolve::{Code, Follow, Keywords, Of};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
 const CONFLUENT_CONSUMER: &str = "confluent_kafka.Consumer";
@@ -184,9 +186,12 @@ fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) 
             .into_iter()
             .collect()
     } else {
-        (code.origins(path, &form.scope, receiver).into_iter())
-            .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
-            .collect()
+        (code
+            .origins(path, &form.scope, Of::Name(receiver), Follow::Values)
+            .iter())
+        .filter_map(|o| o.call)
+        .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
+        .collect()
     };
     (made.into_iter())
         .flat_map(|(at, call)| made_by(code, at, call, through))
