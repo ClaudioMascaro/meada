@@ -117,14 +117,16 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 
     /// The type outside the repository that the source writes for `name` (`c *http.Client` is
-    /// `net/http.Client`): the `Declarations` origin of the form `Type`. A repository function's
-    /// written result type (form `Call`) is no written type.
+    /// `net/http.Client`): the `Declarations` origin of the form `Type` with no steps. A method
+    /// result of a typed value (`x := c.M()`, form `Type` with the step `M`) and a repository
+    /// function's written result type (form `Call`) are no written type.
     fn written_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
         let found = self
             .code
             .origins(path, scope, Of::Name(name), Follow::Declarations);
         let origin = found.into_iter().next()?;
-        (origin.form == Form::Type).then(|| origin.outside.map(|o| o.spelled))?
+        let typed = origin.form == Form::Type && origin.routes.iter().all(|r| r.steps.is_empty());
+        typed.then_some(origin.outside?.spelled)
     }
 
     /// The resty clients `value`, written in `scope` of `path`, may be: those the calls it comes
@@ -542,6 +544,17 @@ mod tests {
     /// `GET /s` with the base `BASE` sets, or with `via`.
     fn sent(via: Option<&str>) -> Vec<Request> {
         vec![(Some("http::GET::/s".into()), via.map(String::from))]
+    }
+
+    #[test]
+    fn a_method_result_of_a_typed_client_is_not_a_written_type() {
+        let src = |body: &str| {
+            let head = "package x\n\nimport \"net/http\"\n\nfunc f(c *http.Client) {";
+            format!("{head}\n\t{body}\n}}\n")
+        };
+        // The typed client itself sends; what one of its methods hands back is not a client.
+        assert_eq!(requests(&src("c.Get(\"/s\")")).len(), 1);
+        assert_eq!(requests(&src("x := c.Wrapped()\n\tx.Get(\"/s\")")), []);
     }
 
     #[test]
