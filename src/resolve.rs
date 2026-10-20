@@ -4772,30 +4772,45 @@ mod tests {
 
     #[test]
     fn a_wrapper_deeper_than_the_limit_is_read_where_the_climb_stops() {
-        let wrapped = |n: usize| {
+        let source = |n: usize| {
             let wrappers: String = (0..n)
                 .map(|i| format!("function w{}(u) {{ return w{i}(u); }}\n", i + 1))
                 .collect();
-            fetched(&format!(
-                "function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n"
-            ))
+            format!("function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n")
         };
+        let wrapped = |n: usize| fetched(&source(n));
         assert_eq!(wrapped(WRAPPER_DEPTH - 1), [Some("/a".to_string())]);
         assert_eq!(wrapped(WRAPPER_DEPTH), [None]);
+
+        // The frames climbed: `WRAPPER_DEPTH` calls up the wrappers, from the call of `w0` to
+        // the site, which is where the climb stops when it is not the call written at the top.
+        let up = |last: &str| {
+            let calls: Vec<String> = (0..WRAPPER_DEPTH - 1).map(|i| format!("w{i}(u)")).collect();
+            format!("{} > {last}", calls.join(" > "))
+        };
+        let top = format!("w{}('/a')", WRAPPER_DEPTH - 1);
+        let stop = format!("w{}(u)", WRAPPER_DEPTH - 1);
+        assert_eq!(climbed(&source(WRAPPER_DEPTH - 1)), [up(&top)]);
+        assert_eq!(climbed(&source(WRAPPER_DEPTH)), [up(&stop)]);
     }
 
     #[test]
     fn a_lattice_of_wrappers_is_climbed_within_the_budget() {
         // Each wrapper calls the one below twice: 2^n ways up from the `fetch`.
-        let lattice = |n: usize| {
+        let source = |n: usize| {
             let wrappers: String = (0..n)
                 .map(|i| format!("function w{}(u) {{ w{i}(u); return w{i}(u); }}\n", i + 1))
                 .collect();
-            fetched(&format!(
-                "function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n"
-            ))
+            format!("function w0(u) {{ return fetch(u); }}\n{wrappers}w{n}('/a');\n")
         };
+        let lattice = |n: usize| fetched(&source(n));
         assert_eq!(lattice(3), vec![Some("/a".to_string()); 8]);
+        // Each way up is its own site, whichever of the two calls of a level it climbed.
+        let way = "w0(u) > w1(u) > w2(u) > w3('/a')";
+        assert_eq!(climbed(&source(3)), vec![way; 8]);
+        // The eight ways are eight different climbs: the calls written alike are not the same.
+        let at = climbed_at(&source(3));
+        assert_eq!(at.iter().collect::<BTreeSet<_>>().len(), 8, "{at:?}");
         let ways = lattice(40);
         assert!(
             !ways.is_empty() && ways.len() < EVAL_BUDGET,
@@ -5212,5 +5227,704 @@ mod tests {
                 );
             }
         }
+    }
+
+    // The rules that decide what an origin walk follows (spec #204), pinned at the `Code`
+    // seam. Each test builds a `Code` over parsed files, asks one question and checks the
+    // answer as one line per origin. The render helpers below own that line; the tickets that
+    // move the question switch them to the new answer and keep every assertion.
+
+    /// A `Code` of `sources` (path, text) parsed by `pack`, handed to `ask`.
+    fn over<T>(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        ask: impl for<'a> FnOnce(&Code<'a>) -> T,
+    ) -> T {
+        let parse =
+            |&(path, src): &(&'static str, &str)| (path, pack.parse(path, src.as_bytes()).unwrap());
+        let facts: Vec<(&'static str, Facts)> = sources.iter().map(parse).collect();
+        let files: BTreeMap<&str, &Facts> = facts.iter().map(|(p, f)| (*p, f)).collect();
+        let resolver = Resolver::new(&files, pack.modules(&[], &files).unwrap(), pack);
+        ask(&Code::new(&resolver, &files, pack))
+    }
+
+    /// The source text of the call at `index` of `path`.
+    fn written(code: &Code, sources: &[(&str, &str)], path: &str, index: usize) -> String {
+        let src = sources.iter().find(|(p, _)| *p == path).unwrap().1;
+        let call = &code.files()[path].calls[index];
+        src[call.range.clone()].to_string()
+    }
+
+    /// One line per origin: its file and callee, `= name` when it names something outside the
+    /// repository (as the file's imports spell it), and ` via call` for each call of the
+    /// repository the walk climbed through to reach it, outermost first.
+    fn origin_lines<'a>(
+        code: &Code<'a>,
+        sources: &[(&'static str, &str)],
+        found: Vec<Through<'a>>,
+    ) -> Vec<String> {
+        let line = |((path, n), frames): Through<'a>| {
+            let call = code.call(path, n).unwrap();
+            let mut line = format!("{path} {}", call.callee);
+            if let Some(outside) = code.external_of(path, call) {
+                line += &format!(" = {outside}");
+            }
+            for (at, index) in frames {
+                line += &format!(" via {}", written(code, sources, at, index));
+            }
+            line
+        };
+        found.into_iter().map(line).collect()
+    }
+
+    /// What the name `name` written in `scope` of `path` may hold: `Code::origins`.
+    fn held_by(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+        scope: &'static str,
+        name: &'static str,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let found = code.origins(path, scope, name).into_iter();
+            origin_lines(code, sources, found.map(|o| (o, Vec::new())).collect())
+        })
+    }
+
+    /// The scope and the value as written, the first argument of the call of `probe(..)` in
+    /// `path`.
+    fn probed<'a>(code: &Code<'a>, path: &'a str) -> (&'a str, &'a Value) {
+        let calls = code.files()[path].calls.iter();
+        let call = calls.into_iter().find(|c| c.callee == "probe").unwrap();
+        (call.scope.as_str(), &call.args[0])
+    }
+
+    /// What the value written as the argument of `probe(..)` in `path` may hold:
+    /// `Code::value_origins`.
+    fn held_by_value(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let (scope, value) = probed(code, path);
+            let found = code.value_origins(path, scope, value).into_iter();
+            origin_lines(code, sources, found.map(|o| (o, Vec::new())).collect())
+        })
+    }
+
+    /// The same with the calls climbed: `Code::value_origins_through`.
+    fn held_through(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let (scope, value) = probed(code, path);
+            origin_lines(
+                code,
+                sources,
+                code.value_origins_through(path, scope, value),
+            )
+        })
+    }
+
+    fn ts() -> &'static dyn LanguagePack {
+        &crate::lang::ts::TsJs
+    }
+
+    fn py() -> &'static dyn LanguagePack {
+        &Python
+    }
+
+    fn rust() -> &'static dyn LanguagePack {
+        &crate::lang::rust::Rust
+    }
+
+    fn go() -> &'static dyn LanguagePack {
+        &crate::lang::go::Go
+    }
+
+    /// One line per callee written in `path`: what the file's imports spell it as (`external`),
+    /// the same read as a path (`external_of`), whether its head is the import itself
+    /// (`outside_call`), and the package and name the import binds (`imported`). `-` for a
+    /// reading that gives nothing.
+    fn read_names(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let or_none = |s: Option<String>| s.unwrap_or_else(|| "-".into());
+            let mut lines = Vec::new();
+            for call in &code.files()[path].calls {
+                let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
+                let imported = (code.imported(path, scope, callee))
+                    .map(|(package, name)| format!("{package} {name}"));
+                lines.push(format!(
+                    "{callee}: external={} by_path={} direct={} import={}",
+                    or_none(code.external(path, scope, callee)),
+                    or_none(code.external_of(path, call)),
+                    code.outside_call(path, scope, callee).is_some(),
+                    or_none(imported),
+                ));
+            }
+            lines
+        })
+    }
+
+    /// The origin `chain` of `scope` in `a.ts` has: the package, how the code would write what
+    /// it made, and the constant the name refers to (`held file:name`).
+    fn constant_origin(
+        sources: &[(&'static str, &str)],
+        scope: &'static str,
+        chain: &'static str,
+    ) -> Option<String> {
+        over(ts(), sources, |code| {
+            let path = code.files().get_key_value("a.ts").unwrap().0;
+            let origin = code.origin(path, scope, chain)?;
+            let held = (origin.binding).map_or(String::new(), |(f, n)| format!(" held {f}:{n}"));
+            Some(format!("{} {}{held}", origin.package, origin.expr))
+        })
+    }
+
+    /// What the Go source `src` declares `name` of `scope` to be outside the repository: the
+    /// origin (`outside_origin`) and the written type (`outside_type`).
+    fn declared(src: &str, scope: &'static str, name: &'static str) -> String {
+        over(go(), &[("a.go", src)], |code| {
+            let path = code.files().get_key_value("a.go").unwrap().0;
+            let or_none = |s: Option<String>| s.unwrap_or_else(|| "-".into());
+            let origin = or_none(code.outside_origin(path, scope, name));
+            format!(
+                "origin={origin} type={}",
+                or_none(code.outside_type(path, scope, name))
+            )
+        })
+    }
+
+    /// The wrapper calls `expand_frames` climbs to each site of the `fetch` of `src`, as written,
+    /// from the call in the wrapper to the site, one line per site.
+    fn climbed(src: &str) -> Vec<String> {
+        climbed_with(src, &|text, _| text)
+    }
+
+    /// `climbed`, each call followed by its position among the calls of the file, which tells
+    /// two calls written alike apart.
+    fn climbed_at(src: &str) -> Vec<String> {
+        climbed_with(src, &|text, index| format!("{text}#{index}"))
+    }
+
+    fn climbed_with(src: &str, show: &dyn Fn(String, usize) -> String) -> Vec<String> {
+        let sources = [("a.ts", src)];
+        over(ts(), &sources, |code| {
+            let path = code.files().get_key_value("a.ts").unwrap().0;
+            let at = (code.files()[path].calls.iter())
+                .position(|c| c.callee == "fetch")
+                .unwrap();
+            let url = |args: &[Value], _: &Keywords| match args.first()? {
+                Value::Ref(_) => None,
+                url => Some(url.clone()),
+            };
+            let mut lines = Vec::new();
+            for expanded in code.expand_frames(path, at, &url) {
+                let frames = (expanded.frames.iter())
+                    .map(|f| show(written(code, &sources, f.path, f.index), f.index))
+                    .collect::<Vec<_>>();
+                lines.push(frames.join(" > "));
+            }
+            lines
+        })
+    }
+
+    /// The sites `expand_constructed` finds for the constructed constant `held` of `a.ts`, on
+    /// behalf of the call `at` (a callee of `a.ts`), each with the first argument of the `new`
+    /// as read there.
+    fn constructed_sites(src: &str, held: &'static str, at: &str) -> Vec<String> {
+        over(ts(), &[("a.ts", src)], |code| {
+            let path = code.files().get_key_value("a.ts").unwrap().0;
+            let at = code.files()[path].calls.iter().position(|c| c.callee == at);
+            let first = |args: &[Value], _: &Keywords| match args.first()? {
+                Value::Ref(_) => None,
+                first => Some(first.clone()),
+            };
+            let found = code.expand_constructed((path, held), (path, at.unwrap()), &first);
+            let mut lines = Vec::new();
+            for (path, index, first) in found {
+                let Value::Str(parts) = first else {
+                    panic!("the first argument is not a string");
+                };
+                let name = crate::lang::literal(&parts).unwrap_or_default();
+                lines.push(format!(
+                    "{} -> {name}",
+                    code.call(path, index).unwrap().callee
+                ));
+            }
+            lines
+        })
+    }
+
+    // Values.
+
+    #[test]
+    fn a_constant_holding_a_call_is_made_by_that_call() {
+        let sources = [("a.py", "p = make()\nq = 3\n")];
+        assert_eq!(held_by(py(), &sources, "a.py", "", "p"), ["a.py make"]);
+        assert_eq!(
+            held_by(py(), &sources, "a.py", "", "q"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn a_constant_imported_from_another_file_is_spelled_through_the_import() {
+        let sources = [
+            (
+                "b.py",
+                "from fastapi import APIRouter\nrouter = APIRouter()\n",
+            ),
+            ("a.py", "from b import router\np = router\n"),
+        ];
+        assert_eq!(
+            held_by(py(), &sources, "a.py", "", "p"),
+            ["b.py APIRouter = fastapi.APIRouter"]
+        );
+    }
+
+    #[test]
+    fn a_parameter_is_reached_through_an_exact_caller_and_not_a_name_matched_one() {
+        let def = "class S:\n    def use(self, r):\n        return r\n";
+        // `s` is an `S`, so `s.use` is exact.
+        let exact = format!("{def}\ndef go():\n    s = S()\n    s.use(Router())\n");
+        // `thing` is of no class Meada can tell, so `thing.use` is only a name match for the
+        // method `use` (`Inferred`), which may be called on any object.
+        let matched = "\ndef other(thing):\n    thing.use(Other())\n";
+        let both = format!("{exact}{matched}");
+        let param = |src: &str| held_by(py(), &[("a.py", src)], "a.py", "S.use", "r");
+        assert_eq!(param(&exact), ["a.py Router"]);
+        assert_eq!(param(&both), ["a.py Router"]);
+        let only = format!("{def}{matched}");
+        assert_eq!(param(&only), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_parameter_bound_by_a_frame_takes_the_argument_of_that_call_alone() {
+        let src = "def wrap(r):\n    return r\n\na = wrap(Alpha())\nb = wrap(Beta())\n";
+        let sources = [("a.py", src)];
+        // Two makers through one factory: each is the factory's argument of its own call.
+        assert_eq!(held_by(py(), &sources, "a.py", "", "a"), ["a.py Alpha"]);
+        assert_eq!(held_by(py(), &sources, "a.py", "", "b"), ["a.py Beta"]);
+        // No call binds the parameter when it is asked for itself: every exact caller does.
+        let callers = held_by(py(), &sources, "a.py", "wrap", "r");
+        assert_eq!(callers, ["a.py Alpha", "a.py Beta"]);
+    }
+
+    #[test]
+    fn a_repository_functions_return_is_followed_and_the_climbed_call_recorded() {
+        let src = "def make():\n    return Client()\n\nc = make()\nprobe(c)\n";
+        let sources = [("a.py", src)];
+        assert_eq!(held_by_value(py(), &sources, "a.py"), ["a.py Client"]);
+        assert_eq!(
+            held_through(py(), &sources, "a.py"),
+            ["a.py Client via make()"]
+        );
+    }
+
+    #[test]
+    fn two_clients_one_factory_makes_differ_by_the_call_that_made_each() {
+        let src = "def mk(u):\n    return Client(u)\n\na = mk('x')\nb = mk('y')\nprobe([a, b])\n";
+        let sources = [("a.py", src)];
+        // One call made both: the origin is one, and the climbed calls tell the clients apart.
+        assert_eq!(held_by_value(py(), &sources, "a.py"), ["a.py Client"]);
+        assert_eq!(
+            held_through(py(), &sources, "a.py"),
+            ["a.py Client via mk('x')", "a.py Client via mk('y')"]
+        );
+    }
+
+    #[test]
+    fn a_lists_items_are_followed_and_the_origins_sorted() {
+        let sources = [
+            ("b.py", "x = Bx()\n"),
+            ("c.py", "y = Cy()\n"),
+            ("a.py", "from c import y\nfrom b import x\np = [y, x]\n"),
+        ];
+        assert_eq!(
+            held_by(py(), &sources, "a.py", "", "p"),
+            ["b.py Bx", "c.py Cy"]
+        );
+    }
+
+    #[test]
+    fn a_class_attribute_assigned_once_is_followed_and_not_when_assigned_twice() {
+        let init = "class S:\n    def __init__(self):\n        self.client = Client()\n";
+        let go = "    def go(self):\n        pass\n";
+        let once = format!("{init}{go}");
+        let attribute = |src: &str| held_by(py(), &[("a.py", src)], "a.py", "S.go", "self.client");
+        assert_eq!(attribute(&once), ["a.py Client"]);
+        let reset = "    def reset(self):\n        self.client = Other()\n";
+        let twice = format!("{init}{reset}{go}");
+        assert_eq!(attribute(&twice), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_parameter_of_an_outer_function_a_closure_captures_gives_nothing() {
+        let outer = "def outer(r):\n    def inner():\n        return r\n    return inner()\n";
+        let src = format!("{outer}\nx = outer(Maker())\nprobe(x)\n");
+        assert_eq!(
+            held_through(py(), &[("a.py", &src)], "a.py"),
+            Vec::<String>::new()
+        );
+        // Returned directly, the same argument is the origin; the call that binds it is no
+        // climb: the argument is read where the caller wrote it.
+        let direct = "def outer(r):\n    return r\n\nx = outer(Maker())\nprobe(x)\n";
+        let found = held_through(py(), &[("a.py", direct)], "a.py");
+        assert_eq!(found, ["a.py Maker"]);
+    }
+
+    #[test]
+    fn functions_that_return_each_other_end_with_no_origin() {
+        let src = "def f():\n    return g()\n\ndef g():\n    return f()\n\np = f()\n";
+        assert_eq!(
+            held_by(py(), &[("a.py", src)], "a.py", "", "p"),
+            Vec::<String>::new()
+        );
+    }
+
+    // Values in a fluent pack (Rust builders).
+
+    /// A `main.rs` with `defs` at the top and `body` in `main`, which ends by probing `r`.
+    fn axum_main(defs: &str, body: &str) -> String {
+        format!(
+            "use axum::Router;\nuse actix_web::App;\n{defs}\nfn main() {{\n{body}\nprobe(r);\n}}\n"
+        )
+    }
+
+    /// What `r` of `axum_main(defs, body)` may hold: `value_origins`, then `value_origins_through`.
+    fn built(defs: &str, body: &str) -> (Vec<String>, Vec<String>) {
+        let src = axum_main(defs, body);
+        let sources = [("main.rs", src.as_str())];
+        let plain = held_by_value(rust(), &sources, "main.rs");
+        (plain, held_through(rust(), &sources, "main.rs"))
+    }
+
+    const ROUTER: &str = "main.rs Router.new = axum.Router.new";
+
+    #[test]
+    fn a_builder_chain_is_the_value_its_maker_made() {
+        let (plain, _) = built(
+            "",
+            "let r = Router::new().route(\"/a\", get(h)).nest(\"/b\", x);",
+        );
+        assert_eq!(plain, [ROUTER]);
+        let (plain, _) = built("", "let r = Router::new();");
+        assert_eq!(plain, [ROUTER]);
+    }
+
+    #[test]
+    fn a_chain_through_a_method_the_library_does_not_pass_on_gives_nothing() {
+        let (plain, _) = built("", "let r = Router::new().route(\"/a\", h).frobnicate();");
+        assert_eq!(plain, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_step_only_a_name_match_found_gives_nothing_and_an_outside_constructor_keeps_its_method() {
+        // The repository's `route` is the only method of that name it defines.
+        let defs = "struct Mine;\nimpl Mine { fn route(&self) -> Mine { Mine } }\n";
+        // `build` is no function Meada knows, so `route` on its result is a name match for the
+        // repository's. The chain starts at no outside constructor, and the `passes` filter
+        // empties it: an origin with no outside name does not survive a step above it.
+        let (plain, _) = built(defs, "let r = build().route(\"/a\");");
+        assert_eq!(plain, Vec::<String>::new());
+        let (plain, _) = built(defs, "let r = build().layer(l).route(\"/a\");");
+        assert_eq!(plain, Vec::<String>::new());
+        // The method of an outside constructor is the library's, whatever the repository names.
+        let (plain, _) = built(defs, "let r = Router::new().route(\"/a\");");
+        assert_eq!(plain, [ROUTER]);
+        let (plain, _) = built(defs, "let r = Router::new().layer(l).route(\"/a\");");
+        assert_eq!(plain, [ROUTER]);
+    }
+
+    #[test]
+    fn a_chain_through_a_repository_function_records_the_climbed_call() {
+        let defs = "fn make() -> Router { Router::new().layer(l) }\n";
+        let (plain, through) = built(defs, "let r = make().route(\"/a\");");
+        assert_eq!(plain, [ROUTER]);
+        assert_eq!(through, [format!("{ROUTER} via make()")]);
+        let (plain, through) = built(defs, "let r = make();");
+        assert_eq!(plain, [ROUTER]);
+        assert_eq!(through, [format!("{ROUTER} via make()")]);
+    }
+
+    #[test]
+    fn a_function_returning_two_chains_keeps_the_one_the_library_passes_on() {
+        let defs = "fn make(f: bool) -> Router {\n    if f { return Router::new().frobnicate(); }\n    \
+                    Router::default().route(\"/a\", h)\n}\n";
+        let (plain, _) = built(defs, "let r = make(true);");
+        assert_eq!(plain, ["main.rs Router.default = axum.Router.default"]);
+    }
+
+    #[test]
+    fn the_methods_called_on_a_functions_result_are_judged_per_library_of_its_origins() {
+        // One function returns an axum router or an actix app; `layer` is axum's alone. The
+        // filter reads each origin's own library, not which return it came from.
+        let defs =
+            "fn make(f: bool) -> Router {\n    if f { return Router::new(); }\n    App::new()\n}\n";
+        let (plain, _) = built(defs, "let r = make(true).layer(l);");
+        assert_eq!(plain, [ROUTER]);
+        let (plain, _) = built(defs, "let r = make(true).frobnicate();");
+        assert_eq!(plain, Vec::<String>::new());
+        let (plain, _) = built(defs, "let r = make(true);");
+        assert_eq!(plain, [ROUTER, "main.rs App.new = actix_web.App.new"]);
+    }
+
+    // The name reading.
+
+    #[test]
+    fn a_path_written_callee_is_read_by_path_and_not_by_a_local_function_that_spells_its_head() {
+        let src = "fn rocket() {}\nfn main() { rocket::build(); }\n";
+        // `external` finds the function `rocket` and so no crate; read as a path, the head is the
+        // crate.
+        assert_eq!(
+            read_names(rust(), &[("main.rs", src)], "main.rs"),
+            ["rocket.build: external=- by_path=rocket.build direct=false import=-"]
+        );
+    }
+
+    #[test]
+    fn a_use_imported_module_function_is_direct() {
+        // An associated function of a type the `use` names.
+        let src = "use reqwest::Client;\nfn main() { Client::new(); }\n";
+        assert_eq!(
+            read_names(rust(), &[("main.rs", src)], "main.rs"),
+            [
+                "Client.new: external=reqwest.Client.new by_path=reqwest.Client.new direct=true \
+              import=reqwest Client.new"
+            ]
+        );
+        // A function of a module the `use` names, and a function the `use` names itself.
+        let module = "use reqwest;\nfn main() { reqwest::get(u); }\n";
+        assert_eq!(
+            read_names(rust(), &[("main.rs", module)], "main.rs"),
+            [
+                "reqwest.get: external=reqwest.get by_path=reqwest.get direct=true import=reqwest get"
+            ]
+        );
+        let item = "use reqwest::get;\nfn main() { get(u); }\n";
+        assert_eq!(
+            read_names(rust(), &[("main.rs", item)], "main.rs"),
+            ["get: external=reqwest.get by_path=reqwest.get direct=true import=reqwest get"]
+        );
+    }
+
+    #[test]
+    fn a_module_function_is_direct_and_a_method_of_a_client_made_from_the_module_is_not() {
+        let src = "package x\nimport \"github.com/gin-gonic/gin\"\nfunc f() {\n\
+                   \tgin.SetMode(\"x\")\n\tr := gin.Default()\n\tr.GET(\"/a\", h)\n}\n";
+        let gin = "github.com/gin-gonic/gin";
+        assert_eq!(
+            read_names(go(), &[("a.go", src)], "a.go"),
+            [
+                format!(
+                    "gin.SetMode: external={gin}.SetMode by_path={gin}.SetMode direct=true import={gin} SetMode"
+                ),
+                format!(
+                    "gin.Default: external={gin}.Default by_path={gin}.Default direct=true import={gin} Default"
+                ),
+                // Read as the local's own spelling: it is outside, and no import names its head.
+                "r.GET: external=r.GET by_path=r.GET direct=false import=-".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_method_of_a_typed_local_from_another_package_is_not_direct() {
+        let src = "package x\nimport \"net/http\"\nfunc f(c *http.Client) {\n\tc.Get(\"u\")\n\
+                   \tvar d http.Client\n\td.Do(1)\n\thttp.Get(\"u\")\n}\n";
+        assert_eq!(
+            read_names(go(), &[("a.go", src)], "a.go"),
+            [
+                "c.Get: external=c.Get by_path=c.Get direct=false import=-",
+                "d.Do: external=d.Do by_path=d.Do direct=false import=-",
+                "http.Get: external=net/http.Get by_path=net/http.Get direct=true import=net/http Get",
+            ]
+        );
+        // A local of a class the repository defines is outside nothing.
+        let other = "package x\nfunc f() {\n\te := other()\n\te.Default()\n}\n";
+        let found = read_names(go(), &[("a.go", other)], "a.go");
+        let none = "-";
+        assert_eq!(
+            found,
+            [
+                format!("other: external={none} by_path={none} direct=false import={none}"),
+                format!("e.Default: external={none} by_path={none} direct=false import={none}"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_name_reexported_through_a_repository_file_carries_the_package_the_name_and_the_files_spelling()
+     {
+        // The package and the name are the ones the repository file imports; the spelling is the
+        // one the importing file gives it.
+        let py_files = [
+            ("b.py", "from fastapi import APIRouter as Base\n"),
+            ("a.py", "from b import Base as R\nR()\n"),
+        ];
+        assert_eq!(
+            read_names(py(), &py_files, "a.py"),
+            ["R: external=b.Base by_path=b.Base direct=true import=fastapi APIRouter"]
+        );
+        let ts_files = [
+            ("b.ts", "export { Kafka as K } from 'kafkajs';\n"),
+            ("a.ts", "import { K as Q } from './b';\nQ();\n"),
+        ];
+        assert_eq!(
+            read_names(ts(), &ts_files, "a.ts"),
+            ["Q: external=./b.K by_path=./b.K direct=true import=kafkajs Kafka"]
+        );
+    }
+
+    // Constants.
+
+    #[test]
+    fn the_kafkajs_producer_chain_is_spelled_and_the_held_constant_named() {
+        let src = "import { Kafka } from 'kafkajs';\nconst kafka = new Kafka({ brokers: [] });\n\
+                   const producer = kafka.producer();\nconst consumer = kafka.consumer({});\n";
+        let sources = [("a.ts", src)];
+        let origin = |chain| constant_origin(&sources, "", chain);
+        assert_eq!(
+            origin("producer").unwrap(),
+            "kafkajs new Kafka().producer() held a.ts:producer"
+        );
+        assert_eq!(
+            origin("consumer").unwrap(),
+            "kafkajs new Kafka().consumer() held a.ts:consumer"
+        );
+        assert_eq!(
+            origin("kafka").unwrap(),
+            "kafkajs new Kafka() held a.ts:kafka"
+        );
+        // A member after the constant is spelled after its chain.
+        assert_eq!(
+            origin("producer.send").unwrap(),
+            "kafkajs new Kafka().producer().send held a.ts:producer"
+        );
+    }
+
+    #[test]
+    fn the_amqplib_channel_chain_is_spelled_under_a_default_and_a_namespace_import() {
+        let body =
+            "const conn = await amqp.connect('u');\nconst ch = await conn.createChannel();\n";
+        let default = format!("import amqp from 'amqplib';\n{body}");
+        let namespace = format!("import * as amqp from 'amqplib';\n{body}");
+        assert_eq!(
+            constant_origin(&[("a.ts", &default)], "", "ch").unwrap(),
+            "amqplib default.connect().createChannel() held a.ts:ch"
+        );
+        assert_eq!(
+            constant_origin(&[("a.ts", &namespace)], "", "ch").unwrap(),
+            "amqplib connect().createChannel() held a.ts:ch"
+        );
+    }
+
+    #[test]
+    fn a_parameter_a_repository_factory_a_star_import_and_a_constant_cycle_give_no_origin() {
+        let none = |sources: &[(&'static str, &str)], scope, chain| {
+            assert_eq!(constant_origin(sources, scope, chain), None, "{chain}");
+        };
+        none(
+            &[("a.ts", "function f(client) { client.send(); }\n")],
+            "f",
+            "client",
+        );
+        let factory = "import { Kafka } from 'kafkajs';\nfunction mk() { return new Kafka({}); }\n\
+                       const k = mk();\nconst p = k.producer();\n";
+        none(&[("a.ts", factory)], "", "p");
+        // A star import names no package member to spell; a named re-export does.
+        let user =
+            "import { Kafka } from './b';\nconst k = new Kafka({});\nconst p = k.producer();\n";
+        none(
+            &[("b.ts", "export * from 'kafkajs';\n"), ("a.ts", user)],
+            "",
+            "p",
+        );
+        let named = [
+            ("b.ts", "export { Kafka } from 'kafkajs';\n"),
+            ("a.ts", user),
+        ];
+        assert!(constant_origin(&named, "", "p").is_some());
+        none(&[("a.ts", "const a = b;\nconst b = a;\n")], "", "a");
+    }
+
+    // Declarations.
+
+    #[test]
+    fn a_written_outside_type_is_the_origin_and_the_type() {
+        let src =
+            "package x\nimport \"github.com/segmentio/kafka-go\"\nfunc f(w *kafka.Writer) {}\n";
+        let kafka = "github.com/segmentio/kafka-go.Writer";
+        assert_eq!(
+            declared(src, "f", "w"),
+            format!("origin={kafka} type={kafka}")
+        );
+    }
+
+    #[test]
+    fn a_value_declared_from_an_outside_call_has_the_methods_on_the_way() {
+        let src = "package x\nimport amqp \"github.com/rabbitmq/amqp091-go\"\nfunc f() {\n\
+                   \tconn, _ := amqp.Dial(\"u\")\n\tch, _ := conn.Channel()\n}\n";
+        let amqp = "github.com/rabbitmq/amqp091-go";
+        assert_eq!(
+            declared(src, "f", "conn"),
+            format!("origin={amqp}.Dial type=-")
+        );
+        assert_eq!(
+            declared(src, "f", "ch"),
+            format!("origin={amqp}.Dial.Channel type=-")
+        );
+    }
+
+    #[test]
+    fn a_name_declared_from_a_repository_function_has_the_type_its_result_writes() {
+        let head = "package x\nimport \"github.com/segmentio/kafka-go\"\n";
+        let outside = format!(
+            "{head}func mk() *kafka.Writer {{ return nil }}\nfunc f() {{\n\tw := mk()\n}}\n"
+        );
+        let kafka = "github.com/segmentio/kafka-go.Writer";
+        assert_eq!(
+            declared(&outside, "f", "w"),
+            format!("origin={kafka} type=-")
+        );
+        // A function is no value of the repository's own type: its result decides, and a type of
+        // the repository is outside nothing.
+        let local = format!(
+            "{head}type T struct{{}}\nfunc mk() *T {{ return nil }}\nfunc f() {{\n\tw := mk()\n}}\n"
+        );
+        assert_eq!(declared(&local, "f", "w"), "origin=- type=-");
+    }
+
+    // Expansion.
+
+    #[test]
+    fn a_constructed_constant_is_read_at_the_wrappers_call_site_and_in_place() {
+        let head = "import { Queue } from 'bullmq';\n";
+        // The name is a literal where the constant is made: read in place, the site is the `add`.
+        let in_place = format!("{head}const q = new Queue('jobs');\nq.add('x', {{}});\n");
+        assert_eq!(
+            constructed_sites(&in_place, "q", "q.add"),
+            ["q.add -> jobs"]
+        );
+        // The name is a parameter of the function that makes the constant: each call of that
+        // wrapper is a site, read with its own argument.
+        let wrapper = "function send(name) { const q = new Queue(name); q.add('x', {}); }\n\
+                       send('jobs');\nsend('mail');\n";
+        assert_eq!(
+            constructed_sites(&format!("{head}{wrapper}"), "send.q", "q.add"),
+            ["send -> jobs", "send -> mail"]
+        );
     }
 }
