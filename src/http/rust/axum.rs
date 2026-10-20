@@ -1,6 +1,8 @@
 //! axum providers (spec #30): `Router::new().route(path, get(h).post(g))` and `any(h)`. A router
 //! is the `Router::new()` call that makes it, followed through the chain of builder calls on it,
-//! constants, arguments and return values (`Code::origins`); its method routers are read through
+//! constants, arguments and return values (`Code::origins` with `Follow::Values`); each origin
+//! is an axum router by the name it carries outside the repository, read as a path
+//! (`Code::outside` with the call's `by_path`). Its method routers are read through
 //! `Code::chain`. `nest`, `nest_service` and `merge` mount a router under a prefix (`merge` adds
 //! none), at any depth, through the `prefixes` of the http root. A router nothing mounts is the
 //! app, served at its root; one mounted where Meada cannot read is served nowhere. It reuses
@@ -13,7 +15,7 @@ use super::super::{
 use crate::contract::Found;
 use crate::lang::rust::frameworks::{self, Made};
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, scope_of};
+use crate::resolve::{Code, Follow, Of, Origin, scope_of};
 use std::collections::{BTreeSet, HashSet};
 
 /// The method routers of axum, as functions of `axum::routing` and as methods of a method
@@ -26,11 +28,16 @@ const AXUM_METHODS: &[&str] = &[
 // ponytail: a route serves a handful of methods; a crafted chain is not read to its end.
 const METHOD_CHAIN: usize = 64;
 
-/// Whether the call `router` creates an axum router.
-fn is_axum_router<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
-    let call = &code.files()[path].calls[n];
-    let name = code.external_of(path, call);
-    name.is_some_and(|n| frameworks::made(&n) == Some(Made::Router))
+/// The calls of `origins` that create an axum router, by the outside name each origin carries.
+fn axum_routers_of<'a>(origins: Vec<Origin<'a>>) -> Vec<CallAt<'a>> {
+    let router = |o: &Origin| {
+        let outside = o.outside.as_ref();
+        outside.is_some_and(|o| frameworks::made(&o.spelled) == Some(Made::Router))
+    };
+    (origins.into_iter())
+        .filter(router)
+        .filter_map(|o| o.call)
+        .collect()
 }
 
 /// The calls of the method router `value` that give a method a handler, and the method each
@@ -53,8 +60,9 @@ fn method_router<'a>(
     let mut out = Vec::new();
     // `get(h)`, `routing::get(h)`: the function of axum that serves the method, made on nothing.
     let start = code.call(path, start)?;
-    let external = code
-        .external_of(path, start)
+    let outside = code.outside(path, &start.scope, &start.callee, start.by_path);
+    let external = outside
+        .map(|o| o.spelled)
         .filter(|_| start.receiver.is_none())?;
     if frameworks::made(&external) != Some(Made::MethodRouter) {
         return None;
@@ -82,10 +90,7 @@ fn axum_routers<'a>(
     call: &'a Call,
     value: &'a Value,
 ) -> Vec<CallAt<'a>> {
-    let origins = code.value_origins(path, &call.scope, value);
-    (origins.into_iter())
-        .filter(|&r| is_axum_router(code, r))
-        .collect()
+    axum_routers_of(code.origins(path, &call.scope, Of::Value(value), Follow::Values))
 }
 
 /// The axum routers given to what `value`, written in `call`, is made of, when it is not a
@@ -104,9 +109,7 @@ fn axum_unread<'a>(
         if !seen.insert(std::ptr::from_ref(value)) {
             continue;
         }
-        let routers: Vec<CallAt> = (code.value_origins(path, scope, value).into_iter())
-            .filter(|&r| is_axum_router(code, r))
-            .collect();
+        let routers = axum_routers_of(code.origins(path, scope, Of::Value(value), Follow::Values));
         if !routers.is_empty() {
             found.extend(routers);
             continue;

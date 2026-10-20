@@ -7,6 +7,13 @@
 //! `.configure(f)` mounts the service configuration `f` receives, and
 //! `mount(prefix, routes![a, b])` puts the listed handlers under the prefix.
 //!
+//! What a value is made by is asked once, `Code::origins` with `Follow::Values`: the calls the
+//! flow reaches, each with the name it has outside the repository. That name is read as a path
+//! (`Code::outside` with the call's `by_path`), so a function of the file spelled like a crate
+//! (`fn rocket()` calling `rocket::build()`) does not hide the crate. A route attribute and a
+//! builder the reader meets in place are read the same way; a type written on a parameter is
+//! read as a value (`Code::outside` without the flag).
+//!
 //! A handler is a node of its own: one a call names (as an argument, `routes![..]` included)
 //! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
 //! names is served at its own path, with no prefix.
@@ -23,7 +30,7 @@ use super::{
 use crate::contract::{Found, Site};
 use crate::lang::rust::frameworks::{self, Made, VERBS};
 use crate::lang::{Call, Class, Value};
-use crate::resolve::{Code, scope_of};
+use crate::resolve::{Code, Follow, Of, Outside, scope_of};
 
 /// How many values the expansions of `items` (constants, the functions a call answers) may add,
 /// over every call of the repository; past it a list is read no further.
@@ -33,6 +40,17 @@ const ITEM_WORK: usize = 1 << 14;
 
 /// The methods `actix_web::web` has a route builder for: `web::get()`, `web::post()`.
 const METHODS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "trace"];
+
+/// What the outside name of a call makes, when it makes an app, a scope, a resource or a Rocket
+/// instance.
+fn made_of(outside: &Outside) -> Option<Made> {
+    let made = frameworks::made(&outside.spelled)?;
+    matches!(
+        made,
+        Made::App | Made::Scope | Made::Resource | Made::Rocket
+    )
+    .then_some(made)
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Framework {
@@ -174,12 +192,11 @@ impl<'c, 'a> Web<'c, 'a> {
     /// What the call `at` makes, when it makes an app, a scope, a resource or a Rocket instance.
     fn made(&self, (path, n): CallAt<'a>) -> Option<Made> {
         let call = &self.code.files()[path].calls[n];
-        let made = frameworks::made(&self.code.external_of(path, call)?)?;
-        matches!(
-            made,
-            Made::App | Made::Scope | Made::Resource | Made::Rocket
+        made_of(
+            &self
+                .code
+                .outside(path, &call.scope, &call.callee, call.by_path)?,
         )
-        .then_some(made)
     }
 
     fn kind(&self, place: Place<'a>) -> Option<Made> {
@@ -198,8 +215,8 @@ impl<'c, 'a> Web<'c, 'a> {
             r.scope == scope
                 && r.name == name
                 && matches!(&r.class, Class::Type(t)
-                if self.code.external(path, &r.scope, t).is_some_and(|t| {
-                    t.starts_with("actix_web.") && t.ends_with(".ServiceConfig")
+                if self.code.outside(path, &r.scope, t, false).is_some_and(|o| {
+                    o.spelled.starts_with("actix_web.") && o.spelled.ends_with(".ServiceConfig")
                 }))
         })
     }
@@ -207,10 +224,12 @@ impl<'c, 'a> Web<'c, 'a> {
     /// The places the value a method is called on may be: the apps, scopes, resources and
     /// Rocket instances the value flow reaches, and the service configuration it is.
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
-        let origins = self.code.value_origins(path, scope, value).into_iter();
-        let mut out: Vec<Place> = origins
-            .filter(|&at| self.made(at).is_some())
-            .map(Place::Made)
+        let origins = self
+            .code
+            .origins(path, scope, Of::Value(value), Follow::Values);
+        let mut out: Vec<Place> = (origins.into_iter())
+            .filter(|o| o.outside.as_ref().and_then(made_of).is_some())
+            .filter_map(|o| o.call.map(Place::Made))
             .collect();
         if self.configuration(path, scope, value) {
             out.push(Place::Config(path, scope));
@@ -312,7 +331,8 @@ impl<'c, 'a> Web<'c, 'a> {
                 .then(|| self.macro_use(path))
                 .flatten()
                 .map(|krate| format!("{krate}.{}", call.callee));
-                let Some(name) = code.external_of(path, call).or(bare) else {
+                let outside = code.outside(path, &call.scope, &call.callee, call.by_path);
+                let Some(name) = outside.map(|o| o.spelled).or(bare) else {
                     continue;
                 };
                 let parts: Vec<&str> = name.split('.').collect();
@@ -493,10 +513,14 @@ impl<'c, 'a> Web<'c, 'a> {
                 continue;
             }
             let (path, scope, arg) = item;
-            for child in code.value_origins(path, scope, arg) {
-                if !matches!(self.made(child), Some(Made::Scope | Made::Resource)) {
+            for origin in code.origins(path, scope, Of::Value(arg), Follow::Values) {
+                let made = origin.outside.as_ref().and_then(made_of);
+                let (true, Some(child)) = (
+                    matches!(made, Some(Made::Scope | Made::Resource)),
+                    origin.call,
+                ) else {
                     continue;
-                }
+                };
                 // The segment a scope or a resource puts before its routes is the one it is
                 // made with; one Meada cannot read is mounted nowhere.
                 let (made, at) = (child.0, child.1);
@@ -560,8 +584,8 @@ impl<'c, 'a> Web<'c, 'a> {
         if ctor.receiver.is_some() {
             return None;
         }
-        let external = code.external_of(path, ctor)?;
-        let method = match external.strip_prefix("actix_web.web.")? {
+        let outside = code.outside(path, &ctor.scope, &ctor.callee, ctor.by_path)?;
+        let method = match outside.spelled.strip_prefix("actix_web.web.")? {
             "route" => ANY.to_string(),
             "method" => {
                 let verb = path_literal(code.value(path, &ctor.scope, ctor.args.first()?))?;

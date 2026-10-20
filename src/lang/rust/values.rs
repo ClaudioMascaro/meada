@@ -1,6 +1,6 @@
 //! The values of the Rust pack: what a call is given and what it is called on, what a `let` or a
 //! `const` binds, and what a function returns, as far as the syntax tells. Contract kinds read
-//! them through the shared value flow (`Code::origins`). A value is built once the whole file
+//! them through the shared value flow (`Code::origins` with `Follow::Values`). A value is built once the whole file
 //! is read, since a path in it needs the file's `use` declarations (`normalize`).
 //!
 //! A call inside a value is a stub: its callee and its span, which the shared side matches to
