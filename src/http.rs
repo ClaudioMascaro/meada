@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::config::gateway_path;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site, shown};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, shown};
 use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
@@ -468,6 +468,10 @@ impl ContractKind for Http {
         "http"
     }
 
+    fn search_word(&self) -> Search {
+        Search::Filter("route")
+    }
+
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
@@ -724,7 +728,7 @@ mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
     };
-    use crate::contract::{ContractKind, Role};
+    use crate::contract::{ContractKind, Role, Search};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
 
@@ -733,6 +737,16 @@ mod tests {
             contract: contract.into(),
             ..Provider::default()
         }
+    }
+
+    #[test]
+    fn routes_are_selected_by_the_route_word() {
+        assert_eq!(Http.search_word(), Search::Filter("route"));
+    }
+
+    #[test]
+    fn a_route_ranks_against_its_path_alone() {
+        assert_eq!(Http.parts("http::get::/users"), (None, Some("/users")));
     }
 
     #[test]

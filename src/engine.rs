@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::channel::Routes;
-use crate::contract::{self, Level, Link};
+use crate::contract::{self, KINDS, Level, Link, Search};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
@@ -19,7 +19,7 @@ pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
 use crate::{
     Result, channel, decisions, document, drift_view, http, index, items, package, render, repo,
-    resource, trace,
+    trace,
 };
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -287,7 +287,7 @@ impl Engine {
     /// contract), `resource` (a declared resource, matched by kind and id) or `channel` (matched
     /// by broker kind and name) matches; `document` lists the documents read, matched by path
     /// or title (see `search_documents`); `package` lists the packages, matched by name (see
-    /// `search_packages`); `community` lists the communities, matched by name, and `process`
+    /// `ContractKind::own_search`); `community` lists the communities, matched by name, and `process`
     /// the processes, matched by their entry point's label (`search_communities`,
     /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
     /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
@@ -300,8 +300,13 @@ impl Engine {
         if kind == Some("document") {
             return self.search_documents(query, budget);
         }
-        if kind == Some("package") {
-            return self.search_packages(query, budget);
+        let selected = kind.and_then(contract::searched);
+        if let Some((own, Search::Own(_))) = selected {
+            self.refresh()?;
+            let exports = self.exports()?;
+            let links = self.links(&exports);
+            let hits = own.own_search(&exports, &links, &query.to_lowercase());
+            return Ok(hits_answer(query, hits, budget));
         }
         if kind == Some("drift") {
             return self.search_drift(query, budget);
@@ -313,16 +318,15 @@ impl Engine {
             return self.search_processes(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
-        let (symbols, contracts) = match kind {
-            None => (true, Some("")),
-            Some("symbol") => (true, None),
-            Some("contract") => (false, Some("")),
-            Some("route") => (false, Some("http::")),
-            Some("resource") => (false, Some(resource::PREFIX)),
-            Some("channel") => (false, Some(channel::PREFIX)),
-            Some(other) => {
-                let valid = "`symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, \
-                             `drift`, `community`, `process`, `ambiguous` or `unresolved`";
+        let (symbols, contracts) = match (kind, selected) {
+            (None, _) => (true, Some(String::new())),
+            (Some("symbol"), _) => (true, None),
+            (Some("contract"), _) => (false, Some(String::new())),
+            (_, Some((filter, _))) => (false, Some(format!("{}::", filter.prefix()))),
+            (Some(other), None) => {
+                let mut valid: Vec<_> = kind_words().map(|w| format!("`{w}`")).collect();
+                let last = valid.pop().unwrap_or_default();
+                let valid = format!("{} or {last}", valid.join(", "));
                 return Err(format!("`kind` takes {valid}, not `{other}`").into());
             }
         };
@@ -349,7 +353,7 @@ impl Engine {
                     }
                 }
             }
-            let Some(prefix) = contracts else {
+            let Some(prefix) = &contracts else {
                 continue;
             };
             let provided = export
@@ -365,17 +369,10 @@ impl Engine {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
-                // A route path ranks against the path part: `/users` is exact for
-                // `http::GET::/users`. A resource ranks against its kind and its id, a channel
-                // against its broker kind and its name.
+                // The identifier ranks whole and by the parts its kind gives: `/users` is exact
+                // for `http::GET::/users`.
                 let lower = contract.to_lowercase();
-                let (kind, id) = match lower.strip_prefix(resource::PREFIX) {
-                    Some(rest) => rest.split_once("::").unzip(),
-                    None => match channel::parse(&lower) {
-                        Some((broker, name)) => (Some(broker), name),
-                        None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
-                    },
-                };
+                let (kind, id) = contract::parts(&lower);
                 let Some(r) = [Some(lower.as_str()), kind, id]
                     .into_iter()
                     .flatten()
@@ -397,7 +394,7 @@ impl Engine {
                     None => match export.document_of(site) {
                         // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
-                        None => package::place(&repo.identity, site).unwrap_or_else(|| {
+                        None => contract::place(&repo.identity, site).unwrap_or_else(|| {
                             // A route file that serves the contract with no function of its own.
                             site.rsplit_once("::")
                                 .map_or(site.as_str(), |(_, p)| p)
@@ -456,42 +453,6 @@ impl Engine {
         let links = self.links(&exports);
         let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
         let hits = drift_view::matches(&self.workspace.repos, &entries, &query.to_lowercase());
-        Ok(hits_answer(query, hits, budget))
-    }
-
-    /// The packages (spec #22) whose name matches `query`, one line each, as `<repository>
-    /// <directory> <name>@<version> (consumers: <n>)`, the version left out when the manifest
-    /// has none. The consumers are the dependency entries linked to the package, at any level.
-    fn search_packages(&self, query: &str, budget: Option<usize>) -> Result<String> {
-        self.refresh()?;
-        let exports = self.exports()?;
-        let links = self.links(&exports);
-        let mut entries: HashMap<&str, usize> = HashMap::new();
-        for link in &links {
-            *entries.entry(&link.provider).or_default() += 1;
-        }
-        let needle = query.to_lowercase();
-        // (rank, repository and directory to break ties, line)
-        let mut hits: Vec<(u8, String, String)> = Vec::new();
-        for export in &exports {
-            for p in &export.packages {
-                let Some(r) = rank(&p.name.to_lowercase(), &needle) else {
-                    continue;
-                };
-                let name = match &p.version {
-                    Some(version) => format!("{}@{version}", p.name),
-                    None => p.name.clone(),
-                };
-                let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
-                // An npm package is named alone, as before PyPI's: any other says its ecosystem.
-                let name = match p.ecosystem.is_npm() {
-                    true => name,
-                    false => format!("{name} ({})", p.ecosystem.name()),
-                };
-                let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
-                hits.push((r, format!("{} {}", p.repository, p.directory), line));
-            }
-        }
         Ok(hits_answer(query, hits, budget))
     }
 
@@ -636,7 +597,7 @@ impl Engine {
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
                     format!("{doc} {DOCUMENTED_ONLY}")
-                } else if let Some(place) = package::place(&repo.identity, site) {
+                } else if let Some(place) = contract::place(&repo.identity, site) {
                     // A dependency entry of a manifest.
                     place
                 } else {
@@ -1113,6 +1074,27 @@ pub(crate) fn rank(name: &str, needle: &str) -> Option<u8> {
     }
 }
 
+/// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
+/// filter words, the rest after the kinds' own renderers (`document` sits between the two).
+const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
+const WORDS_AFTER: [&str; 5] = ["drift", "community", "process", "ambiguous", "unresolved"];
+
+/// Every `kind` word of `search`, in the order its error names them: the engine's own, the
+/// kinds' filter words in kinds order, `document`, the kinds' own-renderer words, then the rest
+/// of the engine's.
+fn kind_words() -> impl Iterator<Item = &'static str> {
+    let kinds = |own: bool| {
+        (KINDS.iter().map(|k| k.search_word()))
+            .filter(move |s| matches!(s, Search::Own(_)) == own)
+            .map(Search::word)
+    };
+    (WORDS_BEFORE.into_iter())
+        .chain(kinds(false))
+        .chain(["document"])
+        .chain(kinds(true))
+        .chain(WORDS_AFTER)
+}
+
 /// The schema a workspace repository's index is attached as.
 fn schema(n: usize) -> String {
     if n == 0 {
@@ -1224,9 +1206,18 @@ fn section(name: &str, items: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::fs;
 
-    use super::Engine;
+    use super::{Engine, kind_words};
+
+    /// No kind's search word is an engine word or another kind's: each `kind` selects one answer.
+    #[test]
+    fn no_search_word_of_a_kind_collides_with_an_engine_word() {
+        let words: Vec<_> = kind_words().collect();
+        let distinct: HashSet<_> = words.iter().collect();
+        assert_eq!(distinct.len(), words.len(), "{words:?}");
+    }
 
     #[test]
     fn a_span_changed_since_indexing_keeps_the_start_alone_in_the_first_line() {
