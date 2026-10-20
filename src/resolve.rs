@@ -3535,8 +3535,8 @@ impl<'a> Code<'a> {
     /// What `read` makes of the positional and keyword arguments of `from`, at each call site
     /// that determines them, with the wrapper calls climbed from the call to each site. `from`
     /// is a call, or the `new` expression a `const` holds on behalf of a call made on that
-    /// constant (`ConstOrigin::binding`): the call is the site when the arguments evaluate where the
-    /// constant stands, and the function enclosing the constant is the client wrapper when they
+    /// constant (`ConstOrigin::binding`): the call is the site when the arguments evaluate where
+    /// the constant stands, and the function enclosing the constant is the client wrapper when they
     /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
     /// parameter of the enclosing function, which makes that function a client wrapper. Each
     /// call site of the wrapper is then read with its own arguments substituted, through any
