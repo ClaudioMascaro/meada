@@ -207,6 +207,9 @@ one for the area a change touches.
   its doors need a stored name, stored fields on the export, provider and consumer rows, and a
   reader in `document` when it reads provider documents. The coding standard sends any other
   hook in the engine to review.
+  One deliberate exception stays outside the kinds: `drift_view.rs` is HTTP's drift view (it
+  reads `http::route` and `Link::drift`, and the engine and `context` call it by name); moving
+  it under the HTTP kind is out of scope for spec #205.
 - A **builder** language (spec #30 #129: a call whose method returns its receiver, such as
   `Router::new().route(..)`): the pack sets `LanguagePack::fluent` and gives each call its
   `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
@@ -338,7 +341,7 @@ one for the area a change touches.
   every side a link would join. Something that is neither side, like a binding or a publish to
   a named exchange, is a `Found` with its own `Role`, an export list of its own
   (`Export::bindings`, `Export::publishes`) and, to show in `context` on a channel, a line in
-  `Engine::contract_sides`. A form whose site is a
+  `Channel::related_sides`. A form whose site is a
   constructor (`new SendMessageCommand(...)`, `new Worker(...)`) reads the call fact of the
   `new`, with its arguments, like any other call.
 - New **document format or document data** (spec #21 tickets after #50): what is read from the
