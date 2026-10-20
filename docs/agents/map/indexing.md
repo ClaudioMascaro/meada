@@ -440,7 +440,7 @@ modules updates it.
   repository is the origin. A constant, parameter or function met again on one path (a cycle) adds
   nothing. `Follow::Constants` (the TypeScript forms) follows `const` bindings alone (same file
   and imported) down to an import whose module is outside the repository, so a parameter or a
-  return value has no origin; the answer carries the maker's form (`new`, a call or the bare
+  return value has no origin; the answer carries the form of the call that made the value (`new`, a call or the bare
   name), what it names outside, the methods called on the way and, as `held`, the constant the
   name refers to, which pairs the calls made on the same client. `Follow::Declarations` (Go's
   typed clients and forms) reads what the source declares the name is: a written type, or the

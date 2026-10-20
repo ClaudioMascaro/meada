@@ -2220,7 +2220,7 @@ pub enum Follow {
     Declarations,
 }
 
-/// How the maker of an origin is written.
+/// How the call that made an origin's value is written.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Form {
     /// A call: a constructor or factory, or a function of the repository whose written result
@@ -2241,7 +2241,8 @@ pub struct Origin<'a> {
     /// declaration or a constant's expression.
     pub call: Option<(&'a str, usize)>,
     pub form: Form,
-    /// What the maker names outside the repository; `None` when it names nothing outside.
+    /// What the call that made the value names outside the repository; `None` when it names
+    /// nothing outside.
     pub outside: Option<Outside<'a>>,
     /// Sorted, at least one.
     pub routes: Vec<Route<'a>>,
@@ -2253,7 +2254,8 @@ pub struct Route<'a> {
     /// The calls of the repository whose return values the walk climbed through, outermost
     /// first: two objects one function makes differ by the call that made each.
     pub through: Vec<(&'a str, usize)>,
-    /// The methods called on what was made, maker first (`kafka.producer()` is `producer`).
+    /// The methods called on what was made, the constructor's first (`kafka.producer()` is
+    /// `producer`).
     pub steps: Vec<&'a str>,
     /// The constant the asked name refers to, its file and qualified name.
     pub held: Option<(&'a str, &'a str)>,
@@ -2271,8 +2273,9 @@ pub struct Outside<'a> {
     pub direct: bool,
 }
 
-/// What the constants walk found: the maker's form, what it names outside, the methods called
-/// on what it made, the constant traced, and a member read off what was made, not yet called.
+/// What the constants walk found: the form of the call that made the value, what it names
+/// outside, the methods called on what it made, the constant traced, and a member read off what
+/// was made, not yet called.
 struct Made<'a> {
     form: Form,
     outside: Outside<'a>,
@@ -2347,7 +2350,7 @@ impl<'a> Code<'a> {
                     Of::Name(chain) => self.trace(path, scope, chain, seen),
                     Of::Value(value) => self.made_by(path, scope, value, seen),
                 };
-                // A member read off what was made and not called is no maker's method.
+                // A member read off what was made and not called is no method of the constructor.
                 let made = made.filter(|m| m.pending.is_none());
                 (made.into_iter())
                     .map(|m| Origin {
@@ -2959,8 +2962,8 @@ impl<'a> Code<'a> {
     }
 
     /// Records the call at `index` of `path` as an origin, with the route the walk came by: the
-    /// calls it climbed, the methods of the chains it went down (maker first) and the constant
-    /// asked for.
+    /// calls it climbed, the methods of the chains it went down (the constructor's first) and the
+    /// constant asked for.
     fn reached(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
         let route = Route {
             through: trail.frames.iter().map(|f| (f.path, f.index)).collect(),
@@ -5510,7 +5513,7 @@ mod tests {
             .collect()
     }
 
-    /// Everything a route carries: ` steps=a,b` (maker first), ` held=file:name`, then `via`.
+    /// Everything a route carries: ` steps=a,b` (constructor first), ` held=file:name`, then `via`.
     fn route_line(code: &Code, sources: &[(&str, &str)], route: &Route) -> String {
         let mut line = String::new();
         if !route.steps.is_empty() {
@@ -5853,7 +5856,7 @@ mod tests {
     fn a_parameter_bound_by_a_frame_takes_the_argument_of_that_call_alone() {
         let src = "def wrap(r):\n    return r\n\na = wrap(Alpha())\nb = wrap(Beta())\n";
         let sources = [("a.py", src)];
-        // Two makers through one factory: each is the factory's argument of its own call.
+        // Two constructors through one factory: each is the factory's argument of its own call.
         assert_eq!(held_by(py(), &sources, "a.py", "", "a"), ["a.py Alpha"]);
         assert_eq!(held_by(py(), &sources, "a.py", "", "b"), ["a.py Beta"]);
         // No call binds the parameter when it is asked for itself: every exact caller does.
