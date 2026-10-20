@@ -64,7 +64,7 @@ fn a_dynamic_url_lists_the_routes_its_method_and_fragments_leave() {
 
     assert_eq!(items.len(), 1);
     let routes: Vec<String> = (items[0].candidates.iter())
-        .map(|c| format!("{} {} {}", c.repository, c.method(), c.path()))
+        .map(|c| format!("{} {}", c.repository, c.label()))
         .collect();
     // The DELETE and POST routes, `/api/users` and `/api/health` are filtered out.
     assert_eq!(

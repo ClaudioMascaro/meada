@@ -1793,6 +1793,12 @@ impl ContractKind for Packages {
         Some(("package", "dependent"))
     }
 
+    /// Several providers of a package fit a dependency entry, but no call is there to pick
+    /// one for.
+    fn decidable(&self) -> bool {
+        false
+    }
+
     /// Every call through a binding imported from a bare specifier, as an `Import`: which of
     /// them name a package of the workspace is known at query time only (`import`). The
     /// manifests are read apart from the packs.
@@ -1935,6 +1941,11 @@ impl ContractKind for Packages {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_ambiguous_package_link_is_no_call_for_a_person() {
+        assert!(!Packages.decidable());
+    }
 
     fn entries(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
         (s.dependencies.iter())
