@@ -3,9 +3,9 @@
 //! constructor (`Code::origins` with `Follow::Values`, the constructor named by the file's `use`
 //! declarations), so a `send` or a `publish` on anything else is no producer. The constructor is
 //! named by `Code::outside` without the path flag, as the forms always read it: a name whose head
-//! is not the import itself (a method of a value made from it) is accepted too. The methods that make a client of
-//! another (`create_channel`, `get_connection`, the setters of a builder) are listed per library
-//! (`LanguagePack::passes`), as for the HTTP clients.
+//! is not the import itself (a method of a value made from it) is accepted too. The methods that
+//! make a client of another (`create_channel`, `get_connection`, the setters of a builder) are
+//! listed per library (`LanguagePack::passes`), as for the HTTP clients.
 //!
 //! Every client of these crates is polled or streamed, so the function that holds the call
 //! naming the topic or the queue handles what it receives.
