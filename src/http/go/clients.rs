@@ -477,3 +477,71 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     found
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::go::Go;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    type Request = (Option<String>, Option<String>);
+
+    /// The contract and the `via` of each consumer of the Go file `src`.
+    fn requests(src: &str) -> Vec<Request> {
+        let facts = Go.parse("x.go", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.go", &facts)]);
+        let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Go);
+        let code = Code::new(&resolver, &files, &Go);
+        let found = consumers(&code).into_iter();
+        found.map(|f| (f.contract, f.via)).collect()
+    }
+
+    const HEAD: &str = "package x\n\nimport \"github.com/go-resty/resty/v2\"\n";
+    const BASE: &str = "resty.New().SetBaseURL(\"https://deep.example.com\")";
+
+    /// `GET /s` with the base `BASE` sets, or with `via`.
+    fn sent(via: Option<&str>) -> Vec<Request> {
+        vec![(Some("http::GET::/s".into()), via.map(String::from))]
+    }
+
+    #[test]
+    fn a_setter_chain_past_the_limit_is_no_consumer() {
+        let chained = |n: usize| {
+            let setters = ".SetTimeout(1)".repeat(n);
+            requests(&format!(
+                "{HEAD}\nfunc f() {{\n\t{BASE}{setters}.R().Get(\"/s\")\n}}\n"
+            ))
+        };
+        // `New`, `SetBaseURL` and `R()` count too.
+        let deep = sent(Some("host:deep.example.com"));
+        assert_eq!(chained(CLIENT_DEPTH - 3), deep);
+        assert_eq!(chained(CLIENT_DEPTH - 2), []);
+    }
+
+    #[test]
+    fn a_client_held_through_fields_past_the_limit_has_an_unknown_base() {
+        // `T0.c` holds what `m0` gives it from `T1.c`, and so on to `Tn.c`, which a literal sets.
+        let held = |n: usize| {
+            let mut src = format!("{HEAD}\nfunc (t *T0) Get() {{ t.c.R().Get(\"/s\") }}\n");
+            for i in 0..=n {
+                src += &format!("\ntype T{i} struct {{ c *resty.Client }}\n");
+                src += &match i < n {
+                    true => format!(
+                        "func m{i}(t *T{}) *T{i} {{ return &T{i}{{c: t.c}} }}\n",
+                        i + 1
+                    ),
+                    false => format!("func m{i}() *T{i} {{ return &T{i}{{c: {BASE}}} }}\n"),
+                };
+            }
+            requests(&src)
+        };
+        let deep = sent(Some("host:deep.example.com"));
+        assert_eq!(held(3), deep);
+        // `R()`, the fields, `SetBaseURL` and `New` count.
+        assert_eq!(held(CLIENT_DEPTH - 4), deep);
+        assert_eq!(held(CLIENT_DEPTH - 3), sent(None));
+    }
+}

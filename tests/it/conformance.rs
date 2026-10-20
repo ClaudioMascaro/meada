@@ -4016,34 +4016,6 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     assert!(!export.contains("http::GET::/r2999\""));
 }
 
-/// A resty client followed back through setters is followed only as far as the limit
-/// (`CLIENT_DEPTH`, 64: the setters, `SetBaseURL` and `R()` count): a request at the limit has
-/// its base, one past it is no consumer.
-#[test]
-fn a_long_resty_setter_chain_is_followed_up_to_its_limit() {
-    const LAST: usize = 61;
-    let repo = fixture_repo("go_setters_long", "conformance-go", Some(ORIGIN));
-    let mut long = String::from("package client\n\nimport \"github.com/go-resty/resty/v2\"\n");
-    for n in [LAST, LAST + 1] {
-        let setters = ".SetTimeout(1)".repeat(n);
-        long += &format!(
-            "\nfunc Setters{n}() {{\n\tresty.New().SetBaseURL(\"https://deep.example.com\"){setters}\
-             .R().Get(\"/s{n}\")\n}}\n"
-        );
-    }
-    std::fs::write(repo.join("client/long.go"), long).unwrap();
-    let export = Engine::open(&repo).unwrap().export().unwrap();
-    let json = serde_json::from_str(&export).unwrap();
-    let found = consumers(&json, "client/long.go");
-    let site = format!("client/long.go::Setters{LAST}::(call_expression).Get#0");
-    let expected = triples(&[(
-        &format!("http::GET::/s{LAST}"),
-        "host:deep.example.com",
-        &site,
-    )]);
-    assert_eq!(found, expected);
-}
-
 /// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.
 fn rust_clients(case: &str, file: &str) -> Vec<Consumer> {
     let repo = fixture_repo(case, "conformance-rust", Some(ORIGIN));
