@@ -6178,6 +6178,20 @@ mod tests {
     }
 
     #[test]
+    fn a_parameter_hides_a_module_constant_of_its_name_from_the_constants_walk() {
+        let src = "import { Kafka } from 'kafkajs';\nconst kafka = new Kafka({});\n\
+                   function f(kafka) { return kafka.producer(); }\n";
+        let sources = [("a.ts", src)];
+        // Inside `f` the name is its parameter: no origin. Outside, the constant's.
+        assert_eq!(constant_origin(&sources, "f", "kafka"), None);
+        assert_eq!(constant_origin(&sources, "f", "kafka.producer"), None);
+        assert_eq!(
+            constant_origin(&sources, "", "kafka").unwrap(),
+            "kafkajs new Kafka() held a.ts:kafka"
+        );
+    }
+
+    #[test]
     fn a_parameter_a_repository_factory_a_star_import_and_a_constant_cycle_give_no_origin() {
         let none = |sources: &[(&'static str, &str)], scope, chain| {
             assert_eq!(constant_origin(sources, scope, chain), None, "{chain}");
