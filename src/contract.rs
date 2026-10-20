@@ -212,6 +212,13 @@ pub trait ContractKind {
         shown(contract)
     }
 
+    /// Where `site` of `repository` sits when it is neither a symbol, a call, the repository
+    /// nor a document's: `None` when this kind does not place it (packages: a manifest or one
+    /// of its dependency entries).
+    fn place(&self, _repository: &str, _site: &str) -> Option<String> {
+        None
+    }
+
     /// The status lines of `repository` (whose index content is `export`) about this kind,
     /// given the links of the workspace.
     fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
@@ -269,6 +276,11 @@ pub fn typed(text: &str) -> &str {
 /// `contract` as its kind labels it in candidates and entry points.
 pub fn label(contract: &str) -> String {
     kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
+}
+
+/// Where `site` of `repository` sits, as the first kind that places it says.
+pub fn place(repository: &str, site: &str) -> Option<String> {
+    KINDS.iter().find_map(|k| k.place(repository, site))
 }
 
 /// Whether `provider` serves `contract`, by the rule of the contract's kind, else by equality.

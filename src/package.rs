@@ -1723,19 +1723,6 @@ pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> Str
     }
 }
 
-/// Where a package site of `repository` sits: a manifest provider (`<repository>::<path>`) as
-/// `<path>`, a dependency entry's consumer (`<repository>::<path>::<field>::<name>`) as `<path>
-/// <field>`; `None` for any other site.
-pub fn place(repository: &str, site: &str) -> Option<String> {
-    let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
-    let parts: Vec<&str> = rest.split("::").collect();
-    match parts[..] {
-        [path] if Ecosystem::of(path).is_some() => Some(path.to_string()),
-        [path, field, _] if Ecosystem::of(path).is_some() => Some(format!("{path} {field}")),
-        _ => None,
-    }
-}
-
 /// A call that reaches a symbol through a package import, for `context`.
 pub struct Reach<'e> {
     /// The position in `exports` of the repository holding the call.
@@ -1792,6 +1779,18 @@ impl ContractKind for Packages {
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("package", "dependent"))
+    }
+
+    /// A manifest provider (`<repository>::<path>`) sits at `<path>`, a dependency entry's
+    /// consumer (`<repository>::<path>::<field>::<name>`) at `<path> <field>`.
+    fn place(&self, repository: &str, site: &str) -> Option<String> {
+        let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
+        let parts: Vec<&str> = rest.split("::").collect();
+        match parts[..] {
+            [path] if Ecosystem::of(path).is_some() => Some(path.to_string()),
+            [path, field, _] if Ecosystem::of(path).is_some() => Some(format!("{path} {field}")),
+            _ => None,
+        }
     }
 
     /// Several providers of a package fit a dependency entry, but no call is there to pick
@@ -2057,7 +2056,7 @@ mod tests {
     #[test]
     fn a_package_site_shows_its_manifest_and_field() {
         let repo = "example.com/a";
-        let at = |site: &str| place(repo, site);
+        let at = |site: &str| Packages.place(repo, site);
         assert_eq!(
             at("example.com/a::package.json"),
             Some("package.json".into())

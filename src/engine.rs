@@ -397,7 +397,7 @@ impl Engine {
                     None => match export.document_of(site) {
                         // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
-                        None => package::place(&repo.identity, site).unwrap_or_else(|| {
+                        None => contract::place(&repo.identity, site).unwrap_or_else(|| {
                             // A route file that serves the contract with no function of its own.
                             site.rsplit_once("::")
                                 .map_or(site.as_str(), |(_, p)| p)
@@ -636,7 +636,7 @@ impl Engine {
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
                     format!("{doc} {DOCUMENTED_ONLY}")
-                } else if let Some(place) = package::place(&repo.identity, site) {
+                } else if let Some(place) = contract::place(&repo.identity, site) {
                     // A dependency entry of a manifest.
                     place
                 } else {
