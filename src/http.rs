@@ -678,6 +678,16 @@ impl ContractKind for Http {
             None => shown(contract),
         }
     }
+
+    fn serves(&self, provider: &Provider, contract: &str) -> bool {
+        serves(provider, contract)
+    }
+
+    /// A route fits a dynamic URL by its code path or by a gateway path.
+    fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {
+        let fits = |c: &str| route_fits(c, consumer.method.as_deref(), &consumer.fragments);
+        fits(&provider.contract) || gateway_contracts(provider).any(|(g, _)| fits(&g))
+    }
 }
 
 #[cfg(test)]
@@ -686,6 +696,57 @@ mod tests {
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
     };
     use crate::contract::ContractKind;
+    use crate::index::{Consumer, Gateway, Provider};
+
+    fn provider(contract: &str) -> Provider {
+        Provider {
+            contract: contract.into(),
+            ..Provider::default()
+        }
+    }
+
+    #[test]
+    fn a_provider_serves_its_route_any_method_and_its_gateway_path_and_nothing_else() {
+        let get = provider("http::GET::/users");
+        assert!(Http.serves(&get, "http::GET::/users"));
+        assert!(!Http.serves(&get, "http::POST::/users"));
+        let any = provider("http::ANY::/users");
+        assert!(Http.serves(&any, "http::DELETE::/users"));
+        assert!(!Http.serves(&any, "http::DELETE::/other"));
+        let gateway = Provider {
+            gateways: vec![Gateway {
+                path: "/shop/users".into(),
+                reason: "gateway prefix /shop".into(),
+            }],
+            ..get
+        };
+        assert!(Http.serves(&gateway, "http::GET::/shop/users"));
+    }
+
+    #[test]
+    fn a_route_is_a_candidate_for_a_dynamic_url_through_its_gateway_path() {
+        let consumer = Consumer {
+            contract: None,
+            site: "r::a.ts::f::g#0".into(),
+            via: None,
+            shape: None,
+            method: Some("GET".into()),
+            fragments: vec!["/shop/".into()],
+            hops: Vec::new(),
+        };
+        let direct = provider("http::GET::/shop/users");
+        let gateway = Provider {
+            gateways: vec![Gateway {
+                path: "/shop/users".into(),
+                reason: "gateway prefix /shop".into(),
+            }],
+            ..provider("http::GET::/users")
+        };
+        assert!(Http.candidate(&consumer, &direct));
+        assert!(Http.candidate(&consumer, &gateway));
+        assert!(!Http.candidate(&consumer, &provider("http::GET::/users")));
+        assert!(!Http.candidate(&consumer, &provider("resource::db::orders")));
+    }
 
     #[test]
     fn a_route_is_labelled_by_its_method_and_path_and_anything_else_as_it_is_shown() {

@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::config;
-use crate::contract::{Level, Link};
-use crate::http;
+use crate::contract::{self, Level, Link};
 use crate::index::Export;
 use crate::items::{Candidate, ItemKind, OpenItem};
 use crate::msg::Msg;
@@ -327,7 +326,9 @@ fn evaluate(
         Kind::AmbiguousLink => core
             .iter()
             .filter(at)
-            .find(|l| (served.iter()).any(|p| p.site == l.provider && http::serves(p, &l.contract)))
+            .find(|l| {
+                (served.iter()).any(|p| p.site == l.provider && contract::serves(p, &l.contract))
+            })
             .map_or(Fate::Stale(Cause::NotCandidate), |l| {
                 Fate::Applies(l.provider.clone(), l.contract.clone())
             }),
