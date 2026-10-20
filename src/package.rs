@@ -25,12 +25,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
-use crate::engine::rank;
+use crate::engine::{rank, section};
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::literals::Literals;
+use crate::render::{Files, label};
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
@@ -1921,6 +1922,55 @@ impl ContractKind for Packages {
         shapes(exports, &providers);
     }
 
+    /// `consumers:` with the calls that reach `symbol` through a package import (spec #22),
+    /// from any repository of the workspace, as `<repository> <path>:<line> <caller>`, then
+    /// ` [<level>, <range flag>]` when the link is not exact or the dependency's range does not
+    /// plainly accept the package's version. Nothing when there are none.
+    fn context_sections(
+        &self,
+        exports: &[Export],
+        repos: &[Repository],
+        links: &[Link],
+        symbol: &str,
+    ) -> Vec<String> {
+        let mut found = reached(exports, links, symbol);
+        found.sort_by_key(|r| {
+            (
+                &repos[r.repository].identity,
+                &r.call.span.path,
+                r.call.span.start,
+            )
+        });
+        let lines: Vec<String> = found
+            .iter()
+            .map(|r| {
+                let repo = &repos[r.repository];
+                let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
+                let caller = &r.call.caller;
+                let caller = match exports[r.repository]
+                    .symbols
+                    .iter()
+                    .any(|s| s.id == *caller)
+                {
+                    true => label(caller),
+                    false => "(top level)",
+                };
+                let level = (r.level != Level::Exact).then(|| r.level.name());
+                let flag = r.flag.map(Flag::words);
+                let tags: Vec<&str> = level.into_iter().chain(flag).collect();
+                let tags = match tags.is_empty() {
+                    true => String::new(),
+                    false => format!(" [{}]", tags.join(", ")),
+                };
+                format!("{} {location} {caller}{tags}", repo.identity)
+            })
+            .collect();
+        match lines.is_empty() {
+            true => lines,
+            false => section("consumers", lines),
+        }
+    }
+
     /// The dependency entry links to the providers of its package: one candidate is `exact`,
     /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
     /// repository. The reason is `reason()`'s, flag included. A call through a package import
@@ -1995,10 +2045,67 @@ impl ContractKind for Packages {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::Span;
 
     #[test]
     fn an_ambiguous_package_link_is_no_call_for_a_person() {
         assert!(!Packages.decidable());
+    }
+
+    /// A symbol a package import reaches lists the calls that reach it as `consumers:`, with
+    /// the range flag of the dependency entry; a symbol nothing reaches adds no section.
+    #[test]
+    fn a_symbol_reached_through_a_package_import_gets_a_consumers_section() {
+        let contract = "package::npm::kit";
+        let call = "r::web/app.ts::go#0";
+        let export = Export {
+            repository: "r".into(),
+            consumers: vec![Consumer {
+                contract: Some(contract.into()),
+                site: call.into(),
+                via: None,
+                shape: None,
+                method: Some("^1.0.0".into()),
+                fragments: Vec::new(),
+                hops: Vec::new(),
+            }],
+            calls: vec![CallSite {
+                id: call.into(),
+                caller: "r::web/app.ts::go".into(),
+                target: None,
+                level: None,
+                candidates: Vec::new(),
+                span: Span {
+                    path: "web/app.ts".into(),
+                    start: 0,
+                    end: 0,
+                },
+            }],
+            ..Export::default()
+        };
+        let link = Link {
+            consumer: call.into(),
+            provider: "r::kit/index.ts::greet".into(),
+            contract: contract.into(),
+            level: Level::Exact,
+            reason: format!("{contract} ^1.0.0 (local none)"),
+            by: None,
+            p: None,
+            drift: None,
+        };
+        let repo = Repository {
+            root: "/nonexistent".into(),
+            identity: "r".into(),
+            config: Default::default(),
+            decisions: Default::default(),
+        };
+        let (exports, repos, links) = ([export], [repo], [link]);
+        let sections = |symbol| Packages.context_sections(&exports, &repos, &links, symbol);
+        assert_eq!(
+            sections("r::kit/index.ts::greet"),
+            ["consumers:", "r web/app.ts (top level) [range unchecked]"]
+        );
+        assert!(sections("r::kit/index.ts::other").is_empty());
     }
 
     #[test]

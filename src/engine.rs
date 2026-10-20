@@ -6,8 +6,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::channel::Routes;
-use crate::contract::{self, KINDS, Level, Link, Search};
+use crate::contract::{self, ContractKind, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
@@ -17,10 +16,7 @@ use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mar
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
-use crate::{
-    Result, channel, decisions, document, drift_view, http, index, items, package, render, repo,
-    trace,
-};
+use crate::{Result, decisions, document, drift_view, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -538,61 +534,61 @@ impl Engine {
     /// the shape a document gives a side follows it, `response` for a route and `payload`
     /// for a channel.
     /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
-    /// the top level of a file `<repository> <role> <path> (top level)`. A channel also lists
-    /// the sides linked to it through another name, each followed by `[<level>: <reason>]`:
-    /// the producers a consumer's wildcard pattern matches, the wildcard consumers that match
-    /// it, and the publishes its bindings route to it, then the bindings themselves.
+    /// the top level of a file `<repository> <role> <path> (top level)`. The kind also lists the
+    /// sides linked to the contract through another name (`ContractKind::related_sides`), each
+    /// followed by `[<level>: <reason>]`; a channel's are the producers a consumer's wildcard
+    /// pattern matches, the wildcard consumers that match it, and the publishes its bindings
+    /// route to it, then the bindings themselves.
     fn contract_sides(
         &self,
         exports: &[Export],
         contract: &str,
-        (provider, consumer): (&str, Option<&str>),
-        what: &str,
+        View {
+            provider,
+            consumer,
+            carried,
+            ..
+        }: View,
+        kind: &dyn ContractKind,
     ) -> Vec<String> {
-        let carried = match http::route(contract) {
-            Some(_) => "response",
-            None => "payload",
-        };
-        let routes = Routes::new(exports);
-        // How a side reaches `contract`: its own (no tag), a match through another name, or
-        // not at all.
-        let tag = |own: bool, matched: Option<(Level, String)>| match own {
-            true => Some(String::new()),
-            false => matched.map(|(level, reason)| format!(" [{}: {reason}]", level.name())),
-        };
         // Providers, then consumers, then the bindings that reach a queue; each with the lines
         // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
             // Each side that reaches `contract`: its site, order, role words, tag and shape.
-            let provided = export.providers.iter().filter_map(|p| {
-                let tag = tag(p.contract == contract, channel::fits(&p.contract, contract))?;
-                Some((&p.site, 0, String::from(provider), tag, &p.shape))
-            });
-            let published = export.publishes.iter().filter_map(|q| {
-                let tag = tag(false, routes.reached(q).remove(contract))?;
-                Some((&q.site, 0, String::from(provider), tag, &None))
-            });
+            // The sides that hold it come from the engine, the others from the kind.
+            let provided = export.providers.iter().filter(|p| p.contract == contract);
+            let provided =
+                provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
             let consumed = export.consumers.iter().filter_map(|c| {
-                let (own, consumer) = (c.contract.as_ref()?, consumer?);
-                let tag = tag(own == contract, channel::fits(contract, own))?;
-                Some((&c.site, 1, String::from(consumer), tag, &c.shape))
+                let words = consumer.filter(|_| c.contract.as_deref() == Some(contract))?;
+                Some((c.site.as_str(), 1, words.into(), c.shape.as_ref()))
             });
-            let bound = (export.bindings.iter().filter(|b| b.contract == contract)).map(|b| {
-                let role = format!("binding {} {}", b.exchange, b.pattern);
-                (&b.site, 2, role, String::new(), &None)
+            let own = provided
+                .chain(consumed)
+                .map(|(site, order, role, shape)| (site, order, role, String::new(), shape));
+            let related = kind.related_sides(exports, export, contract);
+            let related = related.into_iter().map(|r| {
+                let tag = r.matched.map_or_else(String::new, |(level, reason)| {
+                    format!(" [{}: {reason}]", level.name())
+                });
+                let order = match r.role {
+                    Role::Provider => 0,
+                    Role::Consumer => 1,
+                    _ => 2,
+                };
+                (r.site, order, r.words, tag, r.shape)
             });
-            let all = provided.chain(published).chain(consumed).chain(bound);
-            for (site, order, role, tag, shape) in all {
-                let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
+            for (site, order, role, tag, shape) in own.chain(related) {
+                let place = if let Some(s) = export.symbols.iter().find(|s| s.id == site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
-                } else if let Some(c) = export.calls.iter().find(|c| c.id == *site) {
+                } else if let Some(c) = export.calls.iter().find(|c| c.id == site) {
                     let at = files.at(&c.span.path, c.span.start);
                     let name = export.symbols.iter().find(|s| s.id == c.caller);
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
-                } else if *site == repo.identity {
+                } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
@@ -603,7 +599,6 @@ impl Engine {
                 } else {
                     format!("{} (top level)", label(site))
                 };
-                let shape = shape.as_ref();
                 let shape =
                     shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, carried));
                 let line = format!("{} {role} {place}{tag}", repo.identity);
@@ -611,7 +606,7 @@ impl Engine {
             }
         }
         if sides.is_empty() {
-            return vec![format!("no {what} matches `{contract}`")];
+            return vec![format!("no {} matches `{contract}`", kind.prefix())];
         }
         sides.sort();
         let mut lines = vec![contract::shown(contract)];
@@ -646,21 +641,16 @@ impl Engine {
         let repos = &self.workspace.repos;
         // A contract listed by its sides, as `search` prints it; a route by its providers.
         let contract = contract::typed(symbol);
-        if let Some(kind) = contract::kind_of(contract) {
-            let roles = match (kind.sides(), http::route(contract)) {
-                (Some((provider, consumer)), _) => Some((provider, Some(consumer))),
-                (None, Some(_)) => Some(("provider", None)),
-                (None, None) => None,
-            };
-            if let Some(roles) = roles {
-                let mut lines = self.contract_sides(&exports, contract, roles, kind.prefix());
-                if http::route(contract).is_some() {
-                    let links = self.links(&exports);
-                    let entries = drift_view::entries(repos, &exports, &links);
-                    lines.extend(drift_view::consumers(repos, &entries, contract));
-                }
-                return Ok(render::budgeted(&lines, budget));
+        if let Some(kind) = contract::kind_of(contract)
+            && let Some(view) = kind.view(contract)
+        {
+            let mut lines = self.contract_sides(&exports, contract, view, kind);
+            if view.drift {
+                let links = self.links(&exports);
+                let entries = drift_view::entries(repos, &exports, &links);
+                lines.extend(drift_view::consumers(repos, &entries, contract));
             }
+            return Ok(render::budgeted(&lines, budget));
         }
         let suffix = format!("::{symbol}");
         let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())
@@ -725,9 +715,10 @@ impl Engine {
         let span = text.map(|(_, span)| span).unwrap_or_default();
         let mut tail = Vec::from_iter(unavailable);
         tail.extend(relations(identity, export, &mut files, &symbol_found.id));
-        tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
-        let routes = Routes::new(&exports);
-        let workspace = (links.as_slice(), &routes);
+        let sections = (KINDS.iter())
+            .flat_map(|k| k.context_sections(&exports, repos, &links, &symbol_found.id));
+        tail.extend(sections);
+        let workspace = (exports.as_slice(), links.as_slice());
         tail.extend(contracts(
             identity,
             export,
@@ -777,14 +768,14 @@ impl Engine {
     }
 }
 
-/// `contracts:` with what `symbol` provides, the channels it produces to (a publish to a named
-/// exchange, then each queue the bindings route it to) and the contracts its calls consume,
-/// unresolved ones included, each followed by its decided links; `links` and `routes` are the
-/// workspace's. Nothing when it has none.
+/// `contracts:` with what `symbol` provides, what its calls produce (a provider at a call, then
+/// what the kinds add for the call) and the contracts its calls consume, unresolved ones
+/// included, each followed by its decided links; `exports` and `links` are the workspace's.
+/// Nothing when it has none.
 fn contracts(
     identity: &str,
     export: &Export,
-    (links, routes): (&[Link], &Routes),
+    (exports, links): (&[Export], &[Link]),
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
@@ -802,27 +793,18 @@ fn contracts(
                 .map_or_else(Vec::new, |s| shape_lines(identity, s, "response")),
         );
     }
-    // A channel producer is a call site: the symbol around it produces.
+    // A provider can sit at a call (a channel producer): the symbol around it produces. A
+    // kind may add lines for the call.
     for call in export.calls.iter().filter(|c| c.caller == symbol.id) {
-        let produced = export
-            .providers
-            .iter()
-            .filter(|p| p.site == call.id && p.contract.starts_with(channel::PREFIX));
         let location = files.at(&call.span.path, call.span.start);
-        for provider in produced {
+        for provider in export.providers.iter().filter(|p| p.site == call.id) {
             let contract = contract::shown(&provider.contract);
             lines.push(format!("{identity} {location} produces {contract}"));
         }
-        for publish in export.publishes.iter().filter(|q| q.site == call.id) {
-            let (exchange, key) = (&publish.exchange, &publish.key);
-            lines.push(format!("{identity} {location} publishes {exchange} {key}"));
-            for (queue, (level, reason)) in routes.reached(publish) {
-                let level = level.name();
-                lines.push(format!(
-                    "{identity} {location} produces {queue} [{level}: {reason}]"
-                ));
-            }
-        }
+        let added = KINDS
+            .iter()
+            .flat_map(|k| k.at_call(exports, export, &call.id));
+        lines.extend(added.map(|line| format!("{identity} {location} {line}")));
     }
     // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
@@ -966,54 +948,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     let mut lines = section("callers", callers);
     lines.extend(section("callees", callees));
     lines
-}
-
-/// `consumers:` with the calls that reach `symbol` through a package import (spec #22), from
-/// any repository of the workspace, as `<repository> <path>:<line> <caller>`, then ` [<level>,
-/// <range flag>]` when the link is not exact or the dependency's range does not plainly accept
-/// the package's version. Nothing when there are none.
-fn consumers(
-    exports: &[Export],
-    repos: &[Repository],
-    links: &[Link],
-    symbol: &str,
-) -> Vec<String> {
-    let mut reached = package::reached(exports, links, symbol);
-    reached.sort_by_key(|r| {
-        (
-            &repos[r.repository].identity,
-            &r.call.span.path,
-            r.call.span.start,
-        )
-    });
-    let lines: Vec<String> = reached
-        .iter()
-        .map(|r| {
-            let repo = &repos[r.repository];
-            let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
-            let caller = &r.call.caller;
-            let caller = match exports[r.repository]
-                .symbols
-                .iter()
-                .any(|s| s.id == *caller)
-            {
-                true => label(caller),
-                false => "(top level)",
-            };
-            let level = (r.level != Level::Exact).then(|| r.level.name());
-            let flag = r.flag.map(package::Flag::words);
-            let tags: Vec<&str> = level.into_iter().chain(flag).collect();
-            let tags = match tags.is_empty() {
-                true => String::new(),
-                false => format!(" [{}]", tags.join(", ")),
-            };
-            format!("{} {location} {caller}{tags}", repo.identity)
-        })
-        .collect();
-    match lines.is_empty() {
-        true => lines,
-        false => section("consumers", lines),
-    }
 }
 
 /// `<repository> <path>:<line> <name>` for a symbol's definition.
@@ -1195,7 +1129,7 @@ fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<
 }
 
 /// `name:` followed by the items, or `name: none`.
-fn section(name: &str, items: Vec<String>) -> Vec<String> {
+pub(crate) fn section(name: &str, items: Vec<String>) -> Vec<String> {
     if items.is_empty() {
         return vec![format!("{name}: none")];
     }

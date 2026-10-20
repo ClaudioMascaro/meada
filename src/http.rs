@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::config::gateway_path;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, shown};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, View, shown};
 use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
@@ -472,6 +472,17 @@ impl ContractKind for Http {
         Search::Filter("route")
     }
 
+    /// A route is listed by its providers alone: its consumers are calls. Its shape is a
+    /// `response`, and the consumers that read fields follow (drift).
+    fn view(&self, contract: &str) -> Option<View> {
+        route(contract).map(|_| View {
+            provider: "provider",
+            consumer: None,
+            carried: "response",
+            drift: true,
+        })
+    }
+
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
@@ -728,7 +739,7 @@ mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
     };
-    use crate::contract::{ContractKind, Role, Search};
+    use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
 
@@ -742,6 +753,22 @@ mod tests {
     #[test]
     fn routes_are_selected_by_the_route_word() {
         assert_eq!(Http.search_word(), Search::Filter("route"));
+    }
+
+    /// `context` on a route lists its providers, calls its shape `response` and follows the
+    /// linked consumers that read fields; a contract that is no route has no such view.
+    #[test]
+    fn a_route_is_viewed_by_its_providers_with_a_response_and_drift_and_a_non_route_not_at_all() {
+        let view = Http.view("http::GET::/users/{}").unwrap();
+        let expected = View {
+            provider: "provider",
+            consumer: None,
+            carried: "response",
+            drift: true,
+        };
+        assert_eq!(view, expected);
+        assert_eq!(Http.view("http::orders"), None);
+        assert_eq!(Http.view("resource::db::orders"), None);
     }
 
     #[test]

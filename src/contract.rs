@@ -172,6 +172,35 @@ impl Search {
     }
 }
 
+/// How `context` lists a contract of a kind.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct View {
+    /// The word for a provider side: `writer`, `producer`, `provider`.
+    pub provider: &'static str,
+    /// The word for a consumer side; `None` when the consumers are calls that `trace` and the
+    /// `contracts:` of their symbols show, so `context` leaves them out.
+    pub consumer: Option<&'static str>,
+    /// What a side's shape carries: `response` for a route, `payload` for the rest.
+    pub carried: &'static str,
+    /// Whether the linked consumers that read fields follow the sides (the drift view).
+    pub drift: bool,
+}
+
+/// A side that reaches a contract through another name, for `context` to list after the sides
+/// that hold it (`ContractKind::related_sides`).
+pub struct Related<'e> {
+    /// The site of the side.
+    pub site: &'e str,
+    /// The side the line shows as, which orders it: `Provider`, `Consumer` or `Binding`.
+    pub role: Role,
+    /// The words that name the side in the line.
+    pub words: String,
+    /// How the name matched, shown after the line; `None` for a side that holds no tag.
+    pub matched: Option<(Level, String)>,
+    /// The shape a document gives the side.
+    pub shape: Option<&'e Shape>,
+}
+
 /// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
 /// ties, and the line.
 pub type Hit = (u8, String, String);
@@ -204,6 +233,51 @@ pub trait ContractKind {
     /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         None
+    }
+
+    /// How `context` lists `contract`, a contract of this kind, by the words of `sides`
+    /// (default); `None` when it lists none (`context` then reads the argument as a symbol).
+    fn view(&self, _contract: &str) -> Option<View> {
+        self.sides().map(|(provider, consumer)| View {
+            provider,
+            consumer: Some(consumer),
+            carried: "payload",
+            drift: false,
+        })
+    }
+
+    /// The sides of `export` that reach `contract` through another name, besides the sides that
+    /// hold it, which the engine lists: none by default (channels: wildcard producers and
+    /// consumers, the publishes its bindings route to a queue, and the bindings themselves).
+    /// `exports` are the workspace's.
+    fn related_sides<'e>(
+        &self,
+        _exports: &'e [Export],
+        _export: &'e Export,
+        _contract: &str,
+    ) -> Vec<Related<'e>> {
+        Vec::new()
+    }
+
+    /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
+    /// line of each provider sitting at it: none by default (channels: the publish and the
+    /// queues its bindings route it to, a publish having no contract of its own). `exports` are
+    /// the workspace's.
+    fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The sections a symbol's `context` adds after its callees, as lines (packages:
+    /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
+    /// the workspace's, and `symbol` the identity of a symbol of it.
+    fn context_sections(
+        &self,
+        _exports: &[Export],
+        _repos: &[Repository],
+        _links: &[Link],
+        _symbol: &str,
+    ) -> Vec<String> {
+        Vec::new()
     }
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
@@ -437,7 +511,7 @@ impl Names {
 #[cfg(test)]
 mod tests {
     use super::{
-        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, place,
+        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, View, place,
         searched, shown, typed, unresolved,
     };
     use crate::config::Config;
@@ -540,6 +614,50 @@ mod tests {
         let (kind, search) = searched("package").unwrap();
         assert_eq!((kind.prefix(), search), ("package", Search::Own("package")));
         assert!(searched("http").is_none());
+    }
+
+    /// A kind with two named sides is viewed by both, their shape a `payload`, with no drift;
+    /// a kind with no sides has no view.
+    #[test]
+    fn a_kind_with_sides_is_viewed_by_both_and_one_without_has_no_view() {
+        let channel = Channel.view("channel::kafka::orders.created").unwrap();
+        let expected = View {
+            provider: "producer",
+            consumer: Some("consumer"),
+            carried: "payload",
+            drift: false,
+        };
+        assert_eq!(channel, expected);
+        let resource = Resource.view("resource::postgres::orders").unwrap();
+        assert_eq!(
+            (resource.provider, resource.consumer),
+            ("writer", Some("reader"))
+        );
+        assert_eq!(
+            Packages.view("package::npm::kit").unwrap().provider,
+            "package"
+        );
+    }
+
+    /// A kind that adds nothing to `context` (routes, resources, packages as to a call) leaves
+    /// the sides, the call and the symbol alone.
+    #[test]
+    fn a_kind_with_nothing_to_add_leaves_the_sides_the_call_and_the_symbol_alone() {
+        let exports = [Export::default()];
+        for kind in [&Http as &dyn ContractKind, &Resource, &Packages] {
+            let related = kind.related_sides(&exports, &exports[0], "x::y");
+            assert!(related.is_empty());
+            assert!(
+                kind.at_call(&exports, &exports[0], "r::a.ts::f#0")
+                    .is_empty()
+            );
+        }
+        for kind in [&Http as &dyn ContractKind, &Resource, &Channel] {
+            assert!(
+                kind.context_sections(&exports, &[], &[], "r::a.ts::f")
+                    .is_empty()
+            );
+        }
     }
 
     /// The seam places a site as the first kind that answers does, and not at all otherwise.
