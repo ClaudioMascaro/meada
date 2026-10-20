@@ -5,13 +5,16 @@
 //! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`.
 //! The rows of `LIBRARIES` also list reqwest and ureq (spec #30), so the Rust pack's clients are
 //! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a
-//! call is read there).
+//! call is read there). The receiver's client is found with `Code::origins` (`Follow::Values`:
+//! assignments, `with`, `self` attributes, arguments and return values), and a constructor is
+//! named by `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
+//! `outside` an origin carries, which a Rust path call reads as a path.
 
 use super::super::{HTTP_METHODS, based, consumer, fetch};
 use crate::contract::Found;
 use crate::lang::rust::frameworks::{REQWEST_CLIENTS, UREQ_AGENTS};
 use crate::lang::{Facts, Imported, Part, Value};
-use crate::resolve::{Code, Expand, Expanded};
+use crate::resolve::{Code, Expand, Expanded, Follow, Of, Origin};
 
 /// An HTTP client library of Python or Rust, by what it names outside the repository.
 struct Library {
@@ -72,14 +75,18 @@ fn sends(member: &str) -> bool {
 // ponytail: a Python receiver that is the result of a call (`Session().get(...)`,
 // `make().get(...)`) is not read, a Rust one is (the pack gives the receiver's value); a
 // parameter given a client takes the base of every caller that passes one.
-fn client_base<'a>(code: &Code<'a>, origins: Vec<(&'a str, usize)>) -> Option<Option<Vec<Part>>> {
+fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<Vec<Part>>> {
     let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
-    for (at, i) in origins {
+    for (at, i) in origins.iter().filter_map(|o| o.call) {
         let Some(ctor) = code.call(at, i) else {
             continue;
         };
-        let name = code.external(at, &ctor.scope, &ctor.callee);
-        if !name.is_some_and(|n| LIBRARIES.iter().any(|l| l.clients.contains(&n.as_str()))) {
+        let name = code.outside(at, &ctor.scope, &ctor.callee, false);
+        if !name.is_some_and(|n| {
+            LIBRARIES
+                .iter()
+                .any(|l| l.clients.contains(&n.spelled.as_str()))
+        }) {
             continue;
         }
         let base = match ctor.keyword("base_url") {
@@ -111,10 +118,10 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
         let imports = names_library(facts);
         for (n, call) in facts.calls.iter().enumerate() {
             let function = imports
-                .then(|| code.external(path, &call.scope, &call.callee))
+                .then(|| code.outside(path, &call.scope, &call.callee, false))
                 .flatten()
-                .and_then(|name| {
-                    let (module, function) = name.rsplit_once('.')?;
+                .and_then(|outside| {
+                    let (module, function) = outside.spelled.rsplit_once('.')?;
                     let library = LIBRARIES.iter().any(|l| l.modules.contains(&module));
                     (library && sends(function)).then(|| (function.to_string(), None))
                 });
@@ -126,9 +133,11 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                     // A pack that gives the receiver's value reads a receiver that is a call;
                     // Python's is a name.
                     let origins = match code.receiver(path, n) {
-                        Some(value) => code.value_origins(path, &call.scope, value),
+                        Some(value) => {
+                            code.origins(path, &call.scope, Of::Value(value), Follow::Values)
+                        }
                         None if receiver.starts_with('(') => continue,
-                        None => code.name_origins(path, &call.scope, receiver),
+                        None => code.origins(path, &call.scope, Of::Name(receiver), Follow::Values),
                     };
                     match client_base(code, origins) {
                         Some(base) => (member.to_string(), base),
