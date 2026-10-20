@@ -6235,6 +6235,21 @@ mod tests {
     }
 
     #[test]
+    fn a_reference_declares_what_its_name_does_and_another_value_declares_nothing() {
+        let src = "package x\nimport amqp \"github.com/rabbitmq/amqp091-go\"\nfunc f() {\n\
+                   \tconn, _ := amqp.Dial(\"u\")\n\tch, _ := conn.Channel()\n}\n";
+        let reference: &'static Value = Box::leak(Box::new(Value::Ref("ch".into())));
+        over(go(), &[("a.go", src)], |code| {
+            let path = code.files().get_key_value("a.go").unwrap().0;
+            let ask = |of| code.origins(path, "f", of, Follow::Declarations);
+            let by_name = ask(Of::Name("ch"));
+            assert_eq!(by_name.len(), 1);
+            assert_eq!(ask(Of::Value(reference)), by_name);
+            assert_eq!(ask(Of::Value(&Value::Undefined)), []);
+        });
+    }
+
+    #[test]
     fn a_name_declared_from_a_repository_function_has_the_type_its_result_writes() {
         let head = "package x\nimport \"github.com/segmentio/kafka-go\"\n";
         let outside = format!(
