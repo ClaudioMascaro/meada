@@ -269,6 +269,13 @@ fn ts() -> Vec<Case> {
             ),
         ),
         t(
+            "origin-const-chain",
+            format!(
+                "import {{ Kafka }} from 'kafkajs';\nconst k0 = new Kafka({{}});\n{}\nconst p = k{DEEP}.producer();\np.send({{ topic: 'a' }});\n",
+                lines(DEEP, |i| format!("const k{} = k{i};", i + 1))
+            ),
+        ),
+        t(
             "express-chain",
             format!(
                 "{express}const r = express.Router();\nr{}\n",
