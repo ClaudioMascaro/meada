@@ -153,6 +153,11 @@ pub enum Site {
     Call { path: String, index: usize },
 }
 
+/// The engine fixes the phase order, and the kinds answer in `KINDS` order: every kind's
+/// `declare` over every repository, then every kind's `workspace_step` over all of them, then
+/// `link`, then the decisions replay, then every kind's `after_links`. The decisions are
+/// kind-free and a pass over the links must see the decided ones, so they sit between. A new
+/// kind appends to `KINDS`: the order of the list is the order of the steps and of the output.
 pub trait ContractKind {
     /// The identifier prefix: `http` for `http::GET::/users`.
     fn prefix(&self) -> &'static str;
@@ -166,6 +171,11 @@ pub trait ContractKind {
     /// code. A kind also uses it to mark what `meada.toml` says about the sides it found. They
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
+
+    /// Runs once over the index content of every repository of the workspace (in workspace
+    /// order), after every kind's `declare` has run on every repository: a step that needs
+    /// all of them, such as an index of the providers of the whole workspace.
+    fn workspace_step(&self, _exports: &mut [Export]) {}
 
     /// The words for a provider and a consumer of this kind when `context` lists a contract
     /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
@@ -185,6 +195,10 @@ pub trait ContractKind {
         exports: &[Export],
     ) -> Vec<Link>;
 
+    /// Runs once over the links of the whole workspace, after the decisions replay, so it sees
+    /// the decided links: a pass that sets something on them, such as the drift of a link.
+    fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
+
     /// Whether the identifier is an unresolved side: one whose name could not be evaluated
     /// (a channel that is only its broker prefix). It never links, is no open item, and is
     /// shown with the unresolved suffix.
@@ -196,6 +210,12 @@ pub trait ContractKind {
     /// identifier alone, since entry points are stored when the index is written.
     fn label(&self, contract: &str) -> String {
         shown(contract)
+    }
+
+    /// The status lines of `repository` (whose index content is `export`) about this kind,
+    /// given the links of the workspace.
+    fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
+        Vec::new()
     }
 }
 
@@ -305,7 +325,14 @@ impl Names {
 
 #[cfg(test)]
 mod tests {
-    use super::{shown, typed, unresolved};
+    use super::{
+        Channel, ContractKind, Http, Level, Link, Packages, Resource, shown, typed, unresolved,
+    };
+    use crate::config::Config;
+    use crate::decisions::Decisions;
+    use crate::entry::{EntryKind, EntryPoint};
+    use crate::index::Export;
+    use crate::workspace::Repository;
 
     /// The seam shows an unresolved side with its suffix and reads the suffix back off.
     #[test]
@@ -327,5 +354,79 @@ mod tests {
         );
         assert_eq!(shown("http::GET::/users"), "http::GET::/users");
         assert_eq!(shown("not a contract"), "not a contract");
+    }
+
+    fn resource_repo(toml: &str) -> Repository {
+        Repository {
+            root: "".into(),
+            identity: "r".into(),
+            config: toml::from_str::<Config>(toml).unwrap(),
+            decisions: Decisions::default(),
+        }
+    }
+
+    fn entry(identity: &str, kind: EntryKind) -> EntryPoint {
+        EntryPoint {
+            identity: identity.into(),
+            kind,
+            label: identity.into(),
+            site: identity.into(),
+        }
+    }
+
+    /// A resource no link reaches is reported by its kind; a kind with no lines of its own
+    /// reports none.
+    #[test]
+    fn resources_report_status_lines_and_other_kinds_none() {
+        let repo =
+            resource_repo("[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"read\"\n");
+        let export = Export::default();
+        let lines = Resource.status(&repo, &export, &[]);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("resource::postgres::orders"), "{lines:?}");
+        assert!(Http.status(&repo, &export, &[]).is_empty());
+        assert!(Channel.status(&repo, &export, &[]).is_empty());
+    }
+
+    /// A workspace step over a workspace with no package imports leaves every entry point as
+    /// it is, whichever kind runs it (the monorepo rule itself is pinned by the export and
+    /// process goldens).
+    #[test]
+    fn workspace_steps_keep_the_entry_points_of_a_workspace_without_imports() {
+        let mut export = Export {
+            repository: "r".into(),
+            ..Export::default()
+        };
+        export.entry_points = vec![
+            entry("r::a.ts::free", EntryKind::Export),
+            entry("r::a.ts::route", EntryKind::Route),
+        ];
+        let mut exports = vec![export];
+        for kind in [&Packages as &dyn ContractKind, &Http, &Resource, &Channel] {
+            kind.workspace_step(&mut exports);
+        }
+        let kept: Vec<_> = (exports[0].entry_points.iter())
+            .map(|e| &e.identity[..])
+            .collect();
+        assert_eq!(kept, ["r::a.ts::free", "r::a.ts::route"]);
+    }
+
+    /// The HTTP pass after links sets nothing on a link with no shapes; a kind with no pass
+    /// leaves the links alone.
+    #[test]
+    fn the_pass_after_links_leaves_a_link_without_shapes_alone() {
+        let mut links = vec![Link {
+            consumer: "r::a.ts::c".into(),
+            provider: "s::b.ts::p".into(),
+            contract: "http::GET::/x".into(),
+            level: Level::Exact,
+            reason: "x".into(),
+            by: None,
+            p: None,
+            drift: None,
+        }];
+        Http.after_links(&mut links, &[]);
+        Channel.after_links(&mut links, &[]);
+        assert!(links[0].drift.is_none());
     }
 }

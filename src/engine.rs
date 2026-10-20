@@ -118,24 +118,10 @@ impl Engine {
                 Ok(export)
             })
             .collect::<Result<Vec<_>>>()?;
-        // Dependency entries need every repository's packages, so they come after all declares.
-        let providers = package::Providers::new(&exports);
-        package::consume(&mut exports, &providers);
-        // Imports of a package resolve into its provider, wherever it lives.
-        package::import(&mut exports, &providers);
-        // The stored entry points are candidates: a call that reaches an export through a
-        // package import of its own repository (a monorepo) makes it no door, at any level. An
-        // entry point of another kind stays one.
-        for export in &mut exports {
-            let own = format!("{}::", export.repository);
-            let imported: HashSet<&str> = (export.imports.iter())
-                .map(|i| i.target.as_str())
-                .filter(|t| t.starts_with(&own))
-                .collect();
-            entry::drop_imported_exports(&mut export.entry_points, &imported);
+        // Each kind's step over the whole workspace, once every repository has declared.
+        for kind in contract::KINDS {
+            kind.workspace_step(&mut exports);
         }
-        // Shapes imported from a package fill from the shapes it keeps (issue #175).
-        package::shapes(&mut exports, &providers);
         Ok(exports)
     }
 
@@ -144,13 +130,15 @@ impl Engine {
         self.links_and_decisions(exports).0
     }
 
-    /// Every link of the workspace, sorted, with the decisions replayed and the drift of each
-    /// HTTP link (`http::drift`), and the decisions of each repository that did not apply, in
-    /// workspace order.
+    /// Every link of the workspace, sorted, with the decisions replayed and the passes of the
+    /// kinds after them (`ContractKind::after_links`), and the decisions of each repository
+    /// that did not apply, in workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
         let (mut links, evaluations) =
             decisions::replay(self.core_links(exports), &self.workspace, exports);
-        http::drift(&mut links, exports);
+        for kind in contract::KINDS {
+            kind.after_links(&mut links, exports);
+        }
         (links, evaluations)
     }
 
@@ -194,7 +182,9 @@ impl Engine {
         let drift = drift_view::counts(repos, &entries);
         let lines = (repos.iter().zip(&exports).zip(drift))
             .map(|((repo, export), drift)| {
-                let mut lines = resource::report(repo, export, &links);
+                let mut lines: Vec<String> = (contract::KINDS.iter())
+                    .flat_map(|kind| kind.status(repo, export, &links))
+                    .collect();
                 lines.extend(document::report(repo, export));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());

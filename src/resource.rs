@@ -51,7 +51,7 @@ fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec
 /// The status lines of `repo` (whose index content is `export`) about its resources: each
 /// `via` that names no symbol, the fallback to the repository as a whole, and each resource
 /// no link of the workspace (`links`) reaches.
-pub fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
+fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
     let mut lines = Vec::new();
     let mut seen = HashSet::new();
     for resource in &repo.config.resources {
@@ -124,6 +124,10 @@ impl ContractKind for Resource {
         let key = |c: &Consumer| (c.site.clone(), c.contract.clone(), c.via.clone());
         consumers.sort_by_key(key);
         consumers.dedup_by(|a, b| key(a) == key(b));
+    }
+
+    fn status(&self, repository: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
+        report(repository, export, links)
     }
 
     /// The reader `consumer` links to every writer of its resource held by another repository.
