@@ -168,6 +168,40 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
 }
 
 #[test]
+fn go_functions_are_found_by_name_and_list_callers_and_callees() {
+    let repo = fixture_repo(
+        "context_go",
+        "conformance-go",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    assert_golden(
+        "conformance-go.search-new.txt",
+        &engine.search("New", None, None).unwrap(),
+    );
+    // Callers through an import, from a test file of the package and from the external test
+    // package; callees in another file of the package and in the standard library.
+    assert_golden(
+        "conformance-go.context-new.txt",
+        &engine.context("store/store.go::New", None).unwrap(),
+    );
+    // A method's callers by the receiver's written type (a parameter, a field, a `var`, a
+    // literal, a result, a package variable) at `exact`, and by name alone at `inferred`.
+    assert_golden(
+        "conformance-go.context-bump.txt",
+        &engine
+            .context("methods/types.go::Counter.Bump", None)
+            .unwrap(),
+    );
+    // An `http.Get` whose URL a function computes: the consumer shows with no contract.
+    assert_golden(
+        "conformance-go.context-unresolved.txt",
+        &engine.context("client/net.go::Unresolved", None).unwrap(),
+    );
+}
+
+#[test]
 fn rust_programs_are_found_as_processes() {
     let repo = fixture_repo(
         "search_rust_programs",
@@ -179,6 +213,22 @@ fn rust_programs_are_found_as_processes() {
     // `src/main.rs`, `src/bin/` and a `[[bin]] path`, each with its own process.
     assert_golden(
         "conformance-rust.search-process-main.txt",
+        &engine.search("main", Some("process"), None).unwrap(),
+    );
+}
+
+#[test]
+fn go_programs_are_found_as_processes() {
+    let repo = fixture_repo(
+        "context_go_programs",
+        "conformance-go",
+        Some("https://example.com/acme/conformance.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    // `func main` in package `main`, not the one in package `store`.
+    assert_golden(
+        "conformance-go.search-process-main.txt",
         &engine.search("main", Some("process"), None).unwrap(),
     );
 }

@@ -1,0 +1,4 @@
+example.com/xlang-go/api orders.go:17 reserve
+  →[exact: host api.example.com is served by example.com/xlang-go/api] example.com/xlang-go/web src/orders.ts:10 reserveOrder
+    example.com/xlang-go/web src/sync.ts:5 syncOrders
+chain: exact · 1 hops · 2 repos · 69 tokens

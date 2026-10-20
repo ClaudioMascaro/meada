@@ -139,7 +139,7 @@ fn source(dir: &str, spec: &toml::Value) -> Option<Option<String>> {
 /// `rel` joined to the directory `dir`, `.` and `..` folded without touching the file system: a
 /// path of the repository, or one that starts with `..` segments when it leaves it. `None` when
 /// `rel` is absolute.
-fn relative(dir: &str, rel: &str) -> Option<String> {
+pub(crate) fn relative(dir: &str, rel: &str) -> Option<String> {
     if rel.starts_with('/') || rel.contains('\\') {
         return None;
     }

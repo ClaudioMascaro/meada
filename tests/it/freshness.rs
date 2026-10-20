@@ -262,6 +262,63 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     );
 }
 
+/// Renames a function of a multi-file package that the package's other files call, adds a file
+/// to the package that defines a name another file calls, adds one the build constraints leave
+/// out, deletes a file of another package, and replaces `go.mod`'s `replace` target.
+fn edit_go(repo: &Path) {
+    let replace = |file: &str, from: &str, to: &str| {
+        let text = fs::read_to_string(repo.join(file)).unwrap();
+        assert!(text.contains(from), "{file} holds {from}");
+        fs::write(repo.join(file), text.replacen(from, to, 1)).unwrap();
+    };
+    replace("store/helpers.go", "func helper() {}", "func assist() {}");
+    fs::write(
+        repo.join("store/assist.go"),
+        "package store\n\nfunc helper() {\n\tassist()\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.join("store/assist_darwin.go"),
+        "package store\n\nfunc open() {}\n",
+    )
+    .unwrap();
+    fs::remove_file(repo.join("scopes/other.go")).unwrap();
+    replace("go.mod", "=> ./forks/billing", "=> ./billing");
+    replace("web/gin.go", "r.Group(\"/v1\")", "r.Group(\"/v2\")");
+}
+
+#[test]
+fn go_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
+    let repo = fixture_repo("fresh_go", "conformance-go", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit_go(&repo);
+
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert!(before.contains("scopes/other.go::Other"));
+    assert!(!refreshed.contains("scopes/other.go"));
+    assert!(refreshed.contains("store/assist.go::helper"));
+    assert!(!refreshed.contains("assist_darwin.go"));
+    assert!(before.contains("/v1/users") && !refreshed.contains("/v1/users"));
+    assert!(refreshed.contains("/v2/users"));
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_go_cold", "conformance-go", ORIGIN, edit_go)
+    );
+}
+
+#[test]
+fn a_go_export_does_not_depend_on_the_order_files_and_modules_are_found() {
+    let repo = fixture_repo("fresh_order_go", "conformance-go", ORIGIN);
+    let normal = Engine::open(&repo).unwrap().export().unwrap();
+
+    let repo = fixture_repo("fresh_order_go_reversed", "conformance-go", ORIGIN);
+    let reversed = meada::with_reversed_walk(|| Engine::open(&repo).unwrap().export().unwrap());
+
+    assert_eq!(reversed, normal);
+}
+
 fn enable_metrics(repo: &Path) {
     let manifest = repo.join("api/Cargo.toml");
     let text = fs::read_to_string(&manifest).unwrap();
@@ -799,6 +856,59 @@ fn a_refreshed_rust_cross_language_pair_exports_what_a_cold_pair_does() {
 
     let cold = common::xlang_rust("fresh_xlang_rust_cold");
     edit_xlang_rust(&cold);
+    for (n, ((refreshed, before), cold)) in refreshed
+        .iter()
+        .zip(&before)
+        .zip(exports(&cold))
+        .enumerate()
+    {
+        assert_ne!(refreshed, before, "repository {n}");
+        assert_eq!(*refreshed, cold, "repository {n}");
+    }
+    // The renamed variable no longer reaches the web app's routes.
+    assert!(before[1].contains("env:WEB_URL"));
+    assert!(refreshed[1].contains("env:SITE_URL"));
+    assert!(!refreshed[1].contains("env:WEB_URL"));
+}
+
+/// Edits, adds and deletes `.go` files of the api and deletes a route of the web app: a route
+/// path changes, the variable a base URL is read from changes names, a file with a consumer on
+/// the declared host appears, and the file with the other environment read goes.
+fn edit_xlang_go((web, api): &(PathBuf, PathBuf)) {
+    edit_file(
+        api,
+        "orders.go",
+        "\"GET /orders/{id}\"",
+        "\"GET /orders/{id}/level\"",
+    );
+    edit_file(api, "orders.go", "audit()", "report()");
+    edit_file(api, "pricing.go", "\"WEB_URL\"", "\"SITE_URL\"");
+    fs::write(
+        api.join("report.go"),
+        "package main\n\nimport \"net/http\"\n\nfunc report() {\n\thttp.Get(\"https://web.example.com/api/audit\")\n}\n",
+    )
+    .unwrap();
+    fs::remove_file(api.join("audit.go")).unwrap();
+    fs::remove_file(web.join("app/api/promotions/route.ts")).unwrap();
+}
+
+#[test]
+fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
+    let exports = |(web, api): &(PathBuf, PathBuf)| -> Vec<String> {
+        [web, api]
+            .iter()
+            .map(|r| Engine::open(r).unwrap().export().unwrap())
+            .collect()
+    };
+    let repos = common::xlang_go("fresh_xlang_go");
+    [&repos.0, &repos.1].iter().for_each(|r| age(r));
+    let before = exports(&repos);
+    edit_xlang_go(&repos);
+
+    let refreshed = exports(&repos);
+
+    let cold = common::xlang_go("fresh_xlang_go_cold");
+    edit_xlang_go(&cold);
     for (n, ((refreshed, before), cold)) in refreshed
         .iter()
         .zip(&before)

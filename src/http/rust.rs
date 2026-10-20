@@ -78,7 +78,7 @@ struct Web<'c, 'a> {
 
 /// `path` with each `{name}` or `{name:regex}` as one parameter, whatever the regex holds;
 /// `None` when a brace is not closed.
-fn actix_path(path: &str) -> Option<String> {
+pub(super) fn actix_path(path: &str) -> Option<String> {
     let (mut out, mut open) = (String::new(), 0usize);
     for c in path.chars() {
         match c {

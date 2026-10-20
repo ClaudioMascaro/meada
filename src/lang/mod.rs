@@ -11,6 +11,7 @@ use tree_sitter::Node;
 use crate::Result;
 use crate::resolve::{Code, Keywords};
 
+pub mod go;
 pub mod python;
 pub mod rust;
 pub mod ts;
@@ -58,6 +59,7 @@ pub trait LanguagePack {
             published: None,
             programs: Vec::new(),
             reaches: None,
+            shared: Vec::new(),
         })
     }
 
@@ -194,10 +196,16 @@ pub struct Layout {
     /// Rust crate calls into its own files and the libraries of the repository it depends on.
     /// `None` reaches every file.
     pub reaches: Option<Reaches>,
+    /// The groups of files that share one top-level scope, each sorted (a file in none has a
+    /// scope of its own): a Go package is the files of one directory that declare one package.
+    /// Each file sees the top-level definitions and constants of the others, private ones
+    /// included, after its own names and imports, and an import that names one of them names
+    /// them all: a member is what any of them exports, several that define it `ambiguous`.
+    pub shared: Vec<Vec<String>>,
 }
 
 /// Every pack Meada ships, in a fixed order.
-const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust];
+const PACKS: &[&dyn LanguagePack] = &[&ts::TsJs, &python::Python, &rust::Rust, &go::Go];
 
 /// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
@@ -288,10 +296,19 @@ pub struct Facts {
     /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
-    /// Whether the file opens with an inner `#![cfg(..)]` that is false for the target: it is
-    /// left out of the crate, as if no `mod` reached it.
+    /// The methods (`Class.method`) that are no export door though their class is (Go's
+    /// lower-case methods of an exported type).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden: Vec<String>,
+    /// Whether the file is left out of the build for the target: a Rust file that opens with an
+    /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
+    /// constraints exclude it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unbuilt: bool,
+    /// The package the file declares (Go's `package` clause), which `layout` groups files by
+    /// (`Layout::shared`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub package: String,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
@@ -338,6 +355,10 @@ pub enum Class {
     /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
     /// repository stays outside; a function with no written result is unknown.
     Returned(String),
+    /// `Returned`, for a call written as a value (Go's `s.Open()`, `shapes.NewCircle()`): the
+    /// name is read as an expression, so its head may be a local or a parameter whose class
+    /// the source writes, and a method of that class is the function called.
+    Called(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -893,6 +914,50 @@ pub fn topics(value: &Value) -> Option<Vec<Option<String>>> {
         Value::List(items) => items.iter().map(topic).collect(),
         value => Some(vec![topic(value)?]),
     }
+}
+
+/// What an AMQP publish reads of a call's arguments: the exchange and the routing key.
+pub type ReadPublish<'a> =
+    &'a dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>)>;
+
+/// What an AMQP binding reads of a call's arguments: the queue, the exchange and the pattern.
+pub type ReadBinding<'a> =
+    &'a dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>, Option<String>)>;
+
+/// An AMQP publish at each site an expansion found (`publication`).
+pub fn publish<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadPublish) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .map(|(site, at, (exchange, key))| {
+            let (name, role) = publication(exchange, key);
+            Message {
+                broker: "amqp",
+                name,
+                path: site.into(),
+                call: at,
+                role,
+            }
+        })
+        .collect()
+}
+
+/// An AMQP binding of a queue to an exchange at each site an expansion found.
+pub fn bind<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadBinding) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .filter_map(|(site, at, bound)| {
+            // ponytail: a binding that cannot be fully evaluated is dropped, not shown as
+            // unresolved.
+            let (Some(queue), Some(exchange), Some(pattern)) = bound else {
+                return None;
+            };
+            Some(Message {
+                broker: "amqp",
+                name: Some(queue),
+                path: site.into(),
+                call: at,
+                role: Role::Binding { exchange, pattern },
+            })
+        })
+        .collect()
 }
 
 /// A publish to the exchange `exchange` with the routing key `key`, as its name and role: the

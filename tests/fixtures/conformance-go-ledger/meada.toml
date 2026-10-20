@@ -1,0 +1,3 @@
+# Provides the module the Go conformance fixture requires: it joins its workspace as a peer.
+[[peer]]
+repo = "example.com/acme/conformance"

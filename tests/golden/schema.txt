@@ -1074,6 +1074,197 @@ sample.rs
   ]
 }
 
+sample.go
+{
+  "defs": [
+    {
+      "name": "Store",
+      "kind": "Class",
+      "range": {
+        "start": 119,
+        "end": 133
+      },
+      "params": []
+    },
+    {
+      "name": "Getter",
+      "kind": "Class",
+      "range": {
+        "start": 140,
+        "end": 184
+      },
+      "params": []
+    },
+    {
+      "name": "Getter.Get",
+      "kind": "Method",
+      "range": {
+        "start": 160,
+        "end": 182
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "string"
+      }
+    },
+    {
+      "name": "New",
+      "kind": "Function",
+      "range": {
+        "start": 186,
+        "end": 290
+      },
+      "params": [
+        {
+          "name": "name",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "Store"
+      }
+    },
+    {
+      "name": "Store.Get",
+      "kind": "Method",
+      "range": {
+        "start": 292,
+        "end": 354
+      },
+      "params": [
+        {
+          "name": "key",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "string"
+      }
+    }
+  ],
+  "imports": [
+    {
+      "local": "fmt",
+      "source": "fmt",
+      "name": "Namespace"
+    },
+    {
+      "local": "",
+      "source": "example.com/shop/units",
+      "name": "All"
+    },
+    {
+      "local": "db",
+      "source": "example.com/shop/sql",
+      "name": "Namespace"
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Prefix",
+        "local": "Prefix"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Store",
+        "local": "Store"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Getter",
+        "local": "Getter"
+      }
+    },
+    {
+      "Local": {
+        "exported": "New",
+        "local": "New"
+      }
+    }
+  ],
+  "star": "ExceptDefault",
+  "calls": [
+    {
+      "scope": "New",
+      "callee": "fmt.Sprint",
+      "range": {
+        "start": 231,
+        "end": 255
+      }
+    },
+    {
+      "scope": "New",
+      "callee": "db.Open",
+      "range": {
+        "start": 257,
+        "end": 271
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "callee": "Meters",
+      "range": {
+        "start": 341,
+        "end": 352
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "Prefix"
+    },
+    {
+      "name": "New.label"
+    }
+  ],
+  "receivers": [
+    {
+      "scope": "New",
+      "name": "label",
+      "class": {
+        "Called": "fmt.Sprint"
+      }
+    },
+    {
+      "scope": "New",
+      "name": "name",
+      "class": {
+        "Type": "string"
+      }
+    },
+    {
+      "scope": "New",
+      "name": "s",
+      "class": {
+        "Type": "Store"
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "key",
+      "class": {
+        "Type": "string"
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "s",
+      "class": {
+        "Type": "Store"
+      }
+    }
+  ],
+  "package": "store"
+}
+
 sample.openapi.yaml
 {
   "format": "openapi",

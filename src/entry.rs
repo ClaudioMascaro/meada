@@ -229,16 +229,19 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         let Some(facts) = local.files.get(file) else {
             continue;
         };
-        let named = (keyed.entry(file).or_insert_with(|| keyed_defs(facts)))
-            .get(target)
-            .map_or(&[][..], Vec::as_slice);
+        let (keyed, hidden) = keyed.entry(file).or_insert_with(|| keyed_defs(facts));
+        let named = keyed.get(target).map_or(&[][..], Vec::as_slice);
         // The functions and classes of that name, and the methods of a class of that name.
         let class = named.iter().any(|d| d.kind == Kind::Class);
         for def in named {
             let own = match def.kind {
                 Kind::Function => true,
                 // A method of an exported class; a constructor is reached as `new Class`.
-                Kind::Method => class && !def.name.ends_with(".constructor"),
+                Kind::Method => {
+                    class
+                        && !def.name.ends_with(".constructor")
+                        && !hidden.contains(def.name.as_str())
+                }
                 _ => false,
             };
             if own && let Some(name) = local.names.def(file, &def.name) {
@@ -258,8 +261,9 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
 }
 
 /// A file's functions and classes by their name and its methods by their class's, so that an
-/// export finds its own definitions without a scan of them all.
-fn keyed_defs(facts: &Facts) -> HashMap<&str, Vec<&Def>> {
+/// export finds its own definitions without a scan of them all, with the methods that are no
+/// door (`Facts::hidden`) as a set.
+fn keyed_defs(facts: &Facts) -> (HashMap<&str, Vec<&Def>>, HashSet<&str>) {
     let mut keyed: HashMap<&str, Vec<&Def>> = HashMap::new();
     for def in &facts.defs {
         let key = match def.kind {
@@ -269,7 +273,7 @@ fn keyed_defs(facts: &Facts) -> HashMap<&str, Vec<&Def>> {
         };
         keyed.entry(key).or_default().push(def);
     }
-    keyed
+    (keyed, facts.hidden.iter().map(String::as_str).collect())
 }
 
 #[cfg(test)]
@@ -420,6 +424,56 @@ mod tests {
         assert_eq!(export_doors(Star::Public, &names).len(), names.len());
         // Each export read every definition of its file: minutes here.
         assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn a_type_of_many_hidden_methods_finds_its_doors_in_linear_time() {
+        let n = 100_000;
+        let def = |name: String, kind| crate::lang::Def {
+            name,
+            kind,
+            range: 0..0,
+            params: Vec::new(),
+            bases: Vec::new(),
+            decorators: Vec::new(),
+            return_values: Vec::new(),
+            returns: None,
+            type_params: Vec::new(),
+            result: None,
+        };
+        // `T` holds `n` lower-case methods, no door each, and `Run`.
+        let methods = (0..n).map(|i| format!("T.a{i}"));
+        let facts = Facts {
+            defs: std::iter::once(def("T".into(), Kind::Class))
+                .chain(std::iter::once(def("T.Run".into(), Kind::Method)))
+                .chain(methods.clone().map(|m| def(m, Kind::Method)))
+                .collect(),
+            hidden: methods.collect(),
+            ..Facts::default()
+        };
+        let exported = [Exported {
+            path: "t.go".into(),
+            name: Some("T".into()),
+            file: Some("t.go".into()),
+            target: Some("T".into()),
+        }];
+        let files = BTreeMap::from([("t.go", &facts)]);
+        let local = Local {
+            identity: "r",
+            files: &files,
+            names: &Names::new(&[]),
+            symbols: &HashSet::new(),
+            called: &HashSet::new(),
+            exported: &exported,
+            providers: &[],
+            consumers: &[],
+            programs: &[],
+        };
+        let start = std::time::Instant::now();
+        let labels: Vec<String> = find(&local).into_iter().map(|e| e.label).collect();
+        // Each method was looked up among the hidden ones one by one: minutes here.
+        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+        assert_eq!(labels, ["T.Run"]);
     }
 
     #[test]

@@ -1,0 +1,3 @@
+# Depends on the shared module: it joins the workspace through its peer.
+[[peer]]
+repo = "example.com/gopkg/lib"

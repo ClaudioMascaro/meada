@@ -1,0 +1,13 @@
+example.com/gopkg/lib text/text.go:6-8 Greet
+community: text
+processes: 3 (1 export, 2 program; 2 repositories): main (example.com/gopkg/lib), Helper (example.com/gopkg/lib), main (example.com/gopkg/web)
+func Greet(name string) string {
+	return Shout("hello " + name)
+}
+callers:
+example.com/gopkg/lib cmd/app/main.go:6 main
+example.com/gopkg/lib text/helper_test.go:5 Helper
+callees:
+example.com/gopkg/lib text/text.go:11 Shout
+consumers:
+example.com/gopkg/web main.go:18 welcome [range unchecked]

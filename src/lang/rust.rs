@@ -142,6 +142,7 @@ impl LanguagePack for Rust {
             programs,
             modules: Box::new(move |from, specifier| lookup.lookup(from, specifier)),
             reaches: Some(Box::new(move |from, to| tree.reaches(from, to))),
+            shared: Vec::new(),
         })
     }
 
@@ -2511,7 +2512,7 @@ mod tests {
                 let class = match r.class {
                     Class::Enclosing => "Self".to_string(),
                     Class::Named(n) | Class::Type(n) => n,
-                    Class::Returned(n) => format!("{n}()"),
+                    Class::Returned(n) | Class::Called(n) => format!("{n}()"),
                     Class::Imported => "imported".into(),
                     Class::Unknown => "?".into(),
                 };

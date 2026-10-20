@@ -17,6 +17,7 @@ use crate::resolve::{Code, Expanded, Frame, Target, scope_of};
 use crate::shape::{self, Import, Shape, Source, under};
 use crate::workspace::Repository;
 
+mod go;
 mod rust;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
@@ -1752,6 +1753,8 @@ impl ContractKind for Http {
         found.extend(express(code, &mut literals));
         found.extend(axum(code));
         found.extend(rust::providers(code));
+        found.extend(go::providers(code));
+        found.extend(go::consumers(code));
         found.extend(decorated(code));
         found.extend(django(code));
         found

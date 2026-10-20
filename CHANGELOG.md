@@ -8,6 +8,112 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Go language pack (spec #25): `.go` files with no Go toolchain. Functions, methods named
+  `Type.Method` (pointer and value receivers alike), structs, interfaces and other named types,
+  and interface methods (`Interface.Method`); a function literal is no definition, its calls
+  belong to the function around it. An import names a package directory through the module path
+  of the `go.mod` that owns it (a nested module owns its subtree, two modules of one path name
+  none), or through a `replace` to a local directory of the repository (a `replace` by an
+  outside module makes the module external); plain, aliased, dot and blank imports, a name two
+  imports of a file give linking to nothing. The files of one directory that declare one package share their top-level
+  scope, `_test.go` files included, and an import names them all; the standard library and
+  modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
+  target (gc, no cgo): a file whose name ends in another system or architecture, or whose
+  `//go:build` line is false, or that imports `"C"`, is left out. Exports are the names that start with an upper-case
+  letter. The language-neutral seam `Layout::shared` gives a group of files one scope. Method
+  calls: a call on a receiver whose type the source writes (a parameter, the method receiver, a
+  struct field, a `var`, a composite literal `T{}` or `&T{}`, or the first result of a function
+  whose result type is written) reaches that type's method at `exact`, also when another file
+  of the package declares it; a receiver whose type is not written is a name match
+  (`inferred`, or `ambiguous` with every candidate), and a call through an interface stops at
+  the interface method. A promoted method of an embedded struct is a name match. The
+  `func main` of each `package main` is a program entry point with its process; a `main` in
+  another package, a method named `main` or a file left out of the build is not. The index
+  is rebuilt once (new schema version).
+- Go packages (spec #25): each `go.mod` with a `module` provides `package::go::<module path>`, and
+  each `require`, and each `replace` to a local directory (in the repository or, when it leaves it,
+  in another repository of the workspace, resolved from the text and the repositories' roots),
+  links to the workspace provider of that module; a `replace` by another module leaves the module
+  out. The link is `exact`, the reason `package::go::<module path> <version> (local none), range
+  unchecked`. An import of `<module path>/<directory>` reaches the exported names of that
+  directory of the provider, `exact` when the directory exists, with `; import module path` ending
+  the reason. `go.sum` and the module proxy are never read.
+
+- Go HTTP providers (spec #25): `net/http` (`HandleFunc` and `Handle` on the package or a
+  `ServeMux`, Go 1.22 `METHOD host/path` patterns with the host dropped, a mux given as the
+  handler of another under that pattern),
+  gin (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `Handle`, `Any` on the engine
+  or a `Group`) and echo (the same, minus `Handle`). A path's `{id}` and `{id:[0-9]+}` are one
+  parameter segment, and for gin and echo `:id` and `*path` too (`net/http` reads `{name}`,
+  `{name...}` and `{$}` alone); a route of every method is `http::ANY::<path>`. A router is
+  followed through assignments, arguments, return values and imports, so a function registering
+  on the group it receives serves its routes under every prefix its callers give it; a prefix,
+  path or mount Meada cannot read serves nothing: a `ServeMux` reached only as an argument of a
+  call (`http.StripPrefix`, `echo.WrapHandler`, `gin.WrapH`, a middleware) is an unread mount.
+  A mux given as a handler sees the whole path, so its routes are served where they fall under
+  the outer pattern and for its method. A function literal is the route's inline
+  handler. The Go pack now reads what a call is given, what a function returns and what a `:=`
+  holds. The index is rebuilt once (new schema version).
+
+- Go HTTP consumers (spec #25): `net/http` calls on the package, a `Client` or `DefaultClient`
+  (`Get`, `Head`, `Post`, `PostForm`), `NewRequest` and `NewRequestWithContext` (the construction
+  is the consumer, its method read from a literal or `http.MethodX`), and resty requests (the
+  verbs and `Execute`), with the host of the `SetBaseURL` of the client that issued them (that
+  one client: two clients a factory makes keep their own bases), also when the client is a
+  function result, a wrapper's parameter whose callers all pass a traced client, or a struct
+  field, whose base is the one of the clients every composite literal of the repository sets it
+  to (two bases, a literal whose client is not traced or that sets it by position, a base set
+  through the field, and a field written through a selector anywhere give no host); a client
+  written only as a type, such as a field no literal sets, has no host, and so has a wrapper
+  parameter some caller passes an untraced client to. A URL is folded from literals, `+`, `fmt.Sprintf` (a bare
+  `%s` or `%v` is the argument, `%d` and `%v` an integer literal; any other verb and argument,
+  and any flag, width or precision, a parameter segment), constants and package-level names of
+  the package or of another one (a `var` nothing assigns, in the package or through a selector
+  such as `config.Base = ..`, folds like a constant). A wrapper over
+  a client is read at its call sites, to any depth, with cycle detection. A path that cannot be
+  folded is an unresolved consumer.
+
+- Go base URLs from the environment (spec #25): `os.Getenv("X")` and `os.LookupEnv("X")` (its
+  first result) lead a URL as the base URL variable `X`, which maps through `base_url_env` like
+  the other languages' (Meada never reads the value). The read survives a fallback assignment
+  when the value is empty (`if v == "" { v = ".." }`, also tested as `len(v) == 0` with `len`
+  unshadowed in the file, or as `!ok` or `!ok || v == ""` where `ok` is the second result of
+  the same `os.LookupEnv`, bound once and never assigned; the default never read, provided it
+  folds to text from literals and constants of the same file) and
+  `strings.TrimSuffix`, `strings.TrimRight` and `strings.TrimSpace`, of the read or of a name
+  bound to it. Two reads in one URL, a fallback to another read, a name assigned any other way
+  and a read the code spells with a shadowed `os` give no base. Cross-language fixtures
+  `xlang-go-web` (TypeScript) and `xlang-go-api` (Go) prove both directions through a variable
+  and through a declared host.
+
+- Go HTTP providers for chi and gorilla/mux (spec #25). chi: `Get`, `Post` and the other
+  methods, `Method`/`MethodFunc`, `Handle`/`HandleFunc` (every method), `Route(prefix, fn)` and
+  `Group(fn)` (the router `fn` receives, a literal or a named function, is the group, also passed on or held by a name) and
+  `Mount(prefix, router)`; `{id}`, `{id:regex}` and a trailing `*` are one parameter segment.
+  gorilla/mux: `HandleFunc`/`Handle` with `.Methods(..)` (one provider per method; every method
+  without it; an unreadable or doubled `Methods` serves nothing) and
+  `PathPrefix(prefix).Subrouter()`. Prefixes follow the router at any depth, with cycles cut;
+  a router mounted inside a call (a middleware) or given to a router Meada does not read is an
+  unread mount, and `http.StripPrefix` is not modelled.
+
+- Go channels (spec #25): producers and consumers of the common broker clients, linked to the
+  other languages' sides of the same channel. Kafka: segmentio/kafka-go (`Writer{Topic:}` and
+  `WriteMessages`, `Message{Topic:}`, `NewReader(ReaderConfig{Topic:, GroupTopics:})`),
+  confluent-kafka-go (`Produce` with `TopicPartition.Topic`, `Subscribe`, `SubscribeTopics`) and
+  sarama (`SendMessage`, `ConsumePartition`, `ConsumerGroup.Consume`, whose handler is the
+  `ConsumeClaim` of the handler type). RabbitMQ: amqp091-go (`Publish`, `PublishWithContext`,
+  `Consume`, `QueueBind`; the default exchange reaches the queue its key names). SQS:
+  aws-sdk-go-v2 (`SendMessage`, `SendMessageBatch`, `ReceiveMessage`, the queue being the last
+  segment of `QueueUrl`, through `aws.String`). NATS: nats.go (`Publish`, `Subscribe`,
+  `QueueSubscribe`, with the `*` and `>` wildcards inferred). Redis streams: go-redis (`XAdd`,
+  `XReadGroup`; a read without a group is no consumer). A name is folded like a URL, struct
+  fields of a composite literal included; a name that cannot be folded, a pattern topic and a
+  producer whose receiver does not come from the library are unresolved or no side. A callback
+  client's handler is the callback, a polling client's the function that names the topic or
+  queue. `&topic` as the `Topic:` of a `TopicPartition` keeps the name a constant unless the function writes through a pointer; a `Topic` field written anywhere leaves a writer's topic unresolved. The cross-language
+  fixtures carry a TypeScript producer to a Go consumer group, with a golden `trace`. The index
+  is not rebuilt (no schema change).
+
 - Rust channels (spec #30): producers and consumers of the common broker clients, on a client
   that traces back to the library's constructor. rdkafka (`send` of a `FutureRecord::to(topic)`
   or `BaseRecord::to(topic)`, and `subscribe(&[topics])`, on a client from `ClientConfig::new()`),

@@ -9,8 +9,7 @@
 //! naming the topic or the queue handles what it receives.
 
 use crate::lang::{
-    Call, Message, Role, Value, channel_name as name, consume, produce, publication, queue_name,
-    topics,
+    Call, Message, Value, bind, channel_name as name, consume, produce, publish, queue_name, topics,
 };
 use crate::resolve::{Code, Keywords};
 
@@ -189,34 +188,13 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 (Client::Lapin, "basic_publish") => {
                     let read =
                         |a: &[Value], _: &Keywords| Some((name(arg(a, 0))?, name(arg(a, 1))?));
-                    for (site, at, (exchange, key)) in code.expand(path, n, &read) {
-                        let (name, role) = publication(exchange, key);
-                        out.push(Message {
-                            broker: "amqp",
-                            name,
-                            path: site.into(),
-                            call: at,
-                            role,
-                        });
-                    }
+                    out.extend(publish(code, path, n, &read));
                 }
                 (Client::Lapin, "queue_bind") => {
                     let read = |a: &[Value], _: &Keywords| {
                         Some((name(arg(a, 0))?, name(arg(a, 1))?, name(arg(a, 2))?))
                     };
-                    for (site, at, bound) in code.expand(path, n, &read) {
-                        // ponytail: a binding that cannot be fully evaluated is dropped, not
-                        // shown as unresolved.
-                        if let (Some(queue), Some(exchange), Some(pattern)) = bound {
-                            out.push(Message {
-                                broker: "amqp",
-                                name: Some(queue),
-                                path: site.into(),
-                                call: at,
-                                role: Role::Binding { exchange, pattern },
-                            });
-                        }
-                    }
+                    out.extend(bind(code, path, n, &read));
                 }
                 _ => {}
             }
