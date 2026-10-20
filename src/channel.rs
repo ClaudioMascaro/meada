@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::document;
+use crate::entry::EntryKind;
 use crate::index::{self, Binding, Consumer, Export, Provider, Publish};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
@@ -247,6 +248,12 @@ impl ContractKind for Channel {
             })
             .collect()
     }
+
+    /// A consumer is a door, an unresolved side included: the handler still consumes from
+    /// somewhere.
+    fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
+        (role == Role::Consumer && parse(contract).is_some()).then_some(EntryKind::Channel)
+    }
 }
 
 /// Gives each code side a document side merges into (`own`, their shapes) the document's
@@ -366,7 +373,19 @@ fn nats(pattern: &str, subject: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{Channel, nats, pattern_matches};
-    use crate::contract::ContractKind;
+    use crate::contract::{ContractKind, Role};
+    use crate::entry::EntryKind;
+
+    #[test]
+    fn a_consumer_of_a_channel_is_an_entry_point_named_or_unresolved_and_a_provider_is_not() {
+        for contract in ["channel::kafka::orders.created", "channel::kafka"] {
+            assert_eq!(
+                Channel.entry(Role::Consumer, contract),
+                Some(EntryKind::Channel)
+            );
+            assert_eq!(Channel.entry(Role::Provider, contract), None);
+        }
+    }
 
     #[test]
     fn a_side_with_only_its_broker_prefix_is_unresolved() {
