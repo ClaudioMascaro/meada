@@ -25,13 +25,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
-use crate::engine::{rank, section};
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::literals::Literals;
-use crate::render::{Files, label};
+use crate::render::{Files, label, rank, section};
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;

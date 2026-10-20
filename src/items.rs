@@ -100,14 +100,14 @@ fn decidable(link: &Link) -> bool {
 /// The items of every repository as the core sees them, in id order: `links` are the links
 /// before any decision, so a decided call is listed too (the caller drops it to keep the open
 /// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
-/// an unresolved consumer are the routes of the workspace its method and literal URL fragments
-/// leave.
+/// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
+/// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
     for link in links.iter().filter(|l| decidable(l)) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
-    let routes: Vec<(&str, &Provider)> = exports
+    let providers: Vec<(&str, &Provider)> = exports
         .iter()
         .flat_map(|e| e.providers.iter().map(|p| (e.repository.as_str(), p)))
         .collect();
@@ -127,7 +127,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             let (kind, candidates) =
                 match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
                     (None, _) => {
-                        let fitting = routes.iter().filter(|(_, p)| {
+                        let fitting = providers.iter().filter(|(_, p)| {
                             kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
                         });
                         (
@@ -137,7 +137,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     }
                     (Some(_), Some(links)) => {
                         let listed = links.iter().filter_map(|l| {
-                            (routes.iter())
+                            (providers.iter())
                                 .find(|(_, p)| {
                                     p.site == l.provider && contract::serves(p, &l.contract)
                                 })

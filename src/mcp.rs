@@ -183,15 +183,14 @@ pub fn serve() -> crate::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contract::KINDS;
 
     /// The `search` documentation is a literal: the tool list is a token-limited contract, and
-    /// a derived text would change its lines. A new kind fails here until its word is added.
+    /// a derived text would change its lines. A new kind, or an engine word, fails here until
+    /// its word is added.
     #[test]
-    fn the_search_documentation_names_the_word_of_every_kind() {
+    fn the_search_documentation_names_every_kind_word() {
         let schema = serde_json::to_string(&schemars::schema_for!(SearchArgs)).unwrap();
-        for kind in KINDS {
-            let word = kind.search_word().word();
+        for word in crate::engine::kind_words() {
             assert!(schema.contains(&format!("`{word}`")), "`{word}` is missing");
         }
     }

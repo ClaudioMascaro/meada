@@ -51,7 +51,7 @@ modules updates it.
   `info.title` (exact, prefix, substring), as `<repository> <path> (<Summary::shown()>)
   <title>`; `shown` is `openapi 3.1.0, routes: 3` or `asyncapi 3.0.0, channels: 2` (the count
   follows the format, so OpenAPI lines never gain a `channels: 0`). `search` kind `package`
-  (`search_packages`, an early branch too) lists the `packages` rows whose name matches, as
+  (`Packages::own_search`, an early branch too) lists the `packages` rows whose name matches, as
   `<repository> <directory> <name>@<version> (consumers: <n>)` (no `@<version>` for a manifest
   without one; a package of another ecosystem than npm's adds it after the name, as in
   `shared-lib@1.2.0 (pypi)`, and so does its `packages` row, as `ecosystem`); the consumers are the links whose provider is the package's manifest

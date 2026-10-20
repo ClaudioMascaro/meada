@@ -82,7 +82,7 @@ pub struct Link {
 pub struct Found {
     pub role: Role,
     pub site: Site,
-    /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
+    /// The contract identifier; `None` for a consumer Meada could not resolve.
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`; for a
     /// binding or a publish, the exchange.
