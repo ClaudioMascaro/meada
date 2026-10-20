@@ -211,7 +211,9 @@ one for the area a change touches.
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **Go HTTP client** (spec #25, #79): `http/go/clients.rs` reads `net/http` calls (on the
   package, a `Client`, `DefaultClient`), `NewRequest(WithContext)` and resty requests as
-  consumers; a receiver is a client of a library when `Code::outside_type` (the type a typed
+  consumers; a call is a function of a library when `Code::outside_call` says so (its head is the
+  import itself, the one check the Go routers, clients and channels share), and a receiver is a
+  client of a library when `Code::outside_type` (the type a typed
   parameter, field or `:=` names, qualified by its import path) says so. The URL is folded in
   `lang/go/values.rs` at parse time (`+`, `fmt.Sprintf` verbs as holes, `net/http` method
   constants, package-level `const` and a `var` nothing assigns, in the package or in another one
@@ -248,7 +250,8 @@ one for the area a change touches.
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
 - **Go channels** (spec #25, #82): `lang/go/messages.rs` lists each library (`LIBRARIES`: the
-  import path without its major version, `versionless`, and the constructors that make its client)
+  import path without its module's major version, `modfile::unversioned`, which the Go routers
+  and clients use too, and the constructors that make its client)
   and reads a call when `Code::outside_origin` traces its receiver to one of them (the class-based
   twin of `outside_type`: it also follows `x, err := f()`, a repository function that returns a
   library type, and a method on a value the library made, such as `conn.Channel()`). The
@@ -280,9 +283,9 @@ one for the area a change touches.
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
   `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
   the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
-  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: `go::names_module`, the
-  import path matched to the longest module path of the nearest `go.mod`'s entries
-  (`go::inside`), then `Provided::package` looks in the one directory of the provider the rest
+  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: any import path that
+  is a valid contract name (`valid_name`), matched to the longest module path of the nearest
+  `go.mod`'s entries (`modfile::inside`), then `Provided::package` looks in the one directory of the provider the rest
   names, `How::ModulePath`; `go::read` takes `require` and `replace` from `lang::go::modfile`, the
   Go pack's one `go.mod` reader, and gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside
   `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in

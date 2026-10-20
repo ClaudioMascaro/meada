@@ -2129,7 +2129,7 @@ pub type Through<'a> = ((&'a str, usize), Vec<(&'a str, usize)>);
 pub type Field<'a> = (&'a str, &'a str, &'a str);
 
 /// The method a call's callee names (`x.y.get` is `get`).
-fn method(callee: &str) -> &str {
+pub fn method(callee: &str) -> &str {
     callee.rsplit('.').next().unwrap_or(callee)
 }
 
@@ -2454,6 +2454,28 @@ impl<'a> Code<'a> {
             .then(|| self.resolver.imported_name(path, scope, callee))
     }
 
+    /// What `callee` (`pkg.Name`), written in `scope` of `path`, names in a package outside the
+    /// repository, when its head is the import itself (a dot import binds a bare name): not a
+    /// name whose class is one of the package (`e := other()` with `e.Default()`), which
+    /// `external` also reads as the package's.
+    pub fn outside_call(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
+        let head = callee.split_once('.').map_or(callee, |(head, _)| head);
+        self.external(path, scope, head)?;
+        self.external(path, scope, callee)
+    }
+
+    /// The outside type a type the source writes (`http.Client`), read in `scope` of `path`, is,
+    /// spelled as the imports name its package (`net/http.Client`).
+    fn outside_written(&self, path: &'a str, scope: &'a str, written: &'a str) -> Option<String> {
+        let r = self.resolver;
+        let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
+        let found = r.resolve_as(path, scope, written, seen, work, Reading::Path);
+        let Binding::External(package, _) = found else {
+            return None;
+        };
+        Some(format!("{package}.{}", written.rsplit('.').next()?))
+    }
+
     /// The type outside the repository that the source writes for the name `name` (`c *http.Client`
     /// is `net/http.Client`), written in `scope` of `path`: a parameter, a local, a constant or a
     /// field. A type is written as a path, so an import in the file that writes it names the
@@ -2464,14 +2486,7 @@ impl<'a> Code<'a> {
         let Class::Type(written) = self.resolver.receivers[at].get(&(within, held))? else {
             return None;
         };
-        let (seen, work) = (&mut self.resolver.seen(at, within), &mut Work::default());
-        let found = self
-            .resolver
-            .resolve_as(at, within, written, seen, work, Reading::Path);
-        let Binding::External(package, _) = found else {
-            return None;
-        };
-        Some(format!("{package}.{}", written.rsplit('.').next()?))
+        self.outside_written(at, within, written)
     }
 
     /// What the source says the value `name` (a parameter, a local, a constant or a field), written
@@ -2499,24 +2514,18 @@ impl<'a> Code<'a> {
         match r.receivers[at].get(&(within, held))? {
             Class::Type(_) => self.outside_type(path, scope, name),
             Class::Called(callee) => {
-                let head = callee.split('.').next()?;
                 if callee.contains('.')
-                    && matches!(r.binding(at, within, head), Binding::External(..))
+                    && let Some(function) = self.outside_call(at, within, callee)
                 {
                     // A function of a package.
-                    return Some(r.imported_name(at, within, callee));
+                    return Some(function);
                 }
                 if let Binding::Def(t) = r.binding(at, within, callee) {
                     // A function of the repository: the type its result writes.
                     let Some(Class::Type(written)) = &r.defs[t.path][t.name].result else {
                         return None;
                     };
-                    let (seen, work) = (&mut r.seen(t.path, t.name), &mut Work::default());
-                    let found = r.resolve_as(t.path, t.name, written, seen, work, Reading::Path);
-                    let Binding::External(package, _) = found else {
-                        return None;
-                    };
-                    return Some(format!("{package}.{}", written.rsplit('.').next()?));
+                    return self.outside_written(t.path, t.name, written);
                 }
                 // A method of a value that was made outside.
                 let (receiver, member) = callee.rsplit_once('.')?;

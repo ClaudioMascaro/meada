@@ -116,7 +116,7 @@ impl Modules {
     pub fn dir(&self, from: &str, specifier: &str) -> Option<String> {
         let own = self.owner(from)?;
         let replaced = (own.replaces.iter())
-            .filter_map(|(old, dir)| Some((rest(specifier, old)?, dir.as_deref(), old.len())))
+            .filter_map(|(old, dir)| Some((inside(specifier, old)?, dir.as_deref(), old.len())))
             .max_by_key(|(_, _, len)| *len);
         let replaced = match replaced {
             Some((rest, dir, len)) => Some((rest, dir?, len)),
@@ -126,7 +126,7 @@ impl Modules {
             let matches: Vec<(&str, &str, usize)> = (self.modules.iter())
                 .filter_map(|m| {
                     let path = m.path.as_deref()?;
-                    Some((rest(specifier, path)?, m.dir.as_str(), path.len()))
+                    Some((inside(specifier, path)?, m.dir.as_str(), path.len()))
                 })
                 .collect();
             let longest = matches.iter().map(|(_, _, len)| *len).max()?;
@@ -153,8 +153,33 @@ impl Modules {
     }
 }
 
-/// What follows the module path `module` in the import path `specifier`, if it starts with it.
-fn rest<'s>(specifier: &'s str, module: &str) -> Option<&'s str> {
+/// `path`, an import path or one followed by names (`github.com/redis/go-redis/v9.NewClient`),
+/// without the major version suffix of its module: the first element `vN`, N >= 2 written with
+/// no leading zero, which ends the module path (`confluent-kafka-go/v2/kafka` is
+/// `confluent-kafka-go/kafka`). A later `vN` is a directory of the module and stays.
+pub fn unversioned(path: &str) -> String {
+    let mut at = 0;
+    while let Some(found) = path[at..].find("/v") {
+        let start = at + found;
+        let digits = (path[start + 2..].bytes())
+            .take_while(u8::is_ascii_digit)
+            .count();
+        let (number, rest) = (
+            &path[start + 2..start + 2 + digits],
+            &path[start + 2 + digits..],
+        );
+        let major = !number.starts_with('0') && number.parse::<u32>().is_ok_and(|n| n >= 2);
+        if major && (rest.is_empty() || rest.starts_with(['/', '.'])) {
+            return format!("{}{rest}", &path[..start]);
+        }
+        at = start + 2;
+    }
+    path.to_string()
+}
+
+/// What follows the module path `module` in the import path `specifier`, if it starts with it:
+/// the package directory inside the module, empty for its root.
+pub fn inside<'s>(specifier: &'s str, module: &str) -> Option<&'s str> {
     match specifier.strip_prefix(module)? {
         "" => Some(""),
         rest => rest.strip_prefix('/'),
@@ -168,23 +193,19 @@ fn within(dir: &str, parent: &str) -> bool {
         || dir.strip_prefix(parent).is_some_and(|r| r.starts_with('/'))
 }
 
+/// Whether a `replace` target is a local directory (`./x`, `../x`, `.`, `..`) rather than a
+/// module.
+pub fn local_target(target: &str) -> bool {
+    target.starts_with("./") || target.starts_with("../") || matches!(target, "." | "..")
+}
+
 /// The repository directory a `replace` target names, relative to the `go.mod` in `dir`: only a
-/// local path (`./x`, `../x`) that stays inside the repository.
+/// local path (`local_target`) that stays inside the repository.
 fn local(dir: &str, target: &str) -> Option<String> {
-    if !(target.starts_with("./") || target.starts_with("../") || target == "." || target == "..") {
-        return None;
-    }
-    let mut parts: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
-    for segment in target.split('/') {
-        match segment {
-            "" | "." => {}
-            ".." => {
-                parts.pop()?;
-            }
-            name => parts.push(name),
-        }
-    }
-    Some(parts.join("/"))
+    let folded = local_target(target).then(|| crate::package::cargo::relative(dir, target));
+    folded
+        .flatten()
+        .filter(|p| !p.split('/').any(|s| s == ".."))
 }
 
 #[cfg(test)]
@@ -212,6 +233,34 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn the_major_version_of_the_module_alone_is_dropped() {
+        for (path, expected) in [
+            ("github.com/labstack/echo/v4", "github.com/labstack/echo"),
+            (
+                "github.com/labstack/echo/v4.New",
+                "github.com/labstack/echo.New",
+            ),
+            ("redis/go-redis/v9.NewClient", "redis/go-redis.NewClient"),
+            (
+                "confluent-kafka-go/v2/kafka.NewProducer",
+                "confluent-kafka-go/kafka.NewProducer",
+            ),
+            // A `vN` after the module's is a directory of it.
+            ("example.com/x/v2/sub/v3/pkg", "example.com/x/sub/v3/pkg"),
+            ("IBM/sarama.NewSyncProducer", "IBM/sarama.NewSyncProducer"),
+            ("example.com/v1/x.New", "example.com/v1/x.New"),
+            ("example.com/x/v0", "example.com/x/v0"),
+            ("example.com/x/v02", "example.com/x/v02"),
+            ("example.com/vendor/x.New", "example.com/vendor/x.New"),
+            ("example.com/v2x/x.New", "example.com/v2x/x.New"),
+            ("gopkg.in/yaml.v3", "gopkg.in/yaml.v3"),
+            ("net/http", "net/http"),
+        ] {
+            assert_eq!(unversioned(path), expected, "{path}");
+        }
     }
 
     #[test]

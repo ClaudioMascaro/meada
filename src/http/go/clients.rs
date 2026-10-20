@@ -11,10 +11,10 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
 use super::super::{CallAt, based, consumer, fetch};
-use super::{external, split};
+use super::split;
 use crate::contract::Found;
 use crate::lang::{Call, Part, Value};
-use crate::resolve::{Code, Field};
+use crate::resolve::{Code, Field, method as member};
 
 /// How many calls a client or a request is followed back through (`New().SetX().R().SetY()`),
 /// and how many names it is followed through.
@@ -58,7 +58,7 @@ fn passes(member: &str) -> bool {
 
 /// Whether `name` (`github.com/go-resty/resty/v2.Client`) is the type `ty` of resty.
 fn resty_type(name: &str, ty: &str) -> bool {
-    split(name).is_some_and(|(package, name)| RESTY.contains(&package) && name == ty)
+    split(name).is_some_and(|(package, name)| RESTY.contains(&package.as_str()) && name == ty)
 }
 
 /// How a call sends: the HTTP method it sends, or the argument that gives it, and the argument
@@ -270,12 +270,14 @@ impl<'c, 'a> Clients<'c, 'a> {
         let Some(call) = self.code.call(path, index) else {
             return Vec::new();
         };
-        let member = call.callee.rsplit('.').next().unwrap_or_default();
-        let made = external(self.code, path, &call.scope, &call.callee)
+        let member = member(&call.callee);
+        let made = self
+            .code
+            .outside_call(path, &call.scope, &call.callee)
             .as_deref()
             .and_then(split)
             .is_some_and(|(package, name)| {
-                RESTY.contains(&package) && RESTY_CLIENTS.contains(&name)
+                RESTY.contains(&package.as_str()) && RESTY_CLIENTS.contains(&name)
             });
         if made {
             return if request {
@@ -383,8 +385,12 @@ impl<'c, 'a> Clients<'c, 'a> {
         let table = |table: &[(&str, &'static str)]| {
             table.iter().find(|(m, _)| *m == member).map(|(_, v)| *v)
         };
-        let named = external(self.code, path, &call.scope, &call.callee);
-        match named.as_deref().and_then(split) {
+        let named = self.code.outside_call(path, &call.scope, &call.callee);
+        let split = named.as_deref().and_then(split);
+        match split
+            .as_ref()
+            .map(|(package, name)| (package.as_str(), *name))
+        {
             // A function of the package.
             Some((HTTP, "NewRequest")) => return Some((Method::Argument(0), 1, None)),
             Some((HTTP, "NewRequestWithContext")) => {
@@ -451,7 +457,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {
-            let member = stored.callee.rsplit('.').next().unwrap_or_default();
+            let member = member(&stored.callee);
             if !sends.contains(&member) {
                 continue;
             }

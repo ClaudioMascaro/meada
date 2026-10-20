@@ -5,7 +5,8 @@
 use std::collections::BTreeMap;
 
 use crate::lang::{
-    Handler, Message, Role, Value, channel_name as name, literal, property, publication, queue_name,
+    Handler, Message, Role, Value, bind, channel_name as name, literal, property, publish,
+    queue_name,
 };
 use crate::resolve::Code;
 
@@ -151,36 +152,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 (AMQPLIB, expr, "publish") if AMQP_CHANNELS.contains(&expr) => {
                     let read = |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?));
-                    for (site, at, (exchange, key)) in code.expand(path, n, &|a, _| read(a)) {
-                        // The empty exchange is the queue named by the key; one that cannot
-                        // be evaluated leaves the producer unresolved.
-                        let (name, role) = publication(exchange, key);
-                        let (path, call) = (site.into(), at);
-                        out.push(Message {
-                            broker: "amqp",
-                            name,
-                            path,
-                            call,
-                            role,
-                        });
-                    }
+                    out.extend(publish(code, path, n, &|a, _| read(a)));
                 }
                 (AMQPLIB, expr, "bindQueue") if AMQP_CHANNELS.contains(&expr) => {
                     let read =
                         |a: &[Value]| Some((arg_name(a, 0)?, arg_name(a, 1)?, arg_name(a, 2)?));
-                    for (site, at, bound) in code.expand(path, n, &|a, _| read(a)) {
-                        // ponytail: a binding that cannot be fully evaluated is dropped, not
-                        // shown as unresolved.
-                        if let (Some(queue), Some(exchange), Some(pattern)) = bound {
-                            out.push(Message {
-                                broker: "amqp",
-                                name: Some(queue),
-                                path: site.into(),
-                                call: at,
-                                role: Role::Binding { exchange, pattern },
-                            });
-                        }
-                    }
+                    out.extend(bind(code, path, n, &|a, _| read(a)));
                 }
                 _ => {}
             }

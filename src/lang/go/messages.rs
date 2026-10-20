@@ -8,9 +8,10 @@
 //! A client that calls back (`Subscribe(subject, handler)`) has the callback as its handler; a
 //! polling one, the function that holds the call naming the topic or the queue.
 
+use super::modfile::unversioned;
 use crate::lang::{
-    Call, Handler, Message, Role, Value, channel_name as name, consume, produce, property,
-    publication, queue_name, topic, topics,
+    Call, Handler, Message, Value, bind, channel_name as name, consume, produce, property, publish,
+    queue_name, topic, topics,
 };
 use crate::resolve::{Code, Keywords};
 
@@ -163,34 +164,6 @@ const METHODS: &[&str] = &[
     "NewReader",
 ];
 
-/// `origin` without the major version of its package (`go-redis/v9.NewClient` is
-/// `go-redis.NewClient`): a segment `v2` or above, whole or ahead of a `.`.
-fn versionless(origin: &str) -> String {
-    let mut out = String::new();
-    let mut rest = origin;
-    while let Some(at) = rest.find("/v") {
-        let digits = rest[at + 2..]
-            .bytes()
-            .take_while(u8::is_ascii_digit)
-            .count();
-        let after = &rest[at + 2 + digits..];
-        let major = rest[at + 2..at + 2 + digits]
-            .parse::<u32>()
-            .is_ok_and(|n| n >= 2);
-        let ends = after.is_empty() || after.starts_with(['/', '.']);
-        out.push_str(&rest[..at]);
-        match major && ends {
-            true => rest = after,
-            false => {
-                out.push_str("/v");
-                rest = &rest[at + 2..];
-            }
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
@@ -218,7 +191,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let Some(origin) = code.outside_origin(path, &call.scope, receiver) else {
                 continue;
             };
-            let origin = versionless(&origin);
+            let origin = unversioned(&origin);
             let Some(library) = LIBRARIES.iter().find(|l| l.made(&origin)) else {
                 continue;
             };
@@ -285,40 +258,15 @@ fn form<'a>(
             let first = usize::from(method == "PublishWithContext");
             let read =
                 |a: &[Value], _: &Keywords| Some((name(arg(a, first))?, name(arg(a, first + 1))?));
-            code.expand(path, n, &read)
-                .into_iter()
-                .map(|(site, at, (exchange, key))| {
-                    let (name, role) = publication(exchange, key);
-                    Message {
-                        broker: "amqp",
-                        name,
-                        path: site.into(),
-                        call: at,
-                        role,
-                    }
-                })
-                .collect()
+            publish(code, path, n, &read)
         }
         (Client::Amqp, "Consume") => consume(code, path, n, "amqp", &one, None),
         (Client::Amqp, "QueueBind") => {
+            // `QueueBind(queue, key, exchange, ..)`.
             let read = |a: &[Value], _: &Keywords| {
-                Some((name(arg(a, 0))?, name(arg(a, 1))?, name(arg(a, 2))?))
+                Some((name(arg(a, 0))?, name(arg(a, 2))?, name(arg(a, 1))?))
             };
-            let mut out = Vec::new();
-            for (site, at, bound) in code.expand(path, n, &read) {
-                // ponytail: a binding that cannot be fully evaluated is dropped, not shown as
-                // unresolved.
-                if let (Some(queue), Some(pattern), Some(exchange)) = bound {
-                    out.push(Message {
-                        broker: "amqp",
-                        name: Some(queue),
-                        path: site.into(),
-                        call: at,
-                        role: Role::Binding { exchange, pattern },
-                    });
-                }
-            }
-            out
+            bind(code, path, n, &read)
         }
         (Client::Sqs, "SendMessage" | "SendMessageBatch") => {
             produce(code, path, n, "sqs", &|a, _| queue_of(arg(a, 1)))
@@ -355,14 +303,12 @@ fn is_library<'a>(
     callee: &'a str,
     function: &str,
 ) -> bool {
-    let Some((head, _)) = callee.split_once('.') else {
-        return false;
-    };
-    if code.external(path, scope, head).is_none() {
-        return false;
-    }
-    let named = code.external(path, scope, callee);
-    named.is_some_and(|n| versionless(&n) == format!("{KAFKA_GO}.{function}"))
+    let named = callee
+        .contains('.')
+        .then(|| code.outside_call(path, scope, callee));
+    named
+        .flatten()
+        .is_some_and(|n| unversioned(&n) == format!("{KAFKA_GO}.{function}"))
 }
 
 /// The topics of `kafka.NewReader(kafka.ReaderConfig{Topic:, GroupTopics:})`.
@@ -522,26 +468,4 @@ fn arg(args: &[Value], at: usize) -> &Value {
 /// The one channel name the first argument gives.
 fn one(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![name(arg(args, 0))?])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::versionless;
-
-    #[test]
-    fn major_versions_above_one_are_dropped() {
-        for (origin, expected) in [
-            ("redis/go-redis/v9.NewClient", "redis/go-redis.NewClient"),
-            (
-                "confluent-kafka-go/v2/kafka.NewProducer",
-                "confluent-kafka-go/kafka.NewProducer",
-            ),
-            ("IBM/sarama.NewSyncProducer", "IBM/sarama.NewSyncProducer"),
-            ("example.com/v1/x.New", "example.com/v1/x.New"),
-            ("example.com/vendor/x.New", "example.com/vendor/x.New"),
-            ("example.com/v2x/x.New", "example.com/v2x/x.New"),
-        ] {
-            assert_eq!(versionless(origin), expected, "{origin}");
-        }
-    }
 }
