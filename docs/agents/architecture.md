@@ -440,7 +440,10 @@ one for the area a change touches.
   leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
   crate), and `Layout::published` (default: none) the files whose exports a pack counts
   at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
-  library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
+  library root through `pub mod` declarations, so a binary crate exports nothing.
+  `Facts::hidden` lists the methods (`Class.method`) that are no export door although their
+  class is one (Go's lower-case methods and interface methods of an exported type):
+  `entry::exports` skips them, read as a set per file. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
   (`block_member`, before the class's own names: the inherent blocks' definitions, else the
   trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
@@ -760,7 +763,11 @@ one for the area a change touches.
   other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned
   anywhere but its declaration (or written through a selector), fold to nothing: the consumer is
   unresolved (no marker). A verb with flags, width or precision is a hole, and so is `%d` of
-  anything but an integer literal, and `%s` of an integer literal.
+  anything but an integer literal, and `%s` of an integer literal. `values::Std` folds
+  `fmt`, `net/http`, `os`, `strings` and `aws` only where nothing else in the file spells the
+  name they are imported by (`hidden`: a parameter, a local or a function of that name in any
+  function of the file leaves every call of the package in the file unfolded, whatever its
+  scope).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result
