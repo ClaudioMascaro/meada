@@ -91,7 +91,7 @@ one for the area a change touches.
   `channel`; a channel handler is no export entry point. A handler serving several routes or
   channels has an entry point per contract,
   and entry points are unique by identity. The stored export entry points are candidates:
-  `Engine::exports` drops, after `package::import`, each one that is the target of an import
+  `Engine::exports` drops (in the package kind's `workspace_step`, after `import`), each one that is the target of an import
   from its own repository (a monorepo), at any level.
 - Package: `package::npm::<name>`, `package::pypi::<name>` (the PEP 503 normalized name) or
   `package::cargo::<name>` (the `[package] name`; a dependent's site names the key it writes, so
@@ -174,21 +174,39 @@ one for the area a change touches.
 
 ## Seams and what extends them
 
-- New **contract kind**: implement `ContractKind`, add it to `KINDS`. `extract` reads `Code`
-  (never the syntax tree) and returns `Found` with a `Site` (`Def`, `Inline`, `File`, `Call`);
-  a kind fed by `meada.toml` instead overrides `declare(repo, export)`, which `Engine::exports`
-  calls at query time (nothing stored, so a config edit needs no reindex); `link` receives the
-  whole workspace's providers. A kind's rules stay in its own file. A kind whose consumers
-  need providers from other repositories (a package depends on one the workspace holds) adds a
-  workspace step: `Engine::exports` runs it after every `declare`, as `package::consume` (the
-  dependency entries) and `package::import` (the calls through an import) are, over a
-  `Providers` index built once, and `link` reads what the step left on the consumer. Such a
-  consumer is no open item when ambiguous: `items.rs` (`decidable`) skips the contracts of the
-  kind explicitly, since several providers of a name are no call for a person to decide. Its
-  sites show in `context` and `search` through hooks in `engine.rs`: `package::place` names where
-  a site sits (`<path> <field>`), the `consumers:` section of `context` on a symbol adds the
-  calls that reach it through a hop (`package::reached`), and `contract_sides` lists the sides
-  of the contract itself, with the roles `sides` names.
+- New **contract kind**: implement `ContractKind` (`contract.rs`) and add it to `KINDS`, at the
+  end: the order of the list is the order of the steps and of the output. Nothing in
+  `engine.rs`, `items.rs`, `decisions.rs`, `trace.rs` or `entry.rs` names a kind, and a kind's
+  rule stays in its own file. Three questions are required: `prefix`, `extract` (reads `Code`,
+  never the syntax tree, and returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
+  `link` (receives the whole workspace's providers and exports). The others have a default
+  body, and a kind overrides only what it answers differently:
+
+  | Question | The kind says |
+  |---|---|
+  | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
+  | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
+  | `workspace_step` | a step over every repository after every `declare` (the package provider index, dependency entries, imports, shapes) |
+  | `after_links` | a pass over the links after the decisions replay (HTTP: drift) |
+  | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
+  | `place` | where a site sits when it is neither a symbol nor a call (packages: manifest and field) |
+  | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
+  | `sides`, `view`, `related_sides` | the role words, the carried word and drift consumers of `context` on a contract, and the sides that reach it by another name |
+  | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
+  | `starts` | the providers a `trace` start text names |
+  | `status` | the lines `meada status` prints |
+  | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
+
+  The engine fixes the phase order: every `declare`, then every `workspace_step`, then `link`,
+  then the decisions replay, then every `after_links`, each in `KINDS` order (decisions are
+  kind-free and a pass over the links must see decided links). A side is unresolved when its
+  contract is absent (skipped by `link`, an open item whose candidates come from each provider's
+  kind) or when its kind says so (`unresolved`: never linked, never an open item, shown with the
+  suffix). The deliberate extras a kind may still need outside its files: a phrase in the MCP
+  `search` doc string (a test fails until it is there), a variant of `entry::EntryKind` when
+  its doors need a stored name, stored fields on the export, provider and consumer rows, and a
+  reader in `document` when it reads provider documents. The coding standard sends any other
+  hook in the engine to review.
 - A **builder** language (spec #30 #129: a call whose method returns its receiver, such as
   `Router::new().route(..)`): the pack sets `LanguagePack::fluent` and gives each call its
   `Call::receiver` (a value emitted from the syntax, not stored in the index, like `args`).
@@ -315,8 +333,8 @@ one for the area a change touches.
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
   <p>`) is an arm of `channel.rs`'s `wildcard(broker, pattern, name)`, which `fits` calls; a
   binding match (reason `<queue contract> binding <exchange> <p>`) is `routed`. `reaching`
-  joins both for `link` (with the whole workspace's providers and `Routes`) and
-  `Engine::contract_sides` uses `fits` and `Routes::reached`, so `context` on a channel shows
+  joins both for `link` (with the whole workspace's providers and exports, from which it builds `Routes`) and
+  `Channel::related_sides` uses `fits` and `Routes::reached`, so `context` on a channel shows
   every side a link would join. Something that is neither side, like a binding or a publish to
   a named exchange, is a `Found` with its own `Role`, an export list of its own
   (`Export::bindings`, `Export::publishes`) and, to show in `context` on a channel, a line in
@@ -368,22 +386,26 @@ one for the area a change touches.
   resolves them, and what their `exports` rows lead to; `package::exported_shapes`, a step
   `index::refresh` runs after the kinds' `extract`, as
   `Role::Shape` rows; each source reads its own: `Types::exported`, `Zod::exported`,
-  `Literals::exported`). The workspace step `package::shapes`, after `package::import` in
-  `Engine::exports`, resolves each import as a call through it resolves (`Provided::resolve`,
+  `Literals::exported`). The workspace step `package::shapes`, after `import` in the package
+  kind's `workspace_step` (which `Engine::exports` runs), resolves each import as a call through it resolves (`Provided::resolve`,
   over the `exports` rows, which name constants and types too) and fills it with
   `shape::fill`, the one recursion and the one place its limits live, carrying the
   resolution's level: through one that is not `exact` (an `outDir` mapping) a provider's part is
   `guessed` and a consumer's paths are not declared, so no drift on them is `exact`. A new source that reads
   an exported name adds a `Want`, a reader's `exported` and an arm in `exported_shapes`.
-- New **match rule** (a path rewrite, a new provider source): the kind's `link`, the open-item
-  candidates in `items.rs` (`http::route_fits`) and each candidate's contract must agree.
+- New **match rule** (a path rewrite, a new provider source): the kind's `link`, its `serves`
+  and its `candidate` (the questions `items.rs` and `decisions.rs` ask) and each candidate's
+  contract must agree.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.
 - New **entry point kind** (spec #31): a variant of `entry::EntryKind` (its `name` and `parse`
   arms and the list `parse` searches, and its name in the `processes` kinds of the export JSON
-  above, which `tests/it/docs.rs` checks), a finder beside `routes`, `channels`, `programs` and
-  `exports` in `entry::find`, and the `site` its process starts from (a symbol or a code file;
+  above, which `tests/it/docs.rs` checks). A door that is a side of a contract needs no finder:
+  `entry::doors` asks each side's kind (`ContractKind::entry(role, contract)`, which sides make
+  an entry point of which variant, a function of the contract alone). Any other door is a
+  finder beside `programs`, `doors` and `exports` in `entry::find`, and the `site` its process
+  starts from (a symbol or a code file;
   `holds` checks it). The finder reads `entry::Local`: `identity`, `files` (every file's
   `Facts`), `names`, `symbols`, `called`, `exported`, `providers` and `consumers` (`entry::Side`,
   a `site` and a `contract`) and `programs` (`entry::Program`, a `file` and a definition name). A

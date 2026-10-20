@@ -22,7 +22,7 @@ mod ts;
 pub const PARAM: &str = "{}";
 
 /// The method of a provider that serves every method: `http::ANY::<path>`.
-pub const ANY: &str = "ANY";
+const ANY: &str = "ANY";
 
 pub struct Http;
 
@@ -121,7 +121,7 @@ pub fn route(contract: &str) -> Option<(&str, &str)> {
 }
 
 /// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
-pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
+fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
     let method = route(&provider.contract).map(|(method, _)| method);
     (provider.gateways.iter())
         .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
@@ -129,13 +129,13 @@ pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (St
 
 /// Whether a provider of the route `provided` serves the route `wanted`: the same route, or
 /// the same path when the provider serves every method (`ANY`).
-pub(crate) fn fits(provided: &str, wanted: &str) -> bool {
+fn fits(provided: &str, wanted: &str) -> bool {
     provided == wanted
         || matches!((route(provided), route(wanted)), (Some((ANY, p)), Some((_, w))) if p == w)
 }
 
 /// Whether `provider` serves `contract`, by its own path or by a gateway path.
-pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
+fn serves(provider: &Provider, contract: &str) -> bool {
     fits(&provider.contract, contract)
         || gateway_contracts(provider).any(|(g, _)| fits(&g, contract))
 }
@@ -144,7 +144,7 @@ pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
 /// but `ambiguous`) and a shape on both sides: the consumer's at its call site, and that of the
 /// provider at the link's provider site serving the link's contract. Run on the links of the
 /// whole workspace once the decisions are replayed, so everything reading links sees it.
-pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
+fn drift(links: &mut [Link], exports: &[IndexExport]) {
     // A call site holds one consumer per contract it reaches (a wrapper fetching two routes);
     // the same contract from several hosts (`via`) counts only when they read alike.
     let mut consumers: HashMap<(&str, Option<&str>), Vec<Option<&Shape>>> = HashMap::new();
@@ -182,7 +182,7 @@ pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
 /// `method` when that is known (or of every method), and its path holds every literal
 /// fragment, in order.
-pub fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
+fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
     let Some((route_method, mut path)) = route(contract) else {
         return false;
     };

@@ -43,7 +43,7 @@ mod pypi;
 pub struct Packages;
 
 /// The start of every package contract identifier.
-pub const PREFIX: &str = "package::";
+const PREFIX: &str = "package::";
 
 /// A package ecosystem: the manifests it reads, the contract its packages provide, and its
 /// rules for checking a range. How an import names a package is its own too (`split` for npm,
@@ -1120,10 +1120,10 @@ impl<'e> Provided<'e> {
 /// repository in `exports`, then its manifest in `Export::manifests`. Built once for the
 /// workspace steps (`consume`, `import`), both of which only add to the exports and never move
 /// a manifest.
-pub struct Providers(HashMap<(Ecosystem, String), Vec<(usize, usize)>>);
+struct Providers(HashMap<(Ecosystem, String), Vec<(usize, usize)>>);
 
 impl Providers {
-    pub fn new(exports: &[Export]) -> Self {
+    fn new(exports: &[Export]) -> Self {
         let mut providers: HashMap<_, Vec<(usize, usize)>> = HashMap::new();
         for (n, export) in exports.iter().enumerate() {
             for (i, m) in export.manifests.iter().enumerate() {
@@ -1149,7 +1149,7 @@ impl Providers {
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider; a Python import several depended-on packages expose is a consumer of each. Any
 /// other, an import of a package outside the workspace included, adds nothing.
-pub fn import(exports: &mut [Export], providers: &Providers) {
+fn import(exports: &mut [Export], providers: &Providers) {
     // Built for a provider the first time an import reaches it.
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let mut found = Vec::new();
@@ -1228,7 +1228,7 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
 /// a package import gives has it filled (`shape::fill`) from the shape the package's index keeps
 /// for the imported name (`kept`), so an edit to the package changes its importers' drift at the
 /// next query. A part that finds none is open on a provider and adds nothing on a consumer.
-pub fn shapes(exports: &mut [Export], providers: &Providers) {
+fn shapes(exports: &mut [Export], providers: &Providers) {
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let all: &[Export] = exports;
     let mut find = |n, import: &shape::Import| kept(all, providers, &provided, n, import);
@@ -1574,7 +1574,7 @@ pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// that names a package some repository of the workspace provides, a consumer and a
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
-pub fn consume(exports: &mut [Export], providers: &Providers) {
+fn consume(exports: &mut [Export], providers: &Providers) {
     let found: Vec<_> = (exports.iter())
         .map(|export| {
             let mut consumers = Vec::new();
@@ -1643,7 +1643,7 @@ const MAX_RANGE: usize = 256;
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Flag {
+enum Flag {
     /// The range is npm semver and does not accept the local version.
     Mismatch,
     /// The range cannot be checked: not a semver range, or no version to check it against.
@@ -1666,7 +1666,7 @@ impl Flag {
 /// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
 /// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
 /// comparator.
-pub fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
+fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
     let (Some(range), Some(version)) = (range, version) else {
         return Some(Flag::Unchecked);
     };
@@ -1713,7 +1713,7 @@ fn flag_of(contract: &str, range: Option<&str>, version: Option<&str>) -> Option
 /// The reason of a package link: `<identifier> <range|none> (local <version|none>)`, then
 /// `, range mismatch` or `, range unchecked` when `flag_of` says so. The one place the package
 /// reason is built; a path that extends it (an import hop) builds on this.
-pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> String {
+fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> String {
     let said = format!(
         "{contract} {} (local {})",
         range.unwrap_or("none"),
@@ -1726,7 +1726,7 @@ pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> Str
 }
 
 /// A call that reaches a symbol through a package import, for `context`.
-pub struct Reach<'e> {
+struct Reach<'e> {
     /// The position in `exports` of the repository holding the call.
     pub repository: usize,
     pub call: &'e CallSite,
@@ -1737,7 +1737,7 @@ pub struct Reach<'e> {
 
 /// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
 /// with the link's level and the range flag of the dependency entry it went through.
-pub fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
+fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
     let mut found = Vec::new();
     for link in links
         .iter()
