@@ -9,9 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::channel;
-use crate::contract::Names;
-use crate::http;
+use crate::contract::{self, Names, Role};
 use crate::lang::{Def, Facts, Kind};
 use crate::resolve::{Exported, scope_of};
 
@@ -120,11 +118,10 @@ impl Local<'_> {
 
 /// The entry points of a repository, sorted by identity.
 pub fn find(local: &Local) -> Vec<EntryPoint> {
-    let routes = routes(local);
+    let doors = doors(local);
     // A program entry point comes first: dedup keeps it over an export of the same symbol.
     let mut found = programs(local);
-    found.extend(routes);
-    found.extend(channels(local));
+    found.extend(doors);
     let served: HashSet<&str> = found.iter().map(|e| e.site.as_str()).collect();
     let exports = exports(local, &served);
     found.extend(exports);
@@ -158,13 +155,17 @@ fn programs(local: &Local) -> Vec<EntryPoint> {
     found
 }
 
-/// One entry point per route a handler serves: a symbol, or a code file when no function of its
-/// own serves it (its process starts from the file's top-level calls). A route only a document
-/// lists is no entry point.
-fn routes(local: &Local) -> Vec<EntryPoint> {
+/// One entry point per provider or consumer side whose kind makes a door of it: a symbol, or a
+/// code file when no function of its own holds it (its process starts from the file's
+/// top-level calls). A route only a document lists is no entry point. An unresolved channel
+/// side is one too: the handler still consumes from somewhere, and without its entry point it
+/// would show up nowhere (it would also be an export entry point otherwise).
+fn doors(local: &Local) -> Vec<EntryPoint> {
+    let providers = local.providers.iter().map(|s| (Role::Provider, s));
+    let consumers = local.consumers.iter().map(|s| (Role::Consumer, s));
     let mut found = Vec::new();
-    for Side { site, contract } in local.providers {
-        let Some((method, path)) = http::route(contract) else {
+    for (role, Side { site, contract }) in providers.chain(consumers) {
+        let Some(kind) = contract::entry(role, contract) else {
             continue;
         };
         if !local.holds(site) {
@@ -172,28 +173,8 @@ fn routes(local: &Local) -> Vec<EntryPoint> {
         }
         found.push(EntryPoint {
             identity: format!("{site}::{contract}"),
-            kind: EntryKind::Route,
-            label: format!("{method} {path}"),
-            site: site.clone(),
-        });
-    }
-    found
-}
-
-/// One entry point per channel a consumer handler consumes, a symbol or a code file like a
-/// route handler. An unresolved side (`channel::kafka`) is one too: the handler still consumes
-/// from somewhere, and without its entry point it would show up nowhere (it would also be an
-/// export entry point otherwise), so it is labelled as `channel::shown` prints it.
-fn channels(local: &Local) -> Vec<EntryPoint> {
-    let mut found = Vec::new();
-    for Side { site, contract } in local.consumers {
-        if channel::parse(contract).is_none() || !local.holds(site) {
-            continue;
-        }
-        found.push(EntryPoint {
-            identity: format!("{site}::{contract}"),
-            kind: EntryKind::Channel,
-            label: channel::shown(contract),
+            kind,
+            label: contract::label(contract),
             site: site.clone(),
         });
     }
@@ -517,7 +498,7 @@ mod tests {
             programs: &[],
         };
 
-        let got: Vec<(String, String)> = (channels(&local).into_iter())
+        let got: Vec<(String, String)> = (doors(&local).into_iter())
             .map(|e| (e.identity, e.label))
             .collect();
 

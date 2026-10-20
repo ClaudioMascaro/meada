@@ -78,5 +78,9 @@ in the same change:
 
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   of the invariant "The index holds no source text and no values, apart from ...".
-- A step a kind runs outside `ContractKind` (a workspace pass in `Engine::exports`, a rule in
-  `items.rs`, a rendering hook in `engine.rs`) is named under "Seams and what extends them".
+- A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
+  decisions, the trace and the entry points ask the seam (`contract::kind_of`, `shown`,
+  `serves`, `place` and the other free functions) and import no kind module; a hook added to
+  one of them is a finding. What cannot be a question (a stored field, the phrase in the MCP
+  `search` doc string, a variant of `entry::EntryKind`, a reader in `document`) is named under
+  "Seams and what extends them".

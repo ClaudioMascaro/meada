@@ -3,9 +3,9 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::channel::Routes;
 use crate::config::gateway_path;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, View, shown};
+use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
@@ -22,7 +22,7 @@ mod ts;
 pub const PARAM: &str = "{}";
 
 /// The method of a provider that serves every method: `http::ANY::<path>`.
-pub const ANY: &str = "ANY";
+const ANY: &str = "ANY";
 
 pub struct Http;
 
@@ -121,7 +121,7 @@ pub fn route(contract: &str) -> Option<(&str, &str)> {
 }
 
 /// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
-pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
+fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
     let method = route(&provider.contract).map(|(method, _)| method);
     (provider.gateways.iter())
         .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
@@ -129,13 +129,13 @@ pub(crate) fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (St
 
 /// Whether a provider of the route `provided` serves the route `wanted`: the same route, or
 /// the same path when the provider serves every method (`ANY`).
-pub(crate) fn fits(provided: &str, wanted: &str) -> bool {
+fn fits(provided: &str, wanted: &str) -> bool {
     provided == wanted
         || matches!((route(provided), route(wanted)), (Some((ANY, p)), Some((_, w))) if p == w)
 }
 
 /// Whether `provider` serves `contract`, by its own path or by a gateway path.
-pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
+fn serves(provider: &Provider, contract: &str) -> bool {
     fits(&provider.contract, contract)
         || gateway_contracts(provider).any(|(g, _)| fits(&g, contract))
 }
@@ -144,7 +144,7 @@ pub(crate) fn serves(provider: &Provider, contract: &str) -> bool {
 /// but `ambiguous`) and a shape on both sides: the consumer's at its call site, and that of the
 /// provider at the link's provider site serving the link's contract. Run on the links of the
 /// whole workspace once the decisions are replayed, so everything reading links sees it.
-pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
+fn drift(links: &mut [Link], exports: &[IndexExport]) {
     // A call site holds one consumer per contract it reaches (a wrapper fetching two routes);
     // the same contract from several hosts (`via`) counts only when they read alike.
     let mut consumers: HashMap<(&str, Option<&str>), Vec<Option<&Shape>>> = HashMap::new();
@@ -182,7 +182,7 @@ pub(crate) fn drift(links: &mut [Link], exports: &[IndexExport]) {
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
 /// `method` when that is known (or of every method), and its path holds every literal
 /// fragment, in order.
-pub fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
+fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
     let Some((route_method, mut path)) = route(contract) else {
         return false;
     };
@@ -468,6 +468,21 @@ impl ContractKind for Http {
         "http"
     }
 
+    fn search_word(&self) -> Search {
+        Search::Filter("route")
+    }
+
+    /// A route is listed by its providers alone: its consumers are calls. Its shape is a
+    /// `response`, and the consumers that read fields follow (drift).
+    fn view(&self, contract: &str) -> Option<View> {
+        route(contract).map(|_| View {
+            provider: "provider",
+            consumer: None,
+            carried: "response",
+            drift: true,
+        })
+    }
+
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
@@ -573,7 +588,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[IndexExport],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -666,11 +681,149 @@ impl ContractKind for Http {
             })
             .collect()
     }
+
+    /// The drift of the links, once the decisions are replayed (`drift`).
+    fn after_links(&self, links: &mut [Link], exports: &[IndexExport]) {
+        drift(links, exports);
+    }
+
+    /// A route is labelled by its method and path.
+    fn label(&self, contract: &str) -> String {
+        match route(contract) {
+            Some((method, path)) => format!("{method} {path}"),
+            None => shown(contract),
+        }
+    }
+
+    fn serves(&self, provider: &Provider, contract: &str) -> bool {
+        serves(provider, contract)
+    }
+
+    /// A route fits a dynamic URL by its code path or by a gateway path.
+    fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {
+        let fits = |c: &str| route_fits(c, consumer.method.as_deref(), &consumer.fragments);
+        fits(&provider.contract) || gateway_contracts(provider).any(|(g, _)| fits(&g))
+    }
+
+    /// A route is a whole contract (`GET /users` names one too), or a path on any method.
+    fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        let (contract, path) = if route(from).is_some() {
+            (Some(from.to_string()), None)
+        } else if let Some((method, path)) = from.split_once(' ')
+            && path.starts_with('/')
+            && method.chars().all(|c| c.is_ascii_alphabetic())
+        {
+            (Some(self::contract(method, path)), None)
+        } else if from.starts_with('/') {
+            (None, Some(format!("::{}", normalize_path(from))))
+        } else {
+            (None, None)
+        };
+        (providers.iter())
+            .filter(|(c, _)| {
+                contract.as_deref().is_some_and(|w| fits(c, w))
+                    || path.as_deref().is_some_and(|p| c.ends_with(p))
+            })
+            .map(|&(_, site)| site)
+            .collect()
+    }
+
+    /// A provider of a route is a door.
+    fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
+        (role == Role::Provider && route(contract).is_some()).then_some(EntryKind::Route)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CallAt, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits};
+    use super::{
+        CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
+    };
+    use crate::contract::{ContractKind, Role, Search, View};
+    use crate::entry::EntryKind;
+    use crate::index::{Consumer, Gateway, Provider};
+
+    fn provider(contract: &str) -> Provider {
+        Provider {
+            contract: contract.into(),
+            ..Provider::default()
+        }
+    }
+
+    #[test]
+    fn routes_are_selected_by_the_route_word() {
+        assert_eq!(Http.search_word(), Search::Filter("route"));
+    }
+
+    /// `context` on a route lists its providers, calls its shape `response` and follows the
+    /// linked consumers that read fields; a contract that is no route has no such view.
+    #[test]
+    fn a_route_is_viewed_by_its_providers_with_a_response_and_drift_and_a_non_route_not_at_all() {
+        let view = Http.view("http::GET::/users/{}").unwrap();
+        let expected = View {
+            provider: "provider",
+            consumer: None,
+            carried: "response",
+            drift: true,
+        };
+        assert_eq!(view, expected);
+        assert_eq!(Http.view("http::orders"), None);
+        assert_eq!(Http.view("resource::db::orders"), None);
+    }
+
+    #[test]
+    fn a_route_ranks_against_its_path_alone() {
+        assert_eq!(Http.parts("http::get::/users"), (None, Some("/users")));
+    }
+
+    #[test]
+    fn a_provider_serves_its_route_any_method_and_its_gateway_path_and_nothing_else() {
+        let get = provider("http::GET::/users");
+        assert!(Http.serves(&get, "http::GET::/users"));
+        assert!(!Http.serves(&get, "http::POST::/users"));
+        let any = provider("http::ANY::/users");
+        assert!(Http.serves(&any, "http::DELETE::/users"));
+        assert!(!Http.serves(&any, "http::DELETE::/other"));
+        let gateway = Provider {
+            gateways: vec![Gateway {
+                path: "/shop/users".into(),
+                reason: "gateway prefix /shop".into(),
+            }],
+            ..get
+        };
+        assert!(Http.serves(&gateway, "http::GET::/shop/users"));
+    }
+
+    #[test]
+    fn a_route_is_a_candidate_for_a_dynamic_url_through_its_gateway_path() {
+        let consumer = Consumer {
+            contract: None,
+            site: "r::a.ts::f::g#0".into(),
+            via: None,
+            shape: None,
+            method: Some("GET".into()),
+            fragments: vec!["/shop/".into()],
+            hops: Vec::new(),
+        };
+        let direct = provider("http::GET::/shop/users");
+        let gateway = Provider {
+            gateways: vec![Gateway {
+                path: "/shop/users".into(),
+                reason: "gateway prefix /shop".into(),
+            }],
+            ..provider("http::GET::/users")
+        };
+        assert!(Http.candidate(&consumer, &direct));
+        assert!(Http.candidate(&consumer, &gateway));
+        assert!(!Http.candidate(&consumer, &provider("http::GET::/users")));
+        assert!(!Http.candidate(&consumer, &provider("resource::db::orders")));
+    }
+
+    #[test]
+    fn a_route_is_labelled_by_its_method_and_path_and_anything_else_as_it_is_shown() {
+        assert_eq!(Http.label("http::GET::/users/{}"), "GET /users/{}");
+        assert_eq!(Http.label("resource::db::orders"), "resource::db::orders");
+    }
 
     /// `n` routers, each mounted on the next under `/{i}`, as many times as `ways`; the last
     /// is the app.
@@ -820,5 +973,29 @@ mod tests {
         ] {
             assert_eq!(fragments(&parts), expected);
         }
+    }
+
+    #[test]
+    fn a_trace_start_names_the_providers_of_a_route_in_three_forms_and_of_nothing_else() {
+        let providers = [
+            ("http::GET::/users/{}", "r::a.ts::get"),
+            ("http::POST::/users/{}", "r::a.ts::post"),
+            ("http::GET::/other", "r::a.ts::other"),
+            ("channel::kafka::users", "r::a.ts::handle"),
+        ];
+        let starts = |from| Http.starts(from, &providers);
+        assert_eq!(starts("http::GET::/users/{}"), ["r::a.ts::get"]);
+        assert_eq!(starts("GET /users/{}"), ["r::a.ts::get"]);
+        assert_eq!(starts("/users/{}"), ["r::a.ts::get", "r::a.ts::post"]);
+        assert!(starts("get").is_empty());
+        assert!(starts("GET users").is_empty());
+    }
+
+    #[test]
+    fn a_provider_of_a_route_is_an_entry_point_and_a_consumer_is_not() {
+        let route = "http::GET::/users";
+        assert_eq!(Http.entry(Role::Provider, route), Some(EntryKind::Route));
+        assert_eq!(Http.entry(Role::Consumer, route), None);
+        assert_eq!(Http.entry(Role::Provider, "http::nonsense"), None);
     }
 }

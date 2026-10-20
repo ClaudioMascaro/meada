@@ -7,7 +7,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::channel::{Channel, Routes};
+use crate::channel::Channel;
+use crate::entry::EntryKind;
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
 use crate::package::Packages;
@@ -81,7 +82,7 @@ pub struct Link {
 pub struct Found {
     pub role: Role,
     pub site: Site,
-    /// The contract identifier; `None` for an HTTP consumer Meada could not resolve.
+    /// The contract identifier; `None` for a consumer Meada could not resolve.
     pub contract: Option<String>,
     /// How a consumer names the provider's repository, such as `host:api.example.com`; for a
     /// binding or a publish, the exchange.
@@ -153,6 +154,76 @@ pub enum Site {
     Call { path: String, index: usize },
 }
 
+/// How `search` selects a kind with its `kind` argument.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Search {
+    /// The word keeps the contracts of the kind's prefix, ranked like all the others.
+    Filter(&'static str),
+    /// The kind renders the answer itself (`ContractKind::own_search`) for the word.
+    Own(&'static str),
+}
+
+impl Search {
+    /// The `kind` the argument spells.
+    pub fn word(self) -> &'static str {
+        match self {
+            Search::Filter(word) | Search::Own(word) => word,
+        }
+    }
+}
+
+/// How `context` lists a contract of a kind.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct View {
+    /// The word for a provider side: `writer`, `producer`, `provider`.
+    pub provider: &'static str,
+    /// The word for a consumer side; `None` when the consumers are calls that `trace` and the
+    /// `contracts:` of their symbols show, so `context` leaves them out.
+    pub consumer: Option<&'static str>,
+    /// What a side's shape carries: `response` for a route, `payload` for the rest.
+    pub carried: &'static str,
+    /// Whether the linked consumers that read fields follow the sides (the drift view).
+    pub drift: bool,
+}
+
+/// A side that reaches a contract through another name, for `context` to list after the sides
+/// that hold it (`ContractKind::related_sides`).
+pub struct Related<'e> {
+    /// The site of the side.
+    pub site: &'e str,
+    /// The side the line shows as, which orders it: `Provider`, `Consumer` or `Binding`.
+    pub role: Role,
+    /// The words that name the side in the line.
+    pub words: String,
+    /// How the name matched, shown after the line; `None` for a side that holds no tag.
+    pub matched: Option<(Level, String)>,
+    /// The shape a document gives the side.
+    pub shape: Option<&'e Shape>,
+}
+
+/// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
+/// ties, and the line.
+pub type Hit = (u8, String, String);
+
+/// A contract kind: the whole interface of one, so that the engine, the open items, the
+/// decisions, the trace and the entry points ask a kind instead of naming it. Every question
+/// but `prefix`, `extract` and `link` has a default body; a kind overrides only what it
+/// answers differently. The questions are listed in the order the engine asks them.
+///
+/// The engine fixes the phase order, and the kinds answer in `KINDS` order: `extract` and
+/// `entry` when the index is written; then every kind's `declare` over every repository, then
+/// every kind's `workspace_step` over all of them, then `link`, then the decisions replay,
+/// then every kind's `after_links`. The decisions are kind-free and a pass over the links must
+/// see the decided ones, so they sit between. The queries ask the rest of the questions.
+///
+/// One rule for "unresolved": a side is unresolved when its contract is absent (a consumer
+/// whose contract could not be read: skipped by `link`, an open item whose candidates each
+/// provider's kind answers, a dead edge in the trace) or when its kind says so of the
+/// identifier (`unresolved`: never linked, never an open item, shown with the unresolved
+/// suffix).
+///
+/// A new kind appends to `KINDS`: the order of the list is the order of the steps and of the
+/// output.
 pub trait ContractKind {
     /// The identifier prefix: `http` for `http::GET::/users`.
     fn prefix(&self) -> &'static str;
@@ -161,11 +232,78 @@ pub trait ContractKind {
     /// facts and the values `code` evaluates.
     fn extract(&self, code: &Code) -> Vec<Found>;
 
+    /// Which entry point kind a `role` side of `contract` makes. It is a function of the
+    /// contract alone, since entry points are stored when the index is written: changing an
+    /// answer needs a reindex.
+    fn entry(&self, _role: Role, _contract: &str) -> Option<EntryKind> {
+        None
+    }
+
     /// Adds to `export`, the index content of `repo`, the sides `repo` declares for this kind
     /// in its `meada.toml`, keeping the lists sorted: a kind fed by configuration rather than
     /// code. A kind also uses it to mark what `meada.toml` says about the sides it found. They
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
+
+    /// Runs once over the index content of every repository of the workspace (in workspace
+    /// order), after every kind's `declare` has run on every repository: a step that needs
+    /// all of them, such as an index of the providers of the whole workspace.
+    fn workspace_step(&self, _exports: &mut [Export]) {}
+
+    /// The links from `consumer`, held by the repository `from`, to the providers of the
+    /// workspace (each with the repository holding it) and, for a queue, the publishes the
+    /// bindings of the workspace's `exports` route to it. Several fitting providers are all
+    /// linked as ambiguous; none leaves the consumer unlinked.
+    fn link(
+        &self,
+        consumer: &Consumer,
+        from: &Repository,
+        providers: &[(&Repository, &Provider)],
+        exports: &[Export],
+    ) -> Vec<Link>;
+
+    /// Runs once over the links of the whole workspace, after the decisions replay, so it sees
+    /// the decided links: a pass that sets something on them, such as the drift of a link.
+    fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
+
+    /// Whether the identifier is an unresolved side: one whose name could not be evaluated
+    /// (a channel that is only its broker prefix). It never links, is no open item, and is
+    /// shown with the unresolved suffix.
+    fn unresolved(&self, _contract: &str) -> bool {
+        false
+    }
+
+    /// How the identifier is labelled in candidates and entry points. It is a function of the
+    /// identifier alone, since entry points are stored when the index is written.
+    fn label(&self, contract: &str) -> String {
+        shown(contract)
+    }
+
+    /// The parts of the identifier `search` ranks against, besides the whole identifier: a kind
+    /// and an id, or a broker and a name. A route path ranks as its last part.
+    fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
+        (None, last(contract))
+    }
+
+    /// Where `site` of `repository` sits when it is neither a symbol, a call, the repository
+    /// nor a document's: `None` when this kind does not place it (packages: a manifest or one
+    /// of its dependency entries).
+    fn place(&self, _repository: &str, _site: &str) -> Option<String> {
+        None
+    }
+
+    /// The word of `search`'s `kind` that selects this kind: its contracts by the prefix
+    /// (default, such as `resource`; HTTP says `route`), or its own rendering. The words must
+    /// not collide with the engine's, and the MCP `search` documentation names each of them.
+    fn search_word(&self) -> Search {
+        Search::Filter(self.prefix())
+    }
+
+    /// The hits of this kind's own rendering of `search` (`Search::Own`) for `needle`, already
+    /// lower-cased, given the exports and the links of the workspace.
+    fn own_search(&self, _exports: &[Export], _links: &[Link], _needle: &str) -> Vec<Hit> {
+        Vec::new()
+    }
 
     /// The words for a provider and a consumer of this kind when `context` lists a contract
     /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
@@ -173,17 +311,78 @@ pub trait ContractKind {
         None
     }
 
-    /// The links from `consumer`, held by the repository `from`, to the providers of the
-    /// workspace (each with the repository holding it) and, for a queue, the publishes the
-    /// workspace's `routes` send to it. Several fitting providers are all linked as ambiguous;
-    /// none leaves the consumer unlinked.
-    fn link(
+    /// How `context` lists `contract`, a contract of this kind, by the words of `sides`
+    /// (default); `None` when it lists none (`context` then reads the argument as a symbol).
+    fn view(&self, _contract: &str) -> Option<View> {
+        self.sides().map(|(provider, consumer)| View {
+            provider,
+            consumer: Some(consumer),
+            carried: "payload",
+            drift: false,
+        })
+    }
+
+    /// The sides of `export` that reach `contract` through another name, besides the sides that
+    /// hold it, which the engine lists: none by default (channels: wildcard producers and
+    /// consumers, the publishes its bindings route to a queue, and the bindings themselves).
+    /// `exports` are the workspace's.
+    fn related_sides<'e>(
         &self,
-        consumer: &Consumer,
-        from: &Repository,
-        providers: &[(&Repository, &Provider)],
-        routes: &Routes,
-    ) -> Vec<Link>;
+        _exports: &'e [Export],
+        _export: &'e Export,
+        _contract: &str,
+    ) -> Vec<Related<'e>> {
+        Vec::new()
+    }
+
+    /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
+    /// line of each provider sitting at it: none by default (channels: the publish and the
+    /// queues its bindings route it to, a publish having no contract of its own). `exports` are
+    /// the workspace's.
+    fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The sections a symbol's `context` adds after its callees, as lines (packages:
+    /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
+    /// the workspace's, and `symbol` the identity of a symbol of it.
+    fn context_sections(
+        &self,
+        _exports: &[Export],
+        _repos: &[Repository],
+        _links: &[Link],
+        _symbol: &str,
+    ) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The providers a trace start text names, among `providers` (contract, site). The trace
+    /// takes the union of every kind's answer.
+    fn starts<'a>(&self, _from: &str, _providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        Vec::new()
+    }
+
+    /// The status lines of `repository` (whose index content is `export`) about this kind,
+    /// given the links of the workspace.
+    fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Whether the kind's ambiguous links are open items: a call for a person to decide.
+    fn decidable(&self) -> bool {
+        true
+    }
+
+    /// Whether `provider` serves `contract`, aliases included (HTTP: a gateway path, any
+    /// method).
+    fn serves(&self, provider: &Provider, contract: &str) -> bool {
+        provider.contract == contract
+    }
+
+    /// Whether `provider` is a candidate for `consumer`, which has no contract.
+    fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
+        false
+    }
 }
 
 /// Every contract kind of this release.
@@ -193,6 +392,66 @@ pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages]
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     let (prefix, _) = contract.split_once("::")?;
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
+}
+
+/// Whether `contract` is an unresolved side, by the rule of its kind.
+pub fn unresolved(contract: &str) -> bool {
+    kind_of(contract).is_some_and(|k| k.unresolved(contract))
+}
+
+/// `contract` as a person reads it: an unresolved side says so.
+pub fn shown(contract: &str) -> String {
+    match unresolved(contract) {
+        true => format!("{contract} (unresolved)"),
+        false => contract.to_string(),
+    }
+}
+
+/// The contract a person typed as `shown` printed it: `channel::kafka (unresolved)` is
+/// `channel::kafka`.
+pub fn typed(text: &str) -> &str {
+    match text.strip_suffix(" (unresolved)") {
+        Some(contract) if unresolved(contract) => contract,
+        _ => text,
+    }
+}
+
+/// `contract` as its kind labels it in candidates and entry points.
+pub fn label(contract: &str) -> String {
+    kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
+}
+
+/// The kind `search` selects with the `kind` word `word`, and how.
+pub fn searched(word: &str) -> Option<(&'static dyn ContractKind, Search)> {
+    let words = KINDS.iter().map(|k| (*k, k.search_word()));
+    words.into_iter().find(|(_, search)| search.word() == word)
+}
+
+/// The last `::` part of an identifier.
+fn last(contract: &str) -> Option<&str> {
+    contract.rsplit_once("::").map(|(_, part)| part)
+}
+
+/// The parts of `contract` `search` ranks against, as its kind gives them.
+pub fn parts(contract: &str) -> (Option<&str>, Option<&str>) {
+    kind_of(contract).map_or_else(|| (None, last(contract)), |k| k.parts(contract))
+}
+
+/// Where `site` of `repository` sits, as the first kind that places it says.
+pub fn place(repository: &str, site: &str) -> Option<String> {
+    KINDS.iter().find_map(|k| k.place(repository, site))
+}
+
+/// Whether `provider` serves `contract`, by the rule of the contract's kind, else by equality.
+pub fn serves(provider: &Provider, contract: &str) -> bool {
+    kind_of(contract).map_or(provider.contract == contract, |k| {
+        k.serves(provider, contract)
+    })
+}
+
+/// Which entry point kind a `role` side of `contract` makes, by the rule of its kind.
+pub fn entry(role: Role, contract: &str) -> Option<EntryKind> {
+    kind_of(contract)?.entry(role, contract)
 }
 
 /// The names of `Kind::Inline` definitions (inline route handlers, spec #3): the name a kind
@@ -260,5 +519,187 @@ impl Names {
             })
             .collect::<Vec<_>>()
             .join(".")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, View, place,
+        searched, shown, typed, unresolved,
+    };
+    use crate::config::Config;
+    use crate::decisions::Decisions;
+    use crate::entry::{EntryKind, EntryPoint};
+    use crate::index::Export;
+    use crate::workspace::Repository;
+
+    /// The seam shows an unresolved side with its suffix and reads the suffix back off.
+    #[test]
+    fn shown_and_typed_round_trip_through_the_kind() {
+        let broker_only = "channel::kafka";
+        assert!(unresolved(broker_only));
+        assert_eq!(shown(broker_only), "channel::kafka (unresolved)");
+        assert_eq!(typed("channel::kafka (unresolved)"), broker_only);
+
+        let named = "channel::kafka::orders.created";
+        assert!(!unresolved(named));
+        assert_eq!(shown(named), named);
+        assert_eq!(typed(named), named);
+
+        // The suffix means nothing on a resolved side or on a kind with no unresolved sides.
+        assert_eq!(
+            typed("channel::kafka::x (unresolved)"),
+            "channel::kafka::x (unresolved)"
+        );
+        assert_eq!(shown("http::GET::/users"), "http::GET::/users");
+        assert_eq!(shown("not a contract"), "not a contract");
+    }
+
+    fn resource_repo(toml: &str) -> Repository {
+        Repository {
+            root: "".into(),
+            identity: "r".into(),
+            config: toml::from_str::<Config>(toml).unwrap(),
+            decisions: Decisions::default(),
+        }
+    }
+
+    fn entry(identity: &str, kind: EntryKind) -> EntryPoint {
+        EntryPoint {
+            identity: identity.into(),
+            kind,
+            label: identity.into(),
+            site: identity.into(),
+        }
+    }
+
+    /// A resource no link reaches is reported by its kind; a kind with no lines of its own
+    /// reports none.
+    #[test]
+    fn resources_report_status_lines_and_other_kinds_none() {
+        let repo =
+            resource_repo("[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"read\"\n");
+        let export = Export::default();
+        let lines = Resource.status(&repo, &export, &[]);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("resource::postgres::orders"), "{lines:?}");
+        assert!(Http.status(&repo, &export, &[]).is_empty());
+        assert!(Channel.status(&repo, &export, &[]).is_empty());
+    }
+
+    /// A workspace step over a workspace with no package imports leaves every entry point as
+    /// it is, whichever kind runs it (the monorepo rule itself is pinned by the export and
+    /// process goldens).
+    #[test]
+    fn workspace_steps_keep_the_entry_points_of_a_workspace_without_imports() {
+        let mut export = Export {
+            repository: "r".into(),
+            ..Export::default()
+        };
+        export.entry_points = vec![
+            entry("r::a.ts::free", EntryKind::Export),
+            entry("r::a.ts::route", EntryKind::Route),
+        ];
+        let mut exports = vec![export];
+        for kind in [&Packages as &dyn ContractKind, &Http, &Resource, &Channel] {
+            kind.workspace_step(&mut exports);
+        }
+        let kept: Vec<_> = (exports[0].entry_points.iter())
+            .map(|e| &e.identity[..])
+            .collect();
+        assert_eq!(kept, ["r::a.ts::free", "r::a.ts::route"]);
+    }
+
+    /// Each kind says how `search` selects it, in kinds order; the packages render their own
+    /// answer.
+    #[test]
+    fn the_kinds_search_words_follow_the_kinds_order() {
+        let words: Vec<_> = KINDS.iter().map(|k| k.search_word()).collect();
+        assert_eq!(
+            words,
+            [
+                Search::Filter("route"),
+                Search::Filter("resource"),
+                Search::Filter("channel"),
+                Search::Own("package"),
+            ]
+        );
+        let (kind, search) = searched("package").unwrap();
+        assert_eq!((kind.prefix(), search), ("package", Search::Own("package")));
+        assert!(searched("http").is_none());
+    }
+
+    /// A kind with two named sides is viewed by both, their shape a `payload`, with no drift;
+    /// a kind with no sides has no view.
+    #[test]
+    fn a_kind_with_sides_is_viewed_by_both_and_one_without_has_no_view() {
+        let channel = Channel.view("channel::kafka::orders.created").unwrap();
+        let expected = View {
+            provider: "producer",
+            consumer: Some("consumer"),
+            carried: "payload",
+            drift: false,
+        };
+        assert_eq!(channel, expected);
+        let resource = Resource.view("resource::postgres::orders").unwrap();
+        assert_eq!(
+            (resource.provider, resource.consumer),
+            ("writer", Some("reader"))
+        );
+        assert_eq!(
+            Packages.view("package::npm::kit").unwrap().provider,
+            "package"
+        );
+    }
+
+    /// A kind that adds nothing to `context` (routes, resources, packages as to a call) leaves
+    /// the sides, the call and the symbol alone.
+    #[test]
+    fn a_kind_with_nothing_to_add_leaves_the_sides_the_call_and_the_symbol_alone() {
+        let exports = [Export::default()];
+        for kind in [&Http as &dyn ContractKind, &Resource, &Packages] {
+            let related = kind.related_sides(&exports, &exports[0], "x::y");
+            assert!(related.is_empty());
+            assert!(
+                kind.at_call(&exports, &exports[0], "r::a.ts::f#0")
+                    .is_empty()
+            );
+        }
+        for kind in [&Http as &dyn ContractKind, &Resource, &Channel] {
+            assert!(
+                kind.context_sections(&exports, &[], &[], "r::a.ts::f")
+                    .is_empty()
+            );
+        }
+    }
+
+    /// The seam places a site as the first kind that answers does, and not at all otherwise.
+    #[test]
+    fn the_seam_places_a_manifest_site_and_leaves_any_other_alone() {
+        assert_eq!(
+            place("r", "r::kit/package.json"),
+            Some("kit/package.json".into())
+        );
+        assert_eq!(place("r", "r::src/app.ts::main"), None);
+    }
+
+    /// The HTTP pass after links sets nothing on a link with no shapes; a kind with no pass
+    /// leaves the links alone.
+    #[test]
+    fn the_pass_after_links_leaves_a_link_without_shapes_alone() {
+        let mut links = vec![Link {
+            consumer: "r::a.ts::c".into(),
+            provider: "s::b.ts::p".into(),
+            contract: "http::GET::/x".into(),
+            level: Level::Exact,
+            reason: "x".into(),
+            by: None,
+            p: None,
+            drift: None,
+        }];
+        Http.after_links(&mut links, &[]);
+        Channel.after_links(&mut links, &[]);
+        assert!(links[0].drift.is_none());
     }
 }

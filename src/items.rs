@@ -5,10 +5,8 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use crate::contract::{Level, Link};
-use crate::http;
+use crate::contract::{self, Level, Link, kind_of};
 use crate::index::{Export, Provider};
-use crate::package;
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -47,22 +45,14 @@ pub struct Candidate {
 }
 
 impl Candidate {
-    /// The method of the route, empty for a contract that is not an HTTP route.
-    pub fn method(&self) -> &str {
-        http::route(&self.contract).map_or("", |(method, _)| method)
+    /// The contract as its kind labels it: method and path for a route.
+    pub fn label(&self) -> String {
+        contract::label(&self.contract)
     }
 
-    /// The path of the route, empty for a contract that is not an HTTP route.
-    pub fn path(&self) -> &str {
-        http::route(&self.contract).map_or("", |(_, path)| path)
-    }
-
-    /// The candidate as a person or a decider sees it: repository identity, method and path.
+    /// The candidate as a person or a decider sees it: repository identity and label.
     pub fn describe(&self) -> String {
-        match self.method() {
-            "" => format!("{} {}", self.repository, self.contract),
-            method => format!("{} {method} {}", self.repository, self.path()),
-        }
+        format!("{} {}", self.repository, self.label())
     }
 }
 
@@ -88,7 +78,7 @@ pub struct OpenItem {
     pub expression: String,
     /// `None` for a call at the top level of its file.
     pub enclosing: Option<Enclosing>,
-    /// Sorted by repository identity, then method, then path, then site.
+    /// Sorted by repository identity, then label (method and path of a route), then site.
     pub candidates: Vec<Candidate>,
 }
 
@@ -102,23 +92,22 @@ impl OpenItem {
     }
 }
 
-/// Whether `link` is an ambiguous link a person can decide: several providers of a package
-/// fit a dependency entry, but no call is there to pick one for.
+/// Whether `link` is an ambiguous link a person can decide, as its kind says.
 fn decidable(link: &Link) -> bool {
-    link.level == Level::Ambiguous && !link.contract.starts_with(package::PREFIX)
+    link.level == Level::Ambiguous && kind_of(&link.contract).is_none_or(|k| k.decidable())
 }
 
 /// The items of every repository as the core sees them, in id order: `links` are the links
 /// before any decision, so a decided call is listed too (the caller drops it to keep the open
 /// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
-/// an unresolved consumer are the routes of the workspace its method and literal URL fragments
-/// leave.
+/// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
+/// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
     for link in links.iter().filter(|l| decidable(l)) {
         ambiguous.entry(&link.consumer).or_default().push(link);
     }
-    let routes: Vec<(&str, &Provider)> = exports
+    let providers: Vec<(&str, &Provider)> = exports
         .iter()
         .flat_map(|e| e.providers.iter().map(|p| (e.repository.as_str(), p)))
         .collect();
@@ -138,10 +127,8 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             let (kind, candidates) =
                 match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
                     (None, _) => {
-                        let method = consumer.method.as_deref();
-                        let fits = |c: &str| http::route_fits(c, method, &consumer.fragments);
-                        let fitting = routes.iter().filter(|(_, p)| {
-                            fits(&p.contract) || http::gateway_contracts(p).any(|(g, _)| fits(&g))
+                        let fitting = providers.iter().filter(|(_, p)| {
+                            kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
                         });
                         (
                             ItemKind::Unresolved,
@@ -150,8 +137,10 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     }
                     (Some(_), Some(links)) => {
                         let listed = links.iter().filter_map(|l| {
-                            (routes.iter())
-                                .find(|(_, p)| p.site == l.provider && http::serves(p, &l.contract))
+                            (providers.iter())
+                                .find(|(_, p)| {
+                                    p.site == l.provider && contract::serves(p, &l.contract)
+                                })
                                 .map(candidate)
                         });
                         (ItemKind::Ambiguous, listed.collect())
@@ -179,14 +168,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     site: site.into(),
                 })
                 .collect();
-            candidates.sort_by(|a, b| {
-                (&a.repository, a.method(), a.path(), &a.site).cmp(&(
-                    &b.repository,
-                    b.method(),
-                    b.path(),
-                    &b.site,
-                ))
-            });
+            // The label of a route orders as its method then path: the space sorts before
+            // every method letter and before the slash.
+            candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
             items.push(OpenItem {
                 id: consumer.site.clone(),
                 kind,
@@ -226,9 +210,8 @@ mod tests {
     }
 
     #[test]
-    fn an_ambiguous_package_link_is_no_item_even_when_its_consumer_is_a_call() {
+    fn only_an_ambiguous_link_of_a_decidable_kind_is_an_item() {
         assert!(decidable(&ambiguous("http::GET::/users")));
-        assert!(!decidable(&ambiguous("package::npm::@example/a")));
         let exact = Link {
             level: Level::Exact,
             ..ambiguous("http::GET::/users")

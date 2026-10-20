@@ -7,7 +7,6 @@
 
 use std::collections::HashSet;
 
-use crate::channel::Routes;
 use crate::config;
 use crate::contract::{ContractKind, Found, Level, Link};
 use crate::index::{Consumer, Export, Provider};
@@ -18,7 +17,7 @@ use crate::workspace::Repository;
 pub struct Resource;
 
 /// The start of every resource contract identifier.
-pub const PREFIX: &str = "resource::";
+const PREFIX: &str = "resource::";
 
 /// The contract identifier of `resource`: `resource::<kind>::<id>`.
 fn contract(resource: &config::Resource) -> String {
@@ -52,7 +51,7 @@ fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec
 /// The status lines of `repo` (whose index content is `export`) about its resources: each
 /// `via` that names no symbol, the fallback to the repository as a whole, and each resource
 /// no link of the workspace (`links`) reaches.
-pub fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
+fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
     let mut lines = Vec::new();
     let mut seen = HashSet::new();
     for resource in &repo.config.resources {
@@ -88,6 +87,11 @@ impl ContractKind for Resource {
 
     fn extract(&self, _code: &Code) -> Vec<Found> {
         Vec::new()
+    }
+
+    fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
+        let rest = contract.strip_prefix(PREFIX);
+        rest.and_then(|rest| rest.split_once("::")).unzip()
     }
 
     /// One side per `via` symbol the repository has; a `via` entry that names no symbol is
@@ -127,13 +131,17 @@ impl ContractKind for Resource {
         consumers.dedup_by(|a, b| key(a) == key(b));
     }
 
+    fn status(&self, repository: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
+        report(repository, export, links)
+    }
+
     /// The reader `consumer` links to every writer of its resource held by another repository.
     fn link(
         &self,
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -152,5 +160,20 @@ impl ContractKind for Resource {
                 drift: None,
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Resource;
+    use crate::contract::ContractKind;
+
+    #[test]
+    fn a_resource_ranks_against_its_kind_and_its_id() {
+        assert_eq!(
+            Resource.parts("resource::postgres::orders"),
+            (Some("postgres"), Some("orders"))
+        );
+        assert_eq!(Resource.parts("resource::postgres"), (None, None));
     }
 }

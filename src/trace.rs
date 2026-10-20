@@ -9,12 +9,12 @@ use serde::Serialize;
 use crate::contract::{self, Level, Link};
 use crate::entry::EntryPoint;
 use crate::index::{CallSite, Consumer, Export, Symbol};
+use crate::render;
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, mark, unresolved,
 };
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{channel, http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -119,7 +119,7 @@ impl<'a> Graph<'a> {
                 .map(|p| (Mark::Produces, Some(&p.contract), &p.site))
                 .chain(consumed.map(|c| (Mark::Consumes, c.contract.as_ref(), &c.site)));
             for (side, contract, site) in sides {
-                if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
+                if let Some(contract) = contract.filter(|c| contract::unresolved(c)) {
                     graph
                         .unresolved_sides
                         .entry(site)
@@ -213,25 +213,8 @@ impl<'a> Graph<'a> {
                 kind.prefix()
             )]);
         }
-        let (contract, path) = if http::route(from).is_some() {
-            (Some(from.to_string()), None)
-        } else if let Some((method, path)) = from.split_once(' ')
-            && path.starts_with('/')
-            && method.chars().all(|c| c.is_ascii_alphabetic())
-        {
-            (Some(http::contract(method, path)), None)
-        } else if from.starts_with('/') {
-            (None, Some(format!("::{}", http::normalize_path(from))))
-        } else {
-            (None, None)
-        };
-        let route = |c: &str| {
-            contract.as_deref().is_some_and(|w| http::fits(c, w))
-                || path.as_deref().is_some_and(|p| c.ends_with(p))
-        };
-        let mut sites: Vec<&str> = (self.providers.iter())
-            .filter(|(c, _)| route(c))
-            .map(|&(_, s)| s)
+        let mut sites: Vec<&str> = (contract::KINDS.iter())
+            .flat_map(|kind| kind.starts(from, &self.providers))
             .collect();
         sites.sort();
         sites.dedup();
@@ -579,7 +562,7 @@ impl<'a> Walk<'_, 'a> {
     fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
         let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
         for &(side, contract) in sides {
-            let text = format!("{place} {} {}", side.verb(), channel::shown(contract));
+            let text = format!("{place} {} {}", side.verb(), contract::shown(contract));
             self.push(depth, Row::call(text, repo, None));
         }
     }
@@ -1161,7 +1144,7 @@ impl<'a> Walk<'_, 'a> {
                     "{} {} {}",
                     self.place(step.node),
                     side.verb(),
-                    channel::shown(contract)
+                    contract::shown(contract)
                 );
                 Row::call(text, step.repo, None)
             }

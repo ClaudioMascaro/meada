@@ -10,18 +10,24 @@ modules updates it.
   an index; when every repository is already indexed at the current schema it refreshes them
   like a query, to evaluate decisions, and writes
   only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. `search`
+  lines). It owns the `context` and `search` rendering; `trace` lives in `trace.rs`. It imports no kind
+  module: where a rule belongs to a kind it asks `ContractKind` (through the seam's free
+  functions or `KINDS`), in the phase order `Engine::exports` and `core_links` fix (see
+  "New contract kind" in the architecture map). The valid `kind` words of `search` are derived
+  from the kinds' `search_word`, and a test asserts that the MCP `search` doc string names each
+  of them. `search`
   kind `resource` is the contracts under `resource::` (matched by kind and id), the same lines
   `contract` and no kind list; `context` on `resource::<kind>::<id>` lists the writers and
   readers across the workspace (`contract_sides`, shared with channels). `search` kind
   `channel` is the contracts under `channel::`, matched by broker kind and name (an unresolved
   side by its broker kind, printed `channel::kafka (unresolved)`); `context` on
   `channel::<broker>::<name>` (or `channel::<broker>`, the unresolved sides of that broker, also
-  accepted as `search` prints it, through `channel::typed`) lists the producers (the symbol
+  accepted as `search` prints it, through the seam's `typed`) lists the producers (the symbol
   around the producing call) and consumers (the handler) across the workspace, those linked
   through another name included with `[<level>: <reason>]` after them: the producers a
-  wildcard consumer matches (`channel::fits`), the wildcard consumers that match the channel,
-  and the publishes its bindings route to a queue (`Routes::reached`). `context` on a symbol adds
+  wildcard consumer matches (`channel::fits`, private to the kind), the wildcard consumers that match the channel,
+  and the publishes its bindings route to a queue (`Channel::related_sides`, through
+  `Routes::reached`). `context` on a symbol adds
   `produces <channel>` (at the producing call), `publishes <exchange> <key>` followed by
   `produces <queue> [<level>: <reason>]` for each queue the bindings route it to, or `consumes
   <channel>` (the handler) to its `contracts:`. Which contracts `context` lists by side, and
@@ -45,20 +51,20 @@ modules updates it.
   `info.title` (exact, prefix, substring), as `<repository> <path> (<Summary::shown()>)
   <title>`; `shown` is `openapi 3.1.0, routes: 3` or `asyncapi 3.0.0, channels: 2` (the count
   follows the format, so OpenAPI lines never gain a `channels: 0`). `search` kind `package`
-  (`search_packages`, an early branch too) lists the `packages` rows whose name matches, as
+  (`Packages::own_search`, an early branch too) lists the `packages` rows whose name matches, as
   `<repository> <directory> <name>@<version> (consumers: <n>)` (no `@<version>` for a manifest
   without one; a package of another ecosystem than npm's adds it after the name, as in
   `shared-lib@1.2.0 (pypi)`, and so does its `packages` row, as `ecosystem`); the consumers are the links whose provider is the package's manifest
   (`Package::site`), that is the dependency entries at any level, not the call hops, which link to
   symbols. A dependency entry's site (`<repository>::<path>::<field>::<name>`) and a manifest's
   print as `package.json dependencies` and `kit/package.json` in `search` and in `context` on
-  `package::npm::<name>` (`package::place`); that `context` goes through `contract_sides` with the
+  `package::npm::<name>` (`Packages::place`); that `context` goes through `contract_sides` with the
   roles `package` and `dependent`, and `trace` on it points to `context`. `context` on a symbol
   adds a `consumers:` section after `callees:`, only when non-empty: the calls that reach it
-  through a package import (`package::reached`, from the links whose provider is the symbol and
+  through a package import (`Packages::context_sections`, through `reached`, from the links whose provider is the symbol and
   whose contract starts with `package::`), from any repository, as `<repository> <path>:<line>
   <caller>` then ` [<level>, <flag>]` when the link is not `exact` or the dependency's range does
-  not plainly accept the provider's version (`package::flag` on the entry's range and the version
+  not plainly accept the provider's version (`flag` on the entry's range and the version
   of the manifest the hop went through; the reason is never parsed). A `workspace:` range is never
   plain: a consumer through one always shows `range unchecked`, even inside its own repository,
   which `pkg-mono.context-add.txt` pins (`b` through `workspace:*`; `c`, ambiguous with `fork`).
@@ -82,14 +88,16 @@ modules updates it.
   the one place that derives them. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
-  reach come from `http::route_fits` (method, or a route of every method, and ordered literal
-  fragments, see `Found::method` / `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
+  reach come from each provider's kind (`ContractKind::candidate`; for HTTP, `route_fits`: method,
+  or a route of every method, and ordered literal fragments, see `Found::method` /
+  `fragments`). `Candidate::describe` is the one candidate line (repository identity, method,
   path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
-  `list` skips the ambiguous links of `package::` contracts explicitly: several providers of a
-  package name are no call for a person to decide.
+  `list` skips the ambiguous links of a kind that says `decidable` is false (packages): several
+  providers of a package name are no call for a person to decide. Decision replay asks the
+  seam's `serves` whether a provider serves a decided contract.
 - Communities and processes in `search` and `context` (spec #31): `search` kind `community`
   (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
   name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>

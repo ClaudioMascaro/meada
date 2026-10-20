@@ -24,12 +24,13 @@ use std::path::{Component, Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::channel::Routes;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
+use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::literals::Literals;
+use crate::render::{Files, label, rank, section};
 use crate::resolve::{Code, Exported};
 use crate::shape::{self, Shape, Want};
 use crate::workspace::Repository;
@@ -41,7 +42,7 @@ mod pypi;
 pub struct Packages;
 
 /// The start of every package contract identifier.
-pub const PREFIX: &str = "package::";
+const PREFIX: &str = "package::";
 
 /// A package ecosystem: the manifests it reads, the contract its packages provide, and its
 /// rules for checking a range. How an import names a package is its own too (`split` for npm,
@@ -1118,10 +1119,10 @@ impl<'e> Provided<'e> {
 /// repository in `exports`, then its manifest in `Export::manifests`. Built once for the
 /// workspace steps (`consume`, `import`), both of which only add to the exports and never move
 /// a manifest.
-pub struct Providers(HashMap<(Ecosystem, String), Vec<(usize, usize)>>);
+struct Providers(HashMap<(Ecosystem, String), Vec<(usize, usize)>>);
 
 impl Providers {
-    pub fn new(exports: &[Export]) -> Self {
+    fn new(exports: &[Export]) -> Self {
         let mut providers: HashMap<_, Vec<(usize, usize)>> = HashMap::new();
         for (n, export) in exports.iter().enumerate() {
             for (i, m) in export.manifests.iter().enumerate() {
@@ -1147,7 +1148,7 @@ impl Providers {
 /// `Consumer::hops` (`Packages::link` derives its links), and adds an `imports` row per
 /// provider; a Python import several depended-on packages expose is a consumer of each. Any
 /// other, an import of a package outside the workspace included, adds nothing.
-pub fn import(exports: &mut [Export], providers: &Providers) {
+fn import(exports: &mut [Export], providers: &Providers) {
     // Built for a provider the first time an import reaches it.
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let mut found = Vec::new();
@@ -1226,7 +1227,7 @@ pub fn import(exports: &mut [Export], providers: &Providers) {
 /// a package import gives has it filled (`shape::fill`) from the shape the package's index keeps
 /// for the imported name (`kept`), so an edit to the package changes its importers' drift at the
 /// next query. A part that finds none is open on a provider and adds nothing on a consumer.
-pub fn shapes(exports: &mut [Export], providers: &Providers) {
+fn shapes(exports: &mut [Export], providers: &Providers) {
     let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
     let all: &[Export] = exports;
     let mut find = |n, import: &shape::Import| kept(all, providers, &provided, n, import);
@@ -1572,7 +1573,7 @@ pub fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// that names a package some repository of the workspace provides, a consumer and a
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
-pub fn consume(exports: &mut [Export], providers: &Providers) {
+fn consume(exports: &mut [Export], providers: &Providers) {
     let found: Vec<_> = (exports.iter())
         .map(|export| {
             let mut consumers = Vec::new();
@@ -1641,7 +1642,7 @@ const MAX_RANGE: usize = 256;
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Flag {
+enum Flag {
     /// The range is npm semver and does not accept the local version.
     Mismatch,
     /// The range cannot be checked: not a semver range, or no version to check it against.
@@ -1664,7 +1665,7 @@ impl Flag {
 /// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
 /// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
 /// comparator.
-pub fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
+fn flag(range: Option<&str>, version: Option<&str>) -> Option<Flag> {
     let (Some(range), Some(version)) = (range, version) else {
         return Some(Flag::Unchecked);
     };
@@ -1711,7 +1712,7 @@ fn flag_of(contract: &str, range: Option<&str>, version: Option<&str>) -> Option
 /// The reason of a package link: `<identifier> <range|none> (local <version|none>)`, then
 /// `, range mismatch` or `, range unchecked` when `flag_of` says so. The one place the package
 /// reason is built; a path that extends it (an import hop) builds on this.
-pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> String {
+fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> String {
     let said = format!(
         "{contract} {} (local {})",
         range.unwrap_or("none"),
@@ -1723,21 +1724,8 @@ pub fn reason(contract: &str, range: Option<&str>, version: Option<&str>) -> Str
     }
 }
 
-/// Where a package site of `repository` sits: a manifest provider (`<repository>::<path>`) as
-/// `<path>`, a dependency entry's consumer (`<repository>::<path>::<field>::<name>`) as `<path>
-/// <field>`; `None` for any other site.
-pub fn place(repository: &str, site: &str) -> Option<String> {
-    let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
-    let parts: Vec<&str> = rest.split("::").collect();
-    match parts[..] {
-        [path] if Ecosystem::of(path).is_some() => Some(path.to_string()),
-        [path, field, _] if Ecosystem::of(path).is_some() => Some(format!("{path} {field}")),
-        _ => None,
-    }
-}
-
 /// A call that reaches a symbol through a package import, for `context`.
-pub struct Reach<'e> {
+struct Reach<'e> {
     /// The position in `exports` of the repository holding the call.
     pub repository: usize,
     pub call: &'e CallSite,
@@ -1748,7 +1736,7 @@ pub struct Reach<'e> {
 
 /// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
 /// with the link's level and the range flag of the dependency entry it went through.
-pub fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
+fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
     let mut found = Vec::new();
     for link in links
         .iter()
@@ -1792,6 +1780,57 @@ impl ContractKind for Packages {
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("package", "dependent"))
+    }
+
+    /// A manifest provider (`<repository>::<path>`) sits at `<path>`, a dependency entry's
+    /// consumer (`<repository>::<path>::<field>::<name>`) at `<path> <field>`.
+    fn place(&self, repository: &str, site: &str) -> Option<String> {
+        let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
+        let parts: Vec<&str> = rest.split("::").collect();
+        match parts[..] {
+            [path] if Ecosystem::of(path).is_some() => Some(path.to_string()),
+            [path, field, _] if Ecosystem::of(path).is_some() => Some(format!("{path} {field}")),
+            _ => None,
+        }
+    }
+
+    fn search_word(&self) -> Search {
+        Search::Own("package")
+    }
+
+    /// The packages whose name matches `needle`, one line each, as `<repository> <directory>
+    /// <name>@<version> (consumers: <n>)`, the version left out when the manifest has none. The
+    /// consumers are the dependency entries linked to the package, at any level. An npm package
+    /// is named alone, as before PyPI's: any other says its ecosystem.
+    fn own_search(&self, exports: &[Export], links: &[Link], needle: &str) -> Vec<Hit> {
+        let mut entries: HashMap<&str, usize> = HashMap::new();
+        for link in links {
+            *entries.entry(&link.provider).or_default() += 1;
+        }
+        let mut hits = Vec::new();
+        for p in exports.iter().flat_map(|e| &e.packages) {
+            let Some(r) = rank(&p.name.to_lowercase(), needle) else {
+                continue;
+            };
+            let name = match &p.version {
+                Some(version) => format!("{}@{version}", p.name),
+                None => p.name.clone(),
+            };
+            let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
+            let name = match p.ecosystem.is_npm() {
+                true => name,
+                false => format!("{name} ({})", p.ecosystem.name()),
+            };
+            let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
+            hits.push((r, format!("{} {}", p.repository, p.directory), line));
+        }
+        hits
+    }
+
+    /// Several providers of a package fit a dependency entry, but no call is there to pick
+    /// one for.
+    fn decidable(&self) -> bool {
+        false
     }
 
     /// Every call through a binding imported from a bare specifier, as an `Import`: which of
@@ -1862,6 +1901,75 @@ impl ContractKind for Packages {
         index::sort_providers(&mut export.providers);
     }
 
+    /// The steps that need every repository's packages: the dependency entries, the imports
+    /// (which resolve into a provider wherever it lives), the export entry points a call
+    /// reaches through a package import of their own repository (a monorepo: no door, at any
+    /// level; an entry point of another kind stays one), and the shapes imported from a
+    /// package (issue #175).
+    fn workspace_step(&self, exports: &mut [Export]) {
+        let providers = Providers::new(exports);
+        consume(exports, &providers);
+        import(exports, &providers);
+        for export in exports.iter_mut() {
+            let own = format!("{}::", export.repository);
+            let imported: HashSet<&str> = (export.imports.iter())
+                .map(|i| i.target.as_str())
+                .filter(|t| t.starts_with(&own))
+                .collect();
+            entry::drop_imported_exports(&mut export.entry_points, &imported);
+        }
+        shapes(exports, &providers);
+    }
+
+    /// `consumers:` with the calls that reach `symbol` through a package import (spec #22),
+    /// from any repository of the workspace, as `<repository> <path>:<line> <caller>`, then
+    /// ` [<level>, <range flag>]` when the link is not exact or the dependency's range does not
+    /// plainly accept the package's version. Nothing when there are none.
+    fn context_sections(
+        &self,
+        exports: &[Export],
+        repos: &[Repository],
+        links: &[Link],
+        symbol: &str,
+    ) -> Vec<String> {
+        let mut found = reached(exports, links, symbol);
+        found.sort_by_key(|r| {
+            (
+                &repos[r.repository].identity,
+                &r.call.span.path,
+                r.call.span.start,
+            )
+        });
+        let lines: Vec<String> = found
+            .iter()
+            .map(|r| {
+                let repo = &repos[r.repository];
+                let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
+                let caller = &r.call.caller;
+                let caller = match exports[r.repository]
+                    .symbols
+                    .iter()
+                    .any(|s| s.id == *caller)
+                {
+                    true => label(caller),
+                    false => "(top level)",
+                };
+                let level = (r.level != Level::Exact).then(|| r.level.name());
+                let flag = r.flag.map(Flag::words);
+                let tags: Vec<&str> = level.into_iter().chain(flag).collect();
+                let tags = match tags.is_empty() {
+                    true => String::new(),
+                    false => format!(" [{}]", tags.join(", ")),
+                };
+                format!("{} {location} {caller}{tags}", repo.identity)
+            })
+            .collect();
+        match lines.is_empty() {
+            true => lines,
+            false => section("consumers", lines),
+        }
+    }
+
     /// The dependency entry links to the providers of its package: one candidate is `exact`,
     /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
     /// repository. The reason is `reason()`'s, flag included. A call through a package import
@@ -1872,7 +1980,7 @@ impl ContractKind for Packages {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -1936,6 +2044,119 @@ impl ContractKind for Packages {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::Span;
+
+    #[test]
+    fn an_ambiguous_package_link_is_no_call_for_a_person() {
+        assert!(!Packages.decidable());
+    }
+
+    /// A symbol a package import reaches lists the calls that reach it as `consumers:`, with
+    /// the range flag of the dependency entry; a symbol nothing reaches adds no section.
+    #[test]
+    fn a_symbol_reached_through_a_package_import_gets_a_consumers_section() {
+        let contract = "package::npm::kit";
+        let call = "r::web/app.ts::go#0";
+        let export = Export {
+            repository: "r".into(),
+            consumers: vec![Consumer {
+                contract: Some(contract.into()),
+                site: call.into(),
+                via: None,
+                shape: None,
+                method: Some("^1.0.0".into()),
+                fragments: Vec::new(),
+                hops: Vec::new(),
+            }],
+            calls: vec![CallSite {
+                id: call.into(),
+                caller: "r::web/app.ts::go".into(),
+                target: None,
+                level: None,
+                candidates: Vec::new(),
+                span: Span {
+                    path: "web/app.ts".into(),
+                    start: 0,
+                    end: 0,
+                },
+            }],
+            ..Export::default()
+        };
+        let link = Link {
+            consumer: call.into(),
+            provider: "r::kit/index.ts::greet".into(),
+            contract: contract.into(),
+            level: Level::Exact,
+            reason: format!("{contract} ^1.0.0 (local none)"),
+            by: None,
+            p: None,
+            drift: None,
+        };
+        let repo = Repository {
+            root: "/nonexistent".into(),
+            identity: "r".into(),
+            config: Default::default(),
+            decisions: Default::default(),
+        };
+        let (exports, repos, links) = ([export], [repo], [link]);
+        let sections = |symbol| Packages.context_sections(&exports, &repos, &links, symbol);
+        assert_eq!(
+            sections("r::kit/index.ts::greet"),
+            ["consumers:", "r web/app.ts (top level) [range unchecked]"]
+        );
+        assert!(sections("r::kit/index.ts::other").is_empty());
+    }
+
+    #[test]
+    fn packages_render_their_own_search_under_the_package_word() {
+        assert_eq!(Packages.search_word(), Search::Own("package"));
+    }
+
+    #[test]
+    fn the_own_search_lists_a_package_by_name_with_the_entries_linked_to_it() {
+        let package = |name: &str, ecosystem| Package {
+            name: name.into(),
+            version: Some("1.0.0".into()),
+            repository: "r".into(),
+            directory: format!("{name}-dir"),
+            ecosystem,
+            manifest: format!("{name}-dir/manifest"),
+        };
+        let export = Export {
+            packages: vec![
+                package("@a/Kit", Ecosystem::Npm),
+                package("kit-py", Ecosystem::Pypi),
+                package("other", Ecosystem::Npm),
+            ],
+            ..Export::default()
+        };
+        let link = Link {
+            consumer: "r::web/package.json::dependencies::@a/Kit".into(),
+            provider: export.packages[0].site(),
+            contract: "package::npm::@a/Kit".into(),
+            level: Level::Exact,
+            reason: "x".into(),
+            by: None,
+            p: None,
+            drift: None,
+        };
+        let hits = Packages.own_search(&[export], &[link], "kit");
+        assert_eq!(
+            hits,
+            [
+                (
+                    2,
+                    "r @a/Kit-dir".into(),
+                    "r @a/Kit-dir @a/Kit@1.0.0 (consumers: 1)".into()
+                ),
+                (
+                    1,
+                    "r kit-py-dir".into(),
+                    "r kit-py-dir kit-py@1.0.0 (pypi) (consumers: 0)".into()
+                ),
+            ]
+        );
+    }
 
     fn entries(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
         (s.dependencies.iter())
@@ -2026,7 +2247,7 @@ mod tests {
     #[test]
     fn a_package_site_shows_its_manifest_and_field() {
         let repo = "example.com/a";
-        let at = |site: &str| place(repo, site);
+        let at = |site: &str| Packages.place(repo, site);
         assert_eq!(
             at("example.com/a::package.json"),
             Some("package.json".into())

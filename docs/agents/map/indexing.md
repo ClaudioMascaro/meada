@@ -28,6 +28,12 @@ modules updates it.
   `package::python_programs`, and `Layout::programs`, Rust's binary roots) and
   returns the repository's `EntryPoint`s (identity, `EntryKind`, label, `site`), which
   `refresh` rewrites into `entry_points` and `export` loads into `Export::entry_points`.
+  It imports no kind module: which side of a contract is a door, of which `EntryKind`, and how it
+  is labelled are `ContractKind::entry` and `label`, pure functions of the contract since entry
+  points are stored (an answer that changes needs a reindex). The index writer reads the
+  `package` manifests, tsconfigs and shapes directly (`package::read_manifest`, `surface`,
+  `exported_shapes` and the others it calls stay `pub`); the kinds' query-time questions
+  (`declare`, `workspace_step`, `link`, `after_links`) never run at index time.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files, resolve every file's calls in memory, rewrite rows only when a file's

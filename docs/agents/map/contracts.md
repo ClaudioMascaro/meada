@@ -4,8 +4,17 @@ Detail behind the [architecture map](../architecture.md), which keeps the flow, 
 seams, invariants and Known ceilings. The code wins over this file, and a change to these
 modules updates it.
 
-- `contract.rs`: `ContractKind` trait (`prefix`, `extract`, `declare`, `sides`, `link`),
-  `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
+- `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
+  `link` are required, every other question (see "New contract kind" in the architecture map)
+  has a default body. The engine fixes the phase order (every `declare`, every `workspace_step`,
+  `link`, the decisions replay, every `after_links`) and asks the kinds in `KINDS` order; a new
+  kind appends to the list. A side is unresolved when its contract is absent (an unresolved
+  consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
+  functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
+  `entry`, `searched`) are what the rest of the crate calls. A kind's helpers are private to its
+  file; the few that stay `pub` are named under their kind (`http::route`, `contract` and
+  `normalize_path` for the drift view, the config and the documents; `channel::contract` for
+  the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
   `Consumer`, `Binding`, `Publish` or `Import`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
@@ -25,8 +34,8 @@ modules updates it.
   `normalize_path`, and the link rules (host,
   `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
   (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
-  on its path, and its link's reason ends with `; any method`; `route_fits` and a `trace` start
-  (`POST /health`) take it the same way. `http::drift(links, exports)` sets `Link::drift` on every
+  on its path, and its link's reason ends with `; any method`; `route_fits` (HTTP's `candidate`) and a `trace` start
+  (`POST /health`, HTTP's `starts`) take it the same way. `http::drift(links, exports)`, HTTP's `after_links` pass, sets `Link::drift` on every
   HTTP link but an ambiguous one whose consumer (by site and the link's contract, or by site
   alone for an unresolved one; several of one contract count only when their shapes agree) and
   provider (by site, serving the link's contract) both have a shape, through `shape::drift`. An Express route path or mount prefix with a part that cannot
@@ -49,8 +58,8 @@ modules updates it.
   exported: `[serve] hosts` plus the host of every `servers` URL of the repository's documents,
   checked by `link` for a `host:` consumer). `shape`, `gateways` and `hosts` are set on HTTP
   providers only; `http::gateway_contracts(provider)` yields each as
-  `(contract, reason)` and `http::serves(provider, contract)` is the one check of any path, through `fits` (also
-  used by open items and decision replay, so a gateway candidate carries the provider's own
+  `(contract, reason)` and `http::serves(provider, contract)`, HTTP's `serves`, is the one check of any path, through `fits` (also
+  reached by open items and decision replay through the seam's `serves`, so a gateway candidate carries the provider's own
   contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
@@ -164,8 +173,8 @@ modules updates it.
   `extract` calls `code.pack().messages(code)`; a producer is a provider at its call site, a
   consumer a consumer at its handler (an inline handler is named `<broker> <names in order>`,
   such as `kafka orders.created`). `contract(broker, name)` is `channel::<broker>::<name>`, or
-  `channel::<broker>` for an unresolved side (`channel::parse`, `is_unresolved`, and `shown`, which
-  prints it with `(unresolved)`), which `link` skips: it is in the export and never
+  `channel::<broker>` for an unresolved side (`channel::parse`, `Channel::unresolved`, and the seam's `shown`, which
+  prints it with `(unresolved)`, and `typed`, which reads it back), which `link` skips: it is in the export and never
   linked, and since its contract is not `None` it is no open item (`search` kind `unresolved`
   and `meada decide` never see it). `link` joins every consumer to every producer that
   `reaching(contract, providers, routes)` gives, in any repository including its own. Name
@@ -187,7 +196,7 @@ modules updates it.
   when the pattern is the key, else `inferred`, reason `<queue contract> binding <exchange>
   <pattern>`. `reaching` adds those publishes to a queue's producers, and `Routes::reached`
   gives the queues one publish reaches; of several matches to one producer the strongest wins.
-  `ContractKind::link` takes the workspace's `Routes` beside its providers. `declare` adds the
+  `ContractKind::link` takes the workspace's exports and builds its `Routes` from them. `declare` adds the
   channel sides of the repository's AsyncAPI documents (`Summary::channels`, in path order): a
   document side whose contract equals a code side's of the same direction merges into it (every
   such code provider or consumer keeps its site and takes the document's shape unless it has
@@ -212,10 +221,11 @@ modules updates it.
   of a bare specifier from outside the repository (`Code::imported`: specifier in `via`, the
   chain spelled from the imported name in `method`); `declare` makes a provider at `<repository>::<manifest path>` (`Provider::version` for the
   reason) and a `packages` row `{name, version, repository, directory}` (`.` at the root) for each
-  named manifest, private ones too. `consume(exports, providers)` is the workspace-wide step `Engine::exports`
-  runs after every repository's `declare` (one repository cannot see another's providers; the
-  `Providers` index of package names to their manifests is built once there and shared with
-  `import`, and `reaches` is the one place the `workspace:` rule lives): for
+  named manifest, private ones too. `Packages::workspace_step`, which `Engine::exports` runs after
+  every repository's `declare` (one repository cannot see another's providers), builds the
+  `Providers` index of package names to their manifests once and runs `consume`, `import`,
+  the dropped export entry points and `shapes` over it (`reaches` is the one place the
+  `workspace:` rule lives). `consume(exports, providers)` is the first: for
   each dependency entry whose package some repository of the workspace provides (a `workspace:`
   range needs one in its own repository), it adds a consumer at `<repository>::<manifest
   path>::<field>::<name>` (the range travels in `Consumer::method`, which is `serde(skip)`) and a
@@ -224,7 +234,7 @@ modules updates it.
   candidate, `workspace:` keeping the consumer's repository), with the reason `<identifier>
   <range|none> (local <version|none>)`, prefixed `<n> providers fit; ` when ambiguous.
   `reason()` is the one place it is built; it ends with `, range mismatch` or `, range
-  unchecked` when `flag(range, version) -> Option<Flag>` (public; `context` calls it too, and
+  unchecked` when `flag(range, version) -> Option<Flag>` (private; the `consumers:` section calls it too, and
   nobody parses the reason back) says so. `flag` checks with `nodejs-semver` (npm syntax: `^ ~
   x - ||`, prereleases as npm): `Mismatch` when the range does not accept the local version,
   `Unchecked` for a missing range or version, a `workspace:`/`file:`/`link:`/`npm:` range, a git
