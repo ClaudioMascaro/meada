@@ -2,15 +2,14 @@
 //! app or a router, under the router's own prefix and every prefix it is mounted under
 //! (`include_router`, `mount`, `register_blueprint`, through the root's `prefixes`), the app or
 //! router followed through `Code::origins` (`Follow::Values`: constants, imports, arguments and
-//! return values) and counted only when its framework's constructor creates it, read off the
-//! origin's `outside` name (`Code::outside`, the callee as a name). Django providers: the `path()` and `re_path()` entries of every
-//! root URLconf's `urlpatterns`, each `include()` followed at any depth (`URLCONF_BUDGET`,
-//! `INCLUDE_DEPTH`); a function view serves what its decorators allow or every method, a
-//! class-based view the handler methods it defines. Both ask `Code::origins` with
-//! `Follow::Values` (a `urlpatterns` list, an `include()` entry, a view) and read the name of a
-//! decorator, a view or a callee with `Code::outside` without the path flag. Seams of the root
-//! reused: `prefixes`,
-//! `path_literal`, `methods`, `normalize_path`, `provider`.
+//! return values) and counted only when its framework's constructor creates it, its callee read
+//! as a name (`Code::outside` without the path flag). Django providers: the `path()` and
+//! `re_path()` entries of every root URLconf's `urlpatterns`, each `include()` followed at any
+//! depth (`URLCONF_BUDGET`, `INCLUDE_DEPTH`); a function view serves what its decorators allow
+//! or every method, a class-based view the handler methods it defines. Both ask `Code::origins`
+//! with `Follow::Values` (a `urlpatterns` list, an `include()` entry, a view) and read the name
+//! of a decorator, a view or a callee with `Code::outside` without the path flag. Seams of the
+//! root reused: `prefixes`, `path_literal`, `methods`, `normalize_path`, `provider`.
 
 mod clients;
 
@@ -117,30 +116,23 @@ const FRAMEWORKS: &[Framework] = &[
 // one it cannot hold.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     // The framework that creates an app or router, and whether it is an app.
-    let named = |name: &str| -> Option<(&Framework, bool)> {
-        FRAMEWORKS.iter().find_map(|f| {
-            let app = f.apps.contains(&name);
-            (app || f.routers.contains(&name)).then_some((f, app))
-        })
-    };
     let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
         let call = &code.files()[path].calls[n];
-        named(
-            &code
-                .outside(path, &call.scope, &call.callee, false)?
-                .spelled,
-        )
+        let name = code
+            .outside(path, &call.scope, &call.callee, false)?
+            .spelled;
+        FRAMEWORKS.iter().find_map(|f| {
+            let app = f.apps.contains(&name.as_str());
+            (app || f.routers.contains(&name.as_str())).then_some((f, app))
+        })
     };
-    let creator = |o: &Origin<'a>| -> Option<(CallAt<'a>, &Framework, bool)> {
-        let (kind, app) = named(&o.outside.as_ref()?.spelled)?;
-        Some((o.call?, kind, app))
+    let creator = |o: &Origin<'a>| -> Option<(CallAt<'a>, &Framework)> {
+        let at = o.call?;
+        Some((at, framework(at)?.0))
     };
     let routers = |path, scope, name| -> Vec<(CallAt, &Framework)> {
         let origins = code.origins(path, scope, Of::Name(name), Follow::Values);
-        origins
-            .iter()
-            .filter_map(|o| creator(o).map(|(r, f, _)| (r, f)))
-            .collect()
+        origins.iter().filter_map(creator).collect()
     };
     // The prefix a router's constructor gives it: none when absent.
     let own = |router @ (path, n): CallAt<'a>| -> Option<String> {
@@ -185,8 +177,8 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                     (code.origins(path, &call.scope, Of::Value(child), Follow::Values))
                         .iter()
                         .filter_map(creator)
-                        .filter(|&(_, f, _)| std::ptr::eq(f, kind))
-                        .map(|(c, ..)| c)
+                        .filter(|&(_, f)| std::ptr::eq(f, kind))
+                        .map(|(c, _)| c)
                         .collect();
                 if children.is_empty() && how.takes_apps {
                     unread.push((at, kind));
