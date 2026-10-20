@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::channel::Routes;
-use crate::contract::{self, KINDS, Level, Link, Search};
+use crate::contract::{self, KINDS, Level, Link, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
@@ -18,8 +18,7 @@ use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
 use crate::{
-    Result, channel, decisions, document, drift_view, http, index, items, package, render, repo,
-    trace,
+    Result, channel, decisions, document, drift_view, index, items, package, render, repo, trace,
 };
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
@@ -546,13 +545,14 @@ impl Engine {
         &self,
         exports: &[Export],
         contract: &str,
-        (provider, consumer): (&str, Option<&str>),
+        View {
+            provider,
+            consumer,
+            carried,
+            ..
+        }: View,
         what: &str,
     ) -> Vec<String> {
-        let carried = match http::route(contract) {
-            Some(_) => "response",
-            None => "payload",
-        };
         let routes = Routes::new(exports);
         // How a side reaches `contract`: its own (no tag), a match through another name, or
         // not at all.
@@ -646,21 +646,16 @@ impl Engine {
         let repos = &self.workspace.repos;
         // A contract listed by its sides, as `search` prints it; a route by its providers.
         let contract = contract::typed(symbol);
-        if let Some(kind) = contract::kind_of(contract) {
-            let roles = match (kind.sides(), http::route(contract)) {
-                (Some((provider, consumer)), _) => Some((provider, Some(consumer))),
-                (None, Some(_)) => Some(("provider", None)),
-                (None, None) => None,
-            };
-            if let Some(roles) = roles {
-                let mut lines = self.contract_sides(&exports, contract, roles, kind.prefix());
-                if http::route(contract).is_some() {
-                    let links = self.links(&exports);
-                    let entries = drift_view::entries(repos, &exports, &links);
-                    lines.extend(drift_view::consumers(repos, &entries, contract));
-                }
-                return Ok(render::budgeted(&lines, budget));
+        if let Some(kind) = contract::kind_of(contract)
+            && let Some(view) = kind.view(contract)
+        {
+            let mut lines = self.contract_sides(&exports, contract, view, kind.prefix());
+            if view.drift {
+                let links = self.links(&exports);
+                let entries = drift_view::entries(repos, &exports, &links);
+                lines.extend(drift_view::consumers(repos, &entries, contract));
             }
+            return Ok(render::budgeted(&lines, budget));
         }
         let suffix = format!("::{symbol}");
         let found: Vec<(usize, &Symbol)> = (exports.iter().enumerate())

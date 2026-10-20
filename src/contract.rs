@@ -172,6 +172,20 @@ impl Search {
     }
 }
 
+/// How `context` lists a contract of a kind.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct View {
+    /// The word for a provider side: `writer`, `producer`, `provider`.
+    pub provider: &'static str,
+    /// The word for a consumer side; `None` when the consumers are calls that `trace` and the
+    /// `contracts:` of their symbols show, so `context` leaves them out.
+    pub consumer: Option<&'static str>,
+    /// What a side's shape carries: `response` for a route, `payload` for the rest.
+    pub carried: &'static str,
+    /// Whether the linked consumers that read fields follow the sides (the drift view).
+    pub drift: bool,
+}
+
 /// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
 /// ties, and the line.
 pub type Hit = (u8, String, String);
@@ -204,6 +218,17 @@ pub trait ContractKind {
     /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         None
+    }
+
+    /// How `context` lists `contract`, a contract of this kind, by the words of `sides`
+    /// (default); `None` when it lists none (`context` then reads the argument as a symbol).
+    fn view(&self, _contract: &str) -> Option<View> {
+        self.sides().map(|(provider, consumer)| View {
+            provider,
+            consumer: Some(consumer),
+            carried: "payload",
+            drift: false,
+        })
     }
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
@@ -437,7 +462,7 @@ impl Names {
 #[cfg(test)]
 mod tests {
     use super::{
-        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, place,
+        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, View, place,
         searched, shown, typed, unresolved,
     };
     use crate::config::Config;
@@ -540,6 +565,29 @@ mod tests {
         let (kind, search) = searched("package").unwrap();
         assert_eq!((kind.prefix(), search), ("package", Search::Own("package")));
         assert!(searched("http").is_none());
+    }
+
+    /// A kind with two named sides is viewed by both, their shape a `payload`, with no drift;
+    /// a kind with no sides has no view.
+    #[test]
+    fn a_kind_with_sides_is_viewed_by_both_and_one_without_has_no_view() {
+        let channel = Channel.view("channel::kafka::orders.created").unwrap();
+        let expected = View {
+            provider: "producer",
+            consumer: Some("consumer"),
+            carried: "payload",
+            drift: false,
+        };
+        assert_eq!(channel, expected);
+        let resource = Resource.view("resource::postgres::orders").unwrap();
+        assert_eq!(
+            (resource.provider, resource.consumer),
+            ("writer", Some("reader"))
+        );
+        assert_eq!(
+            Packages.view("package::npm::kit").unwrap().provider,
+            "package"
+        );
     }
 
     /// The seam places a site as the first kind that answers does, and not at all otherwise.
