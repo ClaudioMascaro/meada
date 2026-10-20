@@ -7,7 +7,6 @@
 
 use std::collections::HashSet;
 
-use crate::channel::Routes;
 use crate::config;
 use crate::contract::{ContractKind, Found, Level, Link};
 use crate::index::{Consumer, Export, Provider};
@@ -133,7 +132,7 @@ impl ContractKind for Resource {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();

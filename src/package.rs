@@ -24,7 +24,6 @@ use std::path::{Component, Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::channel::Routes;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
@@ -1872,7 +1871,7 @@ impl ContractKind for Packages {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();

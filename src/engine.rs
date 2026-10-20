@@ -163,14 +163,13 @@ impl Engine {
             .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
-        let routes = Routes::new(exports);
         let mut links = Vec::new();
         for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
-                links.extend(kind.link(consumer, from, &providers, &routes));
+                links.extend(kind.link(consumer, from, &providers, exports));
             }
         }
         links
@@ -416,7 +415,11 @@ impl Engine {
                         }),
                     },
                 };
-                let line = format!("{} {location} {}", repo.identity, channel::shown(&contract));
+                let line = format!(
+                    "{} {location} {}",
+                    repo.identity,
+                    contract::shown(&contract)
+                );
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
@@ -660,7 +663,7 @@ impl Engine {
             return vec![format!("no {what} matches `{contract}`")];
         }
         sides.sort();
-        let mut lines = vec![channel::shown(contract)];
+        let mut lines = vec![contract::shown(contract)];
         for (_, line, shape) in sides {
             lines.push(format!("  {line}"));
             lines.extend(shape.into_iter().map(|l| format!("    {l}")));
@@ -691,7 +694,7 @@ impl Engine {
         let exports = self.exports()?;
         let repos = &self.workspace.repos;
         // A contract listed by its sides, as `search` prints it; a route by its providers.
-        let contract = channel::typed(symbol);
+        let contract = contract::typed(symbol);
         if let Some(kind) = contract::kind_of(contract) {
             let roles = match (kind.sides(), http::route(contract)) {
                 (Some((provider, consumer)), _) => Some((provider, Some(consumer))),
@@ -856,7 +859,7 @@ fn contracts(
             .filter(|p| p.site == call.id && p.contract.starts_with(channel::PREFIX));
         let location = files.at(&call.span.path, call.span.start);
         for provider in produced {
-            let contract = channel::shown(&provider.contract);
+            let contract = contract::shown(&provider.contract);
             lines.push(format!("{identity} {location} produces {contract}"));
         }
         for publish in export.publishes.iter().filter(|q| q.site == call.id) {
@@ -873,7 +876,7 @@ fn contracts(
     // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
     for contract in readers.filter_map(|c| c.contract.as_ref()) {
-        let contract = channel::shown(contract);
+        let contract = contract::shown(contract);
         lines.push(line(
             identity,
             files,

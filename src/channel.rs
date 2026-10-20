@@ -95,28 +95,6 @@ pub fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
     })
 }
 
-/// Whether `contract` is a channel side whose name could not be evaluated.
-pub fn is_unresolved(contract: &str) -> bool {
-    matches!(parse(contract), Some((_, None)))
-}
-
-/// `contract` as a person reads it: an unresolved channel side says so.
-pub fn shown(contract: &str) -> String {
-    match is_unresolved(contract) {
-        true => format!("{contract} (unresolved)"),
-        false => contract.to_string(),
-    }
-}
-
-/// The contract a person typed as `shown` printed it: `channel::kafka (unresolved)` is
-/// `channel::kafka`.
-pub fn typed(text: &str) -> &str {
-    match text.strip_suffix(" (unresolved)") {
-        Some(contract) if is_unresolved(contract) => contract,
-        _ => text,
-    }
-}
-
 impl ContractKind for Channel {
     fn prefix(&self) -> &'static str {
         "channel"
@@ -124,6 +102,10 @@ impl ContractKind for Channel {
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("producer", "consumer"))
+    }
+
+    fn unresolved(&self, contract: &str) -> bool {
+        matches!(parse(contract), Some((_, None)))
     }
 
     fn extract(&self, code: &Code) -> Vec<Found> {
@@ -246,13 +228,13 @@ impl ContractKind for Channel {
         consumer: &Consumer,
         _from: &Repository,
         providers: &[(&Repository, &Provider)],
-        routes: &Routes,
+        exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
         let providers = providers.iter().map(|&(_, p)| p);
-        (reaching(contract, providers, routes).into_iter())
+        (reaching(contract, providers, &Routes::new(exports)).into_iter())
             .map(|(provider, (level, reason))| Link {
                 consumer: consumer.site.clone(),
                 provider: provider.to_string(),
@@ -383,7 +365,14 @@ fn nats(pattern: &str, subject: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{nats, pattern_matches};
+    use super::{Channel, nats, pattern_matches};
+    use crate::contract::ContractKind;
+
+    #[test]
+    fn a_side_with_only_its_broker_prefix_is_unresolved() {
+        assert!(Channel.unresolved("channel::kafka"));
+        assert!(!Channel.unresolved("channel::kafka::orders.created"));
+    }
 
     /// Topic-exchange rules: words split at `.`, `*` is one word, `#` zero or more.
     #[test]
