@@ -267,6 +267,19 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// The sections a symbol's `context` adds after its callees, as lines (packages:
+    /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
+    /// the workspace's, and `symbol` the identity of a symbol of it.
+    fn context_sections(
+        &self,
+        _exports: &[Export],
+        _repos: &[Repository],
+        _links: &[Link],
+        _symbol: &str,
+    ) -> Vec<String> {
+        Vec::new()
+    }
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
     /// bindings of the workspace's `exports` route to it. Several fitting providers are all
@@ -624,6 +637,27 @@ mod tests {
             Packages.view("package::npm::kit").unwrap().provider,
             "package"
         );
+    }
+
+    /// A kind that adds nothing to `context` (routes, resources, packages as to a call) leaves
+    /// the sides, the call and the symbol alone.
+    #[test]
+    fn a_kind_with_nothing_to_add_leaves_the_sides_the_call_and_the_symbol_alone() {
+        let exports = [Export::default()];
+        for kind in [&Http as &dyn ContractKind, &Resource, &Packages] {
+            let related = kind.related_sides(&exports, &exports[0], "x::y");
+            assert!(related.is_empty());
+            assert!(
+                kind.at_call(&exports, &exports[0], "r::a.ts::f#0")
+                    .is_empty()
+            );
+        }
+        for kind in [&Http as &dyn ContractKind, &Resource, &Channel] {
+            assert!(
+                kind.context_sections(&exports, &[], &[], "r::a.ts::f")
+                    .is_empty()
+            );
+        }
     }
 
     /// The seam places a site as the first kind that answers does, and not at all otherwise.

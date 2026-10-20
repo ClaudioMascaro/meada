@@ -16,7 +16,7 @@ use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mar
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
-use crate::{Result, decisions, document, drift_view, index, items, package, render, repo, trace};
+use crate::{Result, decisions, document, drift_view, index, items, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -534,10 +534,11 @@ impl Engine {
     /// the shape a document gives a side follows it, `response` for a route and `payload`
     /// for a channel.
     /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
-    /// the top level of a file `<repository> <role> <path> (top level)`. A channel also lists
-    /// the sides linked to it through another name, each followed by `[<level>: <reason>]`:
-    /// the producers a consumer's wildcard pattern matches, the wildcard consumers that match
-    /// it, and the publishes its bindings route to it, then the bindings themselves.
+    /// the top level of a file `<repository> <role> <path> (top level)`. The kind also lists the
+    /// sides linked to the contract through another name (`ContractKind::related_sides`), each
+    /// followed by `[<level>: <reason>]`; a channel's are the producers a consumer's wildcard
+    /// pattern matches, the wildcard consumers that match it, and the publishes its bindings
+    /// route to it, then the bindings themselves.
     fn contract_sides(
         &self,
         exports: &[Export],
@@ -714,7 +715,9 @@ impl Engine {
         let span = text.map(|(_, span)| span).unwrap_or_default();
         let mut tail = Vec::from_iter(unavailable);
         tail.extend(relations(identity, export, &mut files, &symbol_found.id));
-        tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
+        let sections = (KINDS.iter())
+            .flat_map(|k| k.context_sections(&exports, repos, &links, &symbol_found.id));
+        tail.extend(sections);
         let workspace = (exports.as_slice(), links.as_slice());
         tail.extend(contracts(
             identity,
@@ -947,54 +950,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     lines
 }
 
-/// `consumers:` with the calls that reach `symbol` through a package import (spec #22), from
-/// any repository of the workspace, as `<repository> <path>:<line> <caller>`, then ` [<level>,
-/// <range flag>]` when the link is not exact or the dependency's range does not plainly accept
-/// the package's version. Nothing when there are none.
-fn consumers(
-    exports: &[Export],
-    repos: &[Repository],
-    links: &[Link],
-    symbol: &str,
-) -> Vec<String> {
-    let mut reached = package::reached(exports, links, symbol);
-    reached.sort_by_key(|r| {
-        (
-            &repos[r.repository].identity,
-            &r.call.span.path,
-            r.call.span.start,
-        )
-    });
-    let lines: Vec<String> = reached
-        .iter()
-        .map(|r| {
-            let repo = &repos[r.repository];
-            let location = Files::new(&repo.root).at(&r.call.span.path, r.call.span.start);
-            let caller = &r.call.caller;
-            let caller = match exports[r.repository]
-                .symbols
-                .iter()
-                .any(|s| s.id == *caller)
-            {
-                true => label(caller),
-                false => "(top level)",
-            };
-            let level = (r.level != Level::Exact).then(|| r.level.name());
-            let flag = r.flag.map(package::Flag::words);
-            let tags: Vec<&str> = level.into_iter().chain(flag).collect();
-            let tags = match tags.is_empty() {
-                true => String::new(),
-                false => format!(" [{}]", tags.join(", ")),
-            };
-            format!("{} {location} {caller}{tags}", repo.identity)
-        })
-        .collect();
-    match lines.is_empty() {
-        true => lines,
-        false => section("consumers", lines),
-    }
-}
-
 /// `<repository> <path>:<line> <name>` for a symbol's definition.
 fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> String {
     let location = files.at(&symbol.span.path, symbol.span.start);
@@ -1174,7 +1129,7 @@ fn hits_answer(query: &str, mut hits: Vec<(u8, String, String)>, budget: Option<
 }
 
 /// `name:` followed by the items, or `name: none`.
-fn section(name: &str, items: Vec<String>) -> Vec<String> {
+pub(crate) fn section(name: &str, items: Vec<String>) -> Vec<String> {
     if items.is_empty() {
         return vec![format!("{name}: none")];
     }
