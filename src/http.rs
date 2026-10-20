@@ -6,19 +6,17 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::channel::Routes;
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
-use crate::declared::{self, Declared, Types};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::rust::frameworks::{self, Made, REQWEST_CLIENTS, UREQ_AGENTS};
-use crate::lang::{
-    Call, Depends, Export, Facts, Imported, Part, Step, Ty, Value, literal, property,
-};
-use crate::literals::{Handler, Literals};
-use crate::resolve::{Code, Expanded, Frame, Target, scope_of};
-use crate::shape::{self, Import, Shape, Source, under};
+use crate::lang::{Call, Depends, Facts, Imported, Part, Value, literal, property};
+use crate::literals::Literals;
+use crate::resolve::{Code, Target, scope_of};
+use crate::shape::{self, Shape};
 use crate::workspace::Repository;
 
 mod go;
 mod rust;
+mod ts;
 
 /// What every parameter (`[id]`, `[...slug]`, `:id`, a template hole) becomes in a path.
 pub const PARAM: &str = "{}";
@@ -60,24 +58,6 @@ pub fn normalize_path(path: &str) -> String {
 
 const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];
 
-/// The route a Next.js app-router file serves: `app/users/[id]/route.ts` (or under
-/// `src/app/`) serves `/users/{}`. Route groups `(name)` are dropped.
-fn next_route(path: &str) -> Option<String> {
-    let rest = path
-        .strip_prefix("src/")
-        .unwrap_or(path)
-        .strip_prefix("app/")?;
-    let (dir, file) = rest.rsplit_once('/').unwrap_or(("", rest));
-    if !matches!(file, "route.ts" | "route.js") {
-        return None;
-    }
-    let segments: Vec<&str> = dir
-        .split('/')
-        .filter(|s| !s.is_empty() && !(s.starts_with('(') && s.ends_with(')')))
-        .collect();
-    Some(format!("/{}", segments.join("/")))
-}
-
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
 /// read: its method (`None` when unknown) and the literal fragments of its path.
@@ -107,134 +87,6 @@ fn fetch(args: &[Value]) -> Option<Read> {
         method,
         fragments: texts,
     })
-}
-
-/// The consumer shape of the `fetch` at `call` (spec #23): the field paths read from the
-/// parsed body of its response, by the function making the call and by each client wrapper
-/// `frames` climbs from it to the consumer's site, which reads what the one below returns.
-/// The body is the result of `.json()` on the response; a wrapper returns the response, the
-/// body or a part of the body. `None` when nothing is read.
-fn response_reads<'a>(
-    code: &Code<'a>,
-    types: &mut Types,
-    call: (&'a str, usize),
-    frames: &[Frame<'a>],
-) -> Option<Shape> {
-    /// What a value is: the response, or the body below a path (`Body(vec![])`: all of it).
-    #[derive(Clone, PartialEq)]
-    enum Got<'s> {
-        Response,
-        Body(Vec<&'s Step>),
-    }
-    let site = frames.last().map_or(call.0, |f| f.path);
-    let mut out = Shape::new(Source::Reads(site.to_string()));
-    let (mut got, mut at) = (Got::Response, call);
-    // The types the wrapper below declares for the body with its own type parameters, by path:
-    // its call gives the arguments that stand for them. And that wrapper.
-    let mut generic: Vec<(String, &'a Ty)> = Vec::new();
-    let mut wrapper: Option<Target<'a>> = None;
-    for level in 0..=frames.len() {
-        let mut returned = Vec::new();
-        let mut deferred: Vec<(String, &'a Ty)> = Vec::new();
-        // Where the call `at` is written; a call that is not there reads nothing.
-        let scope = code.files().get(at.0).and_then(|f| f.calls.get(at.1));
-        let scope = scope.map(|c| c.scope.as_str());
-        for steps in code.uses(at.0, at.1)? {
-            let (mut path, rest) = match (&got, steps.first()) {
-                (Got::Response, Some(Step::Return)) if steps.len() == 1 => {
-                    returned.push(Got::Response);
-                    continue;
-                }
-                (Got::Response, Some(Step::Call(m))) if m == "json" => (Vec::new(), &steps[1..]),
-                (Got::Response, _) => continue,
-                (Got::Body(path), _) => (path.clone(), &steps[..]),
-            };
-            // A read stops at a method call: `name.toUpperCase()` reads `name`.
-            let read = (rest.iter())
-                .take_while(|s| matches!(s, Step::Field(_) | Step::Element))
-                .count();
-            path.extend(&rest[..read]);
-            let base = written(&path);
-            for prefix in shape::prefixes(&base) {
-                out.list(prefix.to_string(), false, false);
-            }
-            match rest.get(read) {
-                Some(Step::Return) => returned.push(Got::Body(path)),
-                // The type declares what the value holds: the scope is the call's.
-                Some(Step::Typed(ty)) if ty.has_param() => deferred.push((base, ty)),
-                Some(Step::Typed(ty)) => {
-                    let Some(scope) = scope else { continue };
-                    let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
-                    typed(&mut out, &base, listed);
-                }
-                // The wrapper's type parameters, given here, stand in the types it declared.
-                Some(Step::Argument(tys)) => {
-                    let (Some(scope), Some(wrapper)) = (scope, wrapper) else {
-                        continue;
-                    };
-                    let names = code.type_params(wrapper.path, wrapper.name);
-                    let args = declared::Args {
-                        names,
-                        tys,
-                        at: (at.0, scope),
-                    };
-                    for (base, ty) in &generic {
-                        let listed = types
-                            .read_with(code, at.0, scope, ty, Some(args))
-                            .unwrap_or_default();
-                        typed(&mut out, base, listed);
-                    }
-                }
-                _ => {}
-            }
-        }
-        let Some(frame) = frames.get(level) else {
-            break;
-        };
-        // The frame calls the function making the call `at`, which returns one thing.
-        returned.dedup();
-        match <[Got; 1]>::try_from(returned) {
-            Ok([one]) if frame.def.path == at.0 && Some(frame.def.name) == scope => {
-                // A return type that is a type parameter of the wrapper declares what it returns.
-                if let (Got::Body(path), Some(ty)) = (&one, code.returns(at.0, frame.def.name))
-                    && ty.has_param()
-                {
-                    deferred.push((written(path), ty));
-                }
-                got = one;
-            }
-            _ => break,
-        }
-        (generic, wrapper) = (deferred, Some(frame.def));
-        at = (frame.path, frame.index);
-    }
-    out.fields.remove("");
-    (!out.fields.is_empty() || !out.imports.is_empty()).then_some(out)
-}
-
-/// Adds the fields a declared type lists, below `base`, to a consumer's `shape`, with the types
-/// and schemas of a package it names for the query to fill.
-fn typed(shape: &mut Shape, base: &str, listed: Declared) {
-    for (field, optional) in listed.fields {
-        shape.list(under(base, &field), optional, true);
-    }
-    for import in listed.imports {
-        let at = under(base, &import.at);
-        shape.imports.insert(Import { at, ..import });
-    }
-}
-
-/// The field path `steps` (fields and elements) read: `items[].id`.
-fn written(steps: &[&Step]) -> String {
-    let mut out = String::new();
-    for step in steps {
-        match step {
-            Step::Field(name) if out.is_empty() => out += name,
-            Step::Field(name) => out += &format!(".{name}"),
-            _ => out += "[]",
-        }
-    }
-    out
 }
 
 /// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
@@ -465,9 +317,6 @@ fn render(parts: &[Part]) -> String {
         .collect()
 }
 
-/// What `express()`, `Router()` and `express.Router()` return: an app or a router.
-const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
-
 /// The HTTP methods as lower-case names: Express and FastAPI register routes with them, and
 /// Python clients send requests with them.
 const HTTP_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
@@ -555,153 +404,6 @@ fn path_literal(value: Value) -> Option<String> {
         Value::Str(parts) => literal(&parts),
         _ => None,
     }
-}
-
-/// Whether the call `router` creates an Express app or router: `express()`, `Router()` or
-/// `express.Router()`, unless an import from another module than `express` binds the name.
-fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
-    let call = &code.files()[path].calls[n];
-    ROUTERS.contains(&call.callee.as_str())
-        && (code.external(path, &call.scope, &call.callee))
-            .is_none_or(|name| name.starts_with("express."))
-}
-
-/// The shape the handler `name` of `path` gives its route from what the code returns (spec
-/// #23): the one place that picks the source of a code route's shape. The sources come in the
-/// order of ADR 0009, a document merged later in `declare`, then the zod schema the response
-/// is parsed with or typed with, then the returned literals.
-fn provider_shape(
-    code: &Code,
-    literals: &mut Literals,
-    path: &str,
-    name: &str,
-    kind: Handler,
-) -> Option<Shape> {
-    let responses = literals.responses(code, path, name, kind)?;
-    (literals.types().zod().returned(code, &responses, name))
-        .or_else(|| literals.shape(code, &responses))
-}
-
-/// Express providers: `app.METHOD(path, ..., handler)` and `router.METHOD(...)` on an app or a
-/// router, under every prefix of `app.use(prefix, router)` mounts, at any depth. The app or
-/// router is followed through constants, imports, arguments and return values.
-// ponytail: `router.route(path)` chains and `require` are not followed.
-fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
-    // The names Express is known by are spellings (`Router()`), which any other language may
-    // give its own functions and types.
-    if !code.pack().extensions().contains(&"js") {
-        return Vec::new();
-    }
-    let routers = |path, scope, name| -> Vec<CallAt> {
-        let origins = code.origins(path, scope, name).into_iter();
-        origins.filter(|&r| is_express(code, r)).collect()
-    };
-    let mut mounts = Mounts::new();
-    let mut routes = Vec::new();
-    for (&path, facts) in code.files() {
-        for (n, call) in facts.calls.iter().enumerate() {
-            let Some((receiver, member)) = call.callee.rsplit_once('.') else {
-                continue;
-            };
-            let registers = HTTP_METHODS.contains(&member);
-            if !(registers || member == "use") || receiver.starts_with('(') {
-                continue;
-            }
-            let ats = routers(path, &call.scope, receiver);
-            if registers {
-                routes.extend(
-                    ats.into_iter()
-                        .map(|at| (path, n, at, member.to_uppercase())),
-                );
-                continue;
-            }
-            if ats.is_empty() {
-                continue;
-            }
-            let Some(args) = code.args(path, n) else {
-                continue;
-            };
-            let first = args.first().map(|a| (a, code.value(path, &call.scope, a)));
-            let (prefix, rest) = match first {
-                Some((_, Value::Str(parts))) => (literal(&parts), &args[1..]),
-                // A router or a handler first: the mount has no path.
-                None | Some((_, Value::Call(_) | Value::Function(_) | Value::New(..))) => {
-                    (Some(String::new()), args)
-                }
-                Some((Value::Ref(name), _))
-                    if code.definition(path, &call.scope, name).is_some() =>
-                {
-                    (Some(String::new()), args)
-                }
-                // A router reached through arguments and return values has no path either.
-                Some((first, _))
-                    if (code.value_origins(path, &call.scope, first).into_iter())
-                        .any(|c| is_express(code, c)) =>
-                {
-                    (Some(String::new()), args)
-                }
-                // Anything else may be a path Meada cannot read (a parameter, a member of an
-                // imported object): what it mounts is served under no prefix.
-                // ponytail: so is a router mounted after a package's middleware passed uncalled
-                // (`app.use(requireAuth, router)`); tell package handlers from package strings
-                // through `Code::origin` if that loses routes that matter.
-                _ => (None, &args[1..]),
-            };
-            for arg in rest {
-                let children = code.value_origins(path, &call.scope, arg).into_iter();
-                for child in children.filter(|&c| is_express(code, c)) {
-                    let parents = mounts.entry(child).or_default();
-                    parents.extend(ats.iter().map(|&at| (at, prefix.clone())));
-                }
-            }
-        }
-    }
-    let mut found = Vec::new();
-    for (path, n, at, method) in routes {
-        let scope = &code.files()[path].calls[n].scope;
-        // `app.get("env")` reads a setting.
-        let Some([first, .., handler]) = code.args(path, n) else {
-            continue;
-        };
-        let Value::Str(parts) = code.value(path, scope, first) else {
-            continue;
-        };
-        let Some(route) = literal(&parts) else {
-            continue;
-        };
-        // The handler's literals (spec #23), read once for every prefix it is mounted under.
-        let target = match handler {
-            Value::Function(def) => Some((path, def.as_str())),
-            Value::Ref(name) => code.definition(path, scope, name).map(|t| (t.path, t.name)),
-            _ => None,
-        };
-        let shape = target
-            .and_then(|(at, name)| provider_shape(code, literals, at, name, Handler::Express));
-        let root = |_: CallAt| Some(String::new());
-        for prefix in prefixes(at, &mounts, &root, &mut Vec::new()) {
-            let full = normalize_path(&join(&prefix, &route));
-            let site = match handler {
-                Value::Function(def) => Site::Inline {
-                    path: path.into(),
-                    def: def.clone(),
-                    name: format!("{method} {full}"),
-                },
-                Value::Ref(name) => match code.definition(path, scope, name) {
-                    Some(t) => Site::Def {
-                        path: t.path.into(),
-                        name: t.name.into(),
-                    },
-                    None => Site::File(path.into()),
-                },
-                _ => Site::File(path.into()),
-            };
-            found.push(Found {
-                shape: shape.clone(),
-                ..provider(site, contract(&method, &full))
-            });
-        }
-    }
-    found
 }
 
 /// The method routers of axum, as functions of `axum::routing` and as methods of a method
@@ -1696,61 +1398,11 @@ impl ContractKind for Http {
 
     fn extract(&self, code: &Code) -> Vec<Found> {
         let mut found = Vec::new();
-        // `fetch` is a consumer only where the language binds it everywhere.
-        let global = code.binds_everywhere("fetch");
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        for (&path, facts) in code.files() {
-            for (n, call) in facts.calls.iter().enumerate() {
-                let is_fetch = global
-                    && (call.callee == "fetch"
-                        || code.param_defaults_to(path, &call.scope, &call.callee, "fetch"));
-                if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
-                    continue;
-                }
-                let expanded = code.expand_frames(path, n, &|args, _| fetch(args));
-                for Expanded {
-                    site: (site, at),
-                    frames,
-                    found: read,
-                } in expanded
-                {
-                    let shape = response_reads(code, literals.types(), (path, n), &frames);
-                    found.push(consumer(site, at, read, shape));
-                }
-            }
-            let Some(route) = next_route(path) else {
-                continue;
-            };
-            for export in &facts.exports {
-                let Export::Local { exported, local } = export else {
-                    continue;
-                };
-                if !METHODS.contains(&exported.as_str()) {
-                    continue;
-                }
-                // `export const GET = withAuth(...)` defines no function: the file serves it.
-                let defined = facts.defs.iter().any(|d| d.name == *local);
-                let (site, shape) = if defined {
-                    let site = Site::Def {
-                        path: path.into(),
-                        name: local.clone(),
-                    };
-                    (
-                        site,
-                        provider_shape(code, &mut literals, path, local, Handler::Next),
-                    )
-                } else {
-                    (Site::File(path.into()), None)
-                };
-                found.push(Found {
-                    shape,
-                    ..provider(site, contract(exported, &route))
-                });
-            }
-        }
+        found.extend(ts::consumers(code, &mut literals));
+        found.extend(ts::providers(code, &mut literals));
         found.extend(clients(code));
-        found.extend(express(code, &mut literals));
         found.extend(axum(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
