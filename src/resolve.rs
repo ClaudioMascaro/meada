@@ -2059,7 +2059,7 @@ struct Written<'a> {
 // ponytail: real files spend a few units per call; a crafted one doubling a string through
 // forty constants (`const b = a + a`), or a lattice of functions each calling or returning the
 // next twice, would cost 2^40.
-const EVAL_BUDGET: usize = 1 << 16;
+pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 
 /// How deep folding one value recurses: into an item of a list or an object, the constant a
 /// name holds, the argument a caller passes for a parameter. Deeper, the value is unknown. It
@@ -2576,9 +2576,13 @@ impl<'a> Code<'a> {
             let by_position = marker.ends_with("{*}");
             let scope = scope_of(marker);
             for &literal in self.consts(path, marker) {
+                // Each literal read is charged to its file: past the budget, the field is open.
                 let Value::New(written, set) = &literal.value else {
                     return None;
                 };
+                if !self.charge(path, 1) {
+                    return None;
+                }
                 let [value] = &set[..] else {
                     return None;
                 };

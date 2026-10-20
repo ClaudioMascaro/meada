@@ -550,4 +550,19 @@ mod tests {
         assert_eq!(held(CLIENT_DEPTH - 4), deep);
         assert_eq!(held(CLIENT_DEPTH - 3), sent(None));
     }
+
+    #[test]
+    fn a_field_set_by_literals_past_the_budget_has_an_unknown_base() {
+        let held = |n: usize| {
+            let literals = "{c: client}, ".repeat(n);
+            requests(&format!(
+                "{HEAD}\nvar client = {BASE}\n\ntype T struct {{ c *resty.Client }}\n\n\
+                 var all = []T{{{literals}}}\n\nfunc (t *T) Get() {{ t.c.R().Get(\"/s\") }}\n"
+            ))
+        };
+        assert_eq!(held(3), sent(Some("host:deep.example.com")));
+        // Past the file's budget the base is never claimed (the request itself may be absent).
+        let past = held(crate::resolve::EVAL_BUDGET);
+        assert!(past.iter().all(|(_, via)| via.is_none()), "{past:?}");
+    }
 }

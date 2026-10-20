@@ -668,7 +668,8 @@ one for the area a change touches.
   that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):
   folding values (`Code::expand`, `Code::value`) and tracing them to their origins
   (`Code::origins`) charge each step to the file whose code it reads (a value folded, a part
-  copied, a call a wrapper climb reaches, a constant, parameter or return value followed);
+  copied, a call a wrapper climb reaches, a constant, parameter or return value followed, a
+  composite literal `Code::field_values` reads, past which the field's value is open);
   past it, that file's values are unknown, the climb stops at its calls and no origin is found
   through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
   functions each calling or returning the next twice, ends. `EVAL_DEPTH` (256): a value
