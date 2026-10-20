@@ -792,7 +792,9 @@ one for the area a change touches.
   specifier, which names nothing), so a call through it links to nothing. An import of two
   modules of the repository that declare one path names nothing unless a `replace` picks one; a
   `replace` by a module or a directory outside the repository makes the replaced module an
-  outside one; a `vendor/` directory is not followed.
+  outside one; a `vendor/` directory is not followed. A `go.mod` past `package::MAX_BYTES`
+  (read up to one byte past it, as every pack config is, so its last line may be cut) declares no
+  module for the imports either (`modfile::Modules::new`).
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,

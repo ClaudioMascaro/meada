@@ -75,10 +75,13 @@ struct Module {
 }
 
 impl Modules {
-    /// From the `go.mod` files as `(path, contents)`.
+    /// From the `go.mod` files as `(path, contents)`. One past `package::MAX_BYTES` is invalid,
+    /// as `package::go::read` takes it: the index reads a config only up to one byte past that
+    /// size, so its last line may be cut.
     pub fn new(configs: &[(&str, &[u8])]) -> Self {
         let modules = (configs.iter())
             .filter(|(path, _)| path.rsplit('/').next() == Some("go.mod"))
+            .filter(|(_, bytes)| bytes.len() <= crate::package::MAX_BYTES)
             .map(|(path, bytes)| {
                 let dir = path.rsplit_once('/').map_or("", |(d, _)| d).to_string();
                 let file = read(&String::from_utf8_lossy(bytes));
@@ -209,6 +212,31 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn a_go_mod_past_the_size_limit_is_invalid() {
+        let head = "module example.com/shop\n//";
+        let line = "\nreplace example.com/billing => ./billing-v2\n";
+        let cut = crate::package::MAX_BYTES + 1
+            - head.len()
+            - "\nreplace example.com/billing => ./bil".len();
+        let at = |pad: usize, line: &str| format!("{head}{}{line}", " ".repeat(pad));
+        // The index hands the reader one byte past the limit: the last line is cut.
+        let cut_file = at(cut, line)[..crate::package::MAX_BYTES + 1].to_string();
+        assert!(cut_file.ends_with("./bil"));
+        // Both directories hold the module: a cut line would link to the wrong one.
+        let billing: &[u8] = b"module example.com/billing\n";
+        let dir = |text: &str| {
+            let configs = [
+                ("go.mod", text.as_bytes()),
+                ("bil/go.mod", billing),
+                ("billing-v2/go.mod", billing),
+            ];
+            Modules::new(&configs).dir("", "example.com/billing")
+        };
+        assert_eq!(dir(&cut_file), None);
+        assert_eq!(dir(&at(0, line)).as_deref(), Some("billing-v2"));
     }
 
     #[test]
