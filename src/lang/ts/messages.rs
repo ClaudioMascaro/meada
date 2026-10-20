@@ -37,16 +37,23 @@ const AMQP_CHANNELS: [&str; 4] = [
     "connect().createConfirmChannel()",
 ];
 
-/// The package a client's factory is imported from, the factory as JavaScript would write it
+/// A client's factory: the package it is imported from, the factory as JavaScript would write it
 /// (`new Kafka().producer()`), and the constant the client is bound to (its file and qualified
-/// name), from the `Constants` origin of `chain`: `None` unless it comes from an import of
-/// something outside the repository.
+/// name).
+struct Factory<'a> {
+    package: &'a str,
+    expr: String,
+    binding: Option<(&'a str, &'a str)>,
+}
+
+/// The `Factory` of `chain`, from its `Constants` origin: `None` unless it comes from an import
+/// of something outside the repository.
 fn factory<'a>(
     code: &Code<'a>,
     path: &'a str,
     scope: &'a str,
     chain: &'a str,
-) -> Option<(&'a str, String, Option<(&'a str, &'a str)>)> {
+) -> Option<Factory<'a>> {
     let found = code.origins(path, scope, Of::Name(chain), Follow::Constants);
     let origin = found.into_iter().next()?;
     let (package, name) = origin.outside?.imported?;
@@ -59,7 +66,11 @@ fn factory<'a>(
     for step in &route.steps {
         expr += &format!(".{step}()");
     }
-    Some((package, expr, route.held))
+    Some(Factory {
+        package,
+        expr,
+        binding: route.held,
+    })
 }
 
 /// What a form reads of a call's arguments: the channel names, see `names`.
@@ -87,7 +98,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 _ => continue,
             };
-            let Some((package, expr, binding)) = factory(code, path, &call.scope, chain) else {
+            let Some(Factory {
+                package,
+                expr,
+                binding,
+            }) = factory(code, path, &call.scope, chain)
+            else {
                 continue;
             };
             let produce = |broker, read: Read| {
