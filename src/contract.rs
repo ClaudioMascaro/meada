@@ -212,6 +212,12 @@ pub trait ContractKind {
         shown(contract)
     }
 
+    /// The parts of the identifier `search` ranks against, besides the whole identifier: a kind
+    /// and an id, or a broker and a name. A route path ranks as its last part.
+    fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
+        (None, last(contract))
+    }
+
     /// Where `site` of `repository` sits when it is neither a symbol, a call, the repository
     /// nor a document's: `None` when this kind does not place it (packages: a manifest or one
     /// of its dependency entries).
@@ -276,6 +282,16 @@ pub fn typed(text: &str) -> &str {
 /// `contract` as its kind labels it in candidates and entry points.
 pub fn label(contract: &str) -> String {
     kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
+}
+
+/// The last `::` part of an identifier.
+fn last(contract: &str) -> Option<&str> {
+    contract.rsplit_once("::").map(|(_, part)| part)
+}
+
+/// The parts of `contract` `search` ranks against, as its kind gives them.
+pub fn parts(contract: &str) -> (Option<&str>, Option<&str>) {
+    kind_of(contract).map_or_else(|| (None, last(contract)), |k| k.parts(contract))
 }
 
 /// Where `site` of `repository` sits, as the first kind that places it says.

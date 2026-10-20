@@ -365,17 +365,10 @@ impl Engine {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
-                // A route path ranks against the path part: `/users` is exact for
-                // `http::GET::/users`. A resource ranks against its kind and its id, a channel
-                // against its broker kind and its name.
+                // The identifier ranks whole and by the parts its kind gives: `/users` is exact
+                // for `http::GET::/users`.
                 let lower = contract.to_lowercase();
-                let (kind, id) = match lower.strip_prefix(resource::PREFIX) {
-                    Some(rest) => rest.split_once("::").unzip(),
-                    None => match channel::parse(&lower) {
-                        Some((broker, name)) => (Some(broker), name),
-                        None => (None, lower.rsplit_once("::").map(|(_, p)| p)),
-                    },
-                };
+                let (kind, id) = contract::parts(&lower);
                 let Some(r) = [Some(lower.as_str()), kind, id]
                     .into_iter()
                     .flatten()

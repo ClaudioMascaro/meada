@@ -108,6 +108,10 @@ impl ContractKind for Channel {
         matches!(parse(contract), Some((_, None)))
     }
 
+    fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
+        parse(contract).map_or((None, None), |(broker, name)| (Some(broker), name))
+    }
+
     fn extract(&self, code: &Code) -> Vec<Found> {
         let messages = code.pack().messages(code);
         // An inline handler is named after its broker kind and the channels it handles, in
@@ -372,6 +376,15 @@ mod tests {
     fn a_side_with_only_its_broker_prefix_is_unresolved() {
         assert!(Channel.unresolved("channel::kafka"));
         assert!(!Channel.unresolved("channel::kafka::orders.created"));
+    }
+
+    #[test]
+    fn a_channel_ranks_against_its_broker_and_its_name() {
+        assert_eq!(
+            Channel.parts("channel::kafka::orders.created"),
+            (Some("kafka"), Some("orders.created"))
+        );
+        assert_eq!(Channel.parts("channel::kafka"), (Some("kafka"), None));
     }
 
     /// Topic-exchange rules: words split at `.`, `*` is one word, `#` zero or more.

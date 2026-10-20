@@ -706,6 +706,11 @@ mod tests {
     }
 
     #[test]
+    fn a_route_ranks_against_its_path_alone() {
+        assert_eq!(Http.parts("http::get::/users"), (None, Some("/users")));
+    }
+
+    #[test]
     fn a_provider_serves_its_route_any_method_and_its_gateway_path_and_nothing_else() {
         let get = provider("http::GET::/users");
         assert!(Http.serves(&get, "http::GET::/users"));

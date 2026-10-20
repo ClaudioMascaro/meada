@@ -89,6 +89,11 @@ impl ContractKind for Resource {
         Vec::new()
     }
 
+    fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
+        let rest = contract.strip_prefix(PREFIX);
+        rest.and_then(|rest| rest.split_once("::")).unzip()
+    }
+
     /// One side per `via` symbol the repository has; a `via` entry that names no symbol is
     /// ignored. An entry with no `via`, or none that names a symbol, makes the repository as a
     /// whole its side: the site is the repository identity.
@@ -155,5 +160,20 @@ impl ContractKind for Resource {
                 drift: None,
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Resource;
+    use crate::contract::ContractKind;
+
+    #[test]
+    fn a_resource_ranks_against_its_kind_and_its_id() {
+        assert_eq!(
+            Resource.parts("resource::postgres::orders"),
+            (Some("postgres"), Some("orders"))
+        );
+        assert_eq!(Resource.parts("resource::postgres"), (None, None));
     }
 }
