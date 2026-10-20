@@ -134,6 +134,8 @@ struct Walk<'s> {
     /// The scopes that write through a dereference (`*p = ..`, `*p.Topic = ..`), with every
     /// scope around them.
     derefs: HashSet<String>,
+    /// The second name of each `v, ok := os.LookupEnv(..)`, by the scope and the first name.
+    lookups: HashMap<(String, String), String>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -264,37 +266,65 @@ impl Walk<'_> {
             .filter(|(_, _, value)| values::is_env(value))
             .map(|(scope, name, _)| qualify(scope, name))
             .collect();
-        // The fallbacks of names bound to a read: the name, the scope and the default.
-        let mut defaults = Vec::new();
-        for (scope, name, keeps) in std::mem::take(&mut self.assigned) {
-            let mut at = scope.as_str();
-            // The binding the name refers to: the innermost scope that binds it.
-            let found = loop {
-                if self.bound.contains_key(&(at.to_string(), name.clone())) {
-                    break Some(qualify(at, &name));
+        // The binding a name written in a scope refers to: the innermost scope that binds it.
+        let bound = &self.bound;
+        let binder = |scope: &str, name: &str| {
+            let mut at = scope;
+            loop {
+                if bound.contains_key(&(at.to_string(), name.to_string())) {
+                    break Some(at.to_string());
                 }
                 if at.is_empty() {
                     break None;
                 }
                 at = crate::parent(at);
-            };
+            }
+        };
+        // The fallbacks of names bound to a read: the binding, the name, the scope, the default
+        // and its guard.
+        let mut defaults = Vec::new();
+        for (scope, name, keeps) in std::mem::take(&mut self.assigned) {
+            let found = binder(&scope, &name).map(|at| qualify(&at, &name));
             // The address of a topic: a write only when the scope writes through a pointer.
             if matches!(keeps, Keep::Pointer) && !self.writes_through(&scope) {
                 continue;
             }
-            match found {
-                Some(found) if env.contains(&found) && matches!(keeps, Keep::Trim) => {}
-                Some(found) if env.contains(&found) && matches!(keeps, Keep::Default(_)) => {
-                    let Keep::Default(value) = keeps else {
-                        unreachable!()
-                    };
-                    defaults.push((found, scope, value));
+            match (found, keeps) {
+                (Some(found), Keep::Trim) if env.contains(&found) => {}
+                (Some(found), Keep::Default(value, guard)) if env.contains(&found) => {
+                    defaults.push((found, name, scope, value, guard));
                 }
-                Some(found) => _ = assigned.insert(found),
-                None if name != "_" => _ = elsewhere.insert(name),
-                None => {}
+                (Some(found), _) => _ = assigned.insert(found),
+                (None, _) if name != "_" => _ = elsewhere.insert(name),
+                (None, _) => {}
             }
         }
+        // A guard holds when no binding of the file hides `len`, and when `ok` is the second
+        // result of the `os.LookupEnv` that bound the read, bound once and never assigned.
+        // ponytail: a package-level `len` another file of the package declares is not seen.
+        let hides_len = (self.bound.keys()).any(|(_, n)| n == "len")
+            || (self.facts.defs.iter()).any(|d| d.name == "len")
+            || (self.facts.consts.iter()).any(|c| c.name == "len");
+        let guarded = |found: &str, name: &str, scope: &str, guard: &values::Guard| {
+            let Some(ok) = &guard.ok else {
+                return !(guard.len && hides_len);
+            };
+            let at = binder(scope, ok);
+            let paired = (at.as_deref()).filter(|at| qualify(at, name) == found);
+            let lookup = paired.and_then(|at| self.lookups.get(&(at.to_string(), name.into())));
+            !(guard.len && hides_len)
+                && lookup == Some(ok)
+                && paired.is_some_and(|at| {
+                    let once = bound.get(&(at.to_string(), ok.clone())).map(Vec::len) == Some(1);
+                    once && !assigned.contains(&qualify(at, ok))
+                })
+        };
+        let (kept, broken): (Vec<_>, Vec<_>) = (defaults.into_iter())
+            .partition(|(found, name, scope, _, guard)| guarded(found, name, scope, guard));
+        assigned.extend(broken.into_iter().map(|(found, ..)| found));
+        let defaults: Vec<(String, String, Value)> = (kept.into_iter())
+            .map(|(found, _, scope, value, _)| (found, scope, value))
+            .collect();
         // A `var` assigned again holds no one value. One assigned in another file is declared
         // there and here (as a constant of no value), so the package binds the name to neither.
         for constant in &mut self.facts.consts {
@@ -711,8 +741,13 @@ impl Walk<'_> {
             .collect();
         // `v, ok := os.LookupEnv("X")`: the first result is the read, the other the name `ok`.
         let lookup = match (&left[..], &right[..]) {
-            ([name, _], [call]) => {
-                values::lookup_env(*call, src, &self.std, scope, depth).map(|value| (name, value))
+            ([name, ok], [call]) => {
+                let read = values::lookup_env(*call, src, &self.std, scope, depth);
+                if read.is_some() && ok.kind() == "identifier" {
+                    let key = (scope.to_string(), text(*name, src).to_string());
+                    self.lookups.insert(key, text(*ok, src).to_string());
+                }
+                read.map(|value| (name, value))
             }
             _ => None,
         };
@@ -1097,6 +1132,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         vars: BTreeSet::new(),
         selected: BTreeSet::new(),
         derefs: HashSet::new(),
+        lookups: HashMap::new(),
     };
     // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {

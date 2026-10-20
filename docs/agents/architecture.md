@@ -238,7 +238,10 @@ one for the area a change touches.
   `Std::note` saw bound to one earlier in the file (source order; a package-level `var` counts).
   `v = strings.TrimX(v, ..)` leaves `v` a constant when it holds a read, and so does
   `if v == "" { v = .. }` when the default is plain (`values::keeps_env`, `values::plain`,
-  decided in `Walk::finish_values`): text, or names that are constants of the same file holding
+  decided in `Walk::finish_values`); the test may also be `len(v) == 0` (no binding of the file
+  hides `len`; a package-level `len` in another file is not seen), `!ok` or `!ok || v == ""`
+  (`values::Guard`: `ok` is the second name of the `v, ok := os.LookupEnv(..)` that bound `v`,
+  bound once and never assigned): text, or names that are constants of the same file holding
   plain values; a call, a name bound to a read, a loop variable, a package `var` or a name from
   another file leaves `v` no constant, so the base is absent. `http/go/clients.rs` `one_read`
   makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the

@@ -201,7 +201,7 @@ no se indexan, y los contratos Rust son los paquetes, el HTTP y los canales (aba
 lenguaje al otro,
 por contratos HTTP (`fetch` y, en Python, `requests`, `httpx` y `aiohttp` y, en Rust, `reqwest` y `ureq` y, en Go, `net/http` y resty del lado que consume;
 Next.js (app router) y Express y, en Python, FastAPI, Flask y Django y, en Rust, axum, actix-web y Rocket y, en Go, `net/http`, gin, echo, chi y gorilla/mux del lado que sirve, también
-detrás de un gateway; en Rust, una URL base leída del entorno con `std::env::var`, `env!` o `dotenvy::var` y, en Go, con `os.Getenv` o `os.LookupEnv` (con un valor por defecto `if v == "" { v = ... }` y a través de `strings.TrimSuffix`, `TrimRight` o `TrimSpace`) enlaza por `base_url_env`), por los
+detrás de un gateway; en Rust, una URL base leída del entorno con `std::env::var`, `env!` o `dotenvy::var` y, en Go, con `os.Getenv` o `os.LookupEnv` (con un valor por defecto `if v == "" { v = ... }`, también con `len(v) == 0`, `!ok` o `!ok || v == ""` cuando `ok` viene del mismo `os.LookupEnv`, y a través de `strings.TrimSuffix`, `TrimRight` o `TrimSpace`) enlaza por `base_url_env`), por los
 recursos declarados en el `meada.toml` y por canales: tópicos Kafka (`kafkajs` y, en Python, `confluent-kafka` y `kafka-python` y, en Rust, `rdkafka` y, en Go, `segmentio/kafka-go`, `confluent-kafka-go` y `sarama`), colas RabbitMQ
 (`amqplib` y, en Python, `pika` y, en Rust, `lapin` y, en Go, `amqp091-go`, con el `publish` a un exchange llegando a las colas que los
 bindings le atan), colas Amazon SQS (AWS SDK v3, `sqs-consumer` y, en Python, `boto3` y, en Rust, `aws-sdk-sqs` y, en Go, `aws-sdk-go-v2`), subjects

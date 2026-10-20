@@ -73,6 +73,30 @@ func lookedUp() {
 	http.Get(base + "/a")
 }
 
+func lookedUpFallback() {
+	base, ok := os.LookupEnv("OK_URL")
+	if !ok {
+		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
+func lookedUpOrEmpty() {
+	base, ok := os.LookupEnv("OK_EMPTY_URL")
+	if !ok || base == "" {
+		base = DefaultURL
+	}
+	http.Get(base + "/a")
+}
+
+func lengthFallback() {
+	base := os.Getenv("LEN_URL")
+	if len(base) == 0 {
+		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
 func formatted() {
 	http.Get(fmt.Sprintf("%s/a", os.Getenv("FORMAT_URL")))
 }
@@ -193,6 +217,41 @@ func trimmedOtherName() {
 	http.Get(strings.TrimSuffix(base, "/") + "/a")
 }
 
+
+func okOfAnotherLookup() {
+	base, _ := os.LookupEnv("A_URL")
+	_, ok := os.LookupEnv("B_URL")
+	if !ok {
+		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
+func okOfNoLookup() {
+	ok := other() != ""
+	base := os.Getenv("NO_LOOKUP_URL")
+	if !ok {
+		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
+func okAssignedAgain() {
+	base, ok := os.LookupEnv("OK_AGAIN_URL")
+	ok = other() != ""
+	if !ok {
+		base = "http://localhost:3000"
+	}
+	http.Get(base + "/a")
+}
+
+func lookedUpToAVariable() {
+	base, ok := os.LookupEnv("OK_VAR_URL")
+	if !ok {
+		base = defaultVar
+	}
+	http.Get(base + "/a")
+}
 
 func other() string { return "" }
 
