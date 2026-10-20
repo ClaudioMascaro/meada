@@ -289,6 +289,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `meada mcp` answers about the client's first MCP root (in Claude Code the session's directory,
+  also in an app-made worktree) and falls back to its own directory without roots (#192).
 - A root `tsconfig.json` (or `jsconfig.json`) that is not valid JSON, or is larger than 1 MiB,
   no longer stops indexing: it declares no `paths`, as a `pyproject.toml` that cannot be read
   declares no source roots. A root config that is a symbolic link is not read, as the walk

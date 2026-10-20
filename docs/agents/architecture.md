@@ -26,7 +26,8 @@ one for the area a change touches.
   process walk (`Graph::process`, the step list `trace` renders and the export carries).
   `entry.rs`: entry points (spec #31), found when an index is written.
   `drift_view.rs`: how `context`, `search` and `status` show `Link::drift`.
-  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools. `main.rs`: clap.
+  `render.rs`: token budget and line helpers. `mcp.rs`: three read-only tools over the client's
+  first `file://` root, or the server's cwd without roots. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).

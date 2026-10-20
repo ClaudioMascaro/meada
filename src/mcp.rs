@@ -2,11 +2,13 @@
 //! write is the index refresh every query does first. Stdout is the protocol channel, so
 //! anything else goes to stderr.
 
-use std::path::Path;
+use std::path::PathBuf;
 
+use percent_encoding::percent_decode_str;
 use rmcp::{
-    ServerHandler, ServiceExt,
+    RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    service::RequestContext,
     tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
@@ -56,11 +58,46 @@ struct Meada {
     tool_router: ToolRouter<Self>,
 }
 
-/// Opens the repository of the current directory and runs `ask`, which refreshes the index.
-fn answer(ask: impl FnOnce(&Engine) -> crate::Result<String>) -> Result<String, String> {
-    Engine::open(Path::new("."))
+/// Opens the client's first root, else the current directory, and runs `ask`, which refreshes
+/// the index.
+async fn answer(
+    ctx: RequestContext<RoleServer>,
+    ask: impl FnOnce(&Engine) -> crate::Result<String>,
+) -> Result<String, String> {
+    let dir = root_dir(&ctx).await;
+    Engine::open(&dir)
         .and_then(|engine| ask(&engine))
         .map_err(|e| e.to_string())
+}
+
+/// The directory to answer about: the client's first `file://` root, or the server's current
+/// directory. Asked on every call, so `roots/list_changed` needs no cache to invalidate.
+#[expect(
+    deprecated,
+    reason = "roots are deprecated by SEP-2577 and still what Claude Code sends; the cwd fallback keeps the server working once clients drop them"
+)]
+async fn root_dir(ctx: &RequestContext<RoleServer>) -> PathBuf {
+    let cwd = || PathBuf::from(".");
+    if ctx.client_capabilities().is_none_or(|c| c.roots.is_none()) {
+        return cwd();
+    }
+    match ctx.peer.list_roots().await {
+        Ok(result) => result
+            .roots
+            .iter()
+            .find_map(|r| file_path(&r.uri))
+            .unwrap_or_else(cwd),
+        Err(_) => cwd(),
+    }
+}
+
+/// The absolute path of a `file://` URI, percent-decoded; `None` for any other scheme and for
+/// a URI with a host (`file://host/path`), which names no local directory.
+fn file_path(uri: &str) -> Option<PathBuf> {
+    let path = uri.strip_prefix("file://").filter(|p| p.starts_with('/'))?;
+    Some(PathBuf::from(
+        percent_decode_str(path).decode_utf8().ok()?.into_owned(),
+    ))
 }
 
 #[tool_router]
@@ -74,24 +111,40 @@ impl Meada {
     #[tool(
         description = "Find symbols by name and contracts by identifier (`http::GET::/users/{}`). One line each: repository, path:line, name."
     )]
-    async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> Result<String, String> {
-        answer(|engine| {
+    async fn search(
+        &self,
+        Parameters(args): Parameters<SearchArgs>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<String, String> {
+        answer(ctx, |engine| {
             let budget = args.budget.map(|b| b as usize);
             engine.search(&args.query, args.kind.as_deref(), budget)
         })
+        .await
     }
 
     #[tool(
         description = "Show one symbol: its community, the processes it belongs to, its source, callers and callees."
     )]
-    async fn context(&self, Parameters(args): Parameters<ContextArgs>) -> Result<String, String> {
-        answer(|engine| engine.context(&args.symbol, args.budget.map(|b| b as usize)))
+    async fn context(
+        &self,
+        Parameters(args): Parameters<ContextArgs>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<String, String> {
+        answer(ctx, |engine| {
+            engine.context(&args.symbol, args.budget.map(|b| b as usize))
+        })
+        .await
     }
 
     #[tool(
         description = "Follow a chain through calls and cross-repository links, down or up, until it ends. Links show →[level: reason]; a footer sums it up."
     )]
-    async fn trace(&self, Parameters(args): Parameters<TraceArgs>) -> Result<String, String> {
+    async fn trace(
+        &self,
+        Parameters(args): Parameters<TraceArgs>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<String, String> {
         let start = match (args.from.as_deref(), args.changes.as_deref()) {
             (Some(from), None) => Start::From(from),
             (None, Some("uncommitted")) => Start::Uncommitted,
@@ -105,7 +158,10 @@ impl Meada {
             Some("up") => Direction::Up,
             Some(other) => return Err(format!("`direction` takes `down` or `up`, not `{other}`")),
         };
-        answer(|engine| engine.trace(start, direction, args.budget.map(|b| b as usize)))
+        answer(ctx, |engine| {
+            engine.trace(start, direction, args.budget.map(|b| b as usize))
+        })
+        .await
     }
 }
 
@@ -122,4 +178,19 @@ pub fn serve() -> crate::Result<()> {
             .await?;
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_uri_decodes_percent_encoding_and_rejects_other_schemes() {
+        assert_eq!(
+            file_path("file:///tmp/my%20repo/caf%C3%A9"),
+            Some(PathBuf::from("/tmp/my repo/café"))
+        );
+        assert_eq!(file_path("https://example.com/x"), None);
+        assert_eq!(file_path("file://localhost/x"), None);
+    }
 }
