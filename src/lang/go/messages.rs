@@ -1,19 +1,22 @@
 //! The message libraries of the Go pack (spec #25): segmentio/kafka-go, confluent-kafka-go, sarama,
 //! amqp091-go, aws-sdk-go-v2's SQS, nats.go and go-redis. A form is a method called on a value
-//! that the source says the library made (`Code::outside_origin`: written as its type, or made by
-//! its constructor, through the methods that hand the object on, such as `Connection.Channel`),
-//! so a `Publish` or a `Send` on anything else is no producer. The names are folded like URLs
+//! that the source says the library made (`Code::origins` with `Follow::Declarations`: written as
+//! its type, or made by its constructor, through the methods that hand the object on, such as
+//! `Connection.Channel`; the maker is spelled from the origin's outside name and steps), so a
+//! `Publish` or a `Send` on anything else is no producer. A function of the library is a callee
+//! that `Code::outside` names with the package itself as its head. The names are folded like URLs
 //! (`Code::expand`), struct fields of composite literals included.
 //!
 //! A client that calls back (`Subscribe(subject, handler)`) has the callback as its handler; a
 //! polling one, the function that holds the call naming the topic or the queue.
 
 use super::modfile::unversioned;
+use super::package_call;
 use crate::lang::{
     Call, Handler, Message, Value, bind, channel_name as name, consume, produce, property, publish,
     queue_name, topic, topics,
 };
-use crate::resolve::{Code, Keywords};
+use crate::resolve::{Code, Follow, Keywords, Of};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Client {
@@ -188,7 +191,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             if receiver.starts_with('(') {
                 continue;
             }
-            let Some(origin) = code.outside_origin(path, &call.scope, receiver) else {
+            let Some(origin) = made_by(code, path, &call.scope, receiver) else {
                 continue;
             };
             let origin = unversioned(&origin);
@@ -199,6 +202,21 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         }
     }
     out
+}
+
+/// What the source says the value `name`, written in `scope` of `path`, is made by outside the
+/// repository, spelled as the imports name it: a type it is written as
+/// (`github.com/segmentio/kafka-go.Writer`), or the function that made it with the methods
+/// called on the way (`github.com/rabbitmq/amqp091-go.Dial.Channel`). The `Declarations`
+/// origin, its outside name and its steps.
+fn made_by<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
+    let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
+    let origin = found.into_iter().next()?;
+    let mut made = origin.outside?.spelled;
+    for step in &origin.routes.first()?.steps {
+        made = format!("{made}.{step}");
+    }
+    Some(made)
 }
 
 /// What the call at `n` of `path`, `method` of a `client`, produces or consumes.
@@ -305,7 +323,7 @@ fn is_library<'a>(
 ) -> bool {
     let named = callee
         .contains('.')
-        .then(|| code.outside_call(path, scope, callee));
+        .then(|| package_call(code, path, scope, callee));
     named
         .flatten()
         .is_some_and(|n| unversioned(&n) == format!("{KAFKA_GO}.{function}"))

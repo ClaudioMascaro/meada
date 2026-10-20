@@ -13,7 +13,22 @@ use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
     Message, Modules, Param, Receiver, Value, children, named, text,
 };
+use crate::resolve::Code;
 use crate::{Result, parent, qualify};
+
+/// What `name`, written in `scope` of `path`, names in a package outside the repository when the
+/// head of the name is the import itself (`http.Get`, `kafka.NewReader`), spelled as the imports
+/// name it. `Code::outside` filtered on `direct`: a method of a typed local (`c.Get` with
+/// `c *http.Client`) is not a function of the package.
+pub(crate) fn package_call<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    name: &'a str,
+) -> Option<String> {
+    let outside = code.outside(path, scope, name, false)?;
+    outside.direct.then_some(outside.spelled)
+}
 
 mod build;
 mod messages;
