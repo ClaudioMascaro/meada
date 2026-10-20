@@ -205,9 +205,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
-/// What the callee of `call`, written in `path`, names outside the repository, spelled as the
-/// file's imports spell it: `Code::outside` read as a value, not a path, whatever its head is.
-fn outside<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<String> {
+/// The spelling of what the callee of `call`, written in `path`, names outside the repository,
+/// as the file's imports spell it: `Code::outside` read as a value, not a path, whatever its head
+/// is.
+fn outside_spelling<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<String> {
     Some(
         code.outside(path, &call.scope, &call.callee, false)?
             .spelled,
@@ -234,7 +235,7 @@ fn client<'a>(
     };
     origins.into_iter().find_map(|o| {
         let (at, i) = o.call?;
-        let origin = outside(code, at, code.call(at, i)?)?;
+        let origin = outside_spelling(code, at, code.call(at, i)?)?;
         LIBRARIES.iter().find(|l| l.made(&origin)).map(|l| l.client)
     })
 }
@@ -248,7 +249,7 @@ fn record<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<(&'a str, usiz
     let chain = chain(code, file, at)?;
     let at = chain.into_iter().find(|&at| {
         let call = code.call(file, at);
-        let origin = call.and_then(|c| outside(code, file, c));
+        let origin = call.and_then(|c| outside_spelling(code, file, c));
         origin.is_some_and(|o| {
             o.starts_with("rdkafka.")
                 && (o.ends_with(".FutureRecord.to") || o.ends_with(".BaseRecord.to"))
@@ -333,7 +334,7 @@ fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
     let start = calls
         .last()
         .filter(|c| !matches!(c.receiver, Some(Value::Call(_))));
-    let origin = start.and_then(|c| outside(code, file, c));
+    let origin = start.and_then(|c| outside_spelling(code, file, c));
     group && origin.is_some_and(|o| o.starts_with("redis.") && o.contains(".StreamReadOptions."))
 }
 

@@ -385,7 +385,8 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
     let entries = || {
         let origins = code.origins(path, scope, Of::Value(arg), Follow::Values);
         let known = !origins.is_empty()
-            && (origins.iter()).all(|o| is_call(o, DJANGO_PATH) || is_call(o, DJANGO_RE_PATH));
+            && (origins.iter())
+                .all(|o| is_call(code, o, DJANGO_PATH) || is_call(code, o, DJANGO_RE_PATH));
         if known {
             Include::Entries(arg)
         } else {
@@ -441,9 +442,14 @@ fn may_be(module: &str, name: &str) -> bool {
     module == name || module.ends_with(&format!(".{name}"))
 }
 
-/// Whether the origin's call is the function `name` outside the repository.
-fn is_call(origin: &Origin, name: &str) -> bool {
-    (origin.outside.as_ref()).is_some_and(|o| o.spelled == name)
+/// Whether the origin's call is the function `name` outside the repository, its callee read as a
+/// name (a Rust file's `urls::path(..)` is no `path`, as `Origin::outside` reads the call's path).
+fn is_call<'a>(code: &Code<'a>, origin: &Origin<'a>, name: &str) -> bool {
+    let Some((path, n)) = origin.call else {
+        return false;
+    };
+    code.call(path, n)
+        .is_some_and(|call| is_named(code, path, call, name))
 }
 
 /// Whether the callee of `call`, written in `path`, is the function `name` outside the
@@ -520,8 +526,8 @@ fn urlconf<'a>(
         };
         *budget = left;
         let regex = match (
-            is_call(&entry, DJANGO_PATH),
-            is_call(&entry, DJANGO_RE_PATH),
+            is_call(code, &entry, DJANGO_PATH),
+            is_call(code, &entry, DJANGO_RE_PATH),
         ) {
             (true, _) => false,
             (_, true) => true,
@@ -567,7 +573,7 @@ fn urlconf<'a>(
             let Some(origin_call) = code.call(at, i) else {
                 continue;
             };
-            if is_call(&origin, DJANGO_INCLUDE) {
+            if is_call(code, &origin, DJANGO_INCLUDE) {
                 if stack.contains(&(at, i)) || stack.len() >= INCLUDE_DEPTH {
                     continue;
                 }
@@ -595,6 +601,23 @@ fn urlconf<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::rust::Rust;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn a_rust_path_call_named_like_django_path_is_no_route() {
+        // `urls::path` is a module's function, found by its path; read as a name, `urls` is a
+        // local function and `django::urls` is not what `urls::path(..)` names.
+        let src = "use django::urls;\nfn urls() {}\nfn view() {}\n\
+                   static urlpatterns: [R; 1] = [urls::path(\"a/\", view)];\n";
+        let facts = Rust.parse("src/lib.rs", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("src/lib.rs", &facts)]);
+        let resolver = Resolver::new(&files, Rust.modules(&[], &files).unwrap(), &Rust);
+        let code = Code::new(&resolver, &files, &Rust);
+        assert!(django(&code).is_empty());
+    }
 
     #[test]
     fn a_regex_route_reads_literal_text_and_simple_named_groups_only() {

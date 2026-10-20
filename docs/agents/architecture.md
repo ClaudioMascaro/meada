@@ -264,7 +264,7 @@ one for the area a change touches.
   import path without its module's major version, `modfile::unversioned`, which the Go routers
   and clients use too, and the constructors that make its client)
   and reads a call when `Code::origins` with `Follow::Declarations` traces its receiver to one of them (the
-  same question as the written-type read of the clients, with the maker's steps: it also follows `x, err := f()`, a repository function that returns a
+  same question as the written-type read of the clients, with the constructor's steps: it also follows `x, err := f()`, a repository function that returns a
   library type, and a method on a value the library made, such as `conn.Channel()`). The
   channel name goes through `Code::expand`, struct fields of a composite literal included:
   `values::composite` gives `Value::New(Type, [Object(fields)])` for a struct written with its
@@ -309,7 +309,7 @@ one for the area a change touches.
 - New **message library** (spec #20, tickets after #45 and track B packs): a form in the pack's
   `messages` (TS/JS: `lang/ts/messages.rs`; Python: `lang/python/messages.rs`; Rust: `lang/rust/messages.rs`; Go: `lang/go/messages.rs`), matching a call's
   method and the `Code::origins` of its receiver, asked with the policy its language needs (TS/JS:
-  `Constants`, the maker's form, outside name and steps; Go: `Declarations`; Python and Rust:
+  `Constants`, the form of the call that made the value, outside name and steps; Go: `Declarations`; Python and Rust:
   `Values`, the constructors named by the file's imports), reading the name through `Code::expand` (a reader that
   answers `None` when the name holds a parameter makes the enclosing function a client wrapper)
   and giving the handler. A wildcard match (`inferred`, reason `<producer contract> wildcard
