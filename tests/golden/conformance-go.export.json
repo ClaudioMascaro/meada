@@ -122,6 +122,10 @@
       "hash": "97d1009bb1e74a4da631250c19a2ce0fa927a4fdcfeef6fbeec2fa6451a5a8ab"
     },
     {
+      "path": "store/codec_pure.go",
+      "hash": "402cbc1973d73ccb8b0ee585c5e15e20e57e27cb4cb4e18f293afd86f130f26f"
+    },
+    {
       "path": "store/disk_linux.go",
       "hash": "eddb60486d0486767435ae621c88a8383775693692b9425ac2fbd4f3ddf3fb59"
     },
@@ -135,7 +139,7 @@
     },
     {
       "path": "store/store.go",
-      "hash": "a7b088065577a6f1cd1ac80f3ba4fd27b0eb677c51ca5237ab99cb6e7aaee604"
+      "hash": "6bb4e96a7bc4679cd5c4a7a95295f5822c3180c1bb8795d75890099d0572d2b6"
     },
     {
       "path": "store/store_test.go",
@@ -1760,6 +1764,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/codec_pure.go::encode",
+      "span": {
+        "path": "store/codec_pure.go",
+        "start": 32,
+        "end": 48
+      }
+    },
+    {
       "id": "example.com/acme/conformance::store/disk_linux.go::onLinux",
       "span": {
         "path": "store/disk_linux.go",
@@ -1796,7 +1808,7 @@
       "span": {
         "path": "store/store.go",
         "start": 65,
-        "end": 218
+        "end": 263
       }
     },
     {
@@ -1811,32 +1823,32 @@
       "id": "example.com/acme/conformance::store/store.go::Store.Get",
       "span": {
         "path": "store/store.go",
-        "start": 220,
-        "end": 283
+        "start": 265,
+        "end": 328
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init",
       "span": {
         "path": "store/store.go",
-        "start": 379,
-        "end": 402
+        "start": 424,
+        "end": 447
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init#2",
       "span": {
         "path": "store/store.go",
-        "start": 404,
-        "end": 429
+        "start": 449,
+        "end": 474
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::open",
       "span": {
         "path": "store/store.go",
-        "start": 285,
-        "end": 299
+        "start": 330,
+        "end": 344
       }
     },
     {
@@ -6703,14 +6715,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/store.go::New::encode#0",
+      "caller": "example.com/acme/conformance::store/store.go::New",
+      "target": "example.com/acme/conformance::store/codec_pure.go::encode",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 204,
+        "end": 212
+      }
+    },
+    {
       "id": "example.com/acme/conformance::store/store.go::New::fmt.Sprintf#0",
       "caller": "example.com/acme/conformance::store/store.go::New",
       "target": null,
       "level": null,
       "span": {
         "path": "store/store.go",
-        "start": 189,
-        "end": 215
+        "start": 234,
+        "end": 260
       }
     },
     {
@@ -6753,8 +6776,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 419,
-        "end": 427
+        "start": 464,
+        "end": 472
       }
     },
     {
@@ -6764,8 +6787,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 394,
-        "end": 400
+        "start": 439,
+        "end": 445
       }
     },
     {
@@ -6775,8 +6798,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 443,
-        "end": 449
+        "start": 488,
+        "end": 494
       }
     },
     {
@@ -10910,6 +10933,23 @@
   ],
   "communities": [
     {
+      "name": ".",
+      "members": [
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
+        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
+        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
+        "example.com/acme/conformance::internal/units/units.go::Meters",
+        "example.com/acme/conformance::main.go::main",
+        "example.com/acme/conformance::main.go::run",
+        "example.com/acme/conformance::report.go::report",
+        "example.com/acme/conformance::store/helpers.go::Exported",
+        "example.com/acme/conformance::store/store.go::init",
+        "example.com/acme/conformance::store/store.go::open"
+      ]
+    },
+    {
       "name": "billing/invoice",
       "members": [
         "example.com/acme/conformance::billing/invoice/invoice.go::Total",
@@ -11124,25 +11164,14 @@
     {
       "name": "store",
       "members": [
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
-        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
-        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
-        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
-        "example.com/acme/conformance::internal/units/units.go::Meters",
-        "example.com/acme/conformance::main.go::main",
-        "example.com/acme/conformance::main.go::run",
-        "example.com/acme/conformance::report.go::report",
         "example.com/acme/conformance::scopes/scopes.go::Plain",
         "example.com/acme/conformance::store/client_test.go::TestClient",
         "example.com/acme/conformance::store/client_test.go::helper",
+        "example.com/acme/conformance::store/codec_pure.go::encode",
         "example.com/acme/conformance::store/disk_linux.go::onLinux",
-        "example.com/acme/conformance::store/helpers.go::Exported",
         "example.com/acme/conformance::store/helpers.go::helper",
         "example.com/acme/conformance::store/store.go::New",
-        "example.com/acme/conformance::store/store.go::init",
         "example.com/acme/conformance::store/store.go::init#2",
-        "example.com/acme/conformance::store/store.go::open",
         "example.com/acme/conformance::store/store_test.go::TestNew",
         "example.com/acme/conformance::store/sys_unix.go::sysOpen"
       ]
@@ -12792,6 +12821,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         },
         {
           "depth": 2,
@@ -15053,6 +15089,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         }
       ]
     },
@@ -15237,6 +15280,13 @@
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
         },
         {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
+        },
+        {
           "depth": 1,
           "repository": "example.com/acme/conformance",
           "level": "exact",
@@ -15284,6 +15334,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         },
         {
           "depth": 1,

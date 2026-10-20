@@ -19,7 +19,7 @@ All notable changes to Meada are recorded here. The format follows
   scope, `_test.go` files included, and an import names them all; the standard library and
   modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
   target (gc, no cgo): a file whose name ends in another system or architecture, or whose
-  `//go:build` line is false, is left out. Exports are the names that start with an upper-case
+  `//go:build` line is false, or that imports `"C"`, is left out. Exports are the names that start with an upper-case
   letter. The language-neutral seam `Layout::shared` gives a group of files one scope. Method
   calls: a call on a receiver whose type the source writes (a parameter, the method receiver, a
   struct field, a `var`, a composite literal `T{}` or `&T{}`, or the first result of a function

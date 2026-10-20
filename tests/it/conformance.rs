@@ -2722,6 +2722,7 @@ fn go() {
             "scopes/scopes.go::run",
             "store/client_test.go::TestClient",
             "store/client_test.go::helper",
+            "store/codec_pure.go::encode",
             "store/disk_linux.go::onLinux",
             "store/entry.go::main",
             "store/helpers.go::Exported",
@@ -2999,6 +3000,12 @@ fn go() {
                 "store/store.go::New::sysOpen#0",
                 EXACT,
                 &["store/sys_unix.go::sysOpen"],
+            ),
+            // A cgo file is left out, as the target builds without cgo.
+            (
+                "store/store.go::New::encode#0",
+                EXACT,
+                &["store/codec_pure.go::encode"],
             ),
             // A replace by a module from outside makes the module of the repository outside.
             ("report.go::report::old.Old#0", None, &[]),

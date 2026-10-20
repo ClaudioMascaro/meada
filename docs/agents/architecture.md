@@ -767,7 +767,8 @@ one for the area a change touches.
   `CONSTRAINT_DEPTH` (64, `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`,
   parentheses) is not read, and the file is left out, as one that cannot be read (two
   `//go:build` lines, not UTF-8) is. Build constraints hold for one target (`linux`, `amd64`,
-  `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false); a legacy `// +build` line
+  `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false, and a file that imports `"C"`
+  is left out); a legacy `// +build` line
   alone is not read. A plain import binds the name the Go tools assume for its path
   (`assumed_name`: the last element, the one before a `vN`, without `go-`, up to the first
   character no identifier holds), not the package clause of the directory it names, so a

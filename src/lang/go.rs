@@ -1012,6 +1012,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
         imports(node, src, &mut walk.facts);
     }
+    // A cgo file (`import "C"`): the target builds without cgo, so it is left out like a file
+    // its constraints exclude.
+    if walk.facts.imports.iter().any(|i| i.source == "C") {
+        return Ok(Facts {
+            unbuilt: true,
+            ..Facts::default()
+        });
+    }
     walk.std = values::Std::new(tree.root_node(), src, &walk.facts.imports);
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
@@ -1192,6 +1200,13 @@ mod tests {
 
     fn facts(src: &str) -> Facts {
         parse("x.go", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_cgo_file_is_left_out() {
+        assert!(facts("package x\n\nimport \"C\"\n\nfunc F() {}\n").unbuilt);
+        assert!(facts("package x\n\nimport (\n\t\"fmt\"\n\t\"C\"\n)\n").unbuilt);
+        assert!(!facts("package x\n\nimport c \"example.com/C\"\n").unbuilt);
     }
 
     #[test]
