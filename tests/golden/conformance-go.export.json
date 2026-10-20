@@ -10,6 +10,10 @@
       "hash": "0a75b82f3af1552995f1541dc778f30bf1b956ea00ddbec523652fc34f027b32"
     },
     {
+      "path": "client/env.go",
+      "hash": "695d02c67d71d4b5a765acb9614dc52a9b8cc4afba91ad83f2ff5dfdd2df607c"
+    },
+    {
       "path": "client/fields.go",
       "hash": "304f573d023d232d975bcce587723d75a9ebe100a182218d4546e7ad917d7e38"
     },
@@ -205,6 +209,22 @@
         "path": "billing/invoice/invoice.go",
         "start": 56,
         "end": 91
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv",
+      "span": {
+        "path": "client/env.go",
+        "start": 150,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup",
+      "span": {
+        "path": "client/env.go",
+        "start": 215,
+        "end": 376
       }
     },
     {
@@ -2962,6 +2982,88 @@
         "path": "billing/invoice/invoice.go",
         "start": 44,
         "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromEnv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 168,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv::os.Getenv#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromEnv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 177,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 374
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).R#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::os.LookupEnv#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 248,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::resty.New#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 334
       }
     },
     {
@@ -11161,6 +11263,16 @@
   ],
   "consumers": [
     {
+      "contract": "http::GET::/env/get",
+      "site": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/env/lookup",
+      "site": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+      "via": "env:BILLING_URL"
+    },
+    {
       "contract": "http::GET::/v1/items",
       "site": "example.com/acme/conformance::client/fields.go::Billing.Items::(call_expression).Get#0",
       "via": "host:api.example.com"
@@ -11541,6 +11653,11 @@
       "via": "path forks/billing/go.mod"
     },
     {
+      "contract": "package::go::example.com/acme/ledger",
+      "site": "example.com/acme/conformance::go.mod::require::example.com/acme/ledger",
+      "via": null
+    },
+    {
       "contract": "channel::kafka::payments",
       "site": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
       "via": null
@@ -11709,6 +11826,12 @@
       "field": "require",
       "name": "example.com/acme/billing",
       "range": "v0.0.0"
+    },
+    {
+      "manifest": "go.mod",
+      "field": "require",
+      "name": "example.com/acme/ledger",
+      "range": "v1.2.0"
     }
   ],
   "communities": [
@@ -12080,6 +12203,13 @@
       "reason": "package::go::example.com/acme/billing v0.0.0 (local none), range unchecked"
     },
     {
+      "consumer": "example.com/acme/conformance::go.mod::require::example.com/acme/ledger",
+      "provider": "example.com/acme/ledger::go.mod",
+      "contract": "package::go::example.com/acme/ledger",
+      "level": "exact",
+      "reason": "package::go::example.com/acme/ledger v1.2.0 (local none), range unchecked"
+    },
+    {
       "consumer": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
       "provider": "example.com/acme/conformance::messages/sarama.go::SaramaProduce::producer.SendMessage#1",
       "contract": "channel::kafka::payments",
@@ -12253,6 +12383,65 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::billing/invoice/invoice.go::round"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/env.go::FromEnv",
+      "kind": "export",
+      "label": "FromEnv",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/env.go::FromEnv"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/env/get"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/env.go::FromLookup",
+      "kind": "export",
+      "label": "FromLookup",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/env/lookup"
         }
       ]
     },

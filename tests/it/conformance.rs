@@ -2518,10 +2518,17 @@ fn rust() {
 
 /// The Go pack (spec #25): functions, methods by their receiver's type, types and interface
 /// methods; imports through the module path of `go.mod`, a `replace` and a nested module; one
-/// scope per package directory; and build constraints for `linux/amd64`.
+/// scope per package directory; and build constraints for `linux/amd64`. A sibling repository of
+/// the workspace provides the module its `require` of `example.com/acme/ledger` names.
 #[test]
 fn go() {
     const OUTER: &str = "scopes/scopes.go::outer";
+    let ledger = Some("https://example.com/acme/ledger.git");
+    fixture_repo(
+        "conformance_conformance-go",
+        "conformance-go-ledger",
+        ledger,
+    );
     conform(
         "conformance-go",
         &[
@@ -2559,6 +2566,8 @@ fn go() {
             "client/fields.go::Pool.Lease",
             "client/fields.go::Unset",
             "client/fields.go::Unset.Idle",
+            "client/env.go::FromEnv",
+            "client/env.go::FromLookup",
             "client/flags.go::Configure",
             "client/net.go::Cache",
             "client/net.go::Cache.Get",
@@ -3652,6 +3661,18 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
         ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
         ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        // A base URL read from the environment, by `os.Getenv` and by `os.LookupEnv` with a
+        // fallback.
+        (
+            "http::GET::/env/get",
+            "env:API_URL",
+            "client/env.go::FromEnv::http.Get#0",
+        ),
+        (
+            "http::GET::/env/lookup",
+            "env:BILLING_URL",
+            &format!("client/env.go::FromLookup::{}", chain("Get", 0)),
+        ),
         // A client kept in a struct field: the literals that set the field give its base. Two
         // bases, a literal whose client is not traced, a selector write of the field, a base set
         // through the field and a literal without field names leave it unknown; a field no
