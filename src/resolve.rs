@@ -3877,7 +3877,10 @@ mod tests {
             let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
             let resolver = Resolver::new(&files, modules, &Go);
             let code = Code::new(&resolver, &files, &Go);
-            code.outside_origin("x.go", "f", "x0")
+            let found = code.origins("x.go", "f", Of::Name("x0"), Follow::Declarations);
+            let origin = found.into_iter().next()?;
+            let steps = origin.routes[0].steps.iter().map(|s| format!(".{s}"));
+            Some(origin.outside?.spelled + &steps.collect::<String>())
         };
         assert!(origin(3).unwrap().ends_with("Dial.M.M.M"));
         assert!(origin(RECEIVER_DEPTH - 1).is_some());
@@ -4286,7 +4289,8 @@ mod tests {
         let start = std::time::Instant::now();
         for name in &names {
             assert_eq!(code.imported("a.py", "", name), Some(("ext", name.clone())));
-            assert_eq!(code.external("a.py", "", name), Some(format!("ext.{name}")));
+            let outside = code.outside("a.py", "", name, false);
+            assert_eq!(outside.map(|o| o.spelled), Some(format!("ext.{name}")));
         }
         // Each call looked its name up among the file's imports one by one, for the import,
         // for whether a path import exists and for the name it spells: minutes here.
@@ -4430,7 +4434,8 @@ mod tests {
             assert_eq!(code.type_params("a.py", name), ["T"]);
             assert!(code.param_defaults_to("a.py", name, "x", "d"));
             assert_eq!(code.returned("a.py", i).len(), 1);
-            assert!(code.value_origins("a.py", "", &invoked[i]).is_empty());
+            let found = code.origins("a.py", "", Of::Value(&invoked[i]), Follow::Values);
+            assert!(found.is_empty());
         }
         // Each function was looked up among the file's definitions one by one, for its return
         // type, its type parameters, its parameter, its return values and the flow through
@@ -5571,13 +5576,27 @@ mod tests {
         src[call.range.clone()].to_string()
     }
 
-    /// One line per origin and route part: its file and callee, `= name` when it names
-    /// something outside the repository (as the file's imports spell it), then what `part`
-    /// renders of each of its routes, once per distinct rendering.
+    /// What `origin_lines` shows of each route.
+    #[derive(Clone, Copy)]
+    enum Shown {
+        /// Nothing: one line per origin.
+        Nothing,
+        /// The calls climbed: one line per origin and climb.
+        Through,
+        /// Everything (`route_line`): one line per origin and route.
+        All,
+    }
+
+    /// One line per origin and route, as far as `shown` tells routes apart: its file and callee,
+    /// `= name` when it names something outside the repository (as the file's imports spell
+    /// it), then what `route_line` renders of what is shown of the route. Two routes that differ
+    /// only in what is not shown give one line; two that differ in what is shown give two, even
+    /// when they render alike (two calls written alike at different sites).
     fn origin_lines<'a>(
         code: &Code<'a>,
+        sources: &[(&str, &str)],
         found: Vec<Origin<'a>>,
-        part: &dyn Fn(&Route<'a>) -> String,
+        shown: Shown,
     ) -> Vec<String> {
         let mut lines = Vec::new();
         for origin in found {
@@ -5586,14 +5605,29 @@ mod tests {
             if let Some(outside) = &origin.outside {
                 head += &format!(" = {}", outside.spelled);
             }
-            let mut own: Vec<String> = Vec::new();
-            for route in &origin.routes {
-                let line = format!("{head}{}", part(route));
-                if !own.contains(&line) {
-                    own.push(line);
+            let mut own: Vec<Route> = Vec::new();
+            for route in origin.routes {
+                let route = match shown {
+                    Shown::Nothing => Route {
+                        through: Vec::new(),
+                        steps: Vec::new(),
+                        held: None,
+                    },
+                    Shown::Through => Route {
+                        steps: Vec::new(),
+                        held: None,
+                        ..route
+                    },
+                    Shown::All => route,
+                };
+                if !own.contains(&route) {
+                    own.push(route);
                 }
             }
-            lines.extend(own);
+            lines.extend(
+                own.iter()
+                    .map(|r| format!("{head}{}", route_line(code, sources, r))),
+            );
         }
         lines
     }
@@ -5629,7 +5663,7 @@ mod tests {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
             let found = code.origins(path, scope, Of::Name(name), Follow::Values);
-            origin_lines(code, found, &|_| String::new())
+            origin_lines(code, sources, found, Shown::Nothing)
         })
     }
 
@@ -5644,7 +5678,7 @@ mod tests {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
             let found = code.origins(path, scope, Of::Name(name), Follow::Values);
-            origin_lines(code, found, &|r| route_line(code, sources, r))
+            origin_lines(code, sources, found, Shown::All)
         })
     }
 
@@ -5656,19 +5690,19 @@ mod tests {
         (call.scope.as_str(), &call.args[0])
     }
 
-    /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, each
-    /// route rendered by `part`.
+    /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, as
+    /// `origin_lines` shows them.
     fn probe_lines(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
         path: &'static str,
-        part: &dyn Fn(&Code, &Route) -> String,
+        shown: Shown,
     ) -> Vec<String> {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
             let (scope, value) = probed(code, path);
             let found = code.origins(path, scope, Of::Value(value), Follow::Values);
-            origin_lines(code, found, &|r| part(code, r))
+            origin_lines(code, sources, found, shown)
         })
     }
 
@@ -5678,7 +5712,7 @@ mod tests {
         sources: &[(&'static str, &str)],
         path: &'static str,
     ) -> Vec<String> {
-        probe_lines(pack, sources, path, &|_, _| String::new())
+        probe_lines(pack, sources, path, Shown::Nothing)
     }
 
     /// The same with the calls climbed, one line per distinct climb.
@@ -5687,7 +5721,7 @@ mod tests {
         sources: &[(&'static str, &str)],
         path: &'static str,
     ) -> Vec<String> {
-        probe_lines(pack, sources, path, &|code, r| via(code, sources, r))
+        probe_lines(pack, sources, path, Shown::Through)
     }
 
     /// The same with every route in full (`route_line`).
@@ -5696,7 +5730,7 @@ mod tests {
         sources: &[(&'static str, &str)],
         path: &'static str,
     ) -> Vec<String> {
-        probe_lines(pack, sources, path, &|code, r| route_line(code, sources, r))
+        probe_lines(pack, sources, path, Shown::All)
     }
 
     fn ts() -> &'static dyn LanguagePack {
@@ -5978,6 +6012,12 @@ mod tests {
             held_through(py(), &sources, "a.py"),
             ["a.py Client via mk('x')", "a.py Client via mk('y')"]
         );
+        // Two calls written alike at two sites are two climbs.
+        let alike = "def mk(u):\n    return Client(u)\n\na = mk('x')\nb = mk('x')\nprobe([a, b])\n";
+        assert_eq!(
+            held_through(py(), &[("a.py", alike)], "a.py"),
+            ["a.py Client via mk('x')", "a.py Client via mk('x')"]
+        );
     }
 
     #[test]
@@ -6038,7 +6078,7 @@ mod tests {
         )
     }
 
-    /// What `r` of `axum_main(defs, body)` may hold: `value_origins`, then `value_origins_through`.
+    /// What `r` of `axum_main(defs, body)` may hold: `held_by_value`, then `held_through`.
     fn built(defs: &str, body: &str) -> (Vec<String>, Vec<String>) {
         let src = axum_main(defs, body);
         let sources = [("main.rs", src.as_str())];
@@ -6476,6 +6516,8 @@ mod tests {
         none("const p = kafka.a.producer();\n", "p");
         // A `new` after steps, or after a call.
         none("const p = new kafka.producer();\n", "p");
+        none("const p = kafka.producer();\nconst q = new p();\n", "q");
+        // A `new` of an expression no name spells (`(kafka.producer())`) has no head to trace.
         none("const p = new (kafka.producer())();\n", "p");
         // What a call made, called again.
         none("const p = kafka.producer();\nconst q = p();\n", "q");
