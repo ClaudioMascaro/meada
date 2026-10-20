@@ -2927,22 +2927,6 @@ impl<'a> Code<'a> {
         }
     }
 
-    /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
-    /// through constants and imports, the arguments callers pass to parameters, the values
-    /// functions of the repository return and the items of a list or tuple. A call that
-    /// reaches no such function is where the value comes from, such as a constructor
-    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
-    /// binding, an attribute) is left out. The calls of the `Values` origins.
-    pub fn name_origins(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        name: &'a str,
-    ) -> Vec<(&'a str, usize)> {
-        let found = self.origins(path, scope, Of::Name(name), Follow::Values);
-        found.into_iter().filter_map(|o| o.call).collect()
-    }
-
     /// `value_origins` with, for each origin, the calls of the functions of the repository the
     /// walk went through to reach it, outermost first: two objects the same function makes
     /// differ by the call that made each. The climbed calls of each route of the `Values`
@@ -2961,7 +2945,12 @@ impl<'a> Code<'a> {
         out.into_iter().collect()
     }
 
-    /// `name_origins` of a value as written.
+    /// The calls whose result `value`, written in `scope` of `path`, may hold, sorted: followed
+    /// through constants and imports, the arguments callers pass to parameters, the values
+    /// functions of the repository return and the items of a list or tuple. A call that
+    /// reaches no such function is where the value comes from, such as a constructor
+    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
+    /// binding, an attribute) is left out. The calls of the `Values` origins.
     pub fn value_origins(
         &self,
         path: &'a str,
