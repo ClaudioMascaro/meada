@@ -1,11 +1,15 @@
 //! FastAPI and Flask providers (spec #24): a decorator registers the function it decorates on an
 //! app or a router, under the router's own prefix and every prefix it is mounted under
 //! (`include_router`, `mount`, `register_blueprint`, through the root's `prefixes`), the app or
-//! router followed through `Code::origins` and counted only when its framework's constructor
-//! creates it (`Code::external`). Django providers: the `path()` and `re_path()` entries of every
+//! router followed through `Code::origins` (`Follow::Values`: constants, imports, arguments and
+//! return values) and counted only when its framework's constructor creates it, read off the
+//! origin's `outside` name (`Code::outside`, the callee as a name). Django providers: the `path()` and `re_path()` entries of every
 //! root URLconf's `urlpatterns`, each `include()` followed at any depth (`URLCONF_BUDGET`,
 //! `INCLUDE_DEPTH`); a function view serves what its decorators allow or every method, a
-//! class-based view the handler methods it defines. Seams of the root reused: `prefixes`,
+//! class-based view the handler methods it defines. Both ask `Code::origins` with
+//! `Follow::Values` (a `urlpatterns` list, an `include()` entry, a view) and read the name of a
+//! decorator, a view or a callee with `Code::outside` without the path flag. Seams of the root
+//! reused: `prefixes`,
 //! `path_literal`, `methods`, `normalize_path`, `provider`.
 
 mod clients;
@@ -18,7 +22,7 @@ use super::{
 };
 use crate::contract::{Found, Site};
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Target};
+use crate::resolve::{Code, Follow, Of, Origin, Target};
 
 /// FastAPI, Flask and Django providers: see the module.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
@@ -113,17 +117,30 @@ const FRAMEWORKS: &[Framework] = &[
 // one it cannot hold.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     // The framework that creates an app or router, and whether it is an app.
-    let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
-        let call = &code.files()[path].calls[n];
-        let name = code.external(path, &call.scope, &call.callee)?;
+    let named = |name: &str| -> Option<(&Framework, bool)> {
         FRAMEWORKS.iter().find_map(|f| {
-            let app = f.apps.contains(&name.as_str());
-            (app || f.routers.contains(&name.as_str())).then_some((f, app))
+            let app = f.apps.contains(&name);
+            (app || f.routers.contains(&name)).then_some((f, app))
         })
     };
+    let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
+        let call = &code.files()[path].calls[n];
+        named(
+            &code
+                .outside(path, &call.scope, &call.callee, false)?
+                .spelled,
+        )
+    };
+    let creator = |o: &Origin<'a>| -> Option<(CallAt<'a>, &Framework, bool)> {
+        let (kind, app) = named(&o.outside.as_ref()?.spelled)?;
+        Some((o.call?, kind, app))
+    };
     let routers = |path, scope, name| -> Vec<(CallAt, &Framework)> {
-        let origins = code.name_origins(path, scope, name).into_iter();
-        origins.filter_map(|r| Some((r, framework(r)?.0))).collect()
+        let origins = code.origins(path, scope, Of::Name(name), Follow::Values);
+        origins
+            .iter()
+            .filter_map(|o| creator(o).map(|(r, f, _)| (r, f)))
+            .collect()
     };
     // The prefix a router's constructor gives it: none when absent.
     let own = |router @ (path, n): CallAt<'a>| -> Option<String> {
@@ -164,10 +181,13 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                 let given = argument(mount, how.prefix)
                     .map(|p| code.value(path, &call.scope, p))
                     .filter(|p| !matches!(p, Value::Undefined));
-                let children: Vec<CallAt> = (code.value_origins(path, &call.scope, child))
-                    .into_iter()
-                    .filter(|&c| framework(c).is_some_and(|(f, _)| std::ptr::eq(f, kind)))
-                    .collect();
+                let children: Vec<CallAt> =
+                    (code.origins(path, &call.scope, Of::Value(child), Follow::Values))
+                        .iter()
+                        .filter_map(creator)
+                        .filter(|&(_, f, _)| std::ptr::eq(f, kind))
+                        .map(|(c, ..)| c)
+                        .collect();
                 if children.is_empty() && how.takes_apps {
                     unread.push((at, kind));
                 }
@@ -317,18 +337,20 @@ fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
         }
     };
     for name in &def.decorators {
-        if let Some(methods) = code
-            .external(view.path, scope, name)
-            .as_deref()
-            .and_then(named)
+        if let Some(methods) =
+            (code.outside(view.path, scope, name, false)).and_then(|o| named(&o.spelled))
         {
             restrict(methods.iter().map(|m| m.to_string()).collect());
         }
     }
     for (n, call) in facts.calls.iter().enumerate() {
         if call.decorates.as_deref() != Some(view.name)
-            || (code.external(view.path, &call.scope, &call.callee))
-                .is_none_or(|e| e != format!("{DJANGO_HTTP}require_http_methods"))
+            || !is_named(
+                code,
+                view.path,
+                call,
+                &format!("{DJANGO_HTTP}require_http_methods"),
+            )
         {
             continue;
         }
@@ -369,10 +391,9 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
         }
     };
     let entries = || {
-        let origins = code.value_origins(path, scope, arg);
+        let origins = code.origins(path, scope, Of::Value(arg), Follow::Values);
         let known = !origins.is_empty()
-            && (origins.iter())
-                .all(|&o| is_call(code, o, DJANGO_PATH) || is_call(code, o, DJANGO_RE_PATH));
+            && (origins.iter()).all(|o| is_call(o, DJANGO_PATH) || is_call(o, DJANGO_RE_PATH));
         if known {
             Include::Entries(arg)
         } else {
@@ -389,8 +410,8 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
             if let Some(module) = code.module(path, scope, name) {
                 return Include::Module(module);
             }
-            if let Some(name) = code.external(path, scope, name) {
-                return Include::Named(name);
+            if let Some(outside) = code.outside(path, scope, name, false) {
+                return Include::Named(outside.spelled);
             }
             match code.value(path, scope, arg) {
                 value @ Value::Str(_) => dotted(value),
@@ -403,7 +424,7 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
 
 /// The URLconf entries an `include()` call at `index` of `path` holds: the `urlpatterns` of
 /// the module it names, or the entries of the list it is given.
-fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<CallAt<'a>> {
+fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Origin<'a>> {
     let Some(call) = code.call(path, index) else {
         return Vec::new();
     };
@@ -411,8 +432,10 @@ fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<CallAt<'a>>
         return Vec::new();
     };
     match include(code, path, &call.scope, arg) {
-        Include::Module(module) => code.name_origins(module, "", "urlpatterns"),
-        Include::Entries(list) => code.value_origins(path, &call.scope, list),
+        Include::Module(module) => {
+            code.origins(module, "", Of::Name("urlpatterns"), Follow::Values)
+        }
+        Include::Entries(list) => code.origins(path, &call.scope, Of::Value(list), Follow::Values),
         Include::Named(_) | Include::Unknown => Vec::new(),
     }
 }
@@ -426,10 +449,16 @@ fn may_be(module: &str, name: &str) -> bool {
     module == name || module.ends_with(&format!(".{name}"))
 }
 
-/// Whether the call at `at` is the function `name` outside the repository.
-fn is_call<'a>(code: &Code<'a>, (path, n): CallAt<'a>, name: &str) -> bool {
-    let call = &code.files()[path].calls[n];
-    code.external(path, &call.scope, &call.callee).as_deref() == Some(name)
+/// Whether the origin's call is the function `name` outside the repository.
+fn is_call(origin: &Origin, name: &str) -> bool {
+    (origin.outside.as_ref()).is_some_and(|o| o.spelled == name)
+}
+
+/// Whether the callee of `call`, written in `path`, is the function `name` outside the
+/// repository.
+fn is_named<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, name: &str) -> bool {
+    let outside = code.outside(path, &call.scope, &call.callee, false);
+    outside.is_some_and(|o| o.spelled == name)
 }
 
 /// Django providers: the `path()` and `re_path()` entries of every root URLconf's
@@ -450,9 +479,9 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
-            // The name check first: `is_call` resolves the callee.
+            // The name check first: `is_named` resolves the callee.
             let named = call.callee.rsplit('.').next() == Some("include");
-            if !named || !is_call(code, (path, n), DJANGO_INCLUDE) {
+            if !named || !is_named(code, path, call, DJANGO_INCLUDE) {
                 continue;
             }
             let Some(arg) = code.args(path, n).and_then(<[_]>::first) else {
@@ -468,13 +497,14 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     let (mut found, mut budget) = (Vec::new(), URLCONF_BUDGET);
     for root in roots {
-        let entries = code.name_origins(root, "", "urlpatterns");
+        let entries = code.origins(root, "", Of::Name("urlpatterns"), Follow::Values);
         urlconf(code, entries, "", &mut Vec::new(), &mut budget, &mut found);
     }
     found
 }
 
-/// The providers of URLconf `entries` under `prefix`; `stack` holds the `include()` calls
+/// The providers of URLconf `entries` (the `Values` origins of a `urlpatterns` list or an
+/// `include()`d one) under `prefix`; `stack` holds the `include()` calls
 /// being followed, so one met again (a cycle) adds nothing. Each entry read is charged to
 /// `budget`; once it is spent, nothing more is read.
 // ponytail: `django.conf.urls.url`, a view wrapped in a call (`require_POST(view)`), a handler
@@ -483,20 +513,23 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
 // backslashes yields nothing.
 fn urlconf<'a>(
     code: &Code<'a>,
-    entries: Vec<CallAt<'a>>,
+    entries: Vec<Origin<'a>>,
     prefix: &str,
     stack: &mut Vec<CallAt<'a>>,
     budget: &mut usize,
     found: &mut Vec<Found>,
 ) {
-    for entry @ (path, n) in entries {
+    for entry in entries {
+        let Some((path, n)) = entry.call else {
+            continue;
+        };
         let Some(left) = budget.checked_sub(1) else {
             return;
         };
         *budget = left;
         let regex = match (
-            is_call(code, entry, DJANGO_PATH),
-            is_call(code, entry, DJANGO_RE_PATH),
+            is_call(&entry, DJANGO_PATH),
+            is_call(&entry, DJANGO_RE_PATH),
         ) {
             (true, _) => false,
             (_, true) => true,
@@ -534,15 +567,19 @@ fn urlconf<'a>(
             }
             continue;
         }
-        for origin @ (at, i) in code.value_origins(path, &call.scope, view) {
+        let views = code.origins(path, &call.scope, Of::Value(view), Follow::Values);
+        for origin in views {
+            let Some((at, i)) = origin.call else {
+                continue;
+            };
             let Some(origin_call) = code.call(at, i) else {
                 continue;
             };
-            if is_call(code, origin, DJANGO_INCLUDE) {
-                if stack.contains(&origin) || stack.len() >= INCLUDE_DEPTH {
+            if is_call(&origin, DJANGO_INCLUDE) {
+                if stack.contains(&(at, i)) || stack.len() >= INCLUDE_DEPTH {
                     continue;
                 }
-                stack.push(origin);
+                stack.push((at, i));
                 urlconf(code, included(code, at, i), &route, stack, budget, found);
                 stack.pop();
             } else if let Some(class) = origin_call.callee.strip_suffix(".as_view")
