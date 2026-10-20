@@ -11,7 +11,7 @@ modules updates it.
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level. `http/ts/clients.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`; only in a pack whose `globals` has it; each with `Found::shape` from `response_reads`, spec #23: over the frames
-  `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
+  `Code::expand` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
   caller reaches), Python client consumers (`http/python/clients.rs`, below), Next.js app-router

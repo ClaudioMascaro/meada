@@ -2032,7 +2032,20 @@ pub struct Frame<'a> {
     pub index: usize,
 }
 
-/// What `Code::expand_frames` finds at one site.
+/// What a wrapper expansion starts from.
+#[derive(Clone, Copy)]
+pub enum Expand<'a> {
+    /// The call at an index of a file.
+    Call(&'a str, usize),
+    /// The arguments of the `new` expression the `const` `held` (file, name) holds, on behalf of
+    /// the call `at` made on that constant.
+    Constructed {
+        held: (&'a str, &'a str),
+        at: (&'a str, usize),
+    },
+}
+
+/// What `Code::expand` finds at one site.
 pub struct Expanded<'a, R> {
     /// The site's file and call position.
     pub site: (&'a str, usize),
@@ -3204,74 +3217,57 @@ impl<'a> Code<'a> {
         self.resolver.module(path, specifier)
     }
 
-    /// What `read` makes of the positional and keyword arguments of the call at `index` of
-    /// `path`, at each call site that determines them. `read` answers `None` when what it
-    /// needs holds a `Ref`: a parameter of the enclosing function, which makes that function a
-    /// client wrapper. Each call site of the wrapper is then read with its own arguments
-    /// substituted, through any number of wrapper levels. A wrapper reached again through its
-    /// own callers (a cycle) adds nothing; a wrapper nobody calls is read where it stands, its
-    /// parameters unknown.
+    /// What `read` makes of the positional and keyword arguments of `from`, at each call site
+    /// that determines them, with the wrapper calls climbed from the call to each site. `from`
+    /// is a call, or the `new` expression a `const` holds on behalf of a call made on that
+    /// constant (`Origin::binding`): the call is the site when the arguments evaluate where the
+    /// constant stands, and the function enclosing the constant is the client wrapper when they
+    /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
+    /// parameter of the enclosing function, which makes that function a client wrapper. Each
+    /// call site of the wrapper is then read with its own arguments substituted, through any
+    /// number of wrapper levels. A wrapper reached again through its own callers (a cycle) adds
+    /// nothing; a wrapper nobody calls is read where it stands, its parameters unknown.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
         &self,
-        path: &'a str,
-        index: usize,
-        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
-    ) -> Vec<(&'a str, usize, R)> {
-        (self.expand_frames(path, index, read).into_iter())
-            .map(|e| (e.site.0, e.site.1, e.found))
-            .collect()
-    }
-
-    /// `expand`, with the wrapper calls climbed from the call to each site.
-    pub fn expand_frames<R>(
-        &self,
-        path: &'a str,
-        index: usize,
+        from: Expand<'a>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
-        // The full call: the resolver's files may be kept from the index, without values.
-        let Some(call) = self.call(path, index) else {
-            return Vec::new();
-        };
         let mut out = Vec::new();
-        let written = Written {
-            path,
-            scope: &call.scope,
-            args: &call.args,
-            kwargs: &call.kwargs,
-            at: (path, index),
-        };
-        self.walk(&written, &mut Vec::new(), read, &mut out);
+        match from {
+            Expand::Call(path, index) => {
+                // The full call: the resolver's files may be kept from the index, without values.
+                let Some(call) = self.call(path, index) else {
+                    return out;
+                };
+                let written = Written {
+                    path,
+                    scope: &call.scope,
+                    args: &call.args,
+                    kwargs: &call.kwargs,
+                    at: (path, index),
+                };
+                self.walk(&written, &mut Vec::new(), read, &mut out);
+            }
+            Expand::Constructed {
+                held: (file, constant),
+                at,
+            } => {
+                let Some((Value::New(_, args), scope)) = self.held(file, constant) else {
+                    return out;
+                };
+                let written = Written {
+                    path: file,
+                    scope,
+                    args,
+                    kwargs: &[],
+                    at,
+                };
+                self.walk(&written, &mut Vec::new(), read, &mut out);
+            }
+        }
         out
-    }
-
-    /// `expand` for the arguments of the `new` expression the `const` `binding` holds
-    /// (`Origin::binding`), on behalf of the call `at` made on that binding: `at` is the site
-    /// when they evaluate where the binding stands, and the function enclosing the binding is
-    /// the client wrapper when they depend on its parameters.
-    pub fn expand_constructed<R>(
-        &self,
-        (file, constant): (&'a str, &'a str),
-        at: (&'a str, usize),
-        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
-    ) -> Vec<(&'a str, usize, R)> {
-        let Some((Value::New(_, args), scope)) = self.held(file, constant) else {
-            return Vec::new();
-        };
-        let mut out = Vec::new();
-        let written = Written {
-            path: file,
-            scope,
-            args,
-            kwargs: &[],
-            at,
-        };
-        self.walk(&written, &mut Vec::new(), read, &mut out);
-        (out.into_iter())
-            .map(|e| (e.site.0, e.site.1, e.found))
-            .collect()
     }
 
     fn walk<R>(
@@ -4733,8 +4729,8 @@ mod tests {
             Value::Ref(_) => None,
             url => Some(url.clone()),
         };
-        (code.expand("a.ts", n, &url).into_iter())
-            .map(|(_, _, url)| match url {
+        (code.expand(Expand::Call("a.ts", n), &url).into_iter())
+            .map(|e| match e.found {
                 Value::Str(parts) => crate::lang::literal(&parts),
                 _ => None,
             })
@@ -5406,7 +5402,7 @@ mod tests {
         })
     }
 
-    /// The wrapper calls `expand_frames` climbs to each site of the `fetch` of `src`, as written,
+    /// The wrapper calls `expand` climbs to each site of the `fetch` of `src`, as written,
     /// from the call in the wrapper to the site, one line per site.
     fn climbed(src: &str) -> Vec<String> {
         climbed_with(src, &|text, _| text)
@@ -5430,7 +5426,7 @@ mod tests {
                 url => Some(url.clone()),
             };
             let mut lines = Vec::new();
-            for expanded in code.expand_frames(path, at, &url) {
+            for expanded in code.expand(Expand::Call(path, at), &url) {
                 let frames = (expanded.frames.iter())
                     .map(|f| show(written(code, &sources, f.path, f.index), f.index))
                     .collect::<Vec<_>>();
@@ -5440,7 +5436,7 @@ mod tests {
         })
     }
 
-    /// The sites `expand_constructed` finds for the constructed constant `held` of `a.ts`, on
+    /// The sites `expand` finds for the constructed constant `held` of `a.ts`, on
     /// behalf of the call `at` (a callee of `a.ts`), each with the first argument of the `new`
     /// as read there.
     fn constructed_sites(src: &str, held: &'static str, at: &str) -> Vec<String> {
@@ -5451,9 +5447,17 @@ mod tests {
                 Value::Ref(_) => None,
                 first => Some(first.clone()),
             };
-            let found = code.expand_constructed((path, held), (path, at.unwrap()), &first);
+            let from = Expand::Constructed {
+                held: (path, held),
+                at: (path, at.unwrap()),
+            };
             let mut lines = Vec::new();
-            for (path, index, first) in found {
+            for Expanded {
+                site: (path, index),
+                found: first,
+                ..
+            } in code.expand(from, &first)
+            {
                 let Value::Str(parts) = first else {
                     panic!("the first argument is not a string");
                 };

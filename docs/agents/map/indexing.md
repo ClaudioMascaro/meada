@@ -138,7 +138,7 @@ modules updates it.
   its enclosing function); `sqs-consumer` `Consumer.create({queueUrl, handleMessage})`; NATS
   `publish(subject)` / `subscribe(subject, {callback})` on a `connect()` connection (the
   handler is the `callback`, else the enclosing function); BullMQ `add` on a binding that holds
-  `new Queue(name)` (the queue is named by the binding, read with `Code::expand_constructed`:
+  `new Queue(name)` (the queue is named by the binding, read with `Code::expand` over `Expand::Constructed`:
   the `add` call is the producer, or, when `name` is a parameter of the function that makes the
   binding, each call site of that wrapper) and `new Worker(name,
   processor)` (the processor, a definition or a function in place, is the handler); ioredis
@@ -414,13 +414,13 @@ modules updates it.
   `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
-  `Code::expand_frames` is `expand` that also returns, for each site, the wrapper calls it
-  climbed (`Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
+  `Code::expand` returns, for each site, the wrapper calls it
+  climbed (`Expanded::frames`, `Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
   `Call::uses` like `args` (a file without full facts is a miss). An argument binds a parameter as its `Param::binds` says: by position or by
   the parameter's name among the keyword arguments, only by name, or not at all (`Rest`); a
   method called on an instance (`x.m(a)`) passes nothing for an `Instance` receiver, one called
   on its class (`C.m(obj, a)`) passes it first, and a `Class` receiver is never passed.
-  `Code::expand(path, index, read)` hands
+  `Code::expand(Expand::Call(path, index), read)` hands
   `read` the call's positional and keyword arguments, folded, and walks the wrappers' callers
   with them; a call found only by a name match (`data.get(...)` matched to a wrapper method,
   or a bare name no import binds; `Resolver::callers` keeps `exact` calls alone) is not climbed, since it may be on any
@@ -444,9 +444,9 @@ modules updates it.
   the repository (`Binding::External` keeps the specifier and imported name), and spells what
   the code did with it from that name: `new Kafka().producer()` for `kafkajs`. A namespace import
   adds no name, a default import is `default`; `binding` is the constant the chain's head names
-  (how a pack pairs calls on the same client). `Code::expand_constructed(binding, at, read)` is
-  `expand` over the arguments of the `new` a binding holds, on behalf of the call `at` made on
-  it. `Code::pack()` is the pack of the files. `Code::imported(path, scope, chain)` is the same
+  (how a pack pairs calls on the same client). `Code::expand(Expand::Constructed { held: binding, at }, read)`
+  is the same expansion over the arguments of the `new` a binding holds, on behalf of the call
+  `at` made on it. `Code::pack()` is the pack of the files. `Code::imported(path, scope, chain)` is the same
   tracing without `const`s: the specifier and spelled chain when the chain's head is itself an
   import from outside the repository (what `Packages::extract` stores). `Resolver::exported()` is
   what each file exports, as `export` reads it, for the `exports` table.
