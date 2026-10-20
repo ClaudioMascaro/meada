@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, shown};
+use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
@@ -692,6 +693,34 @@ impl ContractKind for Http {
         let fits = |c: &str| route_fits(c, consumer.method.as_deref(), &consumer.fragments);
         fits(&provider.contract) || gateway_contracts(provider).any(|(g, _)| fits(&g))
     }
+
+    /// A route is a whole contract (`GET /users` names one too), or a path on any method.
+    fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        let (contract, path) = if route(from).is_some() {
+            (Some(from.to_string()), None)
+        } else if let Some((method, path)) = from.split_once(' ')
+            && path.starts_with('/')
+            && method.chars().all(|c| c.is_ascii_alphabetic())
+        {
+            (Some(self::contract(method, path)), None)
+        } else if from.starts_with('/') {
+            (None, Some(format!("::{}", normalize_path(from))))
+        } else {
+            (None, None)
+        };
+        (providers.iter())
+            .filter(|(c, _)| {
+                contract.as_deref().is_some_and(|w| fits(c, w))
+                    || path.as_deref().is_some_and(|p| c.ends_with(p))
+            })
+            .map(|&(_, site)| site)
+            .collect()
+    }
+
+    /// A provider of a route is a door.
+    fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
+        (role == Role::Provider && route(contract).is_some()).then_some(EntryKind::Route)
+    }
 }
 
 #[cfg(test)]
@@ -699,7 +728,8 @@ mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
     };
-    use crate::contract::{ContractKind, Search};
+    use crate::contract::{ContractKind, Role, Search};
+    use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
 
     fn provider(contract: &str) -> Provider {
@@ -916,5 +946,29 @@ mod tests {
         ] {
             assert_eq!(fragments(&parts), expected);
         }
+    }
+
+    #[test]
+    fn a_trace_start_names_the_providers_of_a_route_in_three_forms_and_of_nothing_else() {
+        let providers = [
+            ("http::GET::/users/{}", "r::a.ts::get"),
+            ("http::POST::/users/{}", "r::a.ts::post"),
+            ("http::GET::/other", "r::a.ts::other"),
+            ("channel::kafka::users", "r::a.ts::handle"),
+        ];
+        let starts = |from| Http.starts(from, &providers);
+        assert_eq!(starts("http::GET::/users/{}"), ["r::a.ts::get"]);
+        assert_eq!(starts("GET /users/{}"), ["r::a.ts::get"]);
+        assert_eq!(starts("/users/{}"), ["r::a.ts::get", "r::a.ts::post"]);
+        assert!(starts("get").is_empty());
+        assert!(starts("GET users").is_empty());
+    }
+
+    #[test]
+    fn a_provider_of_a_route_is_an_entry_point_and_a_consumer_is_not() {
+        let route = "http::GET::/users";
+        assert_eq!(Http.entry(Role::Provider, route), Some(EntryKind::Route));
+        assert_eq!(Http.entry(Role::Consumer, route), None);
+        assert_eq!(Http.entry(Role::Provider, "http::nonsense"), None);
     }
 }
