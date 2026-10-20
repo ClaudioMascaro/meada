@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
 use crate::document;
 use crate::entry::EntryKind;
 use crate::index::{self, Binding, Consumer, Export, Provider, Publish};
@@ -18,6 +18,9 @@ use crate::shape::Shape;
 use crate::workspace::Repository;
 
 pub struct Channel;
+
+/// The words for a producer and a consumer of a channel in `context`.
+const SIDES: (&str, &str) = ("producer", "consumer");
 
 /// The start of every channel contract identifier.
 pub const PREFIX: &str = "channel::";
@@ -102,7 +105,63 @@ impl ContractKind for Channel {
     }
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
-        Some(("producer", "consumer"))
+        Some(SIDES)
+    }
+
+    /// The producers a consumer's wildcard pattern matches and the wildcard consumers that
+    /// match the channel, the publishes its bindings route to it, and the bindings themselves.
+    fn related_sides<'e>(
+        &self,
+        exports: &'e [Export],
+        export: &'e Export,
+        contract: &str,
+    ) -> Vec<Related<'e>> {
+        let (producer, consumer) = SIDES;
+        let routes = Routes::new(exports);
+        let provided = (export.providers.iter())
+            .filter(|p| p.contract != contract)
+            .filter_map(|p| {
+                Some(Related {
+                    site: &p.site,
+                    role: Role::Provider,
+                    words: producer.into(),
+                    matched: Some(fits(&p.contract, contract)?),
+                    shape: p.shape.as_ref(),
+                })
+            });
+        let published = export.publishes.iter().filter_map(|q| {
+            Some(Related {
+                site: &q.site,
+                role: Role::Provider,
+                words: producer.into(),
+                matched: Some(routes.reached(q).remove(contract)?),
+                shape: None,
+            })
+        });
+        let consumed = export.consumers.iter().filter_map(|c| {
+            let own = c.contract.as_ref().filter(|own| *own != contract)?;
+            Some(Related {
+                site: &c.site,
+                role: Role::Consumer,
+                words: consumer.into(),
+                matched: Some(fits(contract, own)?),
+                shape: c.shape.as_ref(),
+            })
+        });
+        let bound = (export.bindings.iter())
+            .filter(|b| b.contract == contract)
+            .map(|b| Related {
+                site: &b.site,
+                role: Role::Binding,
+                words: format!("binding {} {}", b.exchange, b.pattern),
+                matched: None,
+                shape: None,
+            });
+        provided
+            .chain(published)
+            .chain(consumed)
+            .chain(bound)
+            .collect()
     }
 
     fn unresolved(&self, contract: &str) -> bool {
@@ -379,6 +438,93 @@ mod tests {
     use super::{Channel, nats, pattern_matches};
     use crate::contract::{ContractKind, Role};
     use crate::entry::EntryKind;
+    use crate::index::{Binding, Consumer, Export, Provider, Publish};
+
+    fn provider(contract: &str, site: &str) -> Provider {
+        Provider {
+            contract: contract.into(),
+            site: site.into(),
+            ..Provider::default()
+        }
+    }
+
+    fn consumer(contract: &str, site: &str) -> Consumer {
+        Consumer {
+            contract: Some(contract.into()),
+            site: site.into(),
+            via: None,
+            shape: None,
+            method: None,
+            fragments: Vec::new(),
+            hops: Vec::new(),
+        }
+    }
+
+    /// What `related_sides` says of `contract` over `exports[0]`, a line per side: its site,
+    /// the side it shows as, its words, then `[<level>: <reason>]` when a name matched it.
+    fn related(exports: &[Export], contract: &str) -> Vec<String> {
+        let sides = Channel.related_sides(exports, &exports[0], contract);
+        (sides.into_iter())
+            .map(|r| {
+                let (site, role, words) = (r.site, r.role.name(), r.words);
+                match r.matched {
+                    Some((level, reason)) => {
+                        format!("{site} {role} {words} [{}: {reason}]", level.name())
+                    }
+                    None => format!("{site} {role} {words}"),
+                }
+            })
+            .collect()
+    }
+
+    /// The sides that reach a channel through another name are the wildcard consumers and
+    /// producers, the publishes its bindings route and the bindings; its own sides are left to
+    /// the engine.
+    #[test]
+    fn a_channel_is_reached_through_wildcards_publishes_and_bindings() {
+        let export = Export {
+            providers: vec![provider(
+                "channel::nats::orders.created",
+                "r::a.ts::produce",
+            )],
+            consumers: vec![
+                consumer("channel::nats::orders.*", "r::b.ts::watch"),
+                consumer("channel::nats::orders.created", "r::b.ts::handle"),
+            ],
+            bindings: vec![Binding {
+                contract: "channel::rabbitmq::q".into(),
+                exchange: "ex".into(),
+                pattern: "order.*".into(),
+                site: "r::b.ts::bind".into(),
+            }],
+            publishes: vec![Publish {
+                exchange: "ex".into(),
+                key: "order.created".into(),
+                site: "r::a.ts::pub".into(),
+            }],
+            ..Export::default()
+        };
+        let exports = [export];
+
+        let wildcard = "[inferred: channel::nats::orders.created wildcard orders.*]";
+        assert_eq!(
+            related(&exports, "channel::nats::orders.created"),
+            [format!("r::b.ts::watch consumer consumer {wildcard}")]
+        );
+        assert_eq!(
+            related(&exports, "channel::nats::orders.*"),
+            [format!("r::a.ts::produce provider producer {wildcard}")]
+        );
+        let routed = "[inferred: channel::rabbitmq::q binding ex order.*]";
+        assert_eq!(
+            related(&exports, "channel::rabbitmq::q"),
+            [
+                format!("r::a.ts::pub provider producer {routed}"),
+                "r::b.ts::bind binding binding ex order.*".to_string(),
+            ]
+        );
+        assert!(related(&exports, "channel::kafka::none").is_empty());
+    }
 
     #[test]
     fn a_consumer_of_a_channel_is_an_entry_point_named_or_unresolved_and_a_provider_is_not() {

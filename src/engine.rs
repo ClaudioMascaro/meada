@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::channel::Routes;
-use crate::contract::{self, KINDS, Level, Link, Search, View};
+use crate::contract::{self, ContractKind, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
 use crate::index::{Export, State, Symbol};
@@ -551,48 +551,46 @@ impl Engine {
             carried,
             ..
         }: View,
-        what: &str,
+        kind: &dyn ContractKind,
     ) -> Vec<String> {
-        let routes = Routes::new(exports);
-        // How a side reaches `contract`: its own (no tag), a match through another name, or
-        // not at all.
-        let tag = |own: bool, matched: Option<(Level, String)>| match own {
-            true => Some(String::new()),
-            false => matched.map(|(level, reason)| format!(" [{}: {reason}]", level.name())),
-        };
         // Providers, then consumers, then the bindings that reach a queue; each with the lines
         // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         for (export, repo) in exports.iter().zip(&self.workspace.repos) {
             let mut files = Files::new(&repo.root);
             // Each side that reaches `contract`: its site, order, role words, tag and shape.
-            let provided = export.providers.iter().filter_map(|p| {
-                let tag = tag(p.contract == contract, channel::fits(&p.contract, contract))?;
-                Some((&p.site, 0, String::from(provider), tag, &p.shape))
-            });
-            let published = export.publishes.iter().filter_map(|q| {
-                let tag = tag(false, routes.reached(q).remove(contract))?;
-                Some((&q.site, 0, String::from(provider), tag, &None))
-            });
+            // The sides that hold it come from the engine, the others from the kind.
+            let provided = export.providers.iter().filter(|p| p.contract == contract);
+            let provided =
+                provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
             let consumed = export.consumers.iter().filter_map(|c| {
-                let (own, consumer) = (c.contract.as_ref()?, consumer?);
-                let tag = tag(own == contract, channel::fits(contract, own))?;
-                Some((&c.site, 1, String::from(consumer), tag, &c.shape))
+                let words = consumer.filter(|_| c.contract.as_deref() == Some(contract))?;
+                Some((c.site.as_str(), 1, words.into(), c.shape.as_ref()))
             });
-            let bound = (export.bindings.iter().filter(|b| b.contract == contract)).map(|b| {
-                let role = format!("binding {} {}", b.exchange, b.pattern);
-                (&b.site, 2, role, String::new(), &None)
+            let own = provided
+                .chain(consumed)
+                .map(|(site, order, role, shape)| (site, order, role, String::new(), shape));
+            let related = kind.related_sides(exports, export, contract);
+            let related = related.into_iter().map(|r| {
+                let tag = r.matched.map_or_else(String::new, |(level, reason)| {
+                    format!(" [{}: {reason}]", level.name())
+                });
+                let order = match r.role {
+                    Role::Provider => 0,
+                    Role::Consumer => 1,
+                    _ => 2,
+                };
+                (r.site, order, r.words, tag, r.shape)
             });
-            let all = provided.chain(published).chain(consumed).chain(bound);
-            for (site, order, role, tag, shape) in all {
-                let place = if let Some(s) = export.symbols.iter().find(|s| s.id == *site) {
+            for (site, order, role, tag, shape) in own.chain(related) {
+                let place = if let Some(s) = export.symbols.iter().find(|s| s.id == site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
-                } else if let Some(c) = export.calls.iter().find(|c| c.id == *site) {
+                } else if let Some(c) = export.calls.iter().find(|c| c.id == site) {
                     let at = files.at(&c.span.path, c.span.start);
                     let name = export.symbols.iter().find(|s| s.id == c.caller);
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
-                } else if *site == repo.identity {
+                } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
@@ -603,7 +601,6 @@ impl Engine {
                 } else {
                     format!("{} (top level)", label(site))
                 };
-                let shape = shape.as_ref();
                 let shape =
                     shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, carried));
                 let line = format!("{} {role} {place}{tag}", repo.identity);
@@ -611,7 +608,7 @@ impl Engine {
             }
         }
         if sides.is_empty() {
-            return vec![format!("no {what} matches `{contract}`")];
+            return vec![format!("no {} matches `{contract}`", kind.prefix())];
         }
         sides.sort();
         let mut lines = vec![contract::shown(contract)];
@@ -649,7 +646,7 @@ impl Engine {
         if let Some(kind) = contract::kind_of(contract)
             && let Some(view) = kind.view(contract)
         {
-            let mut lines = self.contract_sides(&exports, contract, view, kind.prefix());
+            let mut lines = self.contract_sides(&exports, contract, view, kind);
             if view.drift {
                 let links = self.links(&exports);
                 let entries = drift_view::entries(repos, &exports, &links);

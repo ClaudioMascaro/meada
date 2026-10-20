@@ -186,6 +186,21 @@ pub struct View {
     pub drift: bool,
 }
 
+/// A side that reaches a contract through another name, for `context` to list after the sides
+/// that hold it (`ContractKind::related_sides`).
+pub struct Related<'e> {
+    /// The site of the side.
+    pub site: &'e str,
+    /// The side the line shows as, which orders it: `Provider`, `Consumer` or `Binding`.
+    pub role: Role,
+    /// The words that name the side in the line.
+    pub words: String,
+    /// How the name matched, shown after the line; `None` for a side that holds no tag.
+    pub matched: Option<(Level, String)>,
+    /// The shape a document gives the side.
+    pub shape: Option<&'e Shape>,
+}
+
 /// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
 /// ties, and the line.
 pub type Hit = (u8, String, String);
@@ -229,6 +244,19 @@ pub trait ContractKind {
             carried: "payload",
             drift: false,
         })
+    }
+
+    /// The sides of `export` that reach `contract` through another name, besides the sides that
+    /// hold it, which the engine lists: none by default (channels: wildcard producers and
+    /// consumers, the publishes its bindings route to a queue, and the bindings themselves).
+    /// `exports` are the workspace's.
+    fn related_sides<'e>(
+        &self,
+        _exports: &'e [Export],
+        _export: &'e Export,
+        _contract: &str,
+    ) -> Vec<Related<'e>> {
+        Vec::new()
     }
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
