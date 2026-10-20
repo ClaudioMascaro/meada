@@ -14,7 +14,7 @@ use super::super::{CallAt, based, consumer, fetch};
 use super::split;
 use crate::contract::Found;
 use crate::lang::{Call, Part, Value};
-use crate::resolve::{Code, Field, method as member};
+use crate::resolve::{Code, Expand, Expanded, Field, method as member};
 
 /// How many calls a client or a request is followed back through (`New().SetX().R().SetY()`),
 /// and how many names it is followed through.
@@ -476,7 +476,12 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
                 let url = one_read(based(base.as_deref(), args.get(url)?));
                 fetch(&[url, method])
             };
-            for (site, at, read) in code.expand(path, n, &read) {
+            for Expanded {
+                site: (site, at),
+                found: read,
+                ..
+            } in code.expand(Expand::Call(path, n), &read)
+            {
                 found.push(consumer(site, at, read, None));
             }
         }
