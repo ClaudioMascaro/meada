@@ -24,7 +24,8 @@ use std::path::{Component, Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
+use crate::engine::rank;
 use crate::entry;
 use crate::index::{self, CallSite, Consumer, Export, Provider};
 use crate::lang::python;
@@ -1793,6 +1794,39 @@ impl ContractKind for Packages {
         }
     }
 
+    fn search_word(&self) -> Search {
+        Search::Own("package")
+    }
+
+    /// The packages whose name matches `needle`, one line each, as `<repository> <directory>
+    /// <name>@<version> (consumers: <n>)`, the version left out when the manifest has none. The
+    /// consumers are the dependency entries linked to the package, at any level. An npm package
+    /// is named alone, as before PyPI's: any other says its ecosystem.
+    fn own_search(&self, exports: &[Export], links: &[Link], needle: &str) -> Vec<Hit> {
+        let mut entries: HashMap<&str, usize> = HashMap::new();
+        for link in links {
+            *entries.entry(&link.provider).or_default() += 1;
+        }
+        let mut hits = Vec::new();
+        for p in exports.iter().flat_map(|e| &e.packages) {
+            let Some(r) = rank(&p.name.to_lowercase(), needle) else {
+                continue;
+            };
+            let name = match &p.version {
+                Some(version) => format!("{}@{version}", p.name),
+                None => p.name.clone(),
+            };
+            let n = entries.get(p.site().as_str()).copied().unwrap_or(0);
+            let name = match p.ecosystem.is_npm() {
+                true => name,
+                false => format!("{name} ({})", p.ecosystem.name()),
+            };
+            let line = format!("{} {} {name} (consumers: {n})", p.repository, p.directory);
+            hits.push((r, format!("{} {}", p.repository, p.directory), line));
+        }
+        hits
+    }
+
     /// Several providers of a package fit a dependency entry, but no call is there to pick
     /// one for.
     fn decidable(&self) -> bool {
@@ -1965,6 +1999,57 @@ mod tests {
     #[test]
     fn an_ambiguous_package_link_is_no_call_for_a_person() {
         assert!(!Packages.decidable());
+    }
+
+    #[test]
+    fn packages_render_their_own_search_under_the_package_word() {
+        assert_eq!(Packages.search_word(), Search::Own("package"));
+    }
+
+    #[test]
+    fn the_own_search_lists_a_package_by_name_with_the_entries_linked_to_it() {
+        let package = |name: &str, ecosystem| Package {
+            name: name.into(),
+            version: Some("1.0.0".into()),
+            repository: "r".into(),
+            directory: format!("{name}-dir"),
+            ecosystem,
+            manifest: format!("{name}-dir/manifest"),
+        };
+        let export = Export {
+            packages: vec![
+                package("@a/Kit", Ecosystem::Npm),
+                package("kit-py", Ecosystem::Pypi),
+                package("other", Ecosystem::Npm),
+            ],
+            ..Export::default()
+        };
+        let link = Link {
+            consumer: "r::web/package.json::dependencies::@a/Kit".into(),
+            provider: export.packages[0].site(),
+            contract: "package::npm::@a/Kit".into(),
+            level: Level::Exact,
+            reason: "x".into(),
+            by: None,
+            p: None,
+            drift: None,
+        };
+        let hits = Packages.own_search(&[export], &[link], "kit");
+        assert_eq!(
+            hits,
+            [
+                (
+                    2,
+                    "r @a/Kit-dir".into(),
+                    "r @a/Kit-dir @a/Kit@1.0.0 (consumers: 1)".into()
+                ),
+                (
+                    1,
+                    "r kit-py-dir".into(),
+                    "r kit-py-dir kit-py@1.0.0 (pypi) (consumers: 0)".into()
+                ),
+            ]
+        );
     }
 
     fn entries(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {

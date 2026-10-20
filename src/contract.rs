@@ -153,6 +153,28 @@ pub enum Site {
     Call { path: String, index: usize },
 }
 
+/// How `search` selects a kind with its `kind` argument.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Search {
+    /// The word keeps the contracts of the kind's prefix, ranked like all the others.
+    Filter(&'static str),
+    /// The kind renders the answer itself (`ContractKind::own_search`) for the word.
+    Own(&'static str),
+}
+
+impl Search {
+    /// The `kind` the argument spells.
+    pub fn word(self) -> &'static str {
+        match self {
+            Search::Filter(word) | Search::Own(word) => word,
+        }
+    }
+}
+
+/// A line of a `search` answer: its rank (0 exact, 1 prefix, 2 substring), the key that breaks
+/// ties, and the line.
+pub type Hit = (u8, String, String);
+
 /// The engine fixes the phase order, and the kinds answer in `KINDS` order: every kind's
 /// `declare` over every repository, then every kind's `workspace_step` over all of them, then
 /// `link`, then the decisions replay, then every kind's `after_links`. The decisions are
@@ -225,6 +247,19 @@ pub trait ContractKind {
         None
     }
 
+    /// The word of `search`'s `kind` that selects this kind: its contracts by the prefix
+    /// (default, such as `resource`; HTTP says `route`), or its own rendering. The words must
+    /// not collide with the engine's, and the MCP `search` documentation names each of them.
+    fn search_word(&self) -> Search {
+        Search::Filter(self.prefix())
+    }
+
+    /// The hits of this kind's own rendering of `search` (`Search::Own`) for `needle`, already
+    /// lower-cased, given the exports and the links of the workspace.
+    fn own_search(&self, _exports: &[Export], _links: &[Link], _needle: &str) -> Vec<Hit> {
+        Vec::new()
+    }
+
     /// The status lines of `repository` (whose index content is `export`) about this kind,
     /// given the links of the workspace.
     fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
@@ -282,6 +317,12 @@ pub fn typed(text: &str) -> &str {
 /// `contract` as its kind labels it in candidates and entry points.
 pub fn label(contract: &str) -> String {
     kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
+}
+
+/// The kind `search` selects with the `kind` word `word`, and how.
+pub fn searched(word: &str) -> Option<(&'static dyn ContractKind, Search)> {
+    let words = KINDS.iter().map(|k| (*k, k.search_word()));
+    words.into_iter().find(|(_, search)| search.word() == word)
 }
 
 /// The last `::` part of an identifier.
@@ -377,7 +418,8 @@ impl Names {
 #[cfg(test)]
 mod tests {
     use super::{
-        Channel, ContractKind, Http, Level, Link, Packages, Resource, shown, typed, unresolved,
+        Channel, ContractKind, Http, KINDS, Level, Link, Packages, Resource, Search, place,
+        searched, shown, typed, unresolved,
     };
     use crate::config::Config;
     use crate::decisions::Decisions;
@@ -460,6 +502,35 @@ mod tests {
             .map(|e| &e.identity[..])
             .collect();
         assert_eq!(kept, ["r::a.ts::free", "r::a.ts::route"]);
+    }
+
+    /// Each kind says how `search` selects it, in kinds order; the packages render their own
+    /// answer.
+    #[test]
+    fn the_kinds_search_words_follow_the_kinds_order() {
+        let words: Vec<_> = KINDS.iter().map(|k| k.search_word()).collect();
+        assert_eq!(
+            words,
+            [
+                Search::Filter("route"),
+                Search::Filter("resource"),
+                Search::Filter("channel"),
+                Search::Own("package"),
+            ]
+        );
+        let (kind, search) = searched("package").unwrap();
+        assert_eq!((kind.prefix(), search), ("package", Search::Own("package")));
+        assert!(searched("http").is_none());
+    }
+
+    /// The seam places a site as the first kind that answers does, and not at all otherwise.
+    #[test]
+    fn the_seam_places_a_manifest_site_and_leaves_any_other_alone() {
+        assert_eq!(
+            place("r", "r::kit/package.json"),
+            Some("kit/package.json".into())
+        );
+        assert_eq!(place("r", "r::src/app.ts::main"), None);
     }
 
     /// The HTTP pass after links sets nothing on a link with no shapes; a kind with no pass
