@@ -8,7 +8,7 @@ use crate::lang::{
     Handler, Message, Role, Value, bind, channel_name as name, literal, property, publish,
     queue_name,
 };
-use crate::resolve::Code;
+use crate::resolve::{Code, Expand, Expanded};
 
 const KAFKAJS: &str = "kafkajs";
 const KAFKA_PRODUCER: &str = "new Kafka().producer()";
@@ -61,13 +61,21 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let Some(origin) = code.origin(path, &call.scope, chain) else {
                 continue;
             };
-            let produce =
-                |broker, read: Read| producers(broker, code.expand(path, n, &|a, _| read(a)));
+            let produce = |broker, read: Read| {
+                producers(broker, code.expand(Expand::Call(path, n), &|a, _| read(a)))
+            };
             // The handler of the call itself (its `option` of argument `arg`), else the
             // function the call is in.
             let consume = |broker, read: Read, handler: Option<Handler>| {
-                (code.expand(path, n, &|a, _| read(a)).into_iter())
-                    .flat_map(|(site, at, names)| {
+                (code
+                    .expand(Expand::Call(path, n), &|a, _| read(a))
+                    .into_iter())
+                .flat_map(
+                    |Expanded {
+                         site: (site, at),
+                         found: names,
+                         ..
+                     }| {
                         let handler = handler.clone().unwrap_or_else(|| enclosing(code, site, at));
                         names.into_iter().map(move |name| Message {
                             broker,
@@ -76,8 +84,9 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             call: at,
                             role: Role::Consumer(handler.clone()),
                         })
-                    })
-                    .collect::<Vec<_>>()
+                    },
+                )
+                .collect::<Vec<_>>()
             };
             match (origin.package, origin.expr.as_str(), method) {
                 (KAFKAJS, KAFKA_PRODUCER, "send") => {
@@ -118,7 +127,13 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 // class field, a parameter) and `addBulk` are not recognized.
                 (BULLMQ, BULLMQ_QUEUE, "add") => {
                     if let Some(binding) = origin.binding {
-                        let found = code.expand_constructed(binding, (path, n), &|a, _| first(a));
+                        let found = code.expand(
+                            Expand::Constructed {
+                                held: binding,
+                                at: (path, n),
+                            },
+                            &|a, _| first(a),
+                        );
                         out.extend(producers("bullmq", found));
                     }
                 }
@@ -165,7 +180,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     }
     for (path, n, binding) in subscriptions {
         let read = |a: &[Value]| names(a, &["topics", "topic"]);
-        for (site, at, names) in code.expand(path, n, &|a, _| read(a)) {
+        for Expanded {
+            site: (site, at),
+            found: names,
+            ..
+        } in code.expand(Expand::Call(path, n), &|a, _| read(a))
+        {
             // With no `run` handler Meada can read, the function that subscribes handles.
             // ponytail: a handler passed through a wrapper's parameter is not followed.
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
@@ -183,17 +203,23 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
 }
 
 /// A producer per name read at each site an expansion found.
-fn producers(broker: &'static str, found: Vec<(&str, usize, Vec<Option<String>>)>) -> Vec<Message> {
+fn producers(broker: &'static str, found: Vec<Expanded<Vec<Option<String>>>>) -> Vec<Message> {
     (found.into_iter())
-        .flat_map(|(site, at, names)| {
-            names.into_iter().map(move |name| Message {
-                broker,
-                name,
-                path: site.into(),
-                call: at,
-                role: Role::Producer,
-            })
-        })
+        .flat_map(
+            |Expanded {
+                 site: (site, at),
+                 found: names,
+                 ..
+             }| {
+                names.into_iter().map(move |name| Message {
+                    broker,
+                    name,
+                    path: site.into(),
+                    call: at,
+                    role: Role::Producer,
+                })
+            },
+        )
         .collect()
 }
 

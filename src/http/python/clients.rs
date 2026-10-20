@@ -11,7 +11,7 @@ use super::super::{HTTP_METHODS, based, consumer, fetch};
 use crate::contract::Found;
 use crate::lang::rust::frameworks::{REQWEST_CLIENTS, UREQ_AGENTS};
 use crate::lang::{Facts, Imported, Part, Value};
-use crate::resolve::Code;
+use crate::resolve::{Code, Expand, Expanded};
 
 /// An HTTP client library of Python or Rust, by what it names outside the repository.
 struct Library {
@@ -152,7 +152,12 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                 let url = based(base.as_deref(), url);
                 fetch(&[url, method.unwrap_or(Value::Unknown)])
             };
-            for (site, at, read) in code.expand(path, n, &read) {
+            for Expanded {
+                site: (site, at),
+                found: read,
+                ..
+            } in code.expand(Expand::Call(path, n), &read)
+            {
                 found.push(consumer(site, at, read, None));
             }
         }
