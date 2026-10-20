@@ -2694,13 +2694,6 @@ impl<'a> Code<'a> {
         })
     }
 
-    /// What `callee`, written in `scope` of `path`, names outside the repository: the module
-    /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
-    /// the repository binds it.
-    pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        Some(self.outside(path, scope, callee, false)?.spelled)
-    }
-
     /// What `callee` (`pkg.Name`), written in `scope` of `path`, names in a package outside the
     /// repository, when its head is the import itself (a dot import binds a bare name): not a
     /// name whose class is one of the package (`e := other()` with `e.Default()`), which
