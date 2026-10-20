@@ -9,12 +9,12 @@ use serde::Serialize;
 use crate::contract::{self, Level, Link};
 use crate::entry::EntryPoint;
 use crate::index::{CallSite, Consumer, Export, Symbol};
+use crate::render;
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, mark, unresolved,
 };
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -213,25 +213,8 @@ impl<'a> Graph<'a> {
                 kind.prefix()
             )]);
         }
-        let (contract, path) = if http::route(from).is_some() {
-            (Some(from.to_string()), None)
-        } else if let Some((method, path)) = from.split_once(' ')
-            && path.starts_with('/')
-            && method.chars().all(|c| c.is_ascii_alphabetic())
-        {
-            (Some(http::contract(method, path)), None)
-        } else if from.starts_with('/') {
-            (None, Some(format!("::{}", http::normalize_path(from))))
-        } else {
-            (None, None)
-        };
-        let route = |c: &str| {
-            contract.as_deref().is_some_and(|w| http::fits(c, w))
-                || path.as_deref().is_some_and(|p| c.ends_with(p))
-        };
-        let mut sites: Vec<&str> = (self.providers.iter())
-            .filter(|(c, _)| route(c))
-            .map(|&(_, s)| s)
+        let mut sites: Vec<&str> = (contract::KINDS.iter())
+            .flat_map(|kind| kind.starts(from, &self.providers))
             .collect();
         sites.sort();
         sites.dedup();

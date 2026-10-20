@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::channel::Channel;
+use crate::entry::EntryKind;
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
 use crate::package::Packages;
@@ -233,6 +234,19 @@ pub trait ContractKind {
     fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
         false
     }
+
+    /// The providers a trace start text names, among `providers` (contract, site). The trace
+    /// takes the union of every kind's answer.
+    fn starts<'a>(&self, _from: &str, _providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        Vec::new()
+    }
+
+    /// Which entry point kind a `role` side of `contract` makes. It is a function of the
+    /// contract alone, since entry points are stored when the index is written: changing an
+    /// answer needs a reindex.
+    fn entry(&self, _role: Role, _contract: &str) -> Option<EntryKind> {
+        None
+    }
 }
 
 /// Every contract kind of this release.
@@ -276,6 +290,11 @@ pub fn serves(provider: &Provider, contract: &str) -> bool {
     kind_of(contract).map_or(provider.contract == contract, |k| {
         k.serves(provider, contract)
     })
+}
+
+/// Which entry point kind a `role` side of `contract` makes, by the rule of its kind.
+pub fn entry(role: Role, contract: &str) -> Option<EntryKind> {
+    kind_of(contract)?.entry(role, contract)
 }
 
 /// The names of `Kind::Inline` definitions (inline route handlers, spec #3): the name a kind
