@@ -211,7 +211,9 @@ one for the area a change touches.
   (`Def::return_values`), read off the syntax only (`lang/go/values.rs`).
 - New **Go HTTP client** (spec #25, #79): `http/go/clients.rs` reads `net/http` calls (on the
   package, a `Client`, `DefaultClient`), `NewRequest(WithContext)` and resty requests as
-  consumers; a receiver is a client of a library when `Code::outside_type` (the type a typed
+  consumers; a call is a function of a library when `Code::outside_call` says so (its head is the
+  import itself, the one check the Go routers, clients and channels share), and a receiver is a
+  client of a library when `Code::outside_type` (the type a typed
   parameter, field or `:=` names, qualified by its import path) says so. The URL is folded in
   `lang/go/values.rs` at parse time (`+`, `fmt.Sprintf` verbs as holes, `net/http` method
   constants, package-level `const` and a `var` nothing assigns, in the package or in another one
@@ -219,7 +221,14 @@ one for the area a change touches.
   statement) that built the client. A base belongs to one client, not to the call that makes
   clients: a client is the `resty.New()` call with the calls of the repository's functions it
   came through (`Code::value_origins_through`), so two clients one factory makes keep their own
-  bases, and a `SetBaseURL` inside the factory reaches every client it makes. Wrapper climbing is
+  bases, and a `SetBaseURL` inside the factory reaches every client it makes. A client held in a
+  struct field (`c.rc`, `Code::field`) holds the clients of the values every composite literal
+  of the repository gives that field of that type (`Code::field_values`, read from the marker
+  constants `{field}` the Go pack writes for each field a literal sets, `{*}` by position, the
+  type `?` when it is not read): a literal by position, of a type not read or not known, or of
+  a type that declares no such field, a value that is not traced, a field written through a
+  selector anywhere (`Code::field_written`), or one met again while it is followed, makes the
+  base unknown, and so does a `SetBaseURL` called through a field. Wrapper climbing is
   `Code::expand`, as for every kind. A package `var` another file of the package assigns, or any
   file of the repository writes through a selector (`pkg.X = ..`, `&pkg.X`, `pkg.X++`: any write
   to a field called `X`, whatever it belongs to), is `Unknown` (`Resolver::redeclared`, read from
@@ -231,14 +240,18 @@ one for the area a change touches.
   `Std::note` saw bound to one earlier in the file (source order; a package-level `var` counts).
   `v = strings.TrimX(v, ..)` leaves `v` a constant when it holds a read, and so does
   `if v == "" { v = .. }` when the default is plain (`values::keeps_env`, `values::plain`,
-  decided in `Walk::finish_values`): text, or names that are constants of the same file holding
+  decided in `Walk::finish_values`); the test may also be `len(v) == 0` (no binding of the file
+  hides `len`; a package-level `len` in another file is not seen), `!ok` or `!ok || v == ""`
+  (`values::Guard`: `ok` is the second name of the `v, ok := os.LookupEnv(..)` that bound `v`,
+  bound once and never assigned): text, or names that are constants of the same file holding
   plain values; a call, a name bound to a read, a loop variable, a package `var` or a name from
   another file leaves `v` no constant, so the base is absent. `http/go/clients.rs` `one_read`
   makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
 - **Go channels** (spec #25, #82): `lang/go/messages.rs` lists each library (`LIBRARIES`: the
-  import path without its major version, `versionless`, and the constructors that make its client)
+  import path without its module's major version, `modfile::unversioned`, which the Go routers
+  and clients use too, and the constructors that make its client)
   and reads a call when `Code::outside_origin` traces its receiver to one of them (the class-based
   twin of `outside_type`: it also follows `x, err := f()`, a repository function that returns a
   library type, and a method on a value the library made, such as `conn.Channel()`). The
@@ -270,9 +283,9 @@ one for the area a change touches.
   ecosystem's own rule in `resolutions` (npm: `split`, `ways`, `Provided::resolve`; PyPI:
   `pypi_resolutions`, `Provided::module`; Cargo: `cargo::names_crate`, the `use` head matched to
   the key of a renamed dependency or to the provider's library name (`cargo::lib_head`), then
-  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: `go::names_module`, the
-  import path matched to the longest module path of the nearest `go.mod`'s entries
-  (`go::inside`), then `Provided::package` looks in the one directory of the provider the rest
+  `Provided::resolve` from the crate's library root, `How::CrateName`; Go: any import path that
+  is a valid contract name (`valid_name`), matched to the longest module path of the nearest
+  `go.mod`'s entries (`modfile::inside`), then `Provided::package` looks in the one directory of the provider the rest
   names, `How::ModulePath`; `go::read` takes `require` and `replace` from `lang::go::modfile`, the
   Go pack's one `go.mod` reader, and gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside
   `ContractKind` fills what a manifest inherits: `cargo::inherit`, run in
@@ -430,7 +443,10 @@ one for the area a change touches.
   leaves out of the exports table (Rust's non-`pub` items: they still resolve inside the
   crate), and `Layout::published` (default: none) the files whose exports a pack counts
   at all (`Resolver::publishing`, called by `refresh`): Rust's are the files reached from a
-  library root through `pub mod` declarations, so a binary crate exports nothing. A block that adds members to a type written elsewhere (Rust's
+  library root through `pub mod` declarations, so a binary crate exports nothing.
+  `Facts::hidden` lists the methods (`Class.method`) that are no export door although their
+  class is one (Go's lower-case methods and interface methods of an exported type):
+  `entry::exports` skips them, read as a set per file. A block that adds members to a type written elsewhere (Rust's
   `impl`) is a `Facts::impls` entry (`Impl {scope, ty, of, within}`), which `Resolver::member`
   (`block_member`, before the class's own names: the inherent blocks' definitions, else the
   trait blocks' or their traits' default bodies; several at that step are `Binding::Several`,
@@ -652,7 +668,8 @@ one for the area a change touches.
   that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):
   folding values (`Code::expand`, `Code::value`) and tracing them to their origins
   (`Code::origins`) charge each step to the file whose code it reads (a value folded, a part
-  copied, a call a wrapper climb reaches, a constant, parameter or return value followed);
+  copied, a call a wrapper climb reaches, a constant, parameter or return value followed, a
+  composite literal `Code::field_values` reads, past which the field's value is open);
   past it, that file's values are unknown, the climb stops at its calls and no origin is found
   through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
   functions each calling or returning the next twice, ends. `EVAL_DEPTH` (256): a value
@@ -735,17 +752,26 @@ one for the area a change touches.
   `Path(..).HandlerFunc`, `NewRoute`, `Host` subrouters and `StrictSlash(..)` chains are not
   read (a router made by a call that is not `NewRouter` has no provider).
 - `http/go/clients.rs` (spec #25, #79): `CLIENT_DEPTH` (64): a client or a request is followed
-  back through that many calls and names (`New().SetX().R().SetY()`, `b := a`); past it the
-  base is unknown and the request is no consumer (the chain is no longer known to be resty's).
-  A request on a client only written as a type (a parameter or field with no constructor in
-  sight) is a consumer with no host, and so is one on a parameter some caller passes an untraced
-  client to (the base is unknown). Only the libraries of the table (`net/http`, resty v2) are
+  back through that many calls, names and struct fields (`New().SetX().R().SetY()`, `b := a`,
+  `c.rc`); past it the base is unknown and the request is no consumer (the chain is no longer
+  known to be resty's). A request on a client only written as a type (a parameter, or a field
+  no composite literal sets) is a consumer with no host, and so is one on a parameter some
+  caller passes an untraced client to (the base is unknown). A field's literals are those of
+  its type: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
+  position, and a conversion from another struct type (`T(other)`), are not seen as setting
+  the fields of `T` (`Code::field_values`), and a literal nested deeper than `VALUE_DEPTH`
+  inside literals written without their type sets the fields of a type not read. Only the
+  libraries of the table (`net/http`, resty v2 and v3, `resty.dev`) are
   clients; a client assigned more than once, one held in a map, a slice or a channel, or an
   interface, is untraced and its requests are no consumer. A `fmt.Sprintf` format with a verb
   other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned
   anywhere but its declaration (or written through a selector), fold to nothing: the consumer is
   unresolved (no marker). A verb with flags, width or precision is a hole, and so is `%d` of
-  anything but an integer literal, and `%s` of an integer literal.
+  anything but an integer literal, and `%s` of an integer literal. `values::Std` folds
+  `fmt`, `net/http`, `os`, `strings` and `aws` only where nothing else in the file spells the
+  name they are imported by (`hidden`: a parameter, a local or a function of that name in any
+  function of the file leaves every call of the package in the file unfolded, whatever its
+  scope).
 - `lang/go.rs`: `PATH_DEPTH` (256): a callee keeps that many selectors of a chain (a longer
   one is its node kind) and a receiver's type is read through fewer `*`, type arguments and
   parentheses (past it the method is no definition, and a parameter, field, `var` or result
@@ -767,7 +793,8 @@ one for the area a change touches.
   `CONSTRAINT_DEPTH` (64, `lang/go/build.rs`): a `//go:build` expression nested deeper (`!`,
   parentheses) is not read, and the file is left out, as one that cannot be read (two
   `//go:build` lines, not UTF-8) is. Build constraints hold for one target (`linux`, `amd64`,
-  `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false); a legacy `// +build` line
+  `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false, and a file that imports `"C"`
+  is left out); a legacy `// +build` line
   alone is not read. A plain import binds the name the Go tools assume for its path
   (`assumed_name`: the last element, the one before a `vN`, without `go-`, up to the first
   character no identifier holds), not the package clause of the directory it names, so a
@@ -776,7 +803,9 @@ one for the area a change touches.
   specifier, which names nothing), so a call through it links to nothing. An import of two
   modules of the repository that declare one path names nothing unless a `replace` picks one; a
   `replace` by a module or a directory outside the repository makes the replaced module an
-  outside one; a `vendor/` directory is not followed.
+  outside one; a `vendor/` directory is not followed. A `go.mod` past `package::MAX_BYTES`
+  (read up to one byte past it, as every pack config is, so its last line may be cut) declares no
+  module for the imports either (`modfile::Modules::new`).
 - `lang/rust.rs` (types): `written` and `parameter` read a type and climb to the items that
   declare a type parameter within `PATH_DEPTH` (256) steps (references, `A + B + 'c` bounds and
   ancestors); past it a type names nothing and a parameter is taken as declared with no bound,

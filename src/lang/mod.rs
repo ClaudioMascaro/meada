@@ -916,6 +916,50 @@ pub fn topics(value: &Value) -> Option<Vec<Option<String>>> {
     }
 }
 
+/// What an AMQP publish reads of a call's arguments: the exchange and the routing key.
+pub type ReadPublish<'a> =
+    &'a dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>)>;
+
+/// What an AMQP binding reads of a call's arguments: the queue, the exchange and the pattern.
+pub type ReadBinding<'a> =
+    &'a dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>, Option<String>)>;
+
+/// An AMQP publish at each site an expansion found (`publication`).
+pub fn publish<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadPublish) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .map(|(site, at, (exchange, key))| {
+            let (name, role) = publication(exchange, key);
+            Message {
+                broker: "amqp",
+                name,
+                path: site.into(),
+                call: at,
+                role,
+            }
+        })
+        .collect()
+}
+
+/// An AMQP binding of a queue to an exchange at each site an expansion found.
+pub fn bind<'a>(code: &Code<'a>, path: &'a str, n: usize, read: ReadBinding) -> Vec<Message> {
+    (code.expand(path, n, read).into_iter())
+        .filter_map(|(site, at, bound)| {
+            // ponytail: a binding that cannot be fully evaluated is dropped, not shown as
+            // unresolved.
+            let (Some(queue), Some(exchange), Some(pattern)) = bound else {
+                return None;
+            };
+            Some(Message {
+                broker: "amqp",
+                name: Some(queue),
+                path: site.into(),
+                call: at,
+                role: Role::Binding { exchange, pattern },
+            })
+        })
+        .collect()
+}
+
 /// A publish to the exchange `exchange` with the routing key `key`, as its name and role: the
 /// empty exchange is the queue named by the key; one that cannot be evaluated leaves the
 /// producer unresolved.

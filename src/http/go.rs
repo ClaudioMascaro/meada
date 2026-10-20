@@ -28,8 +28,9 @@ use super::{
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::contract::Found;
+use crate::lang::go::modfile::unversioned;
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Target};
+use crate::resolve::{Code, Target, method as member};
 
 /// How a route method says which methods the route serves.
 #[derive(Clone, Copy)]
@@ -211,31 +212,9 @@ struct Registration<'a> {
     member: &'a str,
 }
 
-/// `package` without a major version suffix (`github.com/labstack/echo/v4`).
-fn unversioned(package: &str) -> &str {
-    match package.rsplit_once('/') {
-        Some((rest, major))
-            if major
-                .strip_prefix('v')
-                .is_some_and(|n| n.parse::<u32>().is_ok_and(|n| n >= 2)) =>
-        {
-            rest
-        }
-        _ => package,
-    }
-}
-
-/// What `callee` (`pkg.Name`) names in a package outside the repository: only when its head is
-/// the import itself, not a name typed as the package's class (`e := other()` with
-/// `e.Default()`), which the resolver would also read as that package's.
-fn external<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-    let (head, _) = callee.split_once('.').unwrap_or((callee, ""));
-    code.external(path, scope, head)?;
-    code.external(path, scope, callee)
-}
-
-/// The package and the name an outside function is called by (`net/http`, `HandleFunc`).
-fn split(external: &str) -> Option<(&str, &str)> {
+/// The package, without its module's major version (`modfile::unversioned`), and the name an
+/// outside function is called by (`net/http`, `HandleFunc`).
+fn split(external: &str) -> Option<(String, &str)> {
     external
         .rsplit_once('.')
         .map(|(package, name)| (unversioned(package), name))
@@ -353,19 +332,12 @@ struct Group<'a> {
 }
 
 impl<'c, 'a> Go<'c, 'a> {
-    /// What `callee` (`pkg.Name`) names in a package outside the repository: only when its head
-    /// is the import itself, not a name typed as the package's class (`e := other()` with
-    /// `e.Default()`), which the resolver would also read as that package's.
-    fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        external(self.code, path, scope, callee)
-    }
-
     /// Whether the call `at` is a function of `router` that makes a router.
     fn makes(&self, router: &Router, (path, n): CallAt<'a>) -> bool {
         let Some(call) = self.code.call(path, n) else {
             return false;
         };
-        let external = self.external(path, &call.scope, &call.callee);
+        let external = self.code.outside_call(path, &call.scope, &call.callee);
         match external.as_deref().and_then(split) {
             Some((package, name)) => package == router.package && router.made.contains(&name),
             None => false,
@@ -458,7 +430,7 @@ impl<'c, 'a> Go<'c, 'a> {
     /// The group the call `call` of `path` makes, when it is one.
     fn group(&self, path: &'a str, call: &'a Call) -> Option<Group<'a>> {
         let scope = call.scope.as_str();
-        let member = call.callee.rsplit('.').next().unwrap_or_default();
+        let member = member(&call.callee);
         let function = |value: &'a Value| match value {
             Value::Function(name) => Some(Target { path, name }),
             Value::Ref(name) => self.code.definition(path, scope, name),
@@ -610,7 +582,7 @@ impl<'c, 'a> Go<'c, 'a> {
     fn method(&self, path: &'a str, scope: &'a str, arg: &'a Value) -> Option<String> {
         let method = match arg {
             Value::Ref(name) => {
-                let external = self.external(path, scope, name)?;
+                let external = self.code.outside_call(path, scope, name)?;
                 let (package, name) = split(&external)?;
                 let name = name
                     .strip_prefix("Method")
@@ -641,7 +613,7 @@ impl<'c, 'a> Go<'c, 'a> {
             let Some(at) = self.code.call_index(path, &inner.range) else {
                 return;
             };
-            let name = inner.callee.rsplit('.').next().unwrap_or_default();
+            let name = member(&inner.callee);
             if chained(name) {
                 // A second `Methods` on the route ANDs the first.
                 let first = !self.restricted.contains_key(&(path, at));
@@ -662,8 +634,9 @@ impl<'c, 'a> Go<'c, 'a> {
         if let Value::Call(call) = value
             && let [inner] = &call.args[..]
         {
-            let external = self.external(path, scope, &call.callee);
-            if external.as_deref().and_then(split) == Some(("net/http", "HandlerFunc")) {
+            let external = self.code.outside_call(path, scope, &call.callee);
+            let split = external.as_deref().and_then(split);
+            if split.is_some_and(|(package, name)| package == "net/http" && name == "HandlerFunc") {
                 return inner;
             }
         }
@@ -798,7 +771,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     // first: a call registering a route may come before them, or in another file.
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {
-            let member = stored.callee.rsplit('.').next().unwrap_or_default();
+            let member = member(&stored.callee);
             let groups = ROUTERS.iter().flat_map(|r| r.groups);
             if member == RESTRICT {
                 go.restrict(path, n);
@@ -816,7 +789,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut registrations = Vec::new();
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {
-            let member = stored.callee.rsplit('.').next().unwrap_or_default();
+            let member = member(&stored.callee);
             let groups = ROUTERS
                 .iter()
                 .any(|r| r.groups.iter().any(|(m, _)| *m == member));
@@ -841,7 +814,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             }
             // `http.HandleFunc(..)` registers on the router of the package itself; any other
             // call is a method of a router, whatever its head's type reads as.
-            let external = go.external(path, &call.scope, &call.callee);
+            let external = go.code.outside_call(path, &call.scope, &call.callee);
             let package_call =
                 external
                     .as_deref()

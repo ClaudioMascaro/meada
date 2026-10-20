@@ -3,8 +3,8 @@
 //! library's package: a `produce` on anything else is no producer.
 
 use crate::lang::{
-    Call, Handler, Message, Role, Value, channel_name as name, consume, literal, produce,
-    publication, queue_name, topic, topics,
+    Call, Handler, Message, Value, bind, channel_name as name, consume, literal, produce, publish,
+    queue_name, topic, topics,
 };
 use crate::resolve::{Code, Keywords};
 
@@ -138,19 +138,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             arg_name(a, k, 1, "routing_key")?,
                         ))
                     };
-                    for (site, at, (exchange, key)) in code.expand(path, n, &read) {
-                        // The empty exchange is the queue named by the key; one that cannot
-                        // be evaluated leaves the producer unresolved.
-                        let (name, role) = publication(exchange, key);
-                        let (path, call) = (site.into(), at);
-                        out.push(Message {
-                            broker: "amqp",
-                            name,
-                            path,
-                            call,
-                            role,
-                        });
-                    }
+                    out.extend(publish(code, path, n, &read));
                 }
                 (Client::Pika, "queue_bind") => {
                     let read = |a: &[Value], k: &Keywords| {
@@ -160,19 +148,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             arg_name(a, k, 2, "routing_key")?,
                         ))
                     };
-                    for (site, at, bound) in code.expand(path, n, &read) {
-                        // ponytail: a binding that cannot be fully evaluated is dropped, not
-                        // shown as unresolved.
-                        if let (Some(queue), Some(exchange), Some(pattern)) = bound {
-                            out.push(Message {
-                                broker: "amqp",
-                                name: Some(queue),
-                                path: site.into(),
-                                call: at,
-                                role: Role::Binding { exchange, pattern },
-                            });
-                        }
-                    }
+                    out.extend(bind(code, path, n, &read));
                 }
                 _ => {}
             }

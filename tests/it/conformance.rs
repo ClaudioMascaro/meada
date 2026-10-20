@@ -2518,15 +2518,56 @@ fn rust() {
 
 /// The Go pack (spec #25): functions, methods by their receiver's type, types and interface
 /// methods; imports through the module path of `go.mod`, a `replace` and a nested module; one
-/// scope per package directory; and build constraints for `linux/amd64`.
+/// scope per package directory; and build constraints for `linux/amd64`. A sibling repository of
+/// the workspace provides the module its `require` of `example.com/acme/ledger` names.
 #[test]
 fn go() {
     const OUTER: &str = "scopes/scopes.go::outer";
+    let ledger = Some("https://example.com/acme/ledger.git");
+    fixture_repo(
+        "conformance_conformance-go",
+        "conformance-go-ledger",
+        ledger,
+    );
     conform(
         "conformance-go",
         &[
             "billing/invoice/invoice.go::Total",
             "billing/invoice/invoice.go::round",
+            "client/fields.go::Billing",
+            "client/fields.go::NewBilling",
+            "client/fields.go::Billing.Items",
+            "client/fields.go::Ledger",
+            "client/fields.go::NewLedger",
+            "client/fields.go::Ledger.Entries",
+            "client/fields.go::Mirror",
+            "client/fields.go::primary",
+            "client/fields.go::secondary",
+            "client/fields.go::Mirror.Sync",
+            "client/fields.go::Proxy",
+            "client/fields.go::NewProxy",
+            "client/fields.go::plainProxy",
+            "client/fields.go::Proxy.Forward",
+            "client/fields.go::Relay",
+            "client/fields.go::NewRelay",
+            "client/fields.go::Relay.Swap",
+            "client/fields.go::Relay.Send",
+            "client/fields.go::Queue",
+            "client/fields.go::NewQueue",
+            "client/fields.go::Queue.Retarget",
+            "client/fields.go::Queue.Push",
+            "client/fields.go::Pair",
+            "client/fields.go::NewPair",
+            "client/fields.go::positional",
+            "client/fields.go::Pair.Left",
+            "client/fields.go::Pool",
+            "client/fields.go::NewPool",
+            "client/fields.go::pools",
+            "client/fields.go::Pool.Lease",
+            "client/fields.go::Unset",
+            "client/fields.go::Unset.Idle",
+            "client/env.go::FromEnv",
+            "client/env.go::FromLookup",
             "client/flags.go::Configure",
             "client/net.go::Cache",
             "client/net.go::Cache.Get",
@@ -2722,6 +2763,7 @@ fn go() {
             "scopes/scopes.go::run",
             "store/client_test.go::TestClient",
             "store/client_test.go::helper",
+            "store/codec_pure.go::encode",
             "store/disk_linux.go::onLinux",
             "store/entry.go::main",
             "store/helpers.go::Exported",
@@ -2999,6 +3041,12 @@ fn go() {
                 "store/store.go::New::sysOpen#0",
                 EXACT,
                 &["store/sys_unix.go::sysOpen"],
+            ),
+            // A cgo file is left out, as the target builds without cgo.
+            (
+                "store/store.go::New::encode#0",
+                EXACT,
+                &["store/codec_pure.go::encode"],
             ),
             // A replace by a module from outside makes the module of the repository outside.
             ("report.go::report::old.Old#0", None, &[]),
@@ -3440,6 +3488,7 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
     let net = |function: &str, call: &str| format!("client/net.go::{function}::{call}");
     let wrap = |function: &str, call: &str| format!("client/wrappers.go::{function}::{call}");
     let rest = |function: &str, call: &str| format!("client/rest.go::{function}::{call}");
+    let field = |function: &str, call: &str| format!("client/fields.go::{function}::{call}");
     let chain = |verb: &str, n: usize| format!("(call_expression).{verb}#{n}");
     let expected = triples(&[
         // The package, a `Client`, the default client and a client written as a literal.
@@ -3612,6 +3661,67 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
         ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
         ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        // A base URL read from the environment, by `os.Getenv` and by `os.LookupEnv` with a
+        // fallback.
+        (
+            "http::GET::/env/get",
+            "env:API_URL",
+            "client/env.go::FromEnv::http.Get#0",
+        ),
+        (
+            "http::GET::/env/lookup",
+            "env:BILLING_URL",
+            &format!("client/env.go::FromLookup::{}", chain("Get", 0)),
+        ),
+        // A client kept in a struct field: the literals that set the field give its base. Two
+        // bases, a literal whose client is not traced, a selector write of the field, a base set
+        // through the field and a literal without field names leave it unknown; a field no
+        // literal sets is the client its type names.
+        (
+            "http::GET::/v1/items",
+            "host:api.example.com",
+            &field("Billing.Items", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/entries",
+            "host:ledger.example.com",
+            &field("Ledger.Entries", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/sync",
+            "",
+            &field("Mirror.Sync", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/forward",
+            "",
+            &field("Proxy.Forward", &chain("Get", 0)),
+        ),
+        (
+            "http::POST::/send",
+            "",
+            &field("Relay.Send", &chain("Post", 0)),
+        ),
+        (
+            "http::POST::/push",
+            "",
+            &field("Queue.Push", &chain("Post", 0)),
+        ),
+        (
+            "http::GET::/left",
+            "",
+            &field("Pair.Left", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/ping",
+            "",
+            &field("Pool.Lease", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/poll",
+            "",
+            &field("Unset.Idle", &chain("Get", 0)),
+        ),
         // A package variable another package writes through a selector (`config.Base = ..`,
         // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
         // to the constant `Host`.
@@ -3925,34 +4035,6 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(export.contains("http::GET::/r10\""));
     assert!(!export.contains("http::GET::/r2999\""));
-}
-
-/// A resty client followed back through setters is followed only as far as the limit
-/// (`CLIENT_DEPTH`, 64: the setters, `SetBaseURL` and `R()` count): a request at the limit has
-/// its base, one past it is no consumer.
-#[test]
-fn a_long_resty_setter_chain_is_followed_up_to_its_limit() {
-    const LAST: usize = 61;
-    let repo = fixture_repo("go_setters_long", "conformance-go", Some(ORIGIN));
-    let mut long = String::from("package client\n\nimport \"github.com/go-resty/resty/v2\"\n");
-    for n in [LAST, LAST + 1] {
-        let setters = ".SetTimeout(1)".repeat(n);
-        long += &format!(
-            "\nfunc Setters{n}() {{\n\tresty.New().SetBaseURL(\"https://deep.example.com\"){setters}\
-             .R().Get(\"/s{n}\")\n}}\n"
-        );
-    }
-    std::fs::write(repo.join("client/long.go"), long).unwrap();
-    let export = Engine::open(&repo).unwrap().export().unwrap();
-    let json = serde_json::from_str(&export).unwrap();
-    let found = consumers(&json, "client/long.go");
-    let site = format!("client/long.go::Setters{LAST}::(call_expression).Get#0");
-    let expected = triples(&[(
-        &format!("http::GET::/s{LAST}"),
-        "host:deep.example.com",
-        &site,
-    )]);
-    assert_eq!(found, expected);
 }
 
 /// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.

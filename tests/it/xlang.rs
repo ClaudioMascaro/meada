@@ -275,6 +275,9 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("trimmed", "TRIMMED_URL"),
         ("trimmedRight", "RIGHT_URL"),
         ("lookedUp", "LOOKUP_URL"),
+        ("lookedUpFallback", "OK_URL"),
+        ("lookedUpOrEmpty", "OK_EMPTY_URL"),
+        ("lengthFallback", "LEN_URL"),
         ("formatted", "FORMAT_URL"),
         ("packageLevel", "PKG_URL"),
     ];
@@ -304,6 +307,11 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "trimmedLiteral",
         "trimmedOtherName",
         "shadowedPackage",
+        "okOfAnotherLookup",
+        "okOfNoLookup",
+        "okAssignedAgain",
+        "lengthShadowed",
+        "lookedUpToAVariable",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");

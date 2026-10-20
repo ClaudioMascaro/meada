@@ -2,7 +2,8 @@
 //! machine: `linux/amd64`, the `gc` compiler, every `go1.N` release and no cgo. A file is left
 //! out when its name ends in another system or architecture (`_windows.go`, `_arm64.go`), when it
 //! starts with `_` or `.`, or when its `//go:build` line is false. Any other tag (`cgo`, a custom
-//! tag such as `integration`) is false.
+//! tag such as `integration`) is false, and a file that imports `"C"` is left out too (the pack
+//! sees its imports).
 
 /// How deeply a `//go:build` expression may nest (`!`, parentheses); a deeper one is not read,
 /// and the file is left out.

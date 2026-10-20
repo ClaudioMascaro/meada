@@ -364,12 +364,22 @@ pub(super) enum Keep {
     No,
     /// It trims the name by itself (`v = strings.TrimSuffix(v, "/")`): the read stays.
     Trim,
-    /// It is the fallback `if v == "" { v = .. }` to this value: the read stays when the value
-    /// is plain (`plain`), since Meada never reads a default.
-    Default(Value),
+    /// It is the fallback `if v == "" { v = .. }` to this value, behind the guard it tests: the
+    /// read stays when the value is plain (`plain`) and the guard holds, since Meada never reads
+    /// a default.
+    Default(Value, Guard),
     /// The address of a name is taken as the `Topic` of a `TopicPartition` literal: the name
     /// stays a constant unless the scope writes through a dereference.
     Pointer,
+}
+
+/// What a fallback tests beyond an empty read (`v == ""`): `ok`, a name that must be the second
+/// result of the `os.LookupEnv` that bound the read (`!ok`, `!ok || v == ""`), and whether it
+/// calls `len` (`len(v) == 0`), which no binding of the file may hide.
+#[derive(Clone, Default)]
+pub(super) struct Guard {
+    pub(super) ok: Option<String>,
+    pub(super) len: bool,
 }
 
 /// What the assignment `node`, written in `scope` at function literal nesting `depth`, does to
@@ -390,8 +400,8 @@ pub(super) fn keeps_env(node: Node, src: &[u8], std: &Std, scope: &str, depth: u
     let name = text(target, src);
     if trims_itself(right, src, std, name) {
         Keep::Trim
-    } else if empties_to(node, src, name) {
-        Keep::Default(value(right, src, std, scope, depth))
+    } else if let Some(guard) = empties_to(node, src, name) {
+        Keep::Default(value(right, src, std, scope, depth), guard)
     } else {
         Keep::No
     }
@@ -464,9 +474,9 @@ fn trims_itself(node: Node, src: &[u8], std: &Std, name: &str) -> bool {
     }
 }
 
-/// Whether the assignment `node` is the only statement of `if name == "" { .. }`, with no
-/// initializer and no `else`.
-fn empties_to(node: Node, src: &[u8], name: &str) -> bool {
+/// The guard of `if name == "" { .. }` (`test`), when the assignment `node` is its only
+/// statement, with no initializer and no `else`.
+fn empties_to(node: Node, src: &[u8], name: &str) -> Option<Guard> {
     let block = node.parent().filter(|p| p.kind() == "statement_list");
     let alone = block.is_some_and(|b| named(b).count() == 1);
     let block = block
@@ -479,19 +489,67 @@ fn empties_to(node: Node, src: &[u8], name: &str) -> bool {
             && i.child_by_field_name("consequence") == block
     });
     let condition = branch.and_then(|i| i.child_by_field_name("condition"));
-    let Some(condition) = condition.filter(|c| c.kind() == "binary_expression") else {
-        return false;
+    test(condition?, src, name).filter(|_| alone)
+}
+
+/// The guard the condition `node` of a fallback for `name` is: `name == ""` or `len(name) == 0`
+/// (either side), `!ok`, or `!ok ||` one of the first two (either side).
+fn test<'t>(node: Node<'t>, src: &[u8], name: &str) -> Option<Guard> {
+    let operator = |n: Node<'t>| n.child_by_field_name("operator").map(|o| text(o, src));
+    let sides = |n: Node<'t>| -> Option<(Node<'t>, Node<'t>)> {
+        n.child_by_field_name("left")
+            .zip(n.child_by_field_name("right"))
     };
-    let (left, right) = (
-        condition.child_by_field_name("left"),
-        condition.child_by_field_name("right"),
-    );
-    let operator = condition.child_by_field_name("operator");
-    let empty = |n: Node| matches!(text(n, src), "\"\"" | "``");
-    let sides = left.zip(right).is_some_and(|(l, r)| {
-        (text(l, src) == name && empty(r)) || (empty(l) && text(r, src) == name)
-    });
-    alone && sides && operator.is_some_and(|o| text(o, src) == "==")
+    let not_ok = |n: Node<'t>| {
+        let operand = n.child_by_field_name("operand");
+        let operand = operand.filter(|o| o.kind() == "identifier");
+        (n.kind() == "unary_expression" && operator(n) == Some("!"))
+            .then(|| operand.map(|o| text(o, src).to_string()))
+            .flatten()
+    };
+    let empty = |n: Node<'t>| {
+        let (left, right) = sides(n).filter(|_| operator(n) == Some("=="))?;
+        let is_name = |n: Node| n.kind() == "identifier" && text(n, src) == name;
+        let blank = |n: Node| matches!(text(n, src), "\"\"" | "``");
+        let length = |n: Node| {
+            let function = n.child_by_field_name("function");
+            let args: Vec<Node> = arguments(n).collect();
+            n.kind() == "call_expression"
+                && function.is_some_and(|f| f.kind() == "identifier" && text(f, src) == "len")
+                && matches!(args[..], [arg] if is_name(arg))
+        };
+        let zero = |n: Node| text(n, src) == "0";
+        if (is_name(left) && blank(right)) || (blank(left) && is_name(right)) {
+            Some(Guard::default())
+        } else if (length(left) && zero(right)) || (zero(left) && length(right)) {
+            Some(Guard {
+                ok: None,
+                len: true,
+            })
+        } else {
+            None
+        }
+    };
+    match node.kind() {
+        "unary_expression" => not_ok(node).map(|ok| Guard {
+            ok: Some(ok),
+            len: false,
+        }),
+        "binary_expression" if operator(node) == Some("||") => {
+            let (left, right) = sides(node)?;
+            let pair = |a: Node<'t>, b: Node<'t>| {
+                let ok = not_ok(a)?;
+                let guard = empty(b)?;
+                Some(Guard {
+                    ok: Some(ok),
+                    ..guard
+                })
+            };
+            pair(left, right).or_else(|| pair(right, left))
+        }
+        "binary_expression" => empty(node),
+        _ => None,
+    }
 }
 
 /// The first result of `os.LookupEnv("X")`, the call `node` as the one value of a `:=` or `var`.

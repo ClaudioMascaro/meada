@@ -19,7 +19,7 @@ All notable changes to Meada are recorded here. The format follows
   scope, `_test.go` files included, and an import names them all; the standard library and
   modules outside the repository are external. Build constraints hold for a fixed `linux/amd64`
   target (gc, no cgo): a file whose name ends in another system or architecture, or whose
-  `//go:build` line is false, is left out. Exports are the names that start with an upper-case
+  `//go:build` line is false, or that imports `"C"`, is left out. Exports are the names that start with an upper-case
   letter. The language-neutral seam `Layout::shared` gives a group of files one scope. Method
   calls: a call on a receiver whose type the source writes (a parameter, the method receiver, a
   struct field, a `var`, a composite literal `T{}` or `&T{}`, or the first result of a function
@@ -60,9 +60,12 @@ All notable changes to Meada are recorded here. The format follows
   is the consumer, its method read from a literal or `http.MethodX`), and resty requests (the
   verbs and `Execute`), with the host of the `SetBaseURL` of the client that issued them (that
   one client: two clients a factory makes keep their own bases), also when the client is a
-  function result or a wrapper's parameter whose callers all pass a traced client; a client
-  written only as a type, such as a field, has no host, and so has a wrapper parameter some
-  caller passes an untraced client to. A URL is folded from literals, `+`, `fmt.Sprintf` (a bare
+  function result, a wrapper's parameter whose callers all pass a traced client, or a struct
+  field, whose base is the one of the clients every composite literal of the repository sets it
+  to (two bases, a literal whose client is not traced or that sets it by position, a base set
+  through the field, and a field written through a selector anywhere give no host); a client
+  written only as a type, such as a field no literal sets, has no host, and so has a wrapper
+  parameter some caller passes an untraced client to. A URL is folded from literals, `+`, `fmt.Sprintf` (a bare
   `%s` or `%v` is the argument, `%d` and `%v` an integer literal; any other verb and argument,
   and any flag, width or precision, a parameter segment), constants and package-level names of
   the package or of another one (a `var` nothing assigns, in the package or through a selector
@@ -73,7 +76,9 @@ All notable changes to Meada are recorded here. The format follows
 - Go base URLs from the environment (spec #25): `os.Getenv("X")` and `os.LookupEnv("X")` (its
   first result) lead a URL as the base URL variable `X`, which maps through `base_url_env` like
   the other languages' (Meada never reads the value). The read survives a fallback assignment
-  when the value is empty (`if v == "" { v = ".." }`, the default never read, provided it
+  when the value is empty (`if v == "" { v = ".." }`, also tested as `len(v) == 0` with `len`
+  unshadowed in the file, or as `!ok` or `!ok || v == ""` where `ok` is the second result of
+  the same `os.LookupEnv`, bound once and never assigned; the default never read, provided it
   folds to text from literals and constants of the same file) and
   `strings.TrimSuffix`, `strings.TrimRight` and `strings.TrimSpace`, of the read or of a name
   bound to it. Two reads in one URL, a fallback to another read, a name assigned any other way

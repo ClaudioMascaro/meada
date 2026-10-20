@@ -11,6 +11,8 @@ func New() *Store {
 	open()
 	// The variant the constraints build for the target.
 	sysOpen()
+	// The variant that needs no cgo.
+	encode()
 	return &Store{name: fmt.Sprintf("store-%d", 1)}
 }
 

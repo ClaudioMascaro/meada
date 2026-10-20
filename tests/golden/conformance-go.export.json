@@ -10,6 +10,14 @@
       "hash": "0a75b82f3af1552995f1541dc778f30bf1b956ea00ddbec523652fc34f027b32"
     },
     {
+      "path": "client/env.go",
+      "hash": "695d02c67d71d4b5a765acb9614dc52a9b8cc4afba91ad83f2ff5dfdd2df607c"
+    },
+    {
+      "path": "client/fields.go",
+      "hash": "304f573d023d232d975bcce587723d75a9ebe100a182218d4546e7ad917d7e38"
+    },
+    {
       "path": "client/flags.go",
       "hash": "396227e166415629721b34528d9728703115d73242ca3440046791c04e9c4cda"
     },
@@ -122,6 +130,10 @@
       "hash": "97d1009bb1e74a4da631250c19a2ce0fa927a4fdcfeef6fbeec2fa6451a5a8ab"
     },
     {
+      "path": "store/codec_pure.go",
+      "hash": "402cbc1973d73ccb8b0ee585c5e15e20e57e27cb4cb4e18f293afd86f130f26f"
+    },
+    {
       "path": "store/disk_linux.go",
       "hash": "eddb60486d0486767435ae621c88a8383775693692b9425ac2fbd4f3ddf3fb59"
     },
@@ -135,7 +147,7 @@
     },
     {
       "path": "store/store.go",
-      "hash": "a7b088065577a6f1cd1ac80f3ba4fd27b0eb677c51ca5237ab99cb6e7aaee604"
+      "hash": "6bb4e96a7bc4679cd5c4a7a95295f5822c3180c1bb8795d75890099d0572d2b6"
     },
     {
       "path": "store/store_test.go",
@@ -197,6 +209,278 @@
         "path": "billing/invoice/invoice.go",
         "start": 56,
         "end": 91
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv",
+      "span": {
+        "path": "client/env.go",
+        "start": 150,
+        "end": 213
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup",
+      "span": {
+        "path": "client/env.go",
+        "start": 215,
+        "end": 376
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Billing",
+      "span": {
+        "path": "client/fields.go",
+        "start": 148,
+        "end": 184
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Billing.Items",
+      "span": {
+        "path": "client/fields.go",
+        "start": 307,
+        "end": 360
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Ledger",
+      "span": {
+        "path": "client/fields.go",
+        "start": 416,
+        "end": 452
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+      "span": {
+        "path": "client/fields.go",
+        "start": 539,
+        "end": 595
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Mirror",
+      "span": {
+        "path": "client/fields.go",
+        "start": 672,
+        "end": 709
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+      "span": {
+        "path": "client/fields.go",
+        "start": 911,
+        "end": 963
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewBilling",
+      "span": {
+        "path": "client/fields.go",
+        "start": 186,
+        "end": 305
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewLedger",
+      "span": {
+        "path": "client/fields.go",
+        "start": 454,
+        "end": 537
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPair",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2111,
+        "end": 2205
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPool",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2421,
+        "end": 2519
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewProxy",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1078,
+        "end": 1147
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewQueue",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1738,
+        "end": 1837
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewRelay",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1421,
+        "end": 1520
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pair",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2052,
+        "end": 2109
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pair.Left",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2274,
+        "end": 2323
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pool",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2382,
+        "end": 2419
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pool.Lease",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2584,
+        "end": 2637
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Proxy",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1036,
+        "end": 1076
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1257,
+        "end": 1318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1700,
+        "end": 1736
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Push",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1924,
+        "end": 1976
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Retarget",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1839,
+        "end": 1922
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1384,
+        "end": 1419
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Send",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1576,
+        "end": 1627
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Swap",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1522,
+        "end": 1574
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Unset",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2716,
+        "end": 2752
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Unset.Idle",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2754,
+        "end": 2805
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::plainProxy",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1149,
+        "end": 1255
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::pools",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2521,
+        "end": 2582
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::positional",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2207,
+        "end": 2272
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::primary",
+      "span": {
+        "path": "client/fields.go",
+        "start": 711,
+        "end": 808
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::secondary",
+      "span": {
+        "path": "client/fields.go",
+        "start": 810,
+        "end": 909
       }
     },
     {
@@ -1760,6 +2044,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/codec_pure.go::encode",
+      "span": {
+        "path": "store/codec_pure.go",
+        "start": 32,
+        "end": 48
+      }
+    },
+    {
       "id": "example.com/acme/conformance::store/disk_linux.go::onLinux",
       "span": {
         "path": "store/disk_linux.go",
@@ -1796,7 +2088,7 @@
       "span": {
         "path": "store/store.go",
         "start": 65,
-        "end": 218
+        "end": 263
       }
     },
     {
@@ -1811,32 +2103,32 @@
       "id": "example.com/acme/conformance::store/store.go::Store.Get",
       "span": {
         "path": "store/store.go",
-        "start": 220,
-        "end": 283
+        "start": 265,
+        "end": 328
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init",
       "span": {
         "path": "store/store.go",
-        "start": 379,
-        "end": 402
+        "start": 424,
+        "end": 447
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::init#2",
       "span": {
         "path": "store/store.go",
-        "start": 404,
-        "end": 429
+        "start": 449,
+        "end": 474
       }
     },
     {
       "id": "example.com/acme/conformance::store/store.go::open",
       "span": {
         "path": "store/store.go",
-        "start": 285,
-        "end": 299
+        "start": 330,
+        "end": 344
       }
     },
     {
@@ -2690,6 +2982,563 @@
         "path": "billing/invoice/invoice.go",
         "start": 44,
         "end": 52
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromEnv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 168,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromEnv::os.Getenv#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromEnv",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 177,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 374
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).R#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 355
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 351
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::os.LookupEnv#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 248,
+        "end": 275
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/env.go::FromLookup::resty.New#0",
+      "caller": "example.com/acme/conformance::client/env.go::FromLookup",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/env.go",
+        "start": 323,
+        "end": 334
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Billing.Items::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Billing.Items",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 336,
+        "end": 358
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Billing.Items::b.rc.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Billing.Items",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 336,
+        "end": 344
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 568,
+        "end": 593
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries::l.api.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 568,
+        "end": 577
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 938,
+        "end": 961
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync::m.conn.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 938,
+        "end": 948
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewBilling::rc.SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 235,
+        "end": 278
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewBilling::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewBilling",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 222,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewLedger::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewLedger",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 500,
+        "end": 534
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewLedger::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewLedger",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 500,
+        "end": 511
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPair::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPair",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2152,
+        "end": 2202
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPair::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPair",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2152,
+        "end": 2163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPool::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPool",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2466,
+        "end": 2516
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPool::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPool",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2466,
+        "end": 2477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewQueue::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewQueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1784,
+        "end": 1834
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewQueue::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewQueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1784,
+        "end": 1795
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewRelay::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewRelay",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1466,
+        "end": 1517
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewRelay::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewRelay",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1466,
+        "end": 1477
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pair.Left",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 2298,
+        "end": 2321
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pair.Left::p.left.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pair.Left",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2298,
+        "end": 2308
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pool.Lease",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 2610,
+        "end": 2635
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pool.Lease::p.member.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pool.Lease",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2610,
+        "end": 2622
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 1286,
+        "end": 1316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward::p.upstream.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1286,
+        "end": 1300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Push::(call_expression).Post#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Queue.Push",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1950,
+        "end": 1974
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Push::q.jobs.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Queue.Push",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1950,
+        "end": 1960
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Retarget::q.jobs.SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Queue.Retarget",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1869,
+        "end": 1920
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Send::(call_expression).Post#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Relay.Send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1602,
+        "end": 1625
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Send::r.out.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Relay.Send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1602,
+        "end": 1611
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Unset.Idle",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+        "example.com/acme/conformance::store/store.go::Store.Get"
+      ],
+      "span": {
+        "path": "client/fields.go",
+        "start": 2780,
+        "end": 2803
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Unset.Idle::u.idle.R#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Unset.Idle",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2780,
+        "end": 2790
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::plainProxy::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::plainProxy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1201,
+        "end": 1252
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::plainProxy::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::plainProxy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 1201,
+        "end": 1212
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::pools::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::pools",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2567,
+        "end": 2578
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::positional::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::positional",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2245,
+        "end": 2256
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::positional::resty.New#1",
+      "caller": "example.com/acme/conformance::client/fields.go::positional",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 2258,
+        "end": 2269
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::primary::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::primary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 758,
+        "end": 805
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::primary::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::primary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 758,
+        "end": 769
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::secondary::(call_expression).SetBaseURL#0",
+      "caller": "example.com/acme/conformance::client/fields.go::secondary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 859,
+        "end": 906
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::secondary::resty.New#0",
+      "caller": "example.com/acme/conformance::client/fields.go::secondary",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client/fields.go",
+        "start": 859,
+        "end": 870
       }
     },
     {
@@ -6703,14 +7552,25 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/store.go::New::encode#0",
+      "caller": "example.com/acme/conformance::store/store.go::New",
+      "target": "example.com/acme/conformance::store/codec_pure.go::encode",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 204,
+        "end": 212
+      }
+    },
+    {
       "id": "example.com/acme/conformance::store/store.go::New::fmt.Sprintf#0",
       "caller": "example.com/acme/conformance::store/store.go::New",
       "target": null,
       "level": null,
       "span": {
         "path": "store/store.go",
-        "start": 189,
-        "end": 215
+        "start": 234,
+        "end": 260
       }
     },
     {
@@ -6753,8 +7613,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 419,
-        "end": 427
+        "start": 464,
+        "end": 472
       }
     },
     {
@@ -6764,8 +7624,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 394,
-        "end": 400
+        "start": 439,
+        "end": 445
       }
     },
     {
@@ -6775,8 +7635,8 @@
       "level": "exact",
       "span": {
         "path": "store/store.go",
-        "start": 443,
-        "end": 449
+        "start": 488,
+        "end": 494
       }
     },
     {
@@ -10403,6 +11263,61 @@
   ],
   "consumers": [
     {
+      "contract": "http::GET::/env/get",
+      "site": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+      "via": "env:API_URL"
+    },
+    {
+      "contract": "http::GET::/env/lookup",
+      "site": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+      "via": "env:BILLING_URL"
+    },
+    {
+      "contract": "http::GET::/v1/items",
+      "site": "example.com/acme/conformance::client/fields.go::Billing.Items::(call_expression).Get#0",
+      "via": "host:api.example.com"
+    },
+    {
+      "contract": "http::GET::/entries",
+      "site": "example.com/acme/conformance::client/fields.go::Ledger.Entries::(call_expression).Get#0",
+      "via": "host:ledger.example.com"
+    },
+    {
+      "contract": "http::GET::/sync",
+      "site": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/left",
+      "site": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/ping",
+      "site": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/forward",
+      "site": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/push",
+      "site": "example.com/acme/conformance::client/fields.go::Queue.Push::(call_expression).Post#0",
+      "via": null
+    },
+    {
+      "contract": "http::POST::/send",
+      "site": "example.com/acme/conformance::client/fields.go::Relay.Send::(call_expression).Post#0",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/poll",
+      "site": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/on-client",
       "site": "example.com/acme/conformance::client/net.go::Clients::c.Get#0",
       "via": "host:api.example.com"
@@ -10738,6 +11653,11 @@
       "via": "path forks/billing/go.mod"
     },
     {
+      "contract": "package::go::example.com/acme/ledger",
+      "site": "example.com/acme/conformance::go.mod::require::example.com/acme/ledger",
+      "via": null
+    },
+    {
       "contract": "channel::kafka::payments",
       "site": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
       "via": null
@@ -10906,9 +11826,32 @@
       "field": "require",
       "name": "example.com/acme/billing",
       "range": "v0.0.0"
+    },
+    {
+      "manifest": "go.mod",
+      "field": "require",
+      "name": "example.com/acme/ledger",
+      "range": "v1.2.0"
     }
   ],
   "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
+        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
+        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
+        "example.com/acme/conformance::internal/units/units.go::Meters",
+        "example.com/acme/conformance::main.go::main",
+        "example.com/acme/conformance::main.go::run",
+        "example.com/acme/conformance::report.go::report",
+        "example.com/acme/conformance::store/helpers.go::Exported",
+        "example.com/acme/conformance::store/store.go::init",
+        "example.com/acme/conformance::store/store.go::open"
+      ]
+    },
     {
       "name": "billing/invoice",
       "members": [
@@ -11124,25 +12067,14 @@
     {
       "name": "store",
       "members": [
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
-        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
-        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
-        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
-        "example.com/acme/conformance::internal/units/units.go::Meters",
-        "example.com/acme/conformance::main.go::main",
-        "example.com/acme/conformance::main.go::run",
-        "example.com/acme/conformance::report.go::report",
         "example.com/acme/conformance::scopes/scopes.go::Plain",
         "example.com/acme/conformance::store/client_test.go::TestClient",
         "example.com/acme/conformance::store/client_test.go::helper",
+        "example.com/acme/conformance::store/codec_pure.go::encode",
         "example.com/acme/conformance::store/disk_linux.go::onLinux",
-        "example.com/acme/conformance::store/helpers.go::Exported",
         "example.com/acme/conformance::store/helpers.go::helper",
         "example.com/acme/conformance::store/store.go::New",
-        "example.com/acme/conformance::store/store.go::init",
         "example.com/acme/conformance::store/store.go::init#2",
-        "example.com/acme/conformance::store/store.go::open",
         "example.com/acme/conformance::store/store_test.go::TestNew",
         "example.com/acme/conformance::store/sys_unix.go::sysOpen"
       ]
@@ -11250,11 +12182,32 @@
   ],
   "links": [
     {
+      "consumer": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+      "provider": "example.com/acme/conformance::web/chi.go::ChiPing",
+      "contract": "http::GET::/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
+      "consumer": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+      "provider": "example.com/acme/conformance::web/stdlib.go::Ping",
+      "contract": "http::GET::/ping",
+      "level": "ambiguous",
+      "reason": "2 providers fit; host unresolved; the only repository serving it is example.com/acme/conformance"
+    },
+    {
       "consumer": "example.com/acme/conformance::go.mod::require::example.com/acme/billing",
       "provider": "example.com/acme/conformance::forks/billing/go.mod",
       "contract": "package::go::example.com/acme/billing",
       "level": "exact",
       "reason": "package::go::example.com/acme/billing v0.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::go.mod::require::example.com/acme/ledger",
+      "provider": "example.com/acme/ledger::go.mod",
+      "contract": "package::go::example.com/acme/ledger",
+      "level": "exact",
+      "reason": "package::go::example.com/acme/ledger v1.2.0 (local none), range unchecked"
     },
     {
       "consumer": "example.com/acme/conformance::messages/confluent.go::ConfluentConsume",
@@ -11430,6 +12383,492 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::billing/invoice/invoice.go::round"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/env.go::FromEnv",
+      "kind": "export",
+      "label": "FromEnv",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/env.go::FromEnv"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromEnv::http.Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/env/get"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/env.go::FromLookup",
+      "kind": "export",
+      "label": "FromLookup",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/env.go::FromLookup::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/env/lookup"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Billing.Items",
+      "kind": "export",
+      "label": "Billing.Items",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Billing.Items"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Billing.Items::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Billing.Items::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/v1/items"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+      "kind": "export",
+      "label": "Ledger.Entries",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Ledger.Entries"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Ledger.Entries::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Ledger.Entries::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/entries"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+      "kind": "export",
+      "label": "Mirror.Sync",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Mirror.Sync"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/sync"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewBilling",
+      "kind": "export",
+      "label": "NewBilling",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewBilling"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewLedger",
+      "kind": "export",
+      "label": "NewLedger",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewLedger"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewPair",
+      "kind": "export",
+      "label": "NewPair",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewPair"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewPool",
+      "kind": "export",
+      "label": "NewPool",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewPool"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewProxy",
+      "kind": "export",
+      "label": "NewProxy",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewProxy"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewQueue",
+      "kind": "export",
+      "label": "NewQueue",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewQueue"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::NewRelay",
+      "kind": "export",
+      "label": "NewRelay",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::NewRelay"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Pair.Left",
+      "kind": "export",
+      "label": "Pair.Left",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Pair.Left"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/left"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Pool.Lease",
+      "kind": "export",
+      "label": "Pool.Lease",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Pool.Lease"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::web/chi.go::ChiPing",
+            "example.com/acme/conformance::web/stdlib.go::Ping"
+          ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+      "kind": "export",
+      "label": "Proxy.Forward",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Proxy.Forward"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/forward"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Queue.Push",
+      "kind": "export",
+      "label": "Queue.Push",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Queue.Push"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Queue.Push::(call_expression).Post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/push"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Queue.Retarget",
+      "kind": "export",
+      "label": "Queue.Retarget",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Queue.Retarget"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Relay.Send",
+      "kind": "export",
+      "label": "Relay.Send",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Relay.Send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Relay.Send::(call_expression).Post#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/send"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Relay.Swap",
+      "kind": "export",
+      "label": "Relay.Swap",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Relay.Swap"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::client/fields.go::Unset.Idle",
+      "kind": "export",
+      "label": "Unset.Idle",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::client/fields.go::Unset.Idle"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "ambiguous",
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
+          "mark": "ambiguous",
+          "candidates": [
+            "example.com/acme/conformance::client/net.go::Cache.Get",
+            "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+            "example.com/acme/conformance::store/store.go::Store.Get"
+          ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/poll"
         }
       ]
     },
@@ -12792,6 +14231,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 3,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         },
         {
           "depth": 2,
@@ -15053,6 +16499,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         }
       ]
     },
@@ -15237,6 +16690,13 @@
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
         },
         {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
+        },
+        {
           "depth": 1,
           "repository": "example.com/acme/conformance",
           "level": "exact",
@@ -15284,6 +16744,13 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::store/codec_pure.go::encode"
         },
         {
           "depth": 1,

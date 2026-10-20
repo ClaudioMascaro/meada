@@ -39,9 +39,8 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     }
     let via = |module: &str| {
         let target = replaced.get(module)?;
-        let local = target.starts_with("./") || target.starts_with("../");
-        let local = local || matches!(*target, "." | "..");
-        Some(match local.then(|| relative(dir, target)).flatten() {
+        let local = modfile::local_target(target).then(|| relative(dir, target));
+        Some(match local.flatten() {
             Some(at) if at.is_empty() => "path go.mod".to_string(),
             Some(at) => format!("path {at}/go.mod"),
             None => "outside".to_string(),
@@ -77,22 +76,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         name: file.module.filter(|m| valid_name(m)),
         dependencies,
         ..Summary::default()
-    }
-}
-
-/// Whether `specifier`, an import path, may name a module of the workspace: any path that can be
-/// a contract name. A module path needs no dot (`module kit` with a local `replace`), and the
-/// standard library stays external since no `require` names it (`resolutions`).
-pub fn names_module(specifier: &str) -> bool {
-    valid_name(specifier)
-}
-
-/// What follows the module path `module` in the import path `specifier`, if it starts with it:
-/// the package directory inside the module, empty for its root.
-pub fn inside<'s>(specifier: &'s str, module: &str) -> Option<&'s str> {
-    match specifier.strip_prefix(module)? {
-        "" => Some(""),
-        rest => rest.strip_prefix('/'),
     }
 }
 
@@ -169,14 +152,17 @@ mod tests {
 
     #[test]
     fn an_import_path_may_name_a_module_and_the_standard_library_is_left_to_the_requires() {
-        assert!(names_module("example.com/a/b"));
+        assert!(valid_name("example.com/a/b"));
         // A module path needs no dot: a local one is `module kit` with a `replace`.
-        assert!(names_module("kit/text"));
-        assert!(!names_module(""));
-        assert!(!names_module("a:b"));
-        assert_eq!(inside("example.com/a/b/c", "example.com/a"), Some("b/c"));
-        assert_eq!(inside("example.com/a", "example.com/a"), Some(""));
-        assert_eq!(inside("example.com/ab", "example.com/a"), None);
+        assert!(valid_name("kit/text"));
+        assert!(!valid_name(""));
+        assert!(!valid_name("a:b"));
+        assert_eq!(
+            modfile::inside("example.com/a/b/c", "example.com/a"),
+            Some("b/c")
+        );
+        assert_eq!(modfile::inside("example.com/a", "example.com/a"), Some(""));
+        assert_eq!(modfile::inside("example.com/ab", "example.com/a"), None);
     }
 
     #[test]

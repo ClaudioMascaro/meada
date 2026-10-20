@@ -1344,7 +1344,9 @@ fn resolutions<'e>(
             // The module of the nearest `go.mod` whose path the import starts with, the longest.
             let found = (owner(&exports[n].manifests, from, ecosystem)).and_then(|m| {
                 (m.summary.dependencies.iter())
-                    .filter_map(|e| Some((e, go::inside(specifier, &e.name)?)))
+                    .filter_map(|e| {
+                        Some((e, crate::lang::go::modfile::inside(specifier, &e.name)?))
+                    })
                     .max_by_key(|(e, _)| e.name.len())
             });
             let subpath = match found {
@@ -1807,7 +1809,10 @@ impl ContractKind for Packages {
                 };
                 let package = match Ecosystem::of_source(path) {
                     Some(Ecosystem::Cargo) => cargo::names_crate(specifier),
-                    Some(Ecosystem::Go) => go::names_module(specifier),
+                    // Any path that can be a contract name may name a module of the workspace: a
+                    // module path needs no dot (`module kit` with a local `replace`), and the
+                    // standard library stays external since no `require` names it.
+                    Some(Ecosystem::Go) => valid_name(specifier),
                     _ => split(specifier).is_some(),
                 };
                 if chain.is_empty() || !package {
