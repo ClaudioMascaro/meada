@@ -2,12 +2,14 @@
 //! that makes it (`gin.Default()`, `echo.New()`, `chi.NewRouter()`, `http.NewServeMux()`) or a
 //! group a method of it makes (`r.Group("/v1")`, `r.Route("/v1", fn)`,
 //! `r.PathPrefix("/v1").Subrouter()`), followed through assignments, arguments and return values
-//! (`Code::origins`); a route is a call of one of the router's methods on it. Where a route is
+//! (`Code::origins` with `Follow::Values`); a route is a call of one of the router's methods on
+//! it. A call is a function of a router package when `Code::outside` names it with the package
+//! itself as its head (`direct`), so a method of a typed local is not one. Where a route is
 //! served follows the mounts: a group is mounted on the router it is made on under its prefix
 //! (the router the function of a `Route` or `Group` receives is that group), a chi router on
 //! the one it is given to (`Mount(prefix, router)`), a `ServeMux` on the mux it is given to
 //! (`Handle(pattern, mux)`, where it keeps its own paths, served for the pattern's subtree and
-//! method alone), and `Code::origins` reads every router that reaches the receiver, so a
+//! method alone), and `Follow::Values` reads every router that reaches the receiver, so a
 //! function registering on the router it receives serves it under every prefix its callers give
 //! it. A mount Meada does not read serves nothing: a router inside any other call
 //! (`http.StripPrefix`, `echo.WrapHandler`, a middleware) is one.
@@ -28,9 +30,9 @@ use super::{
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::contract::Found;
-use crate::lang::go::modfile::unversioned;
+use crate::lang::go::{modfile::unversioned, package_call};
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Target, method as member};
+use crate::resolve::{Code, Follow, Of, Target, method as member};
 
 /// How a route method says which methods the route serves.
 #[derive(Clone, Copy)]
@@ -337,7 +339,7 @@ impl<'c, 'a> Go<'c, 'a> {
         let Some(call) = self.code.call(path, n) else {
             return false;
         };
-        let external = self.code.outside_call(path, &call.scope, &call.callee);
+        let external = package_call(self.code, path, &call.scope, &call.callee);
         match external.as_deref().and_then(split) {
             Some((package, name)) => package == router.package && router.made.contains(&name),
             None => false,
@@ -349,8 +351,14 @@ impl<'c, 'a> Go<'c, 'a> {
     /// reached through the exact callers that pass the parameter on (`users(r)`) and the names
     /// that hold it (`sub := r`).
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
-        let origins = self.code.value_origins(path, scope, value);
-        let mut places: Vec<Place> = origins.into_iter().map(Place::Made).collect();
+        let origins = self
+            .code
+            .origins(path, scope, Of::Value(value), Follow::Values);
+        let mut places: Vec<Place> = origins
+            .into_iter()
+            .filter_map(|o| o.call)
+            .map(Place::Made)
+            .collect();
         let (mut groups, mut seen) = (Vec::new(), Vec::new());
         if self.reach(path, scope, value, 0, &mut seen, &mut groups) {
             places.extend(groups);
@@ -582,7 +590,7 @@ impl<'c, 'a> Go<'c, 'a> {
     fn method(&self, path: &'a str, scope: &'a str, arg: &'a Value) -> Option<String> {
         let method = match arg {
             Value::Ref(name) => {
-                let external = self.code.outside_call(path, scope, name)?;
+                let external = package_call(self.code, path, scope, name)?;
                 let (package, name) = split(&external)?;
                 let name = name
                     .strip_prefix("Method")
@@ -634,7 +642,7 @@ impl<'c, 'a> Go<'c, 'a> {
         if let Value::Call(call) = value
             && let [inner] = &call.args[..]
         {
-            let external = self.code.outside_call(path, scope, &call.callee);
+            let external = package_call(self.code, path, scope, &call.callee);
             let split = external.as_deref().and_then(split);
             if split.is_some_and(|(package, name)| package == "net/http" && name == "HandlerFunc") {
                 return inner;
@@ -814,7 +822,7 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             }
             // `http.HandleFunc(..)` registers on the router of the package itself; any other
             // call is a method of a router, whatever its head's type reads as.
-            let external = go.code.outside_call(path, &call.scope, &call.callee);
+            let external = package_call(go.code, path, &call.scope, &call.callee);
             let package_call =
                 external
                     .as_deref()

@@ -2133,10 +2133,6 @@ struct Trail<'a> {
     held: Option<(&'a str, &'a str)>,
 }
 
-/// A call a value comes from (its file and position) and the calls of the functions the walk
-/// went through to reach it, outermost first.
-pub type Through<'a> = ((&'a str, usize), Vec<(&'a str, usize)>);
-
 /// A struct field (`Code::field`): the file and the type that declare it, and its name.
 pub type Field<'a> = (&'a str, &'a str, &'a str);
 
@@ -2694,15 +2690,6 @@ impl<'a> Code<'a> {
         })
     }
 
-    /// What `callee` (`pkg.Name`), written in `scope` of `path`, names in a package outside the
-    /// repository, when its head is the import itself (a dot import binds a bare name): not a
-    /// name whose class is one of the package (`e := other()` with `e.Default()`), which
-    /// `external` also reads as the package's.
-    pub fn outside_call(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        let outside = self.outside(path, scope, callee, false)?;
-        outside.direct.then_some(outside.spelled)
-    }
-
     /// The outside type a type the source writes (`http.Client`), read in `scope` of `path`, is,
     /// spelled as the imports name its package (`net/http.Client`).
     fn outside_written(
@@ -2723,33 +2710,6 @@ impl<'a> Code<'a> {
             spelled: format!("{package}.{name}"),
             direct: true,
         })
-    }
-
-    /// The type outside the repository that the source writes for the name `name` (`c *http.Client`
-    /// is `net/http.Client`), written in `scope` of `path`: a parameter, a local, a constant or a
-    /// field. A type is written as a path, so an import in the file that writes it names the
-    /// package. The `Declarations` origin of the form `Type`, with no steps.
-    pub fn outside_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
-        let found = self.origins(path, scope, Of::Name(name), Follow::Declarations);
-        let origin = found.into_iter().next()?;
-        let typed = origin.form == Form::Type && origin.routes.iter().all(|r| r.steps.is_empty());
-        typed.then_some(origin.outside?.spelled)
-    }
-
-    /// What the source says the value `name` (a parameter, a local, a constant or a field), written
-    /// in `scope` of `path`, is made by outside the repository, spelled as the imports name it: a
-    /// type it is written as (`github.com/segmentio/kafka-go.Writer`), or the function that made
-    /// it, with the methods called on the way (`github.com/rabbitmq/amqp091-go.Dial.Channel`).
-    /// A function of the repository stands for the type it writes as its result. The
-    /// `Declarations` origin, spelled.
-    pub fn outside_origin(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
-        let found = self.origins(path, scope, Of::Name(name), Follow::Declarations);
-        let origin = found.into_iter().next()?;
-        let mut spelled = origin.outside?.spelled;
-        for step in &origin.routes.first()?.steps {
-            spelled = format!("{spelled}.{step}");
-        }
-        Some(spelled)
     }
 
     /// The declarations walk of `name`: the type the source writes for it, or the call it is
@@ -2918,40 +2878,6 @@ impl<'a> Code<'a> {
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(&param.name)),
         }
-    }
-
-    /// `value_origins` with, for each origin, the calls of the functions of the repository the
-    /// walk went through to reach it, outermost first: two objects the same function makes
-    /// differ by the call that made each. The climbed calls of each route of the `Values`
-    /// origins.
-    pub fn value_origins_through(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        value: &'a Value,
-    ) -> Vec<Through<'a>> {
-        let mut out = BTreeSet::new();
-        for origin in self.origins(path, scope, Of::Value(value), Follow::Values) {
-            let Some(call) = origin.call else { continue };
-            out.extend(origin.routes.into_iter().map(|r| (call, r.through)));
-        }
-        out.into_iter().collect()
-    }
-
-    /// The calls whose result `value`, written in `scope` of `path`, may hold, sorted: followed
-    /// through constants and imports, the arguments callers pass to parameters, the values
-    /// functions of the repository return and the items of a list or tuple. A call that
-    /// reaches no such function is where the value comes from, such as a constructor
-    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
-    /// binding, an attribute) is left out. The calls of the `Values` origins.
-    pub fn value_origins(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        value: &'a Value,
-    ) -> Vec<(&'a str, usize)> {
-        let found = self.origins(path, scope, Of::Value(value), Follow::Values);
-        found.into_iter().filter_map(|o| o.call).collect()
     }
 
     /// Whether `trail` may follow `flow`: not one it is following (a cycle), at most
