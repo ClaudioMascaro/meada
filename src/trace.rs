@@ -14,7 +14,7 @@ use crate::render::{
 };
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
-use crate::{channel, http, render};
+use crate::{http, render};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -119,7 +119,7 @@ impl<'a> Graph<'a> {
                 .map(|p| (Mark::Produces, Some(&p.contract), &p.site))
                 .chain(consumed.map(|c| (Mark::Consumes, c.contract.as_ref(), &c.site)));
             for (side, contract, site) in sides {
-                if let Some(contract) = contract.filter(|c| channel::is_unresolved(c)) {
+                if let Some(contract) = contract.filter(|c| contract::unresolved(c)) {
                     graph
                         .unresolved_sides
                         .entry(site)
@@ -579,7 +579,7 @@ impl<'a> Walk<'_, 'a> {
     fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
         let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
         for &(side, contract) in sides {
-            let text = format!("{place} {} {}", side.verb(), channel::shown(contract));
+            let text = format!("{place} {} {}", side.verb(), contract::shown(contract));
             self.push(depth, Row::call(text, repo, None));
         }
     }
@@ -1161,7 +1161,7 @@ impl<'a> Walk<'_, 'a> {
                     "{} {} {}",
                     self.place(step.node),
                     side.verb(),
-                    channel::shown(contract)
+                    contract::shown(contract)
                 );
                 Row::call(text, step.repo, None)
             }

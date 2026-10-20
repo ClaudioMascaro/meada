@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::channel::{Channel, Routes};
+use crate::channel::Channel;
 use crate::http::Http;
 use crate::index::{Consumer, Export, Provider};
 use crate::package::Packages;
@@ -175,15 +175,28 @@ pub trait ContractKind {
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
-    /// workspace's `routes` send to it. Several fitting providers are all linked as ambiguous;
-    /// none leaves the consumer unlinked.
+    /// bindings of the workspace's `exports` route to it. Several fitting providers are all
+    /// linked as ambiguous; none leaves the consumer unlinked.
     fn link(
         &self,
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        routes: &Routes,
+        exports: &[Export],
     ) -> Vec<Link>;
+
+    /// Whether the identifier is an unresolved side: one whose name could not be evaluated
+    /// (a channel that is only its broker prefix). It never links, is no open item, and is
+    /// shown with the unresolved suffix.
+    fn unresolved(&self, _contract: &str) -> bool {
+        false
+    }
+
+    /// How the identifier is labelled in candidates and entry points. It is a function of the
+    /// identifier alone, since entry points are stored when the index is written.
+    fn label(&self, contract: &str) -> String {
+        shown(contract)
+    }
 }
 
 /// Every contract kind of this release.
@@ -193,6 +206,33 @@ pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages]
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     let (prefix, _) = contract.split_once("::")?;
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
+}
+
+/// Whether `contract` is an unresolved side, by the rule of its kind.
+pub fn unresolved(contract: &str) -> bool {
+    kind_of(contract).is_some_and(|k| k.unresolved(contract))
+}
+
+/// `contract` as a person reads it: an unresolved side says so.
+pub fn shown(contract: &str) -> String {
+    match unresolved(contract) {
+        true => format!("{contract} (unresolved)"),
+        false => contract.to_string(),
+    }
+}
+
+/// The contract a person typed as `shown` printed it: `channel::kafka (unresolved)` is
+/// `channel::kafka`.
+pub fn typed(text: &str) -> &str {
+    match text.strip_suffix(" (unresolved)") {
+        Some(contract) if unresolved(contract) => contract,
+        _ => text,
+    }
+}
+
+/// `contract` as its kind labels it in candidates and entry points.
+pub fn label(contract: &str) -> String {
+    kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
 }
 
 /// The names of `Kind::Inline` definitions (inline route handlers, spec #3): the name a kind
@@ -260,5 +300,32 @@ impl Names {
             })
             .collect::<Vec<_>>()
             .join(".")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{shown, typed, unresolved};
+
+    /// The seam shows an unresolved side with its suffix and reads the suffix back off.
+    #[test]
+    fn shown_and_typed_round_trip_through_the_kind() {
+        let broker_only = "channel::kafka";
+        assert!(unresolved(broker_only));
+        assert_eq!(shown(broker_only), "channel::kafka (unresolved)");
+        assert_eq!(typed("channel::kafka (unresolved)"), broker_only);
+
+        let named = "channel::kafka::orders.created";
+        assert!(!unresolved(named));
+        assert_eq!(shown(named), named);
+        assert_eq!(typed(named), named);
+
+        // The suffix means nothing on a resolved side or on a kind with no unresolved sides.
+        assert_eq!(
+            typed("channel::kafka::x (unresolved)"),
+            "channel::kafka::x (unresolved)"
+        );
+        assert_eq!(shown("http::GET::/users"), "http::GET::/users");
+        assert_eq!(shown("not a contract"), "not a contract");
     }
 }

@@ -3,9 +3,8 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::channel::Routes;
 use crate::config::gateway_path;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Site};
+use crate::contract::{ContractKind, Found, Level, Link, Role, Site, shown};
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
@@ -573,7 +572,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _routes: &Routes,
+        _exports: &[IndexExport],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -666,11 +665,28 @@ impl ContractKind for Http {
             })
             .collect()
     }
+
+    /// A route is labelled by its method and path.
+    fn label(&self, contract: &str) -> String {
+        match route(contract) {
+            Some((method, path)) => format!("{method} {path}"),
+            None => shown(contract),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CallAt, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits};
+    use super::{
+        CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
+    };
+    use crate::contract::ContractKind;
+
+    #[test]
+    fn a_route_is_labelled_by_its_method_and_path_and_anything_else_as_it_is_shown() {
+        assert_eq!(Http.label("http::GET::/users/{}"), "GET /users/{}");
+        assert_eq!(Http.label("resource::db::orders"), "resource::db::orders");
+    }
 
     /// `n` routers, each mounted on the next under `/{i}`, as many times as `ways`; the last
     /// is the app.

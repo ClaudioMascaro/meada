@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::channel;
-use crate::contract::Names;
+use crate::contract::{self, Names};
 use crate::http;
 use crate::lang::{Def, Facts, Kind};
 use crate::resolve::{Exported, scope_of};
@@ -164,16 +164,13 @@ fn programs(local: &Local) -> Vec<EntryPoint> {
 fn routes(local: &Local) -> Vec<EntryPoint> {
     let mut found = Vec::new();
     for Side { site, contract } in local.providers {
-        let Some((method, path)) = http::route(contract) else {
-            continue;
-        };
-        if !local.holds(site) {
+        if http::route(contract).is_none() || !local.holds(site) {
             continue;
         }
         found.push(EntryPoint {
             identity: format!("{site}::{contract}"),
             kind: EntryKind::Route,
-            label: format!("{method} {path}"),
+            label: contract::label(contract),
             site: site.clone(),
         });
     }
@@ -183,7 +180,7 @@ fn routes(local: &Local) -> Vec<EntryPoint> {
 /// One entry point per channel a consumer handler consumes, a symbol or a code file like a
 /// route handler. An unresolved side (`channel::kafka`) is one too: the handler still consumes
 /// from somewhere, and without its entry point it would show up nowhere (it would also be an
-/// export entry point otherwise), so it is labelled as `channel::shown` prints it.
+/// export entry point otherwise), so it is labelled as `contract::shown` prints it.
 fn channels(local: &Local) -> Vec<EntryPoint> {
     let mut found = Vec::new();
     for Side { site, contract } in local.consumers {
@@ -193,7 +190,7 @@ fn channels(local: &Local) -> Vec<EntryPoint> {
         found.push(EntryPoint {
             identity: format!("{site}::{contract}"),
             kind: EntryKind::Channel,
-            label: channel::shown(contract),
+            label: contract::label(contract),
             site: site.clone(),
         });
     }
