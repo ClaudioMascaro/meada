@@ -219,7 +219,14 @@ one for the area a change touches.
   statement) that built the client. A base belongs to one client, not to the call that makes
   clients: a client is the `resty.New()` call with the calls of the repository's functions it
   came through (`Code::value_origins_through`), so two clients one factory makes keep their own
-  bases, and a `SetBaseURL` inside the factory reaches every client it makes. Wrapper climbing is
+  bases, and a `SetBaseURL` inside the factory reaches every client it makes. A client held in a
+  struct field (`c.rc`, `Code::field`) holds the clients of the values every composite literal
+  of the repository gives that field of that type (`Code::field_values`, read from the marker
+  constants `{field}` the Go pack writes for each field a literal sets, `{*}` by position, the
+  type `?` when it is not read): a literal by position, of a type not read or not known, or of
+  a type that declares no such field, a value that is not traced, a field written through a
+  selector anywhere (`Code::field_written`), or one met again while it is followed, makes the
+  base unknown, and so does a `SetBaseURL` called through a field. Wrapper climbing is
   `Code::expand`, as for every kind. A package `var` another file of the package assigns, or any
   file of the repository writes through a selector (`pkg.X = ..`, `&pkg.X`, `pkg.X++`: any write
   to a field called `X`, whatever it belongs to), is `Unknown` (`Resolver::redeclared`, read from
@@ -735,11 +742,16 @@ one for the area a change touches.
   `Path(..).HandlerFunc`, `NewRoute`, `Host` subrouters and `StrictSlash(..)` chains are not
   read (a router made by a call that is not `NewRouter` has no provider).
 - `http/go/clients.rs` (spec #25, #79): `CLIENT_DEPTH` (64): a client or a request is followed
-  back through that many calls and names (`New().SetX().R().SetY()`, `b := a`); past it the
-  base is unknown and the request is no consumer (the chain is no longer known to be resty's).
-  A request on a client only written as a type (a parameter or field with no constructor in
-  sight) is a consumer with no host, and so is one on a parameter some caller passes an untraced
-  client to (the base is unknown). Only the libraries of the table (`net/http`, resty v2) are
+  back through that many calls, names and struct fields (`New().SetX().R().SetY()`, `b := a`,
+  `c.rc`); past it the base is unknown and the request is no consumer (the chain is no longer
+  known to be resty's). A request on a client only written as a type (a parameter, or a field
+  no composite literal sets) is a consumer with no host, and so is one on a parameter some
+  caller passes an untraced client to (the base is unknown). A field's literals are those of
+  its type: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
+  position, and a conversion from another struct type (`T(other)`), are not seen as setting
+  the fields of `T` (`Code::field_values`), and a literal nested deeper than `VALUE_DEPTH`
+  inside literals written without their type sets the fields of a type not read. Only the
+  libraries of the table (`net/http`, resty v2 and v3, `resty.dev`) are
   clients; a client assigned more than once, one held in a map, a slice or a channel, or an
   interface, is untraced and its requests are no consumer. A `fmt.Sprintf` format with a verb
   other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned

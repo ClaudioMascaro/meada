@@ -4,7 +4,8 @@
 //! a `net/http` `Client` (`c.Get`), or through a request made by `R()` on a client that traces
 //! back to resty's constructor or is written as a resty `Client`. The URL is folded like any
 //! other value (`lang/go/values.rs`) and a client wrapper is read at each of its call sites
-//! (`Code::expand`). A resty client's base URL is the argument of every `SetBaseURL` on it.
+//! (`Code::expand`). A resty client's base URL is the argument of every `SetBaseURL` on it; a
+//! client held in a struct field is the one the composite literals that set the field give it.
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ use super::super::{CallAt, based, consumer, fetch};
 use super::{external, split};
 use crate::contract::Found;
 use crate::lang::{Call, Part, Value};
-use crate::resolve::Code;
+use crate::resolve::{Code, Field};
 
 /// How many calls a client or a request is followed back through (`New().SetX().R().SetY()`),
 /// and how many names it is followed through.
@@ -68,12 +69,14 @@ enum Method {
 }
 
 /// A resty client, as far as the source tells: the call that makes it with the calls of the
-/// functions it came through (two clients one factory makes differ by the call that made each),
-/// or only its type.
+/// functions it came through (two clients one factory makes differ by the call that made each)
+/// and whether it was reached through a struct field (which instance a base set there reaches is
+/// not known); only its type; or one whose base is not known.
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Client<'a> {
-    Made(CallAt<'a>, Vec<CallAt<'a>>),
+    Made(CallAt<'a>, Vec<CallAt<'a>>, bool),
     Typed,
+    Unknown,
 }
 
 /// A base URL set on the clients a call makes: those that came through the calls `through` or
@@ -84,6 +87,9 @@ struct Set<'a> {
     base: Vec<Part>,
 }
 
+/// The clients a struct field holds, `None` when no literal sets it.
+type Held<'a> = Option<Vec<Client<'a>>>;
+
 struct Clients<'c, 'a> {
     code: &'c Code<'a>,
     /// The base URLs set on resty clients, read on first use.
@@ -91,6 +97,9 @@ struct Clients<'c, 'a> {
     /// The clients each call hands back (`true`: the client a request is made on), so a long
     /// chain several calls start from is walked once.
     walked: RefCell<HashMap<(bool, CallAt<'a>), Vec<Client<'a>>>>,
+    /// The clients each struct field holds, `None` when no literal sets it, so a field many
+    /// requests read is followed once.
+    fields: RefCell<HashMap<(bool, Field<'a>), Held<'a>>>,
 }
 
 impl<'c, 'a> Clients<'c, 'a> {
@@ -131,6 +140,12 @@ impl<'c, 'a> Clients<'c, 'a> {
         depth: usize,
         request: bool,
     ) -> Vec<Client<'a>> {
+        if let Value::Ref(name) = value
+            && let Some(field) = self.code.field(path, scope, name)
+            && let Some(held) = self.held(field, depth, request)
+        {
+            return held;
+        }
         let mut out = self.traced(path, scope, value, depth, request);
         let ty = if request { "Request" } else { "Client" };
         if let Value::Ref(name) = value
@@ -159,11 +174,11 @@ impl<'c, 'a> Clients<'c, 'a> {
         for ((p, i), through) in self.code.value_origins_through(path, scope, value) {
             for client in self.hands(p, i, depth + 1, request) {
                 let client = match client {
-                    Client::Made(made, inner) => {
+                    Client::Made(made, inner, field) => {
                         let through = through.iter().chain(&inner).copied().collect();
-                        Client::Made(made, through)
+                        Client::Made(made, through, field)
                     }
-                    Client::Typed => Client::Typed,
+                    other => other,
                 };
                 if !out.contains(&client) {
                     out.push(client);
@@ -171,6 +186,49 @@ impl<'c, 'a> Clients<'c, 'a> {
             }
         }
         out
+    }
+
+    /// The clients the struct field `field` holds: those of the values every composite literal
+    /// of the repository gives it. Unknown when a literal sets it to a value that is not traced
+    /// or that the source does not tell, when it is written through a selector anywhere
+    /// (`x.rc = ..`), or when it is met again while it is followed. `None` when no literal sets
+    /// it.
+    fn held(&self, field: Field<'a>, depth: usize, request: bool) -> Held<'a> {
+        if depth >= CLIENT_DEPTH {
+            return Some(vec![Client::Unknown]);
+        }
+        if let Some(known) = self.fields.borrow().get(&(request, field)) {
+            return known.clone();
+        }
+        (self.fields.borrow_mut()).insert((request, field), Some(vec![Client::Unknown]));
+        let values = match self.code.field_written(field.2) {
+            true => None,
+            false => self.code.field_values(field),
+        };
+        let found = match values {
+            None => Some(vec![Client::Unknown]),
+            Some(values) if values.is_empty() => None,
+            Some(values) => {
+                let mut out = Vec::new();
+                for (path, scope, value) in values {
+                    let clients = self.reaches(path, scope, value, depth + 1, request);
+                    let untraced = clients.is_empty() || clients.contains(&Client::Typed);
+                    let clients = clients.into_iter().map(|client| match client {
+                        Client::Made(made, through, _) => Client::Made(made, through, true),
+                        Client::Typed => Client::Unknown,
+                        Client::Unknown => Client::Unknown,
+                    });
+                    for client in clients.chain(untraced.then_some(Client::Unknown)) {
+                        if !out.contains(&client) {
+                            out.push(client);
+                        }
+                    }
+                }
+                Some(out)
+            }
+        };
+        (self.fields.borrow_mut()).insert((request, field), found.clone());
+        found
     }
 
     /// Whether `name`, a parameter, is passed a client whose origin is not traced by a caller.
@@ -223,7 +281,7 @@ impl<'c, 'a> Clients<'c, 'a> {
             return if request {
                 Vec::new()
             } else {
-                vec![Client::Made((path, index), Vec::new())]
+                vec![Client::Made((path, index), Vec::new(), false)]
             };
         }
         let Some(receiver) = self.code.receiver(path, index) else {
@@ -241,14 +299,16 @@ impl<'c, 'a> Clients<'c, 'a> {
     /// differ. `None` when there is no client.
     fn base(&self, clients: &[Client<'a>]) -> Option<Option<Vec<Part>>> {
         let set = self.bases.get_or_init(|| self.set());
+        let hole = vec![Part::Hole];
         let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
         for client in clients {
             let given: Vec<&Vec<Part>> = match client {
-                Client::Made(made, through) => (set.iter())
+                Client::Made(made, through, _) => (set.iter())
                     .filter(|s| s.made == *made && through.ends_with(&s.through))
                     .map(|s| &s.base)
                     .collect(),
                 Client::Typed => Vec::new(),
+                Client::Unknown => vec![&hole],
             };
             let base = match given[..] {
                 [] => None,
@@ -287,14 +347,18 @@ impl<'c, 'a> Clients<'c, 'a> {
                     _ => vec![Part::Hole],
                 };
                 for client in self.clients(path, &call.scope, receiver, 0) {
-                    let Client::Made(made, through) = client else {
+                    let Client::Made(made, through, field) = client else {
                         continue;
+                    };
+                    // Set through a field: on which of the instances it holds is not known.
+                    let base = match field {
+                        true => vec![Part::Hole],
+                        false => base.clone(),
                     };
                     let known = set
                         .iter()
                         .any(|s| (s.made, &s.through, &s.base) == (made, &through, &base));
                     if !known {
-                        let base = base.clone();
                         set.push(Set {
                             made,
                             through,
@@ -377,6 +441,7 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
         code,
         bases: OnceCell::new(),
         walked: RefCell::new(HashMap::new()),
+        fields: RefCell::new(HashMap::new()),
     };
     let sends: Vec<&str> = [HTTP_METHODS, RESTY_METHODS]
         .iter()

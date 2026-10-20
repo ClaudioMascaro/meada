@@ -1,4 +1,11 @@
 example.com/acme/conformance store/store.go:9 New
+example.com/acme/conformance client/fields.go:10 NewBilling
+example.com/acme/conformance client/fields.go:26 NewLedger
+example.com/acme/conformance client/fields.go:108 NewPair
+example.com/acme/conformance client/fields.go:125 NewPool
+example.com/acme/conformance client/fields.go:56 NewProxy
+example.com/acme/conformance client/fields.go:90 NewQueue
+example.com/acme/conformance client/fields.go:73 NewRelay
 example.com/acme/conformance client/rest.go:53 newClient
 example.com/acme/conformance internal/http-utils/utils.go:3 NewRequest
 example.com/acme/conformance internal/shapes/shapes.go:19 NewCircle

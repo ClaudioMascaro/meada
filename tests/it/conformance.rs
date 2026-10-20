@@ -2527,6 +2527,38 @@ fn go() {
         &[
             "billing/invoice/invoice.go::Total",
             "billing/invoice/invoice.go::round",
+            "client/fields.go::Billing",
+            "client/fields.go::NewBilling",
+            "client/fields.go::Billing.Items",
+            "client/fields.go::Ledger",
+            "client/fields.go::NewLedger",
+            "client/fields.go::Ledger.Entries",
+            "client/fields.go::Mirror",
+            "client/fields.go::primary",
+            "client/fields.go::secondary",
+            "client/fields.go::Mirror.Sync",
+            "client/fields.go::Proxy",
+            "client/fields.go::NewProxy",
+            "client/fields.go::plainProxy",
+            "client/fields.go::Proxy.Forward",
+            "client/fields.go::Relay",
+            "client/fields.go::NewRelay",
+            "client/fields.go::Relay.Swap",
+            "client/fields.go::Relay.Send",
+            "client/fields.go::Queue",
+            "client/fields.go::NewQueue",
+            "client/fields.go::Queue.Retarget",
+            "client/fields.go::Queue.Push",
+            "client/fields.go::Pair",
+            "client/fields.go::NewPair",
+            "client/fields.go::positional",
+            "client/fields.go::Pair.Left",
+            "client/fields.go::Pool",
+            "client/fields.go::NewPool",
+            "client/fields.go::pools",
+            "client/fields.go::Pool.Lease",
+            "client/fields.go::Unset",
+            "client/fields.go::Unset.Idle",
             "client/flags.go::Configure",
             "client/net.go::Cache",
             "client/net.go::Cache.Get",
@@ -3447,6 +3479,7 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
     let net = |function: &str, call: &str| format!("client/net.go::{function}::{call}");
     let wrap = |function: &str, call: &str| format!("client/wrappers.go::{function}::{call}");
     let rest = |function: &str, call: &str| format!("client/rest.go::{function}::{call}");
+    let field = |function: &str, call: &str| format!("client/fields.go::{function}::{call}");
     let chain = |verb: &str, n: usize| format!("(call_expression).{verb}#{n}");
     let expected = triples(&[
         // The package, a `Client`, the default client and a client written as a literal.
@@ -3619,6 +3652,55 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
         ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
         ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        // A client kept in a struct field: the literals that set the field give its base. Two
+        // bases, a literal whose client is not traced, a selector write of the field, a base set
+        // through the field and a literal without field names leave it unknown; a field no
+        // literal sets is the client its type names.
+        (
+            "http::GET::/v1/items",
+            "host:api.example.com",
+            &field("Billing.Items", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/entries",
+            "host:ledger.example.com",
+            &field("Ledger.Entries", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/sync",
+            "",
+            &field("Mirror.Sync", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/forward",
+            "",
+            &field("Proxy.Forward", &chain("Get", 0)),
+        ),
+        (
+            "http::POST::/send",
+            "",
+            &field("Relay.Send", &chain("Post", 0)),
+        ),
+        (
+            "http::POST::/push",
+            "",
+            &field("Queue.Push", &chain("Post", 0)),
+        ),
+        (
+            "http::GET::/left",
+            "",
+            &field("Pair.Left", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/ping",
+            "",
+            &field("Pool.Lease", &chain("Get", 0)),
+        ),
+        (
+            "http::GET::/poll",
+            "",
+            &field("Unset.Idle", &chain("Get", 0)),
+        ),
         // A package variable another package writes through a selector (`config.Base = ..`,
         // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
         // to the constant `Host`.

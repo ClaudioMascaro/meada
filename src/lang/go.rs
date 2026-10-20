@@ -480,6 +480,12 @@ impl Walk<'_> {
                 // `&p`: the name may be written through the pointer, so it holds no one value.
                 // ponytail: except as the `Topic` of a `TopicPartition` literal (confluent-kafka-go's
                 // `*string`), unless the function writes through a dereference; no alias analysis.
+                "composite_literal" => {
+                    let ty = node.child_by_field_name("type");
+                    if let Some(body) = node.child_by_field_name("body") {
+                        self.literal(scope, ty, body, depth, 0);
+                    }
+                }
                 "unary_expression" => {
                     let operand = node.child_by_field_name("operand");
                     let address = node.child_by_field_name("operator");
@@ -602,6 +608,90 @@ impl Walk<'_> {
             {
                 def.result = None;
             }
+        }
+    }
+
+    /// Records what the literal `body` of the type `ty` (`None`: written without it inside
+    /// another literal, `[]T{{..}}`), written in `scope`, sets each field to, for
+    /// `Code::field_values`: a marker constant `{field}` holding `New(type, [value])`, `{*}` for
+    /// the fields a struct sets by position, and the type `?` when it is not read. The literals
+    /// written without their type inside a slice, an array or a map are of its element, key or
+    /// value type; inside any other literal, of a type not read.
+    fn literal<'t>(
+        &mut self,
+        scope: &str,
+        ty: Option<Node<'t>>,
+        body: Node<'t>,
+        depth: usize,
+        level: usize,
+    ) {
+        let src = self.src;
+        let marker = |ty: Option<&str>, field: Option<&str>, value: Value| Const {
+            name: qualify(scope, &format!("{{{}}}", field.unwrap_or("*"))),
+            value: Value::New(ty.unwrap_or("?").to_string(), vec![value]),
+            ty: None,
+        };
+        // ponytail: a literal nested deeper than the value depth sets fields of a type not read.
+        if level >= values::VALUE_DEPTH {
+            self.facts.consts.push(marker(None, None, Value::Unknown));
+            return;
+        }
+        let child = |n: Option<Node<'t>>, name| n.and_then(|n| n.child_by_field_name(name));
+        // The literals written without their type inside this one, with the type each is of.
+        let mut inside: Vec<(Option<Node<'t>>, Node<'t>)> = Vec::new();
+        let elided = |n: Option<Node<'t>>| -> Option<Node<'t>> {
+            (n.and_then(|n| named(n).next())).filter(|n| n.kind() == "literal_value")
+        };
+        let (keys, values) = match ty.map(|t| t.kind()) {
+            Some("slice_type" | "array_type" | "implicit_length_array_type") => {
+                (None, child(ty, "element"))
+            }
+            Some("map_type") => (child(ty, "key"), child(ty, "value")),
+            // An anonymous struct: its fields are no named type's.
+            Some("struct_type") => return,
+            _ => {
+                let name = ty.and_then(|t| type_name(t, src));
+                for e in named(body) {
+                    let keyed = e.kind() == "keyed_element";
+                    let key = (keyed.then(|| e.child_by_field_name("key"))).flatten();
+                    let key = key.and_then(|k| named(k).next());
+                    let value = if keyed {
+                        e.child_by_field_name("value")
+                    } else {
+                        Some(e)
+                    };
+                    if let Some(v) = elided(value) {
+                        inside.push((None, v));
+                        continue;
+                    }
+                    let value = value.and_then(|v| named(v).next());
+                    let set = match (key, value) {
+                        (Some(k), Some(v)) if k.kind() == "identifier" => {
+                            let value = values::value(v, src, &self.std, scope, depth);
+                            marker(name.as_deref(), Some(text(k, src)), value)
+                        }
+                        (Some(_), _) => continue,
+                        (None, _) => marker(name.as_deref(), None, Value::Unknown),
+                    };
+                    self.facts.consts.push(set);
+                }
+                (None, None)
+            }
+        };
+        if keys.is_some() || values.is_some() {
+            for e in named(body) {
+                let (key, value) = match e.kind() {
+                    "keyed_element" => {
+                        (e.child_by_field_name("key"), e.child_by_field_name("value"))
+                    }
+                    _ => (None, Some(e)),
+                };
+                inside.extend(elided(key).map(|k| (keys, k)));
+                inside.extend(elided(value).map(|v| (values, v)));
+            }
+        }
+        for (ty, body) in inside {
+            self.literal(scope, ty, body, depth, level + 1);
         }
     }
 
@@ -1203,6 +1293,21 @@ mod tests {
     }
 
     #[test]
+    fn literals_nested_past_the_limit_set_fields_of_a_type_not_read() {
+        let nested = |n: usize| {
+            let ty = format!("{}T", "[]".repeat(n));
+            let value = format!("{}a: 1{}", "{".repeat(n + 1), "}".repeat(n + 1));
+            let markers = facts(&format!("package x\n\nvar v = {ty}{value}\n")).consts;
+            let marked = |ty: &str| {
+                (markers.iter()).any(|c| matches!(&c.value, Value::New(t, _) if t == ty))
+            };
+            (marked("T"), marked("?"))
+        };
+        assert_eq!(nested(3), (true, false));
+        assert_eq!(nested(values::VALUE_DEPTH + 10), (false, true));
+    }
+
+    #[test]
     fn a_cgo_file_is_left_out() {
         assert!(facts("package x\n\nimport \"C\"\n\nfunc F() {}\n").unbuilt);
         assert!(facts("package x\n\nimport (\n\t\"fmt\"\n\t\"C\"\n)\n").unbuilt);
@@ -1326,7 +1431,9 @@ mod tests {
     fn a_name_one_statement_of_the_function_binds_once_is_a_constant() {
         let consts = |body: &str| -> Vec<String> {
             let src = format!("package x\n\nfunc f() {{ {body} }}\n");
-            facts(&src).consts.into_iter().map(|c| c.name).collect()
+            let names = facts(&src).consts.into_iter().map(|c| c.name);
+            // The markers of the fields literals set are no constants.
+            names.filter(|n| !n.ends_with('}')).collect()
         };
         assert_eq!(consts("r := mk()"), ["f.r"]);
         assert_eq!(consts("var r = mk()"), ["f.r"]);

@@ -2125,6 +2125,9 @@ struct Trail<'a> {
 /// went through to reach it, outermost first.
 pub type Through<'a> = ((&'a str, usize), Vec<(&'a str, usize)>);
 
+/// A struct field (`Code::field`): the file and the type that declare it, and its name.
+pub type Field<'a> = (&'a str, &'a str, &'a str);
+
 /// The method a call's callee names (`x.y.get` is `get`).
 fn method(callee: &str) -> &str {
     callee.rsplit('.').next().unwrap_or(callee)
@@ -2146,6 +2149,9 @@ pub struct Code<'a> {
     folded: RefCell<HashMap<&'a str, usize>>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
+    /// The marker constants of the literals that set each field (`field_values`), by field name
+    /// (`*` for a literal by position), built the first time a field is read.
+    literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -2197,6 +2203,7 @@ impl<'a> Code<'a> {
             chains: RefCell::new(HashMap::new()),
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
+            literals: OnceCell::new(),
             pack,
         }
     }
@@ -2518,6 +2525,73 @@ impl<'a> Code<'a> {
             }
             _ => None,
         }
+    }
+
+    /// The struct field the name `name` (`c.rc`), written in `scope` of `path`, is: the file and
+    /// the type that declare it, and the field.
+    pub fn field(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<Field<'a>> {
+        let Binding::Local(at, ty, field) = self.resolver.binding(path, scope, name) else {
+            return None;
+        };
+        let class = self.resolver.defs.get(at)?.get(ty)?;
+        (class.kind == Kind::Class).then_some((at, ty, field))
+    }
+
+    /// The values the composite literals of the repository give the field `field` (`T{rc: x}`,
+    /// `[]T{{rc: x}}`), each with the file and scope it is written in. `None` when a literal may
+    /// set it to a value the source does not tell: one by position, one whose type is not read
+    /// or not known, or one of a type that declares no such field (an alias). The pack writes
+    /// each as a marker constant `{name}` (`{*}` by position) holding `New(type, [value])`, the
+    /// type `?` when it is not read.
+    // ponytail: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
+    // position, and a conversion from another struct type (`T(other)`), are not seen as setting
+    // the fields of `T`.
+    pub fn field_values(&self, field: Field<'a>) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
+        let (at, ty, name) = field;
+        let index = self.literals.get_or_init(|| {
+            let mut index: HashMap<&'a str, BTreeSet<(&'a str, &'a str)>> = HashMap::new();
+            for (&path, facts) in self.resolver.files {
+                for constant in &facts.consts {
+                    let last = constant.name.rsplit('.').next().unwrap_or_default();
+                    if let Some(set) = last.strip_prefix('{').and_then(|l| l.strip_suffix('}')) {
+                        let marker = (path, constant.name.as_str());
+                        index.entry(set).or_default().insert(marker);
+                    }
+                }
+            }
+            index
+        });
+        let mut out = Vec::new();
+        let markers = [index.get(name), index.get("*")];
+        for &(path, marker) in markers.into_iter().flatten().flatten() {
+            let by_position = marker.ends_with("{*}");
+            let scope = scope_of(marker);
+            for &literal in self.consts(path, marker) {
+                let Value::New(written, set) = &literal.value else {
+                    return None;
+                };
+                let [value] = &set[..] else {
+                    return None;
+                };
+                if written == "?" {
+                    return None;
+                }
+                match self.resolver.binding(path, scope, written) {
+                    Binding::Def(t) if (t.path, t.name) == (at, ty) => match by_position {
+                        true => return None,
+                        false => out.push((path, scope, value)),
+                    },
+                    // Another struct that declares the field, or (by position) any other type.
+                    Binding::Def(t)
+                        if by_position
+                            || (self.resolver.receivers.get(t.path))
+                                .is_some_and(|r| r.contains_key(&(t.name, name))) => {}
+                    Binding::External(..) => {}
+                    _ => return None,
+                }
+            }
+        }
+        Some(out)
     }
 
     /// Whether some file of the repository writes the field `field` through a selector
