@@ -9,14 +9,15 @@ modules updates it.
   `Consumer`, `Binding`, `Publish` or `Import`),
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
-  in the index: unnamed inline segments drop, and an empty result is the file's top level. `http.rs`: `fetch` consumers (also a call to a parameter defaulting to
+  in the index: unnamed inline segments drop, and an empty result is the file's top level. `http/ts/clients.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`; only in a pack whose `globals` has it; each with `Found::shape` from `response_reads`, spec #23: over the frames
   `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
-  caller reaches), Python client consumers (`clients`, below), Next.js app-router, Express,
-  FastAPI, Flask, Django, axum (`http::axum`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and Express ones each with a `Found::shape` from
-  `http::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
+  caller reaches), Python client consumers (`clients`, `http/python/clients.rs`, below), Next.js app-router
+  and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), axum
+  (`http/rust/axum.rs`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and
+  Express ones each with a `Found::shape` from `http::ts::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
   first, else `literals::Literals::shape` (spec #23; both read the 2xx bodies `provider_shape`
   lists once with `Literals::responses`): one `Literals` per `extract` (with its `Types` and their
   `Zod`, which `response_reads` and `provider_shape` reach through it), holding the budgets of
@@ -54,7 +55,7 @@ modules updates it.
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
   (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
-  `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::axum`: `route`,
+  `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::rust::axum`: `route`,
   `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
   `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or
   `any(h)` read by `method_router`, a closure handler an `Inline` def, the paths normalized by
@@ -88,7 +89,7 @@ modules updates it.
   router mounted only under such a prefix is served under no prefix); a path parameter written
   in the literal (`{id}`, `<int:id>`, `:id`) stays one. FastAPI method
   decorators and `api_route`, and Flask `route`, are read from `Call::decorates`: the handler
-  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`): what an
+  is the decorated function, the methods `methods=[...]` or `GET`. Django (`django`, `http/python.rs`): what an
   `include()` argument names is an `Include`: a module of the repository (by dotted name or
   as a module), the entries of a list, either of them first in the tuple form `(module or
   list, "app_name")`, a dotted name no module answers to from the source roots (an import
@@ -105,7 +106,7 @@ modules updates it.
   `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
   `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
   `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
-  the provider's site. Python clients (`clients`, from `LIBRARIES`: `requests`, `httpx`,
+  the provider's site. Python clients (`clients` in `http/python/clients.rs`, from `LIBRARIES`: `requests`, `httpx`,
   `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
   library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
   is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back

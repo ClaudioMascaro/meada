@@ -36,8 +36,15 @@ one for the area a change touches.
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`). `community.rs`: the deterministic Leiden behind communities (spec
   #31). Detail: [map/indexing.md](map/indexing.md).
-- `contract.rs`, `http.rs`, `http/rust.rs`, `http/go.rs`, `resource.rs`, `channel.rs`: the `ContractKind` trait
-  and the HTTP (`http/rust.rs`: the actix-web and Rocket providers; `http/go.rs`, `http/go/clients.rs`: net/http, gin, echo, chi and gorilla/mux providers, and their consumers with resty), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
+- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs`: the
+  `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
+  machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
+  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
+  `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
+  requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
+  and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
+  `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
+  with resty), resource and channel kinds. `package.rs`: npm, PyPI, Cargo and Go packages as contracts (specs #22,
   #24, #30 and #25). Detail:
   [map/contracts.md](map/contracts.md).
 - `document/`, `shape.rs`, `literals.rs`, `zod.rs`: OpenAPI and AsyncAPI provider documents, the
@@ -193,7 +200,7 @@ one for the area a change touches.
   is), else the flow ends. Which methods pass the object on is listed per object, with its
   constructors: `FRAMEWORKS` in `lang/rust/frameworks.rs` for the web frameworks and HTTP
   clients (`passes`, and `frameworks::made`, which the HTTP kind reads), `LIBRARIES` in
-  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http::axum`, and `http::rust`: actix-web
+  `lang/rust/messages.rs` for the brokers. A kind reads a route off each call of the chain (`http/rust/axum.rs`, and `http/rust.rs`: actix-web
   `App`, `web::scope`, `web::resource`, `.configure(f)` and Rocket's `build().mount(..)`, whose
   `routes![..]` the Rust pack reads as a list of the handlers' paths).
   `Code::returned` and `Code::constant` give a kind the values a call may return and a
@@ -322,7 +329,7 @@ one for the area a change touches.
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
 - New **shape source** (spec #23): a provider's is a `shape::Source` variant, never a new shape
-  type, with an arm in `Source::at` and `Source::declared`, in the order `http::provider_shape`
+  type, with an arm in `Source::at` and `Source::declared`, in the order `http::ts::provider_shape`
   and `Http::declare` apply (a document, then a zod schema, `zod.rs`, then the returned
   literals, `literals.rs`). A consumer's (field reads, destructuring, iteration, declared types)
   adds no variant: every consumer shape is `Source::Reads`, and a source adds its paths through
@@ -1156,7 +1163,7 @@ one for the area a change touches.
   served nowhere. A file two crates reach belongs to the first (see above), so a mention in the
   second, of a handler not published, is not counted (no marker). A service configuration is followed into the functions of the
   repository it is passed to (`f(cfg)`, answered exactly), not through methods or closures.
-- `http.rs` (axum): `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
+- `http/rust/axum.rs`: `METHOD_CHAIN` (64): an axum method router chain (`get(a).post(b)`) is read
   to that many calls, a longer one gives its route no provider. `FLUENT_CHAIN` (1024,
   `resolve.rs`): a builder chain (`Router::new().route(..)`, an actix-web `ServiceConfig`'s
   `cfg.service(a).route(..)`) is read to that many calls down to what starts it (`Code::chain`),
@@ -1207,8 +1214,9 @@ one for the area a change touches.
   exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
   setter missing from the list ends the chain and its client (or its router, app, scope,
   resource or Rocket instance) is not read.
-- `http.rs`: `router.route(path)` chains and `require` are not followed. A route path or prefix
-  that depends on a parameter is not read through callers (it yields no route). A FastAPI
+- `http/ts.rs`: `router.route(path)` chains and `require` are not followed. A route path or
+  prefix that depends on a parameter is not read through callers (it yields no route;
+  `http.rs` `path_literal`, for every framework). `http/python.rs`: a FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
   walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
