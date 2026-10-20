@@ -5425,8 +5425,8 @@ mod tests {
 
     // The rules that decide what an origin walk follows (spec #204), pinned at the `Code`
     // seam. Each test builds a `Code` over parsed files, asks one question and checks the
-    // answer as one line per origin. The render helpers below own that line; the tickets that
-    // move the question switch them to the new answer and keep every assertion.
+    // answer as one line per origin. The render helpers below own that line; a test asks them,
+    // never the walks behind `Code::origins` and `Code::outside`.
 
     /// A `Code` of `sources` (path, text) parsed by `pack`, handed to `ask`.
     fn over<T>(
@@ -6034,8 +6034,8 @@ mod tests {
     #[test]
     fn a_path_written_callee_is_read_by_path_and_not_by_a_local_function_that_spells_its_head() {
         let src = "fn rocket() {}\nfn main() { rocket::build(); }\n";
-        // `external` finds the function `rocket` and so no crate; read as a path, the head is the
-        // crate.
+        // Read as a value (`external=`), `rocket` is the function and so no crate; read as a path,
+        // the head is the crate.
         assert_eq!(
             read_names(rust(), &[("main.rs", src)], "main.rs"),
             ["rocket.build: external=- by_path=rocket.build direct=false import=-"]
