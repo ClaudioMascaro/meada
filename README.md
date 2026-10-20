@@ -80,8 +80,10 @@ linha de comando seguem o `LANG` (português ou inglês); as do MCP são sempre 
 
 ## Agentes (MCP)
 
-`meada mcp` fala MCP por stdio e precisa ser iniciado dentro do repositório. Na configuração do
-seu agente (por exemplo o `.mcp.json` do Claude Code):
+`meada mcp` fala MCP por stdio. Ele responde sobre a primeira raiz (`roots`) que o cliente
+informa, no Claude Code a pasta da sessão; sem raízes, sobre a pasta em que foi iniciado, que
+então precisa estar dentro do repositório. Na configuração do seu agente (por exemplo o
+`.mcp.json` do Claude Code):
 
 ```json
 {

@@ -625,6 +625,7 @@ dependencies = [
  "clap",
  "ignore",
  "nodejs-semver",
+ "percent-encoding",
  "rmcp",
  "rusqlite",
  "schemars",

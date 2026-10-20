@@ -80,8 +80,10 @@ messages follow `LANG` (Portuguese or English); MCP messages are always in Engli
 
 ## Agents (MCP)
 
-`meada mcp` speaks MCP over stdio and must be started inside the repository. In your agent's
-configuration (for example Claude Code's `.mcp.json`):
+`meada mcp` speaks MCP over stdio. It answers about the first root (`roots`) the client sends,
+in Claude Code the session's directory; without roots, about the directory it was started in,
+which then must be inside the repository. In your agent's configuration (for example Claude
+Code's `.mcp.json`):
 
 ```json
 {

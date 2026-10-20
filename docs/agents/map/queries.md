@@ -152,7 +152,9 @@ modules updates it.
   classes named render`), plus the markers `REPOSITORY_LEVEL` and `DOCUMENTED_ONLY`. Display
   only.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
-  that reopens it per call (so it refreshes). Stdout is the protocol: log to stderr. No tool writes.
+  that reopens it per call (so it refreshes) on the client's first `file://` root (`roots/list`,
+  asked per call when the client declared the capability), or on the cwd without one. Stdout is
+  the protocol: log to stderr. No tool writes.
 - `main.rs`: clap, with `index`, `status`, `export`, `mcp`, `decide` (`--item`, `--dry-run`,
   `--list`, `--prune`, the last excluding the first three; `--decider`, and `--show-request`,
   and `--min-p`, which require `--decider`). `search`, `context` and `trace`
