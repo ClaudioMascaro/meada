@@ -39,7 +39,7 @@ pub fn contract(broker: &str, name: Option<&str>) -> String {
 
 /// The RabbitMQ routing of the workspace: every binding and every publish to a named
 /// exchange, from any repository, since the broker is shared.
-pub struct Routes<'a> {
+struct Routes<'a> {
     pub bindings: Vec<&'a Binding>,
     pub publishes: Vec<&'a Publish>,
 }
@@ -285,6 +285,23 @@ impl ContractKind for Channel {
         index::sort_consumers(&mut export.consumers);
     }
 
+    /// The publish at `call` and each queue the bindings of the workspace route it to.
+    fn at_call(&self, exports: &[Export], export: &Export, call: &str) -> Vec<String> {
+        let publishes: Vec<_> = export.publishes.iter().filter(|q| q.site == call).collect();
+        if publishes.is_empty() {
+            return Vec::new();
+        }
+        let routes = Routes::new(exports);
+        let mut lines = Vec::new();
+        for publish in publishes {
+            lines.push(format!("publishes {} {}", publish.exchange, publish.key));
+            for (queue, (level, reason)) in routes.reached(publish) {
+                lines.push(format!("produces {queue} [{}: {reason}]", level.name()));
+            }
+        }
+        lines
+    }
+
     /// The consumer links to every producer that reaches its channel (`reaching`), in any
     /// repository. Several producers or consumers are fan-in or fan-out, never ambiguity.
     fn link(
@@ -371,7 +388,7 @@ fn routed(publish: &Publish, binding: &Binding) -> Option<(Level, String)> {
 /// The producers that reach the channel `contract`, by site, with the level and reason of
 /// each: the providers that `fit` it, and the publishes its bindings route to it (`routed`).
 /// Of several matches to one producer the strongest wins.
-pub fn reaching<'p>(
+fn reaching<'p>(
     contract: &str,
     providers: impl IntoIterator<Item = &'p Provider>,
     routes: &Routes<'p>,
@@ -477,12 +494,10 @@ mod tests {
             .collect()
     }
 
-    /// The sides that reach a channel through another name are the wildcard consumers and
-    /// producers, the publishes its bindings route and the bindings; its own sides are left to
-    /// the engine.
-    #[test]
-    fn a_channel_is_reached_through_wildcards_publishes_and_bindings() {
-        let export = Export {
+    /// A NATS producer, a wildcard and a plain consumer of it, and a RabbitMQ publish whose
+    /// exchange a binding routes to the queue `q`.
+    fn workspace() -> [Export; 1] {
+        [Export {
             providers: vec![provider(
                 "channel::nats::orders.created",
                 "r::a.ts::produce",
@@ -503,9 +518,15 @@ mod tests {
                 site: "r::a.ts::pub".into(),
             }],
             ..Export::default()
-        };
-        let exports = [export];
+        }]
+    }
 
+    /// The sides that reach a channel through another name are the wildcard consumers and
+    /// producers, the publishes its bindings route and the bindings; its own sides are left to
+    /// the engine.
+    #[test]
+    fn a_channel_is_reached_through_wildcards_publishes_and_bindings() {
+        let exports = workspace();
         let wildcard = "[inferred: channel::nats::orders.created wildcard orders.*]";
         assert_eq!(
             related(&exports, "channel::nats::orders.created"),
@@ -583,6 +604,25 @@ mod tests {
         for (pattern, key, matches) in table {
             assert_eq!(pattern_matches(pattern, key), matches, "{pattern} on {key}");
         }
+    }
+
+    /// A publish at a call adds its own line and one per queue its bindings route it to; a
+    /// call with no publish adds nothing.
+    #[test]
+    fn a_publish_at_a_call_adds_the_queues_it_reaches() {
+        let exports = workspace();
+        assert_eq!(
+            Channel.at_call(&exports, &exports[0], "r::a.ts::pub"),
+            [
+                "publishes ex order.created",
+                "produces channel::rabbitmq::q [inferred: channel::rabbitmq::q binding ex order.*]",
+            ]
+        );
+        assert!(
+            Channel
+                .at_call(&exports, &exports[0], "r::a.ts::other")
+                .is_empty()
+        );
     }
 
     #[test]

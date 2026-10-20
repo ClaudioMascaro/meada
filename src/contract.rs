@@ -259,6 +259,14 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
+    /// line of each provider sitting at it: none by default (channels: the publish and the
+    /// queues its bindings route it to, a publish having no contract of its own). `exports` are
+    /// the workspace's.
+    fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
     /// bindings of the workspace's `exports` route to it. Several fitting providers are all

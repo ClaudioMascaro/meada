@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::channel::Routes;
 use crate::contract::{self, ContractKind, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::entry::{self, EntryPoint};
@@ -17,9 +16,7 @@ use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mar
 use crate::shape::{self, Shape};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Missing, Repository, Workspace};
-use crate::{
-    Result, channel, decisions, document, drift_view, index, items, package, render, repo, trace,
-};
+use crate::{Result, decisions, document, drift_view, index, items, package, render, repo, trace};
 
 /// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
 const MAX_PEERS: usize = 10;
@@ -718,8 +715,7 @@ impl Engine {
         let mut tail = Vec::from_iter(unavailable);
         tail.extend(relations(identity, export, &mut files, &symbol_found.id));
         tail.extend(consumers(&exports, repos, &links, &symbol_found.id));
-        let routes = Routes::new(&exports);
-        let workspace = (links.as_slice(), &routes);
+        let workspace = (exports.as_slice(), links.as_slice());
         tail.extend(contracts(
             identity,
             export,
@@ -769,14 +765,14 @@ impl Engine {
     }
 }
 
-/// `contracts:` with what `symbol` provides, the channels it produces to (a publish to a named
-/// exchange, then each queue the bindings route it to) and the contracts its calls consume,
-/// unresolved ones included, each followed by its decided links; `links` and `routes` are the
-/// workspace's. Nothing when it has none.
+/// `contracts:` with what `symbol` provides, what its calls produce (a provider at a call, then
+/// what the kinds add for the call) and the contracts its calls consume, unresolved ones
+/// included, each followed by its decided links; `exports` and `links` are the workspace's.
+/// Nothing when it has none.
 fn contracts(
     identity: &str,
     export: &Export,
-    (links, routes): (&[Link], &Routes),
+    (exports, links): (&[Export], &[Link]),
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
@@ -794,27 +790,18 @@ fn contracts(
                 .map_or_else(Vec::new, |s| shape_lines(identity, s, "response")),
         );
     }
-    // A channel producer is a call site: the symbol around it produces.
+    // A provider can sit at a call (a channel producer): the symbol around it produces. A
+    // kind may add lines for the call.
     for call in export.calls.iter().filter(|c| c.caller == symbol.id) {
-        let produced = export
-            .providers
-            .iter()
-            .filter(|p| p.site == call.id && p.contract.starts_with(channel::PREFIX));
         let location = files.at(&call.span.path, call.span.start);
-        for provider in produced {
+        for provider in export.providers.iter().filter(|p| p.site == call.id) {
             let contract = contract::shown(&provider.contract);
             lines.push(format!("{identity} {location} produces {contract}"));
         }
-        for publish in export.publishes.iter().filter(|q| q.site == call.id) {
-            let (exchange, key) = (&publish.exchange, &publish.key);
-            lines.push(format!("{identity} {location} publishes {exchange} {key}"));
-            for (queue, (level, reason)) in routes.reached(publish) {
-                let level = level.name();
-                lines.push(format!(
-                    "{identity} {location} produces {queue} [{level}: {reason}]"
-                ));
-            }
-        }
+        let added = KINDS
+            .iter()
+            .flat_map(|k| k.at_call(exports, export, &call.id));
+        lines.extend(added.map(|line| format!("{identity} {location} {line}")));
     }
     // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
