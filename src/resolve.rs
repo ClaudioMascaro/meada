@@ -2185,20 +2185,6 @@ impl<'a> ByName<'a> {
     }
 }
 
-/// Where a value comes from when a package outside the repository made it: the specifier
-/// imported, and what the code did with what it imports, written as JavaScript would write
-/// it from that name. `const kafka = new Kafka(...)` with `Kafka` imported from `kafkajs`,
-/// then `const producer = kafka.producer()`, makes `producer` the origin `kafkajs`,
-/// `new Kafka().producer()`. A namespace import adds no name; a default import is `default`.
-/// `Code::origin`'s answer, rebuilt from the `Constants` origin.
-pub struct ConstOrigin<'a> {
-    pub package: &'a str,
-    pub expr: String,
-    /// The constant the traced name refers to, as its file and qualified name; `None` when
-    /// the name is the import itself.
-    pub binding: Option<(&'a str, &'a str)>,
-}
-
 /// What `Code::origins` is asked about.
 #[derive(Clone, Copy)]
 pub enum Of<'a> {
@@ -2317,31 +2303,6 @@ impl<'a> Code<'a> {
     /// The language pack whose files these are.
     pub fn pack(&self) -> &'static dyn LanguagePack {
         self.pack
-    }
-
-    /// The origin of `chain`, a name or member chain (`a.b`) written in `path` within
-    /// `scope`, through constants in the same file and imported ones: `None` unless it comes
-    /// from an import of something outside the repository. Only `const` bindings are
-    /// followed; a parameter has no origin. The `Constants` origin, spelled as JavaScript
-    /// would write it.
-    pub fn origin(&self, path: &'a str, scope: &'a str, chain: &'a str) -> Option<ConstOrigin<'a>> {
-        let found = self.origins(path, scope, Of::Name(chain), Follow::Constants);
-        let origin = found.into_iter().next()?;
-        let (package, name) = origin.outside?.imported?;
-        let route = origin.routes.into_iter().next()?;
-        let mut expr = match origin.form {
-            Form::New => format!("new {name}()"),
-            Form::Call => format!("{name}()"),
-            Form::Type | Form::Name => name,
-        };
-        for step in &route.steps {
-            expr += &format!(".{step}()");
-        }
-        Some(ConstOrigin {
-            package,
-            expr,
-            binding: route.held,
-        })
     }
 
     /// What made the value of `of`, written in `path` within `scope`, as far as `follow` lets
@@ -2729,13 +2690,6 @@ impl<'a> Code<'a> {
         })
     }
 
-    /// What `callee`, written in `scope` of `path`, names outside the repository: the module
-    /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
-    /// the repository binds it.
-    pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        Some(self.outside(path, scope, callee, false)?.spelled)
-    }
-
     /// The outside type a type the source writes (`http.Client`), read in `scope` of `path`, is,
     /// spelled as the imports name its package (`net/http.Client`).
     fn outside_written(
@@ -2924,33 +2878,6 @@ impl<'a> Code<'a> {
                 .and_then(|at| call.args.get(at))
                 .or_else(|| call.keyword(&param.name)),
         }
-    }
-
-    /// The calls whose result `name`, written in `scope` of `path`, may hold, sorted: followed
-    /// through constants and imports, the arguments callers pass to parameters, the values
-    /// functions of the repository return and the items of a list or tuple. A call that
-    /// reaches no such function is where the value comes from, such as a constructor
-    /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
-    /// binding, an attribute) is left out. The calls of the `Values` origins.
-    pub fn name_origins(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        name: &'a str,
-    ) -> Vec<(&'a str, usize)> {
-        let found = self.origins(path, scope, Of::Name(name), Follow::Values);
-        found.into_iter().filter_map(|o| o.call).collect()
-    }
-
-    /// `name_origins` of a value as written.
-    pub fn value_origins(
-        &self,
-        path: &'a str,
-        scope: &'a str,
-        value: &'a Value,
-    ) -> Vec<(&'a str, usize)> {
-        let found = self.origins(path, scope, Of::Value(value), Follow::Values);
-        found.into_iter().filter_map(|o| o.call).collect()
     }
 
     /// Whether `trail` may follow `flow`: not one it is following (a cycle), at most
@@ -3477,7 +3404,7 @@ impl<'a> Code<'a> {
     /// What `read` makes of the positional and keyword arguments of `from`, at each call site
     /// that determines them, with the wrapper calls climbed from the call to each site. `from`
     /// is a call, or the `new` expression a `const` holds on behalf of a call made on that
-    /// constant (`ConstOrigin::binding`): the call is the site when the arguments evaluate where
+    /// constant (`Route::held`): the call is the site when the arguments evaluate where
     /// the constant stands, and the function enclosing the constant is the client wrapper when they
     /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
     /// parameter of the enclosing function, which makes that function a client wrapper. Each

@@ -1,7 +1,9 @@
 //! TypeScript and JavaScript providers (spec #23). Express: `app.METHOD(path, ..., handler)` and
 //! `router.METHOD(...)` on an app or a router, under every prefix of `app.use(prefix, router)`
-//! mounts, the app or router followed through `Code::origins`; the Express rules do not run
-//! outside a pack with `js` files. Next.js app-router route files: `app/users/[id]/route.ts`
+//! mounts, the app or router followed through `Code::origins` with `Follow::Values` (constants,
+//! imports, arguments and returns), and what `express()` or `Router()` names outside the
+//! repository read with `Code::outside`; the Express rules do not run outside a pack with `js`
+//! files. Next.js app-router route files: `app/users/[id]/route.ts`
 //! exporting `GET`, `POST`... serves `/users/{}`, route groups `(name)` dropped. `provider_shape`
 //! is the one place that picks the source of a route's code shape, in the order of ADR 0009: a
 //! document, then the zod schema, then the returned literals. Seams of the root reused:
@@ -17,7 +19,7 @@ use super::{
 use crate::contract::{Found, Site};
 use crate::lang::{Export, Value, literal};
 use crate::literals::{Handler, Literals};
-use crate::resolve::Code;
+use crate::resolve::{Code, Follow, Of};
 use crate::shape::Shape;
 
 /// Express and Next.js route-file providers, with the shapes their handlers return (spec #23).
@@ -84,8 +86,8 @@ const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
 fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
     let call = &code.files()[path].calls[n];
     ROUTERS.contains(&call.callee.as_str())
-        && (code.external(path, &call.scope, &call.callee))
-            .is_none_or(|name| name.starts_with("express."))
+        && (code.outside(path, &call.scope, &call.callee, false))
+            .is_none_or(|outside| outside.spelled.starts_with("express."))
 }
 
 /// The shape the handler `name` of `path` gives its route from what the code returns (spec
@@ -115,8 +117,10 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
         return Vec::new();
     }
     let routers = |path, scope, name| -> Vec<CallAt> {
-        let origins = code.name_origins(path, scope, name).into_iter();
-        origins.filter(|&r| is_express(code, r)).collect()
+        let origins = code.origins(path, scope, Of::Name(name), Follow::Values);
+        (origins.into_iter().filter_map(|o| o.call))
+            .filter(|&r| is_express(code, r))
+            .collect()
     };
     let mut mounts = Mounts::new();
     let mut routes = Vec::new();
@@ -157,7 +161,9 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 }
                 // A router reached through arguments and return values has no path either.
                 Some((first, _))
-                    if (code.value_origins(path, &call.scope, first).into_iter())
+                    if (code.origins(path, &call.scope, Of::Value(first), Follow::Values))
+                        .into_iter()
+                        .filter_map(|o| o.call)
                         .any(|c| is_express(code, c)) =>
                 {
                     (Some(String::new()), args)
@@ -166,11 +172,12 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 // imported object): what it mounts is served under no prefix.
                 // ponytail: so is a router mounted after a package's middleware passed uncalled
                 // (`app.use(requireAuth, router)`); tell package handlers from package strings
-                // through `Code::origin` if that loses routes that matter.
+                // through `Code::origins` if that loses routes that matter.
                 _ => (None, &args[1..]),
             };
             for arg in rest {
-                let children = code.value_origins(path, &call.scope, arg).into_iter();
+                let children = code.origins(path, &call.scope, Of::Value(arg), Follow::Values);
+                let children = children.into_iter().filter_map(|o| o.call);
                 for child in children.filter(|&c| is_express(code, c)) {
                     let parents = mounts.entry(child).or_default();
                     parents.extend(ats.iter().map(|&at| (at, prefix.clone())));

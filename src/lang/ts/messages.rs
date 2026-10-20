@@ -1,6 +1,10 @@
 //! The message libraries of the TypeScript and JavaScript pack (spec #20). A form is a method
-//! called on a client whose origin (`Code::origin`) is the library's own factory, imported
-//! from the library's package: a `send` on anything else is no producer.
+//! called on a client whose origin is the library's own factory, imported from the library's
+//! package: a `send` on anything else is no producer. The origin is the one question,
+//! `Code::origins` with `Follow::Constants`: only `const` bindings are followed, so a client
+//! passed in as a parameter or returned by a function has none (certain or absent). `factory`
+//! rebuilds the spelling each form table matches (`new Kafka().producer()`) from the origin's
+//! form, outside name and steps.
 
 use std::collections::BTreeMap;
 
@@ -8,7 +12,7 @@ use crate::lang::{
     Handler, Message, Role, Value, bind, channel_name as name, literal, property, publish,
     queue_name,
 };
-use crate::resolve::{Code, Expand, Expanded};
+use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of};
 
 const KAFKAJS: &str = "kafkajs";
 const KAFKA_PRODUCER: &str = "new Kafka().producer()";
@@ -32,6 +36,42 @@ const AMQP_CHANNELS: [&str; 4] = [
     "connect().createChannel()",
     "connect().createConfirmChannel()",
 ];
+
+/// A client's factory: the package it is imported from, the factory as JavaScript would write it
+/// (`new Kafka().producer()`), and the constant the client is bound to (its file and qualified
+/// name).
+struct Factory<'a> {
+    package: &'a str,
+    expr: String,
+    binding: Option<(&'a str, &'a str)>,
+}
+
+/// The `Factory` of `chain`, from its `Constants` origin: `None` unless it comes from an import
+/// of something outside the repository.
+fn factory<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    chain: &'a str,
+) -> Option<Factory<'a>> {
+    let found = code.origins(path, scope, Of::Name(chain), Follow::Constants);
+    let origin = found.into_iter().next()?;
+    let (package, name) = origin.outside?.imported?;
+    let route = origin.routes.into_iter().next()?;
+    let mut expr = match origin.form {
+        Form::New => format!("new {name}()"),
+        Form::Call => format!("{name}()"),
+        Form::Type | Form::Name => name,
+    };
+    for step in &route.steps {
+        expr += &format!(".{step}()");
+    }
+    Some(Factory {
+        package,
+        expr,
+        binding: route.held,
+    })
+}
 
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
@@ -58,7 +98,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 _ => continue,
             };
-            let Some(origin) = code.origin(path, &call.scope, chain) else {
+            let Some(Factory {
+                package,
+                expr,
+                binding,
+            }) = factory(code, path, &call.scope, chain)
+            else {
                 continue;
             };
             let produce = |broker, read: Read| {
@@ -88,16 +133,16 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 )
                 .collect::<Vec<_>>()
             };
-            match (origin.package, origin.expr.as_str(), method) {
+            match (package, expr.as_str(), method) {
                 (KAFKAJS, KAFKA_PRODUCER, "send") => {
                     out.extend(produce("kafka", &|a| names(a, &["topic"])));
                 }
                 (KAFKAJS, KAFKA_CONSUMER, "subscribe") => {
-                    subscriptions.push((path, n, origin.binding));
+                    subscriptions.push((path, n, binding));
                 }
                 (KAFKAJS, KAFKA_CONSUMER, "run") => {
                     let handler = handler(code, path, n, 0, &["eachMessage", "eachBatch"]);
-                    if let (Some(binding), Some(handler)) = (origin.binding, handler) {
+                    if let (Some(binding), Some(handler)) = (binding, handler) {
                         // ponytail: only the first `run` on a consumer binding counts.
                         handlers.entry(binding).or_insert(handler);
                     }
@@ -126,7 +171,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 // ponytail: a `Queue` with no `const` binding (`new Queue(name).add(...)`, a
                 // class field, a parameter) and `addBulk` are not recognized.
                 (BULLMQ, BULLMQ_QUEUE, "add") => {
-                    if let Some(binding) = origin.binding {
+                    if let Some(binding) = binding {
                         let found = code.expand(
                             Expand::Constructed {
                                 held: binding,
