@@ -1,14 +1,17 @@
-//! actix-web and Rocket providers (spec #30). A handler is a function a route attribute sits on
-//! (`#[get("/x")]`, the pack emits it as a call that decorates the function) or a function a
-//! route builder names (`.route(path, web::get().to(h))`). Where it is served follows the value
-//! of the app, scope, resource or Rocket instance it is registered on, through the same
-//! mounts and prefixes as axum (`prefixes`): a `web::scope(prefix)` is mounted under the prefix
-//! of what takes it, a `.configure(f)` mounts the service configuration `f` receives, and
+//! actix-web and Rocket providers (spec #30); the axum rules live in `rust/axum.rs`. A handler is
+//! a function a route attribute sits on (`#[get("/x")]`, the pack emits it as a call that
+//! decorates the function) or a function a route builder names
+//! (`.route(path, web::get().to(h))`). Where it is served follows the value of the app, scope,
+//! resource or Rocket instance it is registered on, through the same mounts and prefixes as axum
+//! (`prefixes`): a `web::scope(prefix)` is mounted under the prefix of what takes it, a
+//! `.configure(f)` mounts the service configuration `f` receives, and
 //! `mount(prefix, routes![a, b])` puts the listed handlers under the prefix.
 //!
 //! A handler is a node of its own: one a call names (as an argument, `routes![..]` included)
 //! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
 //! names is served at its own path, with no prefix.
+
+mod axum;
 
 use std::cell::{Cell, OnceCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -659,10 +662,12 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
     if !code.pack().extensions().contains(&"rs") {
         return Vec::new();
     }
+    let mut found = axum::providers(code);
     let mut web = Web::new(code);
     web.attributed();
     web.read();
-    web.found()
+    found.extend(web.found());
+    found
 }
 
 #[cfg(test)]

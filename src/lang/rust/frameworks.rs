@@ -1,8 +1,8 @@
 //! The web frameworks and HTTP clients the Rust pack knows (spec #30), one entry per object, as
 //! `messages.rs` lists the brokers: what makes the object outside the repository (the name the
 //! `use` declarations give the call) and the methods that hand that same object back. The value
-//! flow reads the methods through `LanguagePack::passes`; the HTTP kind (`http.rs` for axum,
-//! `http/rust.rs` for actix-web and Rocket) reads what a constructor makes through `made`.
+//! flow reads the methods through `LanguagePack::passes`; the HTTP kind (`http/rust/axum.rs` for
+//! axum, `http/rust.rs` for actix-web and Rocket) reads what a constructor makes through `made`.
 
 /// What an object of a framework or a client library is.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
