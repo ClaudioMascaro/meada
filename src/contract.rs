@@ -197,6 +197,22 @@ pub trait ContractKind {
     fn label(&self, contract: &str) -> String {
         shown(contract)
     }
+
+    /// Whether the kind's ambiguous links are open items: a call for a person to decide.
+    fn decidable(&self) -> bool {
+        true
+    }
+
+    /// Whether `provider` serves `contract`, aliases included (HTTP: a gateway path, any
+    /// method).
+    fn serves(&self, provider: &Provider, contract: &str) -> bool {
+        provider.contract == contract
+    }
+
+    /// Whether `provider` is a candidate for `consumer`, which has no contract.
+    fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
+        false
+    }
 }
 
 /// Every contract kind of this release.
@@ -233,6 +249,13 @@ pub fn typed(text: &str) -> &str {
 /// `contract` as its kind labels it in candidates and entry points.
 pub fn label(contract: &str) -> String {
     kind_of(contract).map_or_else(|| shown(contract), |k| k.label(contract))
+}
+
+/// Whether `provider` serves `contract`, by the rule of the contract's kind, else by equality.
+pub fn serves(provider: &Provider, contract: &str) -> bool {
+    kind_of(contract).map_or(provider.contract == contract, |k| {
+        k.serves(provider, contract)
+    })
 }
 
 /// The names of `Kind::Inline` definitions (inline route handlers, spec #3): the name a kind
