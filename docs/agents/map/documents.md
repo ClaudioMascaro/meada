@@ -152,7 +152,7 @@ modules updates it.
   `literals.rs` records one for a body or spread naming an import (`Reader::imported`), `zod.rs`
   for a schema name (`Reader::named`; `Node::imports`, rendered at the node's path, turned
   `infer` by `Node::declared`), `declared.rs` for a `Ty::Named` and a `z.infer` it cannot find
-  (`Declared::imports`), which `http::response_reads` puts below the read path. `fill(shape,
+  (`Declared::imports`), which `response_reads` (`http/ts/clients.rs`) puts below the read path. `fill(shape,
   at, find)` is the one recursion: `find` gives the kept shape, its repository and the level the
   import resolved at (a consumer's paths through one that is not `exact` are not declared), the kept
   shape is filled first, then grafted at the import's path in its view (`Shape::graft`: a

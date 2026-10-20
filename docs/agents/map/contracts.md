@@ -14,7 +14,7 @@ modules updates it.
   `Code::expand_frames` climbed, the field paths read from the `.json()` of the response in the
   function making the `fetch` and in each wrapper up to the site, a wrapper passing on the
   response, the body or a path below it when it returns that one thing from the function its
-  caller reaches), Python client consumers (`clients`, `http/python/clients.rs`, below), Next.js app-router
+  caller reaches), Python client consumers (`http/python/clients.rs`, below), Next.js app-router
   and Express (`http/ts.rs`), FastAPI, Flask and Django (`http/python.rs`), axum
   (`http/rust/axum.rs`) and actix-web and Rocket (`http/rust.rs`) providers (Next.js and
   Express ones each with a `Found::shape` from `http::ts::provider_shape`, the one place that picks a route's code source: `zod::Zod::returned`
@@ -106,7 +106,7 @@ modules updates it.
   `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` allow (from
   `Call::decorates` and `Def::decorators`, all of them when several restrict it), else `ANY`;
   `C.as_view()` serves each handler method `C` itself defines (`get`, `post`, ...), each one
-  the provider's site. Python clients (`clients` in `http/python/clients.rs`, from `LIBRARIES`: `requests`, `httpx`,
+  the provider's site. Python clients (`consumers` in `http/python/clients.rs`, from `LIBRARIES`: `requests`, `httpx`,
   `aiohttp`): a call is a consumer when `Code::external` names it a module function of a
   library imported by the file (`requests.get`, `httpx.post`, also under an alias), or when it
   is `get`, `post`, ..., `request(method, url)` on a receiver that `Code::origins` traces back
