@@ -2077,7 +2077,7 @@ pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 /// How deep folding one value recurses: into an item of a list or an object, the constant a
 /// name holds, the argument a caller passes for a parameter. Deeper, the value is unknown. It
 /// also bounds the constants, parameters and return values `Code::origins` follows, each into
-/// the next.
+/// the next (`Follow::Values`), and the constants it follows for `Follow::Constants`.
 // ponytail: real values nest a few levels; the limit keeps a crafted chain of thousands of
 // constants from overflowing the stack.
 const EVAL_DEPTH: usize = 256;
@@ -2120,18 +2120,17 @@ enum Flow<'a> {
 
 /// What `Code::origins` carries along: `frames` bind the parameters of the functions whose
 /// return values are being followed, innermost last; `busy` is what is being followed, met
-/// again only through a cycle; `out` holds the origins found.
+/// again only through a cycle; `out` holds the origins found, each with its routes.
 #[derive(Default)]
 struct Trail<'a> {
     frames: Vec<Frame<'a>>,
     busy: Vec<Flow<'a>>,
-    out: BTreeSet<(&'a str, usize)>,
-    /// Each origin of `out` with the calls of the functions whose return values the walk went
-    /// through to it, outermost first (`Code::value_origins_through`).
-    through: BTreeSet<Through<'a>>,
-    /// The methods of the builder chains being followed, which the library they start at must
-    /// pass through (`LanguagePack::passes`).
+    out: BTreeMap<(&'a str, usize), BTreeSet<Route<'a>>>,
+    /// The methods of the builder chains being followed, outermost first, which the library
+    /// they start at must pass through (`LanguagePack::passes`).
     steps: Vec<&'a str>,
+    /// The constant the asked name or value refers to, while the walk is inside it.
+    held: Option<(&'a str, &'a str)>,
 }
 
 /// A call a value comes from (its file and position) and the calls of the functions the walk
@@ -2195,12 +2194,102 @@ impl<'a> ByName<'a> {
 /// it from that name. `const kafka = new Kafka(...)` with `Kafka` imported from `kafkajs`,
 /// then `const producer = kafka.producer()`, makes `producer` the origin `kafkajs`,
 /// `new Kafka().producer()`. A namespace import adds no name; a default import is `default`.
-pub struct Origin<'a> {
+/// `Code::origin`'s answer, rebuilt from the `Constants` origin.
+pub struct ConstOrigin<'a> {
     pub package: &'a str,
     pub expr: String,
     /// The constant the traced name refers to, as its file and qualified name; `None` when
     /// the name is the import itself.
     pub binding: Option<(&'a str, &'a str)>,
+}
+
+/// What `Code::origins` is asked about.
+#[derive(Clone, Copy)]
+pub enum Of<'a> {
+    /// A name or a member chain written in the scope (`router`, `self.client`).
+    Name(&'a str),
+    /// A value as written, such as a call's argument or the receiver of a method.
+    Value(&'a Value),
+}
+
+/// The evidence `Code::origins` accepts, which picks the walk. Each walk is its own, reads its
+/// own facts and charges what it reads.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Follow {
+    /// The value flow: constants and imports, the arguments exact callers pass to parameters,
+    /// what functions of the repository return, list items, a class attribute assigned once,
+    /// and in a fluent pack a builder chain down its receivers, kept only through methods the
+    /// library passes on (`LanguagePack::passes`). Charged to `EVAL_BUDGET`, at most
+    /// `EVAL_DEPTH` deep.
+    Values,
+    /// `const` bindings alone, through `new`, calls and the heads of callees, at most
+    /// `EVAL_DEPTH` constants deep: a parameter or a return value has no origin.
+    Constants,
+    /// What the source declares the name is (`Facts::receivers`): a written type, or the call it
+    /// was declared from, through the methods called on the way, at most `RECEIVER_DEPTH`
+    /// receivers deep.
+    Declarations,
+}
+
+/// How the maker of an origin is written.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Form {
+    /// A call: a constructor or factory, or a function of the repository whose written result
+    /// type is outside (`Declarations`).
+    Call,
+    /// A `new` (`Constants`).
+    New,
+    /// A written type (`Declarations`).
+    Type,
+    /// The bare name, uncalled (`Constants`).
+    Name,
+}
+
+/// What made a value (`Code::origins`), and every route the walk took to it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Origin<'a> {
+    /// The call that made the value, its file and position; `None` when it is read off a
+    /// declaration or a constant's expression.
+    pub call: Option<(&'a str, usize)>,
+    pub form: Form,
+    /// What the maker names outside the repository; `None` when it names nothing outside.
+    pub outside: Option<Outside<'a>>,
+    /// Sorted, at least one.
+    pub routes: Vec<Route<'a>>,
+}
+
+/// One route a walk took to an origin.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct Route<'a> {
+    /// The calls of the repository whose return values the walk climbed through, outermost
+    /// first: two objects one function makes differ by the call that made each.
+    pub through: Vec<(&'a str, usize)>,
+    /// The methods called on what was made, maker first (`kafka.producer()` is `producer`).
+    pub steps: Vec<&'a str>,
+    /// The constant the asked name refers to, its file and qualified name.
+    pub held: Option<(&'a str, &'a str)>,
+}
+
+/// What a name names outside the repository (`Code::outside`).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Outside<'a> {
+    /// The package and the name there, as the binding of the head resolves them through
+    /// re-exports (`Code::imported`): `None` for a method of a local made outside (`r.GET`).
+    pub imported: Option<(&'a str, String)>,
+    /// The name as the file's imports spell it (`fastapi.APIRouter`).
+    pub spelled: String,
+    /// Whether the head of the name is the import itself, not a value made from it.
+    pub direct: bool,
+}
+
+/// What the constants walk found: the maker's form, what it names outside, the methods called
+/// on what it made, the constant traced, and a member read off what was made, not yet called.
+struct Made<'a> {
+    form: Form,
+    outside: Outside<'a>,
+    steps: Vec<&'a str>,
+    held: Option<(&'a str, &'a str)>,
+    pending: Option<&'a str>,
 }
 
 impl<'a> Code<'a> {
@@ -2237,71 +2326,212 @@ impl<'a> Code<'a> {
     /// The origin of `chain`, a name or member chain (`a.b`) written in `path` within
     /// `scope`, through constants in the same file and imported ones: `None` unless it comes
     /// from an import of something outside the repository. Only `const` bindings are
-    /// followed; a parameter has no origin.
-    pub fn origin(&self, path: &'a str, scope: &'a str, chain: &'a str) -> Option<Origin<'a>> {
-        self.trace(path, scope, chain, &mut Vec::new())
+    /// followed; a parameter has no origin. The `Constants` origin, spelled as JavaScript
+    /// would write it.
+    pub fn origin(&self, path: &'a str, scope: &'a str, chain: &'a str) -> Option<ConstOrigin<'a>> {
+        let found = self.origins(path, scope, Of::Name(chain), Follow::Constants);
+        let origin = found.into_iter().next()?;
+        let (package, name) = origin.outside?.imported?;
+        let route = origin.routes.into_iter().next()?;
+        let mut expr = match origin.form {
+            Form::New => format!("new {name}()"),
+            Form::Call => format!("{name}()"),
+            Form::Type | Form::Name => name,
+        };
+        for step in &route.steps {
+            expr += &format!(".{step}()");
+        }
+        Some(ConstOrigin {
+            package,
+            expr,
+            binding: route.held,
+        })
     }
 
+    /// What made the value of `of`, written in `path` within `scope`, as far as `follow` lets
+    /// the walk see, sorted by the call that made each: one origin per call, each with every
+    /// route the walk took to it. `Constants` and `Declarations` give at most one origin, read
+    /// off a constant's expression or a declaration.
+    pub fn origins(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        of: Of<'a>,
+        follow: Follow,
+    ) -> Vec<Origin<'a>> {
+        match follow {
+            Follow::Values => {
+                let mut trail = Trail::default();
+                match of {
+                    Of::Name(name) => self.flow_name(path, scope, name, &mut trail),
+                    Of::Value(value) => self.flow(path, scope, value, &mut trail),
+                }
+                let origin = |((p, n), routes): ((&'a str, usize), BTreeSet<Route<'a>>)| {
+                    let call = &self.resolver.files[p].calls[n];
+                    Origin {
+                        call: Some((p, n)),
+                        form: Form::Call,
+                        outside: self.outside(p, &call.scope, &call.callee, call.by_path),
+                        routes: routes.into_iter().collect(),
+                    }
+                };
+                trail.out.into_iter().map(origin).collect()
+            }
+            Follow::Constants => {
+                let seen = &mut Vec::new();
+                let made = match of {
+                    Of::Name(chain) => self.trace(path, scope, chain, seen),
+                    Of::Value(value) => self.made_by(path, scope, value, seen),
+                };
+                // A member read off what was made and not called is no maker's method.
+                let made = made.filter(|m| m.pending.is_none());
+                (made.into_iter())
+                    .map(|m| Origin {
+                        call: None,
+                        form: m.form,
+                        outside: Some(m.outside),
+                        routes: vec![Route {
+                            through: Vec::new(),
+                            steps: m.steps,
+                            held: m.held,
+                        }],
+                    })
+                    .collect()
+            }
+            Follow::Declarations => {
+                let name = match of {
+                    Of::Name(name) => name,
+                    Of::Value(Value::Ref(name)) => name.as_str(),
+                    // A value as written declares nothing.
+                    Of::Value(_) => return Vec::new(),
+                };
+                let Some((form, outside, steps)) = self.declared(path, scope, name, 0) else {
+                    return Vec::new();
+                };
+                let held = match self.resolver.binding(path, scope, name) {
+                    Binding::Const(at, constant) => Some((at, constant)),
+                    _ => None,
+                };
+                vec![Origin {
+                    call: None,
+                    form,
+                    outside: Some(outside),
+                    routes: vec![Route {
+                        through: Vec::new(),
+                        steps,
+                        held,
+                    }],
+                }]
+            }
+        }
+    }
+
+    /// The constants walk of `chain`: its head an import, or a constant followed into the value
+    /// it holds, then its members. A member of what a call or a `new` made is pending until the
+    /// call it is the callee of; a second one, or one after a pending one, has no origin.
     fn trace(
         &self,
         path: &'a str,
         scope: &'a str,
         chain: &'a str,
         seen: &mut Vec<(&'a str, &'a str)>,
-    ) -> Option<Origin<'a>> {
+    ) -> Option<Made<'a>> {
         let mut members = chain.split('.');
         let head = members.next()?;
-        let mut origin =
+        let mut made =
             match self
                 .resolver
                 .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
             {
-                Binding::External(package, name) => Origin {
-                    package,
-                    expr: match name {
+                Binding::External(package, name) => {
+                    let name = match name {
                         Imported::Namespace => String::new(),
                         Imported::Name(name) | Imported::Member { name, .. } => name.clone(),
                         // A star import spells no name of its own.
                         Imported::All | Imported::Path(_) | Imported::Glob { .. } => {
                             return None;
                         }
-                    },
-                    binding: None,
-                },
+                    };
+                    let spelled = self.resolver.imported_name(path, scope, head);
+                    Made {
+                        form: Form::Name,
+                        outside: Outside {
+                            imported: Some((package, name)),
+                            spelled,
+                            direct: true,
+                        },
+                        steps: Vec::new(),
+                        held: None,
+                        pending: None,
+                    }
+                }
                 Binding::Const(at, constant) => {
-                    // `const a = b; const b = a;` comes from nowhere.
-                    if seen.contains(&(at, constant)) {
+                    // `const a = b; const b = a;` comes from nowhere, and a chain of constants
+                    // `EVAL_DEPTH` long from nothing known.
+                    if seen.contains(&(at, constant)) || seen.len() >= EVAL_DEPTH {
                         return None;
                     }
                     seen.push((at, constant));
                     let (value, within) = self.held(at, constant)?;
-                    let mut origin = match value {
-                        Value::Ref(name) => self.trace(at, within, name, seen)?,
-                        Value::Call(call) => {
-                            let callee = &call.callee;
-                            let mut origin = self.trace(at, within, callee, seen)?;
-                            origin.expr += "()";
-                            origin
-                        }
-                        Value::New(callee, _) => {
-                            let mut origin = self.trace(at, within, callee, seen)?;
-                            origin.expr = format!("new {}()", origin.expr);
-                            origin
-                        }
-                        _ => return None,
-                    };
-                    origin.binding = Some((at, constant));
-                    origin
+                    let mut made = self.made_by(at, within, value, seen)?;
+                    made.held = Some((at, constant));
+                    made
                 }
                 _ => return None,
             };
         for member in members {
-            if !origin.expr.is_empty() {
-                origin.expr.push('.');
+            match made.form {
+                Form::Name => {
+                    let outside = &mut made.outside;
+                    if let Some((_, name)) = &mut outside.imported {
+                        if !name.is_empty() {
+                            name.push('.');
+                        }
+                        *name += member;
+                    }
+                    outside.spelled = format!("{}.{member}", outside.spelled);
+                }
+                _ if made.pending.is_none() => made.pending = Some(member),
+                // An uncalled member of what was made.
+                _ => return None,
             }
-            origin.expr += member;
         }
-        Some(origin)
+        Some(made)
+    }
+
+    /// The constants walk of `value`, written in `path` within `scope`: a name, a call of one,
+    /// or a `new` of one. A call of a member of what was made is a step; a `new` is one of a
+    /// name alone, and what was made is not called again.
+    fn made_by(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        seen: &mut Vec<(&'a str, &'a str)>,
+    ) -> Option<Made<'a>> {
+        match value {
+            Value::Ref(name) => self.trace(path, scope, name, seen),
+            Value::Call(call) => {
+                let mut made = self.trace(path, scope, &call.callee, seen)?;
+                match (made.form, made.pending.take()) {
+                    (Form::Name, _) => made.form = Form::Call,
+                    (_, Some(step)) => made.steps.push(step),
+                    // What a call made, called again.
+                    (_, None) => return None,
+                }
+                Some(made)
+            }
+            Value::New(callee, _) => {
+                let mut made = self.trace(path, scope, callee, seen)?;
+                // A `new` after steps.
+                if made.form != Form::Name {
+                    return None;
+                }
+                made.form = Form::New;
+                Some(made)
+            }
+            _ => None,
+        }
     }
 
     /// The import the head of `chain`, a callee written in `path` within `scope`, names when
@@ -2314,12 +2544,23 @@ impl<'a> Code<'a> {
         scope: &'a str,
         chain: &'a str,
     ) -> Option<(&'a str, String)> {
+        self.imported_as(path, scope, chain, Reading::Any)
+    }
+
+    /// `imported`, its head read as `reading` says.
+    fn imported_as(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        chain: &'a str,
+        reading: Reading,
+    ) -> Option<(&'a str, String)> {
         let (head, members) = chain
             .split_once('.')
             .map_or((chain, None), |(h, m)| (h, Some(m)));
+        let seen = &mut self.resolver.seen(path, scope);
         let Binding::External(specifier, name) =
-            self.resolver
-                .lexical(path, scope, head, &mut self.resolver.seen(path, scope))
+            self.resolver.lexical_as(path, scope, head, seen, reading)
         else {
             return None;
         };
@@ -2458,13 +2699,45 @@ impl<'a> Code<'a> {
         self.resolver.globals.contains(&name)
     }
 
+    /// What `name` (a callee, a decorator, a written type), written in `scope` of `path`, names
+    /// outside the repository, when an import from outside binds it: the package and name the
+    /// head's import resolves to, the name as the file's imports spell it, and whether the head
+    /// is the import itself. With `by_path`, the name is a path (Rust's `a::b::f()`) whose head
+    /// is read among types and modules, so a function of the file that spells like a crate
+    /// (`fn rocket()` calling `rocket::build()`) does not hide it.
+    pub fn outside(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        by_path: bool,
+    ) -> Option<Outside<'a>> {
+        let r = self.resolver;
+        let (reading, head_reading) = match by_path {
+            true => (Reading::Path, Reading::Path),
+            false => (Reading::Value, Reading::Any),
+        };
+        let external = |name| {
+            let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
+            let found = r.resolve_as(path, scope, name, seen, work, reading);
+            matches!(found, Binding::External(..))
+        };
+        if !external(name) {
+            return None;
+        }
+        let head = name.split_once('.').map_or(name, |(head, _)| head);
+        Some(Outside {
+            imported: self.imported_as(path, scope, name, head_reading),
+            spelled: r.imported_name(path, scope, name),
+            direct: external(head),
+        })
+    }
+
     /// What `callee`, written in `scope` of `path`, names outside the repository: the module
     /// and name the file's imports give it (`fastapi.APIRouter`), when an import from outside
     /// the repository binds it.
     pub fn external(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        let binding = self.resolver.binding(path, scope, callee);
-        matches!(binding, Binding::External(..))
-            .then(|| self.resolver.imported_name(path, scope, callee))
+        Some(self.outside(path, scope, callee, false)?.spelled)
     }
 
     /// What `callee` (`pkg.Name`), written in `scope` of `path`, names in a package outside the
@@ -2472,52 +2745,70 @@ impl<'a> Code<'a> {
     /// name whose class is one of the package (`e := other()` with `e.Default()`), which
     /// `external` also reads as the package's.
     pub fn outside_call(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-        let head = callee.split_once('.').map_or(callee, |(head, _)| head);
-        self.external(path, scope, head)?;
-        self.external(path, scope, callee)
+        let outside = self.outside(path, scope, callee, false)?;
+        outside.direct.then_some(outside.spelled)
     }
 
     /// The outside type a type the source writes (`http.Client`), read in `scope` of `path`, is,
     /// spelled as the imports name its package (`net/http.Client`).
-    fn outside_written(&self, path: &'a str, scope: &'a str, written: &'a str) -> Option<String> {
+    fn outside_written(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        written: &'a str,
+    ) -> Option<Outside<'a>> {
         let r = self.resolver;
         let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
         let found = r.resolve_as(path, scope, written, seen, work, Reading::Path);
         let Binding::External(package, _) = found else {
             return None;
         };
-        Some(format!("{package}.{}", written.rsplit('.').next()?))
+        let name = written.rsplit('.').next()?;
+        Some(Outside {
+            imported: Some((package, name.to_string())),
+            spelled: format!("{package}.{name}"),
+            direct: true,
+        })
     }
 
     /// The type outside the repository that the source writes for the name `name` (`c *http.Client`
     /// is `net/http.Client`), written in `scope` of `path`: a parameter, a local, a constant or a
     /// field. A type is written as a path, so an import in the file that writes it names the
-    /// package.
+    /// package. The `Declarations` origin of the form `Type`, with no steps.
     pub fn outside_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
-        let binding = self.resolver.binding(path, scope, name);
-        let (at, within, held) = self.resolver.holder(&binding)?;
-        let Class::Type(written) = self.resolver.receivers[at].get(&(within, held))? else {
-            return None;
-        };
-        self.outside_written(at, within, written)
+        let found = self.origins(path, scope, Of::Name(name), Follow::Declarations);
+        let origin = found.into_iter().next()?;
+        let typed = origin.form == Form::Type && origin.routes.iter().all(|r| r.steps.is_empty());
+        typed.then_some(origin.outside?.spelled)
     }
 
     /// What the source says the value `name` (a parameter, a local, a constant or a field), written
     /// in `scope` of `path`, is made by outside the repository, spelled as the imports name it: a
     /// type it is written as (`github.com/segmentio/kafka-go.Writer`), or the function that made
     /// it, with the methods called on the way (`github.com/rabbitmq/amqp091-go.Dial.Channel`).
-    /// A function of the repository stands for the type it writes as its result.
+    /// A function of the repository stands for the type it writes as its result. The
+    /// `Declarations` origin, spelled.
     pub fn outside_origin(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
-        self.outside_from(path, scope, name, 0)
+        let found = self.origins(path, scope, Of::Name(name), Follow::Declarations);
+        let origin = found.into_iter().next()?;
+        let mut spelled = origin.outside?.spelled;
+        for step in &origin.routes.first()?.steps {
+            spelled = format!("{spelled}.{step}");
+        }
+        Some(spelled)
     }
 
-    fn outside_from(
+    /// The declarations walk of `name`: the type the source writes for it, or the call it is
+    /// declared from (a function of a package, a function of the repository whose result type
+    /// is outside, or a method of a value declared so in turn, a step), at most `RECEIVER_DEPTH`
+    /// receivers deep.
+    fn declared(
         &self,
         path: &'a str,
         scope: &'a str,
         name: &'a str,
         depth: usize,
-    ) -> Option<String> {
+    ) -> Option<(Form, Outside<'a>, Vec<&'a str>)> {
         if depth >= RECEIVER_DEPTH {
             return None;
         }
@@ -2525,25 +2816,31 @@ impl<'a> Code<'a> {
         let binding = r.binding(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
-            Class::Type(_) => self.outside_type(path, scope, name),
+            Class::Type(written) => {
+                let outside = self.outside_written(at, within, written)?;
+                Some((Form::Type, outside, Vec::new()))
+            }
             Class::Called(callee) => {
                 if callee.contains('.')
-                    && let Some(function) = self.outside_call(at, within, callee)
+                    && let Some(function) = self.outside(at, within, callee, false)
+                    && function.direct
                 {
                     // A function of a package.
-                    return Some(function);
+                    return Some((Form::Call, function, Vec::new()));
                 }
                 if let Binding::Def(t) = r.binding(at, within, callee) {
                     // A function of the repository: the type its result writes.
                     let Some(Class::Type(written)) = &r.defs[t.path][t.name].result else {
                         return None;
                     };
-                    return self.outside_written(t.path, t.name, written);
+                    let outside = self.outside_written(t.path, t.name, written)?;
+                    return Some((Form::Call, outside, Vec::new()));
                 }
                 // A method of a value that was made outside.
                 let (receiver, member) = callee.rsplit_once('.')?;
-                let made = self.outside_from(at, within, receiver, depth + 1)?;
-                Some(format!("{made}.{member}"))
+                let (form, outside, mut steps) = self.declared(at, within, receiver, depth + 1)?;
+                steps.push(member);
+                Some((form, outside, steps))
             }
             _ => None,
         }
@@ -2626,16 +2923,11 @@ impl<'a> Code<'a> {
         self.resolver.written.contains(field)
     }
 
-    /// `external` of the callee of `call`, written in `path`. A path call (Rust's `a::b::f()`) has
-    /// its head among types and modules, so a function of the file that spells like a crate
-    /// (`fn rocket()` calling `rocket::build()`) does not hide it.
+    /// `external` of the callee of `call`, written in `path`, read as a path when the call is
+    /// one (`Code::outside` with `Call::by_path`).
     pub fn external_of(&self, path: &'a str, call: &'a Call) -> Option<String> {
-        if !call.by_path {
-            return self.external(path, &call.scope, &call.callee);
-        }
-        let binding = self.resolver.path_binding(path, &call.scope, &call.callee);
-        matches!(binding, Binding::External(..))
-            .then(|| self.resolver.imported_name(path, &call.scope, &call.callee))
+        let outside = self.outside(path, &call.scope, &call.callee, call.by_path)?;
+        Some(outside.spelled)
     }
 
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
@@ -2679,37 +2971,44 @@ impl<'a> Code<'a> {
     /// functions of the repository return and the items of a list or tuple. A call that
     /// reaches no such function is where the value comes from, such as a constructor
     /// (`APIRouter()`); whatever else the name may hold (an assignment that is not its only
-    /// binding, an attribute) is left out.
-    pub fn origins(&self, path: &'a str, scope: &'a str, name: &'a str) -> Vec<(&'a str, usize)> {
-        let mut trail = Trail::default();
-        self.flow_name(path, scope, name, &mut trail);
-        trail.out.into_iter().collect()
+    /// binding, an attribute) is left out. The calls of the `Values` origins.
+    pub fn name_origins(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Vec<(&'a str, usize)> {
+        let found = self.origins(path, scope, Of::Name(name), Follow::Values);
+        found.into_iter().filter_map(|o| o.call).collect()
     }
 
     /// `value_origins` with, for each origin, the calls of the functions of the repository the
     /// walk went through to reach it, outermost first: two objects the same function makes
-    /// differ by the call that made each.
+    /// differ by the call that made each. The climbed calls of each route of the `Values`
+    /// origins.
     pub fn value_origins_through(
         &self,
         path: &'a str,
         scope: &'a str,
         value: &'a Value,
     ) -> Vec<Through<'a>> {
-        let mut trail = Trail::default();
-        self.flow(path, scope, value, &mut trail);
-        trail.through.into_iter().collect()
+        let mut out = BTreeSet::new();
+        for origin in self.origins(path, scope, Of::Value(value), Follow::Values) {
+            let Some(call) = origin.call else { continue };
+            out.extend(origin.routes.into_iter().map(|r| (call, r.through)));
+        }
+        out.into_iter().collect()
     }
 
-    /// `origins` of a value as written.
+    /// `name_origins` of a value as written.
     pub fn value_origins(
         &self,
         path: &'a str,
         scope: &'a str,
         value: &'a Value,
     ) -> Vec<(&'a str, usize)> {
-        let mut trail = Trail::default();
-        self.flow(path, scope, value, &mut trail);
-        trail.out.into_iter().collect()
+        let found = self.origins(path, scope, Of::Value(value), Follow::Values);
+        found.into_iter().filter_map(|o| o.call).collect()
     }
 
     /// Whether `trail` may follow `flow`: not one it is following (a cycle), at most
@@ -2756,8 +3055,9 @@ impl<'a> Code<'a> {
                     // The methods the chain went through hand back the object they were called
                     // on only for the library the chain starts at (`LanguagePack::passes`): a
                     // value derived from a client (`resp.headers()`) is not a client.
+                    // An origin filtered out goes with every route this chain found to it.
                     let steps = trail.steps.split_off(mark);
-                    trail.out.retain(|&(p, n)| {
+                    trail.out.retain(|&(p, n), _| {
                         let call = &self.resolver.files[p].calls[n];
                         match self.external_of(p, call) {
                             Some(origin) => steps.iter().all(|m| self.pack.passes(&origin, m)),
@@ -2767,12 +3067,14 @@ impl<'a> Code<'a> {
                 }
                 if let Some(mut kept) = kept {
                     let outside = !matched
-                        || (trail.out.iter()).all(|&(p, n)| {
+                        || (trail.out.keys()).all(|&(p, n)| {
                             let call = &self.resolver.files[p].calls[n];
                             self.external_of(p, call).is_some()
                         });
                     if outside {
-                        kept.append(&mut trail.out);
+                        for (origin, routes) in std::mem::take(&mut trail.out) {
+                            kept.entry(origin).or_default().extend(routes);
+                        }
                     }
                     trail.out = kept;
                 }
@@ -2786,11 +3088,16 @@ impl<'a> Code<'a> {
         }
     }
 
-    /// Records the call at `index` of `path` as an origin, with the calls the walk came through.
+    /// Records the call at `index` of `path` as an origin, with the route the walk came by: the
+    /// calls it climbed, the methods of the chains it went down (maker first) and the constant
+    /// asked for.
     fn reached(&self, path: &'a str, index: usize, trail: &mut Trail<'a>) {
-        trail.out.insert((path, index));
-        let frames = trail.frames.iter().map(|f| (f.path, f.index)).collect();
-        trail.through.insert(((path, index), frames));
+        let route = Route {
+            through: trail.frames.iter().map(|f| (f.path, f.index)).collect(),
+            steps: trail.steps.iter().rev().copied().collect(),
+            held: trail.held,
+        };
+        trail.out.entry((path, index)).or_default().insert(route);
     }
 
     /// The origins of the call at `index` of `path`, where a chain stops: what a function of
@@ -2926,9 +3233,17 @@ impl<'a> Code<'a> {
                 if !self.follows(trail, &Flow::Const(at, constant)) {
                     return;
                 }
+                // Followed from nothing else, it is the constant the asked name refers to.
+                let asked = trail.busy.is_empty();
+                if asked {
+                    trail.held = Some((at, constant));
+                }
                 trail.busy.push(Flow::Const(at, constant));
                 self.flow(at, crate::parent(constant), &found.value, trail);
                 trail.busy.pop();
+                if asked {
+                    trail.held = None;
+                }
             }
             Binding::Param(function, n, None) => {
                 // Inside a function whose return value is followed, its call binds the
@@ -3220,8 +3535,8 @@ impl<'a> Code<'a> {
     /// What `read` makes of the positional and keyword arguments of `from`, at each call site
     /// that determines them, with the wrapper calls climbed from the call to each site. `from`
     /// is a call, or the `new` expression a `const` holds on behalf of a call made on that
-    /// constant (`Origin::binding`): the call is the site when the arguments evaluate where the
-    /// constant stands, and the function enclosing the constant is the client wrapper when they
+    /// constant (`ConstOrigin::binding`): the call is the site when the arguments evaluate where
+    /// the constant stands, and the function enclosing the constant is the client wrapper when they
     /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
     /// parameter of the enclosing function, which makes that function a client wrapper. Each
     /// call site of the wrapper is then read with its own arguments substituted, through any
@@ -3562,7 +3877,10 @@ mod tests {
             let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
             let resolver = Resolver::new(&files, modules, &Go);
             let code = Code::new(&resolver, &files, &Go);
-            code.outside_origin("x.go", "f", "x0")
+            let found = code.origins("x.go", "f", Of::Name("x0"), Follow::Declarations);
+            let origin = found.into_iter().next()?;
+            let steps = origin.routes[0].steps.iter().map(|s| format!(".{s}"));
+            Some(origin.outside?.spelled + &steps.collect::<String>())
         };
         assert!(origin(3).unwrap().ends_with("Dial.M.M.M"));
         assert!(origin(RECEIVER_DEPTH - 1).is_some());
@@ -3971,7 +4289,8 @@ mod tests {
         let start = std::time::Instant::now();
         for name in &names {
             assert_eq!(code.imported("a.py", "", name), Some(("ext", name.clone())));
-            assert_eq!(code.external("a.py", "", name), Some(format!("ext.{name}")));
+            let outside = code.outside("a.py", "", name, false);
+            assert_eq!(outside.map(|o| o.spelled), Some(format!("ext.{name}")));
         }
         // Each call looked its name up among the file's imports one by one, for the import,
         // for whether a path import exists and for the name it spells: minutes here.
@@ -4115,7 +4434,8 @@ mod tests {
             assert_eq!(code.type_params("a.py", name), ["T"]);
             assert!(code.param_defaults_to("a.py", name, "x", "d"));
             assert_eq!(code.returned("a.py", i).len(), 1);
-            assert!(code.value_origins("a.py", "", &invoked[i]).is_empty());
+            let found = code.origins("a.py", "", Of::Value(&invoked[i]), Follow::Values);
+            assert!(found.is_empty());
         }
         // Each function was looked up among the file's definitions one by one, for its return
         // type, its type parameters, its parameter, its return values and the flow through
@@ -4151,7 +4471,10 @@ mod tests {
             assert!(code.constant("a.py", "", name).is_some());
             assert!(code.constant_type("a.py", name).is_none());
             assert!(code.declared_type("a.py", "", name).is_none());
-            assert!(code.origins("a.py", "", name).is_empty());
+            assert!(
+                code.origins("a.py", "", Of::Name(name), Follow::Values)
+                    .is_empty()
+            );
         }
         // Each constant was looked up among the file's constants one by one, for its value, its
         // type, its declaration and the flow through it: minutes here.
@@ -4822,9 +5145,11 @@ mod tests {
         let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Python);
         let code = Code::new(&resolver, &files, &Python);
-        (code.origins("a.py", "", "p").into_iter())
-            .map(|(_, n)| facts.calls[n].callee.clone())
-            .collect()
+        (code
+            .origins("a.py", "", Of::Name("p"), Follow::Values)
+            .into_iter())
+        .map(|o| facts.calls[o.call.unwrap().1].callee.clone())
+        .collect()
     }
 
     #[test]
@@ -5251,29 +5576,83 @@ mod tests {
         src[call.range.clone()].to_string()
     }
 
-    /// One line per origin: its file and callee, `= name` when it names something outside the
-    /// repository (as the file's imports spell it), and ` via call` for each call of the
-    /// repository the walk climbed through to reach it, outermost first.
-    fn origin_lines<'a>(
-        code: &Code<'a>,
-        sources: &[(&'static str, &str)],
-        found: Vec<Through<'a>>,
-    ) -> Vec<String> {
-        let line = |((path, n), frames): Through<'a>| {
-            let call = code.call(path, n).unwrap();
-            let mut line = format!("{path} {}", call.callee);
-            if let Some(outside) = code.external_of(path, call) {
-                line += &format!(" = {outside}");
-            }
-            for (at, index) in frames {
-                line += &format!(" via {}", written(code, sources, at, index));
-            }
-            line
-        };
-        found.into_iter().map(line).collect()
+    /// What `origin_lines` shows of each route.
+    #[derive(Clone, Copy)]
+    enum Shown {
+        /// Nothing: one line per origin.
+        Nothing,
+        /// The calls climbed: one line per origin and climb.
+        Through,
+        /// Everything (`route_line`): one line per origin and route.
+        All,
     }
 
-    /// What the name `name` written in `scope` of `path` may hold: `Code::origins`.
+    /// One line per origin and route, as far as `shown` tells routes apart: its file and callee,
+    /// `= name` when it names something outside the repository (as the file's imports spell
+    /// it), then what `route_line` renders of what is shown of the route. Two routes that differ
+    /// only in what is not shown give one line; two that differ in what is shown give two, even
+    /// when they render alike (two calls written alike at different sites).
+    fn origin_lines<'a>(
+        code: &Code<'a>,
+        sources: &[(&str, &str)],
+        found: Vec<Origin<'a>>,
+        shown: Shown,
+    ) -> Vec<String> {
+        let mut lines = Vec::new();
+        for origin in found {
+            let (path, n) = origin.call.unwrap();
+            let mut head = format!("{path} {}", code.call(path, n).unwrap().callee);
+            if let Some(outside) = &origin.outside {
+                head += &format!(" = {}", outside.spelled);
+            }
+            let mut own: Vec<Route> = Vec::new();
+            for route in origin.routes {
+                let route = match shown {
+                    Shown::Nothing => Route {
+                        through: Vec::new(),
+                        steps: Vec::new(),
+                        held: None,
+                    },
+                    Shown::Through => Route {
+                        steps: Vec::new(),
+                        held: None,
+                        ..route
+                    },
+                    Shown::All => route,
+                };
+                if !own.contains(&route) {
+                    own.push(route);
+                }
+            }
+            lines.extend(
+                own.iter()
+                    .map(|r| format!("{head}{}", route_line(code, sources, r))),
+            );
+        }
+        lines
+    }
+
+    /// ` via call` for each call of the repository a route climbed through, outermost first.
+    fn via(code: &Code, sources: &[(&str, &str)], route: &Route) -> String {
+        let calls = route.through.iter();
+        calls
+            .map(|&(at, index)| format!(" via {}", written(code, sources, at, index)))
+            .collect()
+    }
+
+    /// Everything a route carries: ` steps=a,b` (maker first), ` held=file:name`, then `via`.
+    fn route_line(code: &Code, sources: &[(&str, &str)], route: &Route) -> String {
+        let mut line = String::new();
+        if !route.steps.is_empty() {
+            line += &format!(" steps={}", route.steps.join(","));
+        }
+        if let Some((file, name)) = route.held {
+            line += &format!(" held={file}:{name}");
+        }
+        line + &via(code, sources, route)
+    }
+
+    /// What the name `name` written in `scope` of `path` may hold: the `Values` origins.
     fn held_by(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
@@ -5283,8 +5662,23 @@ mod tests {
     ) -> Vec<String> {
         over(pack, sources, |code| {
             let path = code.files().get_key_value(path).unwrap().0;
-            let found = code.origins(path, scope, name).into_iter();
-            origin_lines(code, sources, found.map(|o| (o, Vec::new())).collect())
+            let found = code.origins(path, scope, Of::Name(name), Follow::Values);
+            origin_lines(code, sources, found, Shown::Nothing)
+        })
+    }
+
+    /// `held_by` with every route in full (`route_line`).
+    fn routes_of(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+        scope: &'static str,
+        name: &'static str,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let found = code.origins(path, scope, Of::Name(name), Follow::Values);
+            origin_lines(code, sources, found, Shown::All)
         })
     }
 
@@ -5296,36 +5690,47 @@ mod tests {
         (call.scope.as_str(), &call.args[0])
     }
 
-    /// What the value written as the argument of `probe(..)` in `path` may hold:
-    /// `Code::value_origins`.
+    /// The `Values` origins of the value written as the argument of `probe(..)` in `path`, as
+    /// `origin_lines` shows them.
+    fn probe_lines(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+        shown: Shown,
+    ) -> Vec<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let (scope, value) = probed(code, path);
+            let found = code.origins(path, scope, Of::Value(value), Follow::Values);
+            origin_lines(code, sources, found, shown)
+        })
+    }
+
+    /// What the value written as the argument of `probe(..)` in `path` may hold.
     fn held_by_value(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
         path: &'static str,
     ) -> Vec<String> {
-        over(pack, sources, |code| {
-            let path = code.files().get_key_value(path).unwrap().0;
-            let (scope, value) = probed(code, path);
-            let found = code.value_origins(path, scope, value).into_iter();
-            origin_lines(code, sources, found.map(|o| (o, Vec::new())).collect())
-        })
+        probe_lines(pack, sources, path, Shown::Nothing)
     }
 
-    /// The same with the calls climbed: `Code::value_origins_through`.
+    /// The same with the calls climbed, one line per distinct climb.
     fn held_through(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
         path: &'static str,
     ) -> Vec<String> {
-        over(pack, sources, |code| {
-            let path = code.files().get_key_value(path).unwrap().0;
-            let (scope, value) = probed(code, path);
-            origin_lines(
-                code,
-                sources,
-                code.value_origins_through(path, scope, value),
-            )
-        })
+        probe_lines(pack, sources, path, Shown::Through)
+    }
+
+    /// The same with every route in full (`route_line`).
+    fn probe_routes(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+    ) -> Vec<String> {
+        probe_lines(pack, sources, path, Shown::All)
     }
 
     fn ts() -> &'static dyn LanguagePack {
@@ -5344,10 +5749,9 @@ mod tests {
         &crate::lang::go::Go
     }
 
-    /// One line per callee written in `path`: what the file's imports spell it as (`external`),
-    /// the same read as a path (`external_of`), whether its head is the import itself
-    /// (`outside_call`), and the package and name the import binds (`imported`). `-` for a
-    /// reading that gives nothing.
+    /// One line per callee written in `path`, read by `Code::outside`: what the file's imports
+    /// spell it as, the same read as a path, whether its head is the import itself, and the
+    /// package and name the import binds (`imported`). `-` for a reading that gives nothing.
     fn read_names(
         pack: &'static dyn LanguagePack,
         sources: &[(&'static str, &str)],
@@ -5359,13 +5763,15 @@ mod tests {
             let mut lines = Vec::new();
             for call in &code.files()[path].calls {
                 let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
+                let read = code.outside(path, scope, callee, false);
+                let by_path = code.outside(path, scope, callee, call.by_path);
                 let imported = (code.imported(path, scope, callee))
                     .map(|(package, name)| format!("{package} {name}"));
                 lines.push(format!(
                     "{callee}: external={} by_path={} direct={} import={}",
-                    or_none(code.external(path, scope, callee)),
-                    or_none(code.external_of(path, call)),
-                    code.outside_call(path, scope, callee).is_some(),
+                    or_none(read.as_ref().map(|o| o.spelled.clone())),
+                    or_none(by_path.map(|o| o.spelled)),
+                    read.is_some_and(|o| o.direct),
                     or_none(imported),
                 ));
             }
@@ -5373,8 +5779,31 @@ mod tests {
         })
     }
 
-    /// The origin `chain` of `scope` in `a.ts` has: the package, how the code would write what
-    /// it made, and the constant the name refers to (`held file:name`).
+    /// `Code::outside` of the callee `callee` of `path` in full: `imported` (package and name),
+    /// the spelling and `direct`.
+    fn outside_of(
+        pack: &'static dyn LanguagePack,
+        sources: &[(&'static str, &str)],
+        path: &'static str,
+        callee: &str,
+        by_path: bool,
+    ) -> Option<String> {
+        over(pack, sources, |code| {
+            let path = code.files().get_key_value(path).unwrap().0;
+            let calls = code.files()[path].calls.iter();
+            let call = calls.into_iter().find(|c| c.callee == callee).unwrap();
+            let outside = code.outside(path, &call.scope, &call.callee, by_path)?;
+            let imported = (outside.imported).map_or("-".into(), |(p, n)| format!("{p} {n}"));
+            Some(format!(
+                "{imported}; {}; direct={}",
+                outside.spelled, outside.direct
+            ))
+        })
+    }
+
+    /// The `Constants` origin `chain` of `scope` in `a.ts` has: the package, how the code would
+    /// write what it made (rebuilt from the form, the name and the steps), and the constant the
+    /// name refers to (`held file:name`).
     fn constant_origin(
         sources: &[(&'static str, &str)],
         scope: &'static str,
@@ -5382,23 +5811,59 @@ mod tests {
     ) -> Option<String> {
         over(ts(), sources, |code| {
             let path = code.files().get_key_value("a.ts").unwrap().0;
-            let origin = code.origin(path, scope, chain)?;
-            let held = (origin.binding).map_or(String::new(), |(f, n)| format!(" held {f}:{n}"));
-            Some(format!("{} {}{held}", origin.package, origin.expr))
+            let mut found = code.origins(path, scope, Of::Name(chain), Follow::Constants);
+            assert!(found.len() <= 1);
+            let origin = found.pop()?;
+            assert_eq!(origin.call, None);
+            let [route] = &origin.routes[..] else {
+                panic!("one route");
+            };
+            assert!(route.through.is_empty());
+            let (package, name) = origin.outside?.imported?;
+            let mut expr = match origin.form {
+                Form::New => format!("new {name}()"),
+                Form::Call => format!("{name}()"),
+                Form::Name => name,
+                Form::Type => panic!("no written type among constants"),
+            };
+            for step in &route.steps {
+                expr += &format!(".{step}()");
+            }
+            let held = (route.held).map_or(String::new(), |(f, n)| format!(" held {f}:{n}"));
+            Some(format!("{package} {expr}{held}"))
         })
     }
 
-    /// What the Go source `src` declares `name` of `scope` to be outside the repository: the
-    /// origin (`outside_origin`) and the written type (`outside_type`).
+    /// What the Go source `src` declares `name` of `scope` to be outside the repository, the
+    /// `Declarations` origin: spelled with its steps, and the written type (the form `Type` with
+    /// no steps).
     fn declared(src: &str, scope: &'static str, name: &'static str) -> String {
+        let (origin, written, _) = declared_form(src, scope, name);
+        format!("origin={origin} type={written}")
+    }
+
+    /// `declared`, and the form of the origin (`-` for none).
+    fn declared_form(
+        src: &str,
+        scope: &'static str,
+        name: &'static str,
+    ) -> (String, String, String) {
         over(go(), &[("a.go", src)], |code| {
             let path = code.files().get_key_value("a.go").unwrap().0;
-            let or_none = |s: Option<String>| s.unwrap_or_else(|| "-".into());
-            let origin = or_none(code.outside_origin(path, scope, name));
-            format!(
-                "origin={origin} type={}",
-                or_none(code.outside_type(path, scope, name))
-            )
+            let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
+            let none = || "-".to_string();
+            let Some(origin) = found.into_iter().next() else {
+                return (none(), none(), none());
+            };
+            let [route] = &origin.routes[..] else {
+                panic!("one route");
+            };
+            let spelled = origin.outside.unwrap().spelled;
+            let typed = origin.form == Form::Type && route.steps.is_empty();
+            let written = if typed { spelled.clone() } else { none() };
+            let steps = route.steps.iter().map(|s| format!(".{s}"));
+            let full = spelled + &steps.collect::<String>();
+            (full, written, format!("{:?}", origin.form))
         })
     }
 
@@ -5547,6 +6012,12 @@ mod tests {
             held_through(py(), &sources, "a.py"),
             ["a.py Client via mk('x')", "a.py Client via mk('y')"]
         );
+        // Two calls written alike at two sites are two climbs.
+        let alike = "def mk(u):\n    return Client(u)\n\na = mk('x')\nb = mk('x')\nprobe([a, b])\n";
+        assert_eq!(
+            held_through(py(), &[("a.py", alike)], "a.py"),
+            ["a.py Client via mk('x')", "a.py Client via mk('x')"]
+        );
     }
 
     #[test]
@@ -5607,7 +6078,7 @@ mod tests {
         )
     }
 
-    /// What `r` of `axum_main(defs, body)` may hold: `value_origins`, then `value_origins_through`.
+    /// What `r` of `axum_main(defs, body)` may hold: `held_by_value`, then `held_through`.
     fn built(defs: &str, body: &str) -> (Vec<String>, Vec<String>) {
         let src = axum_main(defs, body);
         let sources = [("main.rs", src.as_str())];
@@ -5812,11 +6283,9 @@ mod tests {
             origin("kafka").unwrap(),
             "kafkajs new Kafka() held a.ts:kafka"
         );
-        // A member after the constant is spelled after its chain.
-        assert_eq!(
-            origin("producer.send").unwrap(),
-            "kafkajs new Kafka().producer().send held a.ts:producer"
-        );
+        // A member after the constant, not called, is no step of what was made: no origin (the
+        // old spelling wrote it `new Kafka().producer().send`; no form reads it).
+        assert_eq!(origin("producer.send"), None);
     }
 
     #[test]
@@ -5909,6 +6378,172 @@ mod tests {
             "{head}type T struct{{}}\nfunc mk() *T {{ return nil }}\nfunc f() {{\n\tw := mk()\n}}\n"
         );
         assert_eq!(declared(&local, "f", "w"), "origin=- type=-");
+    }
+
+    // What only the one origin question carries (spec #204).
+
+    #[test]
+    fn a_builder_chain_carries_its_steps_maker_first() {
+        let src = axum_main(
+            "",
+            "let r = Router::new().route(\"/a\", get(h)).nest(\"/b\", x);",
+        );
+        let found = probe_routes(rust(), &[("main.rs", &src)], "main.rs");
+        assert_eq!(
+            found,
+            [format!("{ROUTER} steps=route,nest held=main.rs:main.r")]
+        );
+        // Down a function of the repository: its chain's methods come first.
+        let defs = "fn make() -> Router { Router::new().layer(l) }\n";
+        let src = axum_main(defs, "let r = make().route(\"/a\");");
+        let found = probe_routes(rust(), &[("main.rs", &src)], "main.rs");
+        assert_eq!(
+            found,
+            [format!(
+                "{ROUTER} steps=layer,route held=main.rs:main.r via make()"
+            )]
+        );
+    }
+
+    #[test]
+    fn each_route_holds_the_constant_the_asked_name_refers_to() {
+        let sources = [("a.py", "p = make()\n")];
+        assert_eq!(
+            routes_of(py(), &sources, "a.py", "", "p"),
+            ["a.py make held=a.py:p"]
+        );
+        // The items of a list asked as a value are each their own constant.
+        let list = [("a.py", "a = Alpha()\nb = Beta()\nprobe([a, b])\n")];
+        let found = probe_routes(py(), &list, "a.py");
+        assert_eq!(found, ["a.py Alpha held=a.py:a", "a.py Beta held=a.py:b"]);
+        // The same inputs give the same origins in the same order.
+        assert_eq!(probe_routes(py(), &list, "a.py"), found);
+        // Asked by name, the list is the constant.
+        let named = [("a.py", "a = Alpha()\nb = Beta()\np = [b, a]\n")];
+        assert_eq!(
+            routes_of(py(), &named, "a.py", "", "p"),
+            ["a.py Alpha held=a.py:p", "a.py Beta held=a.py:p"]
+        );
+        // A parameter is no constant, whatever its caller passes.
+        let param = [(
+            "a.py",
+            "def wrap(r):\n    return r\n\nx = Alpha()\nwrap(x)\n",
+        )];
+        assert_eq!(routes_of(py(), &param, "a.py", "wrap", "r"), ["a.py Alpha"]);
+    }
+
+    #[test]
+    fn the_name_reading_carries_the_package_the_spelling_and_whether_the_head_is_the_import() {
+        let py_files = [
+            ("b.py", "from fastapi import APIRouter as Base\n"),
+            ("a.py", "from b import Base as R\nR()\n"),
+        ];
+        assert_eq!(
+            outside_of(py(), &py_files, "a.py", "R", false).unwrap(),
+            "fastapi APIRouter; b.Base; direct=true"
+        );
+        let src = "package x\nimport \"github.com/gin-gonic/gin\"\nfunc f() {\n\
+                   \tr := gin.Default()\n\tr.GET(\"/a\", h)\n}\n";
+        let gin = "github.com/gin-gonic/gin";
+        let go_files = [("a.go", src)];
+        assert_eq!(
+            outside_of(go(), &go_files, "a.go", "gin.Default", false).unwrap(),
+            format!("{gin} Default; {gin}.Default; direct=true")
+        );
+        // A method of a local made outside: no import names its head.
+        assert_eq!(
+            outside_of(go(), &go_files, "a.go", "r.GET", false).unwrap(),
+            "-; r.GET; direct=false"
+        );
+        // A path-written callee whose head a local function spells is outside only by path.
+        let rocket = [(
+            "main.rs",
+            "fn rocket() {}\nfn main() { rocket::build(); }\n",
+        )];
+        assert_eq!(
+            outside_of(rust(), &rocket, "main.rs", "rocket.build", false),
+            None
+        );
+        assert_eq!(
+            outside_of(rust(), &rocket, "main.rs", "rocket.build", true).unwrap(),
+            "rocket build; rocket.build; direct=true"
+        );
+    }
+
+    #[test]
+    fn a_written_type_is_the_form_type_and_a_repository_functions_result_type_the_form_call() {
+        let head = "package x\nimport \"github.com/segmentio/kafka-go\"\n";
+        let kafka = "github.com/segmentio/kafka-go.Writer";
+        let typed = format!("{head}func f(w *kafka.Writer) {{}}\n");
+        assert_eq!(
+            declared_form(&typed, "f", "w"),
+            (kafka.to_string(), kafka.to_string(), "Type".to_string())
+        );
+        let made = format!(
+            "{head}func mk() *kafka.Writer {{ return nil }}\nfunc f() {{\n\tw := mk()\n}}\n"
+        );
+        assert_eq!(
+            declared_form(&made, "f", "w"),
+            (kafka.to_string(), "-".to_string(), "Call".to_string())
+        );
+        // A method of a value a package's function made: the form of that call, with the step.
+        let src = "package x\nimport amqp \"github.com/rabbitmq/amqp091-go\"\nfunc f() {\n\
+                   \tconn, _ := amqp.Dial(\"u\")\n\tch, _ := conn.Channel()\n}\n";
+        let amqp = "github.com/rabbitmq/amqp091-go";
+        assert_eq!(
+            declared_form(src, "f", "ch"),
+            (
+                format!("{amqp}.Dial.Channel"),
+                "-".to_string(),
+                "Call".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn what_the_constants_walk_does_not_express_has_no_origin() {
+        let head = "import { Kafka } from 'kafkajs';\nconst kafka = new Kafka({});\n";
+        let none = |body: &str, chain| {
+            let src = format!("{head}{body}");
+            assert_eq!(
+                constant_origin(&[("a.ts", &src)], "", chain),
+                None,
+                "{body}"
+            );
+        };
+        // An uncalled member after a constant head.
+        none("const p = kafka.producer;\n", "p");
+        none("const p = kafka.a.producer();\n", "p");
+        // A `new` after steps, or after a call.
+        none("const p = new kafka.producer();\n", "p");
+        none("const p = kafka.producer();\nconst q = new p();\n", "q");
+        // A `new` of an expression no name spells (`(kafka.producer())`) has no head to trace.
+        none("const p = new (kafka.producer())();\n", "p");
+        // What a call made, called again.
+        none("const p = kafka.producer();\nconst q = p();\n", "q");
+        // A member of the import itself is part of its name.
+        let named = "import * as k from 'kafkajs';\nconst c = new k.Kafka({});\n";
+        assert_eq!(
+            constant_origin(&[("a.ts", named)], "", "c").unwrap(),
+            "kafkajs new Kafka() held a.ts:c"
+        );
+    }
+
+    #[test]
+    fn a_chain_of_constants_past_the_limit_has_no_origin() {
+        let origin = |n: usize| {
+            let consts = (0..n).map(|i| format!("const c{} = c{i};\n", i + 1));
+            let src = format!(
+                "import {{ Kafka }} from 'kafkajs';\nconst c0 = new Kafka({{}});\n{}",
+                consts.collect::<String>()
+            );
+            let chain: &'static str = format!("c{n}").leak();
+            constant_origin(&[("a.ts", &src)], "", chain)
+        };
+        let held = format!("kafkajs new Kafka() held a.ts:c{}", EVAL_DEPTH - 1);
+        assert_eq!(origin(EVAL_DEPTH - 1), Some(held));
+        assert_eq!(origin(EVAL_DEPTH), None);
+        assert_eq!(origin(20 * EVAL_DEPTH), None);
     }
 
     // Expansion.

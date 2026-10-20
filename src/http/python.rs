@@ -122,7 +122,7 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         })
     };
     let routers = |path, scope, name| -> Vec<(CallAt, &Framework)> {
-        let origins = code.origins(path, scope, name).into_iter();
+        let origins = code.name_origins(path, scope, name).into_iter();
         origins.filter_map(|r| Some((r, framework(r)?.0))).collect()
     };
     // The prefix a router's constructor gives it: none when absent.
@@ -411,7 +411,7 @@ fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<CallAt<'a>>
         return Vec::new();
     };
     match include(code, path, &call.scope, arg) {
-        Include::Module(module) => code.origins(module, "", "urlpatterns"),
+        Include::Module(module) => code.name_origins(module, "", "urlpatterns"),
         Include::Entries(list) => code.value_origins(path, &call.scope, list),
         Include::Named(_) | Include::Unknown => Vec::new(),
     }
@@ -468,7 +468,7 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     let (mut found, mut budget) = (Vec::new(), URLCONF_BUDGET);
     for root in roots {
-        let entries = code.origins(root, "", "urlpatterns");
+        let entries = code.name_origins(root, "", "urlpatterns");
         urlconf(code, entries, "", &mut Vec::new(), &mut budget, &mut found);
     }
     found

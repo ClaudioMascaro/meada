@@ -184,7 +184,7 @@ fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) 
             .into_iter()
             .collect()
     } else {
-        (code.origins(path, &form.scope, receiver).into_iter())
+        (code.name_origins(path, &form.scope, receiver).into_iter())
             .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
             .collect()
     };

@@ -115,7 +115,7 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
         return Vec::new();
     }
     let routers = |path, scope, name| -> Vec<CallAt> {
-        let origins = code.origins(path, scope, name).into_iter();
+        let origins = code.name_origins(path, scope, name).into_iter();
         origins.filter(|&r| is_express(code, r)).collect()
     };
     let mut mounts = Mounts::new();

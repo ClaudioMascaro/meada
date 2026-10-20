@@ -128,7 +128,7 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                     let origins = match code.receiver(path, n) {
                         Some(value) => code.value_origins(path, &call.scope, value),
                         None if receiver.starts_with('(') => continue,
-                        None => code.origins(path, &call.scope, receiver),
+                        None => code.name_origins(path, &call.scope, receiver),
                     };
                     match client_base(code, origins) {
                         Some(base) => (member.to_string(), base),
