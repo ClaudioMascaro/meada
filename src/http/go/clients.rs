@@ -6,15 +6,22 @@
 //! other value (`lang/go/values.rs`) and a client wrapper is read at each of its call sites
 //! (`Code::expand`). A resty client's base URL is the argument of every `SetBaseURL` on it; a
 //! client held in a struct field is the one the composite literals that set the field give it.
+//!
+//! Three readings of `Code`: a function of a package is a callee that `Code::outside` names with
+//! the package as its head (`direct`); a name written as a type is the `Code::origins` answer
+//! with `Follow::Declarations` of the form `Type`; and the calls a client comes from are
+//! `Code::origins` with `Follow::Values`, each route's climbed calls kept apart, so two clients
+//! one factory makes stay apart and a base URL set on one does not leak to the other.
 
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use super::super::{CallAt, based, consumer, fetch};
 use super::split;
 use crate::contract::Found;
+use crate::lang::go::package_call;
 use crate::lang::{Call, Part, Value};
-use crate::resolve::{Code, Expand, Expanded, Field, method as member};
+use crate::resolve::{Code, Expand, Expanded, Field, Follow, Form, Of, method as member};
 
 /// How many calls a client or a request is followed back through (`New().SetX().R().SetY()`),
 /// and how many names it is followed through.
@@ -105,8 +112,19 @@ struct Clients<'c, 'a> {
 impl<'c, 'a> Clients<'c, 'a> {
     /// Whether the name `name` is written as the type `ty` of resty.
     fn typed(&self, path: &'a str, scope: &'a str, name: &'a str, ty: &str) -> bool {
-        let written = self.code.outside_type(path, scope, name);
+        let written = self.written_type(path, scope, name);
         written.is_some_and(|w| resty_type(&w, ty))
+    }
+
+    /// The type outside the repository that the source writes for `name` (`c *http.Client` is
+    /// `net/http.Client`): the `Declarations` origin of the form `Type`. A repository function's
+    /// written result type (form `Call`) is no written type.
+    fn written_type(&self, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
+        let found = self
+            .code
+            .origins(path, scope, Of::Name(name), Follow::Declarations);
+        let origin = found.into_iter().next()?;
+        (origin.form == Form::Type).then(|| origin.outside.map(|o| o.spelled))?
     }
 
     /// The resty clients `value`, written in `scope` of `path`, may be: those the calls it comes
@@ -171,7 +189,17 @@ impl<'c, 'a> Clients<'c, 'a> {
             return Vec::new();
         }
         let mut out: Vec<Client<'a>> = Vec::new();
-        for ((p, i), through) in self.code.value_origins_through(path, scope, value) {
+        let found = self
+            .code
+            .origins(path, scope, Of::Value(value), Follow::Values);
+        // Each route's climbed calls, once: routes that differ only in the constant they held
+        // repeat the same calls, and one client is not read twice.
+        let mut climbs = BTreeSet::new();
+        for origin in found {
+            let Some(call) = origin.call else { continue };
+            climbs.extend(origin.routes.into_iter().map(|r| (call, r.through)));
+        }
+        for ((p, i), through) in climbs {
             for client in self.hands(p, i, depth + 1, request) {
                 let client = match client {
                     Client::Made(made, inner, field) => {
@@ -271,9 +299,7 @@ impl<'c, 'a> Clients<'c, 'a> {
             return Vec::new();
         };
         let member = member(&call.callee);
-        let made = self
-            .code
-            .outside_call(path, &call.scope, &call.callee)
+        let made = package_call(self.code, path, &call.scope, &call.callee)
             .as_deref()
             .and_then(split)
             .is_some_and(|(package, name)| {
@@ -385,7 +411,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         let table = |table: &[(&str, &'static str)]| {
             table.iter().find(|(m, _)| *m == member).map(|(_, v)| *v)
         };
-        let named = self.code.outside_call(path, &call.scope, &call.callee);
+        let named = package_call(self.code, path, &call.scope, &call.callee);
         let split = named.as_deref().and_then(split);
         match split
             .as_ref()
@@ -404,7 +430,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         }
         // The default client, or a name written as `http.Client`.
         let default = named.is_some_and(|n| n == format!("{HTTP}.DefaultClient.{member}"));
-        let client = self.code.outside_type(path, &call.scope, receiver);
+        let client = self.written_type(path, &call.scope, receiver);
         if default || client.is_some_and(|c| c == format!("{HTTP}.Client")) {
             return Some((Method::Is(table(HTTP_METHODS)?), 0, None));
         }
