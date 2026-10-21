@@ -2,10 +2,10 @@
 //! `Summary` a `package.json` gives, its names normalized as PEP 503 does. Ranges are kept as
 //! written and never evaluated: every PyPI package link says `range unchecked`.
 //!
-//! `Pypi` answers the trait's six required questions and overrides three of the rest: `entries`
-//! (every distribution the manifests holding the importing file depend on, nearest first, the
-//! import's module as the subpath), `owns` (only a `pyproject.toml` bounds a package), and
-//! `resolutions`, whole: an import names a module, not a distribution, so a distribution is a
+//! `Pypi` answers the trait's six required questions, `entries` among them (every distribution
+//! the manifests holding the importing file depend on, nearest first, the import's module as
+//! the subpath), and overrides two of the rest: `owns` (only a `pyproject.toml` bounds a
+//! package) and `resolutions`, whole: an import names a module, not a distribution, so a distribution is a
 //! candidate when a provider of it exposes the import's top-level module under its source roots
 //! (`exact` when that is the distribution's own name, `inferred` when it is another of its
 //! modules, `ambiguous` when several distributions expose it). The source roots (`roots`), the
