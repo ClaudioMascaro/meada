@@ -41,6 +41,12 @@ is to itself, or comes from top-level code, is a community of its own; a symbol 
 belongs to none.
 _Avoid_: cluster, module, component
 
+**Server mode**:
+Meada run once for an organisation: `meada mcp --listen` serves the tools over HTTP from mirrors
+of the repositories that a workspace manifest lists, each index outside its checkout, refreshed
+by `meada index` rather than on every query (ADR 0011).
+_Avoid_: hosted mode, cloud, daemon
+
 ### Across repositories
 
 **Peer**:
@@ -52,6 +58,13 @@ The repositories one query can see: the repository where Meada runs, its peers t
 `meada.toml` files (transitively), and the sibling clones whose `meada.toml` names a repository
 already in it. Each keeps its own index.
 _Avoid_: group, monorepo, organization
+
+**Workspace manifest**:
+The versioned `meada.workspace.toml` in an operator's ops repository that lists, for server
+mode, the repositories of the workspace (remote identity and local path), the index directory,
+and the `[serve]` and `[[resource]]` of repositories with no `meada.toml`. A repository's own
+`meada.toml` wins over it. It is never read locally.
+_Avoid_: group config, central repository, global configuration
 
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the

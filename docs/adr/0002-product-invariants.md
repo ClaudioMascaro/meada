@@ -22,13 +22,16 @@ amended for it (2 and 4) and one was added (6).
 2. Local-first: no account, no telemetry, and no key needed to run. Source code never leaves
    the machine, with one exception: the opt-in `meada decide` command may send the minimal code
    excerpt a decision needs to a provider the user configured with their own key (ADR 0006).
-   Indexing and the MCP server never do.
+   Indexing and the MCP server never do. (Amended 2026-10-21; in server mode, ADR 0011, "the
+   machine" is the operator's boundary: the HTTP server returns span text to the clients the
+   operator admits, the stdio server is unchanged.)
 3. Meada writes only inside its own index directory. Changes to the user's files (agent
    instructions, editor configuration, hooks) happen only through an explicit command the user
    runs.
 4. The MCP server has no tool that writes: it never changes the user's files, configuration or
    decisions. Its only write is refreshing Meada's own index before it answers (invariant 3,
-   ADR 0004). It exposes few tools and returns compact output under a default token budget. A
+   ADR 0004). (Amended 2026-10-21; in server mode, ADR 0011, the server writes nothing: the
+   operator refreshes with `meada index`.) It exposes few tools and returns compact output under a default token budget. A
    write tool needs a new ADR. Peers are local paths only: Meada never clones or fetches a peer,
    so the network stays out of indexing.
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
