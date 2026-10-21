@@ -892,10 +892,10 @@ struct Provided<'e> {
     /// The shapes the provider keeps for what its files export (issue #175), by the symbol-like
     /// identity of the constant or type (`<repository>::<path>::<name>`) and the view.
     shapes: HashMap<(String, Want), &'e Shape>,
-    /// The source files that export something, by the path of the manifest that is their
-    /// nearest, none under a `node_modules` directory. Built the first time an ambiguous import
-    /// asks (`candidates`), once for all.
-    owned: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
+    /// The source files that export something, by ecosystem name and the path of the manifest
+    /// of that ecosystem that is their nearest, none under a `node_modules` directory. Built the
+    /// first time an ambiguous import asks (`candidates`), once for all ecosystems.
+    owned: OnceCell<HashMap<(&'static str, &'e str), Vec<&'e str>>>,
     /// The Go source files that are no tests, by directory. Built the first time a Go import
     /// asks (`package`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
@@ -1053,20 +1053,22 @@ impl<'e> Provided<'e> {
         let Some(ecosystem) = of(&manifest.path) else {
             return Vec::new();
         };
-        // Filled for the ecosystem that asks first: npm alone follows Node's rule this far.
         let owned = self.owned.get_or_init(|| {
-            let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
+            let mut owned: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
             for &path in self.exported.keys() {
-                if self.source(path)
-                    && !path.split('/').any(|s| s == "node_modules")
-                    && let Some(m) = nearest(self.manifests, path, ecosystem)
-                {
-                    owned.entry(&m.path).or_default().push(path);
+                if !self.source(path) || path.split('/').any(|s| s == "node_modules") {
+                    continue;
+                }
+                for e in ECOSYSTEMS {
+                    if let Some(m) = nearest(self.manifests, path, *e) {
+                        owned.entry((e.name(), &m.path)).or_default().push(path);
+                    }
                 }
             }
             owned
         });
-        let files = owned.get(manifest.path.as_str()).into_iter().flatten();
+        let key = (ecosystem.name(), manifest.path.as_str());
+        let files = owned.get(&key).into_iter().flatten();
         let mut ids: Vec<String> = files
             .filter(|path| {
                 self.exported[**path]
@@ -3185,7 +3187,11 @@ mod tests {
     fn candidates_are_the_exporting_source_files_of_that_package_alone() {
         let root = manifest("package.json", "{}");
         let nested = manifest("sealed/package.json", "{}");
-        let manifests = [root, nested];
+        let pyproject = Manifest {
+            path: "pyproject.toml".into(),
+            summary: Summary::default(),
+        };
+        let manifests = [root, nested, pyproject];
         let paths = [
             "src/a.ts",
             "src/a.d.ts",
@@ -3202,6 +3208,11 @@ mod tests {
         p.symbols = ids.iter().map(String::as_str).collect();
         p.manifests = &manifests;
 
+        // Another ecosystem asking first keeps its own view of the files: npm's stays npm's.
+        assert_eq!(
+            p.candidates("r", &manifests[2], "f", &|id| p.symbol(id)),
+            ["r::sealed/src/b.ts::f", "r::src/a.ts::f"]
+        );
         // The root package does not take the nested package's file (a directory-prefix test
         // would), a declaration file, or one under `node_modules`; the nested one neither.
         assert_eq!(
