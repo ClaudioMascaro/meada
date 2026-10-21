@@ -62,6 +62,14 @@ impl Ecosystem {
         *self == Ecosystem::Npm
     }
 
+    /// Every ecosystem, in the order `of_contract` searches.
+    const ALL: [Ecosystem; 4] = [
+        Ecosystem::Npm,
+        Ecosystem::Pypi,
+        Ecosystem::Cargo,
+        Ecosystem::Go,
+    ];
+
     /// Its name, as the contract identifier spells it.
     pub fn name(self) -> &'static str {
         match self {
@@ -87,26 +95,23 @@ impl Ecosystem {
     }
 
     /// The ecosystem whose packages the source file at `path` imports: PyPI's for a `.py`
-    /// file, Cargo's for a `.rs` file, Go's for a `.go` file, npm's for the TS/JS pack's.
+    /// file, Cargo's for a `.rs` file, Go's for a `.go` file, npm's for the TS/JS pack's; `None`
+    /// for a file no ecosystem claims.
     fn of_source(path: &str) -> Option<Self> {
-        match path.rsplit_once('.').map(|(_, extension)| extension) {
-            Some("py") => Some(Ecosystem::Pypi),
-            Some("rs") => Some(Ecosystem::Cargo),
-            Some("go") => Some(Ecosystem::Go),
-            _ => Some(Ecosystem::Npm),
+        match path.rsplit_once('.').map(|(_, extension)| extension)? {
+            "py" => Some(Ecosystem::Pypi),
+            "rs" => Some(Ecosystem::Cargo),
+            "go" => Some(Ecosystem::Go),
+            extension if EXTENSIONS.contains(&extension) => Some(Ecosystem::Npm),
+            _ => None,
         }
     }
 
     /// The ecosystem of a package contract identifier.
     fn of_contract(contract: &str) -> Option<Self> {
-        [
-            Ecosystem::Npm,
-            Ecosystem::Pypi,
-            Ecosystem::Cargo,
-            Ecosystem::Go,
-        ]
-        .into_iter()
-        .find(|e| contract.starts_with(e.prefix()))
+        Ecosystem::ALL
+            .into_iter()
+            .find(|e| contract.starts_with(e.prefix()))
     }
 
     /// The start of its contract identifiers.
@@ -992,10 +997,11 @@ impl<'e> Provided<'e> {
     /// Whether `path` is a source file the provider indexes (`source`) whose nearest manifest
     /// is `manifest`: a file of a nested package is not the outer package's.
     fn owned_source(&self, manifest: &Manifest, path: &str) -> bool {
-        let ecosystem = Ecosystem::of(&manifest.path).unwrap_or(Ecosystem::Npm);
-        self.source(path)
-            && owner(self.manifests, path, ecosystem)
-                .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+        Ecosystem::of(&manifest.path).is_some_and(|ecosystem| {
+            self.source(path)
+                && owner(self.manifests, path, ecosystem)
+                    .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+        })
     }
 
     /// The symbols `chain` names in the source files of the package at `manifest` (those whose
@@ -1324,7 +1330,9 @@ fn resolutions<'e>(
     if Ecosystem::of_source(from) == Some(Ecosystem::Pypi) {
         return pypi_resolutions(exports, providers, &at, (n, from), specifier, chain, known);
     }
-    let ecosystem = Ecosystem::of_source(from).unwrap_or(Ecosystem::Npm);
+    let Some(ecosystem) = Ecosystem::of_source(from) else {
+        return Vec::new();
+    };
     let (entry, subpath) = match ecosystem {
         Ecosystem::Cargo => {
             // The specifier is the crate a `use` names: the key of a renamed dependency, else
@@ -1705,8 +1713,7 @@ fn comparators(range: &str) -> bool {
 /// What a dependency `range` on the package `contract` says of the provider's `version`, by
 /// the contract's ecosystem (`Ecosystem::flag`).
 fn flag_of(contract: &str, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
-    let ecosystem = Ecosystem::of_contract(contract).unwrap_or(Ecosystem::Npm);
-    ecosystem.flag(range, version)
+    Ecosystem::of_contract(contract)?.flag(range, version)
 }
 
 /// The reason of a package link: `<identifier> <range|none> (local <version|none>)`, then
@@ -1986,7 +1993,9 @@ impl ContractKind for Packages {
             return Vec::new();
         };
         let range = consumer.method.as_deref();
-        let ecosystem = Ecosystem::of_contract(contract).unwrap_or(Ecosystem::Npm);
+        let Some(ecosystem) = Ecosystem::of_contract(contract) else {
+            return Vec::new();
+        };
         let source = (consumer.via.as_deref(), range);
         let fits: Vec<_> = (providers.iter())
             .filter(|(repo, p)| {
@@ -2718,6 +2727,73 @@ mod tests {
         assert_eq!(
             owner("app/web/x.ts", Ecosystem::Npm),
             Some("app/web/package.json")
+        );
+    }
+
+    #[test]
+    fn sources_contracts_and_manifests_round_trip_each_ecosystem() {
+        let sources = [
+            ("a.py", Ecosystem::Pypi),
+            ("a.rs", Ecosystem::Cargo),
+            ("a.go", Ecosystem::Go),
+            ("a.ts", Ecosystem::Npm),
+            ("a.tsx", Ecosystem::Npm),
+            ("a.js", Ecosystem::Npm),
+            ("a.jsx", Ecosystem::Npm),
+            ("a.mjs", Ecosystem::Npm),
+            ("a.cjs", Ecosystem::Npm),
+        ];
+        for (path, want) in sources {
+            assert_eq!(Ecosystem::of_source(path), Some(want), "{path}");
+        }
+        for path in ["A.java", "notes.txt", "Makefile"] {
+            assert_eq!(Ecosystem::of_source(path), None, "{path}");
+        }
+        for (manifest, e) in [
+            ("package.json", Ecosystem::Npm),
+            ("pyproject.toml", Ecosystem::Pypi),
+            ("Cargo.toml", Ecosystem::Cargo),
+            ("go.mod", Ecosystem::Go),
+        ] {
+            assert_eq!(Ecosystem::of(manifest), Some(e));
+            assert_eq!(Ecosystem::of_contract(&e.contract("x")), Some(e));
+        }
+    }
+
+    #[test]
+    fn a_contract_of_no_ecosystem_has_no_flag_no_suffix_and_no_link() {
+        let contract = "package::maven::x";
+        assert_eq!(Ecosystem::of_contract(contract), None);
+        assert_eq!(flag_of(contract, Some("1"), Some("2")), None);
+        assert_eq!(
+            reason(contract, Some("1"), Some("2")),
+            "package::maven::x 1 (local 2)"
+        );
+        let consumer = Consumer {
+            contract: Some(contract.into()),
+            site: "r::pom.xml".into(),
+            via: None,
+            shape: None,
+            method: Some("1".into()),
+            fragments: Vec::new(),
+            hops: Vec::new(),
+        };
+        let repo = Repository {
+            root: "/nonexistent".into(),
+            identity: "r".into(),
+            config: Default::default(),
+            decisions: Default::default(),
+        };
+        let provider = Provider {
+            contract: contract.into(),
+            site: "r::pom.xml".into(),
+            version: Some("2".into()),
+            ..Provider::default()
+        };
+        assert!(
+            Packages
+                .link(&consumer, &repo, &[(&repo, &provider)], &[])
+                .is_empty()
         );
     }
 
