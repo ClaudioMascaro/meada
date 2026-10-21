@@ -418,10 +418,29 @@ async fn exits_zero_on_sigterm_after_a_call() {
         .unwrap();
     assert!(!text(&result).is_empty());
     // The client keeps its connection open: the stop does not wait for it.
+    // (A SIGTERM sent right after the address, with no call, is the next test.)
     let kill = Command::new("kill")
         .args(["-TERM", &server.child.id().to_string()])
         .status()
         .unwrap();
     assert!(kill.success());
     assert_eq!(server.child.wait().unwrap().code(), Some(0));
+}
+
+/// SIGTERM sent the moment the address is read, before any call: still a clean exit 0, since
+/// the handlers are installed before the address is printed.
+#[cfg(unix)]
+#[test]
+fn exits_zero_on_sigterm_right_after_the_listening_line() {
+    let dir = chain_manifest("server_sigterm_early");
+    assert!(run(&dir, "index").2);
+    for _ in 0..20 {
+        let mut server = Server::start(&dir, "127.0.0.1:0");
+        let kill = Command::new("kill")
+            .args(["-TERM", &server.child.id().to_string()])
+            .status()
+            .unwrap();
+        assert!(kill.success());
+        assert_eq!(server.child.wait().unwrap().code(), Some(0));
+    }
 }

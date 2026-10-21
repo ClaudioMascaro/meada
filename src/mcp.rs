@@ -261,6 +261,8 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
     tokio::runtime::Runtime::new()?.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
+        // Before the address is printed: a signal sent on reading it is never lost.
+        let mut stop = std::pin::pin!(stop_signal()?);
         eprintln!("listening on http://{}", listener.local_addr()?);
         // Not cancelled on a signal: cancelling `cancellation_token` would end the calls in
         // flight, and the stop lets them finish (a bound on the wait is ticket #268).
@@ -290,7 +292,6 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
             .map(|identity| format!("{identity}\n"))
             .collect();
         let routes = Arc::new((endpoints, listing));
-        let mut stop = std::pin::pin!(stop_signal()?);
         let (stopping, _) = tokio::sync::watch::channel(());
         let mut connections = tokio::task::JoinSet::new();
         loop {
