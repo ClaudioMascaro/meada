@@ -22,6 +22,7 @@ pub struct Workspace {
     pub missing: Vec<Missing>,
 }
 
+#[derive(Clone)]
 pub struct Repository {
     pub root: PathBuf,
     pub identity: String,
@@ -42,6 +43,27 @@ impl Repository {
             root,
             identity,
         })
+    }
+
+    /// A mirror `Manifest::read` served, checked again (server mode, at query time): it still
+    /// exists, as the root of a checkout whose remote is its identity.
+    pub fn recheck(&self) -> std::result::Result<(), String> {
+        let shown = self.root.display().to_string();
+        if !self.root.exists() {
+            return Err(Msg::NoMirror(&shown).text());
+        }
+        if !repo::is_checkout(&self.root) {
+            return Err(Msg::NotACheckout(&shown).text());
+        }
+        let found = repo::identity(&self.root);
+        if found != self.identity {
+            return Err(Msg::IdentityMismatch {
+                found: &found,
+                repo: &self.identity,
+            }
+            .text());
+        }
+        Ok(())
     }
 }
 
@@ -147,11 +169,13 @@ impl Workspace {
 
 /// A workspace manifest (`meada.workspace.toml`, ADR 0011), read only from the path
 /// `--workspace` gives: every `[[repository]]` in manifest order.
+#[derive(Clone)]
 pub struct Manifest {
     pub entries: Vec<Listed>,
 }
 
 /// One `[[repository]]` of a manifest.
+#[derive(Clone)]
 pub struct Listed {
     /// The identity it names.
     pub repo: String,

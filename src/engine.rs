@@ -52,6 +52,15 @@ impl Engine {
         Self::read(Manifest::read(manifest)?.workspace(repo)?, manifest)
     }
 
+    /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
+    /// server started: only `repo`'s mirror is checked again (`Repository::recheck`), and every
+    /// index is opened as `open_manifest` opens it. A call of `meada mcp --listen`.
+    pub(crate) fn open_listed(listed: &Manifest, repo: &str, manifest: &Path) -> Result<Self> {
+        let workspace = listed.clone().workspace(repo)?;
+        (workspace.repos[0].recheck()).map_err(|problem| format!("{repo}: {problem}"))?;
+        Self::read(workspace, manifest)
+    }
+
     /// Opens every index of `workspace`, listed by the manifest at `manifest`, read-only.
     fn read(workspace: Workspace, manifest: &Path) -> Result<Self> {
         fits(&workspace)?;
@@ -1088,11 +1097,11 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
         .collect())
 }
 
-/// The identities `meada mcp --listen` serves from the manifest at `manifest`, in manifest
-/// order, once every repository is servable: its mirror is a checkout of the identity listed and
-/// its index opens read-only at the current schema version. Otherwise every problem, one per
-/// line, each index problem naming `meada index --workspace`. It only reads.
-pub fn served(manifest: &Path) -> Result<Vec<String>> {
+/// The manifest at `manifest` as `meada mcp --listen` serves it, once every repository is
+/// servable: its mirror is a checkout of the identity listed and its index opens read-only at
+/// the current schema version. Otherwise every problem, one per line, each index problem naming
+/// `meada index --workspace`. It only reads.
+pub(crate) fn served(manifest: &Path) -> Result<Manifest> {
     let listed = Manifest::read(manifest)?;
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
@@ -1106,13 +1115,10 @@ pub fn served(manifest: &Path) -> Result<Vec<String>> {
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
-    let served: Vec<String> = listed.entries.into_iter().map(|l| l.repo).collect();
     // The whole workspace opens too: what a call opens, whichever repository it names.
-    let first = served
-        .first()
-        .ok_or_else(|| format!("{shown}: no repository listed"))?;
-    Engine::open_manifest(manifest, first)?;
-    Ok(served)
+    let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
+    Engine::open_listed(&listed, &first.repo, manifest)?;
+    Ok(listed)
 }
 
 /// An index state as `status` shows it, `other` for an index of another schema.

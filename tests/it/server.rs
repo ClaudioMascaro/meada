@@ -268,6 +268,30 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert!(run(&dir, "index").2);
     assert_eq!(text(&context().await.unwrap()), fresh);
 
+    // At query time the named repository's mirror alone is checked again: a mirror that is no
+    // checkout any more refuses its own endpoint, and the others answer.
+    let worker = dir.join("chain-worker");
+    let root = worker.canonicalize().unwrap();
+    fs::rename(worker.join(".git"), worker.join("moved.git")).unwrap();
+    let broken = server.client("/example.com/chain/worker").await;
+    let refused = (broken.call_tool(call("search", serde_json::json!({"query": "dashboard"}))))
+        .await
+        .unwrap();
+    assert_eq!(refused.is_error, Some(true));
+    assert_eq!(
+        text(&refused),
+        format!(
+            "example.com/chain/worker: `{}` is not the root of a checkout with a working tree",
+            root.display()
+        )
+    );
+    broken.cancel().await.unwrap();
+    let search = (client.call_tool(call("search", serde_json::json!({"query": "dashboard"}))))
+        .await
+        .unwrap();
+    assert_ne!(search.is_error, Some(true), "{}", text(&search));
+    fs::rename(worker.join("moved.git"), worker.join(".git")).unwrap();
+
     // At query time an index the server cannot read is a tool error naming the fix.
     let catalog = indexes.join("example.com/chain/catalog/index.db");
     fs::write(&catalog, "not an index\n").unwrap();
@@ -313,8 +337,18 @@ fn two_servers_over_one_manifest_answer_alternate_calls_with_no_session() {
     let url = format!("{}/{WEB}", one.url);
     let proxied = post_with(&url, initialize.clone(), &[("Host", "meada.internal")]);
     assert_eq!(proxied.0, 200, "{proxied:?}");
-    let browser = post_with(&url, initialize, &[("Origin", "http://meada.internal")]);
+    let browser = post_with(
+        &url,
+        initialize.clone(),
+        &[("Origin", "http://meada.internal")],
+    );
     assert_eq!(browser.0, 403, "{browser:?}");
+    // The path is percent-decoded before it names a repository.
+    let encoded = post(
+        &format!("{}/example.com%2Fchain%2Fweb", one.url),
+        initialize,
+    );
+    assert_eq!(encoded.0, 200, "{encoded:?}");
 
     let golden = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/chain.trace-down.txt"),

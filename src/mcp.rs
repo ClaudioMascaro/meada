@@ -14,7 +14,7 @@ use std::sync::Arc;
 use http_body_util::{BodyExt, Full, combinators::BoxBody};
 use hyper::body::{Bytes, Incoming};
 use hyper::{Request, Response, StatusCode, header, server::conn::http1, service::service_fn};
-use hyper_util::rt::TokioIo;
+use hyper_util::rt::{TokioIo, TokioTimer};
 use percent_encoding::percent_decode_str;
 use rmcp::{
     RoleServer, ServerHandler, ServiceExt,
@@ -30,6 +30,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::engine::{self, Direction, Engine, Start};
+use crate::workspace::Manifest;
 
 #[derive(Deserialize, JsonSchema)]
 struct SearchArgs {
@@ -79,9 +80,10 @@ struct Meada {
 enum Source {
     /// The client's first root, else the current directory (stdio).
     Roots,
-    /// The workspace of a manifest, `identity` first (server mode): read-only, one engine per
-    /// call, and no request to the client.
+    /// The workspace of the manifest at `manifest`, as `listed` read it at start, `identity`
+    /// first (server mode): read-only, one engine per call, and no request to the client.
     Served {
+        listed: Arc<Manifest>,
         manifest: Arc<Path>,
         identity: Arc<str>,
     },
@@ -101,9 +103,11 @@ impl Meada {
                 let dir = root_dir(&ctx).await;
                 tokio::task::block_in_place(|| Engine::open(&dir))
             }
-            Source::Served { manifest, identity } => {
-                tokio::task::block_in_place(|| Engine::open_manifest(manifest, identity))
-            }
+            Source::Served {
+                listed,
+                manifest,
+                identity,
+            } => tokio::task::block_in_place(|| Engine::open_listed(listed, identity, manifest)),
         };
         tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)))
             .map_err(|e| e.to_string())
@@ -253,7 +257,8 @@ type Endpoint = StreamableHttpService<Meada, NeverSessionManager>;
 /// nobody: the operator's proxy admits clients.
 pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
-    let served = engine::served(manifest)?;
+    let listed = Arc::new(engine::served(manifest)?);
+    let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
     tokio::runtime::Runtime::new()?.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
         eprintln!("listening on http://{}", listener.local_addr()?);
@@ -267,6 +272,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
         let endpoints: HashMap<String, Endpoint> = (served.iter())
             .map(|identity| {
                 let meada = Meada::new(Source::Served {
+                    listed: listed.clone(),
                     manifest: manifest.clone(),
                     identity: identity.as_str().into(),
                 });
@@ -284,15 +290,25 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
             .collect();
         let routes = Arc::new((endpoints, listing));
         loop {
-            let (stream, _) = listener.accept().await?;
+            let stream = match listener.accept().await {
+                Ok((stream, _)) => stream,
+                // Out of descriptors, say: the server goes on, once a few connections closed.
+                Err(e) => {
+                    eprintln!("meada: accepting a connection: {e}");
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue;
+                }
+            };
             let routes = routes.clone();
             tokio::spawn(async move {
                 let service = service_fn(move |request| {
                     let routes = routes.clone();
                     async move { Ok::<_, Infallible>(route(&routes.0, &routes.1, request).await) }
                 });
-                // A connection that breaks ends only itself.
+                // A connection that breaks ends only itself; the timer is what makes hyper's
+                // header read timeout close one that sends nothing.
                 let _ = (http1::Builder::new())
+                    .timer(TokioTimer::new())
                     .serve_connection(TokioIo::new(stream), service)
                     .await;
             });
@@ -300,14 +316,16 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     })
 }
 
-/// The endpoint `request`'s path names (`/<identity>`, a trailing slash tolerated) answers it;
+/// The endpoint `request`'s path names (`/<identity>`, percent-decoded, a trailing slash
+/// tolerated) answers it;
 /// any other path, the root included, is a 404 listing the identities served, one per line.
 async fn route(
     endpoints: &HashMap<String, Endpoint>,
     listing: &str,
     request: Request<Incoming>,
 ) -> Response<BoxBody<Bytes, Infallible>> {
-    let path = request.uri().path();
+    let path = percent_decode_str(request.uri().path()).decode_utf8();
+    let path = path.as_deref().unwrap_or("");
     let identity = path.strip_prefix('/').unwrap_or(path);
     let identity = identity.strip_suffix('/').unwrap_or(identity);
     match endpoints.get(identity) {
@@ -323,7 +341,11 @@ async fn route(
 /// The address `--listen` names: `host:port`, `:port` or `port`, the host an IP address or
 /// `localhost`; without one, the loopback interface. No name is resolved.
 fn address(listen: &str) -> crate::Result<SocketAddr> {
-    let invalid = || format!("`--listen {listen}`: pass host:port, :port or port");
+    let invalid = || {
+        format!(
+            "`--listen {listen}`: pass host:port, :port or port, the host an IP address or localhost"
+        )
+    };
     let (host, port) = listen.rsplit_once(':').unwrap_or(("", listen));
     let port: u16 = port.parse().map_err(|_| invalid())?;
     let host = (host.strip_prefix('['))

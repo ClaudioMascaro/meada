@@ -164,10 +164,12 @@ modules updates it.
 - `mcp.rs`: three tools (`search`, `context`, `trace`) over rmcp, each a thin call to `Engine`
   that reopens it per call. `Meada::source` says where: over stdio (`serve`), on the client's
   first `file://` root (`roots/list`, asked per call when the client declared the capability),
-  or on the cwd without one, refreshing; in server mode (`listen`), `Engine::open_manifest` with
+  or on the cwd without one, refreshing; in server mode (`listen`), `Engine::open_listed` with
   the endpoint's identity first, read-only, with no request to the client. `listen` checks every
-  repository first (`engine::served`), binds a hyper HTTP/1 listener and routes `/<identity>` (a
-  trailing slash tolerated) to that repository's rmcp `StreamableHttpService`: stateless (no
+  repository first and keeps the manifest it read (`engine::served`); a call checks again only
+  the named repository's mirror (`Repository::recheck`), and the indexes as it opens them.
+  It binds a hyper HTTP/1 listener and routes `/<identity>` (percent-decoded, a trailing slash
+  tolerated) to that repository's rmcp `StreamableHttpService`: stateless (no
   session), JSON responses, no `Host` check (a reverse proxy forwards its own name) and any
   `Origin` refused (a browser, as on a DNS rebinding page); other paths get a `text/plain` 404
   with one identity per line. `trace` from `uncommitted` is refused there, and `context` on a

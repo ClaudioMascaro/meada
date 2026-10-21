@@ -18,14 +18,14 @@ use crate::workspace::{Missing, Workspace};
 
 const FILE: &str = "meada.decisions.toml";
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Decisions {
     #[serde(default, rename = "decision")]
     pub items: Vec<Decision>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(try_from = "Raw")]
 pub struct Decision {
     pub kind: Kind,
