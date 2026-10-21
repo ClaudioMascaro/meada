@@ -24,6 +24,7 @@ pub enum Msg<'a> {
     ListedTwice,
     NoMirror(&'a str),
     NotACheckout(&'a str),
+    DubiousOwner(&'a str),
     IdentityMismatch {
         found: &'a str,
         repo: &'a str,
@@ -304,6 +305,17 @@ impl Msg<'_> {
             Msg::NotACheckout(path) => pick(
                 format!("`{path}` is not the root of a checkout with a working tree"),
                 format!("`{path}` não é a raiz de um checkout com árvore de trabalho"),
+            ),
+            Msg::DubiousOwner(path) => pick(
+                format!(
+                    "git refuses `{path}`, which another user owns: Meada needs git 2.38 or \
+                     later to read it, or `safe.directory` set in the system git configuration"
+                ),
+                format!(
+                    "o git recusa `{path}`, que pertence a outro usuário: o Meada precisa do git \
+                     2.38 ou posterior para lê-lo, ou de `safe.directory` na configuração de \
+                     sistema do git"
+                ),
             ),
             Msg::IdentityMismatch { found, repo } => pick(
                 format!("the mirror's remote is `{found}`, not `{repo}`"),
