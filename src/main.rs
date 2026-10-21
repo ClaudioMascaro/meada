@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
@@ -16,8 +16,14 @@ struct Cli {
 // Command descriptions are set at runtime from the message catalog (ADR 0008).
 #[derive(Subcommand)]
 enum Command {
-    Index,
-    Status,
+    Index {
+        #[arg(long)]
+        workspace: Option<PathBuf>,
+    },
+    Status {
+        #[arg(long)]
+        workspace: Option<PathBuf>,
+    },
     Export,
     Mcp,
     Decide {
@@ -42,8 +48,13 @@ fn main() -> ExitCode {
     msg::init(std::env::var("LANG").ok().as_deref());
     let matches = Cli::command()
         .about(Msg::About.text())
-        .mut_subcommand("index", |c| c.about(Msg::Index.text()))
-        .mut_subcommand("status", |c| c.about(Msg::Status.text()))
+        .mut_subcommand("index", |c| {
+            (c.about(Msg::Index.text())).mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+        })
+        .mut_subcommand("status", |c| {
+            (c.about(Msg::Status.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+        })
         .mut_subcommand("export", |c| c.about(Msg::Export.text()))
         .mut_subcommand("mcp", |c| c.about(Msg::Mcp.text()))
         .mut_subcommand("decide", |c| {
@@ -67,7 +78,22 @@ fn main() -> ExitCode {
             msg::init(None);
             meada::mcp::serve()
         }
-        Command::Status => engine::status(here).map(|status| print!("{status}")),
+        Command::Status { workspace } => match workspace {
+            Some(manifest) => engine::status_workspace(&manifest),
+            None => engine::status(here),
+        }
+        .map(|status| print!("{status}")),
+        // Every repository's problem on its own line; the others are refreshed all the same.
+        Command::Index {
+            workspace: Some(manifest),
+        } => engine::index_workspace(&manifest).map(|problems| {
+            for problem in &problems {
+                eprintln!("meada: {problem}");
+            }
+            if !problems.is_empty() {
+                std::process::exit(1);
+            }
+        }),
         Command::Decide {
             item,
             dry_run,

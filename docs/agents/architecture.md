@@ -8,12 +8,18 @@ list below. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 ## Flow
 
 `Engine::open(dir)` finds the **workspace**, creates or recreates each **repository**'s **index**
-in its own `.meada/index.db`, and ATTACHes every **peer** to the first repository's connection
-as `peer<n>`. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
+where `Repository::index` says it lives, and ATTACHes every **peer** to the first repository's
+connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
+**server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
+**workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
+then manifest order, nothing discovered) and each index lives at
+`<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
+are `meada index --workspace` and `meada status --workspace`. Every query (`export`, `search`,
+`context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
-Nothing outside `.meada/` is written. Everything the engine returns is sorted: the same files
-give byte-identical output.
+Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
+Everything the engine returns is sorted: the same files give byte-identical output.
 
 ## Modules (`src/`)
 
@@ -33,7 +39,11 @@ one for the area a change touches.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
-  `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and `export`. `lang/`: the
+  `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
+  mode cannot serve. `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and
+  `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
+  with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
+  `.gitignore`). `lang/`: the
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and

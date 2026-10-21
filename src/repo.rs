@@ -13,6 +13,18 @@ pub fn root(dir: &Path) -> Result<PathBuf> {
     }
 }
 
+/// Whether `dir` is the top level of a checkout with a working tree: not a bare clone, not a
+/// directory inside a checkout, not a directory outside git.
+pub fn is_checkout(dir: &Path) -> bool {
+    let (Some(top), Ok(dir)) = (
+        git(dir, &["rev-parse", "--show-toplevel"]),
+        dir.canonicalize(),
+    ) else {
+        return false;
+    };
+    Path::new(&top).canonicalize().is_ok_and(|top| top == dir)
+}
+
 /// The normalized `origin` remote, or `local/<root directory name>` without one.
 pub fn identity(root: &Path) -> String {
     match git(root, &["remote", "get-url", "origin"]) {

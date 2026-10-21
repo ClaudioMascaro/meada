@@ -571,6 +571,7 @@ mod tests {
             identity: "r".into(),
             config: toml::from_str::<Config>(toml).unwrap(),
             decisions: Decisions::default(),
+            index: "".into(),
         }
     }
 

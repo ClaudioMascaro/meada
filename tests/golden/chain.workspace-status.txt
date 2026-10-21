@@ -1,0 +1,4 @@
+example.com/chain/gateway (../chain-gateway) indexed, 8 files
+  resource::postgres::orders is unlinked: no writer and reader in different repositories
+example.com/chain/web (../chain-web) indexed, 5 files
+missing peer: example.com/chain/catalog, named by example.com/chain/gateway

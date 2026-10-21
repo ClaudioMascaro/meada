@@ -1798,6 +1798,7 @@ mod tests {
             identity: "r".into(),
             config: Default::default(),
             decisions: Default::default(),
+            index: "".into(),
         };
         let (exports, repos, links) = ([export], [repo], [link]);
         let sections = |symbol| Packages.context_sections(&exports, &repos, &links, symbol);
@@ -2358,6 +2359,7 @@ mod tests {
             identity: "r".into(),
             config: Default::default(),
             decisions: Default::default(),
+            index: "".into(),
         };
         let provider = Provider {
             contract: contract.into(),
