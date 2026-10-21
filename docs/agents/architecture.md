@@ -319,7 +319,8 @@ one for the area a change touches.
     import of a file may name, each with the subpath inside the package).
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
-    and Go share `sourced` (a `path` by the folded location, a `git` by the remote's identity).
+    and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
+    remote's identity).
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
   - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
@@ -339,7 +340,8 @@ one for the area a change touches.
   `inherit` (every adapter's, in list order). `package::is_manifest` makes `manifests_found`
   (`index.rs`) stamp the manifest files into `manifests`. The list order fixes the order `of`
   and `of_contract` search in and the order `inherit` runs in; a new ecosystem appends. The
-  deliberate extras: a reader in a language pack when the manifest is also a pack config (as
+  deliberate extras: `is_npm`, the export's compatibility rule (it names the ecosystem only when
+  it is not npm, so the goldens that predate the field stay); a reader in a language pack when the manifest is also a pack config (as
   `go.mod`, read by `lang::go::modfile`, and `Cargo.toml`, read by `lang::rust::crates`, are;
   the adapter calls the pack's reader, never the other way); and, for a user-visible ecosystem,
   the README state line and the CHANGELOG.
@@ -350,7 +352,7 @@ one for the area a change touches.
   `use` head matched to the key of a renamed dependency or to the provider's library name
   (`cargo::lib_head`), then the crate's library root; Go: any import path that is a valid
   contract name (`valid_name`), matched to the longest module path of the nearest `go.mod`'s
-  entries (`modfile::inside`), then the one directory of the provider the rest names; `go::read`
+  entries (`modfile::inside`), then the one directory of the provider the rest names; `Go::read`
   takes `require` and `replace` from `lang::go::modfile`, the Go pack's one `go.mod` reader, and
   gives a local `replace` the Cargo `path` form in `Entry::via`). A step outside `ContractKind`
   fills what a manifest inherits: the seam's `inherit`, run in `index::read_manifests` over the

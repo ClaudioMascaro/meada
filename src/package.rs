@@ -24,7 +24,7 @@
 
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -267,7 +267,9 @@ fn contract(ecosystem: &dyn Ecosystem, name: &str) -> String {
     format!("{}{name}", ecosystem.prefix())
 }
 
-/// Whether `ecosystem` is npm's, the one a package of the export names only when it is not.
+/// Whether `ecosystem` is npm's, the one a package of the export names only when it is not: the
+/// export's compatibility rule, since the `ecosystem` field did not exist when npm was the only
+/// one and the goldens leave it out.
 fn is_npm(ecosystem: &&'static dyn Ecosystem) -> bool {
     ecosystem.name() == Npm.name()
 }
@@ -300,21 +302,26 @@ const MAX_NAME: usize = 214;
 // ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
 const MAX_REEXPORTS: usize = 64;
 
-/// What Meada read from one `package.json`. Nothing else of the file is kept.
+/// What Meada read from one manifest of any ecosystem (a `package.json`, `pyproject.toml`,
+/// `requirements*.txt`, `Cargo.toml` or `go.mod`). Nothing else of the file is kept; a field
+/// the ecosystem has no use for stays empty.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
-    /// A valid npm name; `None` when absent, not a string or not valid, which makes no provider.
+    /// The package's name as its ecosystem spells it; `None` when absent, not a string or not
+    /// valid there, which makes no provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The declared version; `None` when absent or when the format carries none (`go.mod`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     /// Sorted by field, then name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<Entry>,
-    /// The `exports` field as written; `None` when absent or `null`.
+    /// The `exports` field as written; `None` when absent or `null` (npm only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exports: Option<Value>,
-    /// The `types`, `module` and `main` entry fields; a field that is not a string is absent.
+    /// The `types`, `module` and `main` entry fields; a field that is not a string is absent
+    /// (npm only, except `main`, which Cargo sets too).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub types: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -369,7 +376,7 @@ impl Entry {
     }
 }
 
-/// A `package.json` of the index: its repository-relative path and what was read of it.
+/// A manifest of the index: its repository-relative path and what was read of it.
 pub struct Manifest {
     pub path: String,
     pub summary: Summary,
@@ -588,6 +595,50 @@ fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
 }
 
+/// The directory of the manifest at `path` as a repository path to join onto: the root is empty.
+fn bare_directory(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(dir, _)| dir)
+}
+
+/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
+/// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
+/// root): a `path` entry only the package at that path, a `git` one only the repository of that
+/// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
+/// matched against the provider's location by the two roots, folded lexically: nothing is read.
+fn sourced(
+    via: Option<&str>,
+    from: (&str, &Path),
+    ((to, to_root), provider): ((&str, &Path), &str),
+) -> bool {
+    let Some(via) = via else {
+        return true;
+    };
+    match via.split_once(' ') {
+        Some(("path", manifest)) if manifest.starts_with("../") => {
+            folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
+        }
+        Some(("path", manifest)) => from.0 == to && provider == manifest,
+        Some(("git", identity)) => to == identity,
+        _ => false,
+    }
+}
+
+/// `path` with its `.` and `..` folded without touching the file system, so a symlink never
+/// changes where it lands.
+fn folded(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            part => out.push(part),
+        }
+    }
+    out
+}
+
 /// Every manifest of `ecosystem` whose directory holds `path`, the deepest directory first and
 /// those of one directory by path (a `pyproject.toml` before the `requirements*.txt` beside it).
 fn holding<'m>(
@@ -728,10 +779,11 @@ struct Provided<'e> {
     /// The shapes the provider keeps for what its files export (issue #175), by the symbol-like
     /// identity of the constant or type (`<repository>::<path>::<name>`) and the view.
     shapes: HashMap<(String, Want), &'e Shape>,
-    /// The source files that export something, by ecosystem name and the path of the manifest
-    /// of that ecosystem that is their nearest, none under a `node_modules` directory. Built the
-    /// first time an ambiguous import asks (`candidates`), once for all ecosystems.
-    owned: OnceCell<HashMap<(&'static str, &'e str), Vec<&'e str>>>,
+    /// The source files that export something, by the path of the manifest that is their nearest
+    /// in the ecosystem, none under a `node_modules` directory: one table per ecosystem of
+    /// `ECOSYSTEMS`, in its order, built the first time an ambiguous import of that ecosystem
+    /// asks (`candidates`).
+    owned: [OnceCell<HashMap<&'e str, Vec<&'e str>>>; ECOSYSTEMS.len()],
     /// The Go source files that are no tests, by directory. Built the first time a Go import
     /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
@@ -763,7 +815,7 @@ impl<'e> Provided<'e> {
                     ((id, k.want), &k.shape)
                 })
                 .collect(),
-            owned: OnceCell::new(),
+            owned: Default::default(),
             go_dirs: OnceCell::new(),
         }
     }
@@ -836,22 +888,22 @@ impl<'e> Provided<'e> {
         let Some(ecosystem) = of(&manifest.path) else {
             return Vec::new();
         };
-        let owned = self.owned.get_or_init(|| {
-            let mut owned: HashMap<(&str, &str), Vec<&str>> = HashMap::new();
+        let at = (ECOSYSTEMS.iter())
+            .position(|e| e.name() == ecosystem.name())
+            .expect("`of` answers from ECOSYSTEMS");
+        let owned = self.owned[at].get_or_init(|| {
+            let mut owned: HashMap<&str, Vec<&str>> = HashMap::new();
             for &path in self.exported.keys() {
                 if !self.source(path) || path.split('/').any(|s| s == "node_modules") {
                     continue;
                 }
-                for e in ECOSYSTEMS {
-                    if let Some(m) = nearest(self.manifests, path, *e) {
-                        owned.entry((e.name(), &m.path)).or_default().push(path);
-                    }
+                if let Some(m) = nearest(self.manifests, path, ecosystem) {
+                    owned.entry(&m.path).or_default().push(path);
                 }
             }
             owned
         });
-        let key = (ecosystem.name(), manifest.path.as_str());
-        let files = owned.get(&key).into_iter().flatten();
+        let files = owned.get(manifest.path.as_str()).into_iter().flatten();
         let mut ids: Vec<String> = files
             .filter(|path| {
                 self.exported[**path]
@@ -1179,7 +1231,7 @@ pub fn surface(
         manifests,
         configs,
         shapes: HashMap::new(),
-        owned: OnceCell::new(),
+        owned: Default::default(),
         go_dirs: OnceCell::new(),
     };
     let mut queue = Vec::new();
@@ -2527,7 +2579,7 @@ mod tests {
             manifests: &[],
             configs: &[],
             shapes: HashMap::new(),
-            owned: OnceCell::new(),
+            owned: Default::default(),
             go_dirs: OnceCell::new(),
         }
     }
@@ -2665,6 +2717,14 @@ mod tests {
         assert_eq!(
             p.candidates("r", &manifests[2], "f", &|id| p.symbol(id)),
             ["r::sealed/src/b.ts::f", "r::src/a.ts::f"]
+        );
+        // Only the asking ecosystem's table is built (PyPI is the second of `ECOSYSTEMS`).
+        assert!(p.owned[1].get().is_some());
+        assert!(
+            p.owned
+                .iter()
+                .enumerate()
+                .all(|(i, t)| i == 1 || t.get().is_none())
         );
         // The root package does not take the nested package's file (a directory-prefix test
         // would), a declaration file, or one under `node_modules`; the nested one neither.

@@ -269,8 +269,8 @@ pub fn join(dir: &str, rel: &str) -> Option<String> {
 }
 
 /// Every `Cargo.toml` among `configs` that parses, by directory. One past
-/// `lang::MAX_BYTES` is invalid, as `package::cargo::read` takes it: the index reads a config
-/// only up to one byte past that size.
+/// `lang::MAX_BYTES` is invalid, as `Cargo::read` (`package::cargo`) takes it: the index reads a
+/// config only up to one byte past that size.
 fn tables<'c>(configs: &[(&'c str, &'c [u8])]) -> Vec<(&'c str, toml::Table)> {
     let mut tables: Vec<(&str, toml::Table)> = configs
         .iter()

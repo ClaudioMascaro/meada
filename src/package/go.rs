@@ -21,10 +21,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::cargo::sourced;
 use super::{
-    Ecosystem, Entry, How, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
-    inside, owner, valid_name,
+    Ecosystem, Entry, How, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary,
+    bare_directory, directory, inside, owner, sourced, valid_name,
 };
 use crate::contract::Level;
 use crate::index::Export;
@@ -35,63 +34,6 @@ use crate::repo::relative;
 const REQUIRE: &str = "require";
 /// The field of an entry only a `replace` gives (a module some other module requires).
 const REPLACE: &str = "replace";
-
-/// Reads a `go.mod` from its bytes. Hostile input: a file too large reads as empty, a line it
-/// cannot read is skipped, and a module path that cannot be a contract name makes no provider
-/// and no entry.
-pub fn read(path: &str, src: &[u8]) -> Summary {
-    if src.len() > MAX_BYTES {
-        return Summary::default();
-    }
-    let dir = directory(path);
-    let dir = if dir == "." { "" } else { dir };
-    let file = modfile::read(&String::from_utf8_lossy(src));
-    // The first `replace` of a module decides, found once for all.
-    let mut replaced: HashMap<&str, &str> = HashMap::new();
-    for (old, new) in &file.replaces {
-        replaced.entry(old).or_insert(new);
-    }
-    let via = |module: &str| {
-        let target = replaced.get(module)?;
-        let local = modfile::local_target(target).then(|| relative(dir, target));
-        Some(match local.flatten() {
-            Some(at) if at.is_empty() => "path go.mod".to_string(),
-            Some(at) => format!("path {at}/go.mod"),
-            None => "outside".to_string(),
-        })
-    };
-    let mut dependencies: Vec<Entry> = Vec::new();
-    let mut seen: HashSet<&str> = HashSet::new();
-    for (module, version) in &file.requires {
-        if valid_name(module) && seen.insert(module) {
-            dependencies.push(Entry {
-                field: REQUIRE.to_string(),
-                name: module.clone(),
-                range: Some(version.clone()),
-                via: via(module),
-                ..Entry::default()
-            });
-        }
-    }
-    // A replaced module nobody here requires may be one a dependency requires.
-    for (module, _) in &file.replaces {
-        let via = via(module).filter(|v| v.starts_with("path "));
-        if via.is_some() && valid_name(module) && seen.insert(module) {
-            dependencies.push(Entry {
-                field: REPLACE.to_string(),
-                name: module.clone(),
-                via,
-                ..Entry::default()
-            });
-        }
-    }
-    dependencies.sort_by(|a, b| (&a.field, &a.name).cmp(&(&b.field, &b.name)));
-    Summary {
-        name: file.module.filter(|m| valid_name(m)),
-        dependencies,
-        ..Summary::default()
-    }
-}
 
 /// The Go ecosystem.
 pub struct Go;
@@ -105,8 +47,60 @@ impl Ecosystem for Go {
         file_name == "go.mod"
     }
 
+    /// Reads a `go.mod` from its bytes. Hostile input: a file too large reads as empty, a line it
+    /// cannot read is skipped, and a module path that cannot be a contract name makes no provider
+    /// and no entry.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
-        read(path, src)
+        if src.len() > MAX_BYTES {
+            return Summary::default();
+        }
+        let dir = bare_directory(path);
+        let file = modfile::read(&String::from_utf8_lossy(src));
+        // The first `replace` of a module decides, found once for all.
+        let mut replaced: HashMap<&str, &str> = HashMap::new();
+        for (old, new) in &file.replaces {
+            replaced.entry(old).or_insert(new);
+        }
+        let via = |module: &str| {
+            let target = replaced.get(module)?;
+            let local = modfile::local_target(target).then(|| relative(dir, target));
+            Some(match local.flatten() {
+                Some(at) if at.is_empty() => "path go.mod".to_string(),
+                Some(at) => format!("path {at}/go.mod"),
+                None => "outside".to_string(),
+            })
+        };
+        let mut dependencies: Vec<Entry> = Vec::new();
+        let mut seen: HashSet<&str> = HashSet::new();
+        for (module, version) in &file.requires {
+            if valid_name(module) && seen.insert(module) {
+                dependencies.push(Entry {
+                    field: REQUIRE.to_string(),
+                    name: module.clone(),
+                    range: Some(version.clone()),
+                    via: via(module),
+                    ..Entry::default()
+                });
+            }
+        }
+        // A replaced module nobody here requires may be one a dependency requires.
+        for (module, _) in &file.replaces {
+            let via = via(module).filter(|v| v.starts_with("path "));
+            if via.is_some() && valid_name(module) && seen.insert(module) {
+                dependencies.push(Entry {
+                    field: REPLACE.to_string(),
+                    name: module.clone(),
+                    via,
+                    ..Entry::default()
+                });
+            }
+        }
+        dependencies.sort_by(|a, b| (&a.field, &a.name).cmp(&(&b.field, &b.name)));
+        Summary {
+            name: file.module.filter(|m| valid_name(m)),
+            dependencies,
+            ..Summary::default()
+        }
     }
 
     fn sources(&self) -> &'static [&'static str] {
@@ -218,7 +212,7 @@ mod tests {
 
     #[test]
     fn a_go_mod_gives_its_module_its_requires_and_where_a_replace_sends_them() {
-        let s = read(
+        let s = Go.read(
             "app/go.mod",
             b"module example.com/app\ngo 1.22\n\
               require (\n\texample.com/a v1.0.0\n\texample.com/b v1.1.0 // indirect\n\texample.com/c v1.2.0\n\texample.com/d v1.3.0\n)\n\
@@ -255,15 +249,15 @@ mod tests {
 
     #[test]
     fn a_module_without_a_usable_path_provides_nothing_and_a_hostile_file_reads_as_empty() {
-        assert_eq!(read("go.mod", b"go 1.22\n").name, None);
-        assert_eq!(read("go.mod", b"module a:b\n").name, None);
-        assert_eq!(read("go.mod", &[0xff, 0xfe, b'\n']).dependencies, []);
+        assert_eq!(Go.read("go.mod", b"go 1.22\n").name, None);
+        assert_eq!(Go.read("go.mod", b"module a:b\n").name, None);
+        assert_eq!(Go.read("go.mod", &[0xff, 0xfe, b'\n']).dependencies, []);
         assert_eq!(
-            read("go.mod", &vec![b'x'; MAX_BYTES + 1]),
+            Go.read("go.mod", &vec![b'x'; MAX_BYTES + 1]),
             Summary::default()
         );
         // A replace at the root of the repository names its `go.mod`.
-        let s = read("go.mod", b"replace example.com/a => .\n");
+        let s = Go.read("go.mod", b"replace example.com/a => .\n");
         assert_eq!(
             rows(&s),
             [("replace", "example.com/a", None, Some("path go.mod"))]
@@ -288,7 +282,7 @@ mod tests {
     fn manifest(path: &str, src: &str) -> Manifest {
         Manifest {
             path: path.into(),
-            summary: read(path, src.as_bytes()),
+            summary: Go.read(path, src.as_bytes()),
         }
     }
 
@@ -398,7 +392,7 @@ mod tests {
 
     #[test]
     fn a_local_replace_is_a_path_source_that_reaches_the_directory_it_names_and_nothing_else() {
-        let s = read(
+        let s = Go.read(
             "app/go.mod",
             b"require example.com/lib v1.0.0\nreplace example.com/lib => ../lib\n",
         );
@@ -431,7 +425,7 @@ mod tests {
         }
         let text = &text.as_bytes()[..text.len().min(MAX_BYTES)];
         let start = std::time::Instant::now();
-        let s = read("go.mod", text);
+        let s = Go.read("go.mod", text);
         assert!(s.dependencies.len() > n, "{}", s.dependencies.len());
         assert!(start.elapsed().as_secs() < 2, "{:?}", start.elapsed());
     }

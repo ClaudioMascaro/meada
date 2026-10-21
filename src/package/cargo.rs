@@ -21,11 +21,11 @@
 //! never checked, and neither `Cargo.lock` nor a registry is read.
 
 use std::collections::{HashMap, HashSet};
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolved, Summary,
-    directory, owner,
+    bare_directory, directory, owner, sourced,
 };
 use crate::index::Export;
 use crate::lang::rust::crates::{crate_name, entries, lib_name, lib_root, workspace_deps};
@@ -34,69 +34,12 @@ use crate::repo::{normalize_remote, relative};
 /// The field a `[workspace.dependencies]` entry is kept under, in `Summary::workspace`.
 const WORKSPACE: &str = "workspace.dependencies";
 
-/// Reads a `Cargo.toml` from its bytes. Hostile input: a file too large, not UTF-8 or not TOML
-/// reads as empty; a field of another type counts as absent; a name Cargo would refuse makes no
-/// provider; a `workspace = true` entry is kept as such until `inherit` fills it.
-pub fn read(path: &str, src: &[u8]) -> Summary {
-    let table: Option<toml::Table> = (src.len() <= MAX_BYTES)
-        .then(|| std::str::from_utf8(src).ok()?.parse().ok())
-        .flatten();
-    let Some(table) = table else {
-        return Summary::default();
-    };
-    let dir = directory(path);
-    let dir = if dir == "." { "" } else { dir };
-    let text = |v: Option<&toml::Value>| match v {
-        Some(toml::Value::String(s)) if !s.is_empty() => Some(s.clone()),
-        _ => None,
-    };
-    let package = table.get("package");
-    let name = text(package.and_then(|p| p.get("name"))).filter(|n| valid_name(n));
-    let mut seen = HashSet::new();
-    let mut dependencies: Vec<Entry> = Vec::new();
-    for (field, key, spec) in entries(&table) {
-        let Some(entry) = entry(dir, field, key, spec) else {
-            continue;
-        };
-        if seen.insert((entry.field.clone(), entry.key().to_string())) {
-            dependencies.push(entry);
-        }
-    }
-    dependencies.sort_by(|a, b| (&a.field, a.key()).cmp(&(&b.field, b.key())));
-    let mut workspace: Vec<Entry> = Vec::new();
-    for (key, spec) in workspace_deps(&table).into_iter().flatten() {
-        workspace.extend(entry(dir, WORKSPACE, key, spec));
-    }
-    workspace.sort_by(|a, b| a.key().cmp(b.key()));
-    // `version.workspace = true` takes the version from `[workspace.package]` (see `inherit`).
-    let version = package.and_then(|p| p.get("version"));
-    let inherits_version = version.and_then(|v| v.get("workspace")?.as_bool()) == Some(true);
-    // The library name only when it is not the one a path writes for the package anyway.
-    let lib = (name.as_deref())
-        .map(|n| (crate_name(n), lib_name(&table, n)))
-        .filter(|(own, lib)| lib != own && valid_name(lib))
-        .map(|(_, lib)| lib);
-    Summary {
-        version: text(version).filter(|_| name.is_some()),
-        main: name.as_ref().and_then(|_| lib_root(&table, dir)),
-        inherits_version: inherits_version && name.is_some(),
-        workspace_version: text(
-            (table.get("workspace")).and_then(|w| w.get("package")?.get("version")),
-        ),
-        lib_name: lib,
-        name,
-        dependencies,
-        workspace,
-        ..Summary::default()
-    }
-}
-
 /// The dependency `key = spec` of the table `field`, for a manifest in `dir` (empty at the
 /// root); `None` when it is neither a version nor a table, its crate has no valid name or its
 /// source cannot be read (see `source`).
 fn entry(dir: &str, field: &str, key: &str, spec: &toml::Value) -> Option<Entry> {
     if spec.get("workspace").and_then(|w| w.as_bool()) == Some(true) {
-        return valid_name(key).then(|| Entry {
+        return is_crate_name(key).then(|| Entry {
             field: field.to_string(),
             name: key.to_string(),
             inherits: true,
@@ -107,7 +50,7 @@ fn entry(dir: &str, field: &str, key: &str, spec: &toml::Value) -> Option<Entry>
         return None;
     }
     let name = declared(spec, "package")?.unwrap_or(key);
-    if !valid_name(name) || !valid_name(key) {
+    if !is_crate_name(name) || !is_crate_name(key) {
         return None;
     }
     let via = source(dir, spec)?;
@@ -150,64 +93,9 @@ fn source(dir: &str, spec: &toml::Value) -> Option<Option<String>> {
     })
 }
 
-/// Fills each `workspace = true` entry of a Cargo manifest from the `[workspace.dependencies]`
-/// of the nearest manifest above it (or itself) that has any, and `version.workspace = true`
-/// from that manifest's `[workspace.package] version`; an entry that finds no entry of its key
-/// is dropped, as Cargo refuses it. The member keeps its own table (`dev-dependencies`...) and
-/// key, so a workspace entry that renames a crate renames it for the member too.
-fn inherit(manifests: &mut [Manifest]) {
-    type Root = (String, HashMap<String, Entry>, Option<String>);
-    let roots: Vec<Root> = (manifests.iter())
-        .filter(|m| m.path.ends_with("Cargo.toml"))
-        .filter(|m| !m.summary.workspace.is_empty() || m.summary.workspace_version.is_some())
-        .map(|m| {
-            let table = (m.summary.workspace.iter())
-                .map(|e| (e.key().to_string(), e.clone()))
-                .collect();
-            let version = m.summary.workspace_version.clone();
-            (directory(&m.path).to_string(), table, version)
-        })
-        .collect();
-    for m in manifests
-        .iter_mut()
-        .filter(|m| m.path.ends_with("Cargo.toml"))
-    {
-        if !m.summary.inherits_version && !m.summary.dependencies.iter().any(|e| e.inherits) {
-            continue;
-        }
-        let dir = directory(&m.path);
-        let near = (roots.iter())
-            .filter(|(root, ..)| root == "." || dir == root || dir.starts_with(&format!("{root}/")))
-            .max_by_key(|(root, ..)| if root == "." { 0 } else { root.len() + 1 });
-        if std::mem::take(&mut m.summary.inherits_version) {
-            m.summary.version = near.and_then(|(_, _, version)| version.clone());
-        }
-        let entries = std::mem::take(&mut m.summary.dependencies);
-        m.summary.dependencies = entries
-            .into_iter()
-            .filter_map(|e| {
-                if !e.inherits {
-                    return Some(e);
-                }
-                let from = near?.1.get(&e.name)?;
-                Some(Entry {
-                    field: e.field,
-                    alias: (from.name != e.name).then(|| e.name.clone()),
-                    inherits: false,
-                    name: from.name.clone(),
-                    ..from.clone()
-                })
-            })
-            .collect();
-        m.summary
-            .dependencies
-            .sort_by(|a, b| (&a.field, a.key()).cmp(&(&b.field, b.key())));
-    }
-}
-
 /// Whether `name` can be a package name: Cargo's alphabet (ASCII letters and digits, `-` and
 /// `_`), not empty, at most `MAX_NAME` bytes.
-fn valid_name(name: &str) -> bool {
+fn is_crate_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
         && name
@@ -219,14 +107,14 @@ fn valid_name(name: &str) -> bool {
 /// identifier that is not the standard library's.
 pub fn names_crate(specifier: &str) -> bool {
     !matches!(specifier, "std" | "core" | "alloc")
-        && valid_name(specifier)
+        && is_crate_name(specifier)
         && !specifier.contains('-')
 }
 
 /// What a `use` writes for the dependency `entry` when it renames the package: its key with
 /// hyphens turned into underscores. An entry that does not rename it writes the library's own
 /// name (`lib_head`) instead.
-pub fn import_name(entry: &Entry) -> String {
+pub fn key_head(entry: &Entry) -> String {
     crate_name(entry.key())
 }
 
@@ -236,45 +124,6 @@ pub fn lib_head(s: &Summary) -> Option<String> {
     s.lib_name
         .clone()
         .or_else(|| s.name.as_deref().map(crate_name))
-}
-
-/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
-/// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
-/// root): a `path` entry only the package at that path, a `git` one only the repository of that
-/// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
-/// matched against the provider's location by the two roots, folded lexically: nothing is read.
-pub(super) fn sourced(
-    via: Option<&str>,
-    from: (&str, &Path),
-    ((to, to_root), provider): ((&str, &Path), &str),
-) -> bool {
-    let Some(via) = via else {
-        return true;
-    };
-    match via.split_once(' ') {
-        Some(("path", manifest)) if manifest.starts_with("../") => {
-            folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
-        }
-        Some(("path", manifest)) => from.0 == to && provider == manifest,
-        Some(("git", identity)) => to == identity,
-        _ => false,
-    }
-}
-
-/// `path` with its `.` and `..` folded without touching the file system, so a symlink never
-/// changes where it lands.
-fn folded(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for part in path.components() {
-        match part {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
-            part => out.push(part),
-        }
-    }
-    out
 }
 
 /// The Cargo ecosystem.
@@ -289,16 +138,121 @@ impl Ecosystem for Cargo {
         file_name == "Cargo.toml"
     }
 
+    /// Reads a `Cargo.toml` from its bytes. Hostile input: a file too large, not UTF-8 or not TOML
+    /// reads as empty; a field of another type counts as absent; a name Cargo would refuse makes no
+    /// provider; a `workspace = true` entry is kept as such until `inherit` fills it.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
-        read(path, src)
+        let table: Option<toml::Table> = (src.len() <= MAX_BYTES)
+            .then(|| std::str::from_utf8(src).ok()?.parse().ok())
+            .flatten();
+        let Some(table) = table else {
+            return Summary::default();
+        };
+        let dir = bare_directory(path);
+        let text = |v: Option<&toml::Value>| match v {
+            Some(toml::Value::String(s)) if !s.is_empty() => Some(s.clone()),
+            _ => None,
+        };
+        let package = table.get("package");
+        let name = text(package.and_then(|p| p.get("name"))).filter(|n| is_crate_name(n));
+        let mut seen = HashSet::new();
+        let mut dependencies: Vec<Entry> = Vec::new();
+        for (field, key, spec) in entries(&table) {
+            let Some(entry) = entry(dir, field, key, spec) else {
+                continue;
+            };
+            if seen.insert((entry.field.clone(), entry.key().to_string())) {
+                dependencies.push(entry);
+            }
+        }
+        dependencies.sort_by(|a, b| (&a.field, a.key()).cmp(&(&b.field, b.key())));
+        let mut workspace: Vec<Entry> = Vec::new();
+        for (key, spec) in workspace_deps(&table).into_iter().flatten() {
+            workspace.extend(entry(dir, WORKSPACE, key, spec));
+        }
+        workspace.sort_by(|a, b| a.key().cmp(b.key()));
+        // `version.workspace = true` takes the version from `[workspace.package]` (see `inherit`).
+        let version = package.and_then(|p| p.get("version"));
+        let inherits_version = version.and_then(|v| v.get("workspace")?.as_bool()) == Some(true);
+        // The library name only when it is not the one a path writes for the package anyway.
+        let lib = (name.as_deref())
+            .map(|n| (crate_name(n), lib_name(&table, n)))
+            .filter(|(own, lib)| lib != own && is_crate_name(lib))
+            .map(|(_, lib)| lib);
+        Summary {
+            version: text(version).filter(|_| name.is_some()),
+            main: name.as_ref().and_then(|_| lib_root(&table, dir)),
+            inherits_version: inherits_version && name.is_some(),
+            workspace_version: text(
+                (table.get("workspace")).and_then(|w| w.get("package")?.get("version")),
+            ),
+            lib_name: lib,
+            name,
+            dependencies,
+            workspace,
+            ..Summary::default()
+        }
     }
 
     fn sources(&self) -> &'static [&'static str] {
         &["rs"]
     }
 
+    /// Fills each `workspace = true` entry of a Cargo manifest from the `[workspace.dependencies]`
+    /// of the nearest manifest above it (or itself) that has any, and `version.workspace = true`
+    /// from that manifest's `[workspace.package] version`; an entry that finds no entry of its key
+    /// is dropped, as Cargo refuses it. The member keeps its own table (`dev-dependencies`...) and
+    /// key, so a workspace entry that renames a crate renames it for the member too.
     fn inherit(&self, manifests: &mut [Manifest]) {
-        inherit(manifests);
+        type Root = (String, HashMap<String, Entry>, Option<String>);
+        let roots: Vec<Root> = (manifests.iter())
+            .filter(|m| m.path.ends_with("Cargo.toml"))
+            .filter(|m| !m.summary.workspace.is_empty() || m.summary.workspace_version.is_some())
+            .map(|m| {
+                let table = (m.summary.workspace.iter())
+                    .map(|e| (e.key().to_string(), e.clone()))
+                    .collect();
+                let version = m.summary.workspace_version.clone();
+                (directory(&m.path).to_string(), table, version)
+            })
+            .collect();
+        for m in manifests
+            .iter_mut()
+            .filter(|m| m.path.ends_with("Cargo.toml"))
+        {
+            if !m.summary.inherits_version && !m.summary.dependencies.iter().any(|e| e.inherits) {
+                continue;
+            }
+            let dir = directory(&m.path);
+            let near = (roots.iter())
+                .filter(|(root, ..)| {
+                    root == "." || dir == root || dir.starts_with(&format!("{root}/"))
+                })
+                .max_by_key(|(root, ..)| if root == "." { 0 } else { root.len() + 1 });
+            if std::mem::take(&mut m.summary.inherits_version) {
+                m.summary.version = near.and_then(|(_, _, version)| version.clone());
+            }
+            let entries = std::mem::take(&mut m.summary.dependencies);
+            m.summary.dependencies = entries
+                .into_iter()
+                .filter_map(|e| {
+                    if !e.inherits {
+                        return Some(e);
+                    }
+                    let from = near?.1.get(&e.name)?;
+                    Some(Entry {
+                        field: e.field,
+                        alias: (from.name != e.name).then(|| e.name.clone()),
+                        inherits: false,
+                        name: from.name.clone(),
+                        ..from.clone()
+                    })
+                })
+                .collect();
+            m.summary
+                .dependencies
+                .sort_by(|a, b| (&a.field, a.key()).cmp(&(&b.field, b.key())));
+        }
     }
 
     fn names_package(&self, specifier: &str) -> bool {
@@ -319,7 +273,7 @@ impl Ecosystem for Cargo {
             (false, of) if !of.is_empty() => (of.iter()).any(|&(m, i)| {
                 lib_head(&exports[m].manifests[i].summary).as_deref() == Some(specifier)
             }),
-            _ => import_name(e) == specifier,
+            _ => key_head(e) == specifier,
         };
         let entry = (owner(&exports[n].manifests, from, self))
             .filter(|_| names_crate(specifier))
@@ -411,7 +365,7 @@ mod tests {
     }
 
     fn read_at(path: &str, toml: &str) -> Summary {
-        read(path, toml.as_bytes())
+        Cargo.read(path, toml.as_bytes())
     }
 
     type Row<'a> = (&'a str, &'a str, &'a str, Option<&'a str>, Option<&'a str>);
@@ -529,7 +483,7 @@ mod tests {
                 "[package]\nname = \"n\"\nversion = \"1.0.0\"\n",
             ),
         ];
-        inherit(&mut manifests);
+        Cargo.inherit(&mut manifests);
         let versions: Vec<_> = (manifests.iter())
             .map(|m| m.summary.version.as_deref())
             .collect();
@@ -551,9 +505,9 @@ mod tests {
             "[package]\nname = \"a:b\"\n[dependencies]\n\"a b\" = \"1\"\n",
         );
         assert_eq!(bad, Summary::default());
-        assert_eq!(read("Cargo.toml", &[0xff, 0xfe]), Summary::default());
+        assert_eq!(Cargo.read("Cargo.toml", &[0xff, 0xfe]), Summary::default());
         assert_eq!(
-            read("Cargo.toml", &vec![b'#'; MAX_BYTES + 1]),
+            Cargo.read("Cargo.toml", &vec![b'#'; MAX_BYTES + 1]),
             Summary::default()
         );
     }
@@ -579,7 +533,7 @@ mod tests {
                 "[package]\nname = \"o\"\n[dependencies]\nshared = { workspace = true, optional = true }\n",
             ),
         ];
-        inherit(&mut manifests);
+        Cargo.inherit(&mut manifests);
         assert_eq!(
             keys(&manifests[1].summary),
             [

@@ -94,9 +94,6 @@ impl Ecosystem for Npm {
             types: text(root.get("types")),
             module: text(root.get("module")),
             main: text(root.get("main")),
-            roots: Vec::new(),
-            scripts: Vec::new(),
-            workspace: Vec::new(),
             ..Summary::default()
         }
     }

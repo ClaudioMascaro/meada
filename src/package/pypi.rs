@@ -15,7 +15,7 @@ use std::collections::HashSet;
 
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, directory, holding, npm::split, owner,
+    Resolved, Summary, bare_directory, directory, holding, npm::split, owner,
 };
 use crate::contract::Level;
 use crate::index::Export;
@@ -176,10 +176,7 @@ pub fn read_requirements(src: &[u8]) -> Summary {
 /// The source roots of the PyPI package at `manifest`, as the Python pack reads a repository's:
 /// its directory, then the roots its `pyproject.toml` declares, or its `src` when none is.
 fn roots(manifest: &Manifest) -> Vec<String> {
-    let base = match directory(&manifest.path) {
-        "." => "",
-        dir => dir,
-    };
+    let base = bare_directory(&manifest.path);
     python::pyproject::source_roots(base, &manifest.summary.roots)
 }
 
@@ -193,38 +190,6 @@ fn module(at: &Provided, manifest: &Manifest, specifier: &str) -> Option<String>
         .find(|f| at.owned_source(manifest, f))
 }
 
-/// The program entry points the console scripts of the PyPI manifests name, as the file of the
-/// script's module (the one an import of it from the package finds, `roots`) and the function. A
-/// script whose module is no file of the package names nothing. Sorted, without repeats.
-fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    for manifest in manifests {
-        // A script belongs to the package of a manifest that bounds one.
-        let file_name = manifest.path.rsplit('/').next().unwrap_or_default();
-        if !(Pypi.is_manifest(file_name) && Pypi.owns(manifest)) {
-            continue;
-        }
-        let roots = roots(manifest);
-        for (module, function) in &manifest.summary.scripts {
-            let name = module.replace('.', "/");
-            // The first candidate that exists and is this package's, as `module` finds it: a
-            // file of a nested package is not.
-            let owned = |f: &String| {
-                files.contains(&f.as_str())
-                    && owner(manifests, f, &Pypi)
-                        .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
-            };
-            let file = (roots.iter())
-                .flat_map(|root| python::files(root, &name))
-                .find(owned);
-            found.extend(file.map(|f| (f, function.clone())));
-        }
-    }
-    found.sort();
-    found.dedup();
-    found
-}
-
 /// The PyPI ecosystem.
 pub struct Pypi;
 
@@ -233,8 +198,36 @@ impl Ecosystem for Pypi {
         "pypi"
     }
 
+    /// The program entry points the console scripts of the PyPI manifests name, as the file of the
+    /// script's module (the one an import of it from the package finds, `roots`) and the function. A
+    /// script whose module is no file of the package names nothing. Sorted, without repeats.
     fn programs(&self, manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
-        programs(manifests, files)
+        let mut found = Vec::new();
+        for manifest in manifests {
+            // A script belongs to the package of a manifest that bounds one.
+            let file_name = manifest.path.rsplit('/').next().unwrap_or_default();
+            if !(Pypi.is_manifest(file_name) && Pypi.owns(manifest)) {
+                continue;
+            }
+            let roots = roots(manifest);
+            for (module, function) in &manifest.summary.scripts {
+                let name = module.replace('.', "/");
+                // The first candidate that exists and is this package's, as `module` finds it: a
+                // file of a nested package is not.
+                let owned = |f: &String| {
+                    files.contains(&f.as_str())
+                        && owner(manifests, f, &Pypi)
+                            .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
+                };
+                let file = (roots.iter())
+                    .flat_map(|root| python::files(root, &name))
+                    .find(owned);
+                found.extend(file.map(|f| (f, function.clone())));
+            }
+        }
+        found.sort();
+        found.dedup();
+        found
     }
 
     fn is_manifest(&self, file_name: &str) -> bool {
@@ -735,7 +728,7 @@ serve = "acme.cli:main"
             "outer/inner/pkg/cli.py",
         ];
 
-        let found = programs(&all, &files);
+        let found = Pypi.programs(&all, &files);
 
         // `tool/__init__.py` over `tool.py`, as an import finds it; the `src` root of `lib`;
         // `none` has no file; `outer`'s `inner.py` is its own, and `pkg/cli.py` is not in
@@ -761,7 +754,7 @@ serve = "acme.cli:main"
         let files = ["inner/mod.py", "src/inner/mod.py"];
 
         assert_eq!(
-            programs(&all, &files),
+            Pypi.programs(&all, &files),
             [("src/inner/mod.py".to_string(), "go".to_string())]
         );
     }
@@ -769,6 +762,6 @@ serve = "acme.cli:main"
     #[test]
     fn a_requirements_file_declares_no_console_script() {
         let all = [script_manifest("requirements.txt", &[("app", "main")], &[])];
-        assert!(programs(&all, &["app.py"]).is_empty());
+        assert!(Pypi.programs(&all, &["app.py"]).is_empty());
     }
 }
