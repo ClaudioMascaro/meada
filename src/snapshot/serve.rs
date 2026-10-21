@@ -69,7 +69,10 @@ impl Current {
         if let Some(held) = pins.get(id) {
             return Ok(Some(held.clone()));
         }
-        let held = Arc::new(load(&self.local, id.to_string())?);
+        let Some(held) = unless_gone(&self.local, id, load(&self.local, id.to_string()))? else {
+            return Ok(None);
+        };
+        let held = Arc::new(held);
         pins.insert(id.to_string(), held.clone());
         Ok(Some(held))
     }
@@ -101,6 +104,16 @@ pub fn node(manifest: &Path) -> Result<(Config, PathBuf)> {
 /// stored it. Without a pointer the node holds nothing to serve: the error names the pull.
 pub fn held(local: &Path) -> Result<Held> {
     load(local, pointer(local)?)
+}
+
+/// `loaded`, the generation `id` of `local` as `load` read it, or `None` when it failed because
+/// its directory is gone: a pull deleted it between the listing and the read, so it is no longer
+/// held.
+fn unless_gone(local: &Path, id: &str, loaded: Result<Held>) -> Result<Option<Held>> {
+    match loaded {
+        Err(_) if fs::symlink_metadata(local.join(id)).is_err() => Ok(None),
+        loaded => loaded.map(Some),
+    }
 }
 
 /// The id `<local_dir>/current` names; without one, an error naming the pull.
@@ -145,11 +158,7 @@ pub fn ids(local: &Path) -> Vec<String> {
 /// The generation id the store's `current` holds, or why the store did not say within
 /// `REACH_TIMEOUT`.
 pub fn reach(config: &Config) -> std::result::Result<String, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let ask = async {
+    within(async {
         let store = Store::connect(config)?;
         let key = config.key("current");
         let bytes = store.get(&key, CURRENT_MAX).await?;
@@ -157,7 +166,40 @@ pub fn reach(config: &Config) -> std::result::Result<String, String> {
             &key,
             &bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?,
         )
-    };
+    })
+}
+
+/// With `[generations]`: the current generation id Valkey holds, once the store answers that it
+/// holds its document, or why Valkey or the store did not say within `REACH_TIMEOUT`, the reason
+/// prefixed with which one.
+#[cfg(feature = "generation-pointer")]
+pub fn reach_pointer(
+    config: &Config,
+    valkey: &crate::valkey::Config,
+) -> std::result::Result<String, String> {
+    within(async {
+        let read = async {
+            let connection = crate::valkey::Valkey::connect(valkey).await?;
+            super::generations::current(&connection, valkey).await
+        };
+        let (id, _) = read.await.map_err(|e| format!("valkey: {e}"))?;
+        let key = config.key(&format!("generations/{id}.json"));
+        let stored = async { Store::connect(config)?.stored(&key).await };
+        match stored.await.map_err(|e| format!("store: {e}"))? {
+            Some(_) => Ok(id),
+            None => Err(format!("store: {}", Msg::SnapshotNoCurrent(&key).text())),
+        }
+    })
+}
+
+/// `ask` on a runtime of its own, or a timeout after `REACH_TIMEOUT`.
+fn within(
+    ask: impl Future<Output = std::result::Result<String, String>>,
+) -> std::result::Result<String, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
     let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ask).await });
     // Dropping the runtime would wait for a blocking thread still in a DNS lookup.
     runtime.shutdown_background();
@@ -287,6 +329,20 @@ mod tests {
         // A held generation whose document no longer reads is an error, not a 404.
         fs::remove_file(local.join(B).join(pull::DOCUMENT)).unwrap();
         assert!(current.pinned(B).is_err());
+    }
+
+    /// A pin whose read fails because a pull deleted its directory after the listing is a
+    /// generation no longer held (the 404), not an unservable node (the 503).
+    #[test]
+    fn a_pin_deleted_between_the_listing_and_the_read_is_no_longer_held() {
+        let local = scratch("pin-gone");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        let failed = || load(&local, B.to_string());
+        assert!(unless_gone(&local, B, failed()).unwrap().is_none());
+        fs::create_dir(local.join(B)).unwrap();
+        assert!(unless_gone(&local, B, failed()).is_err());
+        let loaded = unless_gone(&local, A, load(&local, A.to_string())).unwrap();
+        assert_eq!(loaded.unwrap().id, A);
     }
 
     /// A held generation is as hostile as the store it came from: a document that does not

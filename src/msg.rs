@@ -331,6 +331,11 @@ pub enum Msg<'a> {
     #[cfg(feature = "snapshot")]
     GenerationNotHeld(&'a str),
     #[cfg(feature = "snapshot")]
+    SnapshotRetainedSkipped {
+        id: &'a str,
+        why: &'a str,
+    },
+    #[cfg(feature = "snapshot")]
     GenerationsHelp,
     About,
     Index,
@@ -1122,6 +1127,11 @@ impl Msg<'_> {
             Msg::GenerationsEmpty(key) => pick(
                 format!("{key}: empty: no generation is retained there"),
                 format!("{key}: vazia: nenhuma geração está retida lá"),
+            ),
+            #[cfg(feature = "snapshot")]
+            Msg::SnapshotRetainedSkipped { id, why } => pick(
+                format!("retained generation {id} not pulled, the next pull retries: {why}"),
+                format!("geração retida {id} não baixada, o próximo pull tenta de novo: {why}"),
             ),
             #[cfg(feature = "snapshot")]
             Msg::GenerationNotHeld(id) => pick(

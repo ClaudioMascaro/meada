@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use crate::common::assert_golden;
 use crate::manifest::{MANIFEST, chain_manifest, contents, run};
 use crate::server::{Server, call, text, tokens};
-use crate::serving::serve;
+use crate::serving::{probe, serve};
 use crate::snapshot::{
     SECRET, append_section, block_on, bucket, bucket_name, named_node, next_commit, objects,
     publish, pull, service, store_manifest,
@@ -466,5 +466,92 @@ fn generations_section_errors_name_the_file_the_line_and_the_sections() {
         let (stdout, stderr, ok) = run(&dir, "status");
         assert!(!ok && stdout.is_empty(), "{sections}");
         assert_eq!(stderr, expected, "{sections}");
+    }
+}
+
+/// A retained generation that cannot be pulled (here its document is gone from the store) never
+/// blocks the current one: the pull swaps, warns naming it and exits 0, the node serves the
+/// current generation, the pin of the missing one is the 404, and the next pull tries again.
+#[test]
+fn a_retained_generation_that_fails_to_pull_does_not_block_the_current_one() {
+    let Some(fleet) = Fleet::new("generations_broken", 2) else {
+        return;
+    };
+    let g1 = fleet.publish();
+    next_commit(&fleet.dir, "chain-web", "second");
+    let g2 = fleet.publish();
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let document = format!("prod/meada/generations/{g1}.json");
+    let key = object_store::path::Path::from(document.as_str());
+    block_on(object_store::ObjectStoreExt::delete(&s3, &key)).unwrap();
+
+    let (node, local) = fleet.node("fresh");
+    let warning = format!("meada: retained generation {g1} not pulled, the next pull retries: ");
+    for _ in 0..2 {
+        let (stdout, stderr, code) = pull(&fleet.dir, &node, &[]);
+        assert_eq!((code, stdout.trim()), (Some(0), g2.as_str()), "{stderr}");
+        assert!(stderr.starts_with(&warning), "{stderr}");
+        assert!(stderr.contains(&document), "{stderr}");
+        assert_eq!(stderr.lines().count(), 1, "{stderr}");
+        assert_eq!(held(&local), [g2.clone()]);
+        let pointer = fs::read_to_string(local.join("current")).unwrap();
+        assert_eq!(pointer, format!("{g2} 0\n"));
+    }
+    let server = serve(&fleet.dir, &node);
+    block_on(async {
+        let client = server.client(&format!("/{WEB}")).await;
+        let query = serde_json::json!({"query": "second"});
+        let found = client.call_tool(call("search", query)).await.unwrap();
+        assert!(text(&found).contains("src/status.ts"), "{}", text(&found));
+        assert_eq!(meta(&found).as_deref(), Some(g2.as_str()));
+        client.cancel().await.unwrap();
+    });
+    let (status, _, named, body) = get(&format!("{}/{WEB}@{g1}", server.url));
+    assert_eq!((status, named.as_deref()), (404, Some(g2.as_str())));
+    let missing = format!("generation {g1} is not held here\n");
+    assert!(body.starts_with(&missing), "{body}");
+}
+
+/// `meada status --generations` with `[generations]` reads the current id from Valkey and checks
+/// that the store holds its document; a dead Valkey or a dead store is named, and the exit code
+/// depends only on what the node holds.
+#[test]
+fn the_status_probe_reads_the_current_generation_from_valkey() {
+    let Some(fleet) = Fleet::new("generations_status", 2) else {
+        return;
+    };
+    let g1 = fleet.publish();
+    let (node, _) = fleet.node("node");
+    assert_eq!(fleet.pull(&node), g1);
+    let (stdout, stderr, code) = probe(&fleet.dir, &node);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stdout}");
+    let reachable = format!("current: {g1}\nheld: {g1}\nstore: reachable (current {g1})\n");
+    assert_eq!(stdout, reachable);
+    let file = fleet.dir.join(&node);
+    let toml = fs::read_to_string(&file).unwrap();
+    let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = dead.local_addr().unwrap().port();
+    drop(dead);
+    let cases = [
+        (
+            &fleet.valkey,
+            format!("redis://127.0.0.1:{port}"),
+            "valkey: ",
+        ),
+        (
+            &fleet.endpoint,
+            format!("http://127.0.0.1:{port}"),
+            "store: ",
+        ),
+    ];
+    for (from, to, which) in cases {
+        let broken = toml.replace(from.as_str(), &to);
+        assert_ne!(broken, toml);
+        fs::write(&file, broken).unwrap();
+        let (stdout, stderr, code) = probe(&fleet.dir, &node);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stdout}");
+        assert!(stdout.starts_with(&format!("current: {g1}\n")), "{stdout}");
+        let line = format!("store: unreachable ({which}");
+        assert!(stdout.contains(&line), "{stdout}");
     }
 }

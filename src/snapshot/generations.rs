@@ -101,11 +101,8 @@ pub struct Pointer {
 /// The pointer and the first `keep` retained generations, every id and fence checked. A missing
 /// pointer, an empty list or a malformed entry is an error naming its key.
 pub async fn read(valkey: &Valkey, config: &valkey::Config, keep: u64) -> Result<Pointer, String> {
-    let (current, retained) = keys(config);
-    let fields = cmd("HMGET").arg(&current).arg("id").arg("fence").clone();
-    let fields: Vec<Option<Vec<u8>>> =
-        (valkey.query(&fields).await).map_err(|e| format!("{current}: {e}"))?;
-    let (id, fence) = pointer(&current, &fields)?;
+    let (id, fence) = current(valkey, config).await?;
+    let retained = keys(config).1;
     let range = cmd("LRANGE").arg(&retained).arg(0).arg(keep - 1).clone();
     let entries: Vec<Vec<u8>> =
         (valkey.query(&range).await).map_err(|e| format!("{retained}: {e}"))?;
@@ -114,6 +111,16 @@ pub async fn read(valkey: &Valkey, config: &valkey::Config, keep: u64) -> Result
         fence,
         retained: listed(&retained, &entries)?,
     })
+}
+
+/// The current generation and its fence, checked; a missing or malformed pointer is an error
+/// naming its key.
+pub async fn current(valkey: &Valkey, config: &valkey::Config) -> Result<(String, u64), String> {
+    let current = keys(config).0;
+    let fields = cmd("HMGET").arg(&current).arg("id").arg("fence").clone();
+    let fields: Vec<Option<Vec<u8>>> =
+        (valkey.query(&fields).await).map_err(|e| format!("{current}: {e}"))?;
+    pointer(&current, &fields)
 }
 
 /// The hash `{<key_prefix>}:current` (`key`), as `HMGET key id fence` returns it.

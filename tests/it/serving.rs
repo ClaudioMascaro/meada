@@ -36,7 +36,7 @@ pub(crate) fn serve(dir: &Path, manifest: &str) -> Server {
 
 /// `meada status --workspace <manifest> --generations` in `dir`, with the store's key id: stdout,
 /// stderr and the exit code.
-fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
+pub(crate) fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
         .args(["status", "--workspace", manifest, "--generations"])
