@@ -79,11 +79,12 @@ in the same change:
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   of the invariant "The index holds no source text and no values, apart from ...".
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
-  decisions, the trace, the entry points and the extraction loop of the index writer ask the seam (`contract::kind_of`, `shown`,
-  `serves`, `place` and the other free functions) and import no kind module; a hook added to
-  one of them, or a kind's step added to the extraction loop, is a finding. What cannot be a question (a stored field, the manifest and tsconfig rows the index writer stores as the stored format, the phrase in the MCP
-  `search` doc string, a variant of `entry::EntryKind`, a reader in `document`) is named under
-  "Seams and what extends them".
+  decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
+  (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no
+  kind module; a hook added to one of them, or a kind's step added to the extraction loop, is a
+  finding. What cannot be a question (a stored field, the manifest and tsconfig rows the index
+  writer stores as the stored format, the phrase in the MCP `search` doc string, a variant of
+  `entry::EntryKind`, a reader in `document`) is named under "Seams and what extends them".
 - A package ecosystem's rule lives in its own module under `package/`, behind the `Ecosystem`
   trait in `package.rs`. The shared package steps ask the trait; the index writer asks the
   seam's free functions (`programs`, `inherit`, `is_manifest`, `read_manifest`) and imports no
