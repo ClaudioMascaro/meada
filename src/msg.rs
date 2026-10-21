@@ -184,6 +184,8 @@ pub enum Msg<'a> {
     #[cfg(feature = "valkey")]
     ValkeyUrlInsecure,
     #[cfg(feature = "valkey")]
+    ValkeyClusterPlain,
+    #[cfg(feature = "valkey")]
     ValkeyBoth,
     #[cfg(feature = "valkey")]
     ValkeyPrefixBraces,
@@ -580,6 +582,11 @@ impl Msg<'_> {
             Msg::ValkeyUrlInsecure => pick(
                 "must verify the server certificate: no #insecure".into(),
                 "deve verificar o certificado do servidor: sem #insecure".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyClusterPlain => pick(
+                "needs a rediss:// url: the nodes a cluster announces are reached over TLS".into(),
+                "exige uma url rediss://: os nós que um cluster anuncia são alcançados por TLS".into(),
             ),
             #[cfg(feature = "valkey")]
             Msg::ValkeyBoth => pick(

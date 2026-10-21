@@ -61,8 +61,10 @@ jobs:
         # bash with pipefail, so a failing `cargo tree` fails the step.
         shell: bash
         run: |
-          # Each module ticket adds the crates its feature brings, space-separated.
-          forbidden="redis arc-swap backon crc16 tokio-rustls rustls-native-certs"
+          # Each module ticket adds the crates its feature brings, space-separated. The list
+          # holds canaries: crates specific to a module's client. Generic ones its feature also
+          # pulls (fastrand, ryu, parking) may enter the default build for other reasons.
+          forbidden="redis arc-swap backon crc16 tokio-rustls rustls-native-certs arcstr combine xxhash-rust async-lock"
           crates=$(cargo tree --locked -e normal --prefix none --format '{p}' | cut -d' ' -f1 | sort -u)
           status=0
           for c in $forbidden; do

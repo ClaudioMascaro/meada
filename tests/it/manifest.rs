@@ -441,6 +441,12 @@ fn valkey_section_errors_name_the_file_the_line_and_the_key() {
             ),
         ),
         (
+            "url = \"redis://127.0.0.1\"\ncluster = true\n",
+            format!(
+                "{at}:5: `valkey.cluster`: needs a rediss:// url: the nodes a cluster announces are reached over TLS\n"
+            ),
+        ),
+        (
             "url = \"redis://127.0.0.1\"\nkey_prefix = \"a{b}\"\n",
             format!("{at}:5: `valkey.key_prefix`: must not contain `{{` or `}}`\n"),
         ),
@@ -510,6 +516,32 @@ fn status_names_whether_valkey_is_reachable_and_its_exit_code_ignores_it() {
     let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
     assert!(code == Some(0) && stderr.is_empty(), "{stderr}");
     assert!(status.ends_with("\nvalkey: reachable\n"), "{status}");
+}
+
+/// A `password_file` that is a FIFO nobody writes is refused at once: the probe neither hangs on
+/// the open nor changes its exit code.
+#[cfg(all(feature = "valkey", unix))]
+#[test]
+fn status_refuses_a_password_file_that_is_not_a_regular_file_without_stalling() {
+    let lines = "url = \"redis://127.0.0.1:1\"\npassword_file = \"../pass-fifo\"\n";
+    let dir = valkey_manifest("manifest_valkey_fifo", lines);
+    let fifo = dir.join("pass-fifo");
+    let _ = fs::remove_file(&fifo);
+    assert!(
+        Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let start = std::time::Instant::now();
+    let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+    assert!(start.elapsed() < std::time::Duration::from_millis(1500));
+    assert!(code == Some(0) && stderr.is_empty(), "{stderr}");
+    assert!(
+        status.contains("pass-fifo: not a regular file)"),
+        "{status}"
+    );
 }
 
 /// A refused AUTH and a failed TLS handshake leave the password out of stdout and stderr.

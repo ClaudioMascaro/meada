@@ -4,6 +4,7 @@
 //! password comes only from the environment variable or the file the section names; it
 //! appears in no error and on no stderr line.
 
+use std::io::Read;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -22,6 +23,9 @@ use crate::msg::Msg;
 pub const REACH_TIMEOUT: Duration = Duration::from_millis(800);
 /// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
+/// The most `password_file` may hold, and the most `ca_file` may.
+const PASSWORD_MAX: u64 = 4096;
+const CA_MAX: u64 = 1 << 20;
 
 /// The `[valkey]` section as written.
 #[derive(Deserialize)]
@@ -75,6 +79,10 @@ impl File {
                 return Err((url, Msg::ValkeyUrlInsecure.text()));
             }
             ConnectionAddr::Unix(_) => return Err((url, Msg::ValkeyUrlInvalid.text())),
+            // A cluster announces its nodes, which are not loopback: TLS from the seed on.
+            ConnectionAddr::Tcp(..) if self.cluster => {
+                return Err(("valkey.cluster", Msg::ValkeyClusterPlain.text()));
+            }
             _ => {}
         }
         let password = match (self.password_env, self.password_file) {
@@ -119,20 +127,47 @@ impl Config {
     }
 
     /// The password, read now from the variable or the file the section names.
-    fn secret(&self) -> Result<Option<String>, String> {
+    async fn secret(&self) -> Result<Option<String>, String> {
         match &self.password {
             Password::None => Ok(None),
             Password::Env(var) => match std::env::var(var) {
                 Ok(value) => Ok(Some(value)),
                 Err(_) => Err(Msg::ValkeyEnvUnset(var).text()),
             },
-            Password::File(file) => match std::fs::read_to_string(file) {
+            Password::File(file) => {
+                let text = read_file(file, PASSWORD_MAX).await?;
+                let text = String::from_utf8(text).map_err(|_| file.display().to_string())?;
                 // A trailing newline is the editor's, not the password's.
-                Ok(text) => Ok(Some(text.trim_end_matches(['\n', '\r']).to_string())),
-                Err(e) => Err(format!("{}: {}", file.display(), e.kind())),
-            },
+                Ok(Some(text.trim_end_matches(['\n', '\r']).to_string()))
+            }
         }
     }
+}
+
+/// The content of the regular file `path`, at most `max` bytes. It reads on a blocking thread,
+/// so a slow mount stalls no timeout, and refuses what is not a regular file (a FIFO would
+/// block the open for ever).
+async fn read_file(path: &Path, max: u64) -> Result<Vec<u8>, String> {
+    let path = path.to_path_buf();
+    let shown = path.display().to_string();
+    let read = move || -> Result<Vec<u8>, String> {
+        let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
+        if !std::fs::metadata(&path).map_err(problem)?.is_file() {
+            return Err(format!("{}: not a regular file", path.display()));
+        }
+        let mut bytes = Vec::new();
+        let file = std::fs::File::open(&path).map_err(problem)?;
+        file.take(max + 1)
+            .read_to_end(&mut bytes)
+            .map_err(problem)?;
+        match bytes.len() as u64 > max {
+            true => Err(format!("{}: larger than {max} bytes", path.display())),
+            false => Ok(bytes),
+        }
+    };
+    tokio::task::spawn_blocking(read)
+        .await
+        .unwrap_or_else(|_| Err(shown))
 }
 
 enum Conn {
@@ -148,7 +183,7 @@ pub struct Valkey {
 
 impl Valkey {
     pub async fn connect(config: &Config) -> Result<Self, String> {
-        let secret = config.secret()?;
+        let secret = config.secret().await?;
         let secret_text = secret.clone();
         let scrub = |e: redis::RedisError| scrub(&e.to_string(), secret_text.as_deref());
         let mut info = (config.url.as_str().into_connection_info()).map_err(scrub)?;
@@ -158,8 +193,7 @@ impl Valkey {
         }
         let tls = match &config.ca_file {
             Some(file) if matches!(info.addr(), ConnectionAddr::TcpTls { .. }) => {
-                let root_cert =
-                    std::fs::read(file).map_err(|e| format!("{}: {}", file.display(), e.kind()))?;
+                let root_cert = read_file(file, CA_MAX).await?;
                 Some(TlsCertificates {
                     client_tls: None,
                     root_cert: Some(root_cert),
@@ -221,10 +255,11 @@ pub fn reach(config: &Config) -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
     let ping = async { Valkey::connect(config).await?.ping().await };
-    match runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ping).await }) {
-        Ok(answer) => answer,
-        Err(_) => Err(Msg::ValkeyTimeout(REACH_TIMEOUT.as_millis() as u64).text()),
-    }
+    let answer = runtime.block_on(async { tokio::time::timeout(REACH_TIMEOUT, ping).await });
+    // Dropping the runtime would wait for a blocking thread still in a DNS lookup or a file
+    // read, for as long as the resolver or the mount takes.
+    runtime.shutdown_background();
+    answer.unwrap_or_else(|_| Err(Msg::ValkeyTimeout(REACH_TIMEOUT.as_millis() as u64).text()))
 }
 
 /// The `valkey:` line `meada status --workspace` prints.
@@ -305,6 +340,31 @@ mod tests {
             let url = format!("url = \"redis://{host}\"");
             assert!(section(&url).is_ok(), "{host}");
         }
+    }
+
+    #[test]
+    fn a_cluster_needs_a_tls_seed_because_it_announces_its_own_nodes() {
+        let (key, _) = section("url = \"redis://127.0.0.1\"\ncluster = true").unwrap_err();
+        assert_eq!(key, "valkey.cluster");
+        assert!(section("url = \"rediss://127.0.0.1\"\ncluster = true").is_ok());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn a_file_is_read_only_when_it_is_a_regular_file_within_the_bound() {
+        let dir = std::env::temp_dir().join(format!("meada-valkey-read-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (small, big) = (dir.join("small"), dir.join("big"));
+        std::fs::write(&small, "abc\n").unwrap();
+        std::fs::write(&big, vec![b'x'; 4097]).unwrap();
+        assert_eq!(read_file(&small, PASSWORD_MAX).await.unwrap(), b"abc\n");
+        for (path, why) in [
+            (&dir, "not a regular file"),
+            (&big, "larger than 4096 bytes"),
+        ] {
+            let err = read_file(path, PASSWORD_MAX).await.unwrap_err();
+            assert!(err.ends_with(why), "{err}");
+        }
+        assert!(read_file(&dir.join("none"), PASSWORD_MAX).await.is_err());
     }
 
     #[test]
