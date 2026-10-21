@@ -1640,7 +1640,8 @@ mod tests {
             actual += &format!("\n{name}\n{summary}\n");
         }
         let src = fs::read(tests.join("fixtures/schema/sample.package.json")).unwrap();
-        let summary = serde_json::to_string_pretty(&package::read(&src)).unwrap();
+        let summary =
+            serde_json::to_string_pretty(&package::read_manifest("package.json", &src)).unwrap();
         actual += &format!("\nsample.package.json\n{summary}\n");
         for (name, path) in [
             ("sample.Cargo.toml", "Cargo.toml"),

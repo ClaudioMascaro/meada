@@ -915,8 +915,8 @@ one for the area a change touches.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_BYTES`
   (1 MiB, in `lang/mod.rs` beside the packs that read their configs by it; a larger file reads as empty, but is read whole first, as code and documents are) and
   `MAX_NAME` (214 bytes; a longer name is no package). A range is stored as written, with no
-  length limit beyond `MAX_BYTES`; `flag` checks only one of at most `MAX_RANGE` (256 bytes) and
-  calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
+  length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most
+  `MAX_RANGE` (256 bytes) and calls a longer one `range unchecked`. PyPI (`package/pypi.rs`, spec #24): `MAX_NAME` and
   `MAX_BYTES` hold for `pyproject.toml` and `requirements*.txt` too (a file past it, not UTF-8
   or not TOML reads as empty; the toml crate's own depth limit stops nested input); a
   requirements file is read line by line, its option lines (`-r`, `-e`, `-c`, `--index-url`),
@@ -944,8 +944,8 @@ one for the area a change touches.
   followed (a `use` writes it, unless the key renames the crate); `version.workspace = true`
   reads the nearest `[workspace.package] version`, and no other inherited field is read. A `use`
   follows `pub mod` and `pub use` rows alone, so an item behind a private module is not
-  reached (no marker). Import resolution: `exported` follows at most
-  `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
+  reached (no marker). Import resolution: `exported` (`package/npm.rs`) follows at most
+  `MAX_CONDITIONS` (32) nested conditions and `lookup` (`package.rs`) at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
   like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is
