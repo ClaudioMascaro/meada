@@ -191,6 +191,53 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
   `meada export --workspace <manifesto> --repo <identidade>` imprime o índice de um repositório,
   por exemplo para alimentar uma base de conhecimento.
 
+### Vários nós
+
+Vários servidores sobre os mesmos índices servem sem módulo de nuvem, desde que o operador
+respeite um único escritor por índice.
+
+- **Layout A, cada nó indexa os próprios espelhos.** Cada nó tem um `index_dir` local e roda
+  `meada index --workspace` sobre os espelhos que busca. É o mais simples, mas os nós divergem:
+  cada um enxerga o commit que buscou, e duas chamadas ao mesmo endpoint podem responder
+  diferente até todos buscarem.
+- **Layout B, um job constrói e os nós recebem.** Um job busca os espelhos e indexa tudo num
+  único commit; os nós recebem os espelhos e os índices prontos e os trocam por `rename`. A
+  reconstrução também usa essa troca (`index.db.new.<pid>` sob `index.db.lock`, renomeado sobre
+  `index.db`), então um leitor vê o índice antigo ou o novo inteiro. Troque um índice por
+  `rename` só enquanto nenhum `meada index` o escreve: o `index.db-journal` vivo de um refresh no
+  lugar seria tomado como journal do arquivo novo.
+- **Sem suporte: `index_dir` em sistema de arquivos de rede (NFS, EFS) compartilhado por um
+  escritor e leitores.** O SQLite não é confiável sobre rede (veja
+  [sqlite.org/useovernet.html](https://sqlite.org/useovernet.html)). Cada nó precisa de um
+  `index_dir` local, ou de um volume que só ele escreve.
+- **Somente leitura.** `index_dir` e os espelhos podem ser somente leitura (um volume preenchido
+  por um init, uma camada de imagem): o servidor não cria nada ali. Um espelho de outro usuário
+  é aceito com `-c safe.directory`, só para os espelhos do manifesto, o que exige git 2.38 ou
+  posterior; no Ubuntu 22.04 e no RHEL 8, com git mais antigo, defina `safe.directory` na
+  configuração do sistema.
+- **Sem sessão.** O transporte é sem estado: nenhuma afinidade de sessão (sticky session) é
+  necessária, e clientes no protocolo 2026-07-28 nem têm sessão.
+- **Proxy reverso.** Encaminhe sem alterar `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` e
+  todo cabeçalho `Mcp-Param-*` (SEP-2243: o rmcp rejeita uma requisição cujos cabeçalhos
+  discordam do corpo); o proxy pode rotear por eles. Encaminhe `Mcp-Session-Id` para clientes
+  antigos e o cabeçalho de resposta `Meada-Generation`. Não adicione `Origin`: o Meada responde
+  403 a qualquer requisição que o traga, e assim uma página de navegador não o chama
+  diretamente. O Meada não confere `Host`, e `--listen` aceita um IP ou `localhost`, nunca um
+  nome que ele resolva.
+- **Prontidão.** Primeiro um passo de init (o `meada index --workspace` ou a cópia dos índices).
+  Depois, uma sonda TCP ou `meada status --workspace <manifesto>` como sonda exec: sai com 0
+  quando todo repositório pode ser servido e com 1 caso contrário, espera no máximo 50 ms por um
+  commit em andamento e conta um índice travado como pronto. `--listen` só abre a porta depois
+  das verificações de início, então uma porta aberta indica índices presentes. O 404 em `/` lista
+  identidades e não é um health check.
+- **Escritor único.** Rode o job de indexação sem sobreposição (por exemplo um CronJob com
+  `concurrencyPolicy: Forbid`). Defina `terminationGracePeriodSeconds` acima do limite de 25 s do
+  SIGTERM e um atraso de `preStop` igual ao tempo que o balanceador leva para tirar o nó do ar.
+
+### Módulos de nuvem
+
+Módulos opt-in, desligados por padrão; cada um é documentado abaixo quando chegar.
+
 ## Decisões
 
 Uma ligação ambígua (vários provedores servem a rota) ou uma URL dinâmica (a chamada monta a
