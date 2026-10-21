@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
 use crate::document;
 use crate::entry::EntryKind;
-use crate::index::{self, Binding, Consumer, Export, Provider, Publish};
+use crate::index::{self, Binding, Consumer, Export, Indexed, Provider, Publish};
 use crate::lang::{self, Handler};
 use crate::resolve::Code;
 use crate::shape::Shape;
@@ -172,7 +172,7 @@ impl ContractKind for Channel {
         parse(contract).map_or((None, None), |(broker, name)| (Some(broker), name))
     }
 
-    fn extract(&self, code: &Code) -> Vec<Found> {
+    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
         let messages = code.pack().messages(code);
         // An inline handler is named after its broker kind and the channels it handles, in
         // the order found: `kafka orders.created`.

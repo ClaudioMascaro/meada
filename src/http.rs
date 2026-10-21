@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::config::gateway_path;
 use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, View, shown};
 use crate::entry::EntryKind;
-use crate::index::{self, Consumer, Export as IndexExport, Gateway, Provider};
+use crate::index::{self, Consumer, Export as IndexExport, Gateway, Indexed, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
 use crate::resolve::Code;
@@ -483,7 +483,7 @@ impl ContractKind for Http {
         })
     }
 
-    fn extract(&self, code: &Code) -> Vec<Found> {
+    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();

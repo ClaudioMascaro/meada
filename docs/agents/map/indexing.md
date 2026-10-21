@@ -31,8 +31,8 @@ modules updates it.
   It imports no kind module: which side of a contract is a door, of which `EntryKind`, and how it
   is labelled are `ContractKind::entry` and `label`, pure functions of the contract since entry
   points are stored (an answer that changes needs a reindex). The index writer reads the
-  `package` manifests, tsconfigs and shapes directly (`package::read_manifest`, `surface`,
-  `exported_shapes` and the others it calls stay `pub`); the kinds' query-time questions
+  `package` manifests and tsconfigs directly (`package::read_manifest` and the others it calls
+  stay `pub`), and hands the kinds what it read (`Indexed`); the kinds' query-time questions
   (`declare`, `workspace_step`, `link`, `after_links`) never run at index time.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
@@ -63,9 +63,10 @@ modules updates it.
   `file` NULL for nothing the repository holds, and each `export * from` a repository file as a
   row with `name` NULL), which `export` loads as `Export::exported`, and the `import` rows of
   `contracts`, loaded as `Export::import_calls` (both `serde(skip)`). Before extracting,
-  `refresh` computes the packages' public surface (`package::surface`, from the `manifests` rows
-  read by `read_manifests`, the `exports` rows of every pack and the files), and the extraction
-  loop runs `package::exported_shapes` over each pack's `Code` for its files, whose `shape` rows
+  `refresh` builds `Indexed` once (the `manifests` and tsconfigs as `read_manifests` returns
+  them, the `exports` rows of every pack and the files), and the extraction loop runs only
+  `contract::KINDS`, each `extract` taking the pack's `Code` and `Indexed`: the package kind
+  builds the packages' public surface from it and adds the exported shapes, whose `shape` rows
   `export` loads as `Export::shapes` (`serde(skip)`, issue #175). Every `manifests` row is folded
   into the configs digest, so an edited `package.json` or `tsconfig.json` extracts again. `sort_providers` and
   `sort_consumers` put the lists back in `export`'s order after a kind's `declare` added sides.
