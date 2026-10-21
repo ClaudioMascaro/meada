@@ -12,8 +12,13 @@
 //! never checked, and neither `Cargo.lock` nor a registry is read.
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
-use super::{Entry, MAX_BYTES, MAX_NAME, Manifest, Summary, directory};
+use super::{
+    Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolved, Summary,
+    directory, owner, sourced,
+};
+use crate::index::Export;
 use crate::lang::rust::crates::{crate_name, entries, lib_name, lib_root, workspace_deps};
 use crate::repo::normalize_remote;
 
@@ -244,9 +249,133 @@ pub fn lib_head(s: &Summary) -> Option<String> {
         .or_else(|| s.name.as_deref().map(crate_name))
 }
 
+/// The Cargo ecosystem.
+pub struct Cargo;
+
+impl Ecosystem for Cargo {
+    fn name(&self) -> &'static str {
+        "cargo"
+    }
+
+    fn is_manifest(&self, file_name: &str) -> bool {
+        file_name == "Cargo.toml"
+    }
+
+    fn read(&self, path: &str, src: &[u8]) -> Summary {
+        read(path, src)
+    }
+
+    fn sources(&self) -> &'static [&'static str] {
+        &["rs"]
+    }
+
+    fn names_package(&self, specifier: &str) -> bool {
+        names_crate(specifier)
+    }
+
+    /// The specifier is the crate a `use` names: the entry of the owning manifest whose key it
+    /// is when the entry renames the package, else whose provider's library head it is (the
+    /// package's own name, with no provider to ask), hyphens as underscores.
+    fn entries<'e>(
+        &self,
+        exports: &'e [Export],
+        providers: &Providers,
+        (n, from): (usize, &str),
+        specifier: &str,
+    ) -> Vec<(&'e Entry, String)> {
+        let heads = |e: &Entry| match (e.alias.is_some(), providers.of(self.name(), &e.name)) {
+            (false, of) if !of.is_empty() => (of.iter()).any(|&(m, i)| {
+                lib_head(&exports[m].manifests[i].summary).as_deref() == Some(specifier)
+            }),
+            _ => import_name(e) == specifier,
+        };
+        let entry = (owner(&exports[n].manifests, from, self))
+            .filter(|_| names_crate(specifier))
+            .and_then(|m| m.summary.dependencies.iter().find(|e| heads(e)));
+        entry.map(|e| (e, ".".to_string())).into_iter().collect()
+    }
+
+    /// `path` by the folded location, `git` by the remote's identity (`sourced`).
+    fn reaches(
+        &self,
+        (via, _): (Option<&str>, Option<&str>),
+        from: (&str, &Path),
+        to: ((&str, &Path), &str),
+    ) -> bool {
+        sourced(via, from, to)
+    }
+
+    /// Only a manifest with a package: a virtual workspace root has none.
+    fn owns(&self, manifest: &Manifest) -> bool {
+        manifest.summary.name.is_some()
+    }
+
+    /// The crate is its library's root file, a path of the repository as `read` folded it; a
+    /// subpath is a module path, followed by name.
+    fn ways(&self, manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
+        match (subpath, &manifest.summary.main) {
+            (".", Some(root)) => vec![(How::CrateName, vec![root.clone()])],
+            _ => Vec::new(),
+        }
+    }
+
+    /// The entry file only, no candidates; an entry that does not rename its crate reaches the
+    /// libraries named as it writes.
+    fn resolve(
+        &self,
+        at: &Provided,
+        repository: &str,
+        manifest: &Manifest,
+        (entry, subpath): (&Entry, &str),
+        (specifier, chain): (&str, &str),
+        known: &dyn Fn(&str) -> bool,
+    ) -> Option<Resolved> {
+        if entry.alias.is_none() && lib_head(&manifest.summary).as_deref() != Some(specifier) {
+            return None;
+        }
+        let (file, how, level) = at.entry(manifest, &self.ways(manifest, subpath))?;
+        let id = at.reach(repository, &file, chain, known)?;
+        Some(Resolved {
+            how,
+            level,
+            targets: vec![id],
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A Cargo path keeps the crate at that path of the dependent's repository, a source from a
+    /// remote the repository of that remote, a version every repository.
+    #[test]
+    fn a_path_or_git_source_reaches_the_provider_it_names() {
+        let at = |id| {
+            let root = match id {
+                "a" => "/w/a",
+                "b" => "/w/b",
+                _ => "/w/x",
+            };
+            (id, Path::new(root))
+        };
+        let path = (Some("path core/Cargo.toml"), None);
+        assert!(Cargo.reaches(path, at("a"), (at("a"), "core/Cargo.toml")));
+        assert!(!Cargo.reaches(path, at("a"), (at("a"), "other/Cargo.toml")));
+        assert!(!Cargo.reaches(path, at("a"), (at("b"), "core/Cargo.toml")));
+        let remote = (Some("git example.com/org/lib"), Some("1"));
+        let lib = ("example.com/org/lib", Path::new("/w/lib"));
+        assert!(Cargo.reaches(remote, at("a"), (lib, "Cargo.toml")));
+        assert!(!Cargo.reaches(remote, at("a"), (at("b"), "Cargo.toml")));
+        assert!(Cargo.reaches((None, Some("1")), at("a"), (at("b"), "Cargo.toml")));
+        // A path out of the repository lands where the two roots say, folded without reading.
+        let out = (Some("path ../b/core/Cargo.toml"), None);
+        assert!(Cargo.reaches(out, at("a"), (at("b"), "core/Cargo.toml")));
+        assert!(!Cargo.reaches(out, at("a"), (at("b"), "Cargo.toml")));
+        assert!(!Cargo.reaches(out, at("a"), (at("x"), "core/Cargo.toml")));
+        let back = (Some("path ../a/core/Cargo.toml"), None);
+        assert!(Cargo.reaches(back, at("a"), (at("a"), "core/Cargo.toml")));
+    }
 
     fn read_at(path: &str, toml: &str) -> Summary {
         read(path, toml.as_bytes())

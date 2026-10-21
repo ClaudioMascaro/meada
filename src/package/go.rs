@@ -12,9 +12,14 @@
 //! module proxy is read.
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 use super::cargo::relative;
-use super::{Entry, MAX_BYTES, Summary, directory, valid_name};
+use super::{
+    Ecosystem, Entry, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
+    owner, sourced, valid_name,
+};
+use crate::index::Export;
 use crate::lang::go::modfile;
 
 /// The field a `require` entry is kept under.
@@ -76,6 +81,81 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         name: file.module.filter(|m| valid_name(m)),
         dependencies,
         ..Summary::default()
+    }
+}
+
+/// The Go ecosystem.
+pub struct Go;
+
+impl Ecosystem for Go {
+    fn name(&self) -> &'static str {
+        "go"
+    }
+
+    fn is_manifest(&self, file_name: &str) -> bool {
+        file_name == "go.mod"
+    }
+
+    fn read(&self, path: &str, src: &[u8]) -> Summary {
+        read(path, src)
+    }
+
+    fn sources(&self) -> &'static [&'static str] {
+        &["go"]
+    }
+
+    /// Any path that can be a contract name may name a module of the workspace: a module path
+    /// needs no dot (`module kit` with a local `replace`), and the standard library stays
+    /// external since no `require` names it.
+    fn names_package(&self, specifier: &str) -> bool {
+        valid_name(specifier)
+    }
+
+    /// The entry of the owning `go.mod` with the longest module path the import starts with,
+    /// the rest of the import as the subpath.
+    fn entries<'e>(
+        &self,
+        exports: &'e [Export],
+        _providers: &Providers,
+        (n, from): (usize, &str),
+        specifier: &str,
+    ) -> Vec<(&'e Entry, String)> {
+        let found = (owner(&exports[n].manifests, from, self)).and_then(|m| {
+            (m.summary.dependencies.iter())
+                .filter_map(|e| Some((e, modfile::inside(specifier, &e.name)?)))
+                .max_by_key(|(e, _)| e.name.len())
+        });
+        let subpath = |rest: &str| match rest {
+            "" => ".".to_string(),
+            rest => format!("./{rest}"),
+        };
+        found
+            .map(|(e, rest)| (e, subpath(rest)))
+            .into_iter()
+            .collect()
+    }
+
+    /// A local `replace` by the folded location, as Cargo's `path` (`sourced`).
+    fn reaches(
+        &self,
+        (via, _): (Option<&str>, Option<&str>),
+        from: (&str, &Path),
+        to: ((&str, &Path), &str),
+    ) -> bool {
+        sourced(via, from, to)
+    }
+
+    /// The one package directory the subpath names in the module (`Provided::package`).
+    fn resolve(
+        &self,
+        at: &Provided,
+        repository: &str,
+        manifest: &Manifest,
+        (_, subpath): (&Entry, &str),
+        (_, chain): (&str, &str),
+        known: &dyn Fn(&str) -> bool,
+    ) -> Option<Resolved> {
+        at.package(repository, manifest, subpath, chain, known)
     }
 }
 

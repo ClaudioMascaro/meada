@@ -2,7 +2,13 @@
 //! `Summary` a `package.json` gives, its names normalized as PEP 503 does. Ranges are kept as
 //! written and never evaluated: every PyPI package link says `range unchecked`.
 
-use super::{Entry, MAX_BYTES, MAX_NAME, Summary};
+use std::collections::HashSet;
+
+use super::{
+    Ecosystem, Entry, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution, Summary,
+    holding, pypi_resolutions, split,
+};
+use crate::index::Export;
 use crate::lang::python::pyproject::{Pyproject, Requirement};
 
 /// The dependency fields, as entries and consumer sites name them.
@@ -156,9 +162,97 @@ pub fn read_requirements(src: &[u8]) -> Summary {
     }
 }
 
+/// The PyPI ecosystem.
+pub struct Pypi;
+
+impl Ecosystem for Pypi {
+    fn name(&self) -> &'static str {
+        "pypi"
+    }
+
+    fn is_manifest(&self, file_name: &str) -> bool {
+        file_name == "pyproject.toml" || is_requirements(file_name)
+    }
+
+    fn read(&self, path: &str, src: &[u8]) -> Summary {
+        match path.ends_with("pyproject.toml") {
+            true => read_pyproject(src),
+            false => read_requirements(src),
+        }
+    }
+
+    fn sources(&self) -> &'static [&'static str] {
+        &["py"]
+    }
+
+    fn names_package(&self, specifier: &str) -> bool {
+        split(specifier).is_some()
+    }
+
+    /// Every distribution the manifests holding the file depend on, the nearest first, once
+    /// each, with the import's module as the subpath.
+    fn entries<'e>(
+        &self,
+        exports: &'e [Export],
+        _providers: &Providers,
+        (n, from): (usize, &str),
+        specifier: &str,
+    ) -> Vec<(&'e Entry, String)> {
+        let mut seen = HashSet::new();
+        (holding(&exports[n].manifests, from, self).into_iter())
+            .flat_map(|m| &m.summary.dependencies)
+            .filter(|e| seen.insert(e.name.as_str()))
+            .map(|e| (e, specifier.to_string()))
+            .collect()
+    }
+
+    /// Only a `pyproject.toml`: a `requirements*.txt` names no package, so it bounds none.
+    fn owns(&self, manifest: &Manifest) -> bool {
+        manifest.path.rsplit('/').next() == Some("pyproject.toml")
+    }
+
+    /// The import names a module, not a distribution (`pypi_resolutions`).
+    fn resolutions<'e>(
+        &self,
+        exports: &'e [Export],
+        providers: &Providers,
+        at: &dyn Fn(usize) -> &'e Provided<'e>,
+        from: (usize, &str),
+        import: (&str, &str),
+        known: &dyn Fn(&Provided<'e>, &str) -> bool,
+    ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+        pypi_resolutions(self, exports, providers, at, from, import, known)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::package::Flag;
+    use std::path::Path;
+
+    #[test]
+    fn a_pyproject_and_a_requirements_file_are_pypi_manifests_and_only_one_owns() {
+        for name in ["pyproject.toml", "requirements.txt", "requirements-dev.txt"] {
+            assert!(Pypi.is_manifest(name), "{name}");
+        }
+        for name in ["requirements.in", "base.txt", "package.json"] {
+            assert!(!Pypi.is_manifest(name), "{name}");
+        }
+        let at = |path: &str| Manifest {
+            path: path.to_string(),
+            summary: Summary::default(),
+        };
+        assert!(Pypi.owns(&at("app/pyproject.toml")));
+        assert!(!Pypi.owns(&at("app/requirements.txt")));
+    }
+
+    #[test]
+    fn a_pypi_range_is_never_evaluated_and_keeps_to_no_repository() {
+        assert_eq!(Pypi.flag(Some("==1.0"), Some("1.0")), Some(Flag::Unchecked));
+        let (a, b) = (("a", Path::new("/w/a")), ("b", Path::new("/w/b")));
+        assert!(Pypi.reaches((None, Some("workspace:*")), a, (b, "package.json")));
+    }
 
     fn deps(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
         (s.dependencies.iter())
