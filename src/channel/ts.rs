@@ -412,31 +412,14 @@ mod tests {
     use crate::lang::ts::TsJs;
     use crate::resolve::Resolver;
 
-    /// The messages of the TypeScript file `src` as lines: broker, name (or `unresolved`),
-    /// role and handler.
+    /// The messages of the TypeScript file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.ts", &facts)]);
         let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &TsJs);
         let code = Code::new(&resolver, &files, &TsJs);
-        messages(&code)
-            .into_iter()
-            .map(|m| {
-                let name = m.name.as_deref().unwrap_or("unresolved");
-                let role = match m.role {
-                    Side::Producer => "producer".to_string(),
-                    Side::Consumer(Handler::Def { path, name }) => {
-                        format!("consumer {path}::{name}")
-                    }
-                    Side::Consumer(Handler::Inline { path, def }) => {
-                        format!("consumer inline {path}::{def}")
-                    }
-                    _ => "other".to_string(),
-                };
-                format!("{} {name} {role}", m.broker)
-            })
-            .collect()
+        crate::channel::message::lines(messages(&code))
     }
 
     #[test]

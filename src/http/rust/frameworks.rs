@@ -2,9 +2,11 @@
 //! object, as `channel/rust.rs` lists the brokers: what makes the object outside the
 //! repository (the name the `use` declarations give the call) and the methods that hand that
 //! same object back. The HTTP kind owns the table: its readers (`axum.rs` for axum, `../rust.rs`
-//! for actix-web and Rocket, `../python/clients.rs` for reqwest and ureq) read what a
-//! constructor makes through `made` and hand the value flow `passes_on`, the question's table of
-//! what passes the object on.
+//! for actix-web and Rocket, `../python/clients.rs` for reqwest and ureq, whose rows are
+//! `CLIENT_LIBRARIES`) read what a constructor makes through `made` and hand the value flow
+//! `passes_on`, the question's table of what passes the object on.
+
+use super::super::Library;
 
 /// What an object of a framework or a client library is.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -40,7 +42,7 @@ pub(crate) struct Framework {
 
 /// What constructs a reqwest or a ureq client, an object whose methods send requests. A
 /// builder chain (`Client::builder().build()?`) is the constructor that starts it.
-pub(crate) const REQWEST_CLIENTS: &[&str] = &[
+const REQWEST_CLIENTS: &[&str] = &[
     "reqwest.Client.new",
     "reqwest.Client.builder",
     "reqwest.ClientBuilder.new",
@@ -48,12 +50,24 @@ pub(crate) const REQWEST_CLIENTS: &[&str] = &[
     "reqwest.blocking.Client.builder",
     "reqwest.blocking.ClientBuilder.new",
 ];
-pub(crate) const UREQ_AGENTS: &[&str] = &[
+const UREQ_AGENTS: &[&str] = &[
     "ureq.agent",
     "ureq.Agent.new",
     "ureq.Agent.new_with_defaults",
     "ureq.Agent.new_with_config",
     "ureq.AgentBuilder.new",
+];
+
+/// The reqwest and ureq rows of the client libraries `python/clients.rs` reads.
+pub(in crate::http) const CLIENT_LIBRARIES: &[Library] = &[
+    Library {
+        modules: &["reqwest", "reqwest.blocking"],
+        clients: REQWEST_CLIENTS,
+    },
+    Library {
+        modules: &["ureq"],
+        clients: UREQ_AGENTS,
+    },
 ];
 
 // ponytail: a setter not listed ends the chain, so what it is called on is not read; add it here.
