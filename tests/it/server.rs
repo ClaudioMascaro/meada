@@ -10,7 +10,9 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Child, ChildStderr, Command, Stdio};
 
-use crate::manifest::{MANIFEST, assert_nothing_else_written, chain_manifest, contents, run};
+use crate::manifest::{
+    MANIFEST, ReadOnly, assert_nothing_else_written, chain_manifest, contents, run, run_export,
+};
 use common::{assert_golden, chain};
 use rmcp::{
     RoleClient, ServiceExt,
@@ -309,6 +311,43 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     client.cancel().await.unwrap();
     let all: Vec<&str> = crate::manifest::CHAIN.iter().map(|(r, _)| *r).collect();
     assert_nothing_else_written(&dir, &all);
+}
+
+/// A node that receives a built index mounts `index_dir` and the mirrors read-only (spec #259):
+/// the server answers `trace` as the golden has it, `status` and `export` answer as on a
+/// writable layout, and nothing is created anywhere.
+#[cfg(unix)]
+#[tokio::test]
+async fn serves_from_read_only_indexes_and_mirrors_and_creates_nothing() {
+    let dir = chain_manifest("server_read_only");
+    assert!(run(&dir, "index").2);
+    let (status, _, _) = run(&dir, "status");
+    let (export, _, _) = run_export(&dir, WEB);
+    let before = contents(&dir);
+
+    let Some(_locked) = ReadOnly::lock(&dir) else {
+        return;
+    };
+    let (locked_status, stderr, ok) = run(&dir, "status");
+    assert!(ok && stderr.is_empty(), "{stderr}");
+    assert_eq!(locked_status, status);
+    let (locked_export, stderr, code) = run_export(&dir, WEB);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(locked_export, export);
+
+    let server = Server::start(&dir, "127.0.0.1:0");
+    let client = server.client(&format!("/{WEB}")).await;
+    let trace = (client.call_tool(call("trace", serde_json::json!({"from": "dashboard"}))))
+        .await
+        .unwrap();
+    assert_golden("chain.trace-down.txt", text(&trace));
+    let context = (client.call_tool(call("context", serde_json::json!({"symbol": "dashboard"}))))
+        .await
+        .unwrap();
+    assert!(text(&context).contains("async function dashboard() {"));
+    client.cancel().await.unwrap();
+
+    assert!(contents(&dir) == before, "something was created or changed");
 }
 
 /// Stateless with JSON responses: no session comes back, and calls sent alternately to two

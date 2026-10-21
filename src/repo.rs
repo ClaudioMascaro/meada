@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use crate::Result;
 
@@ -147,9 +148,39 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
     Ok(changes)
 }
 
+/// The mirrors a server-mode manifest lists, which `git` may read although another user owns
+/// them (ADR 0011). Empty locally: nothing there is trusted.
+static TRUSTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Trusts the mirror at `path` for the `git` calls Meada makes in it: they pass
+/// `-c safe.directory=<path>`. Only for a path the manifest lists, never `*`.
+pub fn trust(path: &Path) {
+    if let Ok(real) = path.canonicalize() {
+        let mut trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+        if !trusted.contains(&real) {
+            trusted.push(real);
+        }
+    }
+}
+
+/// `git` in `dir`: the one place every call goes through, so the one place `safe.directory`
+/// is added.
+fn command(dir: &Path) -> Command {
+    let mut git = Command::new("git");
+    let real = dir.canonicalize().ok();
+    let trusted = TRUSTED.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(real) = real.filter(|real| trusted.contains(real)) {
+        let mut option = std::ffi::OsString::from("safe.directory=");
+        option.push(real);
+        git.arg("-c").arg(option);
+    }
+    git.arg("-C").arg(dir);
+    git
+}
+
 /// `git` in `dir`, its standard output, or its error output as the error.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let out = Command::new("git").arg("-C").arg(dir).args(args).output()?;
+    let out = command(dir).args(args).output()?;
     if !out.status.success() {
         return Err(format!(
             "git {}: {}",
@@ -168,7 +199,28 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_remote, relative};
+    use super::{command, normalize_remote, relative, trust};
+
+    #[test]
+    fn only_a_trusted_mirror_gets_safe_directory() {
+        let dir = std::env::temp_dir().join(format!("meada-trust-{}", std::process::id()));
+        let (listed, other) = (dir.join("listed"), dir.join("other"));
+        std::fs::create_dir_all(&listed).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let args = |dir: &std::path::Path| -> Vec<String> {
+            let git = command(dir);
+            (git.get_args())
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(args(&listed)[0], "-C");
+        trust(&listed);
+        let real = listed.canonicalize().unwrap();
+        let option = format!("safe.directory={}", real.display());
+        assert_eq!(args(&listed)[..2], ["-c".to_string(), option]);
+        assert_eq!(args(&other)[0], "-C");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_relative_path_folds_against_its_directory() {

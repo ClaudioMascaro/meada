@@ -23,6 +23,21 @@ opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` fi
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
+Server mode also runs on `index_dir` and mirrors mounted read-only, possibly owned by another
+user: the open creates no file there (no `index.db.lock`, only a rebuild takes it; no
+`.gitignore`; no journal), and a hot journal that only a write could roll back is reported as the
+interrupted-commit error naming `meada index --workspace`. The open is SQLite's plain read-only
+one, not the `immutable=1` URI. Trade-off: `immutable` skips locking and change detection, so it
+would also skip the shared lock that makes a commit in progress wait for readers and readers for
+a commit, and it would ignore a hot journal, serving a half-written file; it is safe only for
+files that never change in place. A plain read-only open takes a shared `fcntl` lock, which works
+on a read-only mount (the test locks directories `0555` and files `0444`) and keeps the busy
+timeout and the interrupted error working. `immutable=1` would be worth it only on a filesystem
+that refuses locks; none was met, and #265's rename-in keeps either choice safe from a refresh
+in place, which only one writer per index could break. For a mirror another user owns, `git`
+refuses it (`safe.directory`); `repo::command` is the one place Meada runs `git`, and it adds
+`-c safe.directory=<mirror>` for the paths `Manifest::read` registered with `repo::trust`: the
+manifest's mirrors only, in server mode only, never `*`.
 Server mode reads the **workspace manifest**, and each mirror's `meada.toml` and
 `meada.decisions.toml`, once at start (`engine::served`, which refuses to start unless every
 repository can be served), so a change to those files needs a restart, while a code change in a

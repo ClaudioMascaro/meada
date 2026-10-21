@@ -96,7 +96,7 @@ fn run_code(dir: &Path, command: &str) -> (String, String, Option<i32>) {
 pub(crate) const MANIFEST: &str = "ops/meada.workspace.toml";
 
 /// `meada export --workspace ops/meada.workspace.toml --repo <repo>`, as `run_code`.
-fn export(dir: &Path, repo: &str) -> (String, String, Option<i32>) {
+pub(crate) fn run_export(dir: &Path, repo: &str) -> (String, String, Option<i32>) {
     run_args(dir, &["export", "--workspace", MANIFEST, "--repo", repo])
 }
 
@@ -487,13 +487,102 @@ pub(crate) fn contents(dir: &Path) -> Vec<(String, Vec<u8>)> {
         .collect()
 }
 
+/// A directory tree made read-only (directories `0555`, files `0444`) until dropped, when the
+/// permissions come back so the temp dir can be cleaned.
+#[cfg(unix)]
+pub(crate) struct ReadOnly(Vec<(PathBuf, fs::Permissions)>);
+
+#[cfg(unix)]
+impl ReadOnly {
+    /// Locks `dir` down, or `None` with a printed reason when permissions do not bind this user
+    /// (root).
+    pub(crate) fn lock(dir: &Path) -> Option<Self> {
+        use std::os::unix::fs::PermissionsExt;
+        let mut all = vec![dir.to_path_buf()];
+        let mut at = 0;
+        while at < all.len() {
+            if all[at].is_dir() && !all[at].is_symlink() {
+                all.extend(fs::read_dir(&all[at]).unwrap().map(|e| e.unwrap().path()));
+            }
+            at += 1;
+        }
+        let saved: Vec<_> = (all.into_iter().filter(|p| !p.is_symlink()))
+            .map(|p| {
+                let was = fs::metadata(&p).unwrap().permissions();
+                (p, was)
+            })
+            .collect();
+        let locked = Self(saved);
+        for (path, _) in &locked.0 {
+            let mode = if path.is_dir() { 0o555 } else { 0o444 };
+            fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+        }
+        if fs::File::create(dir.join("probe")).is_ok() {
+            let _ = fs::remove_file(dir.join("probe"));
+            eprintln!("skipped: permissions do not bind this user (root)");
+            return None;
+        }
+        Some(locked)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for ReadOnly {
+    fn drop(&mut self) {
+        // Directories first, so what is inside them can be reached again.
+        for (path, was) in &self.0 {
+            let _ = fs::set_permissions(path, was.clone());
+        }
+    }
+}
+
+/// A mirror owned by another user (`GIT_TEST_ASSUME_DIFFERENT_OWNER`): in server mode Meada
+/// passes `-c safe.directory=<mirror>` for the manifest's mirrors, so the start checks pass;
+/// `git` itself still refuses the mirror, and a local run in it gets no such option.
+#[test]
+fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
+    let dir = chain_manifest("manifest_other_owner");
+    assert!(run(&dir, "index").2);
+    let owned = |cwd: &Path, args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+            .current_dir(cwd)
+            .args(args)
+            .env("LANG", "en_US.UTF-8")
+            .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+            .output()
+            .expect("meada runs");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    let mirror = dir.join("chain-web");
+
+    // Without the option, git refuses.
+    let refused = Command::new("git")
+        .arg("-C")
+        .arg(&mirror)
+        .args(["rev-parse", "--show-toplevel"])
+        .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+
+    let (code, stderr) = owned(&dir, &["status", "--workspace", MANIFEST]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    let (code, stderr) = owned(&dir, &["export", "--workspace", MANIFEST, "--repo", WEB]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+}
+
+const WEB: &str = "example.com/chain/web";
+
 #[test]
 fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     let dir = chain_manifest("manifest_export");
     let web = "example.com/chain/web";
 
     // Before `meada index`, nothing is created or built: the error names the fix.
-    let (stdout, stderr, code) = export(&dir, web);
+    let (stdout, stderr, code) = run_export(&dir, web);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
     assert_eq!(
         stderr,
@@ -506,7 +595,7 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     let indexes = dir.join("indexes");
     let indexed = contents(&indexes);
     for (repo, path) in CHAIN {
-        let (stdout, stderr, code) = export(&dir, repo);
+        let (stdout, stderr, code) = run_export(&dir, repo);
         assert_eq!(code, Some(0), "{stderr}");
         assert_golden(&format!("{path}.export.json"), &stdout);
     }
@@ -514,7 +603,7 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     assert!(contents(&indexes) == indexed, "a read wrote an index");
 
     // An identity the manifest does not list names the ones it serves.
-    let (_, stderr, code) = export(&dir, "example.com/chain/nope");
+    let (_, stderr, code) = run_export(&dir, "example.com/chain/nope");
     assert_eq!(code, Some(1));
     assert_eq!(
         stderr,
@@ -525,7 +614,7 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     // A peer's index of another schema is not rebuilt by a read.
     let catalog = indexes.join("example.com/chain/catalog/index.db");
     fs::write(&catalog, "not an index\n").unwrap();
-    let (stdout, stderr, code) = export(&dir, web);
+    let (stdout, stderr, code) = run_export(&dir, web);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
     assert_eq!(
         stderr,
@@ -554,7 +643,7 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     assert!(run(&dir, "index").2);
     for (repo, path) in CHAIN {
         assert!(!dir.join(path).join("meada.toml").exists());
-        let (stdout, stderr, _) = export(&dir, repo);
+        let (stdout, stderr, _) = run_export(&dir, repo);
         assert_golden(&format!("{path}.export.json"), &stdout);
         assert_eq!(stderr, "");
     }
@@ -565,7 +654,7 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     list(dir, &CHAIN, true);
     assert!(run(dir, "index").2);
     for (repo, name) in [CHAIN[0], CHAIN[1]] {
-        let export = export(dir, repo).0;
+        let export = run_export(dir, repo).0;
         let golden = name.replace("chain-", "chain-documents-");
         assert_golden(
             &format!("{golden}.export.json"),
@@ -590,7 +679,7 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     list(&dir, &repos, true);
     assert!(run(&dir, "index").2);
     for (repo, name) in [repos[1], repos[3]] {
-        let export = export(&dir, repo).0;
+        let export = run_export(&dir, repo).0;
         assert_golden(&format!("{name}.export.json"), &without_processes(&export));
     }
 }
@@ -615,7 +704,7 @@ fn a_mirror_with_a_meada_toml_keeps_it_whole_and_status_names_the_ignored_blocks
 
     assert!(run(&dir, "index").2);
 
-    let (stdout, _, _) = export(&dir, "example.com/chain/gateway");
+    let (stdout, _, _) = run_export(&dir, "example.com/chain/gateway");
     assert_golden("chain-gateway.export.json", &stdout);
     let (status, stderr, ok) = run(&dir, "status");
     assert!(ok, "{stderr}");
@@ -639,7 +728,7 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
     decisions(&web, "chain-web");
     assert!(run(&dir, "index").2);
 
-    let (stdout, stderr, _) = export(&dir, "example.com/chain/web");
+    let (stdout, stderr, _) = run_export(&dir, "example.com/chain/web");
 
     assert_golden("chain-web.decided.export.json", &without_processes(&stdout));
     assert_eq!(stderr, "");

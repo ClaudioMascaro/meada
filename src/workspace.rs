@@ -261,6 +261,8 @@ impl Manifest {
         };
         let base = file.parent().unwrap_or(Path::new(""));
         let index_dir = base.join(index_dir);
+        // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
+        (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
         let mut seen = HashSet::new();
         let mut entries: Vec<Listed> = (parsed.repositories.into_iter())
             .map(|e| {
