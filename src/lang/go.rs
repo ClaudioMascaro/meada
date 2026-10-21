@@ -31,7 +31,6 @@ pub(crate) fn package_call<'a>(
 }
 
 mod build;
-pub(crate) mod messages;
 pub mod modfile;
 mod values;
 use values::Keep;

@@ -1,21 +1,22 @@
-//! The message libraries of the Go pack (spec #25): segmentio/kafka-go, confluent-kafka-go, sarama,
-//! amqp091-go, aws-sdk-go-v2's SQS, nats.go and go-redis. A form is a method called on a value
-//! that the source says the library made (`Code::origins` with `Follow::Declarations`: written as
-//! its type, or made by its constructor, through the methods that hand the object on, such as
-//! `Connection.Channel`; the constructor is spelled from the origin's outside name and steps), so a
-//! `Publish` or a `Send` on anything else is no producer. A function of the library is a callee
-//! that `Code::outside` names with the package itself as its head. The names are folded like URLs
-//! (`Code::expand`), struct fields of composite literals included.
+//! The channel kind's Go forms: the message libraries of the Go pack (spec #25),
+//! segmentio/kafka-go, confluent-kafka-go, sarama, amqp091-go, aws-sdk-go-v2's SQS, nats.go and
+//! go-redis. A form is a method called on a value that the source says the library made
+//! (`Code::origins` with `Follow::Declarations`: written as its type, or made by its constructor,
+//! through the methods that hand the object on, such as `Connection.Channel`; the constructor is
+//! spelled from the origin's outside name and steps), so a `Publish` or a `Send` on anything else
+//! is no producer. A function of the library is a callee that `Code::outside` names with the
+//! package itself as its head. The names are folded like URLs (`Code::expand`), struct fields of
+//! composite literals included.
 //!
 //! A client that calls back (`Subscribe(subject, handler)`) has the callback as its handler; a
 //! polling one, the function that holds the call naming the topic or the queue.
 
-use super::modfile::unversioned;
-use super::package_call;
 use crate::channel::message::{
     Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
     topics,
 };
+use crate::lang::go::modfile::unversioned;
+use crate::lang::go::package_call;
 use crate::lang::{Call, Value, property};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
@@ -168,7 +169,7 @@ const METHODS: &[&str] = &[
     "NewReader",
 ];
 
-pub(crate) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"go") {
         return Vec::new();
     }
@@ -490,4 +491,67 @@ fn arg(args: &[Value], at: usize) -> &Value {
 /// The one channel name the first argument gives.
 fn one(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![name(arg(args, 0))?])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel::message::Side;
+    use crate::lang::LanguagePack;
+    use crate::lang::go::Go;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    /// A line per message of the Go file `src`: broker, name (or `unresolved`), role, handler.
+    fn lines(src: &str) -> Vec<String> {
+        let facts = Go.parse("x.go", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.go", &facts)]);
+        let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Go);
+        let code = Code::new(&resolver, &files, &Go);
+        (messages(&code).into_iter())
+            .map(|m| {
+                let name = m.name.as_deref().unwrap_or("unresolved");
+                let (role, handler) = match &m.role {
+                    Side::Producer => ("producer", String::new()),
+                    Side::Consumer(Handler::Inline { def, .. }) => {
+                        // The position of the literal is a byte offset: keep what encloses it.
+                        let (parent, _) = def.rsplit_once('@').unwrap();
+                        ("consumer", format!(" {parent}@"))
+                    }
+                    Side::Consumer(Handler::Def { name, .. }) => ("consumer", format!(" {name}")),
+                    _ => ("other", String::new()),
+                };
+                format!("{} {name} {role}{handler}", m.broker)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_nats_client_produces_and_consumes_with_its_handler() {
+        let src = r#"package x
+
+import (
+	"os"
+
+	"github.com/nats-io/nats.go"
+)
+
+func run() {
+	nc, _ := nats.Connect("nats://nats:4222")
+	nc.Publish("orders.created", []byte("o"))
+	nc.Publish(os.Getenv("SUBJECT"), []byte("o"))
+	nc.Subscribe("orders.created", func(m *nats.Msg) {})
+}
+"#;
+        let found = lines(src);
+        assert_eq!(
+            found,
+            [
+                "nats orders.created producer",
+                "nats unresolved producer",
+                "nats orders.created consumer run.@"
+            ]
+        );
+    }
 }
