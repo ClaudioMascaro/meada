@@ -68,7 +68,9 @@ one for the area a change touches.
   `.gitignore`). A rebuild (a missing index, or one of another schema) is a rename under the
   rebuild lock: `open` builds the whole new index in `index.db.new.<pid>` while it holds
   `index.db.lock` and renames it over `index.db`, so a reader sees the old index or the new
-  one, never a missing or empty file; `refresh` stays one transaction in place. `lang/`: the
+  one, never a missing or empty file; `refresh` stays one transaction in place. An operator
+  renames an index in (built elsewhere) only while no `meada index` writes that index, one
+  writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
   language adapter and the TS/JS, Python, Rust and Go packs. `resolve.rs`: calls to definitions (`Resolver`), values
   and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
   (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and

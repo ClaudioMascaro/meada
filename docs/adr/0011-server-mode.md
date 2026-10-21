@@ -150,6 +150,9 @@ before: the stdio server, discovery and freshness on demand are unchanged.
   the repository with in `[[peer]] repo`.
 - An identity whose segments would leave `index_dir` (`..`, an empty segment) is refused.
 - Invariant 3 holds unchanged: `index_dir` is Meada's own index directory in server mode.
+- An index built elsewhere may be renamed over `<index_dir>/<identity>/index.db` only while no
+  `meada index` writes that index: one writer per index, which the operator keeps. (Amended
+  2026-10-21; #265: a refresh's live journal would otherwise be taken for the new file's.)
 
 ### Refresh by command
 

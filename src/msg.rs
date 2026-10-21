@@ -65,6 +65,10 @@ pub enum Msg<'a> {
         index: &'a str,
         error: &'a str,
     },
+    RebuildLock {
+        lock: &'a str,
+        error: &'a str,
+    },
     MissingPeer {
         repo: &'a str,
         named_by: &'a str,
@@ -355,6 +359,10 @@ impl Msg<'_> {
                     "o índice `{index}` não pôde ser substituído pela reconstrução ({error}); \
                      ficou como estava"
                 ),
+            ),
+            Msg::RebuildLock { lock, error } => pick(
+                format!("cannot take the rebuild lock `{lock}`: {error}"),
+                format!("não foi possível pegar a trava de reconstrução `{lock}`: {error}"),
             ),
             Msg::IndexInMirror { index, mirror } => pick(
                 format!("its index directory `{index}` would be inside the mirror `{mirror}`"),

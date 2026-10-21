@@ -313,10 +313,19 @@ fn beside(index: &Path, suffix: &str) -> PathBuf {
 /// index rebuilt; the `index.db.new.*` a crashed rebuild left are removed only under the lock,
 /// so none belongs to a live rebuild.
 fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<Connection> {
-    let lock = (fs::File::options().read(true).write(true).create(true))
+    let path = beside(index, ".lock");
+    let locked = (fs::File::options().read(true).write(true).create(true))
         .truncate(false)
-        .open(beside(index, ".lock"))?;
-    lock.lock()?;
+        .open(&path)
+        .and_then(|lock| lock.lock().map(|()| lock));
+    let _lock = locked.map_err(|e| {
+        let lock = path.display().to_string();
+        Msg::RebuildLock {
+            lock: &lock,
+            error: &e.to_string(),
+        }
+        .text()
+    })?;
     if let Some(db) = current(index)? {
         return Ok(db);
     }
@@ -1917,7 +1926,9 @@ mod tests {
             let (index, done) = (index.clone(), done.clone());
             move || {
                 let mut seen = Vec::new();
-                while !done.load(Ordering::Relaxed) {
+                // One read more after the rebuild ends, so the new index is read at least once.
+                loop {
+                    let finished = done.load(Ordering::Relaxed);
                     let db = Connection::open_with_flags(&index, OpenFlags::SQLITE_OPEN_READ_ONLY)
                         .unwrap();
                     let version: i32 =
@@ -1927,8 +1938,10 @@ mod tests {
                         _ => files(&db),
                     };
                     seen.push((version == 2, rows));
+                    if finished {
+                        break seen;
+                    }
                 }
-                seen
             }
         });
         let writer = open(&index, &root, REPO, &Serve::default()).unwrap();
@@ -1940,6 +1953,7 @@ mod tests {
         assert_eq!(files(&writer), 1);
         assert_eq!(files(&read(&index).unwrap()), 1);
         assert!(seen.iter().all(|&(_, rows)| rows == 1), "{seen:?}");
+        assert!(seen.iter().any(|&(old, _)| !old), "{seen:?}");
         drop(before);
         let mut left: Vec<String> = (fs::read_dir(index.parent().unwrap()).unwrap())
             .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -1983,11 +1997,11 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    /// A writer killed mid-commit leaves a hot journal only a write can roll back.
-    #[test]
-    fn a_read_only_open_over_an_interrupted_commit_names_the_repository_and_the_fix() {
-        let (dir, index) = index_dir("hot");
-        let writer = open(&index, &dir, REPO, &Serve::default()).unwrap();
+    /// `<dir>/<name>/index.db`, an index of `REPO` holding one community `('c', 'm')`, with
+    /// the hot journal a writer killed while changing its member to `x` leaves.
+    fn interrupted(dir: &Path, name: &str) -> PathBuf {
+        let index = dir.join(name).join("source/index.db");
+        let writer = open(&index, dir, REPO, &Serve::default()).unwrap();
         writer
             .execute_batch("INSERT INTO communities VALUES ('c', 'm');")
             .unwrap();
@@ -1996,8 +2010,7 @@ mod tests {
         let change = "BEGIN; UPDATE communities SET member = 'x';";
         writer.execute_batch(change).unwrap();
         writer.cache_flush().unwrap();
-        let copy = dir.join("copy");
-        fs::create_dir_all(&copy).unwrap();
+        let copy = dir.join(name);
         let journal = fs::read(index.with_file_name("index.db-journal")).unwrap();
         assert_ne!(
             journal.first(),
@@ -2008,8 +2021,17 @@ mod tests {
         for name in ["index.db", "index.db-journal"] {
             fs::copy(index.with_file_name(name), copy.join(name)).unwrap();
         }
+        copy.join("index.db")
+    }
 
-        let error = read(&copy.join("index.db")).err().map(|e| e.to_string());
+    /// A writer killed mid-commit leaves a hot journal only a write can roll back.
+    #[test]
+    fn a_read_only_open_over_an_interrupted_commit_names_the_repository_and_the_fix() {
+        let (dir, _) = index_dir("hot");
+
+        let error = read(&interrupted(&dir, "copy"))
+            .err()
+            .map(|e| e.to_string());
 
         assert_eq!(
             error.as_deref(),
@@ -2018,7 +2040,85 @@ mod tests {
                  --workspace ops/meada.workspace.toml"
             )
         );
-        drop(writer);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The writable open rolls back the hot journal of an index of the current schema and keeps
+    /// that index: no rebuild, so no rebuild lock either.
+    #[test]
+    fn a_writable_open_rolls_back_a_hot_journal_and_keeps_the_index() {
+        let (dir, _) = index_dir("rollback");
+        let index = interrupted(&dir, "copy");
+
+        let db = open(&index, &dir, REPO, &Serve::default()).unwrap();
+
+        let member: String =
+            (db.query_row("SELECT member FROM communities", [], |r| r.get(0))).unwrap();
+        assert_eq!(member, "m");
+        assert!(!index.with_file_name("index.db-journal").exists());
+        assert!(!index.with_file_name("index.db.lock").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A commit in progress past the busy timeout is an error for a writer too, never a reason
+    /// to rebuild: the commit lands in the index afterwards.
+    #[test]
+    fn a_writable_open_of_an_index_locked_past_the_busy_timeout_fails_and_rebuilds_nothing() {
+        let (dir, index) = index_dir("writer_busy");
+        let writer = open(&index, &dir, REPO, &Serve::default()).unwrap();
+        (writer.execute_batch("BEGIN EXCLUSIVE; INSERT INTO communities VALUES ('c', 'm');"))
+            .unwrap();
+
+        let second = with_busy_timeout(Duration::from_millis(50), || {
+            open(&index, &dir, REPO, &Serve::default())
+        });
+
+        assert!(second.is_err());
+        writer.execute_batch("COMMIT").unwrap();
+        assert_eq!(communities(&read(&index).unwrap()), 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A journal left beside a missing index, or beside one of another schema, is not the new
+    /// index's: the rebuild removes it under the lock, and the rebuilt index opens clean.
+    #[test]
+    fn a_rebuild_removes_a_journal_left_beside_the_index() {
+        let (dir, index) = index_dir("stray_journal");
+        // Taken before the checkout exists, so the journal's pages hold no file.
+        let hot = interrupted(&dir, "hot");
+        let root = checkout(&dir);
+        let journal = fs::read(hot.with_file_name("index.db-journal")).unwrap();
+        let parent = index.parent().unwrap();
+        for older in [false, true] {
+            let _ = fs::remove_dir_all(parent);
+            fs::create_dir_all(parent).unwrap();
+            if older {
+                older_index(&index);
+            }
+            fs::write(index.with_file_name("index.db-journal"), &journal).unwrap();
+
+            let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+
+            // The journal's pages (the community row) never reach the new index.
+            assert_eq!(communities(&db), 0, "older: {older}");
+            assert_eq!(files(&db), 1, "older: {older}");
+            assert_eq!(files(&read(&index).unwrap()), 1, "older: {older}");
+            assert!(!index.with_file_name("index.db-journal").exists());
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A rebuild lock that cannot be taken (a read-only index directory) is named.
+    #[test]
+    fn a_rebuild_lock_that_cannot_be_taken_is_named() {
+        let (dir, index) = index_dir("lock_error");
+        let lock = index.with_file_name("index.db.lock");
+        fs::create_dir_all(&lock).unwrap();
+
+        let error = open(&index, &dir, REPO, &Serve::default()).err().unwrap();
+
+        let expected = format!("cannot take the rebuild lock `{}`: ", lock.display());
+        assert!(error.to_string().starts_with(&expected), "{error}");
         let _ = fs::remove_dir_all(&dir);
     }
 
