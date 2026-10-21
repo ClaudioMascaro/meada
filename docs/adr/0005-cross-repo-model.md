@@ -73,10 +73,15 @@ detects cycles.
 ## Considered options
 
 - **A central group repository.** One more repository, plus a pointer in every repository.
+  (Amended 2026-10-21; still rejected for local use. In server mode, ADR 0011, a workspace
+  manifest in the operator's ops repository lists the repositories, and each repository's own
+  `meada.toml` wins over it.)
 - **Configuration inside `.meada/`.** Less visible, and it needs an exception to the
   self-ignoring `.gitignore`.
 - **A global configuration outside version control.** What prior art does. It fails the aim of
-  keeping cross-repo configuration in version control.
+  keeping cross-repo configuration in version control. (Amended 2026-10-21; still rejected for
+  local use. The workspace manifest of server mode, ADR 0011, is versioned in an ops repository
+  and read only from the path `--workspace` gives.)
 - **Automatic prefix and version heuristics.** They produce false positives across versions.
 - **A numeric 0 to 1 score.** It needs tuned weights and gives false precision.
 - **One hop (prior art) or a fixed N hops.** Real systems chain deeper, and any fixed N is

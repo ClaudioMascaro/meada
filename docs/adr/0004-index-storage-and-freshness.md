@@ -19,6 +19,9 @@ fresh, and how things in it are named.
 - `.meada/` holds its own `.gitignore` containing `*`. Meada never edits the user's
   `.gitignore` (invariant 3), and tools that respect ignore files skip the folder.
 - Each worktree has its own index.
+- (Amended 2026-10-21; in server mode, ADR 0011, the index lives at
+  `<index_dir>/<identity>/index.db`, keyed by remote identity, with no `.gitignore`, and nothing
+  is written into the checkout.)
 - A cross-repo query opens the peers' indexes with `ATTACH DATABASE`. Several indexes are read
   together and never merged (invariant 5).
 - The index holds no source text. A span is stored as a location and a content hash. Its text is
@@ -33,6 +36,9 @@ fresh, and how things in it are named.
   and the contract links that touch them, before it answers.
 - Refreshing is a write inside Meada's own index. It is the only write an MCP call makes
   (ADR 0002, invariants 3 and 4).
+- (Amended 2026-10-21; in server mode, ADR 0011, freshness is by command: the server stats
+  nothing per call and writes nothing, and the operator runs `meada index` after a mirror
+  moves. Freshness on demand stays the default.)
 
 ### Stable identities
 
@@ -52,7 +58,9 @@ orphan them.
 ## Considered options
 
 - **An index in the user's cache directory.** Keyed by path, orphaned when a repository moves,
-  harder to find.
+  harder to find. (Amended 2026-10-21; still rejected for local use. Server mode, ADR 0011,
+  keeps indexes outside the checkout, keyed by remote identity in a directory the manifest
+  names, which answers both objections.)
 - **tantivy or a custom format.** No SQL, no `ATTACH`, not inspectable with `sqlite3`.
 - **A watcher in the MCP server.** A long-lived process, and inotify limits in large
   monorepos.
