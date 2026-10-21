@@ -99,14 +99,19 @@ pub(crate) fn probability(p: f64) -> bool {
 /// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
 /// The file holds at most one entry per `call`: a repeat is a parse error naming its line.
 pub fn load(root: &Path) -> Result<Decisions> {
-    let decisions: Decisions = config::read(root, FILE)?;
+    load_up_to(root, None)
+}
+
+/// `load`, reading at most `max` bytes of the file when it is set (`config::read_own_up_to`).
+pub(crate) fn load_up_to(root: &Path, max: Option<u64>) -> Result<Decisions> {
+    let decisions: Decisions = config::read_own_up_to(root, FILE, max)?.unwrap_or_default();
     let mut seen = HashSet::new();
     let Some(repeat) = decisions.items.iter().find(|d| !seen.insert(&d.call)) else {
         return Ok(decisions);
     };
     let file = root.join(FILE);
     // The repeat is the second `call = "<call>"` line.
-    let line = std::fs::read_to_string(&file)?
+    let line = (config::text(&file, max)?.unwrap_or_default())
         .lines()
         .enumerate()
         .filter(|(_, l)| l.starts_with("call") && l.contains(&format!("\"{}\"", repeat.call)))

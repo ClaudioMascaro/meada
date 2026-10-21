@@ -31,9 +31,9 @@ const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.
 
 /// `meada mcp --listen <listen> --workspace ops/meada.workspace.toml` running in `dir`, killed
 /// when dropped. `url` is the address its first stderr line names.
-struct Server {
+pub(crate) struct Server {
     child: Child,
-    url: String,
+    pub(crate) url: String,
     // Kept open, so a later line on stderr does not fail on a closed pipe.
     _stderr: BufReader<ChildStderr>,
 }
@@ -45,10 +45,16 @@ impl Server {
 
     /// `start` with more environment variables.
     fn start_with(dir: &Path, listen: &str, env: &[(&str, &str)]) -> Self {
+        Self::start_args(dir, &["--listen", listen, "--workspace", MANIFEST], env)
+    }
+
+    /// `meada mcp <args>` in `dir`, with more environment variables.
+    pub(crate) fn start_args(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
             .envs(env.iter().copied())
             .current_dir(dir)
-            .args(["mcp", "--listen", listen, "--workspace", MANIFEST])
+            .arg("mcp")
+            .args(args)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
@@ -68,7 +74,7 @@ impl Server {
     }
 
     /// An MCP client of the endpoint at `path`.
-    async fn client(&self, path: &str) -> RunningService<RoleClient, ()> {
+    pub(crate) async fn client(&self, path: &str) -> RunningService<RoleClient, ()> {
         crate::common::crypto_provider();
         let transport = StreamableHttpClientTransport::from_uri(format!("{}{path}", self.url));
         ().serve(transport).await.unwrap()
@@ -124,12 +130,12 @@ fn commit_in_progress(dir: &Path) -> rusqlite::Connection {
 }
 
 /// `name` called with `arguments`.
-fn call(name: &'static str, arguments: serde_json::Value) -> CallToolRequestParams {
+pub(crate) fn call(name: &'static str, arguments: serde_json::Value) -> CallToolRequestParams {
     CallToolRequestParams::new(name).with_arguments(arguments.as_object().unwrap().clone())
 }
 
 /// A tool result's text.
-fn text(result: &CallToolResult) -> &str {
+pub(crate) fn text(result: &CallToolResult) -> &str {
     &result
         .content
         .first()
@@ -159,7 +165,7 @@ fn agent() -> ureq::Agent {
 }
 
 /// `GET url`: status, `Content-Type` and body.
-fn get(url: &str) -> (u16, String, String) {
+pub(crate) fn get(url: &str) -> (u16, String, String) {
     let mut response = agent().get(url).call().unwrap();
     let kind = response.headers()["content-type"]
         .to_str()

@@ -23,18 +23,27 @@ enum Command {
     Status {
         #[arg(long)]
         workspace: Option<PathBuf>,
+        #[cfg(feature = "snapshot")]
+        #[arg(long, requires = "workspace")]
+        generations: bool,
     },
     Export {
         #[arg(long, requires = "repo")]
         workspace: Option<PathBuf>,
         #[arg(long, requires = "workspace")]
         repo: Option<String>,
+        #[cfg(feature = "snapshot")]
+        #[arg(long, requires = "workspace")]
+        generations: bool,
     },
     Mcp {
         #[arg(long, requires = "workspace")]
         listen: Option<String>,
         #[arg(long, requires = "listen")]
         workspace: Option<PathBuf>,
+        #[cfg(feature = "snapshot")]
+        #[arg(long, requires = "listen")]
+        generations: bool,
     },
     Decide {
         #[arg(long)]
@@ -168,12 +177,54 @@ fn main() -> ExitCode {
                     .mut_arg("every", |a| a.help(Msg::SnapshotEvery.text()))
             })
     });
+    #[cfg(feature = "snapshot")]
+    let matches = ["status", "export", "mcp"]
+        .into_iter()
+        .fold(matches, |matches, name| {
+            matches.mut_subcommand(name, |c| {
+                c.mut_arg("generations", |a| a.help(Msg::GenerationsHelp.text()))
+            })
+        });
     let matches = matches.get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let here = Path::new(".");
     let mut unready = false;
     let result = match cli.command {
-        Command::Mcp { listen, workspace } => {
+        #[cfg(feature = "snapshot")]
+        Command::Mcp {
+            listen: Some(listen),
+            workspace: Some(manifest),
+            generations: true,
+        } => {
+            msg::init(None);
+            meada::mcp::listen_generations(&listen, &manifest)
+        }
+        #[cfg(feature = "snapshot")]
+        Command::Status {
+            workspace: Some(manifest),
+            generations: true,
+        } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
+            engine::status_generations(&manifest).map(|status| {
+                print!("{status}");
+                if let Err(problems) = engine::served_generation(&manifest) {
+                    for line in problems.to_string().lines() {
+                        eprintln!("meada: {line}");
+                    }
+                    unready = true;
+                }
+            })
+        }),
+        #[cfg(feature = "snapshot")]
+        Command::Export {
+            workspace: Some(manifest),
+            repo: Some(repo),
+            generations: true,
+        } => Engine::open_node(&manifest, &repo)
+            .and_then(|engine| engine.export())
+            .map(|json| print!("{json}")),
+        Command::Mcp {
+            listen, workspace, ..
+        } => {
             // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
@@ -183,15 +234,16 @@ fn main() -> ExitCode {
         }
         Command::Status {
             workspace: Some(manifest),
+            ..
         } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
             engine::status_workspace(&manifest).map(|status| {
                 print!("{status}");
                 unready = !engine::ready(&manifest);
             })
         }),
-        Command::Status { workspace: None } => {
-            engine::status(here).map(|status| print!("{status}"))
-        }
+        Command::Status {
+            workspace: None, ..
+        } => engine::status(here).map(|status| print!("{status}")),
         // Every repository's problem on its own line; the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),
@@ -227,6 +279,7 @@ fn main() -> ExitCode {
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),
+            ..
         } => Engine::open_manifest(&manifest, &repo)
             .and_then(|engine| engine.export())
             .map(|json| print!("{json}")),

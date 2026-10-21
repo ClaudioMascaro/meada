@@ -16,10 +16,33 @@ then manifest order, nothing discovered) and each index lives at
 `<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
 are `meada index --workspace` and `meada status --workspace`. An engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
-one read transaction held until the engine drops, so an answer sees each index as one commit left
+`trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
+a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
 it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
 nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
-opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
+opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_held`
+builds the workspace from a generation the node holds instead
+(`snapshot::serve::held` reads the pointer file and the generation document, and
+`Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
+`<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
+else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX`; no
+`git` runs, the pull checked each mirror) and opens it read-only as `open_manifest` does, one
+engine per call. The server keeps the last generation read (`serve::Current`, one `Arc<Held>`:
+a generation's directory never changes once renamed into place), so a request reads only the
+pointer file until it names another id, and the request's route hands the `Held` it routed by
+to the call (`Source::Generation`): a swap between two calls changes the generation and one
+during a call does not, and a call still answering keeps its own `Arc` once the server moved
+on. The node's manifest contributes only its module
+sections. `engine::served_generation` is its start check and the predicate `status
+--generations` exits on (current generation present, every mirror rechecked, every index at the
+schema version and holding exactly this build's schema objects, `index::vet`, the whole
+workspace opens), `engine::status_generations` its text (the node's
+current and held ids, and the store's current id with a short timeout, which never changes the
+exit code), and `Engine::open_node` what `export --generations` opens. An index that cannot be
+read in a generation names the generation and its fix (`msg::Fix`), not `meada index`: a
+publish from this build for another schema version, else removing `<local_dir>/<id>` before
+`meada snapshot pull` (a pull of the generation already current changes nothing) or a new
+generation. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
@@ -68,7 +91,9 @@ one for the area a change touches.
   two transports: stdio, about the client's first `file://` root or the server's cwd without
   roots, and in server mode streamable HTTP (`meada mcp --listen`, stateless, JSON responses on
   a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
-  listing the identities served elsewhere (it answers before the `Origin` check, which refuses
+  listing the identities served elsewhere (with `--generations`, `listen_generations` makes
+  the endpoint per request from the current generation's identities, so a pull that adds a
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; it answers before the `Origin` check, which refuses
   any request carrying one with 403; no `Host` check). `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
   handlers before it prints the address, then on a signal drops the listener and lets each
   connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
@@ -143,6 +168,11 @@ one for the area a change touches.
   regular file of the mirror; no nested repository, that is no `.git` component, in any case,
   below the mirror's own `.git` and nothing under its `.git/modules`, since git runs a
   submodule's own configuration when `git status` descends into it; any other type refused);
+  `index::vet` requires the extracted `index.db` to hold exactly the schema objects this build
+  creates (type, name, table and SQL against a fresh in-memory index: no view, trigger, table
+  or index more, none altered) and its header to name the rollback journal (bytes 18 and 19
+  both 1, so no read-only open makes `-wal` or `-shm` files), naming the repository and the
+  object;
   `settle` replaces `.git/config` with `[core]` and the identity's `origin`, removes `hooks`,
   `commondir` and `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a
   clean `git status` that does not descend into submodules (`repo::unclean(_, false)`; the
@@ -153,6 +183,12 @@ one for the area a change touches.
   `current`, and every id-named directory but the new current and the one just replaced is
   deleted. A failure removes the partial directory and leaves the pointer and every held
   generation as they were.
+  `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
+  manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
+  pointer file through `pull::current`, then `generation.json`, bounded and checked as the
+  generation's own), `Current` (the last generation `held` read, kept while the pointer names
+  it), `ids` (the generations held) and `reach` (the store's current id within
+  two seconds, for the probe). It only reads; the pull is the only writer of `local_dir`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
@@ -874,6 +910,11 @@ one for the area a change touches.
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
+- `render.rs`: a source file an answer reads (`render::source`, for `path:line` and a symbol's
+  source) is read only through plain relative parts of its path, through no symbolic link, as a
+  regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
+  without its line, as a missing file does. An answer keeps each file it reads, so several
+  large files add up.
 - `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
   (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
 - `index.rs`: every contract is extracted again and every call resolved again on any change
@@ -890,7 +931,9 @@ one for the area a change touches.
   directory and an `internal/` package are no different from any other directory of the provider;
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
-  silently.
+  silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
+  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`); past it the
+  generation is not servable, the error naming the file.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

@@ -21,11 +21,11 @@ use object_store::{
 use crate::common::git;
 use crate::manifest::{CHAIN, MANIFEST, chain_manifest, run};
 
-const KEY_ID: &str = "meada-test";
-const SECRET: &str = "meada-test-secret";
+pub(crate) const KEY_ID: &str = "meada-test";
+pub(crate) const SECRET: &str = "meada-test-secret";
 
 /// The local store, or `None` with the reason printed.
-fn service() -> Option<String> {
+pub(crate) fn service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_S3_ENDPOINT").ok();
     if url.is_none() {
         let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");
@@ -35,7 +35,7 @@ fn service() -> Option<String> {
     url
 }
 
-fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
+pub(crate) fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build();
@@ -43,7 +43,7 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
 }
 
 /// A client of `bucket` as the tests see the store, the bucket created.
-fn bucket(endpoint: &str, bucket: &str) -> AmazonS3 {
+pub(crate) fn bucket(endpoint: &str, bucket: &str) -> AmazonS3 {
     crate::common::crypto_provider();
     let s3 = AmazonS3Builder::new()
         .with_endpoint(endpoint)
@@ -75,13 +75,13 @@ fn bucket(endpoint: &str, bucket: &str) -> AmazonS3 {
 }
 
 /// A bucket name of this test's own.
-fn bucket_name(case: &str) -> String {
+pub(crate) fn bucket_name(case: &str) -> String {
     format!("meada-{case}-{}", std::process::id()).replace('_', "-")
 }
 
 /// The chain's manifest in `<case>/` with a `[snapshot]` section for `bucket`, indexed. The
 /// secret key comes from a file, the key id from a variable `publish` sets.
-fn store_manifest(case: &str, endpoint: &str, bucket: &str, secret: &str) -> PathBuf {
+pub(crate) fn store_manifest(case: &str, endpoint: &str, bucket: &str, secret: &str) -> PathBuf {
     let dir = chain_manifest(case);
     let secret_file = dir.join("ops/s3-secret");
     fs::write(&secret_file, format!("{secret}\n")).unwrap();
@@ -90,7 +90,7 @@ fn store_manifest(case: &str, endpoint: &str, bucket: &str, secret: &str) -> Pat
     dir
 }
 
-fn section(endpoint: &str, bucket: &str) -> String {
+pub(crate) fn section(endpoint: &str, bucket: &str) -> String {
     format!(
         "\n[snapshot]\nendpoint = \"{endpoint}\"\nregion = \"us-east-1\"\nbucket = \"{bucket}\"\n\
          prefix = \"prod/meada\"\npath_style = true\naccess_key_id_env = \"MEADA_TEST_S3_KEY\"\n\
@@ -105,7 +105,7 @@ fn append_section(dir: &Path, section: &str) {
 }
 
 /// `meada snapshot publish --workspace <manifest>` in `dir`: stdout, stderr and the exit code.
-fn publish(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
+pub(crate) fn publish(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
         .args(["snapshot", "publish", "--workspace", manifest])
@@ -471,8 +471,18 @@ fn snapshot_section_errors_name_the_file_the_line_and_the_key() {
 /// A node's manifest, `<dir>/node/meada.workspace.toml`, listing no repository: its
 /// `[snapshot]` section names the same store, and `local_dir = "generations"`. Returns the
 /// manifest, relative to `dir`, and the local directory.
-fn node(dir: &Path, endpoint: &str, bucket: &str) -> (String, PathBuf) {
-    let node = dir.join("node");
+pub(crate) fn node(dir: &Path, endpoint: &str, bucket: &str) -> (String, PathBuf) {
+    named_node(dir, "node", endpoint, bucket)
+}
+
+/// `node` in `<dir>/<name>/`: another node of the same store.
+pub(crate) fn named_node(
+    dir: &Path,
+    name: &str,
+    endpoint: &str,
+    bucket: &str,
+) -> (String, PathBuf) {
+    let node = dir.join(name);
     let _ = fs::remove_dir_all(&node);
     fs::create_dir_all(&node).unwrap();
     fs::write(node.join("s3-secret"), format!("{SECRET}\n")).unwrap();
@@ -481,11 +491,14 @@ fn node(dir: &Path, endpoint: &str, bucket: &str) -> (String, PathBuf) {
         section(endpoint, bucket)
     );
     fs::write(node.join("meada.workspace.toml"), toml).unwrap();
-    ("node/meada.workspace.toml".into(), node.join("generations"))
+    (
+        format!("{name}/meada.workspace.toml"),
+        node.join("generations"),
+    )
 }
 
 /// `meada snapshot pull --workspace <manifest> <more>` in `dir`, as `publish`.
-fn pull(dir: &Path, manifest: &str, more: &[&str]) -> (String, String, Option<i32>) {
+pub(crate) fn pull(dir: &Path, manifest: &str, more: &[&str]) -> (String, String, Option<i32>) {
     let out = pull_command(dir, manifest, more)
         .output()
         .expect("meada runs");
@@ -493,7 +506,7 @@ fn pull(dir: &Path, manifest: &str, more: &[&str]) -> (String, String, Option<i3
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
-fn pull_command(dir: &Path, manifest: &str, more: &[&str]) -> Command {
+pub(crate) fn pull_command(dir: &Path, manifest: &str, more: &[&str]) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_meada"));
     command
         .current_dir(dir)
@@ -506,7 +519,7 @@ fn pull_command(dir: &Path, manifest: &str, more: &[&str]) -> Command {
 }
 
 /// What `local_dir` holds: each name, sorted, and the pointer file.
-fn held(local: &Path) -> (Vec<String>, String) {
+pub(crate) fn held(local: &Path) -> (Vec<String>, String) {
     let mut names: Vec<String> = (fs::read_dir(local).unwrap())
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
@@ -524,10 +537,14 @@ fn mirror_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
 }
 
 /// A commit in `repo` and `meada index --workspace`, so the next publish is a new generation.
-fn next_commit(dir: &Path, repo: &str, line: &str) {
+pub(crate) fn next_commit(dir: &Path, repo: &str, line: &str) {
     let file = dir.join(repo).join("src/status.ts");
     let src = fs::read_to_string(&file).unwrap();
-    fs::write(&file, format!("{src}\nexport const {line} = 1;\n")).unwrap();
+    fs::write(
+        &file,
+        format!("{src}\nexport function {line}() {{\n  return 1;\n}}\n"),
+    )
+    .unwrap();
     git(&dir.join(repo), &["commit", "-q", "-am", line]);
     assert!(run(dir, "index").2, "index");
 }
@@ -729,6 +746,33 @@ fn bundle_of(index: &Path, mirror: &Path, extra: &[(&[u8], tar::EntryType, &[u8]
     tar.into_inner().unwrap()
 }
 
+/// Schema objects a store could slip into an index of the right version, each with the object
+/// the refusal names: an extra view, an extra trigger and an altered table.
+pub(crate) const HOSTILE_SCHEMAS: [(&str, &str); 3] = [
+    (
+        "CREATE VIEW endless AS WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) \
+         SELECT i FROM n;",
+        "index.db: the view endless",
+    ),
+    (
+        "CREATE TRIGGER t AFTER INSERT ON meta BEGIN DELETE FROM files; END;",
+        "index.db: the trigger t",
+    ),
+    (
+        "DROP TABLE communities; CREATE TABLE communities (name TEXT, member TEXT, x);",
+        "index.db: the table communities",
+    ),
+];
+
+/// A copy of the index at `index`, at `to`, with `sql` run over it.
+pub(crate) fn crafted_index(index: &Path, to: &Path, sql: &str) {
+    fs::copy(index, to).unwrap();
+    rusqlite::Connection::open(to)
+        .unwrap()
+        .execute_batch(sql)
+        .unwrap();
+}
+
 #[test]
 fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one() {
     let Some(endpoint) = service() else { return };
@@ -753,8 +797,15 @@ fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one(
     let _ = fs::remove_file(&escaped);
     let link = tar::EntryType::Symlink;
     let file = tar::EntryType::Regular;
+    let hostile: Vec<PathBuf> = (HOSTILE_SCHEMAS.iter().enumerate())
+        .map(|(n, (sql, _))| {
+            let crafted = dir.join(format!("hostile-{n}.db"));
+            crafted_index(&index, &crafted, sql);
+            crafted
+        })
+        .collect();
     type Stage<'a> = Box<dyn Fn() -> String + 'a>;
-    let cases: Vec<(&str, Stage, &str)> = vec![
+    let mut cases: Vec<(&str, Stage, &str)> = vec![
         (
             "a corrupted bundle",
             Box::new(|| {
@@ -817,6 +868,14 @@ fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one(
             "not a repository identity",
         ),
     ];
+    for (crafted, (_, object)) in hostile.iter().zip(HOSTILE_SCHEMAS) {
+        let (mirror, s3, head) = (&mirror, &s3, &head);
+        let stage_it = move || {
+            let tar = bundle_of(crafted, mirror, &[]);
+            stage(s3, identity, head, &tar, None)
+        };
+        cases.push(("a hostile index schema", Box::new(stage_it), object));
+    }
     for (case, staged, expected) in cases {
         staged();
         let (stdout, stderr, code) = pull(&dir, &manifest, &[]);

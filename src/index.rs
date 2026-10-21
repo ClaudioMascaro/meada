@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
+use rusqlite::config::DbConfig;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
 use serde::{Serialize, Serializer};
 
@@ -20,7 +21,7 @@ use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
-use crate::msg::Msg;
+use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
@@ -174,34 +175,82 @@ pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
 }
 
 /// The index at `path` opened read-only: nothing is created, and a statement that meets a
-/// commit in progress waits for it up to the busy timeout.
+/// commit in progress waits for it up to the busy timeout. The file may come from a store
+/// (ADR 0012), so its schema is trusted with nothing: `trusted_schema` is off (no view or
+/// trigger calls a function that is not innocuous) and the connection is defensive (no
+/// statement corrupts the file, nor writes the schema through a pragma).
 fn read_only(path: &Path) -> rusqlite::Result<Connection> {
     let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    db.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true)?;
+    db.pragma_update(None, "trusted_schema", false)?;
     db.busy_timeout(BUSY.get())?;
     Ok(db)
+}
+
+/// The schema objects of `db`'s `main`: type, name, table and SQL, sorted.
+#[cfg(feature = "snapshot")]
+fn objects(db: &Connection) -> rusqlite::Result<Vec<[Option<String>; 4]>> {
+    let mut statement =
+        db.prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY 1, 2, 3, 4")?;
+    let rows = statement.query_map([], |r| Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?]))?;
+    rows.collect()
+}
+
+/// The index at `index`, of the repository `repo` in a pulled generation, holds exactly the
+/// schema objects this build creates (`SCHEMA`): no view, trigger, table or index more, and
+/// none altered or missing, compared by type, name, table and SQL with a fresh index. A
+/// crafted `symbols` view with an endless recursive query would hang every call. Before it is
+/// opened, its header must name the rollback journal (bytes 18 and 19 both 1): a read-only open
+/// of a WAL index would create `-wal` and `-shm` files in the generation. Checked by `meada
+/// snapshot pull` and the start check of `--generations`; the error names the repository and
+/// the object.
+#[cfg(feature = "snapshot")]
+pub fn vet(index: &Path, repo: &str, fix: Fix) -> Result<()> {
+    let mut header = [0; 20];
+    let read = fs::File::open(index).and_then(|mut f| f.read_exact(&mut header));
+    if read.is_err() || header[18..20] != [1, 1] {
+        return Err(Msg::IndexNotRollback(repo).text().into());
+    }
+    let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
+    let found = objects(&db).map_err(|e| unreadable(e, index, repo, fix))?;
+    let fresh = Connection::open_in_memory()?;
+    fresh.execute_batch(SCHEMA)?;
+    let expected = objects(&fresh)?;
+    let odd = (found.iter().find(|o| !expected.contains(o)))
+        .or_else(|| expected.iter().find(|o| !found.contains(o)));
+    match odd {
+        None => Ok(()),
+        Some([kind, name, ..]) => Err(Msg::IndexSchemaObject {
+            repo,
+            kind: kind.as_deref().unwrap_or_default(),
+            name: name.as_deref().unwrap_or_default(),
+        }
+        .text()
+        .into()),
+    }
 }
 
 /// Opens the indexes of `repos` (index path, repository identity) read-only, as server mode
 /// reads (ADR 0011): the first as `main`, each other attached as `schema(n)`. Nothing is
 /// created, rebuilt or written. A missing index, one of another schema, one a commit left
 /// interrupted, or one a commit in progress keeps locked past the busy timeout is an error
-/// naming its repository, all but the last with `meada index --workspace <manifest>`.
-pub fn open_read(repos: &[(&Path, &str)], manifest: &str) -> Result<Connection> {
+/// naming its repository, all but the last with its fix (`Fix`).
+pub fn open_read(repos: &[(&Path, &str)], fix: Fix) -> Result<Connection> {
     let [(index, repo), ..] = repos else {
         return Err("no repository to open".into());
     };
-    let db = read_only(index).map_err(|e| unreadable(e, index, repo, manifest))?;
+    let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
     for (n, (index, repo)) in repos.iter().enumerate().skip(1) {
         let path = index.to_str().ok_or("index path is not UTF-8")?;
         (db.execute(&format!("ATTACH DATABASE ?1 AS {}", schema(n)), [path]))
-            .map_err(|e| unreadable(e, index, repo, manifest))?;
+            .map_err(|e| unreadable(e, index, repo, fix))?;
     }
     // One read transaction, held until the connection closes (and then rolled back, nothing
     // being written): its first read of each index takes the lock a commit waits on, so every
     // answer read through it sees each index as one commit left it (ADR 0011).
     db.execute_batch("BEGIN DEFERRED")?;
     for (n, (index, repo)) in repos.iter().enumerate() {
-        check_read(&db, &schema(n), index, repo, manifest)?;
+        check_read(&db, &schema(n), index, repo, fix)?;
     }
     Ok(db)
 }
@@ -216,19 +265,13 @@ pub fn schema(n: usize) -> String {
 }
 
 /// The schema version check of a read-only open; the first read, so the one that waits.
-fn check_read(
-    db: &Connection,
-    schema: &str,
-    index: &Path,
-    repo: &str,
-    manifest: &str,
-) -> Result<()> {
+fn check_read(db: &Connection, schema: &str, index: &Path, repo: &str, fix: Fix) -> Result<()> {
     let version = (db.query_row(&format!("PRAGMA {schema}.user_version"), [], |r| {
         r.get::<_, i32>(0)
     }))
-    .map_err(|e| unreadable(e, index, repo, manifest))?;
+    .map_err(|e| unreadable(e, index, repo, fix))?;
     if version != schema_version() {
-        return Err(Msg::IndexOtherVersion { repo, manifest }.text().into());
+        return Err(Msg::IndexOtherVersion { repo, fix }.text().into());
     }
     Ok(())
 }
@@ -238,13 +281,13 @@ fn unreadable(
     e: rusqlite::Error,
     index: &Path,
     repo: &str,
-    manifest: &str,
+    fix: Fix,
 ) -> Box<dyn std::error::Error> {
     let text = match e.sqlite_error_code() {
-        Some(ErrorCode::CannotOpen) => Msg::IndexMissing { repo, manifest }.text(),
-        Some(ErrorCode::NotADatabase) => Msg::IndexOtherVersion { repo, manifest }.text(),
+        Some(ErrorCode::CannotOpen) => Msg::IndexMissing { repo, fix }.text(),
+        Some(ErrorCode::NotADatabase) => Msg::IndexOtherVersion { repo, fix }.text(),
         // A hot journal (a writer stopped mid-commit) that only a write can roll back.
-        Some(ErrorCode::ReadOnly) => Msg::IndexInterrupted { repo, manifest }.text(),
+        Some(ErrorCode::ReadOnly) => Msg::IndexInterrupted { repo, fix }.text(),
         Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) => Msg::IndexLocked {
             repo,
             index: &index.display().to_string(),
@@ -1943,6 +1986,7 @@ mod tests {
         SCHEMA, State, open, open_read, read_config, refresh_stamped, state, with_busy_timeout,
     };
     use crate::config::Serve;
+    use crate::msg::Fix;
     use crate::{document, lang, package};
 
     const REPO: &str = "example.com/acme/web";
@@ -1958,7 +2002,7 @@ mod tests {
 
     /// The index of `REPO` at `index`, opened as server mode reads it.
     fn read(index: &Path) -> crate::Result<Connection> {
-        open_read(&[(index, REPO)], MANIFEST)
+        open_read(&[(index, REPO)], Fix::Index(MANIFEST))
     }
 
     fn communities(db: &Connection) -> i64 {
@@ -2018,6 +2062,101 @@ mod tests {
 
         assert!(commit.join().unwrap() >= Duration::from_millis(150));
         assert_eq!(communities(&read(&index).unwrap()), 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// An index of this build's schema at `<case dir>/index.db`, then `sql` run over it, as a
+    /// store could hand one over.
+    #[cfg(feature = "snapshot")]
+    fn crafted(case: &str, sql: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("meada-vet-{case}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.db");
+        let db = Connection::open(&index).unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        db.pragma_update(None, "user_version", super::schema_version())
+            .unwrap();
+        db.execute_batch(sql).unwrap();
+        index
+    }
+
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn an_index_not_in_rollback_journal_mode_is_refused_before_it_is_opened() {
+        let fix = Fix::Generation {
+            id: "0123456789abcdef",
+            dir: "generations/0123456789abcdef",
+        };
+        let index = crafted("wal", "PRAGMA journal_mode = WAL;");
+        let e = super::vet(&index, REPO, fix).unwrap_err().to_string();
+        assert!(e.starts_with(&format!("{REPO}: index.db: ")), "{e}");
+        assert!(e.contains("rollback journal"), "{e}");
+        for left in ["index.db-wal", "index.db-shm"] {
+            assert!(!index.with_file_name(left).exists(), "{left}");
+        }
+        fs::write(&index, b"short").unwrap();
+        assert!(super::vet(&index, REPO, fix).is_err());
+    }
+
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn an_index_with_a_schema_object_this_build_does_not_create_is_refused() {
+        let fix = Fix::Generation {
+            id: "0123456789abcdef",
+            dir: "generations/0123456789abcdef",
+        };
+        assert!(super::vet(&crafted("clean", ""), REPO, fix).is_ok());
+        let cases = [
+            (
+                "view",
+                "CREATE VIEW endless AS WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 \
+                 FROM n) SELECT i FROM n;",
+                "view endless",
+            ),
+            (
+                "symbols-view",
+                "DROP TABLE symbols; CREATE VIEW symbols AS WITH RECURSIVE n(i) AS (SELECT 1 \
+                 UNION ALL SELECT i + 1 FROM n) SELECT '' AS id, '' AS path, i AS start, i AS \
+                 end FROM n;",
+                "symbols",
+            ),
+            (
+                "trigger",
+                "CREATE TRIGGER t AFTER INSERT ON meta BEGIN DELETE FROM files; END;",
+                "trigger t",
+            ),
+            (
+                "altered",
+                "DROP TABLE communities; CREATE TABLE communities (name TEXT, member TEXT, x);",
+                "table communities",
+            ),
+            ("dropped", "DROP INDEX calls_path;", "index calls_path"),
+        ];
+        for (case, sql, object) in cases {
+            let e = super::vet(&crafted(case, sql), REPO, fix)
+                .unwrap_err()
+                .to_string();
+            assert!(e.starts_with(&format!("{REPO}: index.db: ")), "{case}: {e}");
+            assert!(e.contains(object), "{case}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_read_only_index_trusts_nothing_of_its_schema() {
+        let dir = std::env::temp_dir().join(format!("meada-defensive-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.db");
+        Connection::open(&index)
+            .unwrap()
+            .execute_batch(SCHEMA)
+            .unwrap();
+        let db = super::read_only(&index).unwrap();
+        let trusted: bool = (db.query_row("PRAGMA trusted_schema", [], |r| r.get(0))).unwrap();
+        assert!(!trusted);
+        let defensive = rusqlite::config::DbConfig::SQLITE_DBCONFIG_DEFENSIVE;
+        assert!(db.db_config(defensive).unwrap());
         let _ = fs::remove_dir_all(&dir);
     }
 

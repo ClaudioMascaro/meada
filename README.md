@@ -301,6 +301,25 @@ passo deixa o ponteiro e as gerações guardadas como estavam.
     <id do bundle>/mirror/    # o checkout, .git incluído
 ```
 
+Para servir o que o nó recebeu, `meada mcp --listen <endereço> --workspace <manifesto>
+--generations`. O manifesto do nó contribui só com as seções de módulo (`[snapshot]`); os
+repositórios são os que a geração atual registrou, com os espelhos e índices dentro de
+`<local_dir>/<id da geração>/`. Cada chamada lê `<local_dir>/current` e abre o motor sobre a
+geração que ele nomeia: uma chamada já aberta termina na geração em que começou, a seguinte vê a
+nova, e um `meada snapshot pull --every` troca a geração sem reiniciar o servidor (um
+repositório novo numa geração nova ganha o seu endpoint na hora). Nada é escrito por chamada,
+os índices abrem só para leitura e o servidor não abre conexão alguma com o store. Os nós nunca
+rodam `meada index`: quem indexa é o job, e o nó só recebe. Sem geração atual, ou com um índice
+que não está na versão de schema deste binário, o servidor recusa subir e nomeia
+`meada snapshot pull` ou o repositório e a geração.
+
+`meada status --workspace <manifesto> --generations` é a sonda de prontidão do nó. Imprime o id
+da geração atual, os ids guardados e uma linha `store: reachable (current <id>)` ou
+`store: unreachable (<motivo>)`. O código de saída depende só do estado local: 1 sem uma
+geração atual servível (os problemas vão para stderr), 0 do contrário, com o store alcançável
+ou não, de modo que um store fora do ar não tira o nó da rotação. `meada export --workspace
+<manifesto> --repo <identidade> --generations` exporta do mesmo jeito.
+
 ## Decisões
 
 Uma ligação ambígua (vários provedores servem a rota) ou uma URL dinâmica (a chamada monta a
