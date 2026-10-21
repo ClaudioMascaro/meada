@@ -192,7 +192,7 @@ modules updates it.
   a parallel path into `channel.rs`. The `LIBRARIES` table names each crate's constructors
   (suffix-matched on `Code::outside`, without the path flag, over the constructor the
   `Follow::Values` origin reached) and the methods that hand back the same object
-  (`passes`, which `lang::rust::passes` falls through to, so `flow follows `set`, `create_channel`,
+  (`passes`, which `lang::rust::passes` falls through to, so `flow` follows `set`, `create_channel`,
   `connect` and the like). Forms: rdkafka `send` of a `FutureRecord::to(topic)` or
   `BaseRecord::to(topic)` (the record is found from the argument, down its chain) and
   `subscribe(&[topics])`, on a client from `ClientConfig::new()`; lapin `basic_publish`,
