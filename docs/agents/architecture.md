@@ -16,7 +16,8 @@ then manifest order, nothing discovered) and each index lives at
 `<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
 are `meada index --workspace` and `meada status --workspace`. An engine opened from a
 manifest opens every index read-only on one connection (`index::open_read`: nothing created,
-one read transaction held until the engine drops, so an answer sees each index as one commit left
+`trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
+a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
 it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
 nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
 opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_held`
@@ -34,7 +35,8 @@ during a call does not, and a call still answering keeps its own `Arc` once the 
 on. The node's manifest contributes only its module
 sections. `engine::served_generation` is its start check and the predicate `status
 --generations` exits on (current generation present, every mirror rechecked, every index at the
-schema version, the whole workspace opens), `engine::status_generations` its text (the node's
+schema version and holding exactly this build's schema objects, `index::vet`, the whole
+workspace opens), `engine::status_generations` its text (the node's
 current and held ids, and the store's current id with a short timeout, which never changes the
 exit code), and `Engine::open_node` what `export --generations` opens. An index that cannot be
 read in a generation names the generation and `meada snapshot pull` (`msg::Fix`), not `meada
@@ -164,6 +166,9 @@ one for the area a change touches.
   regular file of the mirror; no nested repository, that is no `.git` component, in any case,
   below the mirror's own `.git` and nothing under its `.git/modules`, since git runs a
   submodule's own configuration when `git status` descends into it; any other type refused);
+  `index::vet` requires the extracted `index.db` to hold exactly the schema objects this build
+  creates (type, name, table and SQL against a fresh in-memory index: no view, trigger, table
+  or index more, none altered), naming the repository and the object;
   `settle` replaces `.git/config` with `[core]` and the identity's `origin`, removes `hooks`,
   `commondir` and `objects/info/alternates`, and checks the checkout, identity, `HEAD` and a
   clean `git status` that does not descend into submodules (`repo::unclean(_, false)`; the

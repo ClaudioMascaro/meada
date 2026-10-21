@@ -746,6 +746,33 @@ fn bundle_of(index: &Path, mirror: &Path, extra: &[(&[u8], tar::EntryType, &[u8]
     tar.into_inner().unwrap()
 }
 
+/// Schema objects a store could slip into an index of the right version, each with the object
+/// the refusal names: an extra view, an extra trigger and an altered table.
+pub(crate) const HOSTILE_SCHEMAS: [(&str, &str); 3] = [
+    (
+        "CREATE VIEW endless AS WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) \
+         SELECT i FROM n;",
+        "index.db: the view endless",
+    ),
+    (
+        "CREATE TRIGGER t AFTER INSERT ON meta BEGIN DELETE FROM files; END;",
+        "index.db: the trigger t",
+    ),
+    (
+        "DROP TABLE communities; CREATE TABLE communities (name TEXT, member TEXT, x);",
+        "index.db: the table communities",
+    ),
+];
+
+/// A copy of the index at `index`, at `to`, with `sql` run over it.
+pub(crate) fn crafted_index(index: &Path, to: &Path, sql: &str) {
+    fs::copy(index, to).unwrap();
+    rusqlite::Connection::open(to)
+        .unwrap()
+        .execute_batch(sql)
+        .unwrap();
+}
+
 #[test]
 fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one() {
     let Some(endpoint) = service() else { return };
@@ -770,8 +797,15 @@ fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one(
     let _ = fs::remove_file(&escaped);
     let link = tar::EntryType::Symlink;
     let file = tar::EntryType::Regular;
+    let hostile: Vec<PathBuf> = (HOSTILE_SCHEMAS.iter().enumerate())
+        .map(|(n, (sql, _))| {
+            let crafted = dir.join(format!("hostile-{n}.db"));
+            crafted_index(&index, &crafted, sql);
+            crafted
+        })
+        .collect();
     type Stage<'a> = Box<dyn Fn() -> String + 'a>;
-    let cases: Vec<(&str, Stage, &str)> = vec![
+    let mut cases: Vec<(&str, Stage, &str)> = vec![
         (
             "a corrupted bundle",
             Box::new(|| {
@@ -834,6 +868,14 @@ fn a_corrupted_or_hostile_generation_fails_the_pull_and_leaves_the_previous_one(
             "not a repository identity",
         ),
     ];
+    for (crafted, (_, object)) in hostile.iter().zip(HOSTILE_SCHEMAS) {
+        let (mirror, s3, head) = (&mirror, &s3, &head);
+        let stage_it = move || {
+            let tar = bundle_of(crafted, mirror, &[]);
+            stage(s3, identity, head, &tar, None)
+        };
+        cases.push(("a hostile index schema", Box::new(stage_it), object));
+    }
     for (case, staged, expected) in cases {
         staged();
         let (stdout, stderr, code) = pull(&dir, &manifest, &[]);

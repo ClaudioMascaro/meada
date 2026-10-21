@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
+use rusqlite::config::DbConfig;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
 use serde::{Serialize, Serializer};
 
@@ -174,11 +175,52 @@ pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
 }
 
 /// The index at `path` opened read-only: nothing is created, and a statement that meets a
-/// commit in progress waits for it up to the busy timeout.
+/// commit in progress waits for it up to the busy timeout. The file may come from a store
+/// (ADR 0012), so its schema is trusted with nothing: `trusted_schema` is off (no view or
+/// trigger calls a function that is not innocuous) and the connection is defensive (no
+/// statement corrupts the file, nor writes the schema through a pragma).
 fn read_only(path: &Path) -> rusqlite::Result<Connection> {
     let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    db.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true)?;
+    db.pragma_update(None, "trusted_schema", false)?;
     db.busy_timeout(BUSY.get())?;
     Ok(db)
+}
+
+/// The schema objects of `db`'s `main`: type, name, table and SQL, sorted.
+#[cfg(feature = "snapshot")]
+fn objects(db: &Connection) -> rusqlite::Result<Vec<[Option<String>; 4]>> {
+    let mut statement =
+        db.prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY 1, 2, 3, 4")?;
+    let rows = statement.query_map([], |r| Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?]))?;
+    rows.collect()
+}
+
+/// The index at `index`, of the repository `repo` in a pulled generation, holds exactly the
+/// schema objects this build creates (`SCHEMA`): no view, trigger, table or index more, and
+/// none altered or missing, compared by type, name, table and SQL with a fresh index. A
+/// crafted `symbols` view with an endless recursive query would hang every call. Checked by
+/// `meada snapshot pull` and the start check of `--generations`; the error names the
+/// repository and the object.
+#[cfg(feature = "snapshot")]
+pub fn vet(index: &Path, repo: &str, fix: Fix) -> Result<()> {
+    let db = read_only(index).map_err(|e| unreadable(e, index, repo, fix))?;
+    let found = objects(&db).map_err(|e| unreadable(e, index, repo, fix))?;
+    let fresh = Connection::open_in_memory()?;
+    fresh.execute_batch(SCHEMA)?;
+    let expected = objects(&fresh)?;
+    let odd = (found.iter().find(|o| !expected.contains(o)))
+        .or_else(|| expected.iter().find(|o| !found.contains(o)));
+    match odd {
+        None => Ok(()),
+        Some([kind, name, ..]) => Err(Msg::IndexSchemaObject {
+            repo,
+            kind: kind.as_deref().unwrap_or_default(),
+            name: name.as_deref().unwrap_or_default(),
+        }
+        .text()
+        .into()),
+    }
 }
 
 /// Opens the indexes of `repos` (index path, repository identity) read-only, as server mode
@@ -2013,6 +2055,80 @@ mod tests {
 
         assert!(commit.join().unwrap() >= Duration::from_millis(150));
         assert_eq!(communities(&read(&index).unwrap()), 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// An index of this build's schema at `<case dir>/index.db`, then `sql` run over it, as a
+    /// store could hand one over.
+    #[cfg(feature = "snapshot")]
+    fn crafted(case: &str, sql: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("meada-vet-{case}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.db");
+        let db = Connection::open(&index).unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        db.pragma_update(None, "user_version", super::schema_version())
+            .unwrap();
+        db.execute_batch(sql).unwrap();
+        index
+    }
+
+    #[cfg(feature = "snapshot")]
+    #[test]
+    fn an_index_with_a_schema_object_this_build_does_not_create_is_refused() {
+        let fix = Fix::Generation("0123456789abcdef");
+        assert!(super::vet(&crafted("clean", ""), REPO, fix).is_ok());
+        let cases = [
+            (
+                "view",
+                "CREATE VIEW endless AS WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 \
+                 FROM n) SELECT i FROM n;",
+                "view endless",
+            ),
+            (
+                "symbols-view",
+                "DROP TABLE symbols; CREATE VIEW symbols AS WITH RECURSIVE n(i) AS (SELECT 1 \
+                 UNION ALL SELECT i + 1 FROM n) SELECT '' AS id, '' AS path, i AS start, i AS \
+                 end FROM n;",
+                "symbols",
+            ),
+            (
+                "trigger",
+                "CREATE TRIGGER t AFTER INSERT ON meta BEGIN DELETE FROM files; END;",
+                "trigger t",
+            ),
+            (
+                "altered",
+                "DROP TABLE communities; CREATE TABLE communities (name TEXT, member TEXT, x);",
+                "table communities",
+            ),
+            ("dropped", "DROP INDEX calls_path;", "index calls_path"),
+        ];
+        for (case, sql, object) in cases {
+            let e = super::vet(&crafted(case, sql), REPO, fix)
+                .unwrap_err()
+                .to_string();
+            assert!(e.starts_with(&format!("{REPO}: index.db: ")), "{case}: {e}");
+            assert!(e.contains(object), "{case}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_read_only_index_trusts_nothing_of_its_schema() {
+        let dir = std::env::temp_dir().join(format!("meada-defensive-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.db");
+        Connection::open(&index)
+            .unwrap()
+            .execute_batch(SCHEMA)
+            .unwrap();
+        let db = super::read_only(&index).unwrap();
+        let trusted: bool = (db.query_row("PRAGMA trusted_schema", [], |r| r.get(0))).unwrap();
+        assert!(!trusted);
+        let defensive = rusqlite::config::DbConfig::SQLITE_DBCONFIG_DEFENSIVE;
+        assert!(db.db_config(defensive).unwrap());
         let _ = fs::remove_dir_all(&dir);
     }
 

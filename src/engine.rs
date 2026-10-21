@@ -1190,6 +1190,7 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
             match r.recheck() {
                 Err(problem) => Some(format!("{}: {problem}", l.repo)),
                 Ok(()) => (index::open_read(&[(&r.index, &r.identity)], fix))
+                    .and_then(|_| index::vet(&r.index, &r.identity, fix))
                     .err()
                     .map(|e| e.to_string()),
             }

@@ -63,6 +63,12 @@ pub enum Msg<'a> {
         fix: Fix<'a>,
     },
     StateLocked,
+    #[cfg(feature = "snapshot")]
+    IndexSchemaObject {
+        repo: &'a str,
+        kind: &'a str,
+        name: &'a str,
+    },
     IndexInterrupted {
         repo: &'a str,
         fix: Fix<'a>,
@@ -513,6 +519,15 @@ impl Msg<'_> {
                     ),
                 ),
             },
+            #[cfg(feature = "snapshot")]
+            Msg::IndexSchemaObject { repo, kind, name } => pick(
+                format!(
+                    "{repo}: index.db: the {kind} {name} is not one this build's schema creates"
+                ),
+                format!(
+                    "{repo}: index.db: o {kind} {name} não é um dos que o esquema deste build cria"
+                ),
+            ),
             Msg::StateLocked => pick(
                 "locked by a commit in progress past the busy timeout".into(),
                 "travado por um commit em andamento além do tempo de espera".into(),

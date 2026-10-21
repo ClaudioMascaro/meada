@@ -14,8 +14,8 @@ use crate::common::assert_golden;
 use crate::manifest::{CHAIN, MANIFEST, contents, run_args};
 use crate::server::{Server, call, get, text};
 use crate::snapshot::{
-    KEY_ID, SECRET, block_on, bucket, bucket_name, named_node, next_commit, publish, pull, service,
-    store_manifest,
+    HOSTILE_SCHEMAS, KEY_ID, SECRET, block_on, bucket, bucket_name, crafted_index, named_node,
+    next_commit, publish, pull, service, store_manifest,
 };
 
 const WEB: &str = "example.com/chain/web";
@@ -267,6 +267,23 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     assert!(stdout.contains("store: unreachable ("), "{stdout}");
     let served = block_on(search_second(&serve(&dir, &one)));
     assert!(served.starts_with("no matches"), "{served}");
+
+    // An index of this schema version holding a schema object this build does not create is
+    // not servable either: the start names the repository and the object.
+    let index = web_index(&local, &first);
+    let kept = local.join("kept.db");
+    fs::copy(&index, &kept).unwrap();
+    for (sql, object) in HOSTILE_SCHEMAS {
+        crafted_index(&kept, &index, sql);
+        let (_, stderr, code) = probe(&dir, &one);
+        assert_eq!(code, Some(1), "{stderr}");
+        let why = format!("{WEB}: {object}");
+        assert!(stderr.contains(&why), "{stderr}");
+        let (code, stderr) = refused(&dir, &one);
+        assert_eq!(code, Some(1));
+        assert!(stderr.contains(&why), "{stderr}");
+    }
+    fs::rename(&kept, &index).unwrap();
 
     // An index of another schema version is not servable: the probe says which generation and
     // repository, and the start is refused.
