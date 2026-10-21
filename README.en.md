@@ -11,7 +11,7 @@ agents, and people too, query that map over MCP. No step of indexing uses an LLM
 
 ## Installation
 
-Pick one of three ways.
+Pick one of four ways.
 
 - **Cargo**: `cargo install meada`.
 - **Prebuilt binary**: download the file for your system from the
@@ -19,6 +19,8 @@ Pick one of three ways.
   Windows, on x86_64 and arm64) and put `meada` on your `PATH`.
 - **Installer** (Linux and macOS):
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
+- **npm**: `npx meada <command>` downloads the prebuilt binary for your platform and runs it,
+  with nothing to install first.
 
 ## Configuration
 
@@ -83,15 +85,17 @@ messages follow `LANG` (Portuguese or English); MCP messages are always in Engli
 `meada mcp` speaks MCP over stdio. It answers about the first root (`roots`) the client sends,
 in Claude Code the session's directory; without roots, about the directory it was started in,
 which then must be inside the repository. In your agent's configuration (for example Claude
-Code's `.mcp.json`):
+Code's `.mcp.json`), using `npx`:
 
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "meada", "args": ["mcp"] }
+    "meada": { "command": "npx", "args": ["meada", "mcp"] }
   }
 }
 ```
+
+With `meada` already on your `PATH`, use `"command": "meada", "args": ["mcp"]`.
 
 There are three tools, always in English, and none of them writes:
 

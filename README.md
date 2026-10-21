@@ -9,7 +9,7 @@ LLM.
 
 ## Instalação
 
-Escolha uma das três formas.
+Escolha uma das quatro formas.
 
 - **Cargo**: `cargo install meada`.
 - **Binário pronto**: baixe o arquivo do seu sistema nas
@@ -17,6 +17,8 @@ Escolha uma das três formas.
   Windows, em x86_64 e arm64) e ponha `meada` no `PATH`.
 - **Instalador** (Linux e macOS):
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
+- **npm**: `npx meada <comando>` baixa o binário pronto da sua plataforma e o executa, sem
+  instalar nada antes.
 
 ## Configuração
 
@@ -83,15 +85,17 @@ linha de comando seguem o `LANG` (português ou inglês); as do MCP são sempre 
 `meada mcp` fala MCP por stdio. Ele responde sobre a primeira raiz (`roots`) que o cliente
 informa, no Claude Code a pasta da sessão; sem raízes, sobre a pasta em que foi iniciado, que
 então precisa estar dentro do repositório. Na configuração do seu agente (por exemplo o
-`.mcp.json` do Claude Code):
+`.mcp.json` do Claude Code), com `npx`:
 
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "meada", "args": ["mcp"] }
+    "meada": { "command": "npx", "args": ["meada", "mcp"] }
   }
 }
 ```
+
+Com `meada` já no `PATH`, use `"command": "meada", "args": ["mcp"]`.
 
 São três ferramentas, sempre em inglês, e nenhuma escreve:
 
