@@ -10,6 +10,7 @@ use std::convert::Infallible;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use http_body_util::{BodyExt, Full, combinators::BoxBody};
 use hyper::body::{Bytes, Incoming};
@@ -242,6 +243,28 @@ pub fn serve() -> crate::Result<()> {
     })
 }
 
+/// How long the server waits, after a stop signal, for the answers in flight to finish before
+/// it drops what is left. Under Kubernetes' default grace period of 30 seconds.
+const DRAIN: Duration = Duration::from_secs(25);
+
+thread_local! {
+    static DRAIN_BOUND: std::cell::Cell<Duration> = const { std::cell::Cell::new(DRAIN) };
+}
+
+/// Runs `f` with `listen` on this thread draining for at most `bound` instead of 25 seconds.
+/// No option or setting reaches it: tests, through `MEADA_DRAIN_MS` in `main`, debug builds only.
+#[doc(hidden)]
+pub fn with_drain_bound<T>(bound: Duration, f: impl FnOnce() -> T) -> T {
+    struct Restore(Duration);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            DRAIN_BOUND.set(self.0);
+        }
+    }
+    let _restore = Restore(DRAIN_BOUND.replace(bound));
+    f()
+}
+
 /// One repository's MCP endpoint.
 type Endpoint = StreamableHttpService<Meada, NeverSessionManager>;
 
@@ -254,18 +277,20 @@ type Endpoint = StreamableHttpService<Meada, NeverSessionManager>;
 /// same indexes answers any call. The `Host` header is not checked, since a reverse proxy
 /// forwards its own hostname; a request with an `Origin` header (a browser, as on a DNS
 /// rebinding page) is refused instead, since MCP clients send none. Meada authenticates
-/// nobody: the operator's proxy admits clients.
+/// nobody: the operator's proxy admits clients. On SIGINT or SIGTERM it stops accepting, lets the
+/// answers in flight finish for at most `DRAIN` (a second signal ends the wait), drops what
+/// is left and returns.
 pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let listed = Arc::new(engine::served(manifest)?);
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
-    tokio::runtime::Runtime::new()?.block_on(async {
+    let drain = DRAIN_BOUND.get();
+    let runtime = tokio::runtime::Runtime::new()?;
+    let stopped: crate::Result<()> = runtime.block_on(async {
         let listener = tokio::net::TcpListener::bind(address).await?;
         // Before the address is printed: a signal sent on reading it is never lost.
-        let mut stop = std::pin::pin!(stop_signal()?);
+        let mut stop = Stop::install()?;
         eprintln!("listening on http://{}", listener.local_addr()?);
-        // Not cancelled on a signal: cancelling `cancellation_token` would end the calls in
-        // flight, and the stop lets them finish (a bound on the wait is ticket #268).
         let config = StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
             .with_json_response(true)
@@ -297,7 +322,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
         loop {
             let accepted = tokio::select! {
                 accepted = listener.accept() => accepted,
-                () = &mut stop => break,
+                () = stop.wait() => break,
             };
             let stream = match accepted {
                 Ok((stream, _)) => stream,
@@ -329,31 +354,66 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
                 let _ = connection.await;
             });
         }
-        // Stop accepting, then let the answers in flight finish.
+        // Stop accepting; hyper closes each connection once its answer is sent. rmcp's token
+        // is cancelled only after the drain: cancelling it first ends the calls in flight with
+        // an error instead of letting them finish.
         drop(listener);
         drop(stopping);
-        while connections.join_next().await.is_some() {}
+        // A second signal ends the drain at once.
+        let drained = tokio::time::timeout(drain, async {
+            while connections.join_next().await.is_some() {}
+        });
+        tokio::select! {
+            drained = drained => if drained.is_err() {
+                eprintln!("meada: dropping connections still open after {drain:?}");
+            },
+            () = stop.wait() => eprintln!("meada: second signal, dropping connections still open"),
+        }
+        config.cancellation_token.cancel();
         Ok(())
-    })
+    });
+    // An answer still waiting on a lock holds its thread past the drain, so the runtime is not
+    // waited for: what is left dies with the process.
+    runtime.shutdown_background();
+    stopped
 }
 
-/// Resolves on SIGINT or SIGTERM (Ctrl-C alone off Unix). The handlers are installed on the
-/// call, so a signal sent once the address is printed is never lost.
+/// The stop signals: SIGINT and SIGTERM (Ctrl-C alone off Unix). Installed on `install`, so a
+/// signal sent once the address is printed is never lost; `wait` resolves once per signal
+/// (signals that arrive together count as one).
 #[cfg(unix)]
-fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
-    use tokio::signal::unix::{SignalKind, signal};
-    let mut term = signal(SignalKind::terminate())?;
-    let mut int = signal(SignalKind::interrupt())?;
-    Ok(async move {
-        tokio::select! { _ = int.recv() => {}, _ = term.recv() => {} }
-    })
+struct Stop {
+    term: tokio::signal::unix::Signal,
+    int: tokio::signal::unix::Signal,
+}
+
+#[cfg(unix)]
+impl Stop {
+    fn install() -> crate::Result<Self> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Self {
+            term: signal(SignalKind::terminate())?,
+            int: signal(SignalKind::interrupt())?,
+        })
+    }
+
+    async fn wait(&mut self) {
+        tokio::select! { _ = self.int.recv() => {}, _ = self.term.recv() => {} }
+    }
 }
 
 #[cfg(not(unix))]
-fn stop_signal() -> crate::Result<impl std::future::Future<Output = ()>> {
-    Ok(async {
+struct Stop;
+
+#[cfg(not(unix))]
+impl Stop {
+    fn install() -> crate::Result<Self> {
+        Ok(Self)
+    }
+
+    async fn wait(&mut self) {
         let _ = tokio::signal::ctrl_c().await;
-    })
+    }
 }
 
 /// The endpoint `request`'s path names (`/<identity>`, percent-decoded, a trailing slash

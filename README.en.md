@@ -174,7 +174,8 @@ refused.
   `:port` or `port`; the host is an IP literal or `localhost`, never resolved, and the default
   is loopback. The first stderr line is `listening on http://<host>:<port>`. SIGINT or SIGTERM
   stop the server: it stops accepting connections, lets the answers in flight finish and exits
-  with code 0.
+  with code 0. The wait is bounded at 25 seconds, under Kubernetes' default 30-second grace
+  period: past the bound the remaining connections are dropped and the exit is still 0.
 - Each repository is one endpoint, `http://<host>:<port>/<identity>` (for example
   `http://meada.internal:7333/github.com/acme/web`); a client configures one URL per repository
   it works on. Any other path answers 404 with the identities served.
