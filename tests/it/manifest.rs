@@ -375,6 +375,197 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
     assert!(!dir.join("indexes").exists());
 }
 
+/// A section a module owns, in a build without the module's feature (ADR 0012): an error naming
+/// the file, the line, the section and the feature. A section the table does not list stays an
+/// unknown key.
+#[cfg(not(feature = "valkey"))]
+#[test]
+fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
+    let dir = mirrors("manifest_module_sections");
+    for (toml, expected) in [
+        (
+            "index_dir = \"../indexes\"\n\n[valkey]\nurl = \"redis://127.0.0.1\"\n",
+            "meada: ops/meada.workspace.toml:3: [valkey] needs a Meada built with the valkey feature\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
+            "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[cache]\nurl = \"redis://127.0.0.1\"\n",
+            "meada: ops/meada.workspace.toml:3: `cache` is not a meada.workspace.toml key\n",
+        ),
+    ] {
+        write_manifest(&dir, toml);
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    }
+}
+
+/// The `[valkey]` section of a build that has the module: its keys are checked, and each error
+/// names the file, the line and the key without echoing the URL.
+#[cfg(feature = "valkey")]
+#[test]
+fn valkey_section_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_valkey_errors");
+    let head = "index_dir = \"../indexes\"\n\n[valkey]\n";
+    let at = "meada: ops/meada.workspace.toml";
+    for (body, expected) in [
+        (
+            "url = \"redis://127.0.0.1\"\nttl = 3\n",
+            format!("{at}:5: `valkey.ttl` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            "key_prefix = \"x\"\n",
+            format!("{at}:3: `valkey.url` is missing\n"),
+        ),
+        (
+            "url = \"rediss://meada:hunter2@cache.example.internal\"\n",
+            format!(
+                "{at}:4: `valkey.url`: carries a password: name it in password_env or password_file\n"
+            ),
+        ),
+        (
+            "url = \"redis://cache.example.internal\"\n",
+            format!(
+                "{at}:4: `valkey.url`: must be a rediss:// URL: TLS is required unless the host is loopback\n"
+            ),
+        ),
+        (
+            "url = \"redis://127.0.0.1\"\npassword_env = \"V\"\npassword_file = \"v\"\n",
+            format!(
+                "{at}:6: `valkey.password_file`: is set together with password_env: use one of the two\n"
+            ),
+        ),
+        (
+            "url = \"redis://127.0.0.1\"\ncluster = true\n",
+            format!(
+                "{at}:5: `valkey.cluster`: needs a rediss:// url: the nodes a cluster announces are reached over TLS\n"
+            ),
+        ),
+        (
+            "url = \"redis://127.0.0.1\"\nkey_prefix = \"a{b}\"\n",
+            format!("{at}:5: `valkey.key_prefix`: must not contain `{{` or `}}`\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+    }
+}
+
+/// The local Valkey `MEADA_TEST_VALKEY_URL` names, or `None` with the reason printed;
+/// `MEADA_TEST_SERVICES_REQUIRED=1` turns the missing variable into a failure.
+#[cfg(feature = "valkey")]
+fn valkey_service() -> Option<String> {
+    let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
+    if url.is_none() {
+        let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");
+        assert!(!required, "MEADA_TEST_VALKEY_URL is not set");
+        eprintln!("skipped: MEADA_TEST_VALKEY_URL is not set");
+    }
+    url
+}
+
+/// The chain's manifest with a `[valkey]` section made of `lines`, indexed.
+#[cfg(feature = "valkey")]
+fn valkey_manifest(case: &str, lines: &str) -> PathBuf {
+    let dir = chain_manifest(case);
+    assert!(run(&dir, "index").2);
+    let ops = dir.join(MANIFEST);
+    let toml = fs::read_to_string(&ops).unwrap();
+    // Top-level tables go before the first `[[repository]]`.
+    let (head, entries) = toml.split_once("\n[[repository]]").unwrap();
+    fs::write(
+        &ops,
+        format!("{head}\n[valkey]\n{lines}\n[[repository]]{entries}"),
+    )
+    .unwrap();
+    dir
+}
+
+/// `status` names Valkey on one line and its exit code stays what local state alone says: a
+/// dead Valkey neither fails an indexed workspace nor stalls the probe, a live one does not
+/// rescue an unindexed one.
+#[cfg(feature = "valkey")]
+#[test]
+fn status_names_whether_valkey_is_reachable_and_its_exit_code_ignores_it() {
+    // Nothing listens on port 1.
+    let dir = valkey_manifest("manifest_valkey_dead", "url = \"redis://127.0.0.1:1\"\n");
+    let start = std::time::Instant::now();
+    let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+    let took = start.elapsed();
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stderr.is_empty(), "{stderr}");
+    assert!(status.contains("\nvalkey: unreachable ("), "{status}");
+    assert!(took < std::time::Duration::from_millis(1500), "{took:?}");
+    // Unindexed: still not ready, whatever Valkey says.
+    fs::remove_file(dir.join("indexes/example.com/chain/web/index.db")).unwrap();
+    let (status, _, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+    assert_eq!(code, Some(1));
+    assert!(status.contains("valkey: unreachable ("), "{status}");
+
+    let Some(url) = valkey_service() else { return };
+    let dir = valkey_manifest("manifest_valkey_live", &format!("url = \"{url}\"\n"));
+    let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+    assert!(code == Some(0) && stderr.is_empty(), "{stderr}");
+    assert!(status.ends_with("\nvalkey: reachable\n"), "{status}");
+}
+
+/// A `password_file` that is a FIFO nobody writes is refused at once: the probe neither hangs on
+/// the open nor changes its exit code.
+#[cfg(all(feature = "valkey", unix))]
+#[test]
+fn status_refuses_a_password_file_that_is_not_a_regular_file_without_stalling() {
+    let lines = "url = \"redis://127.0.0.1:1\"\npassword_file = \"../pass-fifo\"\n";
+    let dir = valkey_manifest("manifest_valkey_fifo", lines);
+    let fifo = dir.join("pass-fifo");
+    let _ = fs::remove_file(&fifo);
+    assert!(
+        Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let start = std::time::Instant::now();
+    let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+    assert!(start.elapsed() < std::time::Duration::from_millis(1500));
+    assert!(code == Some(0) && stderr.is_empty(), "{stderr}");
+    assert!(
+        status.contains("pass-fifo: not a regular file)"),
+        "{status}"
+    );
+}
+
+/// A refused AUTH and a failed TLS handshake leave the password out of stdout and stderr.
+#[cfg(feature = "valkey")]
+#[test]
+fn status_never_prints_the_valkey_password() {
+    let Some(url) = valkey_service() else { return };
+    let secret = "known-secret-7";
+    let tls = url.replacen("redis://", "rediss://", 1);
+    // The default user has no such password: AUTH is refused. A TLS handshake with a plain
+    // port fails.
+    for (case, url) in [("auth", url), ("tls", tls)] {
+        let lines = format!("url = \"{url}\"\npassword_file = \"../valkey-pass\"\n");
+        let dir = valkey_manifest(&format!("manifest_valkey_secret_{case}"), &lines);
+        fs::write(dir.join("valkey-pass"), format!("{secret}\n")).unwrap();
+        let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
+        assert_eq!(code, Some(0), "{case}: {stderr}");
+        assert!(status.contains("valkey: unreachable ("), "{case}: {status}");
+        for text in [&status, &stderr] {
+            assert!(!text.contains(secret), "{case}: {text}");
+        }
+    }
+}
+
 #[test]
 fn a_meada_directory_inside_a_mirror_is_ignored() {
     let dir = chain_manifest("manifest_stray_meada");

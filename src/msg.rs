@@ -171,6 +171,32 @@ pub enum Msg<'a> {
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
+    NeedsFeature {
+        section: &'a str,
+        feature: &'a str,
+    },
+    #[cfg(feature = "valkey")]
+    ValkeyUrlInvalid,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlPassword,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlPlain,
+    #[cfg(feature = "valkey")]
+    ValkeyUrlInsecure,
+    #[cfg(feature = "valkey")]
+    ValkeyClusterPlain,
+    #[cfg(feature = "valkey")]
+    ValkeyBoth,
+    #[cfg(feature = "valkey")]
+    ValkeyPrefixBraces,
+    #[cfg(feature = "valkey")]
+    ValkeyEnvUnset(&'a str),
+    #[cfg(feature = "valkey")]
+    ValkeyTimeout(u64),
+    #[cfg(feature = "valkey")]
+    ValkeyReachable,
+    #[cfg(feature = "valkey")]
+    ValkeyUnreachable(&'a str),
     About,
     Index,
     Status,
@@ -533,6 +559,62 @@ impl Msg<'_> {
                 format!("`{value}` deve começar com `/`"),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into()),
+            Msg::NeedsFeature { section, feature } => pick(
+                format!("[{section}] needs a Meada built with the {feature} feature"),
+                format!("[{section}] exige um Meada compilado com a feature {feature}"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlInvalid => pick(
+                "is not a redis:// or rediss:// URL".into(),
+                "não é uma URL redis:// ou rediss://".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlPassword => pick(
+                "carries a password: name it in password_env or password_file".into(),
+                "traz uma senha: nomeie-a em password_env ou password_file".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlPlain => pick(
+                "must be a rediss:// URL: TLS is required unless the host is loopback".into(),
+                "deve ser uma URL rediss://: TLS é obrigatório, salvo em loopback".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUrlInsecure => pick(
+                "must verify the server certificate: no #insecure".into(),
+                "deve verificar o certificado do servidor: sem #insecure".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyClusterPlain => pick(
+                "needs a rediss:// url: the nodes a cluster announces are reached over TLS".into(),
+                "exige uma url rediss://: os nós que um cluster anuncia são alcançados por TLS".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyBoth => pick(
+                "is set together with password_env: use one of the two".into(),
+                "está junto de password_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyPrefixBraces => pick(
+                "must not contain `{` or `}`".into(),
+                "não pode conter `{` nem `}`".into(),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyEnvUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyReachable => pick("valkey: reachable".into(), "valkey: alcançável".into()),
+            #[cfg(feature = "valkey")]
+            Msg::ValkeyUnreachable(reason) => pick(
+                format!("valkey: unreachable ({reason})"),
+                format!("valkey: inalcançável ({reason})"),
+            ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
                 "Grafo de código sem LLM para agentes e pessoas".into(),

@@ -76,6 +76,24 @@ one for the area a change touches.
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
   is left and exits 0 without waiting for the runtime's threads. `main.rs`: clap.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
+- `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
+  in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
+  `[generations]`, `[refresh_lock]`, `[sessions]`, `[oidc]`) with the cargo feature that owns
+  it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
+  section whose feature is missing is an error naming the file, the line, the section and the
+  feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
+  sets `built` to `cfg!(feature = ..)`. `valkey.rs` (feature `valkey`, internal; the only place
+  the `redis` crate is used) is the one Valkey client the modules share: `File` is the
+  `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
+  outside loopback, at most one of `password_env` and `password_file`, no `{` or `}` in
+  `key_prefix`; each problem names its key), and `Valkey::connect` opens a connection manager or
+  a cluster connection, reading the password from the variable or the file only when it
+  connects. Every key goes through `Config::key(name, tagged)`: `<key_prefix>:<name>`, or
+  `{<key_prefix>}:<name>` for the keys one script touches together (pointer, lock, fence). An
+  error from the client has the password scrubbed. `status --workspace` prints `valkey:
+  reachable` or `valkey: unreachable (<reason>)` after waiting at most `REACH_TIMEOUT`; the
+  line is informational and never changes the probe's exit code. With a `ca_file` the client
+  trusts that file alone, not the system roots as well (redis-rs replaces them).
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

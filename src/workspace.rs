@@ -13,7 +13,7 @@ use serde::Deserialize;
 use crate::config::{self, Config};
 use crate::decisions::{self, Decisions};
 use crate::msg::Msg;
-use crate::{Result, index, repo};
+use crate::{Result, index, modules, repo};
 
 pub struct Workspace {
     /// The repository where Meada runs first, then the others in discovery order.
@@ -175,6 +175,9 @@ impl Workspace {
 #[derive(Clone)]
 pub struct Manifest {
     pub entries: Vec<Listed>,
+    /// The `[valkey]` section, when the build has the module.
+    #[cfg(feature = "valkey")]
+    pub valkey: Option<crate::valkey::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -199,6 +202,8 @@ struct ManifestFile {
     index_dir: Option<String>,
     #[serde(default, rename = "repository")]
     repositories: Vec<EntryFile>,
+    #[cfg(feature = "valkey")]
+    valkey: Option<crate::valkey::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -257,12 +262,16 @@ impl Manifest {
     /// directory. A parse error names the file, the line and the key, as `meada.toml`'s do.
     pub fn read(file: &Path) -> Result<Self> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        modules::check(file, &src)?;
         let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
             let missing = Msg::KeyMissing("index_dir").text();
             return Err(format!("{}: {missing}", file.display()).into());
         };
         let base = file.parent().unwrap_or(Path::new(""));
+        #[cfg(feature = "valkey")]
+        let valkey = (parsed.valkey.map(|v| v.validate(base)).transpose())
+            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
         let index_dir = base.join(index_dir);
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
@@ -310,7 +319,11 @@ impl Manifest {
             }
             .text());
         }
-        Ok(Self { entries })
+        Ok(Self {
+            entries,
+            #[cfg(feature = "valkey")]
+            valkey,
+        })
     }
 
     /// The peers a servable repository's `meada.toml` names that the manifest does not list,

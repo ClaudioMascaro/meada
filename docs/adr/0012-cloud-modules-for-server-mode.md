@@ -93,7 +93,9 @@ A **cloud module** is a cargo feature, off by default, plus one section of
 - A module connects only to the endpoints the operator configured, inside the operator's
   boundary: the store's `endpoint`, the Valkey `url`, the OIDC `issuer` and the `jwks_uri` its
   metadata names, plus the credential endpoint of the source `credentials` names (below). No
-  client follows a redirect to another host.
+  client follows a redirect to another host, with one exception: a Valkey cluster client follows
+  the cluster's `MOVED` and `ASK` to the nodes the cluster announces, always over TLS (the
+  section requires a `rediss` seed when `cluster` is on).
 - The store's credentials come from one source, the one `credentials` names; no other is read.
   Besides `static` (keys from the environment or files, below), three sources reach an endpoint
   the operator chose by choosing them, each a recorded exception:
@@ -110,7 +112,7 @@ A **cloud module** is a cargo feature, off by default, plus one section of
   only exceptions are the Pod Identity agent and the instance metadata service above, at those
   addresses, which the platform serves only over `http` on a link-local address inside the host;
   no other link-local or `http` endpoint is allowed. Certificates verify against the system
-  roots, plus an optional `ca_file` the section names.
+  roots, or only against the `ca_file` when the section names one.
 - Secrets come only from environment variables or files a section names, through `*_env` and
   `*_file` keys (at most one of each pair, each with a documented default such as
   `AWS_SECRET_ACCESS_KEY`), with the credential sources above as the only exceptions: STS, the
