@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
 use serde::{Serialize, Serializer};
 
 use crate::Result;
@@ -20,6 +20,7 @@ use crate::decisions::Stale;
 use crate::document::{self, Format, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
 use crate::lang::{self, Facts};
+use crate::msg::Msg;
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
 use crate::resolve::{Code, Exported, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
@@ -122,14 +123,12 @@ pub enum State {
     Indexed { files: i64 },
 }
 
-/// The state of the index at `path`.
+/// The state of the index at `path`, read as `open_read` reads.
 pub fn state(path: &Path) -> State {
-    if !path.is_file() {
-        return State::Missing;
-    }
-    let Ok(db) = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-    else {
-        return State::OtherSchema;
+    let db = match read_only(path) {
+        Ok(db) => db,
+        Err(e) if e.sqlite_error_code() == Some(ErrorCode::CannotOpen) => return State::Missing,
+        Err(_) => return State::OtherSchema,
     };
     let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0));
     if version.ok() != Some(schema_version()) {
@@ -141,6 +140,100 @@ pub fn state(path: &Path) -> State {
         Ok(files) => State::Indexed { files },
         Err(_) => State::OtherSchema,
     }
+}
+
+/// How long a read waits for a commit in progress on an index before it fails (ADR 0011).
+const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
+
+thread_local! {
+    static BUSY: std::cell::Cell<Duration> = const { std::cell::Cell::new(BUSY_TIMEOUT) };
+}
+
+/// Runs `f` with this thread's read-only opens waiting at most `timeout` for a commit in
+/// progress, instead of 10 seconds. Test-only, as [`with_reversed_walk`]: no command, option or
+/// setting reaches it.
+#[doc(hidden)]
+pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
+    struct Restore(Duration);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            BUSY.set(self.0);
+        }
+    }
+    let _restore = Restore(BUSY.replace(timeout));
+    f()
+}
+
+/// The index at `path` opened read-only: nothing is created, and a statement that meets a
+/// commit in progress waits for it up to the busy timeout.
+fn read_only(path: &Path) -> rusqlite::Result<Connection> {
+    let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    db.busy_timeout(BUSY.get())?;
+    Ok(db)
+}
+
+/// Opens the index of `repo` at `index` read-only, as server mode reads (ADR 0011): nothing is
+/// created, rebuilt or written. A missing index, one of another schema, or one a commit in
+/// progress keeps locked past the busy timeout is an error naming `repo`, the first two with
+/// `meada index --workspace <manifest>`.
+pub fn open_read(index: &Path, repo: &str, manifest: &str) -> Result<Connection> {
+    let db = read_only(index).map_err(|e| unreadable(e, index, repo, manifest))?;
+    check_read(&db, "main", index, repo, manifest)?;
+    Ok(db)
+}
+
+/// Attaches the index of `repo` at `index` to `db`, opened by `open_read`, as `schema`:
+/// read-only like `db`, and refused as `open_read` refuses.
+pub fn attach_read(
+    db: &Connection,
+    schema: &str,
+    index: &Path,
+    repo: &str,
+    manifest: &str,
+) -> Result<()> {
+    let path = index.to_str().ok_or("index path is not UTF-8")?;
+    (db.execute(&format!("ATTACH DATABASE ?1 AS {schema}"), [path]))
+        .map_err(|e| unreadable(e, index, repo, manifest))?;
+    check_read(db, schema, index, repo, manifest)
+}
+
+/// The schema version check of a read-only open; the first read, so the one that waits.
+fn check_read(
+    db: &Connection,
+    schema: &str,
+    index: &Path,
+    repo: &str,
+    manifest: &str,
+) -> Result<()> {
+    let version = (db.query_row(&format!("PRAGMA {schema}.user_version"), [], |r| {
+        r.get::<_, i32>(0)
+    }))
+    .map_err(|e| unreadable(e, index, repo, manifest))?;
+    if version != schema_version() {
+        return Err(Msg::IndexOtherVersion { repo, manifest }.text().into());
+    }
+    Ok(())
+}
+
+/// A read-only open's SQLite error as `open_read` names it.
+fn unreadable(
+    e: rusqlite::Error,
+    index: &Path,
+    repo: &str,
+    manifest: &str,
+) -> Box<dyn std::error::Error> {
+    let text = match e.sqlite_error_code() {
+        Some(ErrorCode::CannotOpen) => Msg::IndexMissing { repo, manifest }.text(),
+        Some(ErrorCode::NotADatabase) => Msg::IndexOtherVersion { repo, manifest }.text(),
+        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) => Msg::IndexLocked {
+            repo,
+            index: &index.display().to_string(),
+            timeout: BUSY.get(),
+        }
+        .text(),
+        _ => return e.into(),
+    };
+    text.into()
 }
 
 /// Opens the index at `index` of the checkout at `root`, creating its directory, and a missing
@@ -1577,9 +1670,47 @@ fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {
 mod tests {
     use std::fs;
     use std::path::Path;
+    use std::time::{Duration, Instant};
 
-    use super::{SCHEMA, read_config, refresh_stamped};
+    use super::{SCHEMA, open, open_read, read_config, refresh_stamped, with_busy_timeout};
     use crate::{document, lang, package};
+
+    /// Server mode (ADR 0011): a read that meets a commit in progress waits for it, and past
+    /// the busy timeout fails naming the repository and the lock.
+    #[test]
+    fn a_read_only_open_waits_for_a_commit_in_progress_up_to_the_busy_timeout() {
+        let dir = std::env::temp_dir().join(format!("meada-index-busy-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let index = dir.join("example.com/acme/web/index.db");
+        let (repo, manifest) = ("example.com/acme/web", "ops/meada.workspace.toml");
+        let writer = open(&index, &dir).unwrap();
+        // The lock a commit takes: no reader gets in until it ends.
+        (writer.execute_batch("BEGIN EXCLUSIVE; INSERT INTO communities VALUES ('c', 'm');"))
+            .unwrap();
+
+        let held = with_busy_timeout(Duration::from_millis(50), || {
+            open_read(&index, repo, manifest)
+        });
+        let expected = format!(
+            "example.com/acme/web: the index `{}` stayed locked by a commit in progress for \
+             longer than 50ms",
+            index.display()
+        );
+        assert_eq!(held.err().map(|e| e.to_string()), Some(expected));
+
+        let commit = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            writer.execute_batch("COMMIT").unwrap();
+        });
+        let start = Instant::now();
+        let db = open_read(&index, repo, manifest).unwrap();
+        let rows: i64 =
+            (db.query_row("SELECT count(*) FROM communities", [], |r| r.get(0))).unwrap();
+        assert!(start.elapsed() >= Duration::from_millis(150));
+        assert_eq!(rows, 1);
+        commit.join().unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_stamped_file_that_vanished_or_cannot_be_read_has_no_row() {

@@ -45,7 +45,7 @@ design points the slices need.
 ### Server mode
 
 Server mode is `meada mcp --listen <addr>` and `meada index`, each given the workspace manifest
-with `--workspace <path>` (other commands: see Open). Without that flag every command behaves as
+with `--workspace <path>`; `meada status` and `meada export` take it too (see Open). Without that flag every command behaves as
 before: the stdio server, discovery and freshness on demand are unchanged.
 
 ### Where source may go (invariant 2)
@@ -231,12 +231,16 @@ mirrors are kept clean by the operator's job.
 
 ### Open
 
+Both points were closed by spec #259 (the manifest slice, #261):
+
 - **`base_url_env` for a repository with no `meada.toml`.** The manifest makes every listed
   repository part of the workspace, so `[[peer]]` is not needed for membership, but the
   variable names that tell Meada which peer a call built from them goes to come only from a
-  consumer's `[[peer]]` entries. Triage gave the manifest `[serve]` and `[[resource]]` only.
-  Whether a manifest entry may carry `[[repository.peer]]` for this is left to the manifest
-  slice or a later amendment.
-- **Which local commands take `--workspace`.** `meada index` and `meada mcp --listen` do.
-  `meada export` (for the knowledge-base feed on the server) and `meada status` need it too,
-  with a way to name one repository; the flag's shape for them is left to the manifest slice.
+  consumer's `[[peer]]` entries. Closed: a manifest entry may carry `[[repository.peer]]` with
+  `repo` and `base_url_env` only, the shape of `meada.toml`'s `[[peer]]` without `path`. A
+  `path` there is an error: the manifest already locates every repository, and membership comes
+  from the manifest, not from peers. Like `serve` and `resource`, the block is ignored when the
+  mirror has its own `meada.toml`.
+- **Which local commands take `--workspace`.** Closed: `meada index`, `meada status`,
+  `meada export` (with `--repo <identity>`, required, since server mode has no "here") and
+  `meada mcp` (with `--listen`; either flag alone is an error). `meada decide` never takes it.

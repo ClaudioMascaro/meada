@@ -16,7 +16,7 @@ mod entry;
 mod http;
 mod index;
 #[doc(hidden)]
-pub use index::with_reversed_walk;
+pub use index::{with_busy_timeout, with_reversed_walk};
 mod items;
 mod lang;
 mod literals;

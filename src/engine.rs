@@ -30,6 +30,8 @@ pub struct Engine {
     workspace: Workspace,
     root: PathBuf,
     identity: String,
+    /// Opened from a manifest (server mode): every index read-only, never refreshed.
+    read_only: bool,
 }
 
 impl Engine {
@@ -40,24 +42,36 @@ impl Engine {
     }
 
     /// Opens the workspace the manifest at `manifest` lists (server mode, ADR 0011), `repo`
-    /// first: every index lives under the manifest's `index_dir`, keyed by identity.
+    /// first, for one answer: every index lives under the manifest's `index_dir`, keyed by
+    /// identity, and is opened read-only. Nothing is stat'ed, refreshed, created or written;
+    /// only `meada index --workspace` writes. A missing index, one of another schema, or one a
+    /// commit in progress locks past the busy timeout is an error naming the repository.
     pub fn open_manifest(manifest: &Path, repo: &str) -> Result<Self> {
-        Self::over(Manifest::read(manifest)?.workspace(repo)?)
+        Self::read(Manifest::read(manifest)?.workspace(repo)?, manifest)
+    }
+
+    /// Opens every index of `workspace`, listed by the manifest at `manifest`, read-only.
+    fn read(workspace: Workspace, manifest: &Path) -> Result<Self> {
+        fits(&workspace)?;
+        let manifest = manifest.display().to_string();
+        let here = &workspace.repos[0];
+        let db = index::open_read(&here.index, &here.identity, &manifest)?;
+        for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
+            index::attach_read(&db, &schema(n), &peer.index, &peer.identity, &manifest)?;
+        }
+        Ok(Self {
+            db,
+            root: here.root.clone(),
+            identity: here.identity.clone(),
+            workspace,
+            read_only: true,
+        })
     }
 
     /// Opens every index of `workspace` where its repository says it lives
     /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
-        if workspace.repos.len() > MAX_PEERS + 1 {
-            // ponytail: one connection attaches every peer, so a workspace reads at most 10
-            // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
-            return Err(Msg::TooManyRepos {
-                found: workspace.repos.len(),
-                max: MAX_PEERS + 1,
-            }
-            .text()
-            .into());
-        }
+        fits(&workspace)?;
         // Opening creates a missing index, or recreates one of another schema, before it is
         // attached.
         for peer in &workspace.repos[1..] {
@@ -74,14 +88,19 @@ impl Engine {
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
+            read_only: false,
         })
     }
 
     /// Brings every index of the workspace up to date with the files on disk (ADR 0004), with
     /// no watcher: only files whose mtime or size changed are hashed. Each repository is
     /// refreshed on its own, through its own connection; links are derived from the stored
-    /// contracts at query time, so links that touch a changed file follow it.
+    /// contracts at query time, so links that touch a changed file follow it. Does nothing on
+    /// an engine opened from a manifest: there the operator's `meada index` refreshes.
     pub fn refresh(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
         for peer in &self.workspace.repos[1..] {
             let db = index::open(&peer.index, &peer.root)?;
             index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
@@ -645,7 +664,8 @@ impl Engine {
     /// line's range names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
-        self.context_fresh(symbol, budget, true)
+        // A read-only engine never refreshes, so it has nothing to retry with.
+        self.context_fresh(symbol, budget, !self.read_only)
     }
 
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
@@ -999,12 +1019,17 @@ pub fn status(dir: &Path) -> Result<String> {
 
 /// `status` in server mode (ADR 0011): every repository the manifest at `manifest` lists, in
 /// manifest order, with its `path` as the manifest writes it and its index state, or why it
-/// cannot be served; then every peer a `meada.toml` names that the manifest does not list. The
-/// decision and status lines come, as locally, only when every repository is indexed at the
-/// current schema.
+/// cannot be served; then every peer a `meada.toml` names that the manifest does not list, and
+/// every entry block a mirror's own `meada.toml` overrides. The decision and status lines come,
+/// as locally, only when every repository is indexed at the current schema. It only reads, as
+/// `Engine::open_manifest` does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
     let listed = Manifest::read(manifest)?;
     let missing = listed.missing();
+    let ignored: String = (listed.entries.iter())
+        .flat_map(|l| l.ignored.iter().map(|block| (block, &l.repo)))
+        .map(|(block, repo)| Msg::IgnoredBlock { block, repo }.text() + "\n")
+        .collect();
     let rows: Vec<_> = (listed.entries.iter())
         .map(|l| {
             let index = (l.repository.as_ref())
@@ -1022,7 +1047,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
     let first = rows.first().map(|(repo, _, _)| repo.clone());
     let report = match (indexed, first) {
         (true, Some(first)) => (listed.workspace(&first))
-            .and_then(Engine::over)
+            .and_then(|workspace| Engine::read(workspace, manifest))
             .and_then(|engine| engine.status_report())
             .unwrap_or_default(),
         _ => Default::default(),
@@ -1035,7 +1060,7 @@ pub fn status_workspace(manifest: &Path) -> Result<String> {
         let line = format!("{repo} ({path}) {state}");
         (repo, line)
     });
-    Ok(status_lines(heads, report, &missing))
+    Ok(status_lines(heads, report, &missing) + &ignored)
 }
 
 /// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`
@@ -1107,6 +1132,21 @@ pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
         .chain(["document"])
         .chain(kinds(true))
         .chain(WORDS_AFTER)
+}
+
+/// Refuses a workspace larger than one connection attaches.
+fn fits(workspace: &Workspace) -> Result<()> {
+    if workspace.repos.len() > MAX_PEERS + 1 {
+        // ponytail: one connection attaches every peer, so a workspace reads at most 10
+        // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
+        return Err(Msg::TooManyRepos {
+            found: workspace.repos.len(),
+            max: MAX_PEERS + 1,
+        }
+        .text()
+        .into());
+    }
+    Ok(())
 }
 
 /// The schema a workspace repository's index is attached as.

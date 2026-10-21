@@ -24,7 +24,12 @@ enum Command {
         #[arg(long)]
         workspace: Option<PathBuf>,
     },
-    Export,
+    Export {
+        #[arg(long, requires = "repo")]
+        workspace: Option<PathBuf>,
+        #[arg(long, requires = "workspace")]
+        repo: Option<String>,
+    },
     Mcp,
     Decide {
         #[arg(long)]
@@ -55,7 +60,11 @@ fn main() -> ExitCode {
             (c.about(Msg::Status.text()))
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
         })
-        .mut_subcommand("export", |c| c.about(Msg::Export.text()))
+        .mut_subcommand("export", |c| {
+            (c.about(Msg::Export.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+                .mut_arg("repo", |a| a.help(Msg::RepoHelp.text()))
+        })
         .mut_subcommand("mcp", |c| c.about(Msg::Mcp.text()))
         .mut_subcommand("decide", |c| {
             c.about(Msg::Decide.text())
@@ -94,6 +103,12 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         }),
+        Command::Export {
+            workspace: Some(manifest),
+            repo: Some(repo),
+        } => Engine::open_manifest(&manifest, &repo)
+            .and_then(|engine| engine.export())
+            .map(|json| print!("{json}")),
         Command::Decide {
             item,
             dry_run,
@@ -120,7 +135,7 @@ fn main() -> ExitCode {
             )
         }),
         command => Engine::open(here).and_then(|engine| match command {
-            Command::Export => engine.export().map(|json| print!("{json}")),
+            Command::Export { .. } => engine.export().map(|json| print!("{json}")),
             _ => engine.refresh(),
         }),
     };
