@@ -82,6 +82,18 @@ All notable changes to Meada are recorded here. The format follows
   the current and the held generations otherwise, and `/<identity>` keeps serving the current
   one. Every answer names its generation in a `Meada-Generation` header and every tool result
   in `_meta` (`meada/generation`); tools, schemas and text output are unchanged.
+- Server mode, refresh lock (ADR 0012, feature `refresh-lock`, section `[refresh_lock]` with
+  `ttl_seconds`, default 300, at least 10; it needs `[generations]`): `meada snapshot lock
+  --workspace <manifest> -- <command>` takes `{<key_prefix>}:lock` in Valkey, gets the next
+  fence from `{<key_prefix>}:fence`, runs the refresh as its child with `MEADA_REFRESH_LOCK`
+  and `MEADA_REFRESH_FENCE`, renews the lock every third of the TTL and releases it, exiting
+  with the child's code. A lock already held exits 1 running nothing; a lock lost (another
+  token, or no renewal for a whole TTL) terminates the child's process group and exits 1.
+  `meada snapshot publish` then needs both variables, stops before any upload once the lock no
+  longer holds its token, and the pointer script writes only while the lock holds it and the
+  fence is above the current one. A node never swaps to a lower fence than its pointer file's;
+  a lost fence key is named, with the recovery, by the refused publish, the refused pull and a
+  `fence: stuck` line of `meada status --generations`. `meada index` stays offline.
 - npm installer (spec #32): cargo-dist builds and publishes an npm package named `meada` with each
   release, at the crate's version, so `npx meada mcp` launches the MCP server and `npx meada
   <command>` runs any command; the release configuration is planned as a dry run on pull requests.

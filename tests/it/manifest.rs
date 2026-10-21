@@ -392,6 +392,10 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:4: [generations] needs a Meada built with the generation-pointer feature\n",
         ),
         (
+            "index_dir = \"../indexes\"\n\n[refresh_lock]\nttl_seconds = 300\n",
+            "meada: ops/meada.workspace.toml:3: [refresh_lock] needs a Meada built with the refresh-lock feature\n",
+        ),
+        (
             "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
         ),

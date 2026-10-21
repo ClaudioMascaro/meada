@@ -82,6 +82,13 @@ enum SnapshotCommand {
         #[arg(long, value_name = "SECONDS", value_parser = clap::value_parser!(u64).range(1..))]
         every: Option<u64>,
     },
+    #[cfg(feature = "refresh-lock")]
+    Lock {
+        #[arg(long)]
+        workspace: PathBuf,
+        #[arg(last = true, required = true, value_name = "COMMAND")]
+        command: Vec<std::ffi::OsString>,
+    },
 }
 
 /// `meada snapshot pull`: the generation id on stdout when the pointer file moved, or once
@@ -183,6 +190,14 @@ fn main() -> ExitCode {
                     .mut_arg("every", |a| a.help(Msg::SnapshotEvery.text()))
             })
     });
+    #[cfg(feature = "refresh-lock")]
+    let matches = matches.mut_subcommand("snapshot", |c| {
+        c.mut_subcommand("lock", |c| {
+            (c.about(Msg::SnapshotLock.text()))
+                .mut_arg("workspace", |a| a.help(Msg::WorkspaceHelp.text()))
+                .mut_arg("command", |a| a.help(Msg::SnapshotLockCommand.text()))
+        })
+    });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
         .into_iter()
@@ -282,6 +297,19 @@ fn main() -> ExitCode {
         Command::Snapshot {
             command: SnapshotCommand::Pull { workspace, every },
         } => pull(&workspace, every),
+        // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
+        #[cfg(feature = "refresh-lock")]
+        Command::Snapshot {
+            command: SnapshotCommand::Lock { workspace, command },
+        } => match meada::snapshot::lock::run(&workspace, &command) {
+            Ok(code) => std::process::exit(code),
+            Err(e) => {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+        },
         Command::Export {
             workspace: Some(manifest),
             repo: Some(repo),

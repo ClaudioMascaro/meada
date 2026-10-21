@@ -22,7 +22,7 @@ use crate::snapshot::{
 const WEB: &str = "example.com/chain/web";
 
 /// The local Valkey, or `None` with the reason printed.
-fn valkey_service() -> Option<String> {
+pub(crate) fn valkey_service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
     if url.is_none() {
         let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");
@@ -40,17 +40,17 @@ fn sections(valkey: &str, case: &str, keep: u64) -> String {
     )
 }
 
-fn prefix(case: &str) -> String {
+pub(crate) fn prefix(case: &str) -> String {
     format!("meada:test-{}-{case}", std::process::id())
 }
 
 /// A connection to the local Valkey, as the tests see it.
-fn admin(url: &str) -> redis::Connection {
+pub(crate) fn admin(url: &str) -> redis::Connection {
     redis::Client::open(url).unwrap().get_connection().unwrap()
 }
 
 /// What Valkey holds for `case`: the pointer hash and the retained list.
-fn pointer(valkey: &mut redis::Connection, case: &str) -> (Vec<String>, Vec<String>) {
+pub(crate) fn pointer(valkey: &mut redis::Connection, case: &str) -> (Vec<String>, Vec<String>) {
     let prefix = prefix(case);
     let hash: Vec<String> = redis::cmd("HMGET")
         .arg(format!("{{{prefix}}}:current"))
@@ -68,17 +68,17 @@ fn pointer(valkey: &mut redis::Connection, case: &str) -> (Vec<String>, Vec<Stri
 }
 
 /// A store, a Valkey and the chain's manifest with `[generations]`, indexed.
-struct Fleet {
-    endpoint: String,
-    bucket: String,
-    valkey: String,
-    dir: PathBuf,
-    case: &'static str,
-    keep: u64,
+pub(crate) struct Fleet {
+    pub(crate) endpoint: String,
+    pub(crate) bucket: String,
+    pub(crate) valkey: String,
+    pub(crate) dir: PathBuf,
+    pub(crate) case: &'static str,
+    pub(crate) keep: u64,
 }
 
 impl Fleet {
-    fn new(case: &'static str, keep: u64) -> Option<Self> {
+    pub(crate) fn new(case: &'static str, keep: u64) -> Option<Self> {
         let endpoint = service()?;
         let valkey = valkey_service()?;
         let name = bucket_name(case);
@@ -96,7 +96,7 @@ impl Fleet {
     }
 
     /// A node of this fleet, with its own `[valkey]` and `[generations]`.
-    fn node(&self, name: &str) -> (String, PathBuf) {
+    pub(crate) fn node(&self, name: &str) -> (String, PathBuf) {
         let (manifest, local) = named_node(&self.dir, name, &self.endpoint, &self.bucket);
         let file = self.dir.join(&manifest);
         let toml =
@@ -106,14 +106,14 @@ impl Fleet {
     }
 
     /// `meada snapshot publish`: the generation id.
-    fn publish(&self) -> String {
+    pub(crate) fn publish(&self) -> String {
         let (stdout, stderr, code) = publish(&self.dir, MANIFEST);
         assert_eq!(code, Some(0), "{stderr}");
         stdout.trim().to_string()
     }
 
     /// `meada snapshot pull` on `node`: the id it printed.
-    fn pull(&self, node: &str) -> String {
+    pub(crate) fn pull(&self, node: &str) -> String {
         let (stdout, stderr, code) = pull(&self.dir, node, &[]);
         assert_eq!(code, Some(0), "{stderr}");
         stdout.trim().to_string()
@@ -334,7 +334,7 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
 }
 
 /// `args` sent to Valkey as one command.
-fn send(valkey: &mut redis::Connection, args: &[&str]) {
+pub(crate) fn send(valkey: &mut redis::Connection, args: &[&str]) {
     let mut command = redis::cmd(args[0]);
     for arg in &args[1..] {
         command.arg(*arg);

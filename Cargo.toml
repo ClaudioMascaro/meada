@@ -24,6 +24,9 @@ http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
+# The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock`: a
+# signal to the child's process group and, on Linux, the signal the child gets when `lock` dies.
+nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal"] }
 nodejs-semver = "7"
 # The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
 # local file store), the `aws` client with ring for its signatures. `aws` itself would bring
@@ -93,6 +96,8 @@ snapshot = [
 ]
 # The current and retained generations in Valkey, and pins (`[generations]`). No crate of its own.
 generation-pointer = ["snapshot", "valkey"]
+# The refresh lock and its fencing tokens (`[refresh_lock]`, `meada snapshot lock`).
+refresh-lock = ["generation-pointer", "dep:nix"]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

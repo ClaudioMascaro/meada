@@ -30,6 +30,7 @@ mod packages;
 mod processes;
 mod pypi;
 mod query;
+mod refresh_lock;
 mod resources;
 mod self_index;
 mod server;

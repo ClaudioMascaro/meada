@@ -39,7 +39,7 @@ impl File {
         let keep = self.keep.unwrap_or(KEEP_DEFAULT);
         match u64::try_from(keep) {
             Ok(keep) if keep >= KEEP_MIN as u64 => Ok(Config { keep }),
-            _ => Err(("generations.keep", Msg::GenerationsKeep(KEEP_MIN).text())),
+            _ => Err(("generations.keep", Msg::AtLeast(KEEP_MIN).text())),
         }
     }
 }
@@ -49,12 +49,30 @@ pub fn keys(valkey: &valkey::Config) -> (String, String) {
     (valkey.key("current", true), valkey.key("retained", true))
 }
 
-/// The pointer script. KEYS: current, retained. ARGV: id, fence, keep, lock token (empty for
-/// none). It removes every entry of the id from the list before pushing it, so the list holds
-/// each id once, trims the list to `keep` and sets the hash, all at once. #276 checks the token
-/// against the lock and the fence against the current one here; without it the fence is `0`
-/// and nothing checks it.
+/// The pointer script. KEYS: current, retained, lock. ARGV: id, fence, keep, lock token (empty
+/// for none). With a token it returns 0 unless the lock holds it, and -1 unless the fence is
+/// above the one `current` holds (compared as decimal text, so no fence loses precision as a
+/// Lua number; -2 when that one is no decimal). Then it removes every entry of the id from the
+/// list before pushing it, so the list holds each id once, trims the list to `keep` and sets
+/// the hash, all at once. Without a token (no `[refresh_lock]`) the fence is `0` and nothing
+/// is checked.
 const POINT: &str = r"
+if ARGV[4] ~= '' then
+  if redis.call('GET', KEYS[3]) ~= ARGV[4] then
+    return 0
+  end
+  local held = redis.call('HGET', KEYS[1], 'fence')
+  if held then
+    if not string.match(held, '^%d+$') then
+      return -2
+    end
+    held = (string.gsub(held, '^0+(%d)', '%1'))
+    local fence = ARGV[2]
+    if #fence < #held or (#fence == #held and fence <= held) then
+      return -1
+    end
+  end
+end
 local mine = ARGV[1] .. ':'
 for _, entry in ipairs(redis.call('LRANGE', KEYS[2], 0, -1)) do
   if string.sub(entry, 1, #mine) == mine then
@@ -68,8 +86,9 @@ return 1
 ";
 
 /// Points the workspace at the generation `id` with `fence`, retaining `keep` generations: the
-/// last write of `meada snapshot publish`. `token` is the refresh lock's (#276), `None` without
-/// one.
+/// last write of `meada snapshot publish`. `token` is the refresh lock's, `None` without one:
+/// with it the write happens only while `{<key_prefix>}:lock` holds the token and `fence` is
+/// above the current one's, and a refusal is an error naming the key that refused it.
 pub async fn point(
     valkey: &Valkey,
     config: &valkey::Config,
@@ -79,13 +98,27 @@ pub async fn point(
     fence: u64,
 ) -> Result<(), String> {
     let (current, retained) = keys(config);
+    let lock = config.key("lock", true);
     let mut script = cmd("EVAL");
-    script.arg(POINT).arg(2).arg(&current).arg(&retained);
+    script
+        .arg(POINT)
+        .arg(3)
+        .arg(&current)
+        .arg(&retained)
+        .arg(&lock);
     script.arg(id).arg(fence).arg(keep).arg(token.unwrap_or(""));
     let wrote = valkey.query::<i64>(&script).await;
-    wrote
-        .map(drop)
-        .map_err(|e| format!("{current}, {retained}: {e}"))
+    match wrote.map_err(|e| format!("{current}, {retained}: {e}"))? {
+        1 => Ok(()),
+        0 => Err(Msg::LockNotHeld(&lock).text()),
+        -1 => Err(Msg::FenceRefused {
+            fence,
+            current: &current,
+            fence_key: &config.key("fence", true),
+        }
+        .text()),
+        _ => Err(Msg::GenerationsBadPointer(&current).text()),
+    }
 }
 
 /// What Valkey says a node should hold.
@@ -357,5 +390,90 @@ mod tests {
             .query::<i64>(cmd("DEL").arg(&current).arg(&retained))
             .await
             .unwrap();
+    }
+
+    /// With a token, the script writes only while the lock holds it and the fence is above the
+    /// current one's, compared as decimals of any length; a refusal names the key and changes
+    /// nothing.
+    #[tokio::test(flavor = "current_thread")]
+    async fn a_token_write_needs_the_lock_and_a_higher_fence() {
+        let Some(url) = crate::valkey::tests::service() else {
+            return;
+        };
+        let pid = std::process::id();
+        let toml = format!("url = \"{url}\"\nkey_prefix = \"meada:test-fence-{pid}\"");
+        let config: valkey::File = toml::from_str(&toml).unwrap();
+        let config = config.validate(std::path::Path::new("/")).unwrap();
+        let valkey = Valkey::connect(&config).await.unwrap();
+        let (current, retained) = keys(&config);
+        let lock = config.key("lock", true);
+        let fence_key = config.key("fence", true);
+        let del = cmd("DEL").arg(&current).arg(&retained).arg(&lock).clone();
+        valkey.query::<i64>(&del).await.unwrap();
+        let set = |key: &str, value: &str| cmd("SET").arg(key).arg(value).clone();
+        async fn id(valkey: &Valkey, current: &str) -> Option<String> {
+            let get = cmd("HGET").arg(current).arg("id").clone();
+            valkey.query(&get).await.unwrap()
+        }
+        let token = "0123456789abcdef0123456789abcdef";
+
+        // No lock, or another token: refused, naming the lock.
+        let e = point(&valkey, &config, 2, A, Some(token), 1).await;
+        assert_eq!(e, Err(Msg::LockNotHeld(&lock).text()));
+        valkey.query::<()>(&set(&lock, "another")).await.unwrap();
+        assert!(point(&valkey, &config, 2, A, Some(token), 1).await.is_err());
+        assert_eq!(id(&valkey, &current).await, None);
+
+        valkey.query::<()>(&set(&lock, token)).await.unwrap();
+        point(&valkey, &config, 2, A, Some(token), 9).await.unwrap();
+        let refused = Msg::FenceRefused {
+            fence: 9,
+            current: &current,
+            fence_key: &fence_key,
+        }
+        .text();
+        assert!(refused.contains(&fence_key), "{refused}");
+        let e = point(&valkey, &config, 2, B, Some(token), 9).await;
+        assert_eq!(e, Err(refused));
+        let e = point(&valkey, &config, 2, B, Some(token), 3).await;
+        assert!(e.unwrap_err().contains("refused fence 3"));
+        assert_eq!(id(&valkey, &current).await.as_deref(), Some(A));
+        point(&valkey, &config, 2, B, Some(token), 10)
+            .await
+            .unwrap();
+        assert_eq!(id(&valkey, &current).await.as_deref(), Some(B));
+
+        // Leading zeros and fences past a Lua number's precision compare as decimals.
+        let hset = |fence: &str| cmd("HSET").arg(&current).arg("fence").arg(fence).clone();
+        valkey.query::<i64>(&hset("011")).await.unwrap();
+        assert!(
+            point(&valkey, &config, 2, A, Some(token), 11)
+                .await
+                .is_err()
+        );
+        point(&valkey, &config, 2, A, Some(token), 12)
+            .await
+            .unwrap();
+        valkey
+            .query::<i64>(&hset("18446744073709551614"))
+            .await
+            .unwrap();
+        let near = u64::MAX - 1;
+        assert!(
+            point(&valkey, &config, 2, B, Some(token), near)
+                .await
+                .is_err()
+        );
+        point(&valkey, &config, 2, B, Some(token), u64::MAX)
+            .await
+            .unwrap();
+
+        // A fence in `current` that is no decimal is refused as a bad pointer.
+        valkey.query::<i64>(&hset("1e3")).await.unwrap();
+        let e = point(&valkey, &config, 2, A, Some(token), 5).await;
+        assert_eq!(e, Err(Msg::GenerationsBadPointer(&current).text()));
+        // Without a token nothing is checked, as without the refresh lock.
+        point(&valkey, &config, 2, A, None, 0).await.unwrap();
+        valkey.query::<i64>(&del).await.unwrap();
     }
 }

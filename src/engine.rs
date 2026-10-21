@@ -1222,26 +1222,48 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
 pub fn status_generations(manifest: &Path) -> Result<String> {
     use crate::snapshot::{pull, serve};
     let (config, local) = serve::node(manifest)?;
-    let current = pull::current(&local).ok().flatten().map(|(id, _)| id);
-    // With `[generations]` the current id is Valkey's, and the store holds no `current`.
+    let node = pull::current(&local).ok().flatten();
+    let current = node.as_ref().map(|(id, _)| id.clone());
+    // With `[generations]` the current id is Valkey's, and the store holds no `current`. A
+    // node fence above Valkey's is the stuck case (`{<key_prefix>}:fence` lost), named.
     #[cfg(feature = "generation-pointer")]
-    let reached = match Manifest::read(manifest)? {
+    let (reached, stuck) = match Manifest::read(manifest)? {
         Manifest {
             generations: Some(_),
             valkey: Some(valkey),
             ..
-        } => serve::reach_pointer(&config, &valkey),
-        _ => serve::reach(&config),
+        } => {
+            let reached = serve::reach_pointer(&config, &valkey);
+            let stuck = match (&reached, &node) {
+                (Ok((_, fence)), Some((_, held))) if held > fence => {
+                    let pointer = local.join(pull::POINTER).display().to_string();
+                    Some(
+                        Msg::FenceStuck {
+                            held: *held,
+                            pointer: &pointer,
+                            fence: *fence,
+                            current: &valkey.key("current", true),
+                            fence_key: &valkey.key("fence", true),
+                        }
+                        .text(),
+                    )
+                }
+                _ => None,
+            };
+            (reached.map(|(id, _)| id), stuck)
+        }
+        _ => (serve::reach(&config), None),
     };
     #[cfg(not(feature = "generation-pointer"))]
-    let reached = serve::reach(&config);
+    let (reached, stuck) = (serve::reach(&config), None::<String>);
     let store = match reached {
         Ok(id) => Msg::SnapshotStoreReachable(&id).text(),
         Err(reason) => Msg::SnapshotStoreUnreachable(&reason).text(),
     };
     let current = Msg::SnapshotStatusCurrent(current.as_deref()).text();
     let held = Msg::SnapshotStatusHeld(&serve::ids(&local)).text();
-    Ok(format!("{current}\n{held}\n{store}\n"))
+    let stuck = stuck.map(|line| format!("{line}\n")).unwrap_or_default();
+    Ok(format!("{current}\n{held}\n{store}\n{stuck}"))
 }
 
 /// An index state as `status` shows it, `other` for an index of another schema.

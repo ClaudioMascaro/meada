@@ -185,6 +185,10 @@ pub struct Manifest {
     /// `[snapshot]` and `[valkey]` are there too.
     #[cfg(feature = "generation-pointer")]
     pub generations: Option<crate::snapshot::generations::Config>,
+    /// The `[refresh_lock]` section, when the build has the module; `read` checks that
+    /// `[generations]` is there too.
+    #[cfg(feature = "refresh-lock")]
+    pub refresh_lock: Option<crate::snapshot::lock::Config>,
 }
 
 /// One `[[repository]]` of a manifest.
@@ -219,6 +223,8 @@ struct ManifestFile {
     snapshot: Option<crate::snapshot::File>,
     #[cfg(feature = "generation-pointer")]
     generations: Option<crate::snapshot::generations::File>,
+    #[cfg(feature = "refresh-lock")]
+    refresh_lock: Option<crate::snapshot::lock::File>,
 }
 
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
@@ -302,6 +308,13 @@ impl Manifest {
             let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
             modules::needs(file, &src, "generations", &missing)?;
         }
+        #[cfg(feature = "refresh-lock")]
+        let refresh_lock = (parsed.refresh_lock.map(|l| l.validate()).transpose())
+            .map_err(|(key, problem)| config::error_at(file, &src, key, &problem))?;
+        #[cfg(feature = "refresh-lock")]
+        if refresh_lock.is_some() && generations.is_none() {
+            modules::needs(file, &src, "refresh_lock", &["generations"])?;
+        }
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&src).into_iter();
@@ -362,6 +375,8 @@ impl Manifest {
             snapshot,
             #[cfg(feature = "generation-pointer")]
             generations,
+            #[cfg(feature = "refresh-lock")]
+            refresh_lock,
         })
     }
 
@@ -426,6 +441,8 @@ impl Manifest {
             snapshot: None,
             #[cfg(feature = "generation-pointer")]
             generations: None,
+            #[cfg(feature = "refresh-lock")]
+            refresh_lock: None,
         })
     }
 

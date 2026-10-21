@@ -67,6 +67,18 @@ The S3-compatible bucket and prefix the operator configures, where `meada snapsh
 uploads generations and from which `meada snapshot pull` downloads them onto a node.
 _Avoid_: cache, registry, artifact store
 
+**Refresh lock**:
+The lock in Valkey that `meada snapshot lock` holds while the operator's refresh (fetch, `meada
+index`, `meada snapshot publish`) runs as its child, so one refresh of a workspace runs at a
+time (ADR 0012).
+_Avoid_: mutex, lease, job lock
+
+**Fence**:
+The number each acquisition of the refresh lock gets, one above the last. The pointer in Valkey
+moves only to a higher fence and a node's never to a lower one, so a stalled job never replaces
+a newer generation; without the lock every fence is `0`.
+_Avoid_: epoch, version, fencing number
+
 ### Across repositories
 
 **Peer**:
