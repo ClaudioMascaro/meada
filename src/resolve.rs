@@ -2225,7 +2225,7 @@ pub enum Of<'a> {
 
 /// The evidence `Code::origins` accepts, which picks the walk. Each walk is its own, reads its
 /// own facts and charges what it reads.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Follow {
     /// The value flow: constants and imports, the arguments exact callers pass to parameters,
     /// what functions of the repository return, list items, a class attribute assigned once,
