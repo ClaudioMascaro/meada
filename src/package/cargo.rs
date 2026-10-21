@@ -1,22 +1,31 @@
 //! Cargo packages (spec #30): a `Cargo.toml` with a `[package]` name provides
 //! `package::cargo::<name>`, and each dependency entry consumes the crate it names. The entries
 //! come from the Rust pack's walker (`crates::entries`), so a manifest is read one way only.
+//! The module answers the trait's questions as follows:
+//!
+//! - `owns`: only a manifest with a package; a virtual workspace root owns nothing.
+//! - `ways`: the crate is its library's root file, named by the crate (`How::CrateName`).
+//! - `entries`: the `use` head names the entry of the owning manifest whose key it is when the
+//!   entry renames the package, else whose provider's library head it is.
+//! - `reaches`: the entry's source (`sourced`), see below.
+//! - `resolve`: the entry file only, no candidates; an entry that does not rename its crate
+//!   must be written as the provider's library head.
 //!
 //! An entry keeps where its crate comes from in `Entry::via`: `path <manifest>` (the
 //! `Cargo.toml` the path names, folded lexically from the manifest's directory: a path of the
-//! repository, or one that starts with `../` when it leaves it, which `Ecosystem::reaches`
-//! matches against the workspace repositories' roots), `git <identity>` (the remote, as
+//! repository, or one that starts with `../` when it leaves it, which `sourced` matches
+//! against the workspace repositories' roots), `git <identity>` (the remote, as
 //! `repo::normalize_remote` spells it) or nothing for a version. A declared source that cannot
 //! be read (an empty or mistyped `path`, `git` or `package`, an absolute path, or both `path`
 //! and `git`) drops the entry, as does any entry that gives no valid name. Cargo ranges are
 //! never checked, and neither `Cargo.lock` nor a registry is read.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolved, Summary,
-    directory, owner, sourced,
+    directory, owner,
 };
 use crate::index::Export;
 use crate::lang::rust::crates::{crate_name, entries, lib_name, lib_root, workspace_deps};
@@ -249,6 +258,45 @@ pub fn lib_head(s: &Summary) -> Option<String> {
         .or_else(|| s.name.as_deref().map(crate_name))
 }
 
+/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
+/// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
+/// root): a `path` entry only the package at that path, a `git` one only the repository of that
+/// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
+/// matched against the provider's location by the two roots, folded lexically: nothing is read.
+pub(super) fn sourced(
+    via: Option<&str>,
+    from: (&str, &Path),
+    ((to, to_root), provider): ((&str, &Path), &str),
+) -> bool {
+    let Some(via) = via else {
+        return true;
+    };
+    match via.split_once(' ') {
+        Some(("path", manifest)) if manifest.starts_with("../") => {
+            folded(&from.1.join(manifest)) == folded(&to_root.join(provider))
+        }
+        Some(("path", manifest)) => from.0 == to && provider == manifest,
+        Some(("git", identity)) => to == identity,
+        _ => false,
+    }
+}
+
+/// `path` with its `.` and `..` folded without touching the file system, so a symlink never
+/// changes where it lands.
+fn folded(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            part => out.push(part),
+        }
+    }
+    out
+}
+
 /// The Cargo ecosystem.
 pub struct Cargo;
 
@@ -346,6 +394,7 @@ impl Ecosystem for Cargo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contract::Level;
 
     /// A Cargo path keeps the crate at that path of the dependent's repository, a source from a
     /// remote the repository of that remote, a version every repository.
@@ -570,5 +619,129 @@ mod tests {
         assert!(!names_crate("std"));
         assert!(!names_crate("shared-core"));
         assert!(!names_crate(""));
+    }
+
+    fn manifest(path: &str, toml: &str) -> Manifest {
+        Manifest {
+            path: path.to_string(),
+            summary: read_at(path, toml),
+        }
+    }
+
+    /// One repository: `app` depends on `core-lib` (its library is `corelib`, in the workspace)
+    /// and on `fancy`, which renames the crate `other-lib` that no repository provides.
+    fn workspace() -> Export {
+        let file = |path: &str| crate::index::File {
+            path: path.to_string(),
+            hash: String::new(),
+        };
+        let row =
+            |path: &str, name: &str, file: &str, target: Option<&str>| crate::resolve::Exported {
+                path: path.to_string(),
+                name: Some(name.to_string()),
+                file: Some(file.to_string()),
+                target: target.map(String::from),
+            };
+        Export {
+            repository: "r".to_string(),
+            files: vec![file("core/src/lib.rs"), file("core/src/m.rs")],
+            manifests: vec![
+                manifest(
+                    "app/Cargo.toml",
+                    "[package]\nname = \"app\"\n[dependencies]\n\
+                     core-lib = { path = \"../core\" }\nfancy = { package = \"other-lib\", version = \"1\" }\n",
+                ),
+                manifest(
+                    "core/Cargo.toml",
+                    "[package]\nname = \"core-lib\"\n[lib]\nname = \"corelib\"\n",
+                ),
+                manifest("Cargo.toml", "[workspace]\nmembers = [\"app\", \"core\"]\n"),
+            ],
+            exported: vec![
+                row("core/src/lib.rs", "f", "core/src/lib.rs", Some("f")),
+                row("core/src/lib.rs", "m", "core/src/m.rs", None),
+                row("core/src/m.rs", "g", "core/src/m.rs", Some("g")),
+            ],
+            ..Export::default()
+        }
+    }
+
+    #[test]
+    fn only_a_manifest_with_a_package_owns() {
+        let package = manifest("Cargo.toml", "[package]\nname = \"a\"\n");
+        let virtual_root = manifest("Cargo.toml", "[workspace]\nmembers = [\"a\"]\n");
+        assert!(Cargo.owns(&package));
+        assert!(!Cargo.owns(&virtual_root));
+    }
+
+    #[test]
+    fn the_way_into_a_crate_is_its_library_root_and_no_other() {
+        let m = manifest("crates/a/Cargo.toml", "[package]\nname = \"a\"\n");
+        assert_eq!(
+            Cargo.ways(&m, "."),
+            [(How::CrateName, vec!["crates/a/src/lib.rs".to_string()])]
+        );
+        assert!(Cargo.ways(&m, "./m").is_empty());
+        let custom = manifest(
+            "Cargo.toml",
+            "[package]\nname = \"a\"\n[lib]\npath = \"src/x.rs\"\n",
+        );
+        assert_eq!(
+            Cargo.ways(&custom, "."),
+            [(How::CrateName, vec!["src/x.rs".to_string()])]
+        );
+        // A virtual manifest has no library root.
+        assert!(
+            Cargo
+                .ways(&manifest("Cargo.toml", "[workspace]\n"), ".")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_use_head_is_a_renamed_key_or_a_library_head() {
+        let exports = [workspace()];
+        let providers = Providers::new(&exports);
+        let named = |specifier: &str| -> Vec<(String, String)> {
+            (Cargo.entries(&exports, &providers, (0, "app/src/main.rs"), specifier))
+                .into_iter()
+                .map(|(e, subpath)| (e.name.clone(), subpath))
+                .collect()
+        };
+        let entry = |name: &str| vec![(name.to_string(), ".".to_string())];
+        // An entry that does not rename its crate is written as the provider's library head.
+        assert_eq!(named("corelib"), entry("core-lib"));
+        assert!(named("core_lib").is_empty());
+        // One that renames it is written as its key, hyphens as underscores.
+        assert_eq!(named("fancy"), entry("other-lib"));
+        assert!(named("other_lib").is_empty());
+        // Never the standard library, and only for a file a manifest with a package owns.
+        assert!(named("std").is_empty());
+        let providers_of = Cargo.entries(&exports, &providers, (0, "elsewhere/x.rs"), "corelib");
+        assert!(providers_of.is_empty());
+    }
+
+    #[test]
+    fn a_crate_resolves_at_its_library_root_by_the_name_a_use_writes() {
+        let exports = [workspace()];
+        let at = Provided::new(&exports[0]);
+        let providers = Providers::new(&exports);
+        let entries = Cargo.entries(&exports, &providers, (0, "app/src/main.rs"), "corelib");
+        let (entry, subpath) = entries[0].clone();
+        let manifest = &exports[0].manifests[1];
+        let resolve = |specifier: &str, chain: &str| {
+            let known = |_: &str| true;
+            let import = ((entry, subpath.as_str()), (specifier, chain));
+            Cargo
+                .resolve(&at, "r", manifest, import.0, import.1, &known)
+                .map(|r| (r.how, r.level, r.targets))
+        };
+        let exact = |id: &str| Some((How::CrateName, Level::Exact, vec![id.to_string()]));
+        assert_eq!(resolve("corelib", "f"), exact("r::core/src/lib.rs::f"));
+        // A module the library root exports.
+        assert_eq!(resolve("corelib", "m.g"), exact("r::core/src/m.rs::g"));
+        assert_eq!(resolve("corelib", "missing"), None);
+        // The package's own name is not what a `use` writes for a library named otherwise.
+        assert_eq!(resolve("core_lib", "f"), None);
     }
 }

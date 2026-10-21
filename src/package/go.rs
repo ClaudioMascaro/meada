@@ -14,10 +14,10 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::cargo::relative;
+use super::cargo::{relative, sourced};
 use super::{
     Ecosystem, Entry, MAX_BYTES, Manifest, Provided, Providers, Resolved, Summary, directory,
-    owner, sourced, valid_name,
+    owner, valid_name,
 };
 use crate::index::Export;
 use crate::lang::go::modfile;
