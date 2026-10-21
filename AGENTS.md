@@ -31,7 +31,8 @@ write tools; one index per repository; determinism) live in
 
 - Conventional Commits.
 - Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test`.
+  `cargo test`; for a change under a cloud module's feature `<f>` (ADR 0012), also
+  `cargo clippy --all-targets --features <f> -- -D warnings` and `cargo test --features <f>`.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.
