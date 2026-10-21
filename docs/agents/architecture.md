@@ -198,9 +198,14 @@ one for the area a change touches.
   pointer file through `pull::current`, then `generation.json`, bounded and checked as the
   generation's own), `Current` (the last generation `held` read, kept while the pointer names
   it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
-  `ids` no longer lists it, so what it keeps is bounded by what the node holds), `ids` (the
-  generations held) and `reach` (the store's current id within two seconds, for the probe). It
-  only reads; the pull is the only writer of `local_dir`.
+  `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
+  because a pull deleted the directory after the listing is `None`, the pin's 404, through
+  `unless_gone`), `ids` (the generations held) and `reach` (the store's current id within two
+  seconds, for the probe; with `[generations]`, `reach_pointer`: Valkey's current id, then a
+  HEAD of its document in the store, within the same bound, the reason prefixed `valkey:` or
+  `store:`). It only reads; the pull is the only writer of `local_dir`. A pinned call still open
+  on a generation that a pull's retention deletes may fail mid-call: the pull holds no lease on
+  what the server reads.
   `snapshot/generations.rs` (feature `generation-pointer`, which implies `snapshot` and
   `valkey`; no crate of its own) is the generation pointer, section `[generations]` (`keep`,
   default 3, at least 2; `Manifest::read` refuses it without `[snapshot]` and `[valkey]` through
@@ -214,9 +219,13 @@ one for the area a change touches.
   go in that script. `read` is the pull's side: `HMGET current id fence` and `LRANGE retained 0
   keep-1`, every id checked by `is_id` and every fence by `snapshot::fence` before anything
   else; a missing pointer, an empty list or a malformed entry is an error naming the key. With
-  it, `pull_locked` (through `Source::wanted`) fetches the current generation and every
-  retained one the node lacks, then swaps the pointer file to `<id> <fence>` as read, then
-  deletes every held id outside the current, the retained and the one just replaced.
+  it, `pull_locked` (through `Source::wanted`) fetches the current generation if the node lacks
+  it and swaps the pointer file to `<id> <fence>` as read (a failure there fails the pull and
+  changes nothing), then fetches every retained one the node lacks, each failure a warning
+  (`Msg::SnapshotRetainedSkipped`, naming the id and the cause, on stderr) that blocks nothing
+  and that the next pull retries, then deletes every held id outside the current, the retained
+  and the one just replaced. A pull that re-fetched the current generation (its directory gone)
+  reports `Pulled::Swapped`, so `--every` prints its id.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.

@@ -343,7 +343,11 @@ cada id (16 caracteres hexadecimais minúsculos) e cada fence (decimal) antes de
 então baixa toda geração retida que o nó não tem e apaga as que saíram da lista, nunca a atual
 nem a que acabou de substituir. O arquivo de ponteiro do nó leva o fence lido com o id. Uma
 entrada malformada, um ponteiro ausente ou uma lista vazia param o pull com um erro que nomeia
-a chave, e o nó fica como estava. Use o mesmo `keep` no job e nos nós.
+a chave, e o nó fica como estava. A geração atual é baixada e trocada primeiro: uma geração
+retida que falha depois dela vira um aviso em stderr com o id e a causa, não bloqueia nada, e o
+próximo pull tenta de novo. Use o mesmo `keep` no job e nos nós. `meada status --generations`
+lê a geração atual do Valkey e confere que o store guarda o seu documento; a linha
+`store: unreachable (...)` diz se falhou o Valkey ou o store.
 
 Um run de workflow fixa as commits em que começou com um pin no caminho:
 `/<identidade>@<geração>`, a geração sendo o que vem depois do último `@`, serve a geração
@@ -353,7 +357,8 @@ atual e as guardadas. Cada resposta HTTP nomeia a sua geração no cabeçalho `M
 (um 404 nomeia a atual) e cada resultado de ferramenta no `_meta`, `{"meada/generation":
 "<id>"}`: o run lê a geração da primeira resposta e fixa as seguintes nela. As ferramentas, os
 parâmetros e o texto das respostas não mudam. O proxy reverso repassa `Meada-Generation` nas
-respostas.
+respostas. Uma chamada fixada ainda aberta numa geração que a retenção de um pull apaga pode
+falhar no meio.
 
 ## Decisões
 

@@ -72,9 +72,12 @@ All notable changes to Meada are recorded here. The format follows
   list of `<id>:<fence>` newest first, each id once, trimmed to `keep`; fence `0` without the
   refresh lock) instead of the store's `current`, and `meada snapshot pull` reads them there:
   every id and fence is checked before the node changes (a malformed entry, a missing pointer or
-  an empty list is an error naming the key), every retained generation the node lacks is
-  downloaded, the others are deleted but for the current one and the one just replaced, and the
-  node's pointer file carries the fence read with the id. `meada mcp --listen --generations`
+  an empty list is an error naming the key), the current generation is downloaded and swapped in
+  first, then every retained one the node lacks (one that fails is a warning naming it, which
+  blocks nothing and the next pull retries), the others are deleted but for the current one and
+  the one just replaced, and the node's pointer file carries the fence read with the id. `meada
+  status --generations` reads the current id from Valkey and checks the store holds its
+  document. `meada mcp --listen --generations`
   then serves `/<identity>@<generation>` from a held generation, a 404 naming the requested,
   the current and the held generations otherwise, and `/<identity>` keeps serving the current
   one. Every answer names its generation in a `Meada-Generation` header and every tool result

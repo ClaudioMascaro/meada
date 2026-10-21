@@ -340,8 +340,12 @@ lowercase hex characters) and every fence (decimal) before it changes the node; 
 downloads every retained generation the node lacks and deletes the ones that left the list,
 never the current one or the one it just replaced. The node's pointer file carries the fence
 read with the id. A malformed entry, a missing pointer or an empty list stops the pull with an
-error naming the key, and the node stays as it was. Use the same `keep` on the job and the
-nodes.
+error naming the key, and the node stays as it was. The current generation is downloaded and
+swapped in first: a retained generation that fails after it becomes a warning on stderr naming
+the id and the cause, blocks nothing, and the next pull retries it. Use the same `keep` on the
+job and the nodes. `meada status --generations` reads the current generation from Valkey and
+checks that the store holds its document; the `store: unreachable (...)` line says whether
+Valkey or the store failed.
 
 A workflow run pins the commits it started on in the path: `/<identity>@<generation>`, the
 generation being what follows the last `@`, serves that held generation on any node while it
@@ -350,7 +354,8 @@ hold answers 404 `text/plain`, naming the requested generation, the current one 
 ones. Every HTTP answer names its generation in the `Meada-Generation` header (a 404 names the
 current one) and every tool result in its `_meta`, `{"meada/generation": "<id>"}`: the run reads
 the generation of its first answer and pins the next ones to it. Tools, parameters and the text
-of the answers do not change. The reverse proxy forwards `Meada-Generation` in answers.
+of the answers do not change. The reverse proxy forwards `Meada-Generation` in answers. A
+pinned call still open on a generation that a pull's retention deletes may fail mid-call.
 
 ## Decisions
 
