@@ -187,7 +187,14 @@ fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) 
             .collect()
     } else {
         (code
-            .origins(path, &form.scope, Of::Name(receiver), Follow::Values)
+            .origins(
+                path,
+                &form.scope,
+                Of::Name(receiver),
+                Follow::Values {
+                    passes: crate::resolve::passes_nothing,
+                },
+            )
             .iter())
         .filter_map(|o| o.call)
         .filter_map(|(at, i)| Some((at, code.call(at, i)?)))

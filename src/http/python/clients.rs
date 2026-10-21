@@ -133,11 +133,23 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                     // A pack that gives the receiver's value reads a receiver that is a call;
                     // Python's is a name.
                     let origins = match code.receiver(path, n) {
-                        Some(value) => {
-                            code.origins(path, &call.scope, Of::Value(value), Follow::Values)
-                        }
+                        Some(value) => code.origins(
+                            path,
+                            &call.scope,
+                            Of::Value(value),
+                            Follow::Values {
+                                passes: crate::lang::rust::passes,
+                            },
+                        ),
                         None if receiver.starts_with('(') => continue,
-                        None => code.origins(path, &call.scope, Of::Name(receiver), Follow::Values),
+                        None => code.origins(
+                            path,
+                            &call.scope,
+                            Of::Name(receiver),
+                            Follow::Values {
+                                passes: crate::lang::rust::passes,
+                            },
+                        ),
                     };
                     match client_base(code, origins) {
                         Some(base) => (member.to_string(), base),

@@ -78,18 +78,10 @@ pub trait LanguagePack {
     /// Whether a method call that no function of the repository answers may hand back the
     /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
     /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
-    /// `passes` every method on the way. One only a name match found counts when the chain
-    /// starts at a constructor of an outside crate, whose method it then is, and ends the flow
-    /// otherwise. A language whose methods return anything stays with the call as the origin.
+    /// the question's table (`Follow::Values`) says passes every method on the way. A chain that
+    /// starts at no outside constructor ends the flow. A language whose methods return anything
+    /// stays with the call as the origin.
     fn fluent(&self) -> bool {
-        false
-    }
-
-    /// Whether `method`, called on what the outside constructor `origin` (`axum.Router.new`)
-    /// made, hands back that same object. Listed per library: a method not listed (`headers()`
-    /// of a response, `json()`, a method of a trait the repository defines) makes a different
-    /// value, and the chain is not followed through it.
-    fn passes(&self, _origin: &str, _method: &str) -> bool {
         false
     }
 

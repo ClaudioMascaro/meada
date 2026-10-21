@@ -5,7 +5,7 @@
 //! named by `Code::outside` without the path flag, as the forms always read it: a name whose head
 //! is not the import itself (a method of a value made from it) is accepted too. The methods that
 //! make a client of another (`create_channel`, `get_connection`, the setters of a builder) are
-//! listed per library (`LanguagePack::passes`), as for the HTTP clients.
+//! listed per library (`lang::rust::passes`), as for the HTTP clients.
 //!
 //! Every client of these crates is polled or streamed, so the function that holds the call
 //! naming the topic or the queue handles what it receives.
@@ -230,8 +230,22 @@ fn client<'a>(
         _ => None,
     };
     let origins = match held {
-        Some((within, value)) => code.origins(path, within, Of::Value(value), Follow::Values),
-        None => code.origins(path, scope, Of::Value(receiver), Follow::Values),
+        Some((within, value)) => code.origins(
+            path,
+            within,
+            Of::Value(value),
+            Follow::Values {
+                passes: crate::lang::rust::passes,
+            },
+        ),
+        None => code.origins(
+            path,
+            scope,
+            Of::Value(receiver),
+            Follow::Values {
+                passes: crate::lang::rust::passes,
+            },
+        ),
     };
     origins.into_iter().find_map(|o| {
         let (at, i) = o.call?;

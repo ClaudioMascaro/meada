@@ -191,9 +191,14 @@ impl<'c, 'a> Clients<'c, 'a> {
             return Vec::new();
         }
         let mut out: Vec<Client<'a>> = Vec::new();
-        let found = self
-            .code
-            .origins(path, scope, Of::Value(value), Follow::Values);
+        let found = self.code.origins(
+            path,
+            scope,
+            Of::Value(value),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         // Each route's climbed calls, once: routes that differ only in the constant they held
         // repeat the same calls, and one client is not read twice.
         let mut climbs = BTreeSet::new();

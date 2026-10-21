@@ -131,7 +131,14 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         Some((at, framework(at)?.0))
     };
     let routers = |path, scope, name| -> Vec<(CallAt, &Framework)> {
-        let origins = code.origins(path, scope, Of::Name(name), Follow::Values);
+        let origins = code.origins(
+            path,
+            scope,
+            Of::Name(name),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         origins.iter().filter_map(creator).collect()
     };
     // The prefix a router's constructor gives it: none when absent.
@@ -173,13 +180,19 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
                 let given = argument(mount, how.prefix)
                     .map(|p| code.value(path, &call.scope, p))
                     .filter(|p| !matches!(p, Value::Undefined));
-                let children: Vec<CallAt> =
-                    (code.origins(path, &call.scope, Of::Value(child), Follow::Values))
-                        .iter()
-                        .filter_map(creator)
-                        .filter(|&(_, f)| std::ptr::eq(f, kind))
-                        .map(|(c, _)| c)
-                        .collect();
+                let children: Vec<CallAt> = (code.origins(
+                    path,
+                    &call.scope,
+                    Of::Value(child),
+                    Follow::Values {
+                        passes: crate::resolve::passes_nothing,
+                    },
+                ))
+                .iter()
+                .filter_map(creator)
+                .filter(|&(_, f)| std::ptr::eq(f, kind))
+                .map(|(c, _)| c)
+                .collect();
                 if children.is_empty() && how.takes_apps {
                     unread.push((at, kind));
                 }
@@ -383,7 +396,14 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
         }
     };
     let entries = || {
-        let origins = code.origins(path, scope, Of::Value(arg), Follow::Values);
+        let origins = code.origins(
+            path,
+            scope,
+            Of::Value(arg),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         let known = !origins.is_empty()
             && (origins.iter())
                 .all(|o| is_call(code, o, DJANGO_PATH) || is_call(code, o, DJANGO_RE_PATH));
@@ -425,10 +445,22 @@ fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Origin<'a>>
         return Vec::new();
     };
     match include(code, path, &call.scope, arg) {
-        Include::Module(module) => {
-            code.origins(module, "", Of::Name("urlpatterns"), Follow::Values)
-        }
-        Include::Entries(list) => code.origins(path, &call.scope, Of::Value(list), Follow::Values),
+        Include::Module(module) => code.origins(
+            module,
+            "",
+            Of::Name("urlpatterns"),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        ),
+        Include::Entries(list) => code.origins(
+            path,
+            &call.scope,
+            Of::Value(list),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        ),
         Include::Named(_) | Include::Unknown => Vec::new(),
     }
 }
@@ -495,7 +527,14 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     let (mut found, mut budget) = (Vec::new(), URLCONF_BUDGET);
     for root in roots {
-        let entries = code.origins(root, "", Of::Name("urlpatterns"), Follow::Values);
+        let entries = code.origins(
+            root,
+            "",
+            Of::Name("urlpatterns"),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         urlconf(code, entries, "", &mut Vec::new(), &mut budget, &mut found);
     }
     found
@@ -565,7 +604,14 @@ fn urlconf<'a>(
             }
             continue;
         }
-        let views = code.origins(path, &call.scope, Of::Value(view), Follow::Values);
+        let views = code.origins(
+            path,
+            &call.scope,
+            Of::Value(view),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         for origin in views {
             let Some((at, i)) = origin.call else {
                 continue;

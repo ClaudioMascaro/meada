@@ -224,9 +224,14 @@ impl<'c, 'a> Web<'c, 'a> {
     /// The places the value a method is called on may be: the apps, scopes, resources and
     /// Rocket instances the value flow reaches, and the service configuration it is.
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
-        let origins = self
-            .code
-            .origins(path, scope, Of::Value(value), Follow::Values);
+        let origins = self.code.origins(
+            path,
+            scope,
+            Of::Value(value),
+            Follow::Values {
+                passes: crate::lang::rust::passes,
+            },
+        );
         let mut out: Vec<Place> = (origins.into_iter())
             .filter(|o| o.outside.as_ref().and_then(made_of).is_some())
             .filter_map(|o| o.call.map(Place::Made))
@@ -513,7 +518,14 @@ impl<'c, 'a> Web<'c, 'a> {
                 continue;
             }
             let (path, scope, arg) = item;
-            for origin in code.origins(path, scope, Of::Value(arg), Follow::Values) {
+            for origin in code.origins(
+                path,
+                scope,
+                Of::Value(arg),
+                Follow::Values {
+                    passes: crate::lang::rust::passes,
+                },
+            ) {
                 let made = origin.outside.as_ref().and_then(made_of);
                 let (true, Some(child)) = (
                     matches!(made, Some(Made::Scope | Made::Resource)),

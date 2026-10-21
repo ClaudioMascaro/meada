@@ -117,7 +117,14 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
         return Vec::new();
     }
     let routers = |path, scope, name| -> Vec<CallAt> {
-        let origins = code.origins(path, scope, Of::Name(name), Follow::Values);
+        let origins = code.origins(
+            path,
+            scope,
+            Of::Name(name),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
         (origins.into_iter().filter_map(|o| o.call))
             .filter(|&r| is_express(code, r))
             .collect()
@@ -161,10 +168,17 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 }
                 // A router reached through arguments and return values has no path either.
                 Some((first, _))
-                    if (code.origins(path, &call.scope, Of::Value(first), Follow::Values))
-                        .into_iter()
-                        .filter_map(|o| o.call)
-                        .any(|c| is_express(code, c)) =>
+                    if (code.origins(
+                        path,
+                        &call.scope,
+                        Of::Value(first),
+                        Follow::Values {
+                            passes: crate::resolve::passes_nothing,
+                        },
+                    ))
+                    .into_iter()
+                    .filter_map(|o| o.call)
+                    .any(|c| is_express(code, c)) =>
                 {
                     (Some(String::new()), args)
                 }
@@ -176,7 +190,14 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 _ => (None, &args[1..]),
             };
             for arg in rest {
-                let children = code.origins(path, &call.scope, Of::Value(arg), Follow::Values);
+                let children = code.origins(
+                    path,
+                    &call.scope,
+                    Of::Value(arg),
+                    Follow::Values {
+                        passes: crate::resolve::passes_nothing,
+                    },
+                );
                 let children = children.into_iter().filter_map(|o| o.call);
                 for child in children.filter(|&c| is_express(code, c)) {
                     let parents = mounts.entry(child).or_default();

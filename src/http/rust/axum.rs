@@ -90,7 +90,14 @@ fn axum_routers<'a>(
     call: &'a Call,
     value: &'a Value,
 ) -> Vec<CallAt<'a>> {
-    axum_routers_of(code.origins(path, &call.scope, Of::Value(value), Follow::Values))
+    axum_routers_of(code.origins(
+        path,
+        &call.scope,
+        Of::Value(value),
+        Follow::Values {
+            passes: crate::lang::rust::passes,
+        },
+    ))
 }
 
 /// The axum routers given to what `value`, written in `call`, is made of, when it is not a
@@ -109,7 +116,14 @@ fn axum_unread<'a>(
         if !seen.insert(std::ptr::from_ref(value)) {
             continue;
         }
-        let routers = axum_routers_of(code.origins(path, scope, Of::Value(value), Follow::Values));
+        let routers = axum_routers_of(code.origins(
+            path,
+            scope,
+            Of::Value(value),
+            Follow::Values {
+                passes: crate::lang::rust::passes,
+            },
+        ));
         if !routers.is_empty() {
             found.extend(routers);
             continue;
