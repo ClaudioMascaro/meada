@@ -88,12 +88,12 @@ enum Source {
         manifest: Arc<Path>,
         identity: Arc<str>,
     },
-    /// The generation `<local_dir>/current` names when the call arrives, `identity` first (server
-    /// mode with `--generations`, feature `snapshot`): as `Served`, with the repositories the
-    /// generation recorded.
+    /// The generation `<local_dir>/current` named when the request was routed, `identity` first
+    /// (server mode with `--generations`, feature `snapshot`): as `Served`, with the
+    /// repositories the generation recorded.
     #[cfg(feature = "snapshot")]
     Generation {
-        local_dir: Arc<Path>,
+        held: Arc<crate::snapshot::serve::Held>,
         identity: Arc<str>,
     },
 }
@@ -118,10 +118,9 @@ impl Meada {
                 identity,
             } => tokio::task::block_in_place(|| Engine::open_listed(listed, identity, manifest)),
             #[cfg(feature = "snapshot")]
-            Source::Generation {
-                local_dir,
-                identity,
-            } => tokio::task::block_in_place(|| Engine::open_generation(local_dir, identity)),
+            Source::Generation { held, identity } => {
+                tokio::task::block_in_place(|| Engine::open_held(held, identity))
+            }
         };
         tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)))
             .map_err(|e| e.to_string())
@@ -296,7 +295,7 @@ enum Routes {
     /// pull that adds a repository needs no restart.
     #[cfg(feature = "snapshot")]
     Generation {
-        local_dir: Arc<Path>,
+        current: crate::snapshot::serve::Current,
         config: StreamableHttpServerConfig,
     },
 }
@@ -351,9 +350,8 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
 pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = address(listen)?;
     let (local_dir, _) = engine::served_generation(manifest)?;
-    let local_dir: Arc<Path> = local_dir.into();
     run(address, move |config| Routes::Generation {
-        local_dir,
+        current: crate::snapshot::serve::Current::new(local_dir),
         config: config.clone(),
     })
 }
@@ -500,22 +498,21 @@ async fn route(
             None => plain(StatusCode::NOT_FOUND, listing.clone()),
         },
         #[cfg(feature = "snapshot")]
-        Routes::Generation { local_dir, config } => {
-            let served: Result<Vec<String>, String> = tokio::task::block_in_place(|| {
-                let held = crate::snapshot::serve::held(local_dir).map_err(|e| e.to_string())?;
-                Ok(held.listed.entries.into_iter().map(|l| l.repo).collect())
-            });
-            match served {
-                Ok(served) if served.iter().any(|repo| repo == identity) => {
+        Routes::Generation { current, config } => {
+            let held = tokio::task::block_in_place(|| current.get().map_err(|e| e.to_string()));
+            match held {
+                Ok(held) if held.listed.entries.iter().any(|l| l.repo == identity) => {
                     let source = Source::Generation {
-                        local_dir: local_dir.clone(),
+                        held,
                         identity: identity.into(),
                     };
                     endpoint(source, config).handle(request).await
                 }
-                Ok(served) => plain(
+                Ok(held) => plain(
                     StatusCode::NOT_FOUND,
-                    served.iter().map(|repo| format!("{repo}\n")).collect(),
+                    (held.listed.entries.iter())
+                        .map(|l| format!("{}\n", l.repo))
+                        .collect(),
                 ),
                 Err(problem) => plain(StatusCode::SERVICE_UNAVAILABLE, format!("{problem}\n")),
             }

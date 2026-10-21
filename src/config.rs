@@ -212,20 +212,49 @@ pub fn load_own(root: &Path) -> Result<Option<Config>> {
     read_own(root, "meada.toml")
 }
 
-/// `<root>/<name>` parsed as `T`, or `T::default()` when the file does not exist. A parse error
-/// names the file, the line and the key; `meada.decisions.toml` is read the same way.
-pub(crate) fn read<T: DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
-    Ok(read_own(root, name)?.unwrap_or_default())
+/// `<root>/<name>` parsed as `T`, or `None` when the file does not exist. A parse error names
+/// the file, the line and the key; `meada.decisions.toml` is read the same way.
+fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
+    read_own_up_to(root, name, None)
 }
 
-/// `read`, with `None` when the file does not exist.
-fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
+/// The most a mirror's `meada.toml` or `meada.decisions.toml` holds in a pulled generation
+/// (ADR 0012), whose files are hostile; a larger one fails the generation, naming the file.
+#[cfg(feature = "snapshot")]
+// ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
+pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
+
+/// `read_own`, reading at most `max` bytes (`read_bounded`) when it is set.
+pub(crate) fn read_own_up_to<T: DeserializeOwned>(
+    root: &Path,
+    name: &str,
+    max: Option<u64>,
+) -> Result<Option<T>> {
     let file = root.join(name);
-    match fs::read_to_string(&file) {
-        Ok(src) => parse(&file, &src, name).map(Some),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("{}: {e}", file.display()).into()),
+    match text(&file, max)? {
+        Some(src) => parse(&file, &src, name).map(Some),
+        None => Ok(None),
     }
+}
+
+/// The text of `file`, `None` when it does not exist; with `max`, read as `read_bounded` reads,
+/// a regular file of at most `max` bytes.
+pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
+    let missing = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
+    let Some(max) = max else {
+        return match fs::read_to_string(file) {
+            Ok(src) => Ok(Some(src)),
+            Err(e) if missing(&e) => Ok(None),
+            Err(e) => Err(format!("{}: {e}", file.display()).into()),
+        };
+    };
+    if fs::metadata(file).is_err_and(|e| missing(&e)) {
+        return Ok(None);
+    }
+    let bytes = read_bounded(file, max)?;
+    let src = String::from_utf8(bytes)
+        .map_err(|_| format!("{}: {}", file.display(), std::io::ErrorKind::InvalidData))?;
+    Ok(Some(src))
 }
 
 /// `src`, the content of `file`, parsed as `T`; an error names the file, the line and the key,
@@ -276,7 +305,6 @@ pub(crate) fn error_at(
 /// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
 /// most `max` bytes. What is not a regular file is refused before it is opened: a FIFO would
 /// block the open for ever.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
 pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     use std::io::Read;
     let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());

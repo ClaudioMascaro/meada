@@ -378,7 +378,9 @@ impl Manifest {
             let file: EntryFile =
                 serde_json::from_value(written.into()).map_err(|e| bad(e.to_string()))?;
             let blocks = file.blocks();
-            let (config, ignored) = match config::load_own(&root).map_err(|e| bad(e.to_string()))? {
+            let max = Some(config::GENERATION_CONFIG_MAX);
+            let own = config::read_own_up_to(&root, "meada.toml", max);
+            let (config, ignored) = match own.map_err(|e| bad(e.to_string()))? {
                 Some(own) => (own, blocks),
                 None => (file.config(), Vec::new()),
             };
@@ -387,7 +389,8 @@ impl Manifest {
                 path: root.display().to_string(),
                 repository: Ok(Repository {
                     config,
-                    decisions: decisions::load(&root).map_err(|e| bad(e.to_string()))?,
+                    decisions: (decisions::load_up_to(&root, max))
+                        .map_err(|e| bad(e.to_string()))?,
                     index: dir.join(bundle).join("index.db"),
                     root,
                     identity: repo.to_string(),

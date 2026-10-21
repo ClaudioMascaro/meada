@@ -19,14 +19,19 @@ manifest opens every index read-only on one connection (`index::open_read`: noth
 one read transaction held until the engine drops, so an answer sees each index as one commit left
 it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
 nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
-opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_generation`
-builds the workspace from the generation `<local_dir>/current` names instead
+opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_held`
+builds the workspace from a generation the node holds instead
 (`snapshot::serve::held` reads the pointer file and the generation document, and
 `Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
 `<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
-else the blocks the document recorded; no `git` runs, the pull checked each mirror) and opens it
-read-only as `open_manifest` does, one engine per call, so a swap between two calls changes the
-generation and one during a call does not. The node's manifest contributes only its module
+else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX`; no
+`git` runs, the pull checked each mirror) and opens it read-only as `open_manifest` does, one
+engine per call. The server keeps the last generation read (`serve::Current`, one `Arc<Held>`:
+a generation's directory never changes once renamed into place), so a request reads only the
+pointer file until it names another id, and the request's route hands the `Held` it routed by
+to the call (`Source::Generation`): a swap between two calls changes the generation and one
+during a call does not, and a call still answering keeps its own `Arc` once the server moved
+on. The node's manifest contributes only its module
 sections. `engine::served_generation` is its start check and the predicate `status
 --generations` exits on (current generation present, every mirror rechecked, every index at the
 schema version, the whole workspace opens), `engine::status_generations` its text (the node's
@@ -172,7 +177,8 @@ one for the area a change touches.
   `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
   manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
   pointer file through `pull::current`, then `generation.json`, bounded and checked as the
-  generation's own), `ids` (the generations held) and `reach` (the store's current id within
+  generation's own), `Current` (the last generation `held` read, kept while the pointer names
+  it), `ids` (the generations held) and `reach` (the store's current id within
   two seconds, for the probe). It only reads; the pull is the only writer of `local_dir`.
 - `decide.rs`, `decisions.rs`, `decider/`: `meada decide`, the decisions file and its replay, and
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
@@ -916,7 +922,9 @@ one for the area a change touches.
   directory and an `internal/` package are no different from any other directory of the provider;
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
-  silently.
+  silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
+  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`); past it the
+  generation is not servable, the error naming the file.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

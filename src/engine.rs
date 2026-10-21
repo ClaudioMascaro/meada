@@ -64,24 +64,24 @@ impl Engine {
         Self::read(workspace, Fix::Index(&manifest.display().to_string()))
     }
 
-    /// `open_manifest` over the generation `<local_dir>/current` names (`--generations`, feature
-    /// `snapshot`), `repo` first, for one answer: the repositories, mirrors and indexes are the
-    /// ones the generation recorded and every index opens read-only. The pointer file and the
-    /// generation document are all it reads before the indexes; the mirrors are not touched
-    /// with `git`, since the pull checked them. A call of `meada mcp --listen --generations`.
+    /// `open_manifest` over the generation `held` (`--generations`, feature `snapshot`), `repo`
+    /// first, for one answer: the repositories, mirrors and indexes are the ones the generation
+    /// recorded and every index opens read-only. Nothing is read before the indexes; the
+    /// mirrors are not touched with `git`, since the pull checked them. A call of `meada mcp
+    /// --listen --generations` answers from the generation its request was routed by.
     #[cfg(feature = "snapshot")]
-    pub(crate) fn open_generation(local_dir: &Path, repo: &str) -> Result<Self> {
-        let held = crate::snapshot::serve::held(local_dir)?;
-        Self::read(held.listed.workspace(repo)?, Fix::Generation(&held.id))
+    pub(crate) fn open_held(held: &crate::snapshot::serve::Held, repo: &str) -> Result<Self> {
+        let fix = Fix::Generation(&held.id);
+        Self::read(held.listed.clone().workspace(repo)?, fix)
     }
 
-    /// `open_generation` over the `local_dir` of the node manifest at `manifest`
-    /// (`meada export --generations`).
+    /// `open_held` over the generation current in the `local_dir` of the node manifest at
+    /// `manifest` (`meada export --generations`).
     #[cfg(feature = "snapshot")]
     pub fn open_node(manifest: &Path, repo: &str) -> Result<Self> {
         let (_, local) = crate::snapshot::serve::node(manifest)?;
         repo::isolate(&local);
-        Self::open_generation(&local, repo)
+        Self::open_held(&crate::snapshot::serve::held(&local)?, repo)
     }
 
     /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
@@ -1200,7 +1200,7 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
     }
     let first = (held.listed.entries.first())
         .ok_or_else(|| format!("{}: no repository listed", local.display()))?;
-    Engine::open_generation(&local, &first.repo)?;
+    Engine::open_held(&held, &first.repo)?;
     let served = held.listed.entries.iter().map(|l| l.repo.clone());
     Ok((local, served.collect()))
 }
