@@ -28,12 +28,38 @@ pub enum Msg<'a> {
         found: &'a str,
         repo: &'a str,
     },
-    NotListed(&'a str),
+    NotListed {
+        repo: &'a str,
+        served: &'a str,
+    },
     IndexInMirror {
         index: &'a str,
         mirror: &'a str,
     },
     WorkspaceHelp,
+    RepoHelp,
+    IgnoredBlock {
+        block: &'a str,
+        repo: &'a str,
+    },
+    IndexMissing {
+        repo: &'a str,
+        manifest: &'a str,
+    },
+    IndexOtherVersion {
+        repo: &'a str,
+        manifest: &'a str,
+    },
+    StateLocked,
+    IndexInterrupted {
+        repo: &'a str,
+        manifest: &'a str,
+    },
+    IndexLocked {
+        repo: &'a str,
+        index: &'a str,
+        timeout: std::time::Duration,
+    },
     MissingPeer {
         repo: &'a str,
         named_by: &'a str,
@@ -250,9 +276,62 @@ impl Msg<'_> {
                 format!("the mirror's remote is `{found}`, not `{repo}`"),
                 format!("o remoto do espelho é `{found}`, não `{repo}`"),
             ),
-            Msg::NotListed(repo) => pick(
-                format!("`{repo}` is not listed in the workspace manifest"),
-                format!("`{repo}` não está listado no manifesto do workspace"),
+            Msg::NotListed { repo, served } => pick(
+                format!("`{repo}` is not listed in the workspace manifest; it serves {served}"),
+                format!("`{repo}` não está listado no manifesto do workspace; ele serve {served}"),
+            ),
+            Msg::RepoHelp => pick(
+                "Server mode: the identity of the repository to export".into(),
+                "Modo servidor: a identidade do repositório a exportar".into(),
+            ),
+            Msg::IgnoredBlock { block, repo } => pick(
+                format!(
+                    "manifest block ignored: {block} of {repo}, whose mirror has its own meada.toml"
+                ),
+                format!(
+                    "bloco do manifesto ignorado: {block} de {repo}, cujo espelho tem seu próprio \
+                     meada.toml"
+                ),
+            ),
+            Msg::IndexMissing { repo, manifest } => pick(
+                format!("{repo}: not indexed; run meada index --workspace {manifest}"),
+                format!("{repo}: não indexado; rode meada index --workspace {manifest}"),
+            ),
+            Msg::IndexOtherVersion { repo, manifest } => pick(
+                format!(
+                    "{repo}: indexed by another version; run meada index --workspace {manifest}"
+                ),
+                format!(
+                    "{repo}: indexado por outra versão; rode meada index --workspace {manifest}"
+                ),
+            ),
+            Msg::IndexInterrupted { repo, manifest } => pick(
+                format!(
+                    "{repo}: its index holds an interrupted commit; run meada index --workspace \
+                     {manifest}"
+                ),
+                format!(
+                    "{repo}: seu índice guarda um commit interrompido; rode meada index \
+                     --workspace {manifest}"
+                ),
+            ),
+            Msg::StateLocked => pick(
+                "locked by a commit in progress past the busy timeout".into(),
+                "travado por um commit em andamento além do tempo de espera".into(),
+            ),
+            Msg::IndexLocked {
+                repo,
+                index,
+                timeout,
+            } => pick(
+                format!(
+                    "{repo}: the index `{index}` stayed locked by a commit in progress for \
+                     longer than {timeout:?}"
+                ),
+                format!(
+                    "{repo}: o índice `{index}` ficou travado por um commit em andamento por \
+                     mais de {timeout:?}"
+                ),
             ),
             Msg::IndexInMirror { index, mirror } => pick(
                 format!("its index directory `{index}` would be inside the mirror `{mirror}`"),

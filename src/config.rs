@@ -1,6 +1,7 @@
 //! `meada.toml`: what a repository consumes from its peers (`[[peer]]`), the hosts it serves on
 //! (`[serve]`) and the resources it reads or writes (`[[resource]]`, spec #19). Errors name the
-//! file, the line and the key.
+//! file, the line and the key. A workspace manifest entry reuses these shapes for a mirror with
+//! no `meada.toml` (`workspace::Manifest`, ADR 0011).
 
 use std::fs;
 use std::ops::Range;
@@ -58,7 +59,7 @@ pub struct Serve {
 }
 
 /// A `[serve]` table that is present: `declared` is set.
-fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
+pub(crate) fn declared<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Serve, D::Error> {
     let serve = Serve::deserialize(d)?;
     Ok(Serve {
         declared: true,
@@ -203,16 +204,26 @@ impl Config {
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
-    read(root, "meada.toml")
+    Ok(load_own(root)?.unwrap_or_default())
+}
+
+/// `<root>/meada.toml`, or `None` when the file does not exist.
+pub fn load_own(root: &Path) -> Result<Option<Config>> {
+    read_own(root, "meada.toml")
 }
 
 /// `<root>/<name>` parsed as `T`, or `T::default()` when the file does not exist. A parse error
 /// names the file, the line and the key; `meada.decisions.toml` is read the same way.
 pub(crate) fn read<T: DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
+    Ok(read_own(root, name)?.unwrap_or_default())
+}
+
+/// `read`, with `None` when the file does not exist.
+fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
     let file = root.join(name);
     match fs::read_to_string(&file) {
-        Ok(src) => parse(&file, &src, name),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Ok(src) => parse(&file, &src, name).map(Some),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", file.display()).into()),
     }
 }

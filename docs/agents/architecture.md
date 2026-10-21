@@ -14,8 +14,12 @@ connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.d
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
 then manifest order, nothing discovered) and each index lives at
 `<index_dir>/<identity>/index.db`; `engine::index_workspace` and `engine::status_workspace`
-are `meada index --workspace` and `meada status --workspace`. Every query (`export`, `search`,
-`context`, `trace`) calls `refresh()` first, then
+are `meada index --workspace` and `meada status --workspace`. An engine opened from a
+manifest opens every index read-only on one connection (`index::open_read`: nothing created,
+one read transaction held until the engine drops, so an answer sees each index as one commit left
+it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
+nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
+opens. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
 reads each index through `index::export`, adds the contracts each `meada.toml` declares
 (`ContractKind::declare`), derives **links** from both, and renders.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
@@ -40,7 +44,11 @@ one for the area a change touches.
   decider mode (the only network path). Detail: [map/decisions.md](map/decisions.md).
 - `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
   `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
-  mode cannot serve. `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and
+  mode cannot serve; an entry's `[repository.serve]`, `[[repository.resource]]` and
+  `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
+  configuration of a mirror with no `meada.toml`. A mirror's own `meada.toml` wins whole: the
+  entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
+  `index.rs`: the SQLite schema, the freshness pipeline in `refresh`, and
   `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
   with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
   `.gitignore`). `lang/`: the

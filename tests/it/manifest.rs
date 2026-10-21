@@ -1,6 +1,7 @@
-//! Server mode's workspace manifest (spec #259, ADR 0011): `meada index --workspace` and
-//! `meada status --workspace` over fixture mirrors listed in a `meada.workspace.toml`, with every
-//! index under the manifest's `index_dir` and nothing written into a mirror.
+//! Server mode's workspace manifest (spec #259, ADR 0011): `meada index --workspace`,
+//! `meada status --workspace` and `meada export --workspace` over fixture mirrors listed in a
+//! `meada.workspace.toml`, with every index under the manifest's `index_dir`, nothing written
+//! into a mirror, and only `meada index` writing.
 
 use crate::common;
 
@@ -9,7 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::freshness::edit_chain;
-use common::{age, assert_golden, chain, fixture_repo, git};
+use common::without_processes;
+use common::{age, assert_golden, chain, decisions, documented_chain, fixture_repo, git};
 use meada::engine::Engine;
 
 const CHAIN: [(&str, &str); 4] = [
@@ -23,12 +25,39 @@ const CHAIN: [(&str, &str); 4] = [
 /// paths relative to it and `index_dir = "../indexes"`. Returns the case directory.
 fn chain_manifest(case: &str) -> PathBuf {
     let dir = mirrors(case);
-    let entries: String = CHAIN
-        .iter()
-        .map(|(repo, path)| format!("\n[[repository]]\nrepo = \"{repo}\"\npath = \"../{path}\"\n"))
-        .collect();
-    write_manifest(&dir, &format!("index_dir = \"../indexes\"\n{entries}"));
+    list(&dir, &CHAIN, false);
     dir
+}
+
+/// Writes `<dir>/ops/meada.workspace.toml` listing `repos` (identity, directory in `dir`) with
+/// `index_dir = "../indexes"`, after removing what a previous run left. With `configs`, each
+/// mirror's `meada.toml` moves into its entry: `[serve]`, `[[peer]]` (without `path`) and
+/// `[[resource]]` become the entry's `[repository.serve]`, `[[repository.peer]]` and
+/// `[[repository.resource]]`, and the mirror is left without one.
+fn list(dir: &Path, repos: &[(&str, &str)], configs: bool) {
+    for left in ["indexes", "ops"] {
+        let _ = fs::remove_dir_all(dir.join(left));
+    }
+    let mut toml = String::from("index_dir = \"../indexes\"\n");
+    for (repo, path) in repos {
+        toml += &format!("\n[[repository]]\nrepo = \"{repo}\"\npath = \"../{path}\"\n");
+        let file = dir.join(path).join("meada.toml");
+        if !configs || !file.exists() {
+            continue;
+        }
+        for line in fs::read_to_string(&file).unwrap().lines() {
+            let line = match line {
+                "[serve]" => "[repository.serve]",
+                "[[peer]]" => "[[repository.peer]]",
+                "[[resource]]" => "[[repository.resource]]",
+                hint if hint.starts_with("path = ") => continue,
+                line => line,
+            };
+            toml += &format!("{line}\n");
+        }
+        fs::remove_file(&file).unwrap();
+    }
+    write_manifest(dir, &toml);
 }
 
 /// The chain's four mirrors in `<case>/`, with nothing a previous run left next to them.
@@ -60,9 +89,22 @@ fn run(dir: &Path, command: &str) -> (String, String, bool) {
 
 /// `run` with the exit code.
 fn run_code(dir: &Path, command: &str) -> (String, String, Option<i32>) {
+    run_args(dir, &[command, "--workspace", MANIFEST])
+}
+
+/// The manifest every test writes, relative to its case directory.
+const MANIFEST: &str = "ops/meada.workspace.toml";
+
+/// `meada export --workspace ops/meada.workspace.toml --repo <repo>`, as `run_code`.
+fn export(dir: &Path, repo: &str) -> (String, String, Option<i32>) {
+    run_args(dir, &["export", "--workspace", MANIFEST, "--repo", repo])
+}
+
+/// `meada <args>` in `dir`, as `run_code`.
+fn run_args(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
-        .args([command, "--workspace", "ops/meada.workspace.toml"])
+        .args(args)
         .env("LANG", "en_US.UTF-8")
         .output()
         .expect("meada runs");
@@ -256,10 +298,14 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     let toml = [
         "index_dir = \"../chain-web/./x/..\"\n".to_string(),
         entry("example.com/chain/web", "../chain-web"),
+        // Overridden by the web mirror's own `meada.toml`, but the web is not served at all.
+        "\n[repository.serve]\nprefix = \"/edge\"\n".to_string(),
         entry("example.com/chain/catalog", "../chain-catalog"),
     ]
     .concat();
     write_manifest(&dir, &toml);
+    let (status, _, _) = run(&dir, "status");
+    assert!(!status.contains("manifest block ignored"), "{status}");
     let (_, stderr, code) = run_code(&dir, "index");
     assert_eq!(code, Some(1));
     assert_eq!(
@@ -293,6 +339,18 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\npath = \"../chain-web\"\n",
             "meada: ops/meada.workspace.toml:3: `repository.repo` is missing\n",
+        ),
+        // The manifest locates every repository: a peer has no `path`.
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\n\n[[repository.peer]]\nrepo = \"example.com/chain/gateway\"\n\
+             path = \"../chain-gateway\"\n",
+            "meada: ops/meada.workspace.toml:9: `repository.peer.path` is not a meada.workspace.toml key\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\n\n[repository.serve]\nprefix = \"edge\"\n",
+            "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: `edge` must start with `/`\n",
         ),
     ] {
         write_manifest(&dir, toml);
@@ -364,6 +422,8 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
     assert!(run(&dir, "index").2);
     let before = exports(&dir);
     edit_chain(&mirrors(&dir));
+    // Only `meada index` refreshes: until it runs, the export is the index's, not the files'.
+    assert_eq!(exports(&dir), before);
 
     assert!(run(&dir, "index").2);
     let refreshed = exports(&dir);
@@ -383,4 +443,172 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
     }
     let all: Vec<&str> = CHAIN.iter().map(|(repo, _)| *repo).collect();
     assert_nothing_else_written(&dir, &all);
+}
+
+/// The bytes of every file under `dir`, by path relative to it.
+fn contents(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    (files(dir).into_iter())
+        .map(|f| (f.clone(), fs::read(dir.join(&f)).unwrap()))
+        .collect()
+}
+
+#[test]
+fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
+    let dir = chain_manifest("manifest_export");
+    let web = "example.com/chain/web";
+
+    // Before `meada index`, nothing is created or built: the error names the fix.
+    let (stdout, stderr, code) = export(&dir, web);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: example.com/chain/web: not indexed; run meada index --workspace \
+         ops/meada.workspace.toml\n"
+    );
+    assert!(!dir.join("indexes").exists());
+
+    assert!(run(&dir, "index").2);
+    let indexes = dir.join("indexes");
+    let indexed = contents(&indexes);
+    for (repo, path) in CHAIN {
+        let (stdout, stderr, code) = export(&dir, repo);
+        assert_eq!(code, Some(0), "{stderr}");
+        assert_golden(&format!("{path}.export.json"), &stdout);
+    }
+    assert!(run(&dir, "status").2);
+    assert!(contents(&indexes) == indexed, "a read wrote an index");
+
+    // An identity the manifest does not list names the ones it serves.
+    let (_, stderr, code) = export(&dir, "example.com/chain/nope");
+    assert_eq!(code, Some(1));
+    assert_eq!(
+        stderr,
+        "meada: `example.com/chain/nope` is not listed in the workspace manifest; it serves \
+         example.com/chain/web, example.com/chain/gateway, example.com/chain/catalog, \
+         example.com/chain/worker\n"
+    );
+    // A peer's index of another schema is not rebuilt by a read.
+    let catalog = indexes.join("example.com/chain/catalog/index.db");
+    fs::write(&catalog, "not an index\n").unwrap();
+    let (stdout, stderr, code) = export(&dir, web);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: example.com/chain/catalog: indexed by another version; run meada index \
+         --workspace ops/meada.workspace.toml\n"
+    );
+    assert_eq!(fs::read_to_string(&catalog).unwrap(), "not an index\n");
+
+    // `--repo` and `--workspace` go together.
+    let (_, stderr, code) = run_args(&dir, &["export", "--workspace", MANIFEST]);
+    assert!(code == Some(2) && stderr.contains("--repo"), "{stderr}");
+    let (_, stderr, code) = run_args(&dir, &["export", "--repo", web]);
+    assert!(
+        code == Some(2) && stderr.contains("--workspace"),
+        "{stderr}"
+    );
+    let all: Vec<&str> = CHAIN.iter().map(|(repo, _)| *repo).collect();
+    assert_nothing_else_written(&dir, &all);
+}
+
+#[test]
+fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
+    // The chain: base URL variables, hosts and resources.
+    let dir = mirrors("manifest_blocks");
+    list(&dir, &CHAIN, true);
+    assert!(run(&dir, "index").2);
+    for (repo, path) in CHAIN {
+        assert!(!dir.join(path).join("meada.toml").exists());
+        let (stdout, stderr, _) = export(&dir, repo);
+        assert_golden(&format!("{path}.export.json"), &stdout);
+        assert_eq!(stderr, "");
+    }
+
+    // Provider documents under `serve`.
+    let (web, ..) = documented_chain("manifest_blocks_documents");
+    let dir = web.parent().unwrap();
+    list(dir, &CHAIN, true);
+    assert!(run(dir, "index").2);
+    for (repo, name) in [CHAIN[0], CHAIN[1]] {
+        let export = export(dir, repo).0;
+        let golden = name.replace("chain-", "chain-documents-");
+        assert_golden(
+            &format!("{golden}.export.json"),
+            &without_processes(&export),
+        );
+    }
+
+    // Gateway prefixes and strips.
+    let case = "manifest_blocks_gateway";
+    let acme = ["ledger", "client", "orders", "billing"].map(|name| {
+        let origin = format!("https://example.com/acme/{name}.git");
+        fixture_repo(case, &format!("gateway-{name}"), Some(&origin));
+        (
+            format!("example.com/acme/{name}"),
+            format!("gateway-{name}"),
+        )
+    });
+    let repos: Vec<(&str, &str)> = (acme.iter())
+        .map(|(repo, path)| (repo.as_str(), path.as_str()))
+        .collect();
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
+    list(&dir, &repos, true);
+    assert!(run(&dir, "index").2);
+    for (repo, name) in [repos[1], repos[3]] {
+        let export = export(&dir, repo).0;
+        assert_golden(&format!("{name}.export.json"), &without_processes(&export));
+    }
+}
+
+#[test]
+fn a_mirror_with_a_meada_toml_keeps_it_whole_and_status_names_the_ignored_blocks() {
+    let dir = mirrors("manifest_ignored");
+    list(&dir, &CHAIN, false);
+    let manifest = dir.join(MANIFEST);
+    let gateway = "path = \"../chain-gateway\"\n";
+    let blocks = "\n[repository.serve]\nprefix = \"/edge\"\n\n\
+                  [[repository.resource]]\nkind = \"s3-bucket\"\nid = \"invoices\"\n\
+                  role = \"write\"\n\n\
+                  [[repository.peer]]\nrepo = \"example.com/chain/worker\"\n\
+                  base_url_env = [\"WORKER_URL\"]\n";
+    let toml = fs::read_to_string(&manifest).unwrap();
+    fs::write(
+        &manifest,
+        toml.replace(gateway, &format!("{gateway}{blocks}")),
+    )
+    .unwrap();
+
+    assert!(run(&dir, "index").2);
+
+    let (stdout, _, _) = export(&dir, "example.com/chain/gateway");
+    assert_golden("chain-gateway.export.json", &stdout);
+    let (status, stderr, ok) = run(&dir, "status");
+    assert!(ok, "{stderr}");
+    assert!(
+        status.ends_with(
+            "\nmanifest block ignored: [repository.serve] of example.com/chain/gateway, \
+             whose mirror has its own meada.toml\n\
+             manifest block ignored: [[repository.resource]] s3-bucket invoices of \
+             example.com/chain/gateway, whose mirror has its own meada.toml\n\
+             manifest block ignored: [[repository.peer]] example.com/chain/worker of \
+             example.com/chain/gateway, whose mirror has its own meada.toml\n"
+        ),
+        "{status}"
+    );
+}
+
+#[test]
+fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
+    let dir = chain_manifest("manifest_decisions");
+    let web = dir.join("chain-web");
+    decisions(&web, "chain-web");
+    assert!(run(&dir, "index").2);
+
+    let (stdout, stderr, _) = export(&dir, "example.com/chain/web");
+
+    assert_golden("chain-web.decided.export.json", &without_processes(&stdout));
+    assert_eq!(stderr, "");
+    decisions(&web, "chain-web-unfit");
+    let (status, _, _) = run(&dir, "status");
+    assert!(status.contains("\n  stale decision: "), "{status}");
 }

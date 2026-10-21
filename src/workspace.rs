@@ -159,6 +159,10 @@ pub struct Listed {
     pub path: String,
     /// The repository at that path, or why it cannot be served.
     pub repository: std::result::Result<Repository, String>,
+    /// The entry's configuration blocks the mirror's own `meada.toml` overrides, as `status`
+    /// names them: `[repository.serve]`, `[[repository.resource]] <kind> <id>`,
+    /// `[[repository.peer]] <repo>`.
+    pub ignored: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -170,11 +174,55 @@ struct ManifestFile {
     repositories: Vec<EntryFile>,
 }
 
+/// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
+/// of its `[[peer]]` without `path` (the manifest locates every repository).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EntryFile {
     repo: String,
     path: String,
+    #[serde(default, deserialize_with = "config::declared")]
+    serve: config::Serve,
+    #[serde(default, rename = "resource")]
+    resources: Vec<config::Resource>,
+    #[serde(default, rename = "peer")]
+    peers: Vec<EntryPeer>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EntryPeer {
+    repo: String,
+    #[serde(default)]
+    base_url_env: Vec<String>,
+}
+
+impl EntryFile {
+    /// Its blocks, as `Listed::ignored` names them.
+    fn blocks(&self) -> Vec<String> {
+        let serve = self
+            .serve
+            .declared
+            .then(|| "[repository.serve]".to_string());
+        let resources =
+            (self.resources.iter()).map(|r| format!("[[repository.resource]] {} {}", r.kind, r.id));
+        let peers = (self.peers.iter()).map(|p| format!("[[repository.peer]] {}", p.repo));
+        serve.into_iter().chain(resources).chain(peers).collect()
+    }
+
+    /// Its blocks as the configuration of a mirror with no `meada.toml`.
+    fn config(self) -> Config {
+        let peers = self.peers.into_iter().map(|p| config::Peer {
+            repo: p.repo,
+            path: None,
+            base_url_env: p.base_url_env,
+        });
+        Config {
+            peers: peers.collect(),
+            serve: self.serve,
+            resources: self.resources,
+        }
+    }
 }
 
 impl Manifest {
@@ -193,11 +241,18 @@ impl Manifest {
         let mut entries: Vec<Listed> = (parsed.repositories.into_iter())
             .map(|e| {
                 let twice = !seen.insert(e.repo.clone());
-                let repository = mirror(&index_dir, &base.join(&e.path), &e.repo, twice);
+                let (repo, path, blocks) = (e.repo.clone(), e.path.clone(), e.blocks());
+                let (repository, ignored) =
+                    match mirror(&index_dir, &base.join(&path), &repo, twice, e.config()) {
+                        Ok((repository, true)) => (Ok(repository), blocks),
+                        Ok((repository, false)) => (Ok(repository), Vec::new()),
+                        Err(problem) => (Err(problem), Vec::new()),
+                    };
                 Listed {
-                    repo: e.repo,
-                    path: e.path,
+                    repo,
+                    path,
                     repository,
+                    ignored,
                 }
             })
             .collect();
@@ -218,6 +273,8 @@ impl Manifest {
                 continue;
             };
             let index = dir.display().to_string();
+            // Not served, so nothing of it is ignored either.
+            listed.ignored.clear();
             listed.repository = Err(Msg::IndexInMirror {
                 index: &index,
                 mirror,
@@ -263,7 +320,14 @@ impl Manifest {
             return Err(problems.join("\n").into());
         }
         let Some(at) = repos.iter().position(|r| r.identity == first) else {
-            return Err(Msg::NotListed(first).text().into());
+            let served: Vec<&str> = repos.iter().map(|r| r.identity.as_str()).collect();
+            let served = served.join(", ");
+            return Err(Msg::NotListed {
+                repo: first,
+                served: &served,
+            }
+            .text()
+            .into());
         };
         let named = repos.remove(at);
         repos.insert(0, named);
@@ -302,13 +366,16 @@ fn resolved(path: &Path) -> PathBuf {
 }
 
 /// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
-/// why it cannot be served. `twice` when an earlier entry names the same identity.
+/// why it cannot be served. `twice` when an earlier entry names the same identity. Its
+/// configuration is its own `meada.toml`, whole, or the entry's blocks (`listed`) when it has
+/// none; the flag says it has one.
 fn mirror(
     index_dir: &Path,
     path: &Path,
     repo: &str,
     twice: bool,
-) -> std::result::Result<Repository, String> {
+    listed: Config,
+) -> std::result::Result<(Repository, bool), String> {
     // Before any path is built from it: segments that would leave `index_dir`.
     if repo.split('/').any(|s| matches!(s, "" | "." | "..")) {
         return Err(Msg::UnsafeIdentity.text());
@@ -335,13 +402,16 @@ fn mirror(
         }
         .text());
     }
-    Ok(Repository {
-        config: config::load(&root).map_err(|e| e.to_string())?,
+    let own = config::load_own(&root).map_err(|e| e.to_string())?;
+    let has_own = own.is_some();
+    let repository = Repository {
+        config: own.unwrap_or(listed),
         decisions: decisions::load(&root).map_err(|e| e.to_string())?,
         index: index_dir.join(repo).join("index.db"),
         root,
         identity: found,
-    })
+    };
+    Ok((repository, has_own))
 }
 
 /// Repository identities and sibling listings, each read from disk once.

@@ -62,8 +62,9 @@ _Avoid_: group, monorepo, organization
 **Workspace manifest**:
 The versioned `meada.workspace.toml` in an operator's ops repository that lists, for server
 mode, the repositories of the workspace (remote identity and local path), the index directory,
-and the `[serve]` and `[[resource]]` of repositories with no `meada.toml`. A repository's own
-`meada.toml` wins over it. It is never read locally.
+and the `[serve]`, `[[resource]]` and `[[peer]]` (`repo` and `base_url_env`, no `path`) of
+repositories with no `meada.toml`. A repository's own `meada.toml` wins over it whole. It is
+never read locally.
 _Avoid_: group config, central repository, global configuration
 
 **Provider**:
