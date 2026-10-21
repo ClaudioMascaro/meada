@@ -29,7 +29,7 @@ use crate::trace::Process;
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
 /// to the facts a pack stores or to a document's or a manifest's stored `summary` changes the
-/// version, and an index with another version is deleted and rebuilt.
+/// version, and an index with another version is rebuilt beside it and renamed over it.
 fn schema_version() -> i32 {
     let hash = blake3::hash(include_bytes!("../tests/golden/schema.txt"));
     let [a, b, c, d, ..] = *hash.as_bytes();
@@ -256,30 +256,126 @@ fn unreadable(
     text.into()
 }
 
-/// Opens the index at `index` of the checkout at `root`, creating its directory, and a missing
-/// index or one of another schema. The checkout's own `.meada/` gets a `.gitignore` of `*`;
-/// an index elsewhere (server mode's `index_dir`) is outside any checkout and gets none.
-pub fn open(index: &Path, root: &Path) -> Result<Connection> {
+/// Opens the index at `index` of the checkout at `root` (repository `identity`, documents per
+/// `serve`), creating its directory. A missing index, or one of another schema, is rebuilt
+/// beside it and renamed over it (`rebuild`), so a reader sees the old index or the whole new
+/// one. The checkout's own `.meada/` gets a `.gitignore` of `*`; an index elsewhere (server
+/// mode's `index_dir`) is outside any checkout and gets none.
+pub fn open(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<Connection> {
     let dir = index.parent().ok_or("index path has no directory")?;
     fs::create_dir_all(dir)?;
     if index == path(root) {
         fs::write(dir.join(".gitignore"), "*\n")?;
     }
-    let path = index;
-    let db = writable(path)?;
-    // An unreadable file counts as a mismatch: the index's directory is Meada's own.
-    let version = db
-        .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
-        .ok();
-    if version == Some(schema_version()) {
+    match current(index)? {
+        Some(db) => Ok(db),
+        None => rebuild(index, root, identity, serve),
+    }
+}
+
+/// The index at `index` opened to write, when it has the current schema. Its first read rolls
+/// back the hot journal a writer stopped mid-commit left. An unreadable file counts as a
+/// mismatch (the index's directory is Meada's own); a missing one is not created, so no reader
+/// finds an empty file; a commit in progress past the busy timeout is an error, never a reason
+/// to rebuild.
+fn current(index: &Path) -> Result<Option<Connection>> {
+    let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let db = match Connection::open_with_flags(index, flags) {
+        Err(e) if e.sqlite_error_code() == Some(ErrorCode::CannotOpen) => return Ok(None),
+        db => db?,
+    };
+    db.busy_timeout(BUSY.get())?;
+    match db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0)) {
+        Ok(version) => Ok((version == schema_version()).then_some(db)),
+        Err(e)
+            if matches!(
+                e.sqlite_error_code(),
+                Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+            ) =>
+        {
+            Err(e.into())
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// `index` with `suffix` appended to its file name.
+fn beside(index: &Path, suffix: &str) -> PathBuf {
+    let mut name = index.as_os_str().to_owned();
+    name.push(suffix);
+    name.into()
+}
+
+/// Rebuilds the index at `index` without ever removing it (spec #259): under an exclusive
+/// lock on `index.db.lock` (created once, never removed), a whole new index is built and
+/// committed in `index.db.new.<pid>`, closed, and renamed over `index.db`. A reader that holds
+/// the old file keeps answering from it. A second rebuild waits for the lock, then finds the
+/// index rebuilt; the `index.db.new.*` a crashed rebuild left are removed only under the lock,
+/// so none belongs to a live rebuild.
+fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<Connection> {
+    let path = beside(index, ".lock");
+    let locked = (fs::File::options().read(true).write(true).create(true))
+        .truncate(false)
+        .open(&path)
+        .and_then(|lock| lock.lock().map(|()| lock));
+    let _lock = locked.map_err(|e| {
+        let lock = path.display().to_string();
+        Msg::RebuildLock {
+            lock: &lock,
+            error: &e.to_string(),
+        }
+        .text()
+    })?;
+    if let Some(db) = current(index)? {
         return Ok(db);
     }
-    drop(db);
-    let _ = fs::remove_file(path);
-    let db = writable(path)?;
-    db.execute_batch(SCHEMA)?;
-    db.pragma_update(None, "user_version", schema_version())?;
-    Ok(db)
+    let dir = index.parent().ok_or("index path has no directory")?;
+    let name = index
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("index path is not UTF-8")?;
+    let crashed = format!("{name}.new.");
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        if entry
+            .file_name()
+            .to_str()
+            .is_some_and(|n| n.starts_with(&crashed))
+        {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    // `current` opened the old index to write, rolling back any hot journal it could; one left
+    // is not that index's (SQLite would take it for the new one's).
+    match fs::remove_file(beside(index, "-journal")) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+        _ => {}
+    }
+    let new = beside(index, &format!(".new.{}", std::process::id()));
+    let built = (|| -> Result<()> {
+        // Closed before the rename, its last commit having left no journal.
+        let db = writable(&new)?;
+        db.execute_batch(SCHEMA)?;
+        db.pragma_update(None, "user_version", schema_version())?;
+        refresh(&db, root, identity, serve)
+    })();
+    // Where a reader holding the old file forbids the rename (Windows), it stays as it was.
+    let replaced = built.and_then(|()| {
+        fs::rename(&new, index).map_err(|e| {
+            let index = index.display().to_string();
+            Msg::IndexNotReplaced {
+                index: &index,
+                error: &e.to_string(),
+            }
+            .text()
+            .into()
+        })
+    });
+    if let Err(e) = replaced {
+        let _ = fs::remove_file(&new);
+        return Err(e);
+    }
+    Ok(writable(index)?)
 }
 
 /// The index at `path` opened to write. Its commits, and its first read, wait up to the busy
@@ -1702,12 +1798,15 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-    use rusqlite::Connection;
+    use rusqlite::{Connection, OpenFlags};
 
     use super::{
         SCHEMA, State, open, open_read, read_config, refresh_stamped, state, with_busy_timeout,
     };
+    use crate::config::Serve;
     use crate::{document, lang, package};
 
     const REPO: &str = "example.com/acme/web";
@@ -1735,7 +1834,7 @@ mod tests {
     #[test]
     fn a_read_only_open_waits_for_a_commit_in_progress_up_to_the_busy_timeout() {
         let (dir, index) = index_dir("busy");
-        let writer = open(&index, &dir).unwrap();
+        let writer = open(&index, &dir, REPO, &Serve::default()).unwrap();
         // The lock a commit takes: no reader gets in until it ends.
         (writer.execute_batch("BEGIN EXCLUSIVE; INSERT INTO communities VALUES ('c', 'm');"))
             .unwrap();
@@ -1767,7 +1866,7 @@ mod tests {
     #[test]
     fn a_read_only_open_sees_one_commit_until_it_closes_and_a_commit_waits_for_it() {
         let (dir, index) = index_dir("snapshot");
-        let writer = open(&index, &dir).unwrap();
+        let writer = open(&index, &dir, REPO, &Serve::default()).unwrap();
         let db = read(&index).unwrap();
         assert_eq!(communities(&db), 0);
 
@@ -1786,11 +1885,123 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    /// A writer killed mid-commit leaves a hot journal only a write can roll back.
+    /// An index of another schema version at `index`, holding one community row, as an older
+    /// Meada left it.
+    fn older_index(index: &Path) {
+        fs::create_dir_all(index.parent().unwrap()).unwrap();
+        let db = Connection::open(index).unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        // An even version, which `schema_version` never is.
+        db.execute_batch("INSERT INTO communities VALUES ('old', 'm'); PRAGMA user_version = 2;")
+            .unwrap();
+    }
+
+    /// A checkout with one TypeScript file, for a rebuild to index.
+    fn checkout(dir: &Path) -> PathBuf {
+        let root = dir.join("checkout");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("a.ts"), "export function a() {\n  return 1;\n}\n").unwrap();
+        root
+    }
+
+    /// The `files` rows of an index read through `db`.
+    fn files(db: &Connection) -> i64 {
+        (db.query_row("SELECT count(*) FROM files", [], |r| r.get(0))).unwrap()
+    }
+
+    /// A rebuild (spec #259) builds the new index beside the old one and renames it over it:
+    /// a reader holding the old one keeps answering from it, a reader opening afterwards gets
+    /// the whole new one, and no open meanwhile finds the index missing or empty.
     #[test]
-    fn a_read_only_open_over_an_interrupted_commit_names_the_repository_and_the_fix() {
-        let (dir, index) = index_dir("hot");
-        let writer = open(&index, &dir).unwrap();
+    fn a_rebuild_replaces_the_index_by_rename_under_readers() {
+        let (dir, index) = index_dir("rename");
+        older_index(&index);
+        let root = checkout(&dir);
+        let before = Connection::open_with_flags(&index, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        before.execute_batch("BEGIN DEFERRED").unwrap();
+        assert_eq!(communities(&before), 1);
+
+        let done = Arc::new(AtomicBool::new(false));
+        let watcher = std::thread::spawn({
+            let (index, done) = (index.clone(), done.clone());
+            move || {
+                let mut seen = Vec::new();
+                // One read more after the rebuild ends, so the new index is read at least once.
+                loop {
+                    let finished = done.load(Ordering::Relaxed);
+                    let db = Connection::open_with_flags(&index, OpenFlags::SQLITE_OPEN_READ_ONLY)
+                        .unwrap();
+                    let version: i32 =
+                        (db.query_row("PRAGMA user_version", [], |r| r.get(0))).unwrap();
+                    let rows = match version {
+                        2 => communities(&db),
+                        _ => files(&db),
+                    };
+                    seen.push((version == 2, rows));
+                    if finished {
+                        break seen;
+                    }
+                }
+            }
+        });
+        let writer = open(&index, &root, REPO, &Serve::default()).unwrap();
+        done.store(true, Ordering::Relaxed);
+        let seen = watcher.join().unwrap();
+
+        // The old index, read through the connection opened before the rename.
+        assert_eq!(communities(&before), 1);
+        assert_eq!(files(&writer), 1);
+        assert_eq!(files(&read(&index).unwrap()), 1);
+        assert!(seen.iter().all(|&(_, rows)| rows == 1), "{seen:?}");
+        assert!(seen.iter().any(|&(old, _)| !old), "{seen:?}");
+        drop(before);
+        let mut left: Vec<String> = (fs::read_dir(index.parent().unwrap()).unwrap())
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["index.db", "index.db.lock"]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A second rebuild waits for the first one's lock, a missing index stays missing until
+    /// the whole new one is renamed in, and the files a crashed rebuild left are removed only
+    /// under that lock.
+    #[test]
+    fn a_rebuild_waits_for_the_rebuild_lock_and_then_removes_what_a_crash_left() {
+        let (dir, index) = index_dir("lock");
+        let root = checkout(&dir);
+        let parent = index.parent().unwrap();
+        fs::create_dir_all(parent).unwrap();
+        let crashed = parent.join("index.db.new.1");
+        fs::write(&crashed, "half an index").unwrap();
+        fs::write(parent.join("index.db.new.1-journal"), "").unwrap();
+        let held = fs::File::create(parent.join("index.db.lock")).unwrap();
+        held.lock().unwrap();
+
+        let rebuild = std::thread::spawn({
+            let (index, root) = (index.clone(), root.clone());
+            move || files(&open(&index, &root, REPO, &Serve::default()).unwrap())
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(!rebuild.is_finished());
+        assert!(crashed.exists());
+        assert!(!index.exists());
+        held.unlock().unwrap();
+
+        assert_eq!(rebuild.join().unwrap(), 1);
+        let mut left: Vec<String> = (fs::read_dir(parent).unwrap())
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["index.db", "index.db.lock"]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `<dir>/<name>/index.db`, an index of `REPO` holding one community `('c', 'm')`, with
+    /// the hot journal a writer killed while changing its member to `x` leaves.
+    fn interrupted(dir: &Path, name: &str) -> PathBuf {
+        let index = dir.join(name).join("source/index.db");
+        let writer = open(&index, dir, REPO, &Serve::default()).unwrap();
         writer
             .execute_batch("INSERT INTO communities VALUES ('c', 'm');")
             .unwrap();
@@ -1799,8 +2010,7 @@ mod tests {
         let change = "BEGIN; UPDATE communities SET member = 'x';";
         writer.execute_batch(change).unwrap();
         writer.cache_flush().unwrap();
-        let copy = dir.join("copy");
-        fs::create_dir_all(&copy).unwrap();
+        let copy = dir.join(name);
         let journal = fs::read(index.with_file_name("index.db-journal")).unwrap();
         assert_ne!(
             journal.first(),
@@ -1811,8 +2021,17 @@ mod tests {
         for name in ["index.db", "index.db-journal"] {
             fs::copy(index.with_file_name(name), copy.join(name)).unwrap();
         }
+        copy.join("index.db")
+    }
 
-        let error = read(&copy.join("index.db")).err().map(|e| e.to_string());
+    /// A writer killed mid-commit leaves a hot journal only a write can roll back.
+    #[test]
+    fn a_read_only_open_over_an_interrupted_commit_names_the_repository_and_the_fix() {
+        let (dir, _) = index_dir("hot");
+
+        let error = read(&interrupted(&dir, "copy"))
+            .err()
+            .map(|e| e.to_string());
 
         assert_eq!(
             error.as_deref(),
@@ -1821,7 +2040,85 @@ mod tests {
                  --workspace ops/meada.workspace.toml"
             )
         );
-        drop(writer);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The writable open rolls back the hot journal of an index of the current schema and keeps
+    /// that index: no rebuild, so no rebuild lock either.
+    #[test]
+    fn a_writable_open_rolls_back_a_hot_journal_and_keeps_the_index() {
+        let (dir, _) = index_dir("rollback");
+        let index = interrupted(&dir, "copy");
+
+        let db = open(&index, &dir, REPO, &Serve::default()).unwrap();
+
+        let member: String =
+            (db.query_row("SELECT member FROM communities", [], |r| r.get(0))).unwrap();
+        assert_eq!(member, "m");
+        assert!(!index.with_file_name("index.db-journal").exists());
+        assert!(!index.with_file_name("index.db.lock").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A commit in progress past the busy timeout is an error for a writer too, never a reason
+    /// to rebuild: the commit lands in the index afterwards.
+    #[test]
+    fn a_writable_open_of_an_index_locked_past_the_busy_timeout_fails_and_rebuilds_nothing() {
+        let (dir, index) = index_dir("writer_busy");
+        let writer = open(&index, &dir, REPO, &Serve::default()).unwrap();
+        (writer.execute_batch("BEGIN EXCLUSIVE; INSERT INTO communities VALUES ('c', 'm');"))
+            .unwrap();
+
+        let second = with_busy_timeout(Duration::from_millis(50), || {
+            open(&index, &dir, REPO, &Serve::default())
+        });
+
+        assert!(second.is_err());
+        writer.execute_batch("COMMIT").unwrap();
+        assert_eq!(communities(&read(&index).unwrap()), 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A journal left beside a missing index, or beside one of another schema, is not the new
+    /// index's: the rebuild removes it under the lock, and the rebuilt index opens clean.
+    #[test]
+    fn a_rebuild_removes_a_journal_left_beside_the_index() {
+        let (dir, index) = index_dir("stray_journal");
+        // Taken before the checkout exists, so the journal's pages hold no file.
+        let hot = interrupted(&dir, "hot");
+        let root = checkout(&dir);
+        let journal = fs::read(hot.with_file_name("index.db-journal")).unwrap();
+        let parent = index.parent().unwrap();
+        for older in [false, true] {
+            let _ = fs::remove_dir_all(parent);
+            fs::create_dir_all(parent).unwrap();
+            if older {
+                older_index(&index);
+            }
+            fs::write(index.with_file_name("index.db-journal"), &journal).unwrap();
+
+            let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+
+            // The journal's pages (the community row) never reach the new index.
+            assert_eq!(communities(&db), 0, "older: {older}");
+            assert_eq!(files(&db), 1, "older: {older}");
+            assert_eq!(files(&read(&index).unwrap()), 1, "older: {older}");
+            assert!(!index.with_file_name("index.db-journal").exists());
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A rebuild lock that cannot be taken (a read-only index directory) is named.
+    #[test]
+    fn a_rebuild_lock_that_cannot_be_taken_is_named() {
+        let (dir, index) = index_dir("lock_error");
+        let lock = index.with_file_name("index.db.lock");
+        fs::create_dir_all(&lock).unwrap();
+
+        let error = open(&index, &dir, REPO, &Serve::default()).err().unwrap();
+
+        let expected = format!("cannot take the rebuild lock `{}`: ", lock.display());
+        assert!(error.to_string().starts_with(&expected), "{error}");
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -12,7 +12,7 @@ use std::process::Command;
 use crate::freshness::edit_chain;
 use common::without_processes;
 use common::{age, assert_golden, chain, decisions, documented_chain, fixture_repo, git};
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 
 pub(crate) const CHAIN: [(&str, &str); 4] = [
     ("example.com/chain/web", "chain-web"),
@@ -133,7 +133,8 @@ fn files(dir: &Path) -> Vec<String> {
 }
 
 /// After a command: the only files under `<dir>/indexes` are each listed repository's
-/// `index.db` and SQLite's companions, and no mirror has a `.meada/`.
+/// `index.db`, SQLite's companions and the rebuild lock (`index.db.new.*` exists only during a
+/// rebuild), and no mirror has a `.meada/`.
 pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
     let written = files(&dir.join("indexes"));
     for file in &written {
@@ -142,6 +143,7 @@ pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
         assert!(
             [
                 "index.db",
+                "index.db.lock",
                 "index.db-journal",
                 "index.db-wal",
                 "index.db-shm"
@@ -602,6 +604,37 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
         }
         assert_eq!(*refreshed, cold, "repository {n}");
     }
+    let all: Vec<&str> = CHAIN.iter().map(|(repo, _)| *repo).collect();
+    assert_nothing_else_written(&dir, &all);
+}
+
+/// "Build once, distribute" (spec #259): an index built elsewhere for the same mirror commits,
+/// renamed over `<index_dir>/<identity>/index.db`, answers as the one it replaces, and an engine
+/// opened before the rename keeps answering from the old one.
+#[test]
+fn an_index_built_elsewhere_and_renamed_in_answers_as_the_one_it_replaces() {
+    let dir = chain_manifest("manifest_renamed_in");
+    assert!(run(&dir, "index").2);
+    let manifest = dir.join(MANIFEST);
+    let web = "example.com/chain/web";
+    let trace =
+        |engine: &Engine| (engine.trace(Start::From("dashboard"), Direction::Down, None)).unwrap();
+    let before = Engine::open_manifest(&manifest, web).unwrap();
+    let served = trace(&before);
+    let built = "ops/built.workspace.toml";
+    let toml = fs::read_to_string(&manifest).unwrap();
+    fs::write(dir.join(built), toml.replace("../indexes", "../built")).unwrap();
+    assert_eq!(run_args(&dir, &["index", "--workspace", built]).2, Some(0));
+
+    let index = |under: &str| dir.join(under).join(web).join("index.db");
+    fs::rename(index("built"), index("indexes")).unwrap();
+
+    assert_eq!(trace(&before), served);
+    drop(before);
+    let after = Engine::open_manifest(&manifest, web).unwrap();
+    assert_eq!(trace(&after), served);
+    assert_golden("chain.trace-down.txt", &served);
+    assert_golden("chain-web.export.json", &after.export().unwrap());
     let all: Vec<&str> = CHAIN.iter().map(|(repo, _)| *repo).collect();
     assert_nothing_else_written(&dir, &all);
 }
