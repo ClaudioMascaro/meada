@@ -12,7 +12,7 @@ modules updates it.
   consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
   `entry`, `searched`) are what the rest of the crate calls. A kind's helpers are private to its
-  file; the few that stay `pub` are named under their kind (`http::route`, `contract` and
+  file; the few that stay `pub` are named under their kind (`http::contract` and
   `normalize_path` for the drift view, the config and the documents; `channel::contract` for
   the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
   `Consumer`, `Binding`, `Publish` or `Import`),
