@@ -858,7 +858,7 @@ struct Provided<'e> {
     /// first time an ambiguous import asks (`candidates`), once for all ecosystems.
     owned: OnceCell<HashMap<(&'static str, &'e str), Vec<&'e str>>>,
     /// The Go source files that are no tests, by directory. Built the first time a Go import
-    /// asks (`package`), once for all.
+    /// asks (`Go::resolve`), once for all.
     go_dirs: OnceCell<HashMap<&'e str, Vec<&'e str>>>,
 }
 
@@ -901,49 +901,6 @@ impl<'e> Provided<'e> {
     /// Whether `path` is a source file the provider indexes (a declaration file is none).
     fn source(&self, path: &str) -> bool {
         self.files.contains(path) && !path.ends_with(".d.ts")
-    }
-
-    /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
-    /// `./<directory>`) of the module at `manifest`: the exported name of the one source file of
-    /// that directory (a test file or one of a nested module is none) that defines it. `exact`
-    /// when found; none when the directory lacks or the name is not exported there.
-    fn package(
-        &self,
-        repository: &str,
-        manifest: &Manifest,
-        subpath: &str,
-        chain: &str,
-        known: &dyn Fn(&str) -> bool,
-    ) -> Option<Resolved> {
-        let base = directory(&manifest.path);
-        let dir = match subpath.strip_prefix("./") {
-            Some(rest) => inside(base, rest)?,
-            None if base == "." => String::new(),
-            None => base.to_string(),
-        };
-        let by_dir = self.go_dirs.get_or_init(|| {
-            let mut by_dir: HashMap<&str, Vec<&str>> = HashMap::new();
-            for &f in self.files.iter().filter(|f| f.ends_with(".go")) {
-                if !f.ends_with("_test.go") {
-                    by_dir
-                        .entry(f.rsplit_once('/').map_or("", |(d, _)| d))
-                        .or_default()
-                        .push(f);
-                }
-            }
-            by_dir
-        });
-        let mut ids: Vec<String> = (by_dir.get(dir.as_str()).into_iter().flatten())
-            .filter(|f| self.owned_source(manifest, f))
-            .filter_map(|f| self.reach(repository, f, chain, known))
-            .collect();
-        ids.sort();
-        ids.dedup();
-        (ids.len() == 1).then_some(Resolved {
-            how: How::ModulePath,
-            level: Level::Exact,
-            targets: ids,
-        })
     }
 
     /// The source file the first of the ways `tried` that leads to one names, with how and at
