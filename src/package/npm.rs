@@ -34,11 +34,6 @@ const WORKSPACE: &str = "workspace:";
 /// present is taken, and no other is followed.
 const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
 
-/// The longest chain of `export *` a lookup in a provider follows; a name further down is not
-/// found.
-// ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
-pub(super) const MAX_REEXPORTS: usize = 64;
-
 /// The deepest an `exports` target nests conditions; deeper, the subpath has no target.
 // ponytail: real maps nest two or three levels; this bounds the walk over a hostile one.
 const MAX_CONDITIONS: usize = 32;

@@ -945,7 +945,7 @@ one for the area a change touches.
   reads the nearest `[workspace.package] version`, and no other inherited field is read. A `use`
   follows `pub mod` and `pub use` rows alone, so an item behind a private module is not
   reached (no marker). Import resolution: `exported` (`package/npm.rs`) follows at most
-  `MAX_CONDITIONS` (32) nested conditions and `lookup` at most `MAX_REEXPORTS` (64) `export *`
+  `MAX_CONDITIONS` (32) nested conditions and `lookup` (`package.rs`) at most `MAX_REEXPORTS` (64) `export *`
   levels; deeper is no target. An array of fallbacks in `exports` and a key with two `*` are not
   read (one `*` in a target keeps every expansion the size of the subpath). `read_tsconfig` reads
   like `read`: past `MAX_BYTES` or `serde_json`'s depth limit, not UTF-8 or not an object it is

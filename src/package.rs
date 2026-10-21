@@ -47,7 +47,7 @@ mod pypi;
 
 use cargo::Cargo;
 use go::Go;
-use npm::{MAX_REEXPORTS, Npm, exported};
+use npm::{Npm, exported};
 use pypi::Pypi;
 
 pub struct Packages;
@@ -252,6 +252,11 @@ pub fn read_manifest(path: &str, src: &[u8]) -> Summary {
 /// The longest package name read, in bytes; a longer one makes no provider.
 // ponytail: npm's own limit, for PyPI names too; a name past it is not a package.
 const MAX_NAME: usize = 214;
+
+/// The longest chain of `export *` a lookup in a provider follows; a name further down is not
+/// found.
+// ponytail: real packages re-export a few levels deep; this bounds the walk over a hostile one.
+const MAX_REEXPORTS: usize = 64;
 
 /// The largest manifest read (`package.json`, `pyproject.toml`, `requirements*.txt`) and the
 /// largest `tsconfig.json`; a larger one counts as empty. Real manifests are a few kilobytes,
