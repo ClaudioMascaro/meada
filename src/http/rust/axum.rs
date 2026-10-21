@@ -6,14 +6,14 @@
 //! `Code::chain`. `nest`, `nest_service` and `merge` mount a router under a prefix (`merge` adds
 //! none), at any depth, through the `prefixes` of the http root. A router nothing mounts is the
 //! app, served at its root; one mounted where Meada cannot read is served nowhere. It reuses
-//! `handler_site` and `normalize_path` of the root, and `frameworks::made` of the Rust pack.
+//! `handler_site` and `normalize_path` of the root, and `frameworks::made` of the Rust HTTP module.
 
 use super::super::{
     ANY, CallAt, Mounts, PARAM, handler_site, join, normalize_path, path_literal, prefixes,
     provider,
 };
+use super::frameworks::{self, Made};
 use crate::contract::Found;
-use crate::lang::rust::frameworks::{self, Made};
 use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, Follow, Of, Origin, scope_of};
 use std::collections::{BTreeSet, HashSet};
@@ -95,7 +95,7 @@ fn axum_routers<'a>(
         &call.scope,
         Of::Value(value),
         Follow::Values {
-            passes: crate::lang::rust::passes,
+            passes: frameworks::passes_on,
         },
     ))
 }
@@ -121,7 +121,7 @@ fn axum_unread<'a>(
             scope,
             Of::Value(value),
             Follow::Values {
-                passes: crate::lang::rust::passes,
+                passes: frameworks::passes_on,
             },
         ));
         if !routers.is_empty() {

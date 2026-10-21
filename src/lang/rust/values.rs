@@ -18,9 +18,9 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use super::builders::{BUILDER_DEPTH, BUILDER_SIZE, BUILDER_WORK, Builder, size};
-use super::frameworks::VERBS;
 use super::{
-    DEFINITION_DEPTH, Heads, PATH_DEPTH, Path, Scan, field, levels, member, normalize, segments,
+    DEFINITION_DEPTH, Heads, PATH_DEPTH, Path, Scan, VERBS, field, levels, member, normalize,
+    segments,
 };
 use crate::lang::{Invocation, Part, Value, children, named, text};
 use crate::qualify;
@@ -37,7 +37,7 @@ pub(super) const VALUE_DEPTH: usize = 64;
 pub(super) const ROUTE_ITEMS: usize = 1024;
 pub(super) const ROUTE_METHODS: usize = 16;
 
-/// The crates whose `Method` constants name an HTTP method (`frameworks::VERBS`).
+/// The crates whose `Method` constants name an HTTP method (`VERBS`).
 const METHOD_CRATES: &[&str] = &["reqwest", "http", "hyper", "axum", "actix_web"];
 
 /// The methods that keep the text of a string, and those that keep it when called on a name
